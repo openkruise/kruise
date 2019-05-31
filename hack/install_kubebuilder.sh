@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 version=1.0.8 # latest stable version
 arch=amd64
 
