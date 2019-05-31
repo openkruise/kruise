@@ -6,6 +6,4 @@ go:
 go_import_path: github.com/kruiseio/kruise
 
 script:
-  - ./hack/install_kubebuilder.sh
-  - export KUBEBUILDER_ASSETS=/usr/local/kubebuilder/bin
   - make all
