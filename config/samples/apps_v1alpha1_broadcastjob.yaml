@@ -1,0 +1,62 @@
+
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: broadcastjob-sample-a
+
+spec:
+  template:
+    spec:
+      containers:
+        - name: pi
+          image: perl
+          command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+      restartPolicy: Never
+  completionPolicy:
+    type: Always
+    backOffLimit: 4
+    ttlSecondsAfterFinished: 10
+
+---
+
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: broadcastjob-sample-b
+
+spec:
+  template:
+    spec:
+      containers:
+        - name: sleep
+          image: busybox
+          command: ["sleep",  "50000"]
+      restartPolicy: Never
+  completionPolicy:
+    type: Always
+    backOffLimit: 4
+    activeDeadlineSeconds: 10
+
+---
+
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: broadcastjob-sample-c
+
+spec:
+  template:
+    spec:
+      containers:
+        - name: sleep
+          image: busybox
+          command: ["sleep",  "5"]
+      restartPolicy: Never
+  completionPolicy:
+    type: Never
