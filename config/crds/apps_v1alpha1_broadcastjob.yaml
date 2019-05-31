@@ -51,7 +51,7 @@ spec:
           properties:
             completionPolicy:
               description: CompletionPolicy indicates the completion policy of the
-                job. Default is Always
+                job. Default is Always CompletionPolicyType
               properties:
                 activeDeadlineSeconds:
                   description: Specifies the duration in seconds relative to the startTime
