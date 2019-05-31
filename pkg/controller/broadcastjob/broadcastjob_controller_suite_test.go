@@ -17,20 +17,14 @@ limitations under the License.
 package broadcastjob
 
 import (
-	stdlog "log"
-	"os"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/kruiseio/kruise/pkg/apis"
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -38,19 +32,19 @@ import (
 var cfg *rest.Config
 
 func TestMain(m *testing.M) {
-	t := &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
-	}
-	apis.AddToScheme(scheme.Scheme)
-
-	var err error
-	if cfg, err = t.Start(); err != nil {
-		stdlog.Fatal(err)
-	}
-
-	code := m.Run()
-	t.Stop()
-	os.Exit(code)
+	//t := &envtest.Environment{
+	//	CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
+	//}
+	//apis.AddToScheme(scheme.Scheme)
+	//
+	//var err error
+	//if cfg, err = t.Start(); err != nil {
+	//	stdlog.Fatal(err)
+	//}
+	//
+	//code := m.Run()
+	//t.Stop()
+	//os.Exit(code)
 }
 
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and
