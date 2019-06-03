@@ -2,10 +2,7 @@
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
 metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: broadcastjob-sample-a
-
 spec:
   template:
     spec:
@@ -16,7 +13,6 @@ spec:
       restartPolicy: Never
   completionPolicy:
     type: Always
-    backOffLimit: 4
     ttlSecondsAfterFinished: 10
 
 ---
@@ -24,10 +20,7 @@ spec:
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
 metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: broadcastjob-sample-b
-
 spec:
   template:
     spec:
@@ -38,7 +31,6 @@ spec:
       restartPolicy: Never
   completionPolicy:
     type: Always
-    backOffLimit: 4
     activeDeadlineSeconds: 10
 
 ---
@@ -46,10 +38,7 @@ spec:
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
 metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: broadcastjob-sample-c
-
 spec:
   template:
     spec:
