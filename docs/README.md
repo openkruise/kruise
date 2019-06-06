@@ -1,0 +1,38 @@
+Upstream Kubernetes provides a set of default controllers for workload management,
+like StatefulSet, Deployment, DaemonSet for instances. As Kubernetes becomes the
+dominant cloud operating system for cloud native applications, its managed applications
+express more and more diverse requirements for workload upgrade and deployment, which
+in many cases, cannot be satisfied by the default controllers.
+
+Kruise attempts to fill such gap by offering a few new controllers as the supplement
+to manage new workloads in Kubernetes. The target user cases are representative, 
+originally collected from the users of Alibaba cloud container services and the
+developers of the in-house large scale on-line/off-line container applications. 
+Most of the use cases can be easily applied to other similar cloud user scenarios.
+
+Currently, Kruise supports the following three new workloads. 
+
+## Workloads
+
+- [Advanced StatefulSet](./astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
+- [BroadcastJob](./broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
+- [SidecarSet](./sidecarSet/README.md): A controller that injects sidecar container into the pod spec based on selectors
+
+  
+
+## Benefits
+
+* In addition to serving new workloads, Kruise also offers extensions to default 
+  controllers for new capabilities. Kruise owners will be responsible to port
+  any change to the default controller from upstream if it has an enhanced 
+  version inside (e.g., Advanced StatefulSet).
+
+* Kruise provides controllers for representative cloud native applications
+  with full Kubernetes API compatibility. Ideally, it can be the first option to 
+  consider when one wants to extend upstream Kubernetes for workload management.
+
+* Kruise plans to offer more Kubernetes automation solutions in the
+  areas of scaling, QoS and operators, etc. Stay tuned!
+
+
+
