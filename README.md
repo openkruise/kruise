@@ -35,7 +35,7 @@ Or run from the repo root directory:
 
 To Install Kustomize, check kustomize [website](https://github.com/kubernetes-sigs/kustomize).
 
-Note that use Kustomize 1.0.11. Version 2.0.3 and less has compatibility issues with kube-builder
+Note that use Kustomize 1.0.11. Version 2.0.3 has compatibility issues with kube-builder
 
 # Examples
 
@@ -94,7 +94,7 @@ Run the tests
 
 `make test`
 
-Build the docker image, by default the image name is `kruiseio/kruise-controller:v1`
+Build the docker image, by default the image name is `openkruise/kruise-controller:v1alpha1`
 
 `export IMG=<your_image_name> && make docker-build`
 
