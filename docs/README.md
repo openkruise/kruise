@@ -1,10 +1,11 @@
-Upstream Kubernetes provides a set of default controllers for workload management,
-like StatefulSet, Deployment, DaemonSet for instances. As Kubernetes becomes the
-dominant cloud operating system for cloud native applications, its managed applications
-express more and more diverse requirements for workload upgrade and deployment, which
-in many cases, cannot be satisfied by the default controllers.
+## Overview
 
-Kruise attempts to fill such gap by offering a few new controllers as the supplement
+Kubernetes provides a set of default controllers for workload management,
+like StatefulSet, Deployment, DaemonSet for instances. While at the same time, managed applications
+express more and more diverse requirements for workload upgrade and deployment, which
+in many cases, cannot be satisfied by the default workload controllers.
+
+Kruise attempts to fill such gap by offering a set of controllers as the supplement
 to manage new workloads in Kubernetes. The target user cases are representative, 
 originally collected from the users of Alibaba cloud container services and the
 developers of the in-house large scale on-line/off-line container applications. 
@@ -18,7 +19,6 @@ Currently, Kruise supports the following three new workloads.
 - [BroadcastJob](./broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
 - [SidecarSet](./sidecarSet/README.md): A controller that injects sidecar container into the pod spec based on selectors
 
-  
 
 ## Benefits
 
@@ -33,6 +33,3 @@ Currently, Kruise supports the following three new workloads.
 
 * Kruise plans to offer more Kubernetes automation solutions in the
   areas of scaling, QoS and operators, etc. Stay tuned!
-
-
-
