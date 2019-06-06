@@ -1,24 +1,25 @@
 # OpenKruise/Kruise
 
-Kruise is an operation suite which extends 
-[Kubernetes controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)
-for better workload management.
+Kruise is at the core of the OpenKruise project. It is a set of controllers which extends and complements 
+[Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)
+on application workload management.
 
-* For more information about Kruise, please visit [kruise.io](https://kruise.io).
+Today, Kruise offers three application workload controllers:
 
-Currently, Kruise offers three Kubernetes workload controllers. 
-- [Advanced StatefulSet](./docs/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
-- [BroadcastJob](./docs/broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
-- [SidecarSet](./docs/sidecarSet/README.md): A controller that injects sidecar container into the pod spec based on selectors.
+* [Advanced StatefulSet](./docs/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
 
-Their detailed descriptions can be found 
-in [documents](./docs/README.md).
+* [BroadcastJob](./docs/broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
 
-# Getting start
+* [SidecarSet](./docs/sidecarSet/README.md): A controller that injects sidecar container into the pod spec based on selectors.
 
-## Install with YAML files
+Please see [documents](./docs/README.md) for more technical information.
 
-#### Install CRDs
+## Getting started
+
+### Install with YAML files
+
+##### Install CRDs
+
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_broadcastjob.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
@@ -26,7 +27,8 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 ```
 Note that ALL three CRDs need to be installed for kruise-controller to run properly.
 
-#### Install kruise-controller
+##### Install kruise-controller
+
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
 
 Or run from the repo root directory:
@@ -37,11 +39,11 @@ To Install Kustomize, check kustomize [website](https://github.com/kubernetes-si
 
 Note that use Kustomize 1.0.11. Version 2.0.3 has compatibility issues with kube-builder
 
-# Examples
+## Usage examples
 
-## Advanced StatefulSet
+### Advanced StatefulSet
 
-## Broadcast Job
+### Broadcast Job
 Run a BroadcastJob that each Pod computes pi, with `ttlSecondsAfterFinished` set to 30. The job
 will be deleted in 30 seconds after the job is finished.
 
@@ -62,7 +64,7 @@ spec:
     type: Always
     ttlSecondsAfterFinished: 30
 ```
-## SidecarSet
+### SidecarSet
 
 The yaml file below describes a SidecarSet that contains a sidecar container named `sidecar1`
 
@@ -82,7 +84,7 @@ spec:
     command: ["sleep", "999d"] # do nothing at all 
 ```
 
-# Developer Guide
+## Developer Guide
 
 There's a `Makefile` in the root folder which describes the options to build and install. Here are some common ones:
 
@@ -108,6 +110,9 @@ Generate manifests e.g. CRD, RBAC etc.
 
 `make manifests` 
 
-# Contribute
+## Community
+
 If you have any questions or want to contribute, you are welcome to join our
 [slack channel](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc)
+
+Mailing List: todo
