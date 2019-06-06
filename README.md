@@ -7,9 +7,9 @@ for better workload management.
 * For more information about Kruise, please visit [kruise.io](https://kruise.io).
 
 Currently, Kruise offers three Kubernetes workload controllers. 
-- [Advanced StatefulSet](./astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
-- [BroadcastJob](./broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
-- [SidecarSet](./sidecarSet/README.md): A controller that injects sidecar container into the pod spec based on selectors.
+- [Advanced StatefulSet](./docs/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
+- [BroadcastJob](./docs/broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
+- [SidecarSet](./docs/sidecarSet/README.md): A controller that injects sidecar container into the pod spec based on selectors.
 
 Their detailed descriptions can be found 
 in [documents](./docs/README.md).
@@ -82,7 +82,7 @@ spec:
     command: ["sleep", "999d"] # do nothing at all 
 ```
 
-# Contribute
+# Developer Guide
 
 There's a `Makefile` in the root folder which describes the options to build and install. Here are some common ones:
 
@@ -108,3 +108,6 @@ Generate manifests e.g. CRD, RBAC etc.
 
 `make manifests` 
 
+# Contribute
+If you have any questions or want to contribute, you are welcome to join our
+[slack channel](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc)
