@@ -6,7 +6,7 @@ on application workload management.
 
 Today, Kruise offers three application workload controllers:
 
-* [Advanced StatefulSet](./docs/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
+* [Advanced StatefulSet](./docs/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, sharding by namespace.
 
 * [BroadcastJob](./docs/broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
 
