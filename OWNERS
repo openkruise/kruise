@@ -1,4 +1,13 @@
-- coldTea214
-- Fei-Guo
-- FillZpp
-- jian-he
+# See: https://go.k8s.io/owners
+approvers:
+  - coldTea214 # for SidecarSet
+  - Fei-Guo
+  - FillZpp # for Advanced StatefulSet
+  - jian-he
+  - jzwlqx # for BroadcastJob
+reviewers:
+  - coldTea214 # for SidecarSet
+  - Fei-Guo
+  - FillZpp # for Advanced StatefulSet
+  - jian-he
+  - jzwlqx # for BroadcastJob
