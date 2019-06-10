@@ -1,4 +1,3 @@
-
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
 metadata:
