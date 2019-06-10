@@ -75,7 +75,8 @@ func TestValidateStatefulSet(t *testing.T) {
 	var val2 int32 = 2
 	var val3 int32 = 3
 	var val_1 int32 = -1
-	maxUnavailable := intstr.FromInt(1)
+	maxUnavailable1 := intstr.FromInt(1)
+	maxUnavailable120Percent := intstr.FromString("120%")
 	successCases := []appsv1alpha1.StatefulSet{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -126,7 +127,7 @@ func TestValidateStatefulSet(t *testing.T) {
 						return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
 							Partition:       &val2,
 							PodUpdatePolicy: appsv1alpha1.RecreatePodUpdateStrategyType,
-							MaxUnavailable:  &maxUnavailable,
+							MaxUnavailable:  &maxUnavailable1,
 						}
 					}()},
 			},
@@ -314,6 +315,45 @@ func TestValidateStatefulSet(t *testing.T) {
 					}()},
 			},
 		},
+		"invalid rolling update 1": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            &val3,
+				UpdateStrategy: appsv1alpha1.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType,
+					RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+						return &appsv1alpha1.RollingUpdateStatefulSetStrategy{MaxUnavailable: &maxUnavailable120Percent}
+					}()},
+			},
+		},
+		"invalid rolling update 2": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            &val3,
+				UpdateStrategy: appsv1alpha1.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType,
+					RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+						return &appsv1alpha1.RollingUpdateStatefulSetStrategy{PodUpdatePolicy: "Unknown"}
+					}()},
+			},
+		},
+		"invalid rolling update 3": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            &val3,
+				UpdateStrategy: appsv1alpha1.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType,
+					RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+						return &appsv1alpha1.RollingUpdateStatefulSetStrategy{PodUpdatePolicy: appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType}
+					}()},
+			},
+		},
 		"negative parition": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.StatefulSetSpec{
@@ -326,7 +366,7 @@ func TestValidateStatefulSet(t *testing.T) {
 						return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
 							Partition:       &val_1,
 							PodUpdatePolicy: appsv1alpha1.RecreatePodUpdateStrategyType,
-							MaxUnavailable:  &maxUnavailable,
+							MaxUnavailable:  &maxUnavailable1,
 						}
 					}()},
 			},
@@ -387,6 +427,9 @@ func TestValidateStatefulSet(t *testing.T) {
 					field != "spec.updateStrategy" &&
 					field != "spec.updateStrategy.rollingUpdate" &&
 					field != "spec.updateStrategy.rollingUpdate.partition" &&
+					field != "spec.updateStrategy.rollingUpdate.maxUnavailable" &&
+					field != "spec.updateStrategy.rollingUpdate.podUpdatePolicy" &&
+					field != "spec.template.spec.readinessGates" &&
 					field != "spec.podManagementPolicy" &&
 					field != "spec.template.spec.activeDeadlineSeconds" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])

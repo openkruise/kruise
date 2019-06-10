@@ -1,5 +1,6 @@
 /*
 Copyright 2019 The Kruise Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -749,56 +750,9 @@ func DeleteAllStatefulSets(c clientset.Interface, kc kruiseclientset.Interface, 
 	}
 }
 
-func CreateStatefulSetPVs(c clientset.Interface, uuid string, count int) error {
-	hostPathType := v1.HostPathDirectoryOrCreate
-	for i := 0; i < count; i++ {
-		pv := &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("local-pv-%v-%v", uuid, i),
-				Labels: map[string]string{
-					"kruise-statefulset-e2e": "yes",
-				},
-			},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				Capacity: v1.ResourceList{
-					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
-				},
-				PersistentVolumeSource: v1.PersistentVolumeSource{
-					HostPath: &v1.HostPathVolumeSource{
-						Path: fmt.Sprintf("/tmp/kruise-e2e/%v/%v", uuid, i),
-						Type: &hostPathType,
-					},
-				},
-				AccessModes: []v1.PersistentVolumeAccessMode{
-					v1.ReadWriteOnce,
-					v1.ReadOnlyMany,
-					v1.ReadWriteMany,
-				},
-			},
-		}
-		if _, err := createPV(c, pv); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func CleanStatefulSetPVs(c clientset.Interface) error {
-	pvList, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{LabelSelector: "kruise-statefulset-e2e=yes"})
-	if err != nil {
-		return err
-	}
-	for _, pv := range pvList.Items {
-		if err = c.CoreV1().PersistentVolumes().Delete(pv.Name, nil); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // NewStatefulSetPVC returns a PersistentVolumeClaim named name, for testing StatefulSets.
 func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
+	quantity, _ := resource.ParseQuantity("20Gi")
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -809,7 +763,7 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+					v1.ResourceStorage: quantity, //*resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},

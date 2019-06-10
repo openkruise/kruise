@@ -1,5 +1,6 @@
 /*
 Copyright 2019 The Kruise Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +23,32 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+const (
+	// StatefulSetInPlaceUpdateReady must add into template.spec.readinessGates when pod podUpdatePolicy
+	// is InPlaceIfPossible or InPlaceOnly. The condition in podStatus will be updated to False before in-place
+	// updating and updated to True after finished updating. This ensures pod being not-ready during
+	// in-place updating.
+	StatefulSetInPlaceUpdateReady v1.PodConditionType = "InPlaceUpdateReady"
+
+	// StatefulSetInPlaceUpdateStateAnnotation records the state of inplace-update.
+	// The value of annotation is inPlaceUpdateState.
+	StatefulSetInPlaceUpdateStateAnnotation string = "inplace-update-state"
+)
+
+// InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
+type InPlaceUpdateState struct {
+	Revision              string                                  `json:"revision"`
+	UpdateTimestamp       metav1.Time                             `json:"updateTimestamp"`
+	LastContainerStatuses map[string]InPlaceUpdateContainerStatus `json:"lastContainerStatuses"`
+}
+
+// InPlaceUpdateContainerStatus records container status in current pod.
+type InPlaceUpdateContainerStatus struct {
+	//ContainerID string `json:"containerID,omitempty"`
+	//Image       string `json:"image,omitempty"`
+	ImageID string `json:"imageID,omitempty"`
+}
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
@@ -68,6 +95,10 @@ const (
 	// recreate Pod when possible. Currently we patch Pod only when any of the main
 	// containers (those in Spec.Containers) has image changes
 	InPlaceIfPossiblePodUpdateStrategyType = "InPlaceIfPossible"
+	// InPlaceOnlyPodUpdateStrategyType indicates that we will update Pod in-place instead of
+	// recreate pod. Currently we only allow images of main containers (those in Spec.Containers)
+	// to be changed.
+	InPlaceOnlyPodUpdateStrategyType = "InPlaceOnly"
 )
 
 // StatefulSetSpec defines the desired state of StatefulSet

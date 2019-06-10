@@ -46,6 +46,10 @@ type StatefulPodControlInterface interface {
 	// pod is an in-out parameter, and any updates made to the pod are reflected as mutations to this parameter. If
 	// the create is successful, the returned error is nil.
 	UpdateStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod) error
+	// InPlaceUpdateStatefulPod in-place updates a Pod in a StatefulSet. It cloud only update image of containers.
+	InPlaceUpdateStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod, spec *InPlaceUpdateSpec) error
+	// UpdateStatefulPodCondition update condition in pod.Status.
+	UpdateStatefulPodCondition(set *appsv1alpha1.StatefulSet, pod *v1.Pod, condition v1.PodCondition) error
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
 	// the returned error is nil.
 	DeleteStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod) error
@@ -132,6 +136,44 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *appsv1alpha1.StatefulS
 		spc.recordPodEvent("update", set, pod, err)
 	}
 	return err
+}
+
+func (spc *realStatefulPodControl) InPlaceUpdateStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod, spec *InPlaceUpdateSpec) error {
+	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		updated, err := podInPlaceUpdate(pod, spec)
+		if err != nil {
+			return err
+		}
+		if _, err := spc.client.CoreV1().Pods(updated.Namespace).Update(updated); err != nil {
+			var gotErr error
+			if updated, gotErr = spc.podLister.Pods(pod.Namespace).Get(pod.Name); gotErr != nil {
+				return gotErr
+			}
+			// no need to deepcopy, because of pod in podInPlaceUpdate will be marshal
+			pod = updated
+			return err
+		}
+		return nil
+	})
+	spc.recordPodEvent("InPlaceUpdate", set, pod, updateErr)
+	return updateErr
+}
+
+func (spc *realStatefulPodControl) UpdateStatefulPodCondition(set *appsv1alpha1.StatefulSet, pod *v1.Pod, condition v1.PodCondition) error {
+	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		updatePodCondition(pod, condition)
+		if _, err := spc.client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod); err != nil {
+			if updated, gotErr := spc.podLister.Pods(pod.Namespace).Get(pod.Name); gotErr != nil {
+				return gotErr
+			} else {
+				pod = updated.DeepCopy()
+			}
+			return err
+		}
+		return nil
+	})
+	spc.recordPodEvent("UpdateCondition", set, pod, updateErr)
+	return updateErr
 }
 
 func (spc *realStatefulPodControl) DeleteStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod) error {
