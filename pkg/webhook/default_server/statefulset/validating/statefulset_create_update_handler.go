@@ -81,7 +81,8 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req types.R
 		if obj.Spec.UpdateStrategy.RollingUpdate != nil &&
 			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1alpha1.InPlaceOnlyPodUpdateStrategyType {
 			if err := validateTemplateInPlaceOnly(&oldObj.Spec.Template, &obj.Spec.Template); err != nil {
-				return admission.ErrorResponse(http.StatusUnprocessableEntity, fmt.Errorf("invalid template modified with InPlaceOnly: %v", err))
+				return admission.ErrorResponse(http.StatusUnprocessableEntity,
+					fmt.Errorf("invalid template modified with InPlaceOnly strategy: %v, currently only image update is allowed for InPlaceOnly", err))
 			}
 		}
 	}

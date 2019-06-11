@@ -45,8 +45,6 @@ type InPlaceUpdateState struct {
 
 // InPlaceUpdateContainerStatus records container status in current pod.
 type InPlaceUpdateContainerStatus struct {
-	//ContainerID string `json:"containerID,omitempty"`
-	//Image       string `json:"image,omitempty"`
 	ImageID string `json:"imageID,omitempty"`
 }
 
