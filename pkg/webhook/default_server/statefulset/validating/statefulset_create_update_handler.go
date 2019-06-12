@@ -18,6 +18,7 @@ package validating
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
@@ -75,6 +76,14 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req types.R
 		updateErrorList := ValidateStatefulSetUpdate(obj, oldObj)
 		if allErrs := append(validationErrorList, updateErrorList...); len(allErrs) > 0 {
 			return admission.ErrorResponse(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+		}
+
+		if obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1alpha1.InPlaceOnlyPodUpdateStrategyType {
+			if err := validateTemplateInPlaceOnly(&oldObj.Spec.Template, &obj.Spec.Template); err != nil {
+				return admission.ErrorResponse(http.StatusUnprocessableEntity,
+					fmt.Errorf("invalid template modified with InPlaceOnly strategy: %v, currently only image update is allowed for InPlaceOnly", err))
+			}
 		}
 	}
 

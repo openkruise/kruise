@@ -7,8 +7,8 @@
   The CRD kind name is still `StatefulSet`.
   This is done on purpose so that user can easily migrate workload to the Advanced StatefulSet from the 
   default StatefulSet. For example, one may simply replace the value of `apiVersion` in the StatefulSet yaml
-  file from `apps/v1` to `apps.kruise.io/v1alpha1` after installing Kruise controller.
-```
+  file from `apps/v1` to `apps.kruise.io/v1alpha1` after installing Kruise manager.
+```yaml
 -  apiVersion: apps/v1
 +  apiVersion: apps.kruise.io/v1alpha1
    kind: StatefulSet
@@ -20,6 +20,9 @@
        matchLabels:
          app: sample
      template:
+       metadata:
+         labels:
+           app: sample
     ... 
 ```
 
@@ -57,7 +60,7 @@ v2, we can perform the following steps using the `MaxUnavailable` feature for fa
    is 3.
 3. After P4 finish update, change `Partition` to 0. The controller will update P1,P2 and P3 concurrently.
    Note that with default StatefulSet, the Pods will be updated sequentially in the order of P3, P2, P1.
-4. Once one of P1, P2 and P3 finish update, P0 will be updated immediately.
+4. Once one of P1, P2 and P3 finishes update, P0 will be updated immediately.
 
 
 
@@ -73,7 +76,7 @@ v2, we can perform the following steps using the `MaxUnavailable` feature for fa
   during the update.
   
   Note that currently, only container image update is supported for in-place update. Any other Pod 
-  template spec update such as changing the command or container ENVs will be refused by kube-apiserver.
+  spec update such as changing the command or container ENVs will be refused by kube-apiserver.
    
   The API change is described below:
   
@@ -131,3 +134,32 @@ const (
 **More importantly**, a readiness-gate named `InPlaceUpdateReady` must be added into `template.spec.readinessGates` 
 when using `InPlaceIfPossible` or `InPlaceOnly`. The condition in podStatus will be updated to False before in-place
 update and updated to True after finished update. This ensures pod being not-ready during in-place update.
+
+An example for StatefulSet using in-place update:
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: StatefulSet
+metadata:
+  name: sample
+spec:
+  replicas: 3
+  serviceName: fake-service
+  selector:
+    matchLabels:
+      app: sample
+  template:
+    metadata:
+      labels:
+        app: sample
+    spec:
+      readinessGates:
+      - conditionType: InPlaceUpdateReady
+      containers:
+      - name: main
+        image: nginx:alpine
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      podUpdatePolicy: InPlaceIfPossible
+```

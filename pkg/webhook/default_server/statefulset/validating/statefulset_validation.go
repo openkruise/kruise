@@ -1,8 +1,11 @@
 package validating
 
 import (
+	"encoding/json"
 	"fmt"
+	"regexp"
 
+	"github.com/appscode/jsonpatch"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -16,6 +19,8 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
+
+var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
 
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
@@ -70,14 +75,31 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 			switch spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy {
 			case "":
 				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("podUpdatePolicy"), ""))
-			case appsv1alpha1.RecreatePodUpdateStrategyType, appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType:
+			case appsv1alpha1.RecreatePodUpdateStrategyType:
+			case appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.InPlaceOnlyPodUpdateStrategyType:
+				var containsReadinessGate bool
+				for _, r := range spec.Template.Spec.ReadinessGates {
+					if r.ConditionType == appsv1alpha1.StatefulSetInPlaceUpdateReady {
+						containsReadinessGate = true
+						break
+					}
+				}
+				if !containsReadinessGate {
+					allErrs = append(allErrs,
+						field.Invalid(fldPath.Child("template").Child("spec").Child("readinessGates"),
+							spec.Template.Spec.ReadinessGates,
+							fmt.Sprintf("must contains %v when podUpdatePolicy is %v",
+								appsv1alpha1.StatefulSetInPlaceUpdateReady,
+								spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy)))
+				}
 			default:
 				allErrs = append(allErrs,
-					field.Invalid(fldPath.Child("updateStrategy").Child("podUpdatePolicy"),
+					field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"),
 						spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy,
-						fmt.Sprintf("must be '%s' or '%s'",
+						fmt.Sprintf("must be '%s', %s or '%s'",
 							appsv1alpha1.RecreatePodUpdateStrategyType,
-							appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType)))
+							appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+							appsv1alpha1.InPlaceOnlyPodUpdateStrategyType)))
 			}
 		}
 	default:
@@ -151,53 +173,27 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.Statefu
 	return allErrs
 }
 
-// ValidateStatefulSetStatus validates a StatefulSetStatus.
-func validateStatefulSetStatus(status *appsv1alpha1.StatefulSetStatus, fieldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fieldPath.Child("replicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fieldPath.Child("readyReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), fieldPath.Child("currentReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fieldPath.Child("updatedReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ObservedGeneration), fieldPath.Child("observedGeneration"))...)
-	if status.CollisionCount != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fieldPath.Child("collisionCount"))...)
-	}
-
-	msg := "cannot be greater than status.replicas"
-	if status.ReadyReplicas > status.Replicas {
-		allErrs = append(allErrs, field.Invalid(fieldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
-	}
-	if status.CurrentReplicas > status.Replicas {
-		allErrs = append(allErrs, field.Invalid(fieldPath.Child("currentReplicas"), status.CurrentReplicas, msg))
-	}
-	if status.UpdatedReplicas > status.Replicas {
-		allErrs = append(allErrs, field.Invalid(fieldPath.Child("updatedReplicas"), status.UpdatedReplicas, msg))
-	}
-
-	return allErrs
-}
-
-// ValidateStatefulSetStatusUpdate tests if required fields in the StatefulSet are set.
-func validateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *appsv1alpha1.StatefulSet) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateStatefulSetStatus(&statefulSet.Status, field.NewPath("status"))...)
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
-	// TODO: Validate status.
-	if apivalidation.IsDecremented(statefulSet.Status.CollisionCount, oldStatefulSet.Status.CollisionCount) {
-		value := int32(0)
-		if statefulSet.Status.CollisionCount != nil {
-			value = *statefulSet.Status.CollisionCount
-		}
-		allErrs = append(allErrs, field.Invalid(field.NewPath("status").Child("collisionCount"), value, "cannot be decremented"))
-	}
-	return allErrs
-}
-
 func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
 	coreTemplate := &core.PodTemplateSpec{}
 	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template.DeepCopy(), coreTemplate, nil); err != nil {
 		return nil, err
 	}
 	return coreTemplate, nil
+}
+
+func validateTemplateInPlaceOnly(oldTemp, newTemp *v1.PodTemplateSpec) error {
+	oldTempJson, _ := json.Marshal(oldTemp.Spec)
+	newTempJson, _ := json.Marshal(newTemp.Spec)
+	patches, err := jsonpatch.CreatePatch(oldTempJson, newTempJson)
+	if err != nil {
+		return fmt.Errorf("failed calculate patches between old/new template spec")
+	}
+
+	for _, p := range patches {
+		if p.Operation != "replace" || !inPlaceUpdateTemplateSpecPatchRexp.MatchString(p.Path) {
+			return fmt.Errorf("%s %s", p.Operation, p.Path)
+		}
+	}
+
+	return nil
 }

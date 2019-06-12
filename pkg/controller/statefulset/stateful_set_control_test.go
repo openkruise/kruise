@@ -1341,6 +1341,143 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	}
 }
 
+func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
+	set := burst(newStatefulSet(3))
+	var partition int32 = 1
+	set.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+		Type: apps.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+			return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+				Partition:       &partition,
+				PodUpdatePolicy: appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+			}
+		}(),
+	}
+	set.Spec.Template.Spec.ReadinessGates = append(set.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appsv1alpha1.StatefulSetInPlaceUpdateReady})
+
+	client := fake.NewSimpleClientset()
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	spc, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+	if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+		t.Fatal(err)
+	}
+	set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ready to update
+	set.Spec.Template.Spec.Containers[0].Image = "foo"
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalPods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(originalPods))
+	// mock pod container statuses
+	for _, p := range originalPods {
+		p.Status.ContainerStatuses = append(p.Status.ContainerStatuses, v1.ContainerStatus{
+			Name:    "nginx",
+			ImageID: "imgID1",
+		})
+	}
+	oldRevision := originalPods[2].Labels[apps.StatefulSetRevisionLabel]
+
+	// in-place update pod 2
+	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if len(pods) < 3 {
+		t.Fatalf("Expected in-place update, actually got pods num: %v", len(pods))
+	}
+
+	if pods[2].Spec.Containers[0].Image != "foo" ||
+		pods[2].Labels[apps.StatefulSetRevisionLabel] == oldRevision {
+		t.Fatalf("Expected in-place update pod2, actually got %+v", pods[2])
+	}
+	condition := getInPlaceUpdateReadyCondition(pods[2])
+	if condition == nil || condition.Status != v1.ConditionFalse {
+		t.Fatalf("Expected InPlaceUpdateReady condition False after in-place update, got %v", condition)
+	}
+
+	// should not update pod 1, because of pod2 status not changed
+	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if pods[1].Labels[apps.StatefulSetRevisionLabel] != oldRevision {
+		t.Fatalf("Expected not to update pod1, actually got %+v", pods[1])
+	}
+
+	// update pod2 status, then update pod 1
+	pods[2].Status.ContainerStatuses = []v1.ContainerStatus{{
+		Name:    "nginx",
+		ImageID: "imgID2",
+	}}
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if len(pods) < 3 {
+		t.Fatalf("Expected in-place update, actually got pods num: %v", len(pods))
+	}
+
+	if pods[1].Spec.Containers[0].Image != "foo" ||
+		pods[1].Labels[apps.StatefulSetRevisionLabel] == oldRevision {
+		t.Fatalf("Expected in-place update pod1, actually got %+v", pods[2])
+	}
+	condition = getInPlaceUpdateReadyCondition(pods[1])
+	if condition == nil || condition.Status != v1.ConditionFalse {
+		t.Fatalf("Expected InPlaceUpdateReady condition False after in-place update, got %v", condition)
+	}
+	condition = getInPlaceUpdateReadyCondition(pods[2])
+	if condition == nil || condition.Status != v1.ConditionTrue {
+		t.Fatalf("Expected InPlaceUpdateReady condition True after in-place update completed, got %v", condition)
+	}
+
+	// should not update pod 0
+	pods[1].Status.ContainerStatuses = []v1.ContainerStatus{{
+		Name:    "nginx",
+		ImageID: "imgID2",
+	}}
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if len(pods) < 3 {
+		t.Fatalf("Expected no update, actually got pods num: %v", len(pods))
+	}
+	if pods[0].Labels[apps.StatefulSetRevisionLabel] != oldRevision {
+		t.Fatalf("Expected not to update pod0, actually got %+v", pods[1])
+	}
+	condition = getInPlaceUpdateReadyCondition(pods[1])
+	if condition == nil || condition.Status != v1.ConditionTrue {
+		t.Fatalf("Expected InPlaceUpdateReady condition True after in-place update completed, got %v", condition)
+	}
+}
+
 func TestStatefulSetControlLimitsHistory(t *testing.T) {
 	type testcase struct {
 		name       string
@@ -1690,15 +1827,16 @@ func (rt *requestTracker) reset() {
 }
 
 type fakeStatefulPodControl struct {
-	podsLister       corelisters.PodLister
-	claimsLister     corelisters.PersistentVolumeClaimLister
-	setsLister       kruiseappslisters.StatefulSetLister
-	podsIndexer      cache.Indexer
-	claimsIndexer    cache.Indexer
-	setsIndexer      cache.Indexer
-	createPodTracker requestTracker
-	updatePodTracker requestTracker
-	deletePodTracker requestTracker
+	podsLister              corelisters.PodLister
+	claimsLister            corelisters.PersistentVolumeClaimLister
+	setsLister              kruiseappslisters.StatefulSetLister
+	podsIndexer             cache.Indexer
+	claimsIndexer           cache.Indexer
+	setsIndexer             cache.Indexer
+	createPodTracker        requestTracker
+	updatePodTracker        requestTracker
+	inPlaceUpdatePodTracker requestTracker
+	deletePodTracker        requestTracker
 }
 
 func newFakeStatefulPodControl(podInformer coreinformers.PodInformer, setInformer kruiseappsinformers.StatefulSetInformer) *fakeStatefulPodControl {
@@ -1710,6 +1848,7 @@ func newFakeStatefulPodControl(podInformer coreinformers.PodInformer, setInforme
 		podInformer.Informer().GetIndexer(),
 		claimsIndexer,
 		setInformer.Informer().GetIndexer(),
+		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0}}
@@ -1850,6 +1989,29 @@ func (spc *fakeStatefulPodControl) UpdateStatefulPod(set *appsv1alpha1.StatefulS
 		}
 	}
 	spc.podsIndexer.Update(pod)
+	return nil
+}
+
+func (spc *fakeStatefulPodControl) InPlaceUpdateStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod, spec *InPlaceUpdateSpec) error {
+	defer spc.inPlaceUpdatePodTracker.inc()
+	if spc.inPlaceUpdatePodTracker.errorReady() {
+		defer spc.inPlaceUpdatePodTracker.reset()
+		return spc.inPlaceUpdatePodTracker.err
+	}
+
+	newPod, err := podInPlaceUpdate(pod, spec)
+	if err != nil {
+		return err
+	}
+	spc.podsIndexer.Update(newPod)
+
+	return nil
+}
+
+func (spc *fakeStatefulPodControl) UpdateStatefulPodCondition(set *appsv1alpha1.StatefulSet, pod *v1.Pod, condition v1.PodCondition) error {
+	updatePodCondition(pod, condition)
+	spc.podsIndexer.Update(pod)
+
 	return nil
 }
 
