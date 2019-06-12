@@ -12,159 +12,159 @@ metadata:
   creationTimestamp: null
   name: kruise-manager-role
 rules:
-- apiGroups:
-  - apps
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - pods/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - broadcastjobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - broadcastjobs/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - sidecarsets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - sidecarsets/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - '*'
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - controllerrevisions
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - statefulsets/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - admissionregistration.k8s.io
-  resources:
-  - mutatingwebhookconfigurations
-  - validatingwebhookconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
+  - apiGroups:
+      - apps
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - apps
+    resources:
+      - pods/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - apps.kruise.io
+    resources:
+      - broadcastjobs
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - apps.kruise.io
+    resources:
+      - broadcastjobs/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - apps.kruise.io
+    resources:
+      - sidecarsets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - apps.kruise.io
+    resources:
+      - sidecarsets/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - '*'
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - apps
+    resources:
+      - controllerrevisions
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - apps.kruise.io
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - apps.kruise.io
+    resources:
+      - statefulsets/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - admissionregistration.k8s.io
+    resources:
+      - mutatingwebhookconfigurations
+      - validatingwebhookconfigurations
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -176,9 +176,9 @@ roleRef:
   kind: ClusterRole
   name: kruise-manager-role
 subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: kruise-system
+  - kind: ServiceAccount
+    name: default
+    namespace: kruise-system
 ---
 apiVersion: v1
 kind: Secret
@@ -196,7 +196,7 @@ metadata:
   namespace: kruise-system
 spec:
   ports:
-  - port: 443
+    - port: 443
   selector:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
@@ -224,39 +224,39 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      - command:
-        - /manager
-        env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: SECRET_NAME
-          value: kruise-webhook-server-secret
-        image: openkruise/kruise-controller:v1
-        imagePullPolicy: Always
-        name: manager
-        ports:
-        - containerPort: 8080
-          name: metrics
-          protocol: TCP
-        - containerPort: 9876
-          name: webhook-server
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 100m
-            memory: 30Mi
-          requests:
-            cpu: 100m
-            memory: 20Mi
-        volumeMounts:
-        - mountPath: /tmp/cert
-          name: cert
-          readOnly: true
+        - command:
+            - /manager
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SECRET_NAME
+              value: kruise-webhook-server-secret
+          image: openkruise/kruise-manager:daily
+          imagePullPolicy: Always
+          name: manager
+          ports:
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            - containerPort: 9876
+              name: webhook-server
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 30Mi
+            requests:
+              cpu: 100m
+              memory: 20Mi
+          volumeMounts:
+            - mountPath: /tmp/cert
+              name: cert
+              readOnly: true
       terminationGracePeriodSeconds: 10
       volumes:
-      - name: cert
-        secret:
-          defaultMode: 420
-          secretName: kruise-webhook-server-secret
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: kruise-webhook-server-secret

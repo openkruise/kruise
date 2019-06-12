@@ -27,7 +27,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 ```
 Note that ALL three CRDs need to be installed for kruise-controller to run properly.
 
-##### Install kruise-controller
+##### Install kruise-controller-manager
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
 
@@ -38,6 +38,8 @@ Or run from the repo root directory:
 To Install Kustomize, check kustomize [website](https://github.com/kubernetes-sigs/kustomize).
 
 Note that use Kustomize 1.0.11. Version 2.0.3 has compatibility issues with kube-builder
+
+The official kruise-controller-manager image is hosted under [docker hub](https://cloud.docker.com/repository/docker/openkruise/kruise-manager).
 
 ## Usage examples
 
@@ -121,7 +123,7 @@ Run the tests
 
 `make test`
 
-Build the docker image, by default the image name is `openkruise/kruise-controller:v1alpha1`
+Build the docker image, by default the image name is `openkruise/kruise-manager:v1alpha1`
 
 `export IMG=<your_image_name> && make docker-build`
 
