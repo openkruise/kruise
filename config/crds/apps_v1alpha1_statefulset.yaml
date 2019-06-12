@@ -103,7 +103,7 @@ spec:
                       type: integer
                     podUpdatePolicy:
                       description: PodUpdatePolicy indicates how pods should be updated
-                        Defautl value is "ReCreate"
+                        Default value is "ReCreate"
                       type: string
                   type: object
                 type:

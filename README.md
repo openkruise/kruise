@@ -42,7 +42,32 @@ Note that use Kustomize 1.0.11. Version 2.0.3 has compatibility issues with kube
 ## Usage examples
 
 ### Advanced StatefulSet
-
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: StatefulSet
+metadata:
+  name: sample
+spec:
+  replicas: 3
+  serviceName: fake-service
+  selector:
+    matchLabels:
+      app: sample
+  template:
+    metadata:
+      labels:
+        app: sample
+    spec:
+      readinessGates:
+      - conditionType: InPlaceUpdateReady # A new condition that ensures the pod reamin at NotReady state while the in-place update is happening
+      containers:
+      - name: main
+        image: nginx:alpine
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      podUpdatePolicy: InPlaceIfPossible
+```
 ### Broadcast Job
 Run a BroadcastJob that each Pod computes pi, with `ttlSecondsAfterFinished` set to 30. The job
 will be deleted in 30 seconds after the job is finished.
@@ -116,3 +141,7 @@ If you have any questions or want to contribute, you are welcome to join our
 [slack channel](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc)
 
 Mailing List: todo
+
+## Copyright
+
+Certain implementation relies on existing code from Kubernetes and the credit goes to original Kubernetes authors.

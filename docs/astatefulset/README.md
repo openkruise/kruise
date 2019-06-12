@@ -76,64 +76,42 @@ v2, we can perform the following steps using the `MaxUnavailable` feature for fa
   during the update.
   
   Note that currently, only container image update is supported for in-place update. Any other Pod 
-  spec update such as changing the command or container ENVs will be refused by kube-apiserver.
+  spec update such as changing the command or container ENV will be refused by kube-apiserver.
    
   The API change is described below:
-  
-```go
-type RollingUpdateStatefulSetStrategy struct {
-	// Partition indicates the ordinal at which the StatefulSet should be
-	// partitioned.
-	// Default value is 0.
-	// +optional
-	Partition *int32 `json:"partition,omitempty"`
-	// The maximum number of pods that can be unavailable during the update.
-	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding down.
-	// Also, maxUnavailable can just be allowed to work with Parallel podManagementPolicy.
-	// Defaults to 1.
-	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-+	// PodUpdatePolicy indicates how pods should be updated
-+	// Defautl value is "ReCreate"
-+	// +optional
-+	PodUpdatePolicy PodUpdateStrategyType `json:"podUpdatePolicy,omitempty"`
-}
-``` 
-
+ 
 ```go
 type PodUpdateStrategyType string
 
 const (
 	// RecreatePodUpdateStrategyType indicates that we always delete Pod and create new Pod
-	// during Pod update, which is the current behavior
+	// during Pod update, which is the default behavior
 	RecreatePodUpdateStrategyType PodUpdateStrategyType = "ReCreate"
-+	// InPlaceIfPossiblePodUpdateStrategyType indicates that we try to update Pod in-place instead of
-+	// recreate Pod when possible. Currently we in-place update Pod only when any of the
-+	// containers (those in Spec.Containers) has image updates. Any other changes to the containers
-+   // will fall back to recreating the pods.
++	// InPlaceIfPossiblePodUpdateStrategyType indicates that we try to in-place update Pod instead of
++	// recreating Pod when possible. Currently, only image update of pod spec is allowed. Any other changes to the pod
++	// spec will fall back to ReCreate PodUpdateStrategyType where pod will be recreated.
 +	InPlaceIfPossiblePodUpdateStrategyType = "InPlaceIfPossible"
-+	// InPlaceOnlyPodUpdateStrategyType indicates that we will update Pod in-place instead of
-+	// recreate pod. Currently we in-place update Pod only when any of the
-+	// containers (those in Spec.Containers) has image updates. Any other changes to the containers
-+   // will not update the pods and statefulset will be stuck on the update procedure.
-+	InPlaceOnlyPodUpdateStrategyType = "InPlaceOnly"
++	// InPlaceOnlyPodUpdateStrategyType indicates that we will in-place update Pod instead of
++	// recreating pod. Currently we only allow image update for pod spec. Any other changes to the pod spec will be
++	// rejected by kube api-server
++	InPlaceOnlyPodUpdateStrategyType = "InPlaceOnl
 )
 ```
 
-- `ReCreate` is the default strategy of podUpdatePolicy, if not specified. Controller will recreate Pods when updated.
+- `ReCreate` is the default strategy of podUpdatePolicy. Controller will recreate Pods when updated.
    This is the same behavior as default StatefulSet.
 - `InPlaceIfPossible` strategy implies that the controller will check if current update is eligible
  for in-place update. If so, an in-place update is performed by updating Pod spec directly. Otherwise,
- controller falls back to the original Pod recreation workflow. The `InPlaceIfPossible` strategy only 
+ controller falls back to the original Pod recreation mechanism. The `InPlaceIfPossible` strategy only 
  works when `Spec.UpdateStrategy.Type` is set to `RollingUpdate`.
 - `InPlaceOnly` strategy implies that the controller will only in-place update Pods. Note that `template.spec`
- is only allowed to update `containers[x].image`, it will return an error if you try to update other fields in 
+ is only allowed to update `containers[x].image`, the api-server will return an error if you try to update other fields in 
   `template.spec`.
 
-**More importantly**, a readiness-gate named `InPlaceUpdateReady` must be added into `template.spec.readinessGates` 
-when using `InPlaceIfPossible` or `InPlaceOnly`. The condition in podStatus will be updated to False before in-place
-update and updated to True after finished update. This ensures pod being not-ready during in-place update.
+    **More importantly**, a readiness-gate named `InPlaceUpdateReady` must be  added into `template.spec.readinessGates` 
+    when using `InPlaceIfPossible` or `InPlaceOnly`. The condition `InPlaceUpdateReady` in podStatus will be updated to False before in-place
+    update and updated to True after the update is finished. This ensures that pod remain at NotReady state while the in-place
+    update is happening.
 
 An example for StatefulSet using in-place update:
 
@@ -144,7 +122,6 @@ metadata:
   name: sample
 spec:
   replicas: 3
-  serviceName: fake-service
   selector:
     matchLabels:
       app: sample

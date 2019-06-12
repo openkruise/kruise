@@ -25,10 +25,10 @@ import (
 )
 
 const (
-	// StatefulSetInPlaceUpdateReady must add into template.spec.readinessGates when pod podUpdatePolicy
+	// StatefulSetInPlaceUpdateReady must be added into template.spec.readinessGates when pod podUpdatePolicy
 	// is InPlaceIfPossible or InPlaceOnly. The condition in podStatus will be updated to False before in-place
-	// updating and updated to True after finished updating. This ensures pod being not-ready during
-	// in-place updating.
+	// updating and updated to True after the update is finished. This ensures pod reamin at NotReady state while
+	// in-place update is happening.
 	StatefulSetInPlaceUpdateReady v1.PodConditionType = "InPlaceUpdateReady"
 
 	// StatefulSetInPlaceUpdateStateAnnotation records the state of inplace-update.
@@ -76,7 +76,7 @@ type RollingUpdateStatefulSetStrategy struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 	// PodUpdatePolicy indicates how pods should be updated
-	// Defautl value is "ReCreate"
+	// Default value is "ReCreate"
 	// +optional
 	PodUpdatePolicy PodUpdateStrategyType `json:"podUpdatePolicy,omitempty"`
 }
@@ -87,15 +87,15 @@ type PodUpdateStrategyType string
 
 const (
 	// RecreatePodUpdateStrategyType indicates that we always delete Pod and create new Pod
-	// during Pod update, which is the current behavior
+	// during Pod update, which is the default behavior
 	RecreatePodUpdateStrategyType PodUpdateStrategyType = "ReCreate"
-	// InPlaceIfPossiblePodUpdateStrategyType indicates that we try to update Pod in-place instead of
-	// recreate Pod when possible. Currently we patch Pod only when any of the main
-	// containers (those in Spec.Containers) has image changes
+	// InPlaceIfPossiblePodUpdateStrategyType indicates that we try to in-place update Pod instead of
+	// recreating Pod when possible. Currently, only image update of pod spec is allowed. Any other changes to the pod
+	// spec will fall back to ReCreate PodUpdateStrategyType where pod will be recreated.
 	InPlaceIfPossiblePodUpdateStrategyType = "InPlaceIfPossible"
-	// InPlaceOnlyPodUpdateStrategyType indicates that we will update Pod in-place instead of
-	// recreate pod. Currently we only allow images of main containers (those in Spec.Containers)
-	// to be changed.
+	// InPlaceOnlyPodUpdateStrategyType indicates that we will in-place update Pod instead of
+	// recreating pod. Currently we only allow image update for pod spec. Any other changes to the pod spec will be
+	// rejected by kube api-server
 	InPlaceOnlyPodUpdateStrategyType = "InPlaceOnly"
 )
 
