@@ -39,7 +39,7 @@ To Install Kustomize, check kustomize [website](https://github.com/kubernetes-si
 
 Note that use Kustomize 1.0.11. Version 2.0.3 has compatibility issues with kube-builder
 
-The official kruise-controller-manager image is hosted under [docker hub](https://cloud.docker.com/repository/docker/openkruise/kruise-manager).
+The official kruise-controller-manager image is hosted under [docker hub](https://hub.docker.com/r/openkruise/kruise-manager).
 
 ## Usage examples
 
