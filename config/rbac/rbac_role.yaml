@@ -5,7 +5,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps
+  - ""
   resources:
   - pods
   verbs:
@@ -17,7 +17,7 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - apps
+  - ""
   resources:
   - pods/status
   verbs:
@@ -45,6 +45,18 @@ rules:
   - update
   - patch
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - apps.kruise.io
   resources:
   - sidecarsets
@@ -67,7 +79,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - '*'
+  - pods
   verbs:
   - get
   - list
@@ -79,7 +91,15 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
+  - pods/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
   verbs:
   - get
   - list

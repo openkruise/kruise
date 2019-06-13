@@ -23,4 +23,4 @@ spec:
         args:
         - "--metrics-addr=127.0.0.1:8080"
         - "--logtostderr=true"
-        - "--v=3"
+        - "--v=4"
