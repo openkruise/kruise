@@ -8,5 +8,5 @@ spec:
     spec:
       containers:
       # Change the value of image field below to your controller image URL
-      - image: openkruise/kruise-manager:v1
+      - image: openkruise/kruise-manager:v0.1.0
         name: manager

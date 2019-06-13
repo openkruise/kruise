@@ -31,59 +31,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// StatefulSetInformer provides access to a shared informer and lister for
-// StatefulSets.
-type StatefulSetInformer interface {
+// BroadcastJobInformer provides access to a shared informer and lister for
+// BroadcastJobs.
+type BroadcastJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.StatefulSetLister
+	Lister() v1alpha1.BroadcastJobLister
 }
 
-type statefulSetInformer struct {
+type broadcastJobInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewStatefulSetInformer constructs a new informer for StatefulSet type.
+// NewBroadcastJobInformer constructs a new informer for BroadcastJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewStatefulSetInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredStatefulSetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewBroadcastJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredBroadcastJobInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredStatefulSetInformer constructs a new informer for StatefulSet type.
+// NewFilteredBroadcastJobInformer constructs a new informer for BroadcastJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredStatefulSetInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredBroadcastJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().StatefulSets(namespace).List(options)
+				return client.AppsV1alpha1().BroadcastJobs(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().StatefulSets(namespace).Watch(options)
+				return client.AppsV1alpha1().BroadcastJobs(namespace).Watch(options)
 			},
 		},
-		&appsv1alpha1.StatefulSet{},
+		&appsv1alpha1.BroadcastJob{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *statefulSetInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStatefulSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *broadcastJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredBroadcastJobInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *statefulSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.StatefulSet{}, f.defaultInformer)
+func (f *broadcastJobInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&appsv1alpha1.BroadcastJob{}, f.defaultInformer)
 }
 
-func (f *statefulSetInformer) Lister() v1alpha1.StatefulSetLister {
-	return v1alpha1.NewStatefulSetLister(f.Informer().GetIndexer())
+func (f *broadcastJobInformer) Lister() v1alpha1.BroadcastJobLister {
+	return v1alpha1.NewBroadcastJobLister(f.Informer().GetIndexer())
 }

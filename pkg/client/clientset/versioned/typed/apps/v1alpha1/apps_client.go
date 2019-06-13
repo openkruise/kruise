@@ -1,5 +1,5 @@
 /*
-Copyright The The Kruise Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,12 +27,22 @@ import (
 
 type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	BroadcastJobsGetter
+	SidecarSetsGetter
 	StatefulSetsGetter
 }
 
 // AppsV1alpha1Client is used to interact with features provided by the apps.kruise.io group.
 type AppsV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1alpha1Client) BroadcastJobs(namespace string) BroadcastJobInterface {
+	return newBroadcastJobs(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) SidecarSets() SidecarSetInterface {
+	return newSidecarSets(c)
 }
 
 func (c *AppsV1alpha1Client) StatefulSets(namespace string) StatefulSetInterface {

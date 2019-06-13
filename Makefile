@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= openkruise/kruise-manager:v1alpha1
+IMG ?= openkruise/kruise-manager:test
 
 all: test manager
 

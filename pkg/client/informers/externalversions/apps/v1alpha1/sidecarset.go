@@ -31,59 +31,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// StatefulSetInformer provides access to a shared informer and lister for
-// StatefulSets.
-type StatefulSetInformer interface {
+// SidecarSetInformer provides access to a shared informer and lister for
+// SidecarSets.
+type SidecarSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.StatefulSetLister
+	Lister() v1alpha1.SidecarSetLister
 }
 
-type statefulSetInformer struct {
+type sidecarSetInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
-// NewStatefulSetInformer constructs a new informer for StatefulSet type.
+// NewSidecarSetInformer constructs a new informer for SidecarSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewStatefulSetInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredStatefulSetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewSidecarSetInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredSidecarSetInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredStatefulSetInformer constructs a new informer for StatefulSet type.
+// NewFilteredSidecarSetInformer constructs a new informer for SidecarSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredStatefulSetInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredSidecarSetInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().StatefulSets(namespace).List(options)
+				return client.AppsV1alpha1().SidecarSets().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().StatefulSets(namespace).Watch(options)
+				return client.AppsV1alpha1().SidecarSets().Watch(options)
 			},
 		},
-		&appsv1alpha1.StatefulSet{},
+		&appsv1alpha1.SidecarSet{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *statefulSetInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStatefulSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *sidecarSetInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredSidecarSetInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *statefulSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.StatefulSet{}, f.defaultInformer)
+func (f *sidecarSetInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&appsv1alpha1.SidecarSet{}, f.defaultInformer)
 }
 
-func (f *statefulSetInformer) Lister() v1alpha1.StatefulSetLister {
-	return v1alpha1.NewStatefulSetLister(f.Informer().GetIndexer())
+func (f *sidecarSetInformer) Lister() v1alpha1.SidecarSetLister {
+	return v1alpha1.NewSidecarSetLister(f.Informer().GetIndexer())
 }

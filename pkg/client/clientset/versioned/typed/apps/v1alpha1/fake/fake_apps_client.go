@@ -1,5 +1,5 @@
 /*
-Copyright The The Kruise Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,14 @@ import (
 
 type FakeAppsV1alpha1 struct {
 	*testing.Fake
+}
+
+func (c *FakeAppsV1alpha1) BroadcastJobs(namespace string) v1alpha1.BroadcastJobInterface {
+	return &FakeBroadcastJobs{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) SidecarSets() v1alpha1.SidecarSetInterface {
+	return &FakeSidecarSets{c}
 }
 
 func (c *FakeAppsV1alpha1) StatefulSets(namespace string) v1alpha1.StatefulSetInterface {

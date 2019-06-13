@@ -29,10 +29,11 @@
 ### `MaxUnavailable` Rolling Update Strategy
   This controller adds a `maxUnavailable` capability in the `RollingUpdateStatefulSetStrategy` to allow parallel Pod
   updates with the guarantee that the number of unavailable pods during the update cannot exceed this value.
+  It is only allowed to use when the podManagementPolicy is `Parallel`.
   
   This feature achieves similar update efficiency like Deployment for cases where the order of 
-  update is not critical to the workload.  Without this feature, the native `StatefulSet` controller can only 
-  update Pods one by one even if the PodManagementPolicyType is `Parallel`. The API change is described below:
+  update is not critical to the workload. Without this feature, the native `StatefulSet` controller can only 
+  update Pods one by one even if the podManagementPolicy is `Parallel`. The API change is described below:
 
 ```go
 type RollingUpdateStatefulSetStrategy struct {
@@ -50,6 +51,7 @@ type RollingUpdateStatefulSetStrategy struct {
 +	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }
 ```
+
 For example, assuming an Advanced StatefulSet has five replicas named P0 to P4, and the workload can
 tolerate losing three replicas temporally. If we want to update the StatefulSet Pod spec from v1 to
 v2, we can perform the following steps using the `MaxUnavailable` feature for fast update.
@@ -65,7 +67,8 @@ v2, we can perform the following steps using the `MaxUnavailable` feature for fa
 
 
 ### `In-Place` Pod Update Strategy 
-  This controller adds an `in-place` Pod update strategy to void recreating Pod during update.
+  This controller adds a `podUpdatePolicy` field in `spec.updateStrategy.rollingUpdate` 
+  which controls recreate or in-place update for Pods.
    
   With this feature, a Pod will not be recreated if the container images are the only updated spec in
   the Advanced StatefulSet Pod template.
@@ -76,7 +79,7 @@ v2, we can perform the following steps using the `MaxUnavailable` feature for fa
   during the update.
   
   Note that currently, only container image update is supported for in-place update. Any other Pod 
-  spec update such as changing the command or container ENV will be refused by kube-apiserver.
+  spec update such as changing the command or container ENV will be rejected by kube-apiserver.
    
   The API change is described below:
  
