@@ -29,7 +29,7 @@ deploy: manifests
 manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
 	cp config/crds/*.yaml ./install/kruise/templates/
-	cp rbac/rbac_role.yaml ./install/kruise/templates/
+	cp config/rbac/rbac_role.yaml ./install/kruise/templates/
 	helm template ./install/kruise > install/yaml/kruise_all_in_one.yaml
 
 # Run go fmt against code
