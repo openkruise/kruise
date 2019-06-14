@@ -22,7 +22,7 @@ spec:
   - port: 443
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: controller-manager
   namespace: system
@@ -30,11 +30,16 @@ metadata:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
 spec:
+  replicas: 3
   selector:
     matchLabels:
       control-plane: controller-manager
       controller-tools.k8s.io: "1.0"
-  serviceName: controller-manager-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 3
+    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -61,6 +66,9 @@ spec:
           requests:
             cpu: 100m
             memory: 20Mi
+        readinessProbe:
+          tcpSocket:
+            port: 9876
         ports:
         - containerPort: 9876
           name: webhook-server
