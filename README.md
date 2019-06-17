@@ -74,7 +74,7 @@ spec:
 Run a BroadcastJob that each Pod computes pi, with `ttlSecondsAfterFinished` set to 30. The job
 will be deleted in 30 seconds after the job is finished.
 
-```
+```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
 metadata:
@@ -95,7 +95,7 @@ spec:
 
 The yaml file below describes a SidecarSet that contains a sidecar container named `sidecar1`
 
-```
+```yaml
 # sidecarset.yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: SidecarSet
