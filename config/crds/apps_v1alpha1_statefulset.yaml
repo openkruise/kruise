@@ -6,10 +6,36 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: statefulsets.apps.kruise.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.replicas
+    description: The desired number of pods.
+    name: DESIRED
+    type: integer
+  - JSONPath: .status.replicas
+    description: The number of currently all pods.
+    name: CURRENT
+    type: integer
+  - JSONPath: .status.updatedReplicas
+    description: The number of pods updated.
+    name: UPDATED
+    type: integer
+  - JSONPath: .status.readyReplicas
+    description: The number of pods ready.
+    name: READY
+    type: integer
+  - JSONPath: .metadata.creationTimestamp
+    description: CreationTimestamp is a timestamp representing the server time when
+      this object was created. It is not guaranteed to be set in happens-before order
+      across separate operations. Clients may not set this value. It is represented
+      in RFC3339 form and is in UTC.
+    name: AGE
+    type: date
   group: apps.kruise.io
   names:
     kind: StatefulSet
     plural: statefulsets
+    shortNames:
+    - sts
   scope: Namespaced
   subresources:
     scale:
