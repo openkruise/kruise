@@ -20,7 +20,7 @@ import (
 	"context"
 	"net/http"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -60,12 +60,46 @@ func setDefaultSidecarSet(sidecarset *appsv1alpha1.SidecarSet) {
 	}
 }
 
-func setDefaultContainer(container *appsv1alpha1.SidecarContainer) {
-	if container.TerminationMessagePolicy == "" {
-		container.TerminationMessagePolicy = corev1.TerminationMessageReadFile
+func setDefaultContainer(sidecarContainer *appsv1alpha1.SidecarContainer) {
+	container := &sidecarContainer.Container
+	v1.SetDefaults_Container(container)
+	for i := range container.Ports {
+		p := &container.Ports[i]
+		v1.SetDefaults_ContainerPort(p)
 	}
-	if container.ImagePullPolicy == "" {
-		container.ImagePullPolicy = corev1.PullIfNotPresent
+	for i := range container.Env {
+		e := &container.Env[i]
+		if e.ValueFrom != nil {
+			if e.ValueFrom.FieldRef != nil {
+				v1.SetDefaults_ObjectFieldSelector(e.ValueFrom.FieldRef)
+			}
+		}
+	}
+	v1.SetDefaults_ResourceList(&container.Resources.Limits)
+	v1.SetDefaults_ResourceList(&container.Resources.Requests)
+	if container.LivenessProbe != nil {
+		v1.SetDefaults_Probe(container.LivenessProbe)
+		if container.LivenessProbe.Handler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.LivenessProbe.Handler.HTTPGet)
+		}
+	}
+	if container.ReadinessProbe != nil {
+		v1.SetDefaults_Probe(container.ReadinessProbe)
+		if container.ReadinessProbe.Handler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.ReadinessProbe.Handler.HTTPGet)
+		}
+	}
+	if container.Lifecycle != nil {
+		if container.Lifecycle.PostStart != nil {
+			if container.Lifecycle.PostStart.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if container.Lifecycle.PreStop != nil {
+			if container.Lifecycle.PreStop.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PreStop.HTTPGet)
+			}
+		}
 	}
 }
 

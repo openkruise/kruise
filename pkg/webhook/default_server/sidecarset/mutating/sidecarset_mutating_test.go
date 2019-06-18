@@ -23,6 +23,7 @@ func TestMutateSidecarSet(t *testing.T) {
 	}
 
 	expectedOutputSidecarSet := sidecarSet.DeepCopy()
+	expectedOutputSidecarSet.Spec.Containers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
 	expectedOutputSidecarSet.Spec.Containers[0].TerminationMessagePolicy = corev1.TerminationMessageReadFile
 	expectedOutputSidecarSet.Spec.Containers[0].ImagePullPolicy = corev1.PullIfNotPresent
 
