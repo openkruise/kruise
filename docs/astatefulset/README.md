@@ -97,7 +97,7 @@ const (
 +	// InPlaceOnlyPodUpdateStrategyType indicates that we will in-place update Pod instead of
 +	// recreating pod. Currently we only allow image update for pod spec. Any other changes to the pod spec will be
 +	// rejected by kube api-server
-+	InPlaceOnlyPodUpdateStrategyType = "InPlaceOnl
++	InPlaceOnlyPodUpdateStrategyType = "InPlaceOnly"
 )
 ```
 
@@ -125,6 +125,7 @@ metadata:
   name: sample
 spec:
   replicas: 3
+  serviceName: fake-service
   selector:
     matchLabels:
       app: sample
