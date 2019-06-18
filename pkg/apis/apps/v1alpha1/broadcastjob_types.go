@@ -106,19 +106,19 @@ type BroadcastJobStatus struct {
 
 	// The number of actively running pods.
 	// +optional
-	Active int32 `json:"active" protobuf:"varint,4,opt,name=active"`
+	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
 
 	// The number of pods which reached phase Succeeded.
 	// +optional
-	Succeeded int32 `json:"succeeded" protobuf:"varint,5,opt,name=succeeded"`
+	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
 
 	// The number of pods which reached phase Failed.
 	// +optional
-	Failed int32 `json:"failed" protobuf:"varint,6,opt,name=failed"`
+	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
 
 	// The desired number of pods, this is typically equal to the number of nodes satisfied to run pods.
 	// +optional
-	Desired int32 `json:"desired" protobuf:"varint,7,opt,name=desired"`
+	Desired int32 `json:"desired,omitempty" protobuf:"varint,7,opt,name=desired"`
 }
 
 type JobConditionType string
@@ -162,6 +162,12 @@ type JobCondition struct {
 // BroadcastJob is the Schema for the broadcastjobs API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=bj
+// +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".status.desired",description="The desired number of pods. This is typically equal to the number of nodes satisfied to run pods."
+// +kubebuilder:printcolumn:name="Active",type="integer",JSONPath=".status.active",description="The number of actively running pods."
+// +kubebuilder:printcolumn:name="Succeeded",type="integer",JSONPath=".status.succeeded",description="The number of pods which reached phase Succeeded."
+// +kubebuilder:printcolumn:name="Failed",type="integer",JSONPath=".status.failed",description="The number of pods which reached phase Failed."
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp",description="CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC."
 type BroadcastJob struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

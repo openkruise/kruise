@@ -6,6 +6,26 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: sidecarsets.apps.kruise.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.matchedPods
+    description: The number of pods matched.
+    name: MATCHED
+    type: integer
+  - JSONPath: .status.updatedPods
+    description: The number of pods matched and updated.
+    name: UPDATED
+    type: integer
+  - JSONPath: .status.readyPods
+    description: The number of pods matched and ready.
+    name: READY
+    type: integer
+  - JSONPath: .metadata.creationTimestamp
+    description: CreationTimestamp is a timestamp representing the server time when
+      this object was created. It is not guaranteed to be set in happens-before order
+      across separate operations. Clients may not set this value. It is represented
+      in RFC3339 form and is in UTC.
+    name: AGE
+    type: date
   group: apps.kruise.io
   names:
     kind: SidecarSet
