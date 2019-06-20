@@ -1,7 +1,7 @@
 # Tutorial
 
 This tutorial walks through an example to deploy a redis cluster(1 master, 2 slaves) and a guestbook app and do in-place
-update of the guestbook app using Kruise controllers. The guestbook app is from this [repo](https://github.com/IBM/guestbook/tree/master/v1).
+update of the guestbook app using Kruise controllers. The guestbook app used is from this [repo](https://github.com/IBM/guestbook/tree/master/v1).
 
 ## Install Kruise CRDs
 ```
@@ -36,8 +36,8 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-service.yaml
 ```
 
-Several things to note in the guestbook-statefulset.yaml
-```
+Several things to note in the `guestbook-statefulset.yaml`
+```yaml
 * apiVersion: apps.kruise.io/v1alpha1  # the kruise group version
   kind: StatefulSet
   ...
@@ -76,7 +76,7 @@ Describe one Guestbook pod
 
 Find that the sidecar container is injected.
 
-```
+```yaml
     Containers:
       guestbook:
         Container ID:   docker://44f19a140c30de2c5b1a3f63c252c074efbb9c1b5eb7893ee7134461466b35c8
@@ -146,6 +146,7 @@ kubectl get nodes -o yaml | grep "openkruise/guestbook:v2"
 ```
 
 Then, run a broadcastjob to download the images.
+
 `kubect apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/broadcastjob.yaml`
 
 Check the broadcastjob is completed. `bj` is short for `broadcastjob`
@@ -203,12 +204,13 @@ guestbook-v1-8                  2/2     Running   0          18h   172.20.0.10  
 guestbook-v1-9                  2/2     Running   0          18h   172.20.0.11    cn-shanghai.192.168.1.106   <none>
 ```
 
-Run this command to patch the statefulset to use the new image. 
+Run this command to patch the statefulset to use the new image.
+
 `kubect apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset-v2.yaml`
 
 In particular, the difference is that the image version is updated to `v2` and partition is set to `15`, meaning that the pods with 
 ordinal larger than or equal to `15` will be updated to v2. The rest pods will remain at `v1`
-```
+```yaml
 spec:
     ...
       containers:
@@ -286,7 +288,7 @@ Events:
 ```
 
 The pods should also be in `Ready` state, the `InPlaceUpdateReady` will be set to `False` right before in-place update and to `True` after update is complete
-```
+```yaml
 Readiness Gates:
   Type                 Status
   InPlaceUpdateReady   True
