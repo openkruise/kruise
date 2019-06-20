@@ -19,6 +19,8 @@ Today, Kruise offers three application workload controllers:
 
 Please see [documents](./docs/README.md) for more technical information.
 
+A [tutorial](./docs/tutorial/README.md) is provided to demonstrate how to use the workload controllers.
+
 ## Getting started
 
 ### Install with YAML files
@@ -66,14 +68,19 @@ spec:
         app: sample
     spec:
       readinessGates:
-      - conditionType: InPlaceUpdateReady # A new condition that ensures the pod reamin at NotReady state while the in-place update is happening
+        # A new condition must be added to ensure the pod remain at NotReady state while the in-place update is happening
+      - conditionType: InPlaceUpdateReady 
       containers:
       - name: main
         image: nginx:alpine
+  podManagementPolicy: Parallel  # allow parallel updates, works together with maxUnavailable
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
+      # Do in-place update if possible, currently only image update is supported for in-place update
       podUpdatePolicy: InPlaceIfPossible
+      # Allow parallel updates with max number of unavailable instances equals to 2
+      maxUnavailable: 2
 ```
 ### Broadcast Job
 Run a BroadcastJob that each Pod computes pi, with `ttlSecondsAfterFinished` set to 30. The job

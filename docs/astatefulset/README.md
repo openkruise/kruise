@@ -135,12 +135,17 @@ spec:
         app: sample
     spec:
       readinessGates:
+         # A new condition that ensures the pod remains at NotReady state while the in-place update is happening
       - conditionType: InPlaceUpdateReady
       containers:
       - name: main
         image: nginx:alpine
+  podManagementPolicy: Parallel # allow parallel updates, works together with maxUnavailable
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
+      # Do in-place update if possible, currently only image update is supported for in-place update
       podUpdatePolicy: InPlaceIfPossible
+      # Allow parallel updates with max number of unavailable instances equals to 2
+      maxUnavailable: 2
 ```
