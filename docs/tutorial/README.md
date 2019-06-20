@@ -182,26 +182,26 @@ in `60` seconds after the job is finished.
 First, check the running pods.
 ```
 $ kubectl get pods -o wide | grep guestbook
-guestbook-v1-0                  2/2     Running   0          18h   172.20.0.145   cn-shanghai.192.168.1.107   <none>
-guestbook-v1-1                  2/2     Running   0          18h   172.20.1.14    cn-shanghai.192.168.1.108   <none>
-guestbook-v1-10                 2/2     Running   0          18h   172.20.1.17    cn-shanghai.192.168.1.108   <none>
-guestbook-v1-11                 2/2     Running   0          18h   172.20.1.18    cn-shanghai.192.168.1.108   <none>
-guestbook-v1-12                 2/2     Running   0          18h   172.20.0.12    cn-shanghai.192.168.1.106   <none>
-guestbook-v1-13                 2/2     Running   0          18h   172.20.0.149   cn-shanghai.192.168.1.107   <none>
-guestbook-v1-14                 2/2     Running   0          18h   172.20.1.19    cn-shanghai.192.168.1.108   <none>
-guestbook-v1-15                 2/2     Running   0          18h   172.20.0.13    cn-shanghai.192.168.1.106   <none>
-guestbook-v1-16                 2/2     Running   0          18h   172.20.0.150   cn-shanghai.192.168.1.107   <none>
-guestbook-v1-17                 2/2     Running   0          18h   172.20.0.151   cn-shanghai.192.168.1.107   <none>
-guestbook-v1-18                 2/2     Running   0          18h   172.20.0.14    cn-shanghai.192.168.1.106   <none>
-guestbook-v1-19                 2/2     Running   0          18h   172.20.1.20    cn-shanghai.192.168.1.108   <none>
-guestbook-v1-2                  2/2     Running   0          18h   172.20.1.15    cn-shanghai.192.168.1.108   <none>
-guestbook-v1-3                  2/2     Running   0          18h   172.20.0.147   cn-shanghai.192.168.1.107   <none>
-guestbook-v1-4                  2/2     Running   0          18h   172.20.0.146   cn-shanghai.192.168.1.107   <none>
-guestbook-v1-5                  2/2     Running   0          18h   172.20.1.16    cn-shanghai.192.168.1.108   <none>
-guestbook-v1-6                  2/2     Running   0          18h   172.20.0.148   cn-shanghai.192.168.1.107   <none>
-guestbook-v1-7                  2/2     Running   0          18h   172.20.0.9     cn-shanghai.192.168.1.106   <none>
-guestbook-v1-8                  2/2     Running   0          18h   172.20.0.10    cn-shanghai.192.168.1.106   <none>
-guestbook-v1-9                  2/2     Running   0          18h   172.20.0.11    cn-shanghai.192.168.1.106   <none>
+guestbook-v1-0                  2/2     Running   0          18h   172.20.0.145   192.168.1.107   <none>
+guestbook-v1-1                  2/2     Running   0          18h   172.20.1.14    192.168.1.108   <none>
+guestbook-v1-10                 2/2     Running   0          18h   172.20.1.17    192.168.1.108   <none>
+guestbook-v1-11                 2/2     Running   0          18h   172.20.1.18    192.168.1.108   <none>
+guestbook-v1-12                 2/2     Running   0          18h   172.20.0.12    192.168.1.106   <none>
+guestbook-v1-13                 2/2     Running   0          18h   172.20.0.149   192.168.1.107   <none>
+guestbook-v1-14                 2/2     Running   0          18h   172.20.1.19    192.168.1.108   <none>
+guestbook-v1-15                 2/2     Running   0          18h   172.20.0.13    192.168.1.106   <none>
+guestbook-v1-16                 2/2     Running   0          18h   172.20.0.150   192.168.1.107   <none>
+guestbook-v1-17                 2/2     Running   0          18h   172.20.0.151   192.168.1.107   <none>
+guestbook-v1-18                 2/2     Running   0          18h   172.20.0.14    192.168.1.106   <none>
+guestbook-v1-19                 2/2     Running   0          18h   172.20.1.20    192.168.1.108   <none>
+guestbook-v1-2                  2/2     Running   0          18h   172.20.1.15    192.168.1.108   <none>
+guestbook-v1-3                  2/2     Running   0          18h   172.20.0.147   192.168.1.107   <none>
+guestbook-v1-4                  2/2     Running   0          18h   172.20.0.146   192.168.1.107   <none>
+guestbook-v1-5                  2/2     Running   0          18h   172.20.1.16    192.168.1.108   <none>
+guestbook-v1-6                  2/2     Running   0          18h   172.20.0.148   192.168.1.107   <none>
+guestbook-v1-7                  2/2     Running   0          18h   172.20.0.9     192.168.1.106   <none>
+guestbook-v1-8                  2/2     Running   0          18h   172.20.0.10    192.168.1.106   <none>
+guestbook-v1-9                  2/2     Running   0          18h   172.20.0.11    192.168.1.106   <none>
 ```
 
 Run this command to patch the statefulset to use the new image.
@@ -281,10 +281,10 @@ $ kubectl describe pod guestbook-v1-0
 Events:
   Type    Reason   Age                From                                Message
   ----    ------   ----               ----                                -------
-  Normal  Created  10m (x2 over 18h)  kubelet, cn-shanghai.192.168.1.107  Created container
-  Normal  Started  10m (x2 over 18h)  kubelet, cn-shanghai.192.168.1.107  Started container
-  Normal  Killing  10m                kubelet, cn-shanghai.192.168.1.107  Killing container with id docker://guestbook:Container spec hash changed (4055768332 vs 2933593838).. Container will be killed and recreated.
-  Normal  Pulled   10m                kubelet, cn-shanghai.192.168.1.107  Container image "openkruise/guestbook:v3" already present on machine
+  Normal  Created  10m (x2 over 18h)  kubelet, 192.168.1.107  Created container
+  Normal  Started  10m (x2 over 18h)  kubelet, 192.168.1.107  Started container
+  Normal  Killing  10m                kubelet, 192.168.1.107  Killing container with id docker://guestbook:Container spec hash changed (4055768332 vs 2933593838).. Container will be killed and recreated.
+  Normal  Pulled   10m                kubelet, 192.168.1.107  Container image "openkruise/guestbook:v3" already present on machine
 ```
 
 The pods should also be in `Ready` state, the `InPlaceUpdateReady` will be set to `False` right before in-place update and to `True` after update is complete
