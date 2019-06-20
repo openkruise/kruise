@@ -261,7 +261,7 @@ Check the pods again. `guestbook-v1-15` to `guestbook-v1-19` are updated with `R
 IPs remain the same, `CONTROLLER-REVISION-HASH` are updated from ` guestbook-v1-7c947b5f94` to `guestbook-v1-576bd76785`
 
 ```
-$ kubectl get pods -o wide | grep guestbook
+$ kubectl get pod -L controller-revision-hash -o wide | grep guestbook
 
 NAME                            READY   STATUS    RESTARTS   AGE     IP             NODE                        NOMINATED NODE   CONTROLLER-REVISION-HASH
 guestbook-v1-0                  1/1     Running   0          3m22s   172.29.1.21    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
