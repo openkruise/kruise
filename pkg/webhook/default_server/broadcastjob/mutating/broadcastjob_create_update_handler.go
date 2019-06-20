@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/default_server/utils"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission/types"
@@ -53,6 +54,7 @@ func (h *BroadcastJobCreateUpdateHandler) mutatingBroadcastJobFn(ctx context.Con
 
 // SetDefaults_BroadcastJob sets any unspecified values to defaults.
 func setDefaultBroadcastJob(job *appsv1alpha1.BroadcastJob) {
+	utils.SetDefaultPodTemplate(&job.Spec.Template.Spec)
 	if job.Spec.CompletionPolicy.Type == "" {
 		job.Spec.CompletionPolicy.Type = appsv1alpha1.Always
 	}
