@@ -271,7 +271,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// set the generation, and revisions in the returned status
-	status := appsv1alpha1.StatefulSetStatus{Replicas: 0, ReadyReplicas: 0, CurrentReplicas: 0, UpdatedReplicas: 0}
+	status := appsv1alpha1.StatefulSetStatus{}
 	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
