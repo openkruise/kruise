@@ -205,6 +205,9 @@ spec:
               type: integer
           required:
           - replicas
+          - readyReplicas
+          - currentReplicas
+          - updatedReplicas
           type: object
   version: v1alpha1
 status:

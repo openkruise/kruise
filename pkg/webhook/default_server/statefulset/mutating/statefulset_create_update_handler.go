@@ -18,11 +18,15 @@ package mutating
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	patchutil "github.com/openkruise/kruise/pkg/util/patch"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -64,16 +68,23 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req types.R
 	if err != nil {
 		return admission.ErrorResponse(http.StatusBadRequest, err)
 	}
-	copy := obj.DeepCopy()
 
-	SetObjectDefaults(copy)
+	SetObjectDefaults(obj)
 	obj.Status = appsv1alpha1.StatefulSetStatus{}
 
-	err = h.mutatingStatefulSetFn(ctx, copy)
+	err = h.mutatingStatefulSetFn(ctx, obj)
 	if err != nil {
 		return admission.ErrorResponse(http.StatusInternalServerError, err)
 	}
-	resp := admission.PatchResponse(obj, copy)
+
+	marshaledPod, err := json.Marshal(obj)
+	if err != nil {
+		return admission.ErrorResponse(http.StatusInternalServerError, err)
+	}
+	resp := patchutil.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaledPod)
+	if len(resp.Patches) > 0 {
+		klog.V(5).Infof("Admit StatefulSet %s/%s patches: %v", obj.Namespace, obj.Name, util.DumpJson(resp.Patches))
+	}
 	return resp
 }
 

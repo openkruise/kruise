@@ -1,9 +1,25 @@
 apiVersion: apps.kruise.io/v1alpha1
 kind: StatefulSet
 metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: statefulset-sample
+  name: sample
 spec:
-  # Add fields here
-  foo: bar
+  replicas: 10
+  serviceName: fake-service
+  selector:
+    matchLabels:
+      app: sample
+  template:
+    metadata:
+      labels:
+        app: sample
+    spec:
+      readinessGates:
+        - conditionType: InPlaceUpdateReady
+      containers:
+        - name: main
+          image: nginx:alpine
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      podUpdatePolicy: InPlaceIfPossible
+      maxUnavailable: 2

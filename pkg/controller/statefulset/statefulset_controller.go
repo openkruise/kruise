@@ -177,6 +177,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 // Automatically generate RBAC rules to allow the Controller to read and write Pods
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
