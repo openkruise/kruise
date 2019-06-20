@@ -2,6 +2,7 @@
 
 This tutorial walks through an example to deploy a redis cluster(1 master, 2 slaves) and a guestbook app and do in-place
 update of the guestbook app using Kruise controllers. The guestbook app used is from this [repo](https://github.com/IBM/guestbook/tree/master/v1).
+Below steps assume you have an existing kubernetes cluster running properly.
 
 ## Install Kruise CRDs
 ```
@@ -27,6 +28,25 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 The sidecarset controller is a webhook controller and will watch pod creation and automatically inject a sidecar guestbook container into the matched pods
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sidecar.yaml`
+
+Below is how the sidecarset looks like:
+```
+apiVersion: apps.kruise.io/v1alpha1
+kind: SidecarSet
+metadata:
+  name: guestbook-sidecar
+spec:
+  selector: # select the pods to be injected with sidecar containers
+    matchLabels:
+      app: guestbook
+  containers:
+    - name: guestbook-sidecar
+      image: openkruise/guestbook:sidecar
+      imagePullPolicy: Always
+      ports:
+        - name: sidecar-server
+          containerPort: 4000 # different from main guestbook containerPort which is 3000
+```
 
 ## Install Guestbook 
 
@@ -65,7 +85,7 @@ Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.
 `app.kruise.io` postfix needs to be appended due to naming collision with Kubernetes native `statefulset` kind.
  Verify that all pods are READY.
 ```
-kubect get sts.apps.kruise.io
+kubectl get sts.apps.kruise.io
 
 NAME           DESIRED   CURRENT   UPDATED   READY   AGE
 guestbook-v1   20        20        20        20      6m
@@ -181,32 +201,33 @@ in `60` seconds after the job is finished.
 
 First, check the running pods.
 ```
-$ kubectl get pods -o wide | grep guestbook
-guestbook-v1-0                  2/2     Running   0          18h   172.20.0.145   192.168.1.107   <none>
-guestbook-v1-1                  2/2     Running   0          18h   172.20.1.14    192.168.1.108   <none>
-guestbook-v1-10                 2/2     Running   0          18h   172.20.1.17    192.168.1.108   <none>
-guestbook-v1-11                 2/2     Running   0          18h   172.20.1.18    192.168.1.108   <none>
-guestbook-v1-12                 2/2     Running   0          18h   172.20.0.12    192.168.1.106   <none>
-guestbook-v1-13                 2/2     Running   0          18h   172.20.0.149   192.168.1.107   <none>
-guestbook-v1-14                 2/2     Running   0          18h   172.20.1.19    192.168.1.108   <none>
-guestbook-v1-15                 2/2     Running   0          18h   172.20.0.13    192.168.1.106   <none>
-guestbook-v1-16                 2/2     Running   0          18h   172.20.0.150   192.168.1.107   <none>
-guestbook-v1-17                 2/2     Running   0          18h   172.20.0.151   192.168.1.107   <none>
-guestbook-v1-18                 2/2     Running   0          18h   172.20.0.14    192.168.1.106   <none>
-guestbook-v1-19                 2/2     Running   0          18h   172.20.1.20    192.168.1.108   <none>
-guestbook-v1-2                  2/2     Running   0          18h   172.20.1.15    192.168.1.108   <none>
-guestbook-v1-3                  2/2     Running   0          18h   172.20.0.147   192.168.1.107   <none>
-guestbook-v1-4                  2/2     Running   0          18h   172.20.0.146   192.168.1.107   <none>
-guestbook-v1-5                  2/2     Running   0          18h   172.20.1.16    192.168.1.108   <none>
-guestbook-v1-6                  2/2     Running   0          18h   172.20.0.148   192.168.1.107   <none>
-guestbook-v1-7                  2/2     Running   0          18h   172.20.0.9     192.168.1.106   <none>
-guestbook-v1-8                  2/2     Running   0          18h   172.20.0.10    192.168.1.106   <none>
-guestbook-v1-9                  2/2     Running   0          18h   172.20.0.11    192.168.1.106   <none>
+$ kubectl get pod -L controller-revision-hash -o wide | grep guestbook
+NAME                            READY   STATUS    RESTARTS   AGE     IP             NODE                        NOMINATED NODE   CONTROLLER-REVISION-HASH
+guestbook-v1-0                  1/1     Running   0          35s     172.29.1.21    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-1                  1/1     Running   0          35s     172.29.0.148   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-10                 1/1     Running   0          33s     172.29.1.23    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-11                 1/1     Running   0          33s     172.29.0.151   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-12                 1/1     Running   0          32s     172.29.0.152   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-13                 1/1     Running   0          32s     172.29.0.153   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-14                 1/1     Running   0          32s     172.29.0.27    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-15                 1/1     Running   0          31s     172.29.0.28    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-16                 1/1     Running   0          31s     172.29.1.24    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-17                 1/1     Running   0          30s     172.29.0.29    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-18                 1/1     Running   0          30s     172.29.0.154   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-19                 1/1     Running   0          30s     172.29.1.25    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-2                  1/1     Running   0          35s     172.29.0.22    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-3                  1/1     Running   0          35s     172.29.0.149   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-4                  1/1     Running   0          35s     172.29.0.23    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-5                  1/1     Running   0          35s     172.29.1.22    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-6                  1/1     Running   0          35s     172.29.0.24    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-7                  1/1     Running   0          34s     172.29.0.150   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-8                  1/1     Running   0          34s     172.29.0.25    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-9                  1/1     Running   0          34s     172.29.0.26    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
 ```
 
 Run this command to patch the statefulset to use the new image.
 
-`kubect apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset-v2.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset-v2.yaml`
 
 In particular, the difference is that the image version is updated to `v2` and partition is set to `15`, meaning that the pods with 
 ordinal larger than or equal to `15` will be updated to v2. The rest pods will remain at `v1`
@@ -236,32 +257,33 @@ NAME           DESIRED   CURRENT   UPDATED   READY   AGE
 guestbook-v1   20        20        5         20      18h
 ``` 
 
-Check the pods again. `guestbook-v1-15` to `guestbook-v1-19` are updated with `RESTARTS` showing `1` and IPs remain the same.
+Check the pods again. `guestbook-v1-15` to `guestbook-v1-19` are updated with `RESTARTS` showing `1`, 
+IPs remain the same, `CONTROLLER-REVISION-HASH` are updated from ` guestbook-v1-7c947b5f94` to `guestbook-v1-576bd76785`
 
 ```
 $ kubectl get pods -o wide | grep guestbook
 
-NAME                            READY   STATUS    RESTARTS   AGE   IP             NODE            NOMINATED NODE
-guestbook-v1-0                  2/2     Running   0          18h   172.20.0.145   192.168.1.107   <none>
-guestbook-v1-1                  2/2     Running   0          18h   172.20.1.14    192.168.1.108   <none>
-guestbook-v1-10                 2/2     Running   0          18h   172.20.1.17    192.168.1.108   <none>
-guestbook-v1-11                 2/2     Running   0          18h   172.20.1.18    192.168.1.108   <none>
-guestbook-v1-12                 2/2     Running   0          18h   172.20.0.12    192.168.1.106   <none>
-guestbook-v1-13                 2/2     Running   0          18h   172.20.0.149   192.168.1.107   <none>
-guestbook-v1-14                 2/2     Running   0          18h   172.20.1.19    192.168.1.108   <none>
-guestbook-v1-15                 2/2     Running   1          18h   172.20.0.13    192.168.1.106   <none>
-guestbook-v1-16                 2/2     Running   1          18h   172.20.0.150   192.168.1.107   <none>
-guestbook-v1-17                 2/2     Running   1          18h   172.20.0.151   192.168.1.107   <none>
-guestbook-v1-18                 2/2     Running   1          18h   172.20.0.14    192.168.1.106   <none>
-guestbook-v1-19                 2/2     Running   1          18h   172.20.1.20    192.168.1.108   <none>
-guestbook-v1-2                  2/2     Running   0          18h   172.20.1.15    192.168.1.108   <none>
-guestbook-v1-3                  2/2     Running   0          18h   172.20.0.147   192.168.1.107   <none>
-guestbook-v1-4                  2/2     Running   0          18h   172.20.0.146   192.168.1.107   <none>
-guestbook-v1-5                  2/2     Running   0          18h   172.20.1.16    192.168.1.108   <none>
-guestbook-v1-6                  2/2     Running   0          18h   172.20.0.148   192.168.1.107   <none>
-guestbook-v1-7                  2/2     Running   0          18h   172.20.0.9     192.168.1.106   <none>
-guestbook-v1-8                  2/2     Running   0          18h   172.20.0.10    192.168.1.106   <none>
-guestbook-v1-9                  2/2     Running   0          18h   172.20.0.11    192.168.1.106   <none>
+NAME                            READY   STATUS    RESTARTS   AGE     IP             NODE                        NOMINATED NODE   CONTROLLER-REVISION-HASH
+guestbook-v1-0                  1/1     Running   0          3m22s   172.29.1.21    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-1                  1/1     Running   0          3m22s   172.29.0.148   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-10                 1/1     Running   0          3m20s   172.29.1.23    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-11                 1/1     Running   0          3m20s   172.29.0.151   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-12                 1/1     Running   0          3m19s   172.29.0.152   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-13                 1/1     Running   0          3m19s   172.29.0.153   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-14                 1/1     Running   0          3m19s   172.29.0.27    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-15                 1/1     Running   1          3m18s   172.29.0.28    cn-shanghai.192.168.1.114   <none>           guestbook-v1-576bd76785
+guestbook-v1-16                 1/1     Running   1          3m18s   172.29.1.24    cn-shanghai.192.168.1.113   <none>           guestbook-v1-576bd76785
+guestbook-v1-17                 1/1     Running   1          3m17s   172.29.0.29    cn-shanghai.192.168.1.114   <none>           guestbook-v1-576bd76785
+guestbook-v1-18                 1/1     Running   1          3m17s   172.29.0.154   cn-shanghai.192.168.1.112   <none>           guestbook-v1-576bd76785
+guestbook-v1-19                 1/1     Running   1          3m17s   172.29.1.25    cn-shanghai.192.168.1.113   <none>           guestbook-v1-576bd76785
+guestbook-v1-2                  1/1     Running   0          3m22s   172.29.0.22    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-3                  1/1     Running   0          3m22s   172.29.0.149   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-4                  1/1     Running   0          3m22s   172.29.0.23    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-5                  1/1     Running   0          3m22s   172.29.1.22    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-6                  1/1     Running   0          3m22s   172.29.0.24    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-7                  1/1     Running   0          3m21s   172.29.0.150   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-8                  1/1     Running   0          3m21s   172.29.0.25    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+guestbook-v1-9                  1/1     Running   0          3m21s   172.29.0.26    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
 ```
 
 Now set `partition` to `0`, all pods will be updated to v2 this time, and all pods' IP remain `unchanged`. You should also find 
