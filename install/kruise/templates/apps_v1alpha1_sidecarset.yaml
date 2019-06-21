@@ -84,6 +84,10 @@ spec:
                 with the latest SidecarSet's containers
               format: int32
               type: integer
+          required:
+          - matchedPods
+          - updatedPods
+          - readyPods
           type: object
   version: v1alpha1
 status:

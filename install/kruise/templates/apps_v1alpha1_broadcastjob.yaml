@@ -170,6 +170,11 @@ spec:
               description: The number of pods which reached phase Succeeded.
               format: int32
               type: integer
+          required:
+          - active
+          - succeeded
+          - failed
+          - desired
           type: object
   version: v1alpha1
 status:
