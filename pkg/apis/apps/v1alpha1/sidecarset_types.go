@@ -43,13 +43,13 @@ type SidecarSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// matchedPods is the number of Pods whose labels are matched with this SidecarSet's selector
-	MatchedPods int32 `json:"matchedPods,omitempty"`
+	MatchedPods int32 `json:"matchedPods"`
 
 	// updatedPods is the number of matched Pods that are injected with the latest SidecarSet's containers
-	UpdatedPods int32 `json:"updatedPods,omitempty"`
+	UpdatedPods int32 `json:"updatedPods"`
 
 	// readyPods is the number of matched Pods that have a ready condition
-	ReadyPods int32 `json:"readyPods,omitempty"`
+	ReadyPods int32 `json:"readyPods"`
 }
 
 // +genclient

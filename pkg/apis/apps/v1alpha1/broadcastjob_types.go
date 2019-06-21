@@ -106,19 +106,19 @@ type BroadcastJobStatus struct {
 
 	// The number of actively running pods.
 	// +optional
-	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
+	Active int32 `json:"active" protobuf:"varint,4,opt,name=active"`
 
 	// The number of pods which reached phase Succeeded.
 	// +optional
-	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
+	Succeeded int32 `json:"succeeded" protobuf:"varint,5,opt,name=succeeded"`
 
 	// The number of pods which reached phase Failed.
 	// +optional
-	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
+	Failed int32 `json:"failed" protobuf:"varint,6,opt,name=failed"`
 
 	// The desired number of pods, this is typically equal to the number of nodes satisfied to run pods.
 	// +optional
-	Desired int32 `json:"desired,omitempty" protobuf:"varint,7,opt,name=desired"`
+	Desired int32 `json:"desired" protobuf:"varint,7,opt,name=desired"`
 }
 
 type JobConditionType string
