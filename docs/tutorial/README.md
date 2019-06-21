@@ -4,7 +4,22 @@ This tutorial walks through an example to deploy a redis cluster(1 master, 2 sla
 update of the guestbook app using Kruise controllers. The guestbook app used is from this [repo](https://github.com/IBM/guestbook/tree/master/v1).
 Below steps assume you have an existing kubernetes cluster running properly.
 
+## Installing Helm v3
+
+From [Helm v3 releases](https://github.com/helm/helm/releases/tag/v3.0.0-alpha.1).
+
+Or, some of Helm v3 Latest Release on Aliyun OSS:
+
+* [MacOS amd64 tar.gz](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-darwin-amd64.tar.gz)
+* [MacOS amd64 zip](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-darwin-amd64.zip)
+* [Linux 386](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-linux-386.tar.gz)
+* [Linux amd64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-linux-amd64.tar.gz) 
+* [Linux arm64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-linux-arm64.tar.gz)
+* [Windows amd64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-windows-amd64.zip)
+
+
 ## Install Kruise CRDs
+
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_broadcastjob.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
@@ -15,115 +30,62 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
 
-## Install redis
-```
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-deployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-service.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-slave-deployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-slave-service.yaml
-```
+## Installing guestbook-kruise Chart
 
-## Install Guestbook sidecarset
-
-The sidecarset controller is a webhook controller and will watch pod creation and automatically inject a sidecar guestbook container into the matched pods
-
-`kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sidecar.yaml`
-
-Below is how the sidecarset looks like:
-```
-apiVersion: apps.kruise.io/v1alpha1
-kind: SidecarSet
-metadata:
-  name: guestbook-sidecar
-spec:
-  selector: # select the pods to be injected with sidecar containers
-    matchLabels:
-      app: guestbook
-  containers:
-    - name: guestbook-sidecar
-      image: openkruise/guestbook:sidecar
-      imagePullPolicy: Always
-      ports:
-        - name: sidecar-server
-          containerPort: 4000 # different from main guestbook containerPort which is 3000
+Add the repository to your local environment:
+```bash
+$ helm repo add apphub https://apphub.aliyuncs.com
 ```
 
-## Install Guestbook 
+To install the chart with release name (application name) of `guestbook-kruise`:
 
-This will create an Advanced StatefulSet with guestbook containers.
-```
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-service.yaml
+```bash
+$ helm install guestbook-kruise apphub/guestbook-kruise
 ```
 
-Several things to note in the `guestbook-statefulset.yaml`
-```yaml
-* apiVersion: apps.kruise.io/v1alpha1  # the kruise group version
-  kind: StatefulSet
-  ...
-    spec:
-*     readinessGates:
-*        # A new condition must be added to ensure the pod remain at NotReady state while the in-place update is happening
-*        - conditionType: InPlaceUpdateReady
-      containers:
-      - name: guestbook
-        image: openkruise/guestbook:v1
-        ports:
-        - name: http-server
-          containerPort: 3000
-*    podManagementPolicy: Parallel  # allow parallel updates, works together with maxUnavailable
-*    updateStrategy:
-*       type: RollingUpdate
-*       rollingUpdate:
-*         # Do in-place update if possible, currently only image update is supported for in-place update
-*         podUpdatePolicy: InPlaceIfPossible
-*         # Allow parallel updates with max number of unavailable instances equals to 3
-*         maxUnavailable: 3
+## Configuration
+
+The following tables lists the configurable parameters of the chart and their default values.
+
+| Parameter                  | Description                                     | Default                                                    |
+| -----------------------    | ---------------------------------------------   | ---------------------------------------------------------- |
+| `image.repository`         | Image repository                                | `resouer/guestbook`                                         |
+| `image.tag`                | Image tag                                       | `v1`                                                       |
+| `image.pullPolicy`         | Image pull policy                               | `Always`                                                   |
+| `service.type`             | Service type                                    | `LoadBalancer`                                             |
+| `service.port`             | Service port                                    | `3000`                                                     |
+| `redis.slaveEnabled`       | Redis slave enabled                             | `true`                                                     |
+| `redis.port`               | Redis port                                      | `6379`                                                     |
+
+Specify each parameter using the `--set [key=value]` argument to `helm install`. For example,
+
+```bash
+$ helm install guestbook-kruise apphub/guestbook-kruise --set service.type=NodePort
 ```
 
-Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind. 
-`app.kruise.io` postfix needs to be appended due to naming collision with Kubernetes native `statefulset` kind.
- Verify that all pods are READY.
+Get the application URL by running these commands:
+
+```shell
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status of by running 'kubectl get svc -w guestbook-kruise --namespace default'
+  export SERVICE_IP=$(kubectl get svc --namespace default guestbook-kruise -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  echo http://$SERVICE_IP:3000
 ```
-kubectl get sts.apps.kruise.io
 
-NAME           DESIRED   CURRENT   UPDATED   READY   AGE
-guestbook-v1   20        20        20        20      6m
+
+
+## If you are using minikube:
+
+```bash
+$ minikube service guestbook-kruise
 ```
 
-Describe one Guestbook pod
-`kubectl describe pod guestbook-v1-0`
+Get the application URL by running these commands:
 
-Find that the sidecar container is injected.
-
-```yaml
-    Containers:
-      guestbook:
-        Container ID:   docker://44f19a140c30de2c5b1a3f63c252c074efbb9c1b5eb7893ee7134461466b35c8
-        Image:          openkruise/guestbook:v1
-        Image ID:       docker-pullable://openkruise/guestbook@sha256:a5b6e5462982ca795fa9c7ddc378ea5b24a31e5d57eb806095526f7b21384dbd
-        Port:           3000/TCP
-        Host Port:      0/TCP
-        State:          Running
-          Started:      Wed, 19 Jun 2019 17:30:29 +0800
-        Ready:          True
-        Restart Count:  0
-        Environment:    <none>
-        Mounts:
-          /var/run/secrets/kubernetes.io/serviceaccount from default-token-k5qpw (ro)
-+     guestbook-sidecar:
-+       Container ID:   docker://cbc379ce84624d9801928d5b2f1f2739e24094b440c55d62f7e0892eb31b0719
-+       Image:          openkruise/guestbook:sidecar
-+       Image ID:       docker-pullable://openkruise/guestbook@sha256:016eddf673cc7afc5da2fa96b5148161b521cff20583fb1d0c3aa44e6ac75272
-+       Port:           4000/TCP
-+       Host Port:      0/TCP
-+       State:          Running
-+         Started:      Wed, 19 Jun 2019 17:30:45 +0800
-+       Ready:          True
-+       Restart Count:  0
-+       Environment:
-+         IS_INJECTED:  true
-+       Mounts:         <none>
+```shell
+  export NODE_PORT=$(kubectl get --namespace default -o jsonpath="{.spec.ports[0].nodePort}" services guestbook-kruise)
+  export NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
 ```
 
 
@@ -132,9 +94,8 @@ Find that the sidecar container is injected.
 
 You can now view the Guestbook on browser.
 
-* **Local Host:**
-    If you are running Kubernetes locally, to view the guestbook, navigate to `http://localhost:3000` for the main guestbook
-    and `http://localhost:4000` for the sidecar guestbook. 
+* **Local Host（minikube）:**
+    If you are running Kubernetes locally, to view the guestbook, navigate to the application URL get in above steps. 
     
 
 * **Remote Host:**
@@ -154,9 +115,6 @@ redis-slave    ClusterIP      172.21.5.58    <none>          6379/TCP           
 Visit `http://47.101.74.131:3000` for the main guestbook.
 ![Guestbook](./v1/guestbook.jpg)
 
-Visit `http://47.101.74.131:4000` for the sidecar guestbook.
-
-![Guestbook](./v1/guestbook-sidecar.jpg)
 
 
 ## Run a BroadcastJob to pre download a new image
