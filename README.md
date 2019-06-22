@@ -19,7 +19,7 @@ Today, Kruise offers three application workload controllers:
 
 Please see [documents](./docs/README.md) for more technical information.
 
-A [tutorial](./docs/tutorial/README.md) is provided to demonstrate how to use the workload controllers.
+Several [tutorials](./docs/tutorial/README.md) are provided to demonstrate how to use the workload controllers.
 
 ## Getting started
 
