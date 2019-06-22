@@ -1,8 +1,23 @@
 # Tutorial
 
-This tutorial walks through an example to deploy a redis cluster(1 master, 2 slaves) and a guestbook app and do in-place
-update of the guestbook app using Kruise controllers. The guestbook app used is from this [repo](https://github.com/IBM/guestbook/tree/master/v1).
+This tutorial walks through an example to deploy a guestbook app by Helm v3 and do in-place
+update of the guestbook app using Kruise controllers. The guestbook app used is from this [repo](https://github.com/cloudnativeapp/guestbook/tree/master/v1).
+
 Below steps assume you have an existing kubernetes cluster running properly.
+
+## Install Helm v3
+
+From [Helm v3 releases](https://github.com/helm/helm/releases/tag/v3.0.0-alpha.1).
+
+Or, some of Helm v3 Latest Release on Aliyun OSS:
+
+* [MacOS amd64 tar.gz](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-darwin-amd64.tar.gz)
+* [MacOS amd64 zip](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-darwin-amd64.zip)
+* [Linux 386](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-linux-386.tar.gz)
+* [Linux amd64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-linux-amd64.tar.gz) 
+* [Linux arm64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-linux-arm64.tar.gz)
+* [Windows amd64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-windows-amd64.zip)
+
 
 ## Install Kruise CRDs
 ```
@@ -13,24 +28,22 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 
 ## Install kruise-manager
 
-`kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
-
-## Install redis
 ```
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-deployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-service.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-slave-deployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-slave-service.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml
 ```
 
-## Install Guestbook sidecarset
+
+## Install guestbook sidecarset
 
 The sidecarset controller is a webhook controller and will watch pod creation and automatically inject a sidecar guestbook container into the matched pods
 
-`kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sidecar.yaml`
+```
+$ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sidecar.yaml
+```
 
 Below is how the sidecarset looks like:
-```
+
+```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: SidecarSet
 metadata:
@@ -48,15 +61,8 @@ spec:
           containerPort: 4000 # different from main guestbook containerPort which is 3000
 ```
 
-## Install Guestbook 
+## Take a closer look into guestbook application
 
-This will create an Advanced StatefulSet with guestbook containers.
-```
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-service.yaml
-```
-
-Several things to note in the `guestbook-statefulset.yaml`
 ```yaml
 * apiVersion: apps.kruise.io/v1alpha1  # the kruise group version
   kind: StatefulSet
@@ -81,20 +87,49 @@ Several things to note in the `guestbook-statefulset.yaml`
 *         maxUnavailable: 3
 ```
 
+## Installing the application by using Helm
+
+Add the repository to your Helm:
+```bash
+$ helm repo add apphub https://apphub.aliyuncs.com
+```
+
+To install the chart with release name (application name) of `demo-v1`, replica of `20`:
+
+```bash
+$ helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook
+```
+
+The Chart located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
+
+## Check your application
+
 Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind. 
 `app.kruise.io` postfix needs to be appended due to naming collision with Kubernetes native `statefulset` kind.
  Verify that all pods are READY.
 ```
-kubectl get sts.apps.kruise.io
+$ kubectl get sts.apps.kruise.io
+NAME                            DESIRED    CURRENT    UPDATED    READY    AGE
+demo-v1-guestbook-kruise   20         20         20         20       17s
 
-NAME           DESIRED   CURRENT   UPDATED   READY   AGE
-guestbook-v1   20        20        20        20      6m
+$ kubectl get pods
+NAME                                   READY   STATUS    RESTARTS   AGE
+demo-v1-guestbook-kruise-0        1/1     Running   0          39s
+demo-v1-guestbook-kruise-1        1/1     Running   0          39s
+...
+demo-v1-guestbook-kruise-16       1/1     Running   0          35s
+demo-v1-guestbook-kruise-17       1/1     Running   0          34s
+demo-v1-guestbook-kruise-18       1/1     Running   0          34s
+demo-v1-guestbook-kruise-19       1/1     Running   0          33s
 ```
 
-Describe one Guestbook pod
-`kubectl describe pod guestbook-v1-0`
+Describe one guestbook pod:
 
-Find that the sidecar container is injected.
+```
+$ kubectl describe pod demo-v1-guestbook-kruise-0
+```
+
+Check that the sidecar container is injected.
 
 ```yaml
     Containers:
@@ -127,7 +162,6 @@ Find that the sidecar container is injected.
 ```
 
 
-
 ## View the Guestbook
 
 You can now view the Guestbook on browser.
@@ -144,10 +178,7 @@ You can now view the Guestbook on browser.
 $ kubectl get svc
 
 NAME           TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
-guestbook      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
-kubernetes     ClusterIP      172.21.0.1     <none>          443/TCP                         104m
-redis-master   ClusterIP      172.21.10.81   <none>          6379/TCP                        86m
-redis-slave    ClusterIP      172.21.5.58    <none>          6379/TCP                        86m
+demo-v1-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
 `47.101.74.131` is the external IP. 
@@ -158,16 +189,18 @@ Visit `http://47.101.74.131:4000` for the sidecar guestbook.
 
 ![Guestbook](./v1/guestbook-sidecar.jpg)
 
-
 ## Run a BroadcastJob to pre download a new image
+
 First check that the nodes do not have images present. Below command should output nothing.
 ```
-kubectl get nodes -o yaml | grep "openkruise/guestbook:v2"
+$ kubectl get nodes -o yaml | grep "openkruise/guestbook:v2"
 ```
 
 Then, run a broadcastjob to download the images.
 
-`kubect apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/broadcastjob.yaml`
+```
+$ kubect apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/broadcastjob.yaml
+```
 
 Check the broadcastjob is completed. `bj` is short for `broadcastjob`
 ```
@@ -203,31 +236,33 @@ First, check the running pods.
 ```
 $ kubectl get pod -L controller-revision-hash -o wide | grep guestbook
 NAME                            READY   STATUS    RESTARTS   AGE     IP             NODE                        NOMINATED NODE   CONTROLLER-REVISION-HASH
-guestbook-v1-0                  1/1     Running   0          35s     172.29.1.21    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-1                  1/1     Running   0          35s     172.29.0.148   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-10                 1/1     Running   0          33s     172.29.1.23    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-11                 1/1     Running   0          33s     172.29.0.151   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-12                 1/1     Running   0          32s     172.29.0.152   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-13                 1/1     Running   0          32s     172.29.0.153   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-14                 1/1     Running   0          32s     172.29.0.27    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-15                 1/1     Running   0          31s     172.29.0.28    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-16                 1/1     Running   0          31s     172.29.1.24    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-17                 1/1     Running   0          30s     172.29.0.29    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-18                 1/1     Running   0          30s     172.29.0.154   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-19                 1/1     Running   0          30s     172.29.1.25    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-2                  1/1     Running   0          35s     172.29.0.22    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-3                  1/1     Running   0          35s     172.29.0.149   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-4                  1/1     Running   0          35s     172.29.0.23    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-5                  1/1     Running   0          35s     172.29.1.22    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-6                  1/1     Running   0          35s     172.29.0.24    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-7                  1/1     Running   0          34s     172.29.0.150   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-8                  1/1     Running   0          34s     172.29.0.25    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-9                  1/1     Running   0          34s     172.29.0.26    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+demo-v1-guestbook-kruise-0                  1/1     Running   0          35s     172.29.1.21    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-1                  1/1     Running   0          35s     172.29.0.148   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-10                 1/1     Running   0          33s     172.29.1.23    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-11                 1/1     Running   0          33s     172.29.0.151   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-12                 1/1     Running   0          32s     172.29.0.152   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-13                 1/1     Running   0          32s     172.29.0.153   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-14                 1/1     Running   0          32s     172.29.0.27    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-15                 1/1     Running   0          31s     172.29.0.28    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-16                 1/1     Running   0          31s     172.29.1.24    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-17                 1/1     Running   0          30s     172.29.0.29    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-18                 1/1     Running   0          30s     172.29.0.154   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-19                 1/1     Running   0          30s     172.29.1.25    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-2                  1/1     Running   0          35s     172.29.0.22    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-3                  1/1     Running   0          35s     172.29.0.149   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-4                  1/1     Running   0          35s     172.29.0.23    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-5                  1/1     Running   0          35s     172.29.1.22    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-6                  1/1     Running   0          35s     172.29.0.24    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-7                  1/1     Running   0          34s     172.29.0.150   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-8                  1/1     Running   0          34s     172.29.0.25    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-9                  1/1     Running   0          34s     172.29.0.26    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
 ```
 
 Run this command to patch the statefulset to use the new image.
 
-`kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset-v2.yaml`
+```
+$ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-patch-to-v2.yaml
+```
 
 In particular, the difference is that the image version is updated to `v2` and partition is set to `15`, meaning that the pods with 
 ordinal larger than or equal to `15` will be updated to v2. The rest pods will remain at `v1`
@@ -254,36 +289,36 @@ Check the statefulset, find the statefulset has 5 pods updated
 $ kubectl get sts.apps.kruise.io
 
 NAME           DESIRED   CURRENT   UPDATED   READY   AGE
-guestbook-v1   20        20        5         20      18h
+demo-v1-guestbook-kruise   20        20        5         20      18h
 ``` 
 
-Check the pods again. `guestbook-v1-15` to `guestbook-v1-19` are updated with `RESTARTS` showing `1`, 
-IPs remain the same, `CONTROLLER-REVISION-HASH` are updated from ` guestbook-v1-7c947b5f94` to `guestbook-v1-576bd76785`
+Check the pods again. `demo-v1-guestbook-kruise-15` to `demo-v1-guestbook-kruise-19` are updated with `RESTARTS` showing `1`, 
+IPs remain the same, `CONTROLLER-REVISION-HASH` are updated from ` demo-v1-guestbook-kruise-7c947b5f94` to `demo-v1-guestbook-kruise-576bd76785`
 
 ```
 $ kubectl get pod -L controller-revision-hash -o wide | grep guestbook
 
 NAME                            READY   STATUS    RESTARTS   AGE     IP             NODE                        NOMINATED NODE   CONTROLLER-REVISION-HASH
-guestbook-v1-0                  1/1     Running   0          3m22s   172.29.1.21    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-1                  1/1     Running   0          3m22s   172.29.0.148   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-10                 1/1     Running   0          3m20s   172.29.1.23    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-11                 1/1     Running   0          3m20s   172.29.0.151   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-12                 1/1     Running   0          3m19s   172.29.0.152   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-13                 1/1     Running   0          3m19s   172.29.0.153   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-14                 1/1     Running   0          3m19s   172.29.0.27    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-15                 1/1     Running   1          3m18s   172.29.0.28    cn-shanghai.192.168.1.114   <none>           guestbook-v1-576bd76785
-guestbook-v1-16                 1/1     Running   1          3m18s   172.29.1.24    cn-shanghai.192.168.1.113   <none>           guestbook-v1-576bd76785
-guestbook-v1-17                 1/1     Running   1          3m17s   172.29.0.29    cn-shanghai.192.168.1.114   <none>           guestbook-v1-576bd76785
-guestbook-v1-18                 1/1     Running   1          3m17s   172.29.0.154   cn-shanghai.192.168.1.112   <none>           guestbook-v1-576bd76785
-guestbook-v1-19                 1/1     Running   1          3m17s   172.29.1.25    cn-shanghai.192.168.1.113   <none>           guestbook-v1-576bd76785
-guestbook-v1-2                  1/1     Running   0          3m22s   172.29.0.22    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-3                  1/1     Running   0          3m22s   172.29.0.149   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-4                  1/1     Running   0          3m22s   172.29.0.23    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-5                  1/1     Running   0          3m22s   172.29.1.22    cn-shanghai.192.168.1.113   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-6                  1/1     Running   0          3m22s   172.29.0.24    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-7                  1/1     Running   0          3m21s   172.29.0.150   cn-shanghai.192.168.1.112   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-8                  1/1     Running   0          3m21s   172.29.0.25    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
-guestbook-v1-9                  1/1     Running   0          3m21s   172.29.0.26    cn-shanghai.192.168.1.114   <none>           guestbook-v1-7c947b5f94
+demo-v1-guestbook-kruise-0                  1/1     Running   0          3m22s   172.29.1.21    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-1                  1/1     Running   0          3m22s   172.29.0.148   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-10                 1/1     Running   0          3m20s   172.29.1.23    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-11                 1/1     Running   0          3m20s   172.29.0.151   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-12                 1/1     Running   0          3m19s   172.29.0.152   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-13                 1/1     Running   0          3m19s   172.29.0.153   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-14                 1/1     Running   0          3m19s   172.29.0.27    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-15                 1/1     Running   1          3m18s   172.29.0.28    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-16                 1/1     Running   1          3m18s   172.29.1.24    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-17                 1/1     Running   1          3m17s   172.29.0.29    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-18                 1/1     Running   1          3m17s   172.29.0.154   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-19                 1/1     Running   1          3m17s   172.29.1.25    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-2                  1/1     Running   0          3m22s   172.29.0.22    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-3                  1/1     Running   0          3m22s   172.29.0.149   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-4                  1/1     Running   0          3m22s   172.29.0.23    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-5                  1/1     Running   0          3m22s   172.29.1.22    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-6                  1/1     Running   0          3m22s   172.29.0.24    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-7                  1/1     Running   0          3m21s   172.29.0.150   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-8                  1/1     Running   0          3m21s   172.29.0.25    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-9                  1/1     Running   0          3m21s   172.29.0.26    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
 ```
 
 Now set `partition` to `0`, all pods will be updated to v2 this time, and all pods' IP remain `unchanged`. You should also find 
@@ -292,12 +327,12 @@ that all 20 pods are updated fairly soon because 1) new images are already pre-d
 ```
 $ kubectl get sts.apps.kruise.io
 NAME           DESIRED   CURRENT   UPDATED   READY   AGE
-guestbook-v1   20        20        20        20      18h
+demo-v1-guestbook-kruise   20        20        20        20      18h
 ```
 
 Describe a pod and find that the events show the original container is killed and new container is started. This verifies `in-place` update
 ```
-$ kubectl describe pod guestbook-v1-0
+$ kubectl describe pod demo-v1-guestbook-kruise-0
 
 ...
 Events:
