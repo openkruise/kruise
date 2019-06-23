@@ -17,6 +17,7 @@ metadata:
 spec:
   selector: # select the pods to be injected with sidecar containers
     matchLabels:
+      # This needs to match the labels of the pods to be injected.
       app.kubernetes.io/name: guestbook-kruise
   containers:
     - name: guestbook-sidecar
@@ -35,7 +36,7 @@ To install the chart with release name (application name) of `demo-v1`, replica 
 ```bash
 helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook,image.tag=v2
 ```
-The Chart located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
+The Chart is located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
 
 
 Alternatively, Install the application using YAML files:
@@ -111,7 +112,7 @@ You can now view the Sidecar Guestbook on browser.
     If you are running Kubernetes locally, to view the sidecar guestbook, navigate to `http://localhost:4000`. 
 
 * **Remote Host:**
-    To view the sidecar guestbook on a remote host, locate the external IP of the load balancer in the **IP** column of the `kubectl get services` output.
+    To view the sidecar guestbook on a remote host, locate the external IP of the application in the **IP** column of the `kubectl get services` output.
     For example, run 
 ```
 kubectl get svc
@@ -144,4 +145,10 @@ Then uninstall it:
 
 ```
 helm uninstall demo-v1
+```
+If you are not using helm, deleting the application using below commands:
+```
+kubectl delete sts.apps.kruise.io demo-v1-guestbook-kruise
+kubectl delete svc demo-v1-guestbook-kruise redis-master redis-slave
+kubectl delete deploy redis-master redis-slave
 ```

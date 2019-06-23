@@ -11,7 +11,7 @@ To install the chart with release name (application name) of `demo-v1`, replica 
 helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook
 ```
 
-The Chart located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
+The Chart is located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
 
 Now the guestbook-kruise app has been installed!
 
@@ -79,20 +79,17 @@ You can now view the Guestbook on browser.
     If you are running Kubernetes locally, to view the guestbook, navigate to `http://localhost:3000` for the guestbook    
 
 * **Remote Host:**
-    To view the guestbook on a remote host, locate the external IP of the load balancer in the **IP** column of the `kubectl get services` output.
+    To view the guestbook on a remote host, locate the external IP of the application in the **IP** column of the `kubectl get services` output.
     For example, run 
 ```
-$ kubectl get svc
+kubectl get svc
 
-NAME           TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
-guestbook      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
-kubernetes     ClusterIP      172.21.0.1     <none>          443/TCP                         104m
-redis-master   ClusterIP      172.21.10.81   <none>          6379/TCP                        86m
-redis-slave    ClusterIP      172.21.5.58    <none>          6379/TCP                        86m
+NAME                          TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
+demo-v1-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
 `47.101.74.131` is the external IP. 
-Visit `http://47.101.74.131:3000` for the main guestbook.
+Visit `http://47.101.74.131:3000` for the guestbook UI.
 ![Guestbook](./v1/guestbook.jpg)
 
 
@@ -123,7 +120,7 @@ demo-v1-guestbook-kruise-8                  1/1     Running   0          34s    
 demo-v1-guestbook-kruise-9                  1/1     Running   0          34s     172.29.0.26    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
 ```
 
-Run this command to patch the statefulset to use the new image.
+Run this command to update the statefulset to use the new image.
 
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-patch-to-v2.yaml
@@ -131,7 +128,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 
 What this command does is that it changes the image version to `v2` and changes `partition` to `15`.
 This will update pods with ordinal number >= 15 (i.e. 15 - 19)to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`.
-YAML diff details shown below:
+The YAML diff details are shown below:
 ```yaml
 spec:
     ...
@@ -240,4 +237,11 @@ Then uninstall it:
 
 ```
 helm uninstall demo-v1
+```
+
+If you are not using helm, deleting the application using below commands:
+```
+kubectl delete sts.apps.kruise.io demo-v1-guestbook-kruise
+kubectl delete svc demo-v1-guestbook-kruise redis-master redis-slave
+kubectl delete deploy redis-master redis-slave
 ```
