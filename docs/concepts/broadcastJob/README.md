@@ -141,3 +141,6 @@ spec:
   completionPolicy:
     type: Never
 ```
+
+## Tutorial
+-  [Use Broadcast Job to pre-download image](../../tutorial/broadcastjob.md)

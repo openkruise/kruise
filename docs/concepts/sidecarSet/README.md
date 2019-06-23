@@ -98,3 +98,6 @@ status:
   readyPods: 1
   updatedPods: 1
 ```
+## Tutorial
+A more sophisticated tutorial is provided:
+-  [Use SidecarSet to inject a sidecar container into the Guestbook application](../../tutorial/sidecarset.md)

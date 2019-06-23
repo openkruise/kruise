@@ -149,3 +149,6 @@ spec:
       # Allow parallel updates with max number of unavailable instances equals to 2
       maxUnavailable: 2
 ```
+
+### Tutorial
+-  [Use advanced StatefulSet to install Guestbook app](../../tutorial/advanced-statefulset.md)
