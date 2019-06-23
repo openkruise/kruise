@@ -11,7 +11,7 @@ kubectl get nodes -o yaml | grep "openkruise/guestbook:v3"
 
 ## Run a broadcastjob to download the images
 
-`kubect apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/broadcastjob.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/broadcastjob.yaml`
 
 Check the broadcastjob is completed. `bj` is short for `broadcastjob`
 ```
