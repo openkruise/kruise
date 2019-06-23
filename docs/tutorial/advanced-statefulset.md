@@ -129,8 +129,8 @@ Run this command to patch the statefulset to use the new image.
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-patch-to-v2.yaml
 ```
 
-In particular, the difference is that the image version is updated to `v2` and partition is set to `15`, meaning that the pods with 
-ordinal larger than or equal to `15` will be updated to v2. The rest pods will remain at `v1`
+What this command does is that it changes the image version to `v2` and change `partition` to `15`.
+This will update pods with ordinal number >= 15 (i.e. 15 - 19)to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`. Details shown below:
 ```yaml
 spec:
     ...
@@ -187,7 +187,7 @@ demo-v1-guestbook-kruise-9                  1/1     Running   0          3m21s  
 ```
 
 Now set `partition` to `0`, all pods will be updated to v2 this time, and all pods' IP remain `unchanged`. You should also find 
-that all 20 pods are updated fairly soon because 1) new images are already pre-downloaded, 2) the `maxUnavailable` feature allows parallel updates instead of sequential 
+that all 20 pods are updated fairly soon because the `maxUnavailable` feature allows parallel updates instead of sequential update.
 
 ```
 kubectl get sts.apps.kruise.io

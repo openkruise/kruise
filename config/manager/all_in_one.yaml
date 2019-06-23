@@ -233,7 +233,7 @@ spec:
                   fieldPath: metadata.namespace
             - name: SECRET_NAME
               value: kruise-webhook-server-secret
-          image: openkruise/kruise-manager:test
+          image: openkruise/kruise-manager:daily
           imagePullPolicy: Always
           name: manager
           ports:
