@@ -223,3 +223,21 @@ Conditions:
   ContainersReady      True
   PodScheduled         True
 ```
+
+## Uninstall app
+
+Using helm to uninstall apps is very easy.
+
+First you may want to list your helm apps:
+
+```
+helm list
+NAME          NAMESPACE  REVISION  UPDATED                               STATUS    CHART
+demo-v1       default    1         2019-06-23 13:33:21.278013 +0800 CST  deployed  guestbook-kruise-0.3.0
+```  
+
+Then uninstall it:
+
+```
+helm uninstall demo-v1
+```

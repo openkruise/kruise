@@ -30,16 +30,15 @@ spec:
 
 ## Installing the application
 
-To install the chart with release name (application name) of `demo-sidecar`, replica of `20`:
+To install the chart with release name (application name) of `demo-v1`, replica of `20`:
 
 ```bash
-helm install demo-sidecar apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook,image.tag=v2
+helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook,image.tag=v2
 ```
 The Chart located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
 
 
-Alternatively, Install the application using YAML files
-This will create an Advanced StatefulSet with guestbook containers.
+Alternatively, Install the application using YAML files:
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sts-for-sidecar-demo.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-service-for-sidecar-demo.yaml
@@ -52,23 +51,23 @@ Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.
 ```
 kubectl get sts.apps.kruise.io
 NAME                            DESIRED    CURRENT    UPDATED    READY    AGE
-demo-sidecar-guestbook-kruise   20         20         20         20       17s
+demo-v1-guestbook-kruise   20         20         20         20       17s
 
 kubectl get pods
 NAME                                   READY   STATUS    RESTARTS   AGE
-demo-sidecar-guestbook-kruise-0        1/1     Running   0          39s
-demo-sidecar-guestbook-kruise-1        1/1     Running   0          39s
+demo-v1-guestbook-kruise-0        1/1     Running   0          39s
+demo-v1-guestbook-kruise-1        1/1     Running   0          39s
 ...
-demo-sidecar-guestbook-kruise-16       1/1     Running   0          35s
-demo-sidecar-guestbook-kruise-17       1/1     Running   0          34s
-demo-sidecar-guestbook-kruise-18       1/1     Running   0          34s
-demo-sidecar-guestbook-kruise-19       1/1     Running   0          33s
+demo-v1-guestbook-kruise-16       1/1     Running   0          35s
+demo-v1-guestbook-kruise-17       1/1     Running   0          34s
+demo-v1-guestbook-kruise-18       1/1     Running   0          34s
+demo-v1-guestbook-kruise-19       1/1     Running   0          33s
 ```
 
 Describe one guestbook pod:
 
 ```
-kubectl describe pod demo-sidecar-guestbook-kruise-0
+kubectl describe pod demo-v1-guestbook-kruise-0
 ```
 
 Check that the sidecar container is injected.
@@ -118,7 +117,7 @@ You can now view the Sidecar Guestbook on browser.
 kubectl get svc
 
 NAME           TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
-demo-sidecar-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
+demo-v1-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
 `47.101.74.131` is the external IP. 
@@ -128,3 +127,21 @@ Visit `http://47.101.74.131:4000` for the sidecar guestbook.
 ![Guestbook](./v1/guestbook-sidecar.jpg)
 
 The main guestbook is running on port `3000`, i.e. `http://localhost:4000`
+
+## Uninstall app
+
+Using helm to uninstall apps is very easy.
+
+First you may want to list your helm apps:
+
+```
+helm list
+NAME          NAMESPACE  REVISION  UPDATED                               STATUS    CHART
+demo-v1       default    1         2019-06-23 13:33:21.278013 +0800 CST  deployed  guestbook-kruise-0.3.0
+```  
+
+Then uninstall it:
+
+```
+helm uninstall demo-v1
+```
