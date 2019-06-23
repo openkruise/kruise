@@ -129,8 +129,9 @@ Run this command to patch the statefulset to use the new image.
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-patch-to-v2.yaml
 ```
 
-What this command does is that it changes the image version to `v2` and change `partition` to `15`.
-This will update pods with ordinal number >= 15 (i.e. 15 - 19)to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`. Details shown below:
+What this command does is that it changes the image version to `v2` and changes `partition` to `15`.
+This will update pods with ordinal number >= 15 (i.e. 15 - 19)to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`.
+YAML diff details shown below:
 ```yaml
 spec:
     ...
