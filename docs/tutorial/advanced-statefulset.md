@@ -13,6 +13,10 @@ helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.reposit
 
 The Chart located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
 
+Now the guestbook-kruise app has been installed!
+
+If you don't use helm, you need to install with YAML files as below.
+
 ## Install the Guestbook application with YAML files
 
 Below installs a redis cluster with 1 master 2 slaves
@@ -53,6 +57,8 @@ Several things to note in the `guestbook-statefulset.yaml`
 *         # Allow parallel updates with max number of unavailable instances equals to 3
 *         maxUnavailable: 3
 ```
+
+Now the app has been installed.
 
 ## Verify Guestbook Started
 Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind. 
