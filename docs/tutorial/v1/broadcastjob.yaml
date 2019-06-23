@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: guestbook
-          image: openkruise/guestbook:v2
+          image: openkruise/guestbook:v3
           command: ["echo",  "started"] # a dummy command to do nothing
       restartPolicy: Never
   completionPolicy:
