@@ -184,8 +184,12 @@ demo-v1-guestbook-kruise-8                  1/1     Running   0          3m21s  
 demo-v1-guestbook-kruise-9                  1/1     Running   0          3m21s   172.29.0.26    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
 ```
 
-Now set `partition` to `0`, all pods will be updated to v2 this time, and all pods' IP remain `unchanged`. You should also find 
-that all 20 pods are updated fairly soon because the `maxUnavailable` feature allows parallel updates instead of sequential update.
+Now upgrade all the pods, run
+```
+kubectl edit sts.apps.kruise.io demo-v1-guestbook-kruise
+``` 
+and update `partition` to `0`, all pods will be updated to v2 this time, and all pods' IP remain `unchanged`. You should also find 
+that all 20 pods are updated fairly fast because the `maxUnavailable` feature allows parallel updates instead of sequential update.
 
 ```
 kubectl get sts.apps.kruise.io
