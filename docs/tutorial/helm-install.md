@@ -14,7 +14,24 @@ Or, some of Helm v3 Latest Release on Aliyun OSS:
 If you are using Helm for first time, you may need to init Helm:
 
 ```
-helm init
+➜  ~ helm init
+Creating ~/.helm
+Creating ~/.helm/repository
+Creating ~/.helm/repository/cache
+Creating ~/.helm/plugins
+Creating ~/.helm/starters
+Creating ~/.helm/cache/archive
+Creating ~/.helm/repository/repositories.yaml
+Adding stable repo with URL: https://kubernetes-charts.storage.googleapis.com
+^C
+
+➜  ~ touch ~/.helm/repository/repositories.yaml
+
+
+➜  ~ helm init
+Updating repository file format...
+$HELM_HOME has been configured at ~/.helm.
+Happy Helming!
 ```
 
 Add the [AppHub](https://developer.aliyun.com/hub) repository to your Helm:
