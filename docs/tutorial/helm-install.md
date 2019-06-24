@@ -15,22 +15,22 @@ If you are using Helm for first time, you may need to init Helm:
 
 ```
 ➜  ~ helm init
-Creating /Users/bingshenwbs/.helm
-Creating /Users/bingshenwbs/.helm/repository
-Creating /Users/bingshenwbs/.helm/repository/cache
-Creating /Users/bingshenwbs/.helm/plugins
-Creating /Users/bingshenwbs/.helm/starters
-Creating /Users/bingshenwbs/.helm/cache/archive
-Creating /Users/bingshenwbs/.helm/repository/repositories.yaml
+Creating ~/.helm
+Creating ~/.helm/repository
+Creating ~/.helm/repository/cache
+Creating ~/.helm/plugins
+Creating ~/.helm/starters
+Creating ~/.helm/cache/archive
+Creating ~/.helm/repository/repositories.yaml
 Adding stable repo with URL: https://kubernetes-charts.storage.googleapis.com
 ^C
 
-➜  ~ touch /Users/bingshenwbs/.helm/repository/repositories.yaml
+➜  ~ touch ~/.helm/repository/repositories.yaml
 
 
 ➜  ~ helm init
 Updating repository file format...
-$HELM_HOME has been configured at /Users/bingshenwbs/.helm.
+$HELM_HOME has been configured at ~/.helm.
 Happy Helming!
 ```
 
