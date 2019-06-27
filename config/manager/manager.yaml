@@ -22,7 +22,7 @@ spec:
   - port: 443
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: controller-manager
   namespace: system
@@ -30,16 +30,11 @@ metadata:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       control-plane: controller-manager
       controller-tools.k8s.io: "1.0"
-  strategy:
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 100%
-    type: RollingUpdate
   template:
     metadata:
       labels:

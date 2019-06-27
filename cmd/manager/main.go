@@ -35,9 +35,11 @@ import (
 
 func main() {
 	var metricsAddr string
+	var enableLeaderElection bool
 	var leaderElectionNamespace string
 	var namespace string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false, "Whether you need to enable leader election.")
 	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "kruise-system",
 		"This determines the namespace in which the leader election configmap will be created, it will use in-cluster namespace if empty.")
 	flag.StringVar(&namespace, "namespace", "",
@@ -58,13 +60,16 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
-	mgr, err := manager.New(cfg, manager.Options{
+	managerOptions := manager.Options{
 		MetricsBindAddress:      metricsAddr,
-		LeaderElection:          true,
-		LeaderElectionID:        "kruise-manager",
-		LeaderElectionNamespace: leaderElectionNamespace,
 		Namespace:               namespace,
-	})
+	}
+	if enableLeaderElection {
+		managerOptions.LeaderElection = true
+		managerOptions.LeaderElectionID = "kruise-manager"
+		managerOptions.LeaderElectionNamespace = leaderElectionNamespace
+	}
+	mgr, err := manager.New(cfg, managerOptions)
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
 		os.Exit(1)
