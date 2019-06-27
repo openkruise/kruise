@@ -61,8 +61,8 @@ func main() {
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
 	managerOptions := manager.Options{
-		MetricsBindAddress:      metricsAddr,
-		Namespace:               namespace,
+		MetricsBindAddress: metricsAddr,
+		Namespace:          namespace,
 	}
 	if enableLeaderElection {
 		managerOptions.LeaderElection = true

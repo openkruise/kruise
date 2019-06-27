@@ -310,7 +310,7 @@ spec:
                   fieldPath: metadata.namespace
             - name: SECRET_NAME
               value: kruise-webhook-server-secret
-          image: registry.cn-beijing.aliyuncs.com/workshopdem/kruise-manager:daily1
+          image: registry.cn-beijing.aliyuncs.com/workshopdem/kruise-manager:daily
           imagePullPolicy: Always
           name: manager
           ports:
