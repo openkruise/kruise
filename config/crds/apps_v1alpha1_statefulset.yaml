@@ -152,7 +152,6 @@ spec:
           required:
           - selector
           - template
-          - serviceName
           type: object
         status:
           properties:

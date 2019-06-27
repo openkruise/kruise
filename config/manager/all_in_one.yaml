@@ -166,6 +166,83 @@ rules:
       - patch
       - delete
 ---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: kruise-mutating-webhook-configuration
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: kruise-validating-webhook-configuration
+webhooks:
+  - clientConfig:
+      service:
+        name: kruise-webhook-server-service
+        namespace: kruise-system
+        path: /validating-create-update-broadcastjob
+    failurePolicy: Fail
+    name: validating-create-update-broadcastjob.kruise.io
+    namespaceSelector:
+      matchExpressions:
+        - key: control-plane
+          operator: DoesNotExist
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - broadcastjobs
+    sideEffects: Unknown
+  - clientConfig:
+      service:
+        name: kruise-webhook-server-service
+        namespace: kruise-system
+        path: /validating-create-update-sidecarset
+    failurePolicy: Fail
+    name: validating-create-update-sidecarset.kruise.io
+    namespaceSelector:
+      matchExpressions:
+        - key: control-plane
+          operator: DoesNotExist
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - sidecarsets
+    sideEffects: Unknown
+  - clientConfig:
+      service:
+        name: kruise-webhook-server-service
+        namespace: kruise-system
+        path: /validating-create-update-statefulset
+    failurePolicy: Fail
+    name: validating-create-update-statefulset.kruise.io
+    namespaceSelector:
+      matchExpressions:
+        - key: control-plane
+          operator: DoesNotExist
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - statefulsets
+    sideEffects: Unknown
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -233,7 +310,7 @@ spec:
                   fieldPath: metadata.namespace
             - name: SECRET_NAME
               value: kruise-webhook-server-secret
-          image: registry.cn-beijing.aliyuncs.com/workshopdem/kruise-manager:daily
+          image: openkruise/kruise-manager:daily
           imagePullPolicy: Always
           name: manager
           ports:
