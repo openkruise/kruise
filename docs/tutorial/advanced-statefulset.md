@@ -19,7 +19,7 @@ If you don't use helm, you need to install with YAML files as below.
 
 ## Install the Guestbook application with YAML files
 
-Below installs a redis cluster with 1 master 2 slaves
+Below installs a redis cluster with 1 master 2 replicas
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-deployment.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-service.yaml
