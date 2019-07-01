@@ -142,5 +142,23 @@ spec:
     type: Never
 ```
 
+#### Use pod template's `nodeSelector` to run on selected nodes
+User can set the `NodeSelector` or the `affinity` field in the pod template to restrict the job to run only on the selected nodes.
+For example, below spec will run a job only on nodes with label `nodeType=gpu`
+```
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: broadcastjob-selected-nodes
+spec:
+  template:
+    spec:
+      containers:
+        - name: sleep
+          image: busybox
+          command: ["sleep",  "5"]
+      nodeSelector:
+        nodeType: gpu
+```
 ## Tutorial
 -  [Use Broadcast Job to pre-download image](../../tutorial/broadcastjob.md)
