@@ -340,11 +340,12 @@ func ApplyRevision(set *appsv1alpha1.StatefulSet, revision *apps.ControllerRevis
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(patched, clone)
+	restoredSet := &appsv1alpha1.StatefulSet{}
+	err = json.Unmarshal(patched, restoredSet)
 	if err != nil {
 		return nil, err
 	}
-	return clone, nil
+	return restoredSet, nil
 }
 
 // nextRevision finds the next valid revision number based on revisions. If the length of revisions
