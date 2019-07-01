@@ -97,27 +97,27 @@ Visit `http://47.101.74.131:3000` for the guestbook UI.
 First, check the running pods.
 ```
 kubectl get pod -L controller-revision-hash -o wide | grep guestbook
-NAME                            READY   STATUS    RESTARTS   AGE     IP             NODE                        NOMINATED NODE   CONTROLLER-REVISION-HASH
-demo-v1-guestbook-kruise-0                  1/1     Running   0          35s     172.29.1.21    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-1                  1/1     Running   0          35s     172.29.0.148   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-10                 1/1     Running   0          33s     172.29.1.23    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-11                 1/1     Running   0          33s     172.29.0.151   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-12                 1/1     Running   0          32s     172.29.0.152   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-13                 1/1     Running   0          32s     172.29.0.153   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-14                 1/1     Running   0          32s     172.29.0.27    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-15                 1/1     Running   0          31s     172.29.0.28    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-16                 1/1     Running   0          31s     172.29.1.24    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-17                 1/1     Running   0          30s     172.29.0.29    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-18                 1/1     Running   0          30s     172.29.0.154   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-19                 1/1     Running   0          30s     172.29.1.25    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-2                  1/1     Running   0          35s     172.29.0.22    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-3                  1/1     Running   0          35s     172.29.0.149   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-4                  1/1     Running   0          35s     172.29.0.23    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-5                  1/1     Running   0          35s     172.29.1.22    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-6                  1/1     Running   0          35s     172.29.0.24    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-7                  1/1     Running   0          34s     172.29.0.150   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-8                  1/1     Running   0          34s     172.29.0.25    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-9                  1/1     Running   0          34s     172.29.0.26    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+NAME                                        READY   STATUS    RESTARTS   AGE     IP             NODE            NOMINATED NODE   CONTROLLER-REVISION-HASH
+demo-v1-guestbook-kruise-0                  1/1     Running   0          35s     172.29.1.21    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-1                  1/1     Running   0          35s     172.29.0.148   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-10                 1/1     Running   0          33s     172.29.1.23    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-11                 1/1     Running   0          33s     172.29.0.151   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-12                 1/1     Running   0          32s     172.29.0.152   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-13                 1/1     Running   0          32s     172.29.0.153   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-14                 1/1     Running   0          32s     172.29.0.27    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-15                 1/1     Running   0          31s     172.29.0.28    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-16                 1/1     Running   0          31s     172.29.1.24    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-17                 1/1     Running   0          30s     172.29.0.29    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-18                 1/1     Running   0          30s     172.29.0.154   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-19                 1/1     Running   0          30s     172.29.1.25    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-2                  1/1     Running   0          35s     172.29.0.22    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-3                  1/1     Running   0          35s     172.29.0.149   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-4                  1/1     Running   0          35s     172.29.0.23    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-5                  1/1     Running   0          35s     172.29.1.22    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-6                  1/1     Running   0          35s     172.29.0.24    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-7                  1/1     Running   0          34s     172.29.0.150   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-8                  1/1     Running   0          34s     172.29.0.25    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-9                  1/1     Running   0          34s     172.29.0.26    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
 ```
 
 Run this command to update the statefulset to use the new image.
@@ -151,7 +151,7 @@ Check the statefulset, find the statefulset has 5 pods updated
 ```
 kubectl get sts.apps.kruise.io
 
-NAME           DESIRED   CURRENT   UPDATED   READY   AGE
+NAME                       DESIRED   CURRENT   UPDATED   READY   AGE
 demo-v1-guestbook-kruise   20        20        5         20      18h
 ``` 
 
@@ -161,27 +161,27 @@ IPs remain the same, `CONTROLLER-REVISION-HASH` are updated from ` demo-v1-guest
 ```
 kubectl get pod -L controller-revision-hash -o wide | grep guestbook
 
-NAME                            READY   STATUS    RESTARTS   AGE     IP             NODE                        NOMINATED NODE   CONTROLLER-REVISION-HASH
-demo-v1-guestbook-kruise-0                  1/1     Running   0          3m22s   172.29.1.21    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-1                  1/1     Running   0          3m22s   172.29.0.148   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-10                 1/1     Running   0          3m20s   172.29.1.23    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-11                 1/1     Running   0          3m20s   172.29.0.151   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-12                 1/1     Running   0          3m19s   172.29.0.152   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-13                 1/1     Running   0          3m19s   172.29.0.153   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-14                 1/1     Running   0          3m19s   172.29.0.27    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-15                 1/1     Running   1          3m18s   172.29.0.28    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-576bd76785
-demo-v1-guestbook-kruise-16                 1/1     Running   1          3m18s   172.29.1.24    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-576bd76785
-demo-v1-guestbook-kruise-17                 1/1     Running   1          3m17s   172.29.0.29    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-576bd76785
-demo-v1-guestbook-kruise-18                 1/1     Running   1          3m17s   172.29.0.154   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-576bd76785
-demo-v1-guestbook-kruise-19                 1/1     Running   1          3m17s   172.29.1.25    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-576bd76785
-demo-v1-guestbook-kruise-2                  1/1     Running   0          3m22s   172.29.0.22    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-3                  1/1     Running   0          3m22s   172.29.0.149   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-4                  1/1     Running   0          3m22s   172.29.0.23    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-5                  1/1     Running   0          3m22s   172.29.1.22    cn-shanghai.192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-6                  1/1     Running   0          3m22s   172.29.0.24    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-7                  1/1     Running   0          3m21s   172.29.0.150   cn-shanghai.192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-8                  1/1     Running   0          3m21s   172.29.0.25    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
-demo-v1-guestbook-kruise-9                  1/1     Running   0          3m21s   172.29.0.26    cn-shanghai.192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+NAME                                        READY   STATUS    RESTARTS   AGE     IP             NODE            NOMINATED NODE   CONTROLLER-REVISION-HASH
+demo-v1-guestbook-kruise-0                  1/1     Running   0          3m22s   172.29.1.21    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-1                  1/1     Running   0          3m22s   172.29.0.148   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-10                 1/1     Running   0          3m20s   172.29.1.23    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-11                 1/1     Running   0          3m20s   172.29.0.151   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-12                 1/1     Running   0          3m19s   172.29.0.152   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-13                 1/1     Running   0          3m19s   172.29.0.153   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-14                 1/1     Running   0          3m19s   172.29.0.27    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-15                 1/1     Running   1          3m18s   172.29.0.28    192.168.1.114   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-16                 1/1     Running   1          3m18s   172.29.1.24    192.168.1.113   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-17                 1/1     Running   1          3m17s   172.29.0.29    192.168.1.114   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-18                 1/1     Running   1          3m17s   172.29.0.154   192.168.1.112   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-19                 1/1     Running   1          3m17s   172.29.1.25    192.168.1.113   <none>           demo-v1-guestbook-kruise-576bd76785
+demo-v1-guestbook-kruise-2                  1/1     Running   0          3m22s   172.29.0.22    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-3                  1/1     Running   0          3m22s   172.29.0.149   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-4                  1/1     Running   0          3m22s   172.29.0.23    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-5                  1/1     Running   0          3m22s   172.29.1.22    192.168.1.113   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-6                  1/1     Running   0          3m22s   172.29.0.24    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-7                  1/1     Running   0          3m21s   172.29.0.150   192.168.1.112   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-8                  1/1     Running   0          3m21s   172.29.0.25    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
+demo-v1-guestbook-kruise-9                  1/1     Running   0          3m21s   172.29.0.26    192.168.1.114   <none>           demo-v1-guestbook-kruise-7c947b5f94
 ```
 
 Now upgrade all the pods, run
