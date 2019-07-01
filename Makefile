@@ -4,6 +4,9 @@ IMG ?= openkruise/kruise-manager:test
 
 all: test manager
 
+go_check:
+	@scripts/check_go_version "1.11.1"
+
 # Run tests
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
@@ -30,7 +33,7 @@ manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
 
 # Run go fmt against code
-fmt:
+fmt: go_check
 	go fmt ./pkg/... ./cmd/...
 
 # Run go vet against code
