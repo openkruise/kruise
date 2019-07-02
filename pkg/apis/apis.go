@@ -18,6 +18,8 @@ limitations under the License.
 //go:generate go run ../../vendor/k8s.io/code-generator/cmd/deepcopy-gen/main.go -O zz_generated.deepcopy -i ./... -h ../../hack/boilerplate.go.txt
 // Generate defaulter for apis
 //go:generate go run ../../vendor/k8s.io/code-generator/cmd/defaulter-gen/main.go -i ./apps/v1alpha1 -O zz_generated.defaults -h ../../hack/boilerplate.go.txt
+// Generate openapi for apis
+//go:generate go run ../../vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./apps/v1alpha1 -p github.com/openkruise/kruise/pkg/apis/apps/v1alpha1 -h ../../hack/boilerplate.go.txt --report-filename ../../api/api-rules/violation_exceptions.list
 
 // Package apis contains Kubernetes API groups.
 package apis
