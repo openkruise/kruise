@@ -2,6 +2,8 @@
 # Image URL to use all building/pushing image targets
 IMG ?= openkruise/kruise-manager:test
 
+CURRENT_DIR=$(shell pwd)
+
 all: test manager
 
 go_check:
@@ -46,6 +48,7 @@ ifndef GOPATH
 	$(error GOPATH not defined, please define GOPATH. Run "go help gopath" to learn more about GOPATH)
 endif
 	go generate ./pkg/... ./cmd/...
+	go run ./hack/gen-openapi-spec/main.go > ${CURRENT_DIR}/api/openapi-spec/swagger.json
 
 # Build the docker image
 docker-build: #test

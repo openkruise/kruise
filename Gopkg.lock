@@ -10,6 +10,22 @@
   version = "v0.37.4"
 
 [[projects]]
+  digest = "1:bd3632deea7c224314b504dc51fbd244a59163e89c0cb730877d51bb13f5f74a"
+  name = "github.com/PuerkitoBio/purell"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "44968752391892e1b0d0b821ee79e9a85fa13049"
+  version = "v1.1.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:c739832d67eb1e9cc478a19cc1a1ccd78df0397bf8a32978b759152e205f644b"
+  name = "github.com/PuerkitoBio/urlesc"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "de5bf2ad457846296e2031421a34e2568e304e35"
+
+[[projects]]
   digest = "1:464aef731a5f82ded547c62e249a2e9ec59fbbc9ddab53cda7b9857852630a61"
   name = "github.com/appscode/jsonpatch"
   packages = ["."]
@@ -23,6 +39,14 @@
   packages = ["quantile"]
   pruneopts = "T"
   revision = "4b2b341e8d7715fae06375aa633dbb6e91b3fb46"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:7e53b0877524491d390b3b146ca481b32eaef15ad9cce7e5f59d0199d7947f0d"
+  name = "github.com/codegangsta/negroni"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "c6a59be0ce122566695fbd5e48a77f8f10c8a63a"
   version = "v1.0.0"
 
 [[projects]]
@@ -88,6 +112,38 @@
   version = "v0.1.1"
 
 [[projects]]
+  digest = "1:deaebdf65d6d8c9fba4e1ec2f04b38739fe63d544ebaeba316ee8281a26c8a0f"
+  name = "github.com/go-openapi/jsonpointer"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "a105a905c5e6ad147f08504784917f3e178e0ba5"
+  version = "v0.19.2"
+
+[[projects]]
+  digest = "1:ace067abf49e9861040c3f33b67ce39602eb491a2532389467e9ca1dd8cb8e5e"
+  name = "github.com/go-openapi/jsonreference"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "2903bfd4bfbaf188694f1edf731f2725a8fa344f"
+  version = "v0.19.2"
+
+[[projects]]
+  digest = "1:9d29c43e2f6fe25d602e5d2347aac8faa2addf0ae99440d146f1f36601869e9d"
+  name = "github.com/go-openapi/spec"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "bdfd7e07daecc404d77868a88b2364d0aed0ee5a"
+  version = "v0.19.2"
+
+[[projects]]
+  digest = "1:3f411af1ede2170e2704880d0f8769be0ac5822fb55e9d034dbce8e1621a0802"
+  name = "github.com/go-openapi/swag"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "beaa04455d9d7fadea558e98e60293fd528a89c0"
+  version = "v0.19.3"
+
+[[projects]]
   digest = "1:92755a73daaa2397bbd4fd7b14d920decd24c0669b1d58db7e4ef986b1934e5f"
   name = "github.com/gobuffalo/envy"
   packages = ["."]
@@ -129,6 +185,17 @@
   version = "v1.3.1"
 
 [[projects]]
+  digest = "1:eca5b59a68125905e4f62d6f5072f01740a7648a808e93f6d76c5334ff948601"
+  name = "github.com/gomodule/redigo"
+  packages = [
+    "internal",
+    "redis",
+  ]
+  pruneopts = "T"
+  revision = "9c11da706d9b7902c6da69c592f75637793fe121"
+  version = "v2.0.0"
+
+[[projects]]
   digest = "1:0bfbe13936953a98ae3cfe8ed6670d396ad81edf069a806d2f6515d7bb6950df"
   name = "github.com/google/btree"
   packages = ["."]
@@ -163,6 +230,14 @@
   pruneopts = "T"
   revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
   version = "v0.2.0"
+
+[[projects]]
+  digest = "1:c3b4b286b0fd6a625a9c5fd6829bc5140dc5614388e0d33615213c27a061e7f1"
+  name = "github.com/gorilla/mux"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "00bdffe0f3c77e27d2cf6f5c70232a2d3e4d9c15"
+  version = "v1.7.3"
 
 [[projects]]
   branch = "master"
@@ -231,6 +306,18 @@
   pruneopts = "T"
   revision = "0ff49de124c6f76f8494e194af75bde0f1a49a29"
   version = "v1.1.6"
+
+[[projects]]
+  branch = "master"
+  digest = "1:6bda9283afef46e72e78d90580f152df3a7be019a2f425d1441e45e41c103cc1"
+  name = "github.com/mailru/easyjson"
+  packages = [
+    "buffer",
+    "jlexer",
+    "jwriter",
+  ]
+  pruneopts = "T"
+  revision = "b2ccc519800e761ac8000b95e5d57c80a897ff9e"
 
 [[projects]]
   digest = "1:3804a3a02964db8e6db3e5e7960ac1c1a9b12835642dd4f4ac4e56c749ec73eb"
@@ -450,6 +537,22 @@
   version = "v1.3.0"
 
 [[projects]]
+  digest = "1:e478dfdf6164ff401d9a3261fae489e78565d7bdcad6c406d55c2461503ce8ba"
+  name = "github.com/xyproto/pinterface"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "9710ef24b6847f028ae78e63a001a56963bdc989"
+  version = "v5.0.0"
+
+[[projects]]
+  digest = "1:29a69a06d5f881cad140a540d4fd3c8cf4d1fd7014a3a69c897836f48c7d600c"
+  name = "github.com/xyproto/simpleredis"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "f2c3a2cf62d069ecdc9b49bd1512cefac318e33d"
+  version = "v2.6.0"
+
+[[projects]]
   digest = "1:365b8ecb35a5faf5aa0ee8d798548fc9cd4200cb95d77a5b0b285ac881bae499"
   name = "go.uber.org/atomic"
   packages = ["."]
@@ -566,6 +669,7 @@
     "unicode/cldr",
     "unicode/norm",
     "unicode/rangetable",
+    "width",
   ]
   pruneopts = "T"
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
@@ -1059,7 +1163,10 @@
   branch = "master"
   digest = "1:d2cfaba6e04ba0574f3edf1e437b855ef4dd02999bbae0efb05fcbc34e9aa06e"
   name = "k8s.io/kube-openapi"
-  packages = ["pkg/util/proto"]
+  packages = [
+    "pkg/common",
+    "pkg/util/proto",
+  ]
   pruneopts = "T"
   revision = "6b3d3b2d5666c5912bab8b7bf26bf50f75a8f887"
 
@@ -1237,13 +1344,18 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/davecgh/go-spew/spew",
+    "github.com/appscode/jsonpatch",
+    "github.com/codegangsta/negroni",
     "github.com/emicklei/go-restful",
+    "github.com/evanphx/json-patch",
+    "github.com/go-openapi/spec",
+    "github.com/gorilla/mux",
     "github.com/onsi/ginkgo",
     "github.com/onsi/ginkgo/config",
     "github.com/onsi/gomega",
     "github.com/pkg/errors",
     "github.com/stretchr/testify/assert",
+    "github.com/xyproto/simpleredis",
     "golang.org/x/net/context",
     "k8s.io/api/admission/v1beta1",
     "k8s.io/api/admissionregistration/v1beta1",
@@ -1305,6 +1417,7 @@
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "k8s.io/klog",
     "k8s.io/klog/klogr",
+    "k8s.io/kube-openapi/pkg/common",
     "k8s.io/kubernetes/pkg/api/legacyscheme",
     "k8s.io/kubernetes/pkg/api/v1/pod",
     "k8s.io/kubernetes/pkg/apis/apps/install",

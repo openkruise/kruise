@@ -1,0 +1,23 @@
+language: go
+
+go:
+  - "1.8"
+  - "1.9"
+  - "1.10"
+  - "1.11"
+  - tip
+
+services:
+    - redis-server
+
+os:
+  - linux
+
+dist: trusty
+sudo: false
+
+install: true
+
+script:
+  - env GO111MODULE=on go build
+  - env GO111MODULE=on go test
