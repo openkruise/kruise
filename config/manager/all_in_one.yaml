@@ -177,6 +177,7 @@ metadata:
   name: kruise-validating-webhook-configuration
 webhooks:
   - clientConfig:
+      caBundle: fake
       service:
         name: kruise-webhook-server-service
         namespace: kruise-system
@@ -199,6 +200,7 @@ webhooks:
           - broadcastjobs
     sideEffects: Unknown
   - clientConfig:
+      caBundle: fake
       service:
         name: kruise-webhook-server-service
         namespace: kruise-system
@@ -221,6 +223,7 @@ webhooks:
           - sidecarsets
     sideEffects: Unknown
   - clientConfig:
+      caBundle: fake
       service:
         name: kruise-webhook-server-service
         namespace: kruise-system
