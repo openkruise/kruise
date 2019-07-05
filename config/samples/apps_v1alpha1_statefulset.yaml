@@ -18,6 +18,7 @@ spec:
       containers:
         - name: main
           image: nginx:alpine
+  podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:

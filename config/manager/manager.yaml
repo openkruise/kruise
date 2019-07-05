@@ -57,10 +57,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 1Gi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 100Mi
         readinessProbe:
           tcpSocket:
             port: 9876
