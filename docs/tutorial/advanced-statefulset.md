@@ -123,7 +123,7 @@ demo-v1-guestbook-kruise-9                  1/1     Running   0          34s    
 Run this command to update the statefulset to use the new image.
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-patch-to-v2.yaml
+kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset-v2.yaml
 ```
 
 What this command does is that it changes the image version to `v2` and changes `partition` to `15`.
