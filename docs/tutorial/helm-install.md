@@ -2,7 +2,9 @@
 
 From [Helm v3 releases](https://github.com/helm/helm/releases/tag/v3.0.0-alpha.1).
 
-Or, some of Helm v3 Latest Release on Aliyun OSS:
+## If you are in China
+
+Well, some of Helm v3 Latest Release on Aliyun OSS:
 
 * [MacOS amd64 tar.gz](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-darwin-amd64.tar.gz)
 * [MacOS amd64 zip](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-darwin-amd64.zip)
@@ -14,21 +16,8 @@ Or, some of Helm v3 Latest Release on Aliyun OSS:
 If you are using Helm for first time, you may need to init Helm:
 
 ```
-➜  ~ helm init
-Creating ~/.helm
-Creating ~/.helm/repository
-Creating ~/.helm/repository/cache
-Creating ~/.helm/plugins
-Creating ~/.helm/starters
-Creating ~/.helm/cache/archive
-Creating ~/.helm/repository/repositories.yaml
-Adding stable repo with URL: https://kubernetes-charts.storage.googleapis.com
-^C
+helm init
 
-➜  ~ touch ~/.helm/repository/repositories.yaml
-
-
-➜  ~ helm init
 Updating repository file format...
 $HELM_HOME has been configured at ~/.helm.
 Happy Helming!
