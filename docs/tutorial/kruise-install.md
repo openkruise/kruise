@@ -9,13 +9,14 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_statefulset.yaml
 ```
+```
 
 ### Install kruise-manager
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
 
 **Note that default memory limit of kruise-controller-manager is `1Gi`,
- you should update the resources in `all_in_one.yaml` before apply it into large-scale clusters.**
+ you should update the resources in [all_in_one.yaml](https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml) before apply it into large-scale clusters.**
 
 ## Verify Kruise-manager is running
 
