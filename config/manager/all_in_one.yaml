@@ -303,6 +303,10 @@ spec:
       containers:
         - command:
             - /manager
+          args:
+            - "--metrics-addr=127.0.0.1:8080"
+            - "--logtostderr=true"
+            - "--v=4"
           env:
             - name: POD_NAMESPACE
               valueFrom:
