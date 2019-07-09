@@ -5,19 +5,21 @@
 [![codecov](https://codecov.io/gh/openkruise/kruise/branch/master/graph/badge.svg)](https://codecov.io/gh/openkruise/kruise)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2908/badge)](https://bestpractices.coreinfrastructure.org/en/projects/2908)
 
-Kruise is at the core of the OpenKruise project. It is a set of controllers which extends and complements 
+Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements 
 [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)
-on application workload management.
+on workload management.
 
-Today, Kruise offers three application workload controllers:
+Today, Kruise offers three workload controllers:
 
-* [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, sharding by namespace.
+* [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
 
-* [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
+* [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
 
-* [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar container into the pod spec based on selectors.
+* [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors.
 
 Please see [documents](./docs/README.md) for more technical information.
+
+Please find the project **roadmap** [here](./docs/roadmap/README.md).
 
 Several [tutorials](./docs/tutorial/README.md) are provided to demonstrate how to use the workload controllers.
 
@@ -152,7 +154,7 @@ Generate manifests e.g. CRD, RBAC etc.
 ## Community
 
 If you have any questions or want to contribute, you are welcome to join our
-[slack channel](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc)
+[slack channel](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc).
 
 Mailing List: todo
 
