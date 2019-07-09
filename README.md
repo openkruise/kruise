@@ -19,7 +19,7 @@ Today, Kruise offers three workload controllers:
 
 Please see [documents](./docs/README.md) for more technical information.
 
-Please find the latest project **roadmap** [here](./docs/roadmap/2019-Q3.md).
+Please find the project **roadmap** [here](./docs/roadmap/README.md).
 
 Several [tutorials](./docs/tutorial/README.md) are provided to demonstrate how to use the workload controllers.
 
