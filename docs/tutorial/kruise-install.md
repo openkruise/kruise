@@ -9,7 +9,6 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_statefulset.yaml
 ```
-```
 
 ### Install kruise-manager
 
