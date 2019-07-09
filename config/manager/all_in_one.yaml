@@ -198,7 +198,6 @@ webhooks:
           - UPDATE
         resources:
           - broadcastjobs
-    sideEffects: Unknown
   - clientConfig:
       caBundle: fake
       service:
@@ -221,7 +220,6 @@ webhooks:
           - UPDATE
         resources:
           - sidecarsets
-    sideEffects: Unknown
   - clientConfig:
       caBundle: fake
       service:
@@ -244,7 +242,6 @@ webhooks:
           - UPDATE
         resources:
           - statefulsets
-    sideEffects: Unknown
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -306,6 +303,10 @@ spec:
       containers:
         - command:
             - /manager
+          args:
+            - "--metrics-addr=127.0.0.1:8080"
+            - "--logtostderr=true"
+            - "--v=4"
           env:
             - name: POD_NAMESPACE
               valueFrom:
