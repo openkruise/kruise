@@ -35,6 +35,7 @@ spec:
     matchLabels:
       control-plane: controller-manager
       controller-tools.k8s.io: "1.0"
+  serviceName: controller-manager-service
   template:
     metadata:
       labels:
@@ -57,10 +58,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 1Gi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 100Mi
         readinessProbe:
           tcpSocket:
             port: 9876
