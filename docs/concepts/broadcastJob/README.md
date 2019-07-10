@@ -78,7 +78,7 @@ added node in the cluster, he can deploy a BroadcastJob with `Never` policy.
  - `SUCCEEDED`: The number of succeeded Pods.
  - `FAILED`: The number of failed Pods.
 
-#### Use `ttlSecondsAfterFinished`
+#### Use `ttlSecondsAfterFinished` to automatically delete the job after it completes for x seconds
 Run a BroadcastJob that each Pod computes a pi, with `ttlSecondsAfterFinished` set to 30. 
 The job will be deleted in 30 seconds after it is finished.
 
@@ -100,7 +100,7 @@ spec:
     ttlSecondsAfterFinished: 30
 ```
 
-#### Use `activeDeadlineSeconds`
+#### Use `activeDeadlineSeconds` to restrict the lifetime of a job
 
 Run a BroadcastJob that each Pod sleeps for 50 seconds, with `activeDeadlineSeconds` set to 10 seconds. 
 The job will be marked as Failed after it runs for 10 seconds, and the running Pods will be deleted.
@@ -122,9 +122,9 @@ spec:
     activeDeadlineSeconds: 10
 ```
 
-#### Use `Never` completionPolicy
+#### Use `Never` completionPolicy to always keep the job active to automatically trigger pods on newly coming nodes
 Run a BroadcastJob with `Never` completionPolicy. The job will continue to run even if all Pods 
-have completed on all nodes.
+have completed on all nodes. This is useful for automatically triggering new pods run on newly coming nodes.  
 ```
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
