@@ -122,9 +122,9 @@ spec:
     activeDeadlineSeconds: 10
 ```
 
-#### Automatically launch pods on newly coming nodes by keeping the job active using `Never` completionPolicy
+#### Automatically launch pods on newly added nodes by keeping the job active using `Never` completionPolicy
 Run a BroadcastJob with `Never` completionPolicy. The job will continue to run even if all Pods 
-have completed on all nodes. This is useful for automatically triggering new pods run on newly coming nodes.  
+have completed on all nodes. This is useful for automatically running Pods on newly added nodes. 
 ```
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
