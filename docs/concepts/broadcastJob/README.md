@@ -78,7 +78,7 @@ added node in the cluster, he can deploy a BroadcastJob with `Never` policy.
  - `SUCCEEDED`: The number of succeeded Pods.
  - `FAILED`: The number of failed Pods.
 
-#### Use `ttlSecondsAfterFinished` to automatically delete the job after it completes for x seconds
+#### Automatically delete the job after it completes for x seconds using `ttlSecondsAfterFinished`
 Run a BroadcastJob that each Pod computes a pi, with `ttlSecondsAfterFinished` set to 30. 
 The job will be deleted in 30 seconds after it is finished.
 
@@ -100,7 +100,7 @@ spec:
     ttlSecondsAfterFinished: 30
 ```
 
-#### Use `activeDeadlineSeconds` to restrict the lifetime of a job
+#### Restrict the lifetime of a job using `activeDeadlineSeconds`
 
 Run a BroadcastJob that each Pod sleeps for 50 seconds, with `activeDeadlineSeconds` set to 10 seconds. 
 The job will be marked as Failed after it runs for 10 seconds, and the running Pods will be deleted.
@@ -122,7 +122,7 @@ spec:
     activeDeadlineSeconds: 10
 ```
 
-#### Use `Never` completionPolicy to always keep the job active to automatically trigger pods on newly coming nodes
+#### Automatically launch pods on newly coming nodes by keeping the job active using `Never` completionPolicy
 Run a BroadcastJob with `Never` completionPolicy. The job will continue to run even if all Pods 
 have completed on all nodes. This is useful for automatically triggering new pods run on newly coming nodes.  
 ```
