@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/openkruise/kruise/branch/master/graph/badge.svg)](https://codecov.io/gh/openkruise/kruise)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2908/badge)](https://bestpractices.coreinfrastructure.org/en/projects/2908)
 
-Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements 
+Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements
 [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)
 on workload management.
 
@@ -27,16 +27,17 @@ Several [tutorials](./docs/tutorial/README.md) are provided to demonstrate how t
 
 ### Install with YAML files
 
-##### Install CRDs
+#### Install CRDs
 
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_broadcastjob.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_statefulset.yaml
 ```
+
 Note that ALL three CRDs need to be installed for kruise-controller to run properly.
 
-##### Install kruise-controller-manager
+#### Install kruise-controller-manager
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
 
@@ -53,6 +54,7 @@ The official kruise-controller-manager image is hosted under [docker hub](https:
 ## Usage examples
 
 ### Advanced StatefulSet
+
 ```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: StatefulSet
@@ -71,7 +73,7 @@ spec:
     spec:
       readinessGates:
         # A new condition must be added to ensure the pod remain at NotReady state while the in-place update is happening
-      - conditionType: InPlaceUpdateReady 
+      - conditionType: InPlaceUpdateReady
       containers:
       - name: main
         image: nginx:alpine
@@ -84,7 +86,9 @@ spec:
       # Allow parallel updates with max number of unavailable instances equals to 2
       maxUnavailable: 2
 ```
+
 ### Broadcast Job
+
 Run a BroadcastJob that each Pod computes pi, with `ttlSecondsAfterFinished` set to 30. The job
 will be deleted in 30 seconds after the job is finished.
 
@@ -105,6 +109,7 @@ spec:
     type: Always
     ttlSecondsAfterFinished: 30
 ```
+
 ### SidecarSet
 
 The yaml file below describes a SidecarSet that contains a sidecar container named `sidecar1`
@@ -122,7 +127,7 @@ spec:
   containers:
   - name: sidecar1
     image: centos:7
-    command: ["sleep", "999d"] # do nothing at all 
+    command: ["sleep", "999d"] # do nothing at all
 ```
 
 ## Developer Guide
@@ -149,7 +154,7 @@ or just
 
 Generate manifests e.g. CRD, RBAC etc.
 
-`make manifests` 
+`make manifests`
 
 ## Community
 

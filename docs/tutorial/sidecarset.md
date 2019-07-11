@@ -1,4 +1,5 @@
 # Inject Sidecar Container with SidecarSet
+
 This tutorial walks you through an example to automatically inject a sidecar container with sidecarset.
 
 ## Install Guestbook sidecarset
@@ -26,8 +27,7 @@ spec:
       ports:
         - name: sidecar-server
           containerPort: 4000 # different from main guestbook containerPort which is 3000
-``` 
-
+```
 
 ## Installing the application
 
@@ -36,19 +36,22 @@ To install the chart with release name (application name) of `demo-v1`, replica 
 ```bash
 helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook,image.tag=v2
 ```
+
 The Chart is located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
 
-
 Alternatively, Install the application using YAML files:
+
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sts-for-sidecar-demo.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-service-for-sidecar-demo.yaml
 ```
 
 ## Check your application
-Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind. 
+
+Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind.
 `app.kruise.io` postfix needs to be appended due to naming collision with Kubernetes native `statefulset` kind.
  Verify that all pods are READY.
+
 ```
 kubectl get sts.apps.kruise.io
 NAME                            DESIRED    CURRENT    UPDATED    READY    AGE
@@ -103,17 +106,17 @@ Check that the sidecar container is injected.
 +       Mounts:         <none>
 ```
 
-
 ## View the Sidecar Guestbook
 
 You can now view the Sidecar Guestbook on browser.
 
 * **Local Host:**
-    If you are running Kubernetes locally, to view the sidecar guestbook, navigate to `http://localhost:4000`. 
+    If you are running Kubernetes locally, to view the sidecar guestbook, navigate to `http://localhost:4000`.
 
 * **Remote Host:**
     To view the sidecar guestbook on a remote host, locate the external IP of the application in the **IP** column of the `kubectl get services` output.
-    For example, run 
+    For example, run
+
 ```
 kubectl get svc
 
@@ -121,8 +124,7 @@ NAME           TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)            
 demo-v1-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
-`47.101.74.131` is the external IP. 
-
+`47.101.74.131` is the external IP.
 
 Visit `http://47.101.74.131:4000` for the sidecar guestbook.
 ![Guestbook](./v1/guestbook-sidecar.jpg)
@@ -139,14 +141,16 @@ First you may want to list your helm apps:
 helm list
 NAME          NAMESPACE  REVISION  UPDATED                               STATUS    CHART
 demo-v1       default    1         2019-06-23 13:33:21.278013 +0800 CST  deployed  guestbook-kruise-0.3.0
-```  
+```
 
 Then uninstall it:
 
 ```
 helm uninstall demo-v1
 ```
+
 If you are not using helm, deleting the application using below commands:
+
 ```
 kubectl delete sts.apps.kruise.io demo-v1-guestbook-kruise
 kubectl delete svc demo-v1-guestbook-kruise redis-master redis-slave
