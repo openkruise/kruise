@@ -73,7 +73,7 @@ Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.
 kubectl get sts.apps.kruise.io
 
 NAME           DESIRED   CURRENT   UPDATED   READY   AGE
-guestbook-v1   20        20        20        20      6m
+demo-v1-guestbook-kruise   20        20        20        20      6m
 ```
 
 ## View the Guestbook
