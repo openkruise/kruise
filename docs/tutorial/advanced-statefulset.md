@@ -1,7 +1,7 @@
-# Install Guestbook Application 
+# Install Guestbook Application
+
 This tutorial walks you through an example to install a guestbook application using advanced statefulset.
 The guestbook app used is from this [repo](https://github.com/IBM/guestbook/tree/master/v1).
-
 
 ## Installing the Guestbook application using Helm
 
@@ -20,6 +20,7 @@ If you don't use helm, you need to install with YAML files as below.
 ## Install the Guestbook application with YAML files
 
 Below installs a redis cluster with 1 master 2 replicas
+
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-deployment.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-service.yaml
@@ -28,12 +29,14 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 ```
 
 Below creates a guestbook application using advanced statefulset.
+
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-service.yaml
 ```
 
 Several things to note in the `guestbook-statefulset.yaml`
+
 ```yaml
 * apiVersion: apps.kruise.io/v1alpha1  # the kruise group version
   kind: StatefulSet
@@ -61,9 +64,11 @@ Several things to note in the `guestbook-statefulset.yaml`
 Now the app has been installed.
 
 ## Verify Guestbook Started
-Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind. 
+
+Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind.
 `app.kruise.io` postfix needs to be appended due to naming collision with Kubernetes native `statefulset` kind.
  Verify that all pods are READY.
+
 ```
 kubectl get sts.apps.kruise.io
 
@@ -76,11 +81,12 @@ guestbook-v1   20        20        20        20      6m
 You can now view the Guestbook on browser.
 
 * **Local Host:**
-    If you are running Kubernetes locally, to view the guestbook, navigate to `http://localhost:3000` for the guestbook    
+    If you are running Kubernetes locally, to view the guestbook, navigate to `http://localhost:3000` for the guestbook
 
 * **Remote Host:**
     To view the guestbook on a remote host, locate the external IP of the application in the **IP** column of the `kubectl get services` output.
-    For example, run 
+    For example, run
+
 ```
 kubectl get svc
 
@@ -88,13 +94,14 @@ NAME                          TYPE           CLUSTER-IP     EXTERNAL-IP     PORT
 demo-v1-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
-`47.101.74.131` is the external IP. 
+`47.101.74.131` is the external IP.
 Visit `http://47.101.74.131:3000` for the guestbook UI.
 ![Guestbook](./v1/guestbook.jpg)
 
-
 ## Inplace-update guestbook to the new image
+
 First, check the running pods.
+
 ```
 kubectl get pod -L controller-revision-hash -o wide | grep guestbook
 NAME                                        READY   STATUS    RESTARTS   AGE     IP             NODE            NOMINATED NODE   CONTROLLER-REVISION-HASH
@@ -129,6 +136,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 What this command does is that it changes the image version to `v2` and changes `partition` to `15`.
 This will update pods with ordinal number >= 15 (i.e. 15 - 19)to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`.
 The YAML diff details are shown below:
+
 ```yaml
 spec:
     ...
@@ -148,15 +156,16 @@ spec:
 ```
 
 Check the statefulset, find the statefulset has 5 pods updated
+
 ```
 kubectl get sts.apps.kruise.io
 
 NAME                       DESIRED   CURRENT   UPDATED   READY   AGE
 demo-v1-guestbook-kruise   20        20        5         20      18h
-``` 
+```
 
-Check the pods again. `demo-v1-guestbook-kruise-15` to `demo-v1-guestbook-kruise-19` are updated with `RESTARTS` showing `1`, 
-IPs remain the same, `CONTROLLER-REVISION-HASH` are updated from ` demo-v1-guestbook-kruise-7c947b5f94` to `demo-v1-guestbook-kruise-576bd76785`
+Check the pods again. `demo-v1-guestbook-kruise-15` to `demo-v1-guestbook-kruise-19` are updated with `RESTARTS` showing `1`,
+IPs remain the same, `CONTROLLER-REVISION-HASH` are updated from `demo-v1-guestbook-kruise-7c947b5f94` to `demo-v1-guestbook-kruise-576bd76785`
 
 ```
 kubectl get pod -L controller-revision-hash -o wide | grep guestbook
@@ -185,10 +194,12 @@ demo-v1-guestbook-kruise-9                  1/1     Running   0          3m21s  
 ```
 
 Now upgrade all the pods, run
+
 ```
 kubectl edit sts.apps.kruise.io demo-v1-guestbook-kruise
-``` 
-and update `partition` to `0`, all pods will be updated to v2 this time, and all pods' IP remain `unchanged`. You should also find 
+```
+
+and update `partition` to `0`, all pods will be updated to v2 this time, and all pods' IP remain `unchanged`. You should also find
 that all 20 pods are updated fairly fast because the `maxUnavailable` feature allows parallel updates instead of sequential update.
 
 ```
@@ -198,6 +209,7 @@ demo-v1-guestbook-kruise   20        20        20        20      18h
 ```
 
 Describe a pod and find that the events show the original container is killed and new container is started. This verifies `in-place` update
+
 ```
 kubectl describe pod demo-v1-guestbook-kruise-0
 
@@ -212,6 +224,7 @@ Events:
 ```
 
 The pods should also be in `Ready` state, the `InPlaceUpdateReady` will be set to `False` right before in-place update and to `True` after update is complete
+
 ```yaml
 Readiness Gates:
   Type                 Status
@@ -235,7 +248,7 @@ First you may want to list your helm apps:
 helm list
 NAME          NAMESPACE  REVISION  UPDATED                               STATUS    CHART
 demo-v1       default    1         2019-06-23 13:33:21.278013 +0800 CST  deployed  guestbook-kruise-0.3.0
-```  
+```
 
 Then uninstall it:
 
@@ -244,6 +257,7 @@ helm uninstall demo-v1
 ```
 
 If you are not using helm, deleting the application using below commands:
+
 ```
 kubectl delete sts.apps.kruise.io demo-v1-guestbook-kruise
 kubectl delete svc demo-v1-guestbook-kruise redis-master redis-slave

@@ -1,9 +1,11 @@
 # Install Kruise Controller Manager
+
 Below steps assume you have an existing kubernetes cluster running properly.
 
 ## Install with YAML files
 
 ### Install Kruise CRDs
+
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_broadcastjob.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
@@ -17,6 +19,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 ## Verify Kruise-manager is running
 
 Check the kruise-manager pod is running
+
 ```
 kubectl get pods -n kruise-system
 

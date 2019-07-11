@@ -54,7 +54,7 @@ spec:
   containers:
   - name: sidecar1
     image: centos:7
-    command: ["sleep", "999d"] # do nothing at all 
+    command: ["sleep", "999d"] # do nothing at all
 ```
 
 Create a SidecarSet based on the YAML file:
@@ -91,13 +91,18 @@ test-pod   2/2     Running   0          118s
 In the meantime, the SidecarSet status updated:
 
 ```
+
 # kubectl get sidecarset test-sidecarset -o yaml | grep -A4 status
+
 status:
   matchedPods: 1
   observedGeneration: 1
   readyPods: 1
   updatedPods: 1
 ```
+
 ## Tutorial
+
 A more sophisticated tutorial is provided:
--  [Use SidecarSet to inject a sidecar container into the Guestbook application](../../tutorial/sidecarset.md)
+
+- [Use SidecarSet to inject a sidecar container into the Guestbook application](../../tutorial/sidecarset.md)
