@@ -40,7 +40,7 @@ func IsJobFinished(j *appsv1alpha1.BroadcastJob) bool {
 	return false
 }
 
-// filterPods returns list of activePods and number of failed pods, number of succceeded pods
+// filterPods returns list of activePods and number of failed pods, number of succeeded pods
 func filterPods(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1.Pod) {
 	var activePods, succeededPods, failedPods []*v1.Pod
 	for _, p := range pods {
