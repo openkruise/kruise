@@ -1261,7 +1261,6 @@ func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string
 	Expect(err).NotTo(HaveOccurred())
 	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 	priorRevision := currentRevision
-	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = oldImage
 	})

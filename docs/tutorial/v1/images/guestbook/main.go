@@ -64,7 +64,7 @@ func GetList(key string) ([]string, error) {
 
 func AppendToList(item string, key string) ([]string, error) {
 	var err error
-	items := []string{}
+	var items []string
 
 	// Using Redis
 	if masterPool != nil {
