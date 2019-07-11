@@ -252,7 +252,7 @@ func ReplacesPods(t *testing.T, set *appsv1alpha1.StatefulSet, invariants invari
 		if err != nil {
 			t.Fatalf("Error getting updated StatefulSet: %v", err)
 		}
-		if pods, err = spc.setPodReady(set, i); err != nil {
+		if _, err = spc.setPodReady(set, i); err != nil {
 			t.Error(err)
 		}
 	}

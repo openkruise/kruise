@@ -81,10 +81,12 @@ func TestReconcileJobCreatePod(t *testing.T) {
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
 
 	podList := &v1.PodList{}
 	listOptions := client.InNamespace(request.Namespace)
 	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	assert.NoError(t, err)
 
 	// 2 pods active
 	assert.Equal(t, int32(2), retrievedJob.Status.Active)
@@ -126,6 +128,7 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
 
 	// 10 pods active
 	assert.Equal(t, int32(10), retrievedJob.Status.Active)
@@ -134,6 +137,8 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 	listOptions := client.InNamespace(request.Namespace)
 	listOptions.MatchingLabels(labelsAsMap(job1))
 	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	assert.NoError(t, err)
+
 	// 10 new pods created
 	assert.Equal(t, 10, len(podList.Items))
 }
@@ -175,6 +180,7 @@ func TestJobComplete(t *testing.T) {
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
 
 	// completionTime is set
 	assert.NotNil(t, retrievedJob.Status.CompletionTime)
@@ -234,6 +240,7 @@ func TestJobFailed(t *testing.T) {
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
 
 	// The job is failed
 	assert.True(t, len(retrievedJob.Status.Conditions) > 0)
