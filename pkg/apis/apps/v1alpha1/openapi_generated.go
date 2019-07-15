@@ -433,6 +433,13 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.R
 							Format:      "",
 						},
 					},
+					"paused": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Paused indicates that the StatefulSet is paused and will not be processed by the StatefulSet controller.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

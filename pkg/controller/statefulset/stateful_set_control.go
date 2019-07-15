@@ -522,7 +522,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if err != nil {
 			return &status, err
 		}
+		if set.Spec.UpdateStrategy.RollingUpdate.Paused {
+			return &status, nil
+		}
 	}
+
 	var unavailablePods []string
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {
