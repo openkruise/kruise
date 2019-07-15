@@ -32,6 +32,7 @@ type SidecarSetSpec struct {
 	Containers []SidecarContainer `json:"containers,omitempty"`
 }
 
+// SidecarContainer defines the container of Sidecar
 type SidecarContainer struct {
 	corev1.Container
 }

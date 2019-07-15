@@ -21,6 +21,7 @@ import (
 	v12 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
+// SetDefaultPodTemplate sets default pod template
 func SetDefaultPodTemplate(in *v1.PodSpec) {
 	v12.SetDefaults_PodSpec(in)
 	for i := range in.Volumes {

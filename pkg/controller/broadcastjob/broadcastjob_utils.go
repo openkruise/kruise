@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog"
 )
 
+// IsJobFinished returns true when finishing job
 func IsJobFinished(j *appsv1alpha1.BroadcastJob) bool {
 	if j.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
 		return false

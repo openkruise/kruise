@@ -6,6 +6,7 @@ import (
 	rest "k8s.io/client-go/rest"
 )
 
+// GenericClientset defines a generic client
 type GenericClientset struct {
 	KubeClient   kubeclientset.Interface
 	KruiseClient kruiseclientset.Interface

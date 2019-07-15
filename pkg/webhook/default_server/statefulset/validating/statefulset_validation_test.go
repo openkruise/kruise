@@ -74,7 +74,7 @@ func TestValidateStatefulSet(t *testing.T) {
 	var val1 int32 = 1
 	var val2 int32 = 2
 	var val3 int32 = 3
-	var val_1 int32 = -1
+	var minus1 int32 = -1
 	maxUnavailable1 := intstr.FromInt(1)
 	maxUnavailable120Percent := intstr.FromString("120%")
 	successCases := []appsv1alpha1.StatefulSet{
@@ -191,7 +191,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
-				Replicas:            &val_1,
+				Replicas:            &minus1,
 				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 				UpdateStrategy:      appsv1alpha1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
@@ -364,7 +364,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
 						return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
-							Partition:       &val_1,
+							Partition:       &minus1,
 							PodUpdatePolicy: appsv1alpha1.RecreatePodUpdateStrategyType,
 							MaxUnavailable:  &maxUnavailable1,
 						}
