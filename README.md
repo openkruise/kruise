@@ -5,9 +5,11 @@
 [![codecov](https://codecov.io/gh/openkruise/kruise/branch/master/graph/badge.svg)](https://codecov.io/gh/openkruise/kruise)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2908/badge)](https://bestpractices.coreinfrastructure.org/en/projects/2908)
 
-Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements
-[Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)
-on workload management.
+|![notification](docs/img/bell-outline-badge.svg)Community Meeting|
+|------------------|
+|The Kruise Project holds bi-weekly community calls. To join us and watch previous meeting notes and recordings, please see [meeting schedule](https://github.com/openkruise/project/blob/master/MEETING_SCHEDULE.md).|
+
+Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
 
 Today, Kruise offers three workload controllers:
 
@@ -158,10 +160,17 @@ Generate manifests e.g. CRD, RBAC etc.
 
 ## Community
 
-If you have any questions or want to contribute, you are welcome to join our
-[slack channel](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc).
+If you have any questions or want to contribute, you are welcome to communicate most things via GitHub issues or pull requests.
 
-Mailing List: todo
+Other active communication channels:
+
+- Slack: [channel address](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc)
+- Mailing List: todo
+- Dingtalk Group(钉钉讨论群)
+
+<div align="center">
+  <img src="docs/img/openkruise-dev-group.JPG" width="250" title="dingtalk">
+</div>
 
 ## Copyright
 
