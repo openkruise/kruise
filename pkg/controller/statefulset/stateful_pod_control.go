@@ -55,6 +55,7 @@ type StatefulPodControlInterface interface {
 	DeleteStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod) error
 }
 
+// NewRealStatefulPodControl returns a new realStatefulPodControl
 func NewRealStatefulPodControl(
 	client clientset.Interface,
 	setLister kruiseappslisters.StatefulSetLister,

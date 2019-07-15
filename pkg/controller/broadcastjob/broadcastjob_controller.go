@@ -166,7 +166,7 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 
 	// convert pod list to a slice of pointers
 	var pods []*corev1.Pod
-	for i, _ := range podList.Items {
+	for i := range podList.Items {
 		pods = append(pods, &podList.Items[i])
 	}
 
@@ -587,14 +587,15 @@ func (r *ReconcileBroadcastJob) createPods(nodeName, namespace string, template 
 	if err := r.Client.Create(context.TODO(), pod); err != nil {
 		r.recorder.Eventf(object, corev1.EventTypeWarning, kubecontroller.FailedCreatePodReason, "Error creating: %v", err)
 		return err
-	} else {
-		accessor, err := meta.Accessor(object)
-		if err != nil {
-			klog.Errorf("parentObject does not have ObjectMeta, %v", err)
-			return nil
-		}
-		klog.Infof("Controller %v created pod %v", accessor.GetName(), pod.Name)
-		r.recorder.Eventf(object, corev1.EventTypeNormal, kubecontroller.SuccessfulCreatePodReason, "Created pod: %v", pod.Name)
 	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
+		return nil
+	}
+	klog.Infof("Controller %v created pod %v", accessor.GetName(), pod.Name)
+	r.recorder.Eventf(object, corev1.EventTypeNormal, kubecontroller.SuccessfulCreatePodReason, "Created pod: %v", pod.Name)
+
 	return nil
 }

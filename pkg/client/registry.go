@@ -8,6 +8,7 @@ var (
 	genericClient *GenericClientset
 )
 
+// NewRegistry creates clientset by client-go
 func NewRegistry(mgr manager.Manager) error {
 	var err error
 	genericClient, err = newForConfig(mgr.GetConfig())
@@ -17,6 +18,7 @@ func NewRegistry(mgr manager.Manager) error {
 	return nil
 }
 
+// GetGenericClient returns clientset
 func GetGenericClient() GenericClientset {
 	return *genericClient
 }

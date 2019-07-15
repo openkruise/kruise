@@ -71,6 +71,7 @@ type CompletionPolicy struct {
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,4,opt,name=ttlSecondsAfterFinished"`
 }
 
+// CompletionPolicyType indicates the type of completion policy
 type CompletionPolicyType string
 
 const (
@@ -121,6 +122,7 @@ type BroadcastJobStatus struct {
 	Desired int32 `json:"desired" protobuf:"varint,7,opt,name=desired"`
 }
 
+// JobConditionType indicates valid conditions type of a job
 type JobConditionType string
 
 // These are valid conditions of a job.

@@ -120,7 +120,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 
 var _ reconcile.Reconciler = &ReconcileStatefulSet{}
 
-// StatefulSetController reconciles a StatefulSet object
+// ReconcileStatefulSet reconciles a StatefulSet object
 type ReconcileStatefulSet struct {
 	// client interface
 	kruiseClient kruiseclientset.Interface

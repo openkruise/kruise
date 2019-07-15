@@ -116,6 +116,7 @@ func ListPushHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+// InfoHandler returns DB info
 func InfoHandler(rw http.ResponseWriter, req *http.Request) {
 	info := ""
 
@@ -133,6 +134,7 @@ func InfoHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte(info + "\n"))
 }
 
+// EnvHandler returns environment info
 func EnvHandler(rw http.ResponseWriter, req *http.Request) {
 	environment := make(map[string]string)
 	for _, item := range os.Environ() {
@@ -150,6 +152,7 @@ func EnvHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+// HelloHandler returns "hello"
 func HelloHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte("Hello from guestbook. " +
 		"Your app is up! (Hostname: " +
@@ -162,11 +165,11 @@ func findRedisURL() string {
 	host := os.Getenv("REDIS_MASTER_SERVICE_HOST")
 	port := os.Getenv("REDIS_MASTER_SERVICE_PORT")
 	password := os.Getenv("REDIS_MASTER_SERVICE_PASSWORD")
-	master_port := os.Getenv("REDIS_MASTER_PORT")
+	masterPort := os.Getenv("REDIS_MASTER_PORT")
 
 	if host != "" && port != "" && password != "" {
 		return password + "@" + host + ":" + port
-	} else if master_port != "" {
+	} else if masterPort != "" {
 		return "redis-master:6379"
 	}
 	return ""
