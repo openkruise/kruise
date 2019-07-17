@@ -169,6 +169,7 @@ type NodeTestContextType struct {
 	ExtraEnvs map[string]string
 }
 
+// CloudConfig defines some config
 type CloudConfig struct {
 	ApiEndpoint       string
 	ProjectID         string
@@ -190,9 +191,10 @@ type CloudConfig struct {
 	Provider ProviderInterface
 }
 
+// TestContext defines a context include test settings and global state
 var TestContext TestContextType
 
-// Register flags common to all e2e test suites.
+// RegisterCommonFlags registers flags common to all e2e test suites.
 func RegisterCommonFlags() {
 	// Turn on verbose by default to get spec names
 	config.DefaultReporterConfig.Verbose = true
@@ -230,7 +232,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
 }
 
-// Register flags specific to the cluster e2e test suite.
+// RegisterClusterFlags registers flags specific to the cluster e2e test suite.
 func RegisterClusterFlags() {
 	flag.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
 	flag.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
@@ -281,7 +283,7 @@ func RegisterClusterFlags() {
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
 }
 
-// Register flags specific to the node e2e test suite.
+// RegisterNodeFlags registers flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	// Mark the test as node e2e when node flags are api.Registry.
 	TestContext.NodeE2E = true

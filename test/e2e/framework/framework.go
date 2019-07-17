@@ -43,7 +43,7 @@ import (
 const (
 	maxKubectlExecRetries = 5
 	// TODO(mikedanese): reset this to 5 minutes once #47135 is resolved.
-	// ref https://github.com/kubernetes/kubernetes/issues/47135
+	// DefaultNamespaceDeletionTimeout ref https://github.com/kubernetes/kubernetes/issues/47135
 	DefaultNamespaceDeletionTimeout = 10 * time.Minute
 )
 
@@ -83,19 +83,21 @@ type Framework struct {
 	TestSummaries []TestDataSummary
 }
 
+// TestDataSummary defines a interface to test data summary
 type TestDataSummary interface {
 	SummaryKind() string
 	PrintHumanReadable() string
 	PrintJSON() string
 }
 
+// FrameworkOptions contains some options
 type FrameworkOptions struct {
 	ClientQPS    float32
 	ClientBurst  int
 	GroupVersion *schema.GroupVersion
 }
 
-// NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
+// NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
 	options := FrameworkOptions{
@@ -105,6 +107,7 @@ func NewDefaultFramework(baseName string) *Framework {
 	return NewFramework(baseName, options, nil)
 }
 
+// NewFramework makes a new framework and sets up a BeforeEach/AfterEach
 func NewFramework(baseName string, options FrameworkOptions, client clientset.Interface) *Framework {
 	f := &Framework{
 		BaseName:  baseName,
@@ -266,6 +269,7 @@ func (f *Framework) AfterEach() {
 	}
 }
 
+// CreateNamespace is used to create namespace
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*v1.Namespace, error) {
 	createTestingNS := TestContext.CreateTestingNS
 	if createTestingNS == nil {
@@ -296,12 +300,12 @@ func (f *Framework) WaitForPodRunning(podName string) error {
 	return WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
 }
 
-// Wrapper function for ginkgo describe.  Adds namespacing.
+// KruiseDescribe is a wrapper function for ginkgo describe.  Adds namespacing.
 func KruiseDescribe(text string, body func()) bool {
 	return Describe("[kruise.io] "+text, body)
 }
 
-// Wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
+// ConformanceIt is a wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
 func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
 	return It(text+" [Conformance]", body, timeout...)
 }

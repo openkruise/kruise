@@ -37,10 +37,12 @@ var (
 	lists map[string][]string = map[string][]string{}
 )
 
+// Input contains the input text
 type Input struct {
 	InputText string `json:"input_text"`
 }
 
+// GetList gets list by key
 func GetList(key string) ([]string, error) {
 	// Using Redis
 	if slavePool != nil {
@@ -62,6 +64,7 @@ func GetList(key string) ([]string, error) {
 	return lists[key], nil
 }
 
+// AppendToList put item into list
 func AppendToList(item string, key string) ([]string, error) {
 	var err error
 	var items []string
@@ -82,6 +85,7 @@ func AppendToList(item string, key string) ([]string, error) {
 	return items, nil
 }
 
+// ListRangeHandler handles lrange request
 func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 	var data []byte
 
@@ -97,6 +101,7 @@ func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+// ListPushHandler handles rpush request
 func ListPushHandler(rw http.ResponseWriter, req *http.Request) {
 	var data []byte
 
