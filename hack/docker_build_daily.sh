@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo $TRAVIS_EVENT_TYPE, $TRAVIS_BRANCH
+echo "$TRAVIS_EVENT_TYPE, $TRAVIS_BRANCH"
 
 if [[ "$TRAVIS_EVENT_TYPE" = "cron" && "$TRAVIS_BRANCH" = "master" ]]; then
     echo "building container"
