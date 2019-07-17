@@ -13,7 +13,7 @@ Well, some of Helm v3 Latest Release on Aliyun OSS:
 * [Linux arm64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-linux-arm64.tar.gz)
 * [Windows amd64](https://cloudnativeapphub.oss-cn-hangzhou.aliyuncs.com/helm-v3.0.0-alpha.1-windows-amd64.zip)
 
-### If you are using Helm for first time, you may need to init Helm with stable URL:
+### If you are using Helm for first time, you may need to init Helm with stable URL
 
 ```
 helm init --stable-repo-url https://apphub.aliyuncs.com
