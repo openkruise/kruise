@@ -18,8 +18,8 @@ package util
 
 import "encoding/json"
 
-// DumpJson returns the JSON encoding
-func DumpJson(o interface{}) string {
+// DumpJSON returns the JSON encoding
+func DumpJSON(o interface{}) string {
 	j, _ := json.Marshal(o)
 	return string(j)
 }

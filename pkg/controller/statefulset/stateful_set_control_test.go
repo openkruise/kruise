@@ -56,7 +56,7 @@ import (
 
 type invariantFunc func(set *appsv1alpha1.StatefulSet, spc *fakeStatefulPodControl) error
 
-func setupController(client clientset.Interface, kruiseClient kruiseclientset.Interface) (*fakeStatefulPodControl, *fakeStatefulSetStatusUpdater, StatefulSetControlInterface, chan struct{}) {
+func setupController(client clientset.Interface, kruiseClient kruiseclientset.Interface) (*fakeStatefulPodControl, *fakeStatefulSetStatusUpdater, ControlInterface, chan struct{}) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	kruiseInformerFactory := kruiseinformers.NewSharedInformerFactory(kruiseClient, controller.NoResyncPeriodFunc())
 	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1alpha1().StatefulSets())
@@ -1084,7 +1084,7 @@ func TestStatefulSetControlRollingUpdateWithPaused(t *testing.T) {
 
 	testFn := func(test *testcase, t *testing.T) {
 		set := test.initial()
-		var partition int32 = 0
+		var partition int32
 		set.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
 			Type: apps.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
@@ -2261,7 +2261,7 @@ func (ssu *fakeStatefulSetStatusUpdater) SetUpdateStatefulSetStatusError(err err
 	ssu.updateStatusTracker.after = after
 }
 
-var _ StatefulSetStatusUpdaterInterface = &fakeStatefulSetStatusUpdater{}
+var _ StatusUpdaterInterface = &fakeStatefulSetStatusUpdater{}
 
 func assertMonotonicInvariants(set *appsv1alpha1.StatefulSet, spc *fakeStatefulPodControl) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -2398,7 +2398,7 @@ func fakeResourceVersion(object interface{}) {
 }
 
 func scaleUpStatefulSetControl(set *appsv1alpha1.StatefulSet,
-	ssc StatefulSetControlInterface,
+	ssc ControlInterface,
 	spc *fakeStatefulPodControl,
 	invariants invariantFunc) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -2459,7 +2459,7 @@ func scaleUpStatefulSetControl(set *appsv1alpha1.StatefulSet,
 	return invariants(set, spc)
 }
 
-func scaleDownStatefulSetControl(set *appsv1alpha1.StatefulSet, ssc StatefulSetControlInterface, spc *fakeStatefulPodControl, invariants invariantFunc) error {
+func scaleDownStatefulSetControl(set *appsv1alpha1.StatefulSet, ssc ControlInterface, spc *fakeStatefulPodControl, invariants invariantFunc) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
@@ -2553,7 +2553,7 @@ func updateComplete(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) bool {
 }
 
 func updateStatefulSetControl(set *appsv1alpha1.StatefulSet,
-	ssc StatefulSetControlInterface,
+	ssc ControlInterface,
 	spc *fakeStatefulPodControl,
 	invariants invariantFunc) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)

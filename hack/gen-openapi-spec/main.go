@@ -14,10 +14,10 @@ import (
 
 // Generate OpenAPI spec definitions for Kruise Resources
 func main() {
-	generateSwaggerJson()
+	generateSwaggerJSON()
 }
 
-func generateSwaggerJson() {
+func generateSwaggerJSON() {
 	version := "v0.1.0"
 	if len(os.Args) > 1 {
 		version = os.Args[1]

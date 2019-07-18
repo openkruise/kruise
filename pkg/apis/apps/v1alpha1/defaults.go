@@ -22,8 +22,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_BroadcastJob sets any unspecified values to defaults.
-func SetDefaults_BroadcastJob(job *BroadcastJob) {
+// SetDefaultsBroadcastJob sets any unspecified values to defaults.
+func SetDefaultsBroadcastJob(job *BroadcastJob) {
 	if job.Spec.CompletionPolicy.Type == "" {
 		job.Spec.CompletionPolicy.Type = Always
 	}

@@ -34,7 +34,7 @@ var (
 	slavePool  *simpleredis.ConnectionPool
 
 	// For when Redis is not used, we just keep it in memory
-	lists map[string][]string = map[string][]string{}
+	lists = map[string][]string{}
 )
 
 // Input contains the input text

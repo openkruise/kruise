@@ -44,9 +44,12 @@ func init() {
 }
 
 var (
-	SidecarIgnoredNamespaces       = []string{"kube-system", "kube-public"}
+	// SidecarIgnoredNamespaces indicates the ignored namespaces
+	SidecarIgnoredNamespaces = []string{"kube-system", "kube-public"}
+	// SidecarSetGenerationAnnotation indicates generation annotation
 	SidecarSetGenerationAnnotation = "kruise.io/sidecarset-generation"
-	SidecarEnvKey                  = "IS_INJECTED"
+	// SidecarEnvKey is a key
+	SidecarEnvKey = "IS_INJECTED"
 )
 
 // PodCreateHandler handles Pod
@@ -107,7 +110,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 		return nil
 	}
 
-	klog.V(4).Infof("[sidecar inject] before mutating: %v", util.DumpJson(pod))
+	klog.V(4).Infof("[sidecar inject] before mutating: %v", util.DumpJSON(pod))
 	// apply sidecar info into pod
 	// 1. apply containers
 	pod.Spec.Containers = append(pod.Spec.Containers, sidecarContainers...)
@@ -122,7 +125,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 		}
 		pod.Annotations[SidecarSetGenerationAnnotation] = string(encodedStr)
 	}
-	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJson(pod))
+	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
 
 	return nil
 }

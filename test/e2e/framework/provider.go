@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
+// Factory represents the factory pattern
 type Factory func() (ProviderInterface, error)
 
 var (
@@ -103,41 +104,62 @@ type ProviderInterface interface {
 // which doesn't do anything.
 type NullProvider struct{}
 
+// FrameworkBeforeEach is a framework before each
 func (n NullProvider) FrameworkBeforeEach(f *Framework) {}
-func (n NullProvider) FrameworkAfterEach(f *Framework)  {}
 
+// FrameworkAfterEach is framework after each
+func (n NullProvider) FrameworkAfterEach(f *Framework) {}
+
+// ResizeGroup no usages
 func (n NullProvider) ResizeGroup(string, int32) error {
-	return fmt.Errorf("Provider does not support InstanceGroups")
+	return fmt.Errorf("provider does not support InstanceGroups")
 }
+
+// GetGroupNodes no usages
 func (n NullProvider) GetGroupNodes(group string) ([]string, error) {
 	return nil, fmt.Errorf("provider does not support InstanceGroups")
 }
+
+// GroupSize no usages
 func (n NullProvider) GroupSize(group string) (int, error) {
 	return -1, fmt.Errorf("provider does not support InstanceGroups")
 }
 
+// CreatePD no usages
 func (n NullProvider) CreatePD(zone string) (string, error) {
 	return "", fmt.Errorf("provider does not support volume creation")
 }
+
+// DeletePD no usages
 func (n NullProvider) DeletePD(pdName string) error {
 	return fmt.Errorf("provider does not support volume deletion")
 }
+
+// CreatePVSource no usages
 func (n NullProvider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
 	return nil, fmt.Errorf("Provider not supported")
 }
+
+// DeletePVSource no usages
 func (n NullProvider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
 	return fmt.Errorf("Provider not supported")
 }
 
+// CleanupServiceResources no usages
 func (n NullProvider) CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
 }
 
+// EnsureLoadBalancerResourcesDeleted no usages
 func (n NullProvider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return nil
 }
+
+// LoadBalancerSrcRanges no usages
 func (n NullProvider) LoadBalancerSrcRanges() []string {
 	return nil
 }
+
+// EnableAndDisableInternalLB no usages
 func (n NullProvider) EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service)) {
 	nop := func(svc *v1.Service) {}
 	return nop, nop
