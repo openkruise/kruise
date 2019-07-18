@@ -131,6 +131,10 @@ spec:
                       description: PodUpdatePolicy indicates how pods should be updated
                         Default value is "ReCreate"
                       type: string
+                    paused:
+                      description: Paused indicates that the StatefulSet is paused and will not be
+                        processed by the StatefulSet controller.Default value is false.
+                      type: boolean
                   type: object
                 type:
                   description: Type indicates the type of the StatefulSetUpdateStrategy.

@@ -79,6 +79,10 @@ type RollingUpdateStatefulSetStrategy struct {
 	// Default value is "ReCreate"
 	// +optional
 	PodUpdatePolicy PodUpdateStrategyType `json:"podUpdatePolicy,omitempty"`
+	// Paused indicates that the StatefulSet is paused.
+	// Default value is false
+	// +optional
+	Paused bool `json:"paused,omitempty"`
 }
 
 // PodUpdateStrategyType is a string enumeration type that enumerates
