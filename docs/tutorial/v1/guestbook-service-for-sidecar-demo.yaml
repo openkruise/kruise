@@ -13,5 +13,5 @@ spec:
     targetPort: sidecar-server
     name: sidecar-port
   selector:
-    app: guestbook-with-sidecar
+    app.kubernetes.io/name: guestbook-with-sidecar
   type: LoadBalancer

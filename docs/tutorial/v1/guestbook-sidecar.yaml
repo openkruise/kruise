@@ -5,7 +5,7 @@ metadata:
 spec:
   selector: # select the pods to be injected with sidecar containers
     matchLabels:
-      app.kubernetes.io/name: guestbook-kruise
+      app.kubernetes.io/name: guestbook-with-sidecar
   containers:
     - name: guestbook-sidecar
       image: openkruise/guestbook:sidecar

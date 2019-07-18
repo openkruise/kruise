@@ -46,7 +46,7 @@ Several things to note in the `guestbook-statefulset.yaml`
 *        # A new condition must be added to ensure the pod remain at NotReady state while the in-place update is happening
 *        - conditionType: InPlaceUpdateReady
       containers:
-      - name: guestbook
+      - name: guestbook-kruise
         image: openkruise/guestbook:v1
         ports:
         - name: http-server
@@ -141,7 +141,7 @@ The YAML diff details are shown below:
 spec:
     ...
       containers:
-      - name: guestbook
+      - name: guestbook-kruise
 -       image: openkruise/guestbook:v1
 +       image: openkruise/guestbook:v2
   podManagementPolicy: Parallel  # allow parallel updates, works together with maxUnavailable

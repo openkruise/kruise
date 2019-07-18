@@ -10,11 +10,11 @@ spec:
   serviceName: guestbook-with-sidecar
   selector:
     matchLabels:
-      app: guestbook-with-sidecar
+      app.kubernetes.io/name:  guestbook-with-sidecar
   template:
     metadata:
       labels:
-        app:  guestbook-with-sidecar
+        app.kubernetes.io/name:  guestbook-with-sidecar
         version: "1.0"
     spec:
       readinessGates:
