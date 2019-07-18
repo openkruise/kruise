@@ -149,7 +149,7 @@ func validateStatefulSet(statefulSet *appsv1alpha1.StatefulSet) field.ErrorList 
 	return allErrs
 }
 
-// validateStatefulSetUpdate tests if required fields in the StatefulSet are set.
+// ValidateStatefulSetUpdate tests if required fields in the StatefulSet are set.
 func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.StatefulSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 

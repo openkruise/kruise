@@ -34,7 +34,7 @@ import (
 
 var inPlaceUpdatePatchRexp = regexp.MustCompile("/spec/containers/([0-9]+)/image")
 
-// inPlaceUpdateSpec records the images of containers which need to in-place update.
+// InPlaceUpdateSpec records the images of containers which need to in-place update.
 type InPlaceUpdateSpec struct {
 	revision        string
 	patches         []jsonpatch.JsonPatchOperation

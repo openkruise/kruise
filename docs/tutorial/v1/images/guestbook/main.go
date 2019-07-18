@@ -37,10 +37,12 @@ var (
 	lists map[string][]string = map[string][]string{}
 )
 
+// Input contains the input text
 type Input struct {
 	InputText string `json:"input_text"`
 }
 
+// GetList gets list by key
 func GetList(key string) ([]string, error) {
 	// Using Redis
 	if slavePool != nil {
@@ -62,6 +64,7 @@ func GetList(key string) ([]string, error) {
 	return lists[key], nil
 }
 
+// AppendToList put item into list
 func AppendToList(item string, key string) ([]string, error) {
 	var err error
 	var items []string
@@ -82,6 +85,7 @@ func AppendToList(item string, key string) ([]string, error) {
 	return items, nil
 }
 
+// ListRangeHandler handles lrange request
 func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 	var data []byte
 
@@ -97,6 +101,7 @@ func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+// ListPushHandler handles rpush request
 func ListPushHandler(rw http.ResponseWriter, req *http.Request) {
 	var data []byte
 
@@ -116,6 +121,7 @@ func ListPushHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+// InfoHandler returns DB info
 func InfoHandler(rw http.ResponseWriter, req *http.Request) {
 	info := ""
 
@@ -133,6 +139,7 @@ func InfoHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte(info + "\n"))
 }
 
+// EnvHandler returns environment info
 func EnvHandler(rw http.ResponseWriter, req *http.Request) {
 	environment := make(map[string]string)
 	for _, item := range os.Environ() {
@@ -150,6 +157,7 @@ func EnvHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+// HelloHandler returns "hello"
 func HelloHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte("Hello from guestbook. " +
 		"Your app is up! (Hostname: " +
@@ -162,11 +170,11 @@ func findRedisURL() string {
 	host := os.Getenv("REDIS_MASTER_SERVICE_HOST")
 	port := os.Getenv("REDIS_MASTER_SERVICE_PORT")
 	password := os.Getenv("REDIS_MASTER_SERVICE_PASSWORD")
-	master_port := os.Getenv("REDIS_MASTER_PORT")
+	masterPort := os.Getenv("REDIS_MASTER_PORT")
 
 	if host != "" && port != "" && password != "" {
 		return password + "@" + host + ":" + port
-	} else if master_port != "" {
+	} else if masterPort != "" {
 		return "redis-master:6379"
 	}
 	return ""

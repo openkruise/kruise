@@ -2,20 +2,21 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202-4EB1BA.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Go Report Card](https://goreportcard.com/badge/github.com/openkruise/kruise)](https://goreportcard.com/report/github.com/openkruise/kruise)
-[![codecov](https://codecov.io/gh/openkruise/kruise/branch/master/graph/badge.svg)](https://codecov.io/gh/openkruise/kruise)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2908/badge)](https://bestpractices.coreinfrastructure.org/en/projects/2908)
 
-Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements
-[Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)
-on workload management.
+|![notification](docs/img/bell-outline-badge.svg)Community Meeting|
+|------------------|
+|The Kruise Project holds bi-weekly community calls. To join us and watch previous meeting notes and recordings, please see [meeting schedule](https://github.com/openkruise/project/blob/master/MEETING_SCHEDULE.md).|
+
+Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
 
 Today, Kruise offers three workload controllers:
 
-* [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
+- [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`.
 
-* [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
+- [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
 
-* [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors.
+- [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors.
 
 Please see [documents](./docs/README.md) for more technical information.
 
@@ -158,10 +159,17 @@ Generate manifests e.g. CRD, RBAC etc.
 
 ## Community
 
-If you have any questions or want to contribute, you are welcome to join our
-[slack channel](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc).
+If you have any questions or want to contribute, you are welcome to communicate most things via GitHub issues or pull requests.
 
-Mailing List: todo
+Other active communication channels:
+
+- Slack: [channel address](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWMzZDI5NTM3ZjM1MGY2Mjg1NzU4ZjBjMDJmNjZmZTEwYTZkMzk4ZTAzNmY5NTczODhkZDU2NzVhM2I2MzNmODc)
+- Mailing List: todo
+- Dingtalk Group(钉钉讨论群)
+
+<div align="center">
+  <img src="docs/img/openkruise-dev-group.JPG" width="250" title="dingtalk">
+</div>
 
 ## Copyright
 

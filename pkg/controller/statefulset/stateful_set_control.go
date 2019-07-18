@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
-// StatefulSetControl implements the control logic for updating StatefulSets and their children Pods. It is implemented
+// StatefulSetControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
 // as an interface to allow for extensions that provide different semantics. Currently, there is only one implementation.
 type StatefulSetControlInterface interface {
 	// UpdateStatefulSet implements the control logic for Pod creation, update, and deletion, and
@@ -522,7 +522,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if err != nil {
 			return &status, err
 		}
+		if set.Spec.UpdateStrategy.RollingUpdate.Paused {
+			return &status, nil
+		}
 	}
+
 	var unavailablePods []string
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {

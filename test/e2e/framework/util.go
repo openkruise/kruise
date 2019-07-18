@@ -58,23 +58,24 @@ import (
 )
 
 const (
-	// How long to wait for the pod to be listable
+	// PodListTimeout indicates how long to wait for the pod to be listable
 	PodListTimeout = time.Minute
-	// Initial pod start can be delayed O(minutes) by slow docker pulls
+	// PodStartTimeout indicates that initial pod start can be delayed O(minutes) by slow docker pulls
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	PodStartTimeout = 5 * time.Minute
 
-	// Same as `PodStartTimeout` to wait for the pod to be started, but shorter.
+	// PodStartShortTimeout is same as `PodStartTimeout` to wait for the pod to be started, but shorter.
 	// Use it case by case when we are sure pod start will not be delayed
 	// minutes by slow docker pulls or something else.
 	PodStartShortTimeout = 2 * time.Minute
 
-	// How long to wait for a pod to be deleted
+	// PodDeleteTimeout indicates how long to wait for a pod to be deleted
 	PodDeleteTimeout = 5 * time.Minute
 
 	// PodEventTimeout is how much we wait for a pod event to occur.
 	PodEventTimeout = 2 * time.Minute
 
+	// NamespaceCleanupTimeout indicates:
 	// If there are any orphaned namespaces to clean up, this test is running
 	// on a long lived cluster. A long wait here is preferably to spurious test
 	// failures caused by leaked resources from a previous test run.
@@ -83,29 +84,30 @@ const (
 	// Some pods can take much longer to get ready due to volume attach/detach latency.
 	slowPodStartTimeout = 15 * time.Minute
 
-	// How long to wait for a service endpoint to be resolvable.
+	// ServiceStartTimeout indicates how long to wait for a service endpoint to be resolvable.
 	ServiceStartTimeout = 3 * time.Minute
 
-	// How often to Poll pods, nodes and claims.
+	// Poll indicates how often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
 
 	pollShortTimeout = 1 * time.Minute
 	pollLongTimeout  = 5 * time.Minute
 
+	// ServiceAccountProvisionTimeout indicates a service account provision timeout.
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
 	ServiceAccountProvisionTimeout = 2 * time.Minute
 
-	// How long to try single API calls (like 'get' or 'list'). Used to prevent
+	// SingleCallTimeout indicates how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
 	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	SingleCallTimeout = 5 * time.Minute
 
-	// How long nodes have to be "ready" when a test begins. They should already
+	// NodeReadyInitialTimeout indicates how long nodes have to be "ready" when a test begins. They should already
 	// be "ready" before the test starts, so this is small.
 	NodeReadyInitialTimeout = 20 * time.Second
 
-	// How long pods have to be "ready" when a test begins.
+	// PodReadyBeforeTimeout indicates how long pods have to be "ready" when a test begins.
 	PodReadyBeforeTimeout = 5 * time.Minute
 
 	// How long pods have to become scheduled onto nodes
@@ -115,33 +117,33 @@ const (
 	ServiceRespondingTimeout = 2 * time.Minute
 	EndpointRegisterTimeout  = time.Minute
 
-	// How long claims have to become dynamically provisioned
+	// ClaimProvisionTimeout indicates how long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
 
-	// Same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
+	// ClaimProvisionShortTimeout is same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
 	// Use it case by case when we are sure this timeout is enough.
 	ClaimProvisionShortTimeout = 1 * time.Minute
 
-	// How long claims have to become bound
+	// ClaimBindingTimeout indicates how long claims have to become bound
 	ClaimBindingTimeout = 3 * time.Minute
 
-	// How long claims have to become deleted
+	// ClaimDeletingTimeout indicates how long claims have to become deleted
 	ClaimDeletingTimeout = 3 * time.Minute
 
-	// How long PVs have to beome reclaimed
+	// PVReclaimingTimeout indicates how long PVs have to beome reclaimed
 	PVReclaimingTimeout = 3 * time.Minute
 
-	// How long PVs have to become bound
+	// PVBindingTimeout indicates how long PVs have to become bound
 	PVBindingTimeout = 3 * time.Minute
 
-	// How long PVs have to become deleted
+	// PVDeletingTimeout indicates how long PVs have to become deleted
 	PVDeletingTimeout = 3 * time.Minute
 
-	// How long a node is allowed to become "Ready" after it is restarted before
+	// RestartNodeReadyAgainTimeout indicates how long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
 	RestartNodeReadyAgainTimeout = 5 * time.Minute
 
-	// How long a pod is allowed to become "running" and "ready" after a node
+	// RestartPodReadyAgainTimeout indicates how long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
 
@@ -165,15 +167,17 @@ var (
 		Key:    schedulerapi.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
+	// NotReadyTaintTemplate is the taint for when a node doesn't ready.
 	NotReadyTaintTemplate = &v1.Taint{
 		Key:    schedulerapi.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 )
 
-// unique identifier of the e2e run
+// RunId is a unique identifier of the e2e run
 var RunId = uuid.NewUUID()
 
+// CreateTestingNSFn defines a function to create test
 type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -464,6 +468,7 @@ func isDynamicDiscoveryError(err error) bool {
 	return true
 }
 
+// DumpAllNamespaceInfo is used to dump all namespace info
 func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 	DumpEventsInNamespace(func(opts metav1.ListOptions, ns string) (*v1.EventList, error) {
 		return c.CoreV1().Events(ns).List(opts)
@@ -508,8 +513,10 @@ func dumpAllNodeInfo(c clientset.Interface) {
 	//DumpNodeDebugInfo(c, names, Logf)
 }
 
+// EventsLister defines a event listener
 type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error)
 
+// DumpEventsInNamespace dump events in namespace
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
@@ -542,7 +549,7 @@ func (o byFirstTimestamp) Less(i, j int) bool {
 	return o[i].FirstTimestamp.Before(&o[j].FirstTimestamp)
 }
 
-// Checks whether all registered nodes are ready.
+// AllNodesReady checks whether all registered nodes are ready.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
@@ -588,6 +595,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	return nil
 }
 
+// RestclientConfig loads config
 func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
@@ -604,8 +612,10 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	return c, nil
 }
 
+// ClientConfigGetter gets client config
 type ClientConfigGetter func() (*restclient.Config, error)
 
+// LoadConfig loads config
 func LoadConfig() (*restclient.Config, error) {
 	c, err := RestclientConfig(TestContext.KubeContext)
 	if err != nil {
@@ -619,6 +629,7 @@ func LoadConfig() (*restclient.Config, error) {
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
 }
 
+// LoadClientset loads config of client set
 func LoadClientset() (*clientset.Clientset, error) {
 	config, err := LoadConfig()
 	if err != nil {
@@ -635,10 +646,12 @@ func log(level string, format string, args ...interface{}) {
 	fmt.Fprintf(GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
+// Logf print info log
 func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
 }
 
+// Failf print fail log
 func Failf(format string, args ...interface{}) {
 	FailfWithOffset(1, format, args...)
 }
@@ -651,12 +664,14 @@ func FailfWithOffset(offset int, format string, args ...interface{}) {
 	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
 
+// Skip log info with skip
 func Skipf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
 	ginkgowrapper.Skip(nowStamp() + ": " + msg)
 }
 
+// ExpectNoError checks if "err" is set
 func ExpectNoError(err error, explain ...interface{}) {
 	ExpectNoErrorWithOffset(1, err, explain...)
 }
@@ -670,6 +685,7 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	ExpectWithOffset(1+offset, err).NotTo(HaveOccurred(), explain...)
 }
 
+// ExpectNoErrorWithRetries checks if "err" is set with retries
 func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
 	var err error
 	for i := 0; i < maxRetries; i++ {
@@ -742,6 +758,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 	}
 }
 
+// DumpDebugInfo dumps debug info
 func DumpDebugInfo(c clientset.Interface, ns string) {
 	sl, _ := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, s := range sl.Items {
@@ -753,7 +770,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 	}
 }
 
-// Waits default amount of time (PodStartTimeout) for the specified pod to become running.
+// WaitForPodRunningInNamespace waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 	if pod.Status.Phase == v1.PodRunning {
@@ -762,7 +779,7 @@ func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, PodStartTimeout)
 }
 
-// Waits default amount of time (PodStartTimeout) for the specified pod to become running.
+// WaitForPodNameRunningInNamespace waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodNameRunningInNamespace(c clientset.Interface, podName, namespace string) error {
 	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
@@ -775,6 +792,7 @@ func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace 
 	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
 }
 
+// WaitTimeoutForPodRunningInNamespace waits default amount of time
 func WaitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return wait.PollImmediate(Poll, timeout, podRunning(c, podName, namespace))
 }
@@ -812,6 +830,7 @@ type kubectlBuilder struct {
 	timeout <-chan time.Time
 }
 
+// NewKubectlCommand return a kubectlBuilder
 func NewKubectlCommand(args ...string) *kubectlBuilder {
 	b := new(kubectlBuilder)
 	b.cmd = KubectlCmd(args...)
@@ -936,7 +955,7 @@ func KubectlCmd(args ...string) *exec.Cmd {
 	return cmd
 }
 
-// Filters nodes in NodeList in place, removing nodes that do not
+// FilterNodes filters nodes in NodeList in place, removing nodes that do not
 // satisfy the given condition
 // TODO: consider merging with pkg/client/cache.NodeLister
 func FilterNodes(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
@@ -961,10 +980,12 @@ func isNodeSchedulable(node *v1.Node) bool {
 	return !node.Spec.Unschedulable && nodeReady && networkReady
 }
 
+// IsNodeConditionSetAsExpected indicate if node is ready
 func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
 	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
 }
 
+// IsNodeConditionSetAsExpectedSilent indicate if node is ready with silent
 func IsNodeConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
 	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
@@ -988,20 +1009,19 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				if wantTrue {
 					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
 						return true
-					} else {
-						msg := ""
-						if !hasNodeControllerTaints {
-							msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-								conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-						} else {
-							msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-								conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
-						}
-						if !silent {
-							Logf(msg)
-						}
-						return false
 					}
+					msg := ""
+					if !hasNodeControllerTaints {
+						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+					} else {
+						msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
+					}
+					if !silent {
+						Logf(msg)
+					}
+					return false
 				} else {
 					// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
 					if cond.Status != v1.ConditionTrue {
@@ -1016,13 +1036,12 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 			}
 			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
 				return true
-			} else {
-				if !silent {
-					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-				}
-				return false
 			}
+			if !silent {
+				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+			}
+			return false
 		}
 
 	}
@@ -1032,6 +1051,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 	return false
 }
 
+// IsNodeConditionUnset indicate if set condition
 func IsNodeConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == conditionType {
@@ -1117,6 +1137,7 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 
 type podCondition func(pod *v1.Pod) (bool, error)
 
+// WaitForPodCondition waits until pod satisfied condition
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {

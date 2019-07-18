@@ -94,7 +94,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 
 		sidecarSetGeneration[sidecarSet.Name] = sidecarSet.Generation
 
-		for i, _ := range sidecarSet.Spec.Containers {
+		for i := range sidecarSet.Spec.Containers {
 			sidecarContainer := &sidecarSet.Spec.Containers[i]
 
 			// add env to container
@@ -127,6 +127,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 	return nil
 }
 
+// PodMatchSidecarSet determines if pod match Selector of sidecar.
 func PodMatchSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
 	selector, err := metav1.LabelSelectorAsSelector(sidecarSet.Spec.Selector)
 	if err != nil {

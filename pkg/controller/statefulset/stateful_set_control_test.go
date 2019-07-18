@@ -1072,6 +1072,203 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 	}
 }
 
+func TestStatefulSetControlRollingUpdateWithPaused(t *testing.T) {
+	type testcase struct {
+		name       string
+		paused     bool
+		invariants func(set *appsv1alpha1.StatefulSet, spc *fakeStatefulPodControl) error
+		initial    func() *appsv1alpha1.StatefulSet
+		update     func(set *appsv1alpha1.StatefulSet) *appsv1alpha1.StatefulSet
+		validate   func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error
+	}
+
+	testFn := func(test *testcase, t *testing.T) {
+		set := test.initial()
+		var partition int32 = 0
+		set.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			Type: apps.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+				return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+					Partition: &partition,
+					Paused:    test.paused,
+				}
+			}(),
+		}
+		client := fake.NewSimpleClientset()
+		kruiseClient := kruisefake.NewSimpleClientset(set)
+		spc, _, ssc, stop := setupController(client, kruiseClient)
+		defer close(stop)
+		if err := scaleUpStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set = test.update(set)
+		if err := updateStatefulSetControl(set, ssc, spc, assertUpdateInvariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if err := test.validate(set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+	}
+
+	originalImage := newStatefulSet(3).Spec.Template.Spec.Containers[0].Image
+
+	tests := []testcase{
+		{
+			name:       "monotonic image update",
+			paused:     false,
+			invariants: assertMonotonicInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return newStatefulSet(3)
+			},
+			update: func(set *appsv1alpha1.StatefulSet) *appsv1alpha1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "foo"
+				return set
+			},
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				for i := range pods {
+					if pods[i].Spec.Containers[0].Image != "foo" {
+						return fmt.Errorf("want pod %s image foo found %s", pods[i].Name, pods[i].Spec.Containers[0].Image)
+					}
+				}
+				return nil
+			},
+		},
+		{
+			name:       "monotonic image update with paused",
+			paused:     true,
+			invariants: assertMonotonicInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return newStatefulSet(3)
+			},
+			update: func(set *appsv1alpha1.StatefulSet) *appsv1alpha1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "foo"
+				return set
+			},
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				for i := range pods {
+					if pods[i].Spec.Containers[0].Image != originalImage {
+						return fmt.Errorf("want pod %s image %s found %s", pods[i].Name, originalImage, pods[i].Spec.Containers[0].Image)
+					}
+				}
+				return nil
+			},
+		},
+		{
+			name:       "monotonic image update and scale up with paused",
+			paused:     true,
+			invariants: assertMonotonicInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return newStatefulSet(3)
+			},
+			update: func(set *appsv1alpha1.StatefulSet) *appsv1alpha1.StatefulSet {
+				*set.Spec.Replicas = 5
+				set.Spec.Template.Spec.Containers[0].Image = "foo"
+				return set
+			},
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				for i := range pods {
+					if i < 3 && pods[i].Spec.Containers[0].Image != originalImage {
+						return fmt.Errorf("want pod %s image %s found %s", pods[i].Name, originalImage, pods[i].Spec.Containers[0].Image)
+					}
+					if i >= 3 && pods[i].Spec.Containers[0].Image != "foo" {
+						return fmt.Errorf("want pod %s image foo found %s", pods[i].Name, pods[i].Spec.Containers[0].Image)
+					}
+				}
+				return nil
+			},
+		},
+		{
+			name:       "burst image update",
+			paused:     false,
+			invariants: assertBurstInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return burst(newStatefulSet(3))
+			},
+			update: func(set *appsv1alpha1.StatefulSet) *appsv1alpha1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "foo"
+				return set
+			},
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				for i := range pods {
+					if pods[i].Spec.Containers[0].Image != "foo" {
+						return fmt.Errorf("want pod %s image foo found %s", pods[i].Name, pods[i].Spec.Containers[0].Image)
+					}
+				}
+				return nil
+			},
+		},
+		{
+			name:       "burst image update with paused",
+			paused:     true,
+			invariants: assertBurstInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return burst(newStatefulSet(3))
+			},
+			update: func(set *appsv1alpha1.StatefulSet) *appsv1alpha1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "foo"
+				return set
+			},
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				for i := range pods {
+					if pods[i].Spec.Containers[0].Image != originalImage {
+						return fmt.Errorf("want pod %s image %s found %s", pods[i].Name, originalImage, pods[i].Spec.Containers[0].Image)
+					}
+				}
+				return nil
+			},
+		},
+		{
+			name:       "burst image update and scale up with paused",
+			paused:     true,
+			invariants: assertBurstInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return burst(newStatefulSet(3))
+			},
+			update: func(set *appsv1alpha1.StatefulSet) *appsv1alpha1.StatefulSet {
+				*set.Spec.Replicas = 5
+				set.Spec.Template.Spec.Containers[0].Image = "foo"
+				return set
+			},
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				for i := range pods {
+					if i < 3 && pods[i].Spec.Containers[0].Image != originalImage {
+						return fmt.Errorf("want pod %s image %s found %s", pods[i].Name, originalImage, pods[i].Spec.Containers[0].Image)
+					}
+					if i >= 3 && pods[i].Spec.Containers[0].Image != "foo" {
+						return fmt.Errorf("want pod %s image foo found %s", pods[i].Name, pods[i].Spec.Containers[0].Image)
+					}
+				}
+				return nil
+			},
+		},
+	}
+	for i := range tests {
+		testFn(&tests[i], t)
+	}
+}
+
 func TestStatefulSetControlRollingUpdateWithPartition(t *testing.T) {
 	type testcase struct {
 		name       string
@@ -2328,6 +2525,9 @@ func updateComplete(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) bool {
 	case apps.OnDeleteStatefulSetStrategyType:
 		return true
 	case apps.RollingUpdateStatefulSetStrategyType:
+		if set.Spec.UpdateStrategy.RollingUpdate != nil && set.Spec.UpdateStrategy.RollingUpdate.Paused == true {
+			return true
+		}
 		if set.Spec.UpdateStrategy.RollingUpdate == nil || *set.Spec.UpdateStrategy.RollingUpdate.Partition <= 0 {
 			if set.Status.CurrentReplicas < *set.Spec.Replicas {
 				return false
@@ -2426,6 +2626,7 @@ func updateStatefulSetControl(set *appsv1alpha1.StatefulSet,
 		if err != nil {
 			return err
 		}
+
 	}
 	return invariants(set, spc)
 }

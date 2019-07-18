@@ -22,5 +22,6 @@ import (
 )
 
 var (
+	// NewNginxImage gets a Niginx image
 	NewNginxImage = imageutils.GetE2EImage(imageutils.NginxNew)
 )

@@ -89,6 +89,7 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req types.R
 	return resp
 }
 
+// SetObjectDefaults sets object by default
 func SetObjectDefaults(in *appsv1alpha1.StatefulSet) {
 	setDefaults(in)
 	utils.SetDefaultPodTemplate(&in.Spec.Template.Spec)

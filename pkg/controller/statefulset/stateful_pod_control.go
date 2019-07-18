@@ -55,6 +55,7 @@ type StatefulPodControlInterface interface {
 	DeleteStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod) error
 }
 
+// NewRealStatefulPodControl returns a new realStatefulPodControl
 func NewRealStatefulPodControl(
 	client clientset.Interface,
 	setLister kruiseappslisters.StatefulSetLister,
@@ -163,11 +164,11 @@ func (spc *realStatefulPodControl) UpdateStatefulPodCondition(set *appsv1alpha1.
 	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		updatePodCondition(pod, condition)
 		if _, err := spc.client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod); err != nil {
-			if updated, gotErr := spc.podLister.Pods(pod.Namespace).Get(pod.Name); gotErr != nil {
+			updated, gotErr := spc.podLister.Pods(pod.Namespace).Get(pod.Name)
+			if gotErr != nil {
 				return gotErr
-			} else {
-				pod = updated.DeepCopy()
 			}
+			pod = updated.DeepCopy()
 			return err
 		}
 		return nil

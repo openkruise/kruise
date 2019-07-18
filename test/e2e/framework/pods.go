@@ -28,7 +28,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-// Convenience method for getting a pod client interface in the framework's namespace,
+// PodClient is convenience method for getting a pod client interface in the framework's namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
 func (f *Framework) PodClient() *PodClient {
@@ -38,6 +38,7 @@ func (f *Framework) PodClient() *PodClient {
 	}
 }
 
+// PodClient defines a convenience method for getting a pod client interface in the framework's namespace
 type PodClient struct {
 	f *Framework
 	v1core.PodInterface
