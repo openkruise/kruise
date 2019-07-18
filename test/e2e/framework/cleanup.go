@@ -19,6 +19,7 @@ package framework
 
 import "sync"
 
+// CleanupActionHandle defines a type for cleanup action handle
 type CleanupActionHandle *int
 
 var cleanupActionsLock sync.Mutex

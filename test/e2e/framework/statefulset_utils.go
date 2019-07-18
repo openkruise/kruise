@@ -48,11 +48,11 @@ import (
 )
 
 const (
-	// Poll interval for StatefulSet tests
+	// StatefulSetPoll indicates poll interval for StatefulSet tests
 	StatefulSetPoll = 10 * time.Second
-	// Timeout interval for StatefulSet operations
+	// StatefulSetTimeout indicates timeout interval for StatefulSet operations
 	StatefulSetTimeout = 10 * time.Minute
-	// Timeout for stateful pods to change state
+	// StatefulPodTimeout indicates timeout for stateful pods to change state
 	StatefulPodTimeout = 5 * time.Minute
 )
 
@@ -474,16 +474,15 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *appsv1alpha1.St
 				}
 			}
 			return false, nil
-		} else {
-			for i := int(*set.Spec.Replicas) - 1; i >= partition; i-- {
-				if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
-					Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						set.Status.UpdateRevision,
-						pods.Items[i].Labels[apps.StatefulSetRevisionLabel])
-					return false, nil
-				}
+		}
+		for i := int(*set.Spec.Replicas) - 1; i >= partition; i-- {
+			if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
+				Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					set.Status.UpdateRevision,
+					pods.Items[i].Labels[apps.StatefulSetRevisionLabel])
+				return false, nil
 			}
 		}
 		return true, nil
@@ -491,7 +490,7 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *appsv1alpha1.St
 	return set, pods
 }
 
-// WaitForRunningAndReady waits for numStatefulPods in ss to be Running and not Ready.
+// WaitForRunningAndNotReady waits for numStatefulPods in ss to be Running and not Ready.
 func (s *StatefulSetTester) WaitForRunningAndNotReady(numStatefulPods int32, ss *appsv1alpha1.StatefulSet) {
 	s.WaitForRunning(numStatefulPods, 0, ss)
 }
@@ -661,7 +660,7 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *appsv1alpha1.StatefulSet, 
 }
 
 // CheckServiceName asserts that the ServiceName for ss is equivalent to expectedServiceName.
-func (p *StatefulSetTester) CheckServiceName(ss *appsv1alpha1.StatefulSet, expectedServiceName string) error {
+func (s *StatefulSetTester) CheckServiceName(ss *appsv1alpha1.StatefulSet, expectedServiceName string) error {
 	Logf("Checking if statefulset spec.serviceName is %s", expectedServiceName)
 
 	if expectedServiceName != ss.Spec.ServiceName {
@@ -876,6 +875,7 @@ func (sp statefulPodsByOrdinal) Less(i, j int) bool {
 
 type updateStatefulSetFunc func(*appsv1alpha1.StatefulSet)
 
+// UpdateStatefulSetWithRetries update StatefulSet with retries
 func UpdateStatefulSetWithRetries(kc kruiseclientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *appsv1alpha1.StatefulSet, err error) {
 	statefulSets := kc.AppsV1alpha1().StatefulSets(namespace)
 	var updateErr error

@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// CreateServiceSpec creates service spec
 func CreateServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
 	headlessService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
