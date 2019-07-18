@@ -3,26 +3,28 @@ kind: StatefulSet
 metadata:
   name: demo-v1-guestbook-kruise
   labels:
-    app: guestbook
-    version: "1.0"
+    app.kubernetes.io/name: guestbook-kruise
+    app.kubernetes.io/instance: demo-v1
 spec:
   replicas: 20
-  serviceName: guestbook
+  serviceName: demo-v1-guestbook-kruise
   selector:
     matchLabels:
-      app: guestbook
+      app.kubernetes.io/name: guestbook-kruise
+      app.kubernetes.io/instance: demo-v1
   template:
     metadata:
       labels:
-        app: guestbook
-        version: "1.0"
+        app.kubernetes.io/name: guestbook-kruise
+        app.kubernetes.io/instance: demo-v1
     spec:
       readinessGates:
         # A new condition that ensures the pod remains at NotReady state while the in-place update is happening
-        - conditionType: InPlaceUpdateReady
+      - conditionType: InPlaceUpdateReady
       containers:
-      - name: guestbook
+      - name: guestbook-kruise
         image: openkruise/guestbook:v1
+        imagePullPolicy: Always
         ports:
         - name: http-server
           containerPort: 3000
