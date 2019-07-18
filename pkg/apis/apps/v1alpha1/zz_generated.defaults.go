@@ -33,7 +33,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_BroadcastJob(in *BroadcastJob) {
-	SetDefaults_BroadcastJob(in)
+	SetDefaultsBroadcastJob(in)
 }
 
 func SetObjectDefaults_BroadcastJobList(in *BroadcastJobList) {

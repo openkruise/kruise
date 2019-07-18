@@ -31,8 +31,8 @@ import (
 	"syscall"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,8 +114,8 @@ const (
 	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
 
 	podRespondingTimeout     = 15 * time.Minute
-	ServiceRespondingTimeout = 2 * time.Minute
-	EndpointRegisterTimeout  = time.Minute
+	serviceRespondingTimeout = 2 * time.Minute
+	endpointRegisterTimeout  = time.Minute
 
 	// ClaimProvisionTimeout indicates how long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
@@ -174,8 +174,8 @@ var (
 	}
 )
 
-// RunId is a unique identifier of the e2e run
-var RunId = uuid.NewUUID()
+// RunID is a unique identifier of the e2e run
+var RunID = uuid.NewUUID()
 
 // CreateTestingNSFn defines a function to create test
 type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
@@ -186,7 +186,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels["e2e-run"] = string(RunId)
+	labels["e2e-run"] = string(RunID)
 
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -518,11 +518,11 @@ type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error
 
 // DumpEventsInNamespace dump events in namespace
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
-	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
+	ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	By(fmt.Sprintf("Found %d events.", len(events.Items)))
+	ginkgo.By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
 	sortedEvents := events.Items
 	if len(sortedEvents) > 1 {
@@ -621,9 +621,8 @@ func LoadConfig() (*restclient.Config, error) {
 	if err != nil {
 		if TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
@@ -643,7 +642,7 @@ func nowStamp() string {
 }
 
 func log(level string, format string, args ...interface{}) {
-	fmt.Fprintf(GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
+	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
 // Logf print info log
@@ -664,7 +663,7 @@ func FailfWithOffset(offset int, format string, args ...interface{}) {
 	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
 
-// Skip log info with skip
+// Skipf log info with skip
 func Skipf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
@@ -682,7 +681,7 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	if err != nil {
 		Logf("Unexpected error occurred: %v", err)
 	}
-	ExpectWithOffset(1+offset, err).NotTo(HaveOccurred(), explain...)
+	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 // ExpectNoErrorWithRetries checks if "err" is set with retries
@@ -695,7 +694,7 @@ func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 		}
 		Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
 	}
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
+	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 // logPodStates logs basic info of provided pods for debugging.
@@ -813,51 +812,56 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 	}
 }
 
-// RunKubectlOrDie is a convenience wrapper over kubectlBuilder
+// RunKubectlOrDie is a convenience wrapper over KubectlBuilder
 func RunKubectlOrDie(args ...string) string {
 	return NewKubectlCommand(args...).ExecOrDie()
 }
 
-// RunKubectl is a convenience wrapper over kubectlBuilder
+// RunKubectl is a convenience wrapper over KubectlBuilder
 func RunKubectl(args ...string) (string, error) {
 	return NewKubectlCommand(args...).Exec()
 }
 
-// kubectlBuilder is used to build, customize and execute a kubectl Command.
+// KubectlBuilder is used to build, customize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
-type kubectlBuilder struct {
+type KubectlBuilder struct {
 	cmd     *exec.Cmd
 	timeout <-chan time.Time
 }
 
-// NewKubectlCommand return a kubectlBuilder
-func NewKubectlCommand(args ...string) *kubectlBuilder {
-	b := new(kubectlBuilder)
+// NewKubectlCommand return a KubectlBuilder
+func NewKubectlCommand(args ...string) *KubectlBuilder {
+	b := new(KubectlBuilder)
 	b.cmd = KubectlCmd(args...)
 	return b
 }
 
-func (b *kubectlBuilder) WithEnv(env []string) *kubectlBuilder {
+// WithEnv sets env
+func (b *KubectlBuilder) WithEnv(env []string) *KubectlBuilder {
 	b.cmd.Env = env
 	return b
 }
 
-func (b *kubectlBuilder) WithTimeout(t <-chan time.Time) *kubectlBuilder {
+// WithTimeout sets timeout
+func (b *KubectlBuilder) WithTimeout(t <-chan time.Time) *KubectlBuilder {
 	b.timeout = t
 	return b
 }
 
-func (b kubectlBuilder) WithStdinData(data string) *kubectlBuilder {
+// WithStdinData sets stdin data
+func (b KubectlBuilder) WithStdinData(data string) *KubectlBuilder {
 	b.cmd.Stdin = strings.NewReader(data)
 	return &b
 }
 
-func (b kubectlBuilder) WithStdinReader(reader io.Reader) *kubectlBuilder {
+// WithStdinReader sets stdin reader
+func (b KubectlBuilder) WithStdinReader(reader io.Reader) *KubectlBuilder {
 	b.cmd.Stdin = reader
 	return &b
 }
 
-func (b kubectlBuilder) ExecOrDie() string {
+// ExecOrDie indicates execute or die
+func (b KubectlBuilder) ExecOrDie() string {
 	str, err := b.Exec()
 	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
 	// Note that we're still dying after retrying so that we can get visibility to triage it further.
@@ -868,7 +872,7 @@ func (b kubectlBuilder) ExecOrDie() string {
 		Logf("stdout: %q", retryStr)
 		Logf("err: %v", retryErr)
 	}
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return str
 }
 
@@ -886,14 +890,15 @@ func isTimeout(err error) bool {
 	return false
 }
 
-func (b kubectlBuilder) Exec() (string, error) {
+// Exec executes
+func (b KubectlBuilder) Exec() (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
+		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
 	}
 	errCh := make(chan error, 1)
 	go func() {
@@ -902,19 +907,19 @@ func (b kubectlBuilder) Exec() (string, error) {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			var rc int = 127
+			var rc = 127
 			if ee, ok := err.(*exec.ExitError); ok {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)
 			}
 			return "", uexec.CodeExitError{
-				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err),
+				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
 				Code: rc,
 			}
 		}
 	case <-b.timeout:
 		b.cmd.Process.Kill()
-		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
+		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stderr: %q", stderr.String())
 	Logf("stdout: %q", stdout.String())
@@ -1022,17 +1027,16 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 						Logf(msg)
 					}
 					return false
-				} else {
-					// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
-					if cond.Status != v1.ConditionTrue {
-						return true
-					}
-					if !silent {
-						Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-					}
-					return false
 				}
+				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
+				if cond.Status != v1.ConditionTrue {
+					return true
+				}
+				if !silent {
+					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				}
+				return false
 			}
 			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
 				return true

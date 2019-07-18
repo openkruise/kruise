@@ -171,7 +171,7 @@ type NodeTestContextType struct {
 
 // CloudConfig defines some config
 type CloudConfig struct {
-	ApiEndpoint       string
+	APIEndpoint       string
 	ProjectID         string
 	Zone              string // for multizone tests, arbitrarily chosen zone
 	Region            string
@@ -256,7 +256,7 @@ func RegisterClusterFlags() {
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
+	flag.StringVar(&cloudConfig.APIEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")

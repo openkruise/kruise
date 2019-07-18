@@ -153,20 +153,20 @@ func checkInPlaceUpdateCompleted(pod *v1.Pod) error {
 // podInPlaceUpdate updates a pod object in-place, including revision label, spec images and
 // annotation of in-place update state.
 func podInPlaceUpdate(pod *v1.Pod, spec *InPlaceUpdateSpec) (*v1.Pod, error) {
-	patchJson, _ := json.Marshal(spec.patches)
-	patchClient, err := jsonpatch2.DecodePatch(patchJson)
+	patchJSON, _ := json.Marshal(spec.patches)
+	patchClient, err := jsonpatch2.DecodePatch(patchJSON)
 	if err != nil {
-		return nil, fmt.Errorf("failed DecodePatch patches %v : %v", string(patchJson), err)
+		return nil, fmt.Errorf("failed DecodePatch patches %v : %v", string(patchJSON), err)
 	}
 
-	podJson, _ := json.Marshal(pod)
-	newPodJson, err := patchClient.Apply(podJson)
+	podJSON, _ := json.Marshal(pod)
+	newPodJSON, err := patchClient.Apply(podJSON)
 	if err != nil {
-		return nil, fmt.Errorf("failed apply patches %v to pod: %v", string(patchJson), err)
+		return nil, fmt.Errorf("failed apply patches %v to pod: %v", string(patchJSON), err)
 	}
 
 	var newPod *v1.Pod
-	if err := json.Unmarshal(newPodJson, &newPod); err != nil {
+	if err := json.Unmarshal(newPodJSON, &newPod); err != nil {
 		return nil, fmt.Errorf("failed unmarshal pod after patch: %v", err)
 	}
 
@@ -186,11 +186,11 @@ func podInPlaceUpdate(pod *v1.Pod, spec *InPlaceUpdateSpec) (*v1.Pod, error) {
 			}
 		}
 	}
-	inPlaceUpdateStateJson, _ := json.Marshal(inPlaceUpdateState)
+	inPlaceUpdateStateJSON, _ := json.Marshal(inPlaceUpdateState)
 	if newPod.Annotations == nil {
 		newPod.Annotations = map[string]string{}
 	}
-	newPod.Annotations[appsv1alpha1.StatefulSetInPlaceUpdateStateAnnotation] = string(inPlaceUpdateStateJson)
+	newPod.Annotations[appsv1alpha1.StatefulSetInPlaceUpdateStateAnnotation] = string(inPlaceUpdateStateJSON)
 
 	return newPod, nil
 }
