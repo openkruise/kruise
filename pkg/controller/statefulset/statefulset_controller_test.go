@@ -55,6 +55,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const statefulSetResyncPeriod = 30 * time.Second
+
 func alwaysReady() bool { return true }
 
 func TestStatefulSetControllerCreates(t *testing.T) {

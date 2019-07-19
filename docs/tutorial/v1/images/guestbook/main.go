@@ -37,11 +37,6 @@ var (
 	lists = map[string][]string{}
 )
 
-// Input contains the input text
-type Input struct {
-	InputText string `json:"input_text"`
-}
-
 // GetList gets list by key
 func GetList(key string) ([]string, error) {
 	// Using Redis
