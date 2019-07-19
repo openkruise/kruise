@@ -30,6 +30,9 @@ type SidecarSetSpec struct {
 	// 1. normal container info that should be injected into pod
 	// 2. custom fields to control insert behavior(currently empty)
 	Containers []SidecarContainer `json:"containers,omitempty"`
+
+	// indicates that the sidecarset is paused and will not be processed by the sidecarset controller.
+	Paused bool `json:"paused,omitempty"`
 }
 
 // SidecarContainer defines the container of Sidecar
@@ -43,7 +46,7 @@ type SidecarSetStatus struct {
 	// SidecarSet's generation, which is updated on mutation by the API Server.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// matchedPods is the number of Pods whose labels are matched with this SidecarSet's selector
+	// matchedPods is the number of Pods whose labels are matched with this SidecarSet's selector and are created after sidecarset creates
 	MatchedPods int32 `json:"matchedPods"`
 
 	// updatedPods is the number of matched Pods that are injected with the latest SidecarSet's containers

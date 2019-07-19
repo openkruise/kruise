@@ -151,11 +151,16 @@ func isPodChanged(oldPod, newPod *corev1.Pod) bool {
 	if newPod.DeletionTimestamp != oldPod.DeletionTimestamp {
 		return true
 	}
+
 	// If the pod's readiness has changed, the associated endpoint address
 	// will move from the unready endpoints set to the ready endpoints.
 	// So for the purposes of an endpoint, a readiness change on a pod
 	// means we have a changed pod.
 	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(newPod) {
+		return true
+	}
+
+	if !isPodImageConsistent(oldPod) && isPodImageConsistent(newPod) {
 		return true
 	}
 

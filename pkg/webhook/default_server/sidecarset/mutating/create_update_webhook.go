@@ -23,13 +23,13 @@ import (
 )
 
 func init() {
-	builderName := "mutating-create-sidecarset"
+	builderName := "mutating-create-update-sidecarset"
 	Builders[builderName] = builder.
 		NewWebhookBuilder().
-		Name(builderName + ".kruise.io").
-		Path("/" + builderName).
+		Name(builderName+".kruise.io").
+		Path("/"+builderName).
 		Mutating().
-		Operations(admissionregistrationv1beta1.Create).
+		Operations(admissionregistrationv1beta1.Create, admissionregistrationv1beta1.Update).
 		FailurePolicy(admissionregistrationv1beta1.Fail).
 		ForType(&appsv1alpha1.SidecarSet{})
 }

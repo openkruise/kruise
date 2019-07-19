@@ -117,11 +117,15 @@ func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// ignore inactive pods
+	// ignore inactive pods and pods are created before sidecarset creates
 	var filteredPods []*corev1.Pod
 	for i := range matchedPods.Items {
 		pod := &matchedPods.Items[i]
-		if controllerutil.IsPodActive(pod) && !isIgnoredPod(pod) {
+		podCreateBeforeSidecarSet, err := isPodCreatedBeforeSidecarSet(sidecarSet, pod)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if controllerutil.IsPodActive(pod) && !isIgnoredPod(pod) && !podCreateBeforeSidecarSet {
 			filteredPods = append(filteredPods, pod)
 		}
 	}
@@ -131,7 +135,53 @@ func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// update sidecarset status
 	err = r.updateSidecarSetStatus(sidecarSet, status)
-	return reconcile.Result{}, err
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// update procedure:
+	// 1. check if sidecarset paused, if so, then quit
+	// 2. check if fields other than image in sidecarset had changed, if so, then quit
+	// 3. check unavailable pod number, if > 0, then quit(maxUnavailable=1)
+	// 4. find out pods need update
+	// 5. update one pod(maxUnavailable=1)
+	if sidecarSet.Spec.Paused {
+		klog.V(3).Infof("sidecarset %v is paused, skip update", sidecarSet.Name)
+		return reconcile.Result{}, nil
+	}
+
+	if len(filteredPods) == 0 {
+		return reconcile.Result{}, nil
+	}
+	otherFieldsChanged, err := otherFieldsInSidecarChanged(sidecarSet, filteredPods[0])
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if otherFieldsChanged {
+		klog.V(3).Infof("fields other than image in sidecarset %v had changed, skip update", sidecarSet.Name)
+		return reconcile.Result{}, nil
+	}
+
+	unavailableNum, err := getUnavailableNumber(sidecarSet, filteredPods)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	// we only support sequential update currently, equals to maxUnavailable = 1
+	if unavailableNum != 0 {
+		klog.V(3).Infof("current unavailable pod number: %v, skip update", unavailableNum)
+		return reconcile.Result{}, nil
+	}
+
+	var podsNeedUpdate []*corev1.Pod
+	for _, pod := range filteredPods {
+		isUpdated, err := isPodSidecarUpdated(sidecarSet, pod)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if !isUpdated {
+			podsNeedUpdate = append(podsNeedUpdate, pod)
+		}
+	}
+	return reconcile.Result{}, r.updateSidecarImageAndHash(sidecarSet, podsNeedUpdate)
 }

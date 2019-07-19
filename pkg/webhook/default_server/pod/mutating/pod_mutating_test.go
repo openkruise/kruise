@@ -17,6 +17,7 @@ import (
 
 	"github.com/openkruise/kruise/pkg/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/default_server/sidecarset/mutating"
 )
 
 func TestMain(m *testing.M) {
@@ -33,6 +34,10 @@ func TestMain(m *testing.M) {
 func TestSidecarSetMutatePod(t *testing.T) {
 	sidecarSet1 := &appsv1alpha1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				mutating.SidecarSetHashAnnotation:             "c4k2dbb95d",
+				mutating.SidecarSetHashWithoutImageAnnotation: "26c9ct5hfb",
+			},
 			Name:       "sidecarset1",
 			Generation: 123,
 		},
@@ -43,7 +48,8 @@ func TestSidecarSetMutatePod(t *testing.T) {
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
-						Name: "sidecar1",
+						Name:  "sidecar1",
+						Image: "sidecar-image1",
 					},
 				},
 			},
@@ -52,6 +58,10 @@ func TestSidecarSetMutatePod(t *testing.T) {
 
 	sidecarSet2 := &appsv1alpha1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				mutating.SidecarSetHashAnnotation:             "gm967682cm",
+				mutating.SidecarSetHashWithoutImageAnnotation: "h8c6gb5d2b",
+			},
 			Name:       "sidecarset2",
 			Generation: 456,
 		},
@@ -62,7 +72,8 @@ func TestSidecarSetMutatePod(t *testing.T) {
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
-						Name: "sidecar2",
+						Name:  "sidecar2",
+						Image: "sidecar-image2",
 					},
 				},
 			},
@@ -103,10 +114,18 @@ func TestSidecarSetMutatePod(t *testing.T) {
 	if !isMarkedSidecar(pod1.Spec.Containers[1]) || !isMarkedSidecar(pod1.Spec.Containers[2]) {
 		t.Errorf("expect env injected, but got nothing")
 	}
-	expectedAnnotation := `{"sidecarset1":123,"sidecarset2":456}`
-	if pod1.Annotations[SidecarSetGenerationAnnotation] != expectedAnnotation {
-		t.Errorf("expect annotation %v but got %v", pod1.Annotations[SidecarSetGenerationAnnotation], expectedAnnotation)
+	hashKey1 := mutating.SidecarSetHashAnnotation
+	hashKey2 := mutating.SidecarSetHashWithoutImageAnnotation
+	expectedAnnotation1 := `{"sidecarset1":"c4k2dbb95d","sidecarset2":"gm967682cm"}`
+	expectedAnnotation2 := `{"sidecarset1":"26c9ct5hfb","sidecarset2":"h8c6gb5d2b"}`
+	if pod1.Annotations[hashKey1] != expectedAnnotation1 {
+		t.Errorf("expect annotation %v but got %v", expectedAnnotation1, pod1.Annotations[hashKey1])
 	}
+	if pod1.Annotations[hashKey2] != expectedAnnotation2 {
+		t.Errorf("expect annotation %v but got %v", expectedAnnotation2, pod1.Annotations[hashKey2])
+	}
+
+	// nothing changed
 	if !reflect.DeepEqual(pod2, expectedMutatedPod2) {
 		t.Errorf("\nexpected mutated pod:\n%+v,\nbut got %+v\n", expectedMutatedPod2, pod2)
 	}

@@ -305,6 +305,10 @@
             "$ref": "#/definitions/kruise.apps.v1alpha1.SidecarContainer"
           }
         },
+        "paused": {
+          "description": "indicates that the sidecarset is paused and will not be processed by the sidecarset controller.",
+          "type": "boolean"
+        },
         "selector": {
           "description": "selector is a label query over pods that should be injected",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
