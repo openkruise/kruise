@@ -57,6 +57,10 @@ spec:
               items:
                 type: object
               type: array
+            paused:
+              description: indicates that the sidecarset is paused and will not be
+                processed by the sidecarset controller.
+              type: boolean
             selector:
               description: selector is a label query over pods that should be injected
               type: object
@@ -65,7 +69,7 @@ spec:
           properties:
             matchedPods:
               description: matchedPods is the number of Pods whose labels are matched
-                with this SidecarSet's selector
+                with this SidecarSet's selector and are created after sidecarset creates
               format: int32
               type: integer
             observedGeneration:

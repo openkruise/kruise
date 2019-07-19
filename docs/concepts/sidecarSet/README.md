@@ -53,7 +53,7 @@ spec:
       app: nginx
   containers:
   - name: sidecar1
-    image: centos:7
+    image: centos:6.7
     command: ["sleep", "999d"] # do nothing at all
 ```
 
@@ -100,6 +100,14 @@ status:
   readyPods: 1
   updatedPods: 1
 ```
+
+### Update a SidecarSet
+
+Use ```kubectl edit sidecarset test-sidecarset``` to modify sidecarSet image from "centos:6.7" to "centos:6.8", then you will see matched pods will be updated in place one by one(we only support maxUnavailable=1 for now).
+
+You could use ```kubectl patch sidecarset test-sidecarset --type merge -p '{"spec":{"paused":true}}'``` to pause the update procedure.
+
+If user modifies fields other than image in sidecarSet, pod won't get updated until pod is recreated by workload(e.g. deployment), which we called "lazy update".
 
 ## Tutorial
 

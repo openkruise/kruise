@@ -585,6 +585,13 @@ func schema_pkg_apis_apps_v1alpha1_SidecarSetSpec(ref common.ReferenceCallback) 
 							},
 						},
 					},
+					"paused": {
+						SchemaProps: spec.SchemaProps{
+							Description: "indicates that the sidecarset is paused and will not be processed by the sidecarset controller.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

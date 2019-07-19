@@ -20,7 +20,8 @@ import (
 	"context"
 	"net/http"
 
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/api/admission/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -29,8 +30,15 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 )
 
+const (
+	// hash of a sidecarset
+	SidecarSetHashAnnotation             = "kruise.io/sidecarset-hash"
+	// hash of a sidecarset without images of sidecar
+	SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
+)
+
 func init() {
-	webhookName := "mutating-create-sidecarset"
+	webhookName := "mutating-create-update-sidecarset"
 	if HandlerMap[webhookName] == nil {
 		HandlerMap[webhookName] = []admission.Handler{}
 	}
@@ -47,11 +55,6 @@ type SidecarSetCreateHandler struct {
 
 	// Decoder decodes objects
 	Decoder types.Decoder
-}
-
-func (h *SidecarSetCreateHandler) mutatingSidecarSetFn(ctx context.Context, obj *appsv1alpha1.SidecarSet) error {
-	setDefaultSidecarSet(obj)
-	return nil
 }
 
 func setDefaultSidecarSet(sidecarset *appsv1alpha1.SidecarSet) {
@@ -103,6 +106,26 @@ func setDefaultContainer(sidecarContainer *appsv1alpha1.SidecarContainer) {
 	}
 }
 
+func setHashSidecarSet(sidecarset *appsv1alpha1.SidecarSet) error {
+	if sidecarset.Annotations == nil {
+		sidecarset.Annotations = make(map[string]string)
+	}
+
+	hash, err := SidecarSetHash(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[SidecarSetHashAnnotation] = hash
+
+	hash, err = SidecarSetHashWithoutImage(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[SidecarSetHashWithoutImageAnnotation] = hash
+
+	return nil
+}
+
 var _ admission.Handler = &SidecarSetCreateHandler{}
 
 // Handle handles admission requests.
@@ -115,10 +138,18 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req types.Request)
 	}
 	copy := obj.DeepCopy()
 
-	err = h.mutatingSidecarSetFn(ctx, copy)
-	if err != nil {
-		return admission.ErrorResponse(http.StatusInternalServerError, err)
+	switch req.AdmissionRequest.Operation {
+	case v1beta1.Create:
+		setDefaultSidecarSet(copy)
+		if err := setHashSidecarSet(copy); err != nil {
+			return admission.ErrorResponse(http.StatusInternalServerError, err)
+		}
+	case v1beta1.Update:
+		if err := setHashSidecarSet(copy); err != nil {
+			return admission.ErrorResponse(http.StatusInternalServerError, err)
+		}
 	}
+
 	return admission.PatchResponse(obj, copy)
 }
 
