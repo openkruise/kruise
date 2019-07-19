@@ -3,7 +3,7 @@ package client
 import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kubeclientset "k8s.io/client-go/kubernetes"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
 )
 
 // GenericClientset defines a generic client
@@ -26,21 +26,4 @@ func newForConfig(c *rest.Config) (*GenericClientset, error) {
 		KubeClient:   kubeClient,
 		KruiseClient: kruiseClient,
 	}, nil
-}
-
-// NewForConfigOrDie creates a new Clientset for the given config and
-// panics if there is an error in the config.
-func newForConfigOrDie(c *rest.Config) *GenericClientset {
-	return &GenericClientset{
-		KubeClient:   kubeclientset.NewForConfigOrDie(c),
-		KruiseClient: kruiseclientset.NewForConfigOrDie(c),
-	}
-}
-
-// New creates a new Clientset for the given RESTClient.
-func new(c rest.Interface) *GenericClientset {
-	return &GenericClientset{
-		KubeClient:   kubeclientset.New(c),
-		KruiseClient: kruiseclientset.New(c),
-	}
 }

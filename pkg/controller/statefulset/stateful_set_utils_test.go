@@ -37,6 +37,21 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
+// overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
+// Generally used to tie break between StatefulSets that have overlapping selectors.
+type overlappingStatefulSets []*appsv1alpha1.StatefulSet
+
+func (o overlappingStatefulSets) Len() int { return len(o) }
+
+func (o overlappingStatefulSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o overlappingStatefulSets) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
+}
+
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
