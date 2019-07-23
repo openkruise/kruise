@@ -224,17 +224,18 @@
           "type": "integer",
           "format": "int32"
         },
+        "paused": {
+          "description": "Paused indicates that the StatefulSet is paused. Default value is false",
+          "type": "boolean"
+        },
         "podUpdatePolicy": {
           "description": "PodUpdatePolicy indicates how pods should be updated Default value is \"ReCreate\"",
           "type": "string"
-        },
-        "paused": {
-          "description": "Paused indicates that the StatefulSet is paused and will not be processed by the StatefulSet controller.",
-          "type": "boolean"
         }
       }
     },
     "kruise.apps.v1alpha1.SidecarContainer": {
+      "description": "SidecarContainer defines the container of Sidecar",
       "type": "object",
       "required": [
         "Container"
@@ -325,7 +326,7 @@
       ],
       "properties": {
         "matchedPods": {
-          "description": "matchedPods is the number of Pods whose labels are matched with this SidecarSet's selector",
+          "description": "matchedPods is the number of Pods whose labels are matched with this SidecarSet's selector and are created after sidecarset creates",
           "type": "integer",
           "format": "int32"
         },

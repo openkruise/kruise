@@ -27,18 +27,5 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&BroadcastJob{}, func(obj interface{}) { SetObjectDefaults_BroadcastJob(obj.(*BroadcastJob)) })
-	scheme.AddTypeDefaultingFunc(&BroadcastJobList{}, func(obj interface{}) { SetObjectDefaults_BroadcastJobList(obj.(*BroadcastJobList)) })
 	return nil
-}
-
-func SetObjectDefaults_BroadcastJob(in *BroadcastJob) {
-	SetDefaultsBroadcastJob(in)
-}
-
-func SetObjectDefaults_BroadcastJobList(in *BroadcastJobList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_BroadcastJob(a)
-	}
 }

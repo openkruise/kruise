@@ -88,7 +88,7 @@ func getLatestPod(client client.Client, pod *corev1.Pod) (*corev1.Pod, error) {
 	newPod := &corev1.Pod{}
 	podKey := types.NamespacedName{
 		Namespace: pod.Namespace,
-		Name: pod.Name,
+		Name:      pod.Name,
 	}
 	err := client.Get(context.TODO(), podKey, newPod)
 	return newPod, err

@@ -136,7 +136,7 @@ func TestShouldDoInPlaceUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "podUpdatePolicy is not InPlaceIfPossible",
+			name:                  "podUpdatePolicy is not InPlaceIfPossible",
 			rollingUpdateStrategy: &appsv1alpha1.RollingUpdateStatefulSetStrategy{},
 			updateRevision: &apps.ControllerRevision{
 				Data: runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},

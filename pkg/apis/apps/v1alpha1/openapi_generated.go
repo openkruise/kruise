@@ -435,7 +435,7 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.R
 					},
 					"paused": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Paused indicates that the StatefulSet is paused and will not be processed by the StatefulSet controller.",
+							Description: "Paused indicates that the StatefulSet is paused. Default value is false",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -452,7 +452,8 @@ func schema_pkg_apis_apps_v1alpha1_SidecarContainer(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "SidecarContainer defines the container of Sidecar",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"Container": {
 						SchemaProps: spec.SchemaProps{
@@ -616,7 +617,7 @@ func schema_pkg_apis_apps_v1alpha1_SidecarSetStatus(ref common.ReferenceCallback
 					},
 					"matchedPods": {
 						SchemaProps: spec.SchemaProps{
-							Description: "matchedPods is the number of Pods whose labels are matched with this SidecarSet's selector",
+							Description: "matchedPods is the number of Pods whose labels are matched with this SidecarSet's selector and are created after sidecarset creates",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

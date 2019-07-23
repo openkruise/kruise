@@ -32,7 +32,7 @@ import (
 
 const (
 	// hash of a sidecarset
-	SidecarSetHashAnnotation             = "kruise.io/sidecarset-hash"
+	SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
 	// hash of a sidecarset without images of sidecar
 	SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
 )

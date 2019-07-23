@@ -153,9 +153,14 @@ Push the image
 or just
 `docker push <your_image_name>`
 
-Generate manifests e.g. CRD, RBAC etc.
+Generate manifests e.g. CRD, RBAC YAML files etc.
 
 `make manifests`
+
+Run `kruise-controller-manager` locally for testing, this will run against kubernetes cluster defined in  `~/.kube/config`.
+Run below command from root folder.
+
+`make run` or `go run ./cmd/manager/main.go`
 
 ## Community
 
