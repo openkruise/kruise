@@ -161,7 +161,7 @@ Run `kruise-controller-manager` locally for testing, this will run against kuber
 Run below command from root folder.
 
 `make run` or `go run ./cmd/manager/main.go`
- 
+
 ## Community
 
 If you have any questions or want to contribute, you are welcome to communicate most things via GitHub issues or pull requests.
