@@ -1,17 +1,17 @@
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: kruise-mutating-webhook-configuration
+  name: mutating-webhook-configuration
 ---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: kruise-validating-webhook-configuration
+  name: validating-webhook-configuration
 webhooks:
   - clientConfig:
       caBundle: fake
       service:
-        name: kruise-webhook-server-service
+        name: webhook-server-service
         namespace: kruise-system
         path: /validating-create-update-broadcastjob
     failurePolicy: Fail
@@ -33,7 +33,7 @@ webhooks:
   - clientConfig:
       caBundle: fake
       service:
-        name: kruise-webhook-server-service
+        name: webhook-server-service
         namespace: kruise-system
         path: /validating-create-update-sidecarset
     failurePolicy: Fail
@@ -55,7 +55,7 @@ webhooks:
   - clientConfig:
       caBundle: fake
       service:
-        name: kruise-webhook-server-service
+        name: webhook-server-service
         namespace: kruise-system
         path: /validating-create-update-statefulset
     failurePolicy: Fail
