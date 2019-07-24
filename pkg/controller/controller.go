@@ -17,8 +17,13 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.KBLog.WithName("AddToManager")
 
 // AddToManagerFuncs is a list of functions to add all Controllers to the Manager
 var AddToManagerFuncs []func(manager.Manager) error
@@ -28,6 +33,11 @@ var AddToManagerFuncs []func(manager.Manager) error
 func AddToManager(m manager.Manager) error {
 	for _, f := range AddToManagerFuncs {
 		if err := f(m); err != nil {
+			if kindMatchErr, ok := err.(*meta.NoKindMatchError); ok {
+				log.Info(fmt.Sprintf("CRD %v is not installed, its controller will perform noops!",
+					kindMatchErr.GroupKind))
+				continue
+			}
 			return err
 		}
 	}
