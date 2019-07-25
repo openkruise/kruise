@@ -17,12 +17,13 @@ Make your own code changes and validate the build by running `make manager` in K
 The new controller manager will be deployed via a statefulset to replace the default Kruise controller manager.
 The deployment can be done by following steps assuming a fresh environment:
 
-* Prerequisites: create new/use existing [dock hub](https://hub.docker.com/) account ($DOCKERID), and create a `kruise` repository in it. Also, [install Kruise CRDs](../../README.md#install-crds);
-* step 1: `docker login` with the $DOCKERID account;
-* step 2: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
-* step 3: `make docker-build` to build the image locally;
-* step 4: `make docker-push` to push the image to dock hub under the `kruise` repository;
-* step 5: change the `config/manager/all_in_one.yaml` and replace the container image of the controller manager statefulset to `$DOCKERID/kruise:test`
+* Prerequisites: [install Kruise CRDs](../../README.md#install-crds);
+* step 1: `eval $(minikube docker-env)` configure your local environment to re-use the Docker daemon inside the minikube instance;
+* step 2: `export NO_PROXY=${your minikube virtual ip}` neglect ip proxy;
+* step 3: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
+* step 4: `make docker-build` to build the image locally;
+* step 5: `make docker-push` to push the image to dock hub under the `kruise` repository;
+* step 6: change the `config/manager/all_in_one.yaml` and replace the container image of the controller manager statefulset to `openkruise/kruise:test`
 
 ```yaml
 spec:
@@ -40,7 +41,7 @@ spec:
                   fieldPath: metadata.namespace
             - name: SECRET_NAME
               value: kruise-webhook-server-secret
-          image: $DOCKERID/kruise:test
+          image: openkruise/kruise:test
           imagePullPolicy: Always
           name: manager
 ```
@@ -52,6 +53,6 @@ Then one can perform manual tests and use `kubectl logs kruise-controller-manage
 
 Notes:
 
-* Step 1, 2, 5 are one-time efforts.
+* Step 1, 2, 3, 6 are one-time efforts.
 * Kubebuilder default `make run` does not work for webhooks since kubernetes services usually do not work in local dev environment. Hence, it is recommended to debug controller manager in Pod.
 
