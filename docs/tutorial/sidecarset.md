@@ -149,6 +149,15 @@ spec:
 
 Relaunch the `guestbook-with-sidecar` service, then one can navigate `http://MINIKUBE_IP:30164` to access the sidecar service.
 
+## Update the sidecar
+
+Use `kubectl edit sidecarset guestbook-sidecar`, change image to "openkruise/guestbook:sidecar-v2"
+
+Use `kubectl get sidecarset guestbook-sidecar`, check if all pods are updated according to UPDATED field
+
+When all pods are updated, visit `http://47.101.74.131:4000` again
+![Guestbook2](./v1/guestbook-sidecar2.jpg)
+
 ## Clean up
 
 Using helm to uninstall apps is very easy.
