@@ -54,24 +54,23 @@ Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.
 
 ```
 kubectl get sts.apps.kruise.io
-NAME                            DESIRED    CURRENT    UPDATED    READY    AGE
-demo-v1-guestbook-kruise   20         20         20         20       17s
+NAME                        DESIRED    CURRENT    UPDATED    READY    AGE
+guestbook-with-sidecar      20         20         20         20       17s
 
-kubectl get pods
-NAME                                   READY   STATUS    RESTARTS   AGE
-demo-v1-guestbook-kruise-0        1/1     Running   0          39s
-demo-v1-guestbook-kruise-1        1/1     Running   0          39s
+kubectl get pod
+NAME                        READY   STATUS    RESTARTS   AGE
+guestbook-with-sidecar-0    2/2     Running   0          18s
+guestbook-with-sidecar-1    2/2     Running   0          18s
 ...
-demo-v1-guestbook-kruise-16       1/1     Running   0          35s
-demo-v1-guestbook-kruise-17       1/1     Running   0          34s
-demo-v1-guestbook-kruise-18       1/1     Running   0          34s
-demo-v1-guestbook-kruise-19       1/1     Running   0          33s
+guestbook-with-sidecar-17   2/2     Running   0          13s
+guestbook-with-sidecar-18   2/2     Running   0          13s
+guestbook-with-sidecar-19   2/2     Running   0          12s
 ```
 
 Describe one guestbook pod:
 
 ```
-kubectl describe pod demo-v1-guestbook-kruise-0
+kubectl describe pod guestbook-with-sidecar-0
 ```
 
 Check that the sidecar container is injected.
@@ -120,8 +119,8 @@ You can now view the Sidecar Guestbook on browser.
 ```
 kubectl get svc
 
-NAME           TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
-demo-v1-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
+NAME                      TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
+guestbook-with-sidecar    LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
 `47.101.74.131` is the external IP.
@@ -152,7 +151,7 @@ helm uninstall demo-v1
 If you are not using helm, deleting the application using below commands:
 
 ```
-kubectl delete sts.apps.kruise.io demo-v1-guestbook-kruise
-kubectl delete svc demo-v1-guestbook-kruise redis-master redis-slave
-kubectl delete deploy redis-master redis-slave
+kubectl delete sts.apps.kruise.io guestbook-with-sidecar
+kubectl delete svc guestbook-with-sidecar
+kubectl delete sidecarset guestbook-sidecar
 ```

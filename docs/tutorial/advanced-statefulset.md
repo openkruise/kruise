@@ -90,8 +90,8 @@ You can now view the Guestbook on browser.
 ```
 kubectl get svc
 
-NAME                          TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
-demo-v1-guestbook-kruise      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
+NAME           TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
+guestbook      LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
 `47.101.74.131` is the external IP.
@@ -260,6 +260,6 @@ If you are not using helm, deleting the application using below commands:
 
 ```
 kubectl delete sts.apps.kruise.io demo-v1-guestbook-kruise
-kubectl delete svc demo-v1-guestbook-kruise redis-master redis-slave
+kubectl delete svc guestbook redis-master redis-slave
 kubectl delete deploy redis-master redis-slave
 ```
