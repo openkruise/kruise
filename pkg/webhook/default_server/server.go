@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -84,10 +85,14 @@ func Add(mgr manager.Manager) error {
 			WithManager(mgr).
 			Build()
 		if err != nil {
+			if kindMatchErr, ok := err.(*meta.NoKindMatchError); ok {
+				log.Info(fmt.Sprintf("CRD %v is not installed,  webhook %v registration is ignored",
+					kindMatchErr.GroupKind, k))
+				continue
+			}
 			return err
 		}
 		webhooks = append(webhooks, wh)
 	}
-
 	return svr.Register(webhooks...)
 }
