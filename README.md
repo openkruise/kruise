@@ -157,10 +157,7 @@ Generate manifests e.g. CRD, RBAC YAML files etc.
 
 `make manifests`
 
-Run `kruise-controller-manager` locally for testing, this will run against kubernetes cluster defined in  `~/.kube/config`.
-Run below command from Kruise folder. Note: if Kruise CRDs have not been installed, [install all CRDs](#install-crds) first!
-
-`make run` or `go run ./cmd/manager/main.go`
+To debug kruise controller manager locally, please check the [debug guide](./docs/debug/README.md).
 
 ## Community
 
