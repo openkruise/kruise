@@ -20,7 +20,7 @@ The deployment can be done by following steps assuming a fresh environment:
 * Prerequisites: [install Kruise CRDs](../../README.md#install-crds);
 * step 1: `eval $(minikube docker-env)` configure your local environment to re-use the Docker daemon inside the minikube instance;
 * step 2: `export NO_PROXY=${your minikube virtual ip}` neglect ip proxy;
-* step 3: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
+* step 3: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=openkruise/kruise:test`;
 * step 4: `make docker-build` to build the image locally;
 * step 5: `make docker-push` to push the image to dock hub under the `kruise` repository;
 * step 6: change the `config/manager/all_in_one.yaml` and replace the container image of the controller manager statefulset to `openkruise/kruise:test`
