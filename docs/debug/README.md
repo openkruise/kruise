@@ -19,7 +19,7 @@ The deployment can be done by following steps assuming a fresh environment:
 
 * Prerequisites: create new/use existing [dock hub](https://hub.docker.com/) account ($DOCKERID), and create a `kruise` repository in it. Also, [install Kruise CRDs](../../README.md#install-crds);
 * step 1: `docker login` with the $DOCKERID account;
-* step 2: `export IMG=<image_name>` to specifiy the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
+* step 2: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
 * step 3: `make docker-build` to build the image locally;
 * step 4: `make docker-push` to push the image to dock hub under the `kruise` repository;
 * step 5: change the `config/manager/all_in_one.yaml` and replace the container image of the controller manager statefulset to `$DOCKERID/kruise:test`
