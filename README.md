@@ -157,7 +157,7 @@ Generate manifests e.g. CRD, RBAC YAML files etc.
 
 `make manifests`
 
-To debug kruise controller manager locally, please check the [debug guide](./docs/debug/README.md).
+To develop/debug kruise controller manager locally, please check the [debug guide](./docs/debug/README.md).
 
 ## Community
 
