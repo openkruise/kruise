@@ -17,7 +17,7 @@ Make your own code changes and validate the build by running `make manager` in K
 The new controller manager will be deployed via a statefulset to replace the default Kruise controller manager.
 The deployment can be done by following steps assuming a fresh environment:
 
-* Prerequisites: create new/use existing [dock hub](hub.docker.com) account ($DOCKERID), and create a `kruise` repository in it. Also, [install Kruise CRDs](../../README.md#install-crds);
+* Prerequisites: create new/use existing [dock hub](https://hub.docker.com/) account ($DOCKERID), and create a `kruise` repository in it. Also, [install Kruise CRDs](../../README.md#install-crds);
 * step 1: `docker login` with the $DOCKERID account;
 * step 2: `export IMG=<image_name>` to specifiy the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
 * step 3: `make docker-build` to build the image locally;
