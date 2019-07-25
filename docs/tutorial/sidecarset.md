@@ -1,14 +1,13 @@
 # Inject Sidecar Container with SidecarSet
 
-This tutorial walks you through an example to automatically inject a sidecar container with sidecarset.
+The sidecarset controller implements a MutatingAdmissionWebhook which watches for Pod creation and automatically injects the containers specified in sidecarset CRDs
+into the matched pods. This tutorial demonstrates how sidecarset controller automatically injects a guestbook sidecar container for gusetbook Pods.
 
-## Install Guestbook sidecarset
-
-The sidecarset controller is a webhook controller and will watch pod creation and automatically inject a sidecar guestbook container into the matched pods
+## Install guestbook sidecarset
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sidecar.yaml`
 
-## Take a closer look into guestbook application
+**guestbook-sidecar at a glance**
 
 ```yaml
 apiVersion: apps.kruise.io/v1alpha1
@@ -18,8 +17,7 @@ metadata:
 spec:
   selector: # select the pods to be injected with sidecar containers
     matchLabels:
-      # This needs to match the labels of the pods to be injected.
-      app.kubernetes.io/name: guestbook-kruise
+      app.kubernetes.io/name: guestbook-with-sidecar
   containers:
     - name: guestbook-sidecar
       image: openkruise/guestbook:sidecar
@@ -27,37 +25,40 @@ spec:
       ports:
         - name: sidecar-server
           containerPort: 4000 # different from main guestbook containerPort which is 3000
+
 ```
 
-## Installing the application
+## Install guestbook application
 
-To install the chart with release name (application name) of `demo-v1`, replica of `20`:
+Run following command to install the [helm chart](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise) with release
+name (application name) of `demo-v1`, replica of `20`:
 
 ```bash
 helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook,image.tag=v2
 ```
 
-The Chart is located in [this repo](https://github.com/cloudnativeapp/workshop/tree/master/kubecon2019china/charts/guestbook-kruise).
-
-Alternatively, Install the application using YAML files:
+Alternatively, install the application using YAML files:
 
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-sts-for-sidecar-demo.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-service-for-sidecar-demo.yaml
 ```
 
-## Check your application
+## Check guestbook Pod containers
 
-Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind.
-`app.kruise.io` postfix needs to be appended due to naming collision with Kubernetes native `statefulset` kind.
- Verify that all pods are READY.
+Run `kubectl get sts.apps.kruise.io` to check the statefulset status.
+Note that `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind.
+`app.kruise.io` postfix is needed to resolve the naming conflict with Kubernetes native `statefulset` kind.
+Verify that all pods are READY.
 
 ```
-kubectl get sts.apps.kruise.io
 NAME                        DESIRED    CURRENT    UPDATED    READY    AGE
 guestbook-with-sidecar      20         20         20         20       17s
+```
 
-kubectl get pod
+Run `kubectl get pod` to check the status of all replicas.
+
+```
 NAME                        READY   STATUS    RESTARTS   AGE
 guestbook-with-sidecar-0    2/2     Running   0          18s
 guestbook-with-sidecar-1    2/2     Running   0          18s
@@ -67,13 +68,7 @@ guestbook-with-sidecar-18   2/2     Running   0          13s
 guestbook-with-sidecar-19   2/2     Running   0          12s
 ```
 
-Describe one guestbook pod:
-
-```
-kubectl describe pod guestbook-with-sidecar-0
-```
-
-Check that the sidecar container is injected.
+Run `kubectl describe pod guestbook-with-sidecar-0` to check one Pod and verify that the sidecar container is injected.
 
 ```yaml
     Containers:
@@ -105,32 +100,54 @@ Check that the sidecar container is injected.
 +       Mounts:         <none>
 ```
 
-## View the Sidecar Guestbook
+## Access the Sidecar service
 
-You can now view the Sidecar Guestbook on browser.
+Now you can access the Sidecar guestbook service via web browser.
 
 * **Local Host:**
-    If you are running Kubernetes locally, to view the sidecar guestbook, navigate to `http://localhost:4000`.
+    If you are running all Kubernetes components locally in a single node, navigate to `http://localhost:4000` to access the sidecar service.
 
 * **Remote Host:**
-    To view the sidecar guestbook on a remote host, locate the external IP of the application in the **IP** column of the `kubectl get services` output.
-    For example, run
+    To access the sidecar service on a remote host, run `kubectl get services` and find the external IP of the service in the **EXTERNAL-IP** column of the output.
+    e.g., `47.101.74.131` in this example.
 
 ```
-kubectl get svc
-
 NAME                      TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)                         AGE
 guestbook-with-sidecar    LoadBalancer   172.21.2.187   47.101.74.131   3000:31459/TCP,4000:32099/TCP   35m
 ```
 
-`47.101.74.131` is the external IP.
-
-Visit `http://47.101.74.131:4000` for the sidecar guestbook.
+The web browser output looks like:
 ![Guestbook](./v1/guestbook-sidecar.jpg)
 
-The main guestbook is running on port `3000`, i.e. `http://localhost:4000`
+The main guestbook service is running on port `3000`, e.g., `http://localhost:3000`. Check for the difference!
 
-## Uninstall app
+In above example, the `guestbook-with-sidecar` service uses `LoadBalancer` type. It works in a cloud environment where cloud provider supports external load balancers.
+In case one wants to examine the same in local environment using `minikube`, change the `guestbook-with-sidecar` service type to `NodePort`.
+An example `guestbook-service-for-sidecar-demo.yaml` looks like:
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: guestbook-with-sidecar
+  labels:
+    app: guestbook-with-sidecar
+spec:
+  ports:
+  - nodePort: 30163
+    port: 3000
+    targetPort: http-server
+    name: main-port
+  - nodePort: 30164
+    port: 4000
+    targetPort: sidecar-server
+    name: sidecar-port
+  selector:
+    app.kubernetes.io/name: guestbook-with-sidecar
+  type: NodePort
+```
+Relaunch the `guestbook-with-sidecar` service, then one can navigate `http://MINIKUBE_IP:30164` to access the sidecar service.
+
+## Clean up
 
 Using helm to uninstall apps is very easy.
 
