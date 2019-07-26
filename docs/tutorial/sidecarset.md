@@ -124,6 +124,7 @@ The main guestbook service is running on port `3000`, e.g., `http://localhost:30
 In above example, the `guestbook-with-sidecar` service uses `LoadBalancer` type. It works in a cloud environment where cloud provider supports external load balancers.
 In case one wants to examine the same in local environment using `minikube`, change the `guestbook-with-sidecar` service type to `NodePort`.
 An example `guestbook-service-for-sidecar-demo.yaml` looks like:
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -145,6 +146,7 @@ spec:
     app.kubernetes.io/name: guestbook-with-sidecar
   type: NodePort
 ```
+
 Relaunch the `guestbook-with-sidecar` service, then one can navigate `http://MINIKUBE_IP:30164` to access the sidecar service.
 
 ## Clean up
