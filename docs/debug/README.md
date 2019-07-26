@@ -1,3 +1,35 @@
+# How to DEBUG
+
+## DEBUG: start with process locally
+
+Start kruise-manager process locally, it can connect to a local or remote k8s-cluster.
+
+**Set up hostname**
+
+First, you should think of a fake hostname for your local machine, such as `power-machine`.
+
+Add this line into `/etc/hosts` file in which machine that runs kube-apiserver or minikube:
+
+```
+IP_OF_YOUR_LOCAL_MACHINE power-machine
+```
+
+*Note that `IP_OF_YOUR_LOCAL_MACHINE` should be ETH_IP instead of 127.0.0.1*
+
+**Install CRDs into cluster and run kruise-manager**
+
+Run these locally:
+
+```bash
+export KUBECONFIG=${PATH_TO_CONFIG}
+export WEBHOOK_HOST=power-machine
+
+make install
+make run
+```
+
+## DEBUG: start with Pod
+
 The followings are the steps to debug Kruise controller manager locally using Pod.
 
 **Install docker**
