@@ -45,9 +45,9 @@ func init() {
 }
 
 var (
-	// pods in these namespaces won't get injected
+	// SidecarIgnoredNamespaces specifies the namespaces where Pods won't get injected
 	SidecarIgnoredNamespaces = []string{"kube-system", "kube-public"}
-	// environment variable which marks a container as injected
+	// SidecarEnvKey specifies the environment variable which marks a container as injected
 	SidecarEnvKey = "IS_INJECTED"
 )
 
