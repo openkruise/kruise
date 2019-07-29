@@ -100,6 +100,68 @@ func TestReconcileJobCreatePod(t *testing.T) {
 }
 
 // Test scenario:
+// 1 job, 1 normal node, 1 unschedulable node
+// Check only 1 pod is created because the other node is unschedulable
+// Reset the unschedulable node to be schedulable, and reconcile job again
+// Check 2 pods created on both nodes
+func TestPodsOnUnschedulableNodes(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1alpha1.AddToScheme(scheme)
+	_ = v1.AddToScheme(scheme)
+
+	p := int32(2)
+	// A job
+	job1 := createJob("job1", p)
+
+	// Create Node1 with Unschedulable to true
+	node1 := createNode("node1")
+	node1.Spec.Unschedulable = true
+
+	// Create node2
+	node2 := createNode("node2")
+
+	reconcileJob := createReconcileJob(scheme, job1, node1, node2)
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "job1",
+			Namespace: "default",
+		},
+	}
+
+	_, err := reconcileJob.Reconcile(request)
+	assert.NoError(t, err)
+	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	// assert Job exists
+	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
+
+	podList := &v1.PodList{}
+	listOptions := client.InNamespace(request.Namespace)
+	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	assert.NoError(t, err)
+
+	// 1 pod active on node2,  node1 is unschedulable hence no pod
+	assert.Equal(t, int32(1), retrievedJob.Status.Active)
+	assert.Equal(t, int32(1), retrievedJob.Status.Desired)
+	assert.Equal(t, 1, len(podList.Items))
+
+	// reset unschedulable to false and reconcile, the pod now should be allocated
+	node1.Spec.Unschedulable = false
+	_, err = reconcileJob.Reconcile(request)
+
+	podList = &v1.PodList{}
+	listOptions = client.InNamespace(request.Namespace)
+	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	assert.NoError(t, err)
+
+	// 2 pods allocated on both nodes
+	assert.Equal(t, int32(2), retrievedJob.Status.Active)
+	assert.Equal(t, int32(2), retrievedJob.Status.Desired)
+	assert.Equal(t, 2, len(podList.Items))
+
+}
+
+// Test scenario:
 // 10 nodes without pods
 // 10 pods created with slow start
 func TestReconcileJobMultipleBatches(t *testing.T) {

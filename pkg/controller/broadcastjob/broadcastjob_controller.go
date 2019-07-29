@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/utils/integer"
@@ -493,26 +494,44 @@ func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
 //   - PodFitsHost: checks pod's NodeName against node
 //   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
 //   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
+//   - CheckNodeUnschedulablePredicate: check if the pod can tolerate node unschedulable
 func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	nodeInfo := schedulercache.NewNodeInfo()
 	_ = nodeInfo.SetNode(node)
 
-	fit, _, err := predicates.PodFitsHost(pod, nil, nodeInfo)
+	fit, reasons, err := predicates.PodFitsHost(pod, nil, nodeInfo)
 	if err != nil || !fit {
+		logPredicateFailedReason(reasons, node)
 		return false, err
 	}
 
-	fit, _, err = predicates.PodMatchNodeSelector(pod, nil, nodeInfo)
+	fit, reasons, err = predicates.PodMatchNodeSelector(pod, nil, nodeInfo)
 	if err != nil || !fit {
+		logPredicateFailedReason(reasons, node)
 		return false, err
 	}
 
-	fit, _, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	if err != nil || !fit {
+		logPredicateFailedReason(reasons, node)
 		return false, err
 	}
 
+	fit, reasons, err = predicates.CheckNodeUnschedulablePredicate(pod, nil, nodeInfo)
+	if err != nil || !fit {
+		logPredicateFailedReason(reasons, node)
+		return false, err
+	}
 	return true, nil
+}
+
+func logPredicateFailedReason(reasons []algorithm.PredicateFailureReason, node *corev1.Node) {
+	if len(reasons) == 0 {
+		return
+	}
+	for _, reason := range reasons {
+		klog.Errorf("Failed predicate on node %s : %s ", node.Name, reason.GetReason())
+	}
 }
 
 // NewPod creates a new pod
