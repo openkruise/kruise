@@ -31,9 +31,9 @@ import (
 )
 
 const (
-	// hash of a sidecarset
+	// SidecarSetHashAnnotation represents the key of a sidecarset hash
 	SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
-	// hash of a sidecarset without images of sidecar
+	// SidecarSetHashWithoutImageAnnotation represents the key of a sidecarset hash without images of sidecar
 	SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
 )
 
