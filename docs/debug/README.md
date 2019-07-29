@@ -2,13 +2,18 @@
 
 ## DEBUG: start with process locally
 
-Start kruise-manager process locally, it can connect to a local or remote k8s-cluster.
+Kubebuilder default `make run` does not work for webhooks since its scaffolding code starts webhook server
+using kubernetes service and the service usually does not work in local dev environment.
 
-**Set up hostname**
+PR [#103](https://github.com/openkruise/kruise/pull/103) workarounds this problem by allowing to start
+webbook server in local host directly. With this fix, one can start/debug kruise-manager process locally
+which connects to a local or remote Kubernetes cluster. Several extra steps are needed to make it work:
+
+**Setup hostname**
 
 First, you should think of a fake hostname for your local machine, such as `power-machine`.
 
-Add this line into `/etc/hosts` file in which machine that runs kube-apiserver or minikube:
+Add this line into `/etc/hosts` file in the machine that runs kube-apiserver or minikube:
 
 ```
 IP_OF_YOUR_LOCAL_MACHINE power-machine
@@ -16,7 +21,7 @@ IP_OF_YOUR_LOCAL_MACHINE power-machine
 
 *Note that `IP_OF_YOUR_LOCAL_MACHINE` should be ETH_IP instead of 127.0.0.1*
 
-**Install CRDs into cluster and run kruise-manager**
+**Install CRDs and run kruise-manager**
 
 Run these locally:
 
@@ -30,7 +35,9 @@ make run
 
 ## DEBUG: start with Pod
 
-The followings are the steps to debug Kruise controller manager locally using Pod.
+The followings are the steps to debug Kruise controller manager locally using Pod. Note that the
+`WEBHOOK_HOST` env variable should be unset if you have tried [above](#debug-start-with-process-locally)
+debugging methodology before.
 
 **Install docker**
 
@@ -81,9 +88,4 @@ spec:
 * step 7: `kubectl apply -f config/manager/all_in_one.yaml` to install the new statefulset with the customized controller manager image;
 
 Then one can perform manual tests and use `kubectl logs kruise-controller-manager-0 -n kruise-system` to check controller logs for debugging.
-
-Notes:
-
-* Step 1, 2, 5 are one-time efforts.
-* Kubebuilder default `make run` does not work for webhooks since kubernetes services usually do not work in local dev environment. Hence, it is recommended to debug controller manager in Pod.
 
