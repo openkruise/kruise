@@ -5,6 +5,7 @@ import (
 
 	"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -12,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 type enqueueBroadcastJobForNode struct {
@@ -60,7 +60,7 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: bj.Namespace,
-				Name: bj.Name}})
+				Name:      bj.Name}})
 	}
 }
 
