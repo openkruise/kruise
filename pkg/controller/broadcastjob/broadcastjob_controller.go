@@ -389,6 +389,10 @@ func isJobComplete(job *appsv1alpha1.BroadcastJob, desiredNodes map[string]*core
 		// the job will not terminate, if the the completion policy is never
 		return false
 	}
+	// if no desiredNodes, job pending
+	if len(desiredNodes) == 0 {
+		return false
+	}
 	for _, pod := range desiredNodes {
 		if pod == nil || kubecontroller.IsPodActive(pod) {
 			// the job is incomplete if there exits any pod not yet created OR  still active
