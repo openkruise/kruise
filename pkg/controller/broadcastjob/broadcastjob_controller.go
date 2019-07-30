@@ -391,6 +391,7 @@ func isJobComplete(job *appsv1alpha1.BroadcastJob, desiredNodes map[string]*core
 	}
 	// if no desiredNodes, job pending
 	if len(desiredNodes) == 0 {
+		klog.Info("Num desiredNodes is 0")
 		return false
 	}
 	for _, pod := range desiredNodes {
