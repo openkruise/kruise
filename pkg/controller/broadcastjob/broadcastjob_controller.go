@@ -193,7 +193,7 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 	desiredNodes, restNodesToRunPod, podsToDelete := getNodesToRunPod(nodes, job, existingNodeToPodMap)
 	desired = int32(len(desiredNodes))
 	klog.Infof("%s/%s has %d/%d nodes remaining to schedule pods", job.Namespace, job.Name, len(restNodesToRunPod), desired)
-	klog.Infof("Before broadcastjob %s/%s, active=%d, failed=%d, desired=%d", active, failed, desired)
+	klog.Infof("Before broadcastjob %s/%s, active=%d, failed=%d, desired=%d", job.Namespace, job.Name, active, failed, desired)
 
 	jobFailed, failureReason, failureMessage := isJobFailed(job, pods)
 	// Job is failed. For keepAlive type, the job will never fail.
@@ -231,7 +231,7 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 				fmt.Sprintf("Job %s/%s is completed, %d pods succeeded, %d pods failed", job.Namespace, job.Name, succeeded, failed))
 		}
 	}
-	klog.Infof("After broadcastjob %s/%s, active=%d, failed=%d, desired=%d", active, failed, desired)
+	klog.Infof("After broadcastjob %s/%s, active=%d, failed=%d, desired=%d", job.Namespace, job.Name, active, failed, desired)
 
 	// no need to update the job if the status hasn't changed since last time
 	if job.Status.Active != active || job.Status.Succeeded != succeeded ||
