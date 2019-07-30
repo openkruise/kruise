@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
@@ -539,10 +538,6 @@ func NewPod(job *appsv1alpha1.BroadcastJob, nodeName string) *corev1.Pod {
 	newPod := &corev1.Pod{Spec: job.Spec.Template.Spec, ObjectMeta: job.Spec.Template.ObjectMeta}
 	newPod.Namespace = job.Namespace
 	newPod.Spec.NodeName = nodeName
-
-	// Added default tolerations for the pods.
-	util.AddOrUpdateDaemonPodTolerations(&newPod.Spec, false)
-
 	return newPod
 }
 

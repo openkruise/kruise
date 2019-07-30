@@ -102,8 +102,6 @@ func TestReconcileJobCreatePod(t *testing.T) {
 // Test scenario:
 // 1 job, 1 normal node, 1 unschedulable node
 // Check only 1 pod is created because the other node is unschedulable
-// Reset the unschedulable node to be schedulable, and reconcile job again
-// Check 2 pods created on both nodes
 func TestPodsOnUnschedulableNodes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = appsv1alpha1.AddToScheme(scheme)
@@ -144,21 +142,6 @@ func TestPodsOnUnschedulableNodes(t *testing.T) {
 	assert.Equal(t, int32(1), retrievedJob.Status.Active)
 	assert.Equal(t, int32(1), retrievedJob.Status.Desired)
 	assert.Equal(t, 1, len(podList.Items))
-
-	// reset unschedulable to false and reconcile, the pod now should be allocated
-	node1.Spec.Unschedulable = false
-	_, err = reconcileJob.Reconcile(request)
-
-	podList = &v1.PodList{}
-	listOptions = client.InNamespace(request.Namespace)
-	err = reconcileJob.List(context.TODO(), listOptions, podList)
-	assert.NoError(t, err)
-
-	// 2 pods allocated on both nodes
-	assert.Equal(t, int32(2), retrievedJob.Status.Active)
-	assert.Equal(t, int32(2), retrievedJob.Status.Desired)
-	assert.Equal(t, 2, len(podList.Items))
-
 }
 
 // Test scenario:
