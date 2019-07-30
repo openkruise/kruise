@@ -17,21 +17,12 @@ limitations under the License.
 package broadcastjob
 
 import (
-	"sync"
-	"testing"
-	"time"
-
-	"github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var cfg *rest.Config
 
-func TestMain(m *testing.M) {
+/*func TestMain(m *testing.M) {
 	//t := &envtest.Environment{
 	//	CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
 	//}
@@ -132,4 +123,4 @@ func TestReconcile(t *testing.T) {
 	//// Manually delete Deployment since GC isn't enabled in the test control plane
 	//g.Eventually(func() error { return c.Delete(context.TODO(), deploy) }, timeout).
 	//	Should(gomega.MatchError("deployments.apps \"foo-deployment\" not found"))
-}
+}*/
