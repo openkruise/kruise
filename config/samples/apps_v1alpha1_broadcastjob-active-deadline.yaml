@@ -12,4 +12,4 @@ spec:
       restartPolicy: Never
   completionPolicy:
     type: Always
-    activeDeadlineSeconds: 10
+    activeDeadlineSeconds: 200

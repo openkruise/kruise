@@ -84,15 +84,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &appsv1alpha1.BroadcastJob{},
 	})
 
-	err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &appsv1alpha1.BroadcastJob{},
-	})
-
 	if err != nil {
 		return err
 	}
 
+	// Watch for changes to Pod
+	if err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueBroadcastJobForNode{client: mgr.GetClient()}); err != nil {
+		return err
+	}
 	return nil
 }
 
