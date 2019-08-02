@@ -38,8 +38,6 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_statefulset.yaml
 ```
 
-Note that ALL three CRDs need to be installed for kruise-controller to run properly.
-
 #### Install kruise-controller-manager
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
