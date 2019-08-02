@@ -39,10 +39,10 @@ const (
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
 type InPlaceUpdateState struct {
 	// Revision is the updated statefulset revision hash.
-	Revision              string                                  `json:"revision"`
+	Revision string `json:"revision"`
 
 	// UpdateTimestamp is the time when the in-place update happens.
-	UpdateTimestamp       metav1.Time                             `json:"updateTimestamp"`
+	UpdateTimestamp metav1.Time `json:"updateTimestamp"`
 
 	// LastContainerStatuses records the before-in-place-update container statuses. It is a map from ContainerName
 	// to InPlaceUpdateContainerStatus

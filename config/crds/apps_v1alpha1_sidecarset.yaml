@@ -51,15 +51,14 @@ spec:
         spec:
           properties:
             containers:
-              description: 'containers contains two pieces of information: 1. normal
-                container info that should be injected into pod 2. custom fields to
-                control insert behavior(currently empty)'
+              description: Containers is the list of sidecar containers to be injected
+                into the selected pod
               items:
                 type: object
               type: array
             paused:
-              description: indicates that the sidecarset is paused and will not be
-                processed by the sidecarset controller.
+              description: Paused indicates that the sidecarset is paused and will
+                not be processed by the sidecarset controller.
               type: boolean
             selector:
               description: selector is a label query over pods that should be injected
