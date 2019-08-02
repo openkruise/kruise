@@ -24,8 +24,8 @@ Please find the project **roadmap** [here](./docs/roadmap/README.md).
 
 Several [tutorials](./docs/tutorial/README.md) are provided to demonstrate how to use the workload controllers.
 
-A [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) by [Lachlan Evenson](/https://github.com/lachie83) is also provided for demonstrating the controllers. 
- 
+A [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) by [Lachlan Evenson](/https://github.com/lachie83) is also provided for demonstrating the controllers.
+
 ## Getting started
 
 ### Install with YAML files
