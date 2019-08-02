@@ -26,12 +26,10 @@ type SidecarSetSpec struct {
 	// selector is a label query over pods that should be injected
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
-	// containers contains two pieces of information:
-	// 1. normal container info that should be injected into pod
-	// 2. custom fields to control insert behavior(currently empty)
+	// Containers is the list of sidecar containers to be injected into the selected pod
 	Containers []SidecarContainer `json:"containers,omitempty"`
 
-	// indicates that the sidecarset is paused and will not be processed by the sidecarset controller.
+	// Paused indicates that the sidecarset is paused and will not be processed by the sidecarset controller.
 	Paused bool `json:"paused,omitempty"`
 }
 
