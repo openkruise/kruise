@@ -15,20 +15,20 @@
 
 ### Features
 
-- Add MaxUnavailable Rolling Update Strategy
+- Add MaxUnavailable rolling upgrade strategy
 - Add In-Place pod update strategy
-
+- Add paused functionality during rolling upgrade
 ## Broadcast Job
 
 ### Features
 
 - Add BroadcastJob that runs pods on all nodes to completion
-- Add `Never` termination policy to have jobs running after it finishes all pods
+- Add `Never` termination policy to have job running after it finishes all pods
 - Add `ttlSecondsAfterFinished` to delete the job after it finishes in x seconds.
 
 ### Bugs
 
-- Make broadcastjob hornor node unschedulable condition
+- Make broadcastjob honor node unschedulable condition
 
 ## Sidecar Set
 
