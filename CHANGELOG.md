@@ -1,5 +1,3 @@
-# CHANGE LOGS
-
 # v0.1.0
 
 ## Kruise-Controller-Manager
