@@ -27,7 +27,7 @@ import (
 const (
 	// StatefulSetInPlaceUpdateReady must be added into template.spec.readinessGates when pod podUpdatePolicy
 	// is InPlaceIfPossible or InPlaceOnly. The condition in podStatus will be updated to False before in-place
-	// updating and updated to True after the update is finished. This ensures pod reamin at NotReady state while
+	// updating and updated to True after the update is finished. This ensures pod to remain at NotReady state while
 	// in-place update is happening.
 	StatefulSetInPlaceUpdateReady v1.PodConditionType = "InPlaceUpdateReady"
 
@@ -38,12 +38,19 @@ const (
 
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
 type InPlaceUpdateState struct {
+	// Revision is the updated statefulset revision hash.
 	Revision              string                                  `json:"revision"`
+
+	// UpdateTimestamp is the time when the in-place update happens.
 	UpdateTimestamp       metav1.Time                             `json:"updateTimestamp"`
+
+	// LastContainerStatuses records the before-in-place-update container statuses. It is a map from ContainerName
+	// to InPlaceUpdateContainerStatus
 	LastContainerStatuses map[string]InPlaceUpdateContainerStatus `json:"lastContainerStatuses"`
 }
 
-// InPlaceUpdateContainerStatus records container status in current pod.
+// InPlaceUpdateContainerStatus records the statuses of the container that are mainly used
+// to determine whether the InPlaceUpdate is completed.
 type InPlaceUpdateContainerStatus struct {
 	ImageID string `json:"imageID,omitempty"`
 }
@@ -96,11 +103,11 @@ const (
 	// InPlaceIfPossiblePodUpdateStrategyType indicates that we try to in-place update Pod instead of
 	// recreating Pod when possible. Currently, only image update of pod spec is allowed. Any other changes to the pod
 	// spec will fall back to ReCreate PodUpdateStrategyType where pod will be recreated.
-	InPlaceIfPossiblePodUpdateStrategyType = "InPlaceIfPossible"
+	InPlaceIfPossiblePodUpdateStrategyType PodUpdateStrategyType = "InPlaceIfPossible"
 	// InPlaceOnlyPodUpdateStrategyType indicates that we will in-place update Pod instead of
 	// recreating pod. Currently we only allow image update for pod spec. Any other changes to the pod spec will be
 	// rejected by kube-apiserver
-	InPlaceOnlyPodUpdateStrategyType = "InPlaceOnly"
+	InPlaceOnlyPodUpdateStrategyType PodUpdateStrategyType = "InPlaceOnly"
 )
 
 // StatefulSetSpec defines the desired state of StatefulSet

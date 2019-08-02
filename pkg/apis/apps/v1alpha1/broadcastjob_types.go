@@ -23,14 +23,14 @@ import (
 
 // BroadcastJobSpec defines the desired state of BroadcastJob
 type BroadcastJobSpec struct {
-	// Specifies the maximum desired number of pods the job should
+	// Parallelism specifies the maximum desired number of pods the job should
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when the work left to do is less than max parallelism.
 	// Not setting this value means no limit.
 	// +optional
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
-	// Describes the pod that will be created when executing a job.
+	// Template describes the pod that will be created when executing a job.
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// CompletionPolicy indicates the completion policy of the job.
@@ -45,13 +45,13 @@ type CompletionPolicy struct {
 	// Default is Always
 	Type CompletionPolicyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=CompletionPolicyType"`
 
-	// Specifies the duration in seconds relative to the startTime that the job may be active
+	// ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active
 	// before the system tries to terminate it; value must be positive integer.
 	// Only works for Always type
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=activeDeadlineSeconds"`
 
-	// Specifies the number of retries before marking this job failed.
+	// BackoffLimit specifies the number of retries before marking this job failed.
 	// Not setting value means no limit.
 	// Only works for Always type
 	// +optional
@@ -75,8 +75,10 @@ type CompletionPolicy struct {
 type CompletionPolicyType string
 
 const (
-	// Always means the job will eventually finish on these conditions: after all pods on the desired nodes are
-	// completed (regardless succeeded or failed), exceeds ActiveDeadlineSeconds, exceeds BackoffLimit.
+	// Always means the job will eventually finish on these conditions:
+	// 1) after all pods on the desired nodes are completed (regardless succeeded or failed),
+	// 2) exceeds ActiveDeadlineSeconds,
+	// 3) exceeds BackoffLimit.
 	// This is the default CompletionPolicyType
 	Always CompletionPolicyType = "Always"
 
