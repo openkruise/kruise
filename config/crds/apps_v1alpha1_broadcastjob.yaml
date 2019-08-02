@@ -62,15 +62,16 @@ spec:
                 job. Default is Always CompletionPolicyType
               properties:
                 activeDeadlineSeconds:
-                  description: Specifies the duration in seconds relative to the startTime
-                    that the job may be active before the system tries to terminate
-                    it; value must be positive integer. Only works for Always type
+                  description: ActiveDeadlineSeconds specifies the duration in seconds
+                    relative to the startTime that the job may be active before the
+                    system tries to terminate it; value must be positive integer.
+                    Only works for Always type.
                   format: int64
                   type: integer
                 backoffLimit:
-                  description: Specifies the number of retries before marking this
-                    job failed. Not setting value means no limit. Only works for Always
-                    type
+                  description: BackoffLimit specifies the number of retries before
+                    marking this job failed. Not setting value means no limit. Only
+                    works for Always type.
                   format: int32
                   type: integer
                 ttlSecondsAfterFinished:
@@ -92,15 +93,15 @@ spec:
                   type: string
               type: object
             parallelism:
-              description: Specifies the maximum desired number of pods the job should
-                run at any given time. The actual number of pods running in steady
-                state will be less than this number when the work left to do is less
-                than max parallelism. Not setting this value means no limit.
+              description: Parallelism specifies the maximum desired number of pods
+                the job should run at any given time. The actual number of pods running
+                in steady state will be less than this number when the work left to
+                do is less than max parallelism. Not setting this value means no limit.
               format: int32
               type: integer
             template:
-              description: Describes the pod that will be created when executing a
-                job.
+              description: Template describes the pod that will be created when executing
+                a job.
               type: object
           required:
           - template

@@ -18,6 +18,7 @@
 - Add MaxUnavailable rolling upgrade strategy
 - Add In-Place pod update strategy
 - Add paused functionality during rolling upgrade
+
 ## Broadcast Job
 
 ### Features
