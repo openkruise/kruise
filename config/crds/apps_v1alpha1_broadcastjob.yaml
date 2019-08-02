@@ -65,13 +65,13 @@ spec:
                   description: ActiveDeadlineSeconds specifies the duration in seconds
                     relative to the startTime that the job may be active before the
                     system tries to terminate it; value must be positive integer.
-                    Only works for Always type
+                    Only works for Always type.
                   format: int64
                   type: integer
                 backoffLimit:
                   description: BackoffLimit specifies the number of retries before
                     marking this job failed. Not setting value means no limit. Only
-                    works for Always type
+                    works for Always type.
                   format: int32
                   type: integer
                 ttlSecondsAfterFinished:

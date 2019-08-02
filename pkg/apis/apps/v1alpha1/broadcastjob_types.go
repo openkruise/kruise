@@ -47,13 +47,13 @@ type CompletionPolicy struct {
 
 	// ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active
 	// before the system tries to terminate it; value must be positive integer.
-	// Only works for Always type
+	// Only works for Always type.
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=activeDeadlineSeconds"`
 
 	// BackoffLimit specifies the number of retries before marking this job failed.
 	// Not setting value means no limit.
-	// Only works for Always type
+	// Only works for Always type.
 	// +optional
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,3,opt,name=backoffLimit"`
 

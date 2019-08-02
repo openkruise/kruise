@@ -125,12 +125,12 @@
       "type": "object",
       "properties": {
         "activeDeadlineSeconds": {
-          "description": "ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer. Only works for Always type",
+          "description": "ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer. Only works for Always type.",
           "type": "integer",
           "format": "int64"
         },
         "backoffLimit": {
-          "description": "BackoffLimit specifies the number of retries before marking this job failed. Not setting value means no limit. Only works for Always type",
+          "description": "BackoffLimit specifies the number of retries before marking this job failed. Not setting value means no limit. Only works for Always type.",
           "type": "integer",
           "format": "int32"
         },

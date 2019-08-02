@@ -105,7 +105,7 @@ status:
 
 Use ```kubectl edit sidecarset test-sidecarset``` to modify SidecarSet image from `centos:6.7` to `centos:6.8`. You
 should find that the matched pods will be updated in-place sequentially similar to Advanced StatefulSet.
-Note that we only support upgrading sidecar container one at a time, i.e. `maxUnavailable=1 for now.
+Note that we only support upgrading sidecar container one at a time, i.e., `maxUnavailable=1 for now.
 
 You could use ```kubectl patch sidecarset test-sidecarset --type merge -p '{"spec":{"paused":true}}'``` to pause the update procedure.
 

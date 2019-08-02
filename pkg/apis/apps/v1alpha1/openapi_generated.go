@@ -266,14 +266,14 @@ func schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref common.ReferenceCallback
 					},
 					"activeDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer. Only works for Always type",
+							Description: "ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer. Only works for Always type.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"backoffLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BackoffLimit specifies the number of retries before marking this job failed. Not setting value means no limit. Only works for Always type",
+							Description: "BackoffLimit specifies the number of retries before marking this job failed. Not setting value means no limit. Only works for Always type.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

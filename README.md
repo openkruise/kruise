@@ -16,7 +16,7 @@ Today, Kruise offers three workload controllers:
 
 - [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
 
-- [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also be able to upgrade the sidecar containers.
+- [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also is able to upgrade the sidecar containers.
 
 Please see [documents](./docs/README.md) for more technical information.
 
