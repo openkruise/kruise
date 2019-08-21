@@ -20,10 +20,9 @@ Today, Kruise offers three workload controllers:
 
 Please see [documents](./docs/README.md) for more technical information.
 
-Please find the project **roadmap** [here](./docs/roadmap/README.md).
+The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
 
 Several [tutorials](./docs/tutorial/README.md) are provided to demonstrate how to use the workload controllers.
-
 A [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) by [Lachlan Evenson](https://github.com/lachie83) is also provided for demonstrating the controllers.
 
 ## Getting started
