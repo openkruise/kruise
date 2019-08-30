@@ -18,9 +18,12 @@ package mutating
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"k8s.io/api/admission/v1beta1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -28,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission/types"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	patchutil "github.com/openkruise/kruise/pkg/util/patch"
 )
 
 const (
@@ -58,8 +63,23 @@ type SidecarSetCreateHandler struct {
 }
 
 func setDefaultSidecarSet(sidecarset *appsv1alpha1.SidecarSet) {
+	setSidecarSetUpdateStratety(&sidecarset.Spec.Strategy)
+
 	for i := range sidecarset.Spec.Containers {
 		setDefaultContainer(&sidecarset.Spec.Containers[i])
+	}
+
+	klog.V(3).Infof("sidecarset after mutating: %v", util.DumpJSON(sidecarset))
+}
+
+func setSidecarSetUpdateStratety(strategy *appsv1alpha1.SidecarSetUpdateStrategy) {
+	if strategy.RollingUpdate == nil {
+		rollingUpdate := appsv1alpha1.RollingUpdateSidecarSet{}
+		strategy.RollingUpdate = &rollingUpdate
+	}
+	if strategy.RollingUpdate.MaxUnavailable == nil {
+		maxUnavailable := intstr.FromInt(1)
+		strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 	}
 }
 
@@ -139,18 +159,19 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req types.Request)
 	copy := obj.DeepCopy()
 
 	switch req.AdmissionRequest.Operation {
-	case v1beta1.Create:
+	case v1beta1.Create, v1beta1.Update:
 		setDefaultSidecarSet(copy)
-		if err := setHashSidecarSet(copy); err != nil {
-			return admission.ErrorResponse(http.StatusInternalServerError, err)
-		}
-	case v1beta1.Update:
 		if err := setHashSidecarSet(copy); err != nil {
 			return admission.ErrorResponse(http.StatusInternalServerError, err)
 		}
 	}
 
-	return admission.PatchResponse(obj, copy)
+	// related issue: https://github.com/kubernetes-sigs/kubebuilder/issues/510
+	marshaledSidecarSet, err := json.Marshal(copy)
+	if err != nil {
+		return admission.ErrorResponse(http.StatusInternalServerError, err)
+	}
+	return patchutil.ResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaledSidecarSet)
 }
 
 //var _ inject.Client = &SidecarSetCreateHandler{}

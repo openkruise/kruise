@@ -82,6 +82,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 	}
 
 	var sidecarContainers []corev1.Container
+	var sidecarVolumes []corev1.Volume
 	sidecarSetHash := make(map[string]string)
 	sidecarSetHashWithoutImage := make(map[string]string)
 	matchNothing := true
@@ -106,6 +107,8 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 
 			sidecarContainers = append(sidecarContainers, sidecarContainer.Container)
 		}
+
+		sidecarVolumes = append(sidecarVolumes, sidecarSet.Spec.Volumes...)
 	}
 	if matchNothing {
 		return nil
@@ -115,7 +118,9 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 	// apply sidecar info into pod
 	// 1. apply containers
 	pod.Spec.Containers = append(pod.Spec.Containers, sidecarContainers...)
-	// 2. apply annotations
+	// 2. apply volumes
+	pod.Spec.Volumes = append(pod.Spec.Volumes, sidecarVolumes...)
+	// 3. apply annotations
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}

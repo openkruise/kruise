@@ -22,11 +22,14 @@ import (
 	"net/http"
 	"regexp"
 
+	"k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	validationfield "k8s.io/apimachinery/pkg/util/validation/field"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -105,13 +108,42 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 		}
 	}
 
-	allErrs = append(allErrs, validateContainersForSidecarSet(spec.Containers, nil, fldPath.Child("containers"))...)
+	allErrs = append(allErrs, validateSidecarSetStratety(&spec.Strategy, fldPath.Child("strategy"))...)
+	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
+	allErrs = append(allErrs, vErrs...)
+	allErrs = append(allErrs, validateContainersForSidecarSet(spec.Containers, vols, fldPath.Child("containers"))...)
 
 	return allErrs
 }
 
+func validateSidecarSetStratety(strategy *appsv1alpha1.SidecarSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if strategy.RollingUpdate == nil {
+		allErrs = append(allErrs, validationfield.Required(fldPath.Child("rollingUpdate"), ""))
+	} else {
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*(strategy.RollingUpdate.MaxUnavailable), fldPath.Child("maxUnavailable"))...)
+	}
+	return allErrs
+}
+
+func getCoreVolumes(volumes []v1.Volume, fldPath *field.Path) ([]core.Volume, field.ErrorList) {
+	allErrs := field.ErrorList{}
+
+	coreVolumes := []core.Volume{}
+	for _, volume := range volumes {
+		coreVolume := core.Volume{}
+		if err := corev1.Convert_v1_Volume_To_core_Volume(&volume, &coreVolume, nil); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), volume, fmt.Sprintf("Convert_v1_Volume_To_core_Volume failed: %v", err)))
+			return nil, allErrs
+		}
+		coreVolumes = append(coreVolumes, coreVolume)
+	}
+
+	return coreVolumes, allErrs
+}
+
 func validateContainersForSidecarSet(
-	containers []appsv1alpha1.SidecarContainer, volumes map[string]core.VolumeSource, fldPath *field.Path) field.ErrorList {
+	containers []appsv1alpha1.SidecarContainer, coreVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	coreContainers := []core.Container{}
@@ -131,6 +163,7 @@ func validateContainersForSidecarSet(
 			DNSPolicy:     core.DNSClusterFirst,
 			RestartPolicy: core.RestartPolicyAlways,
 			Containers:    coreContainers,
+			Volumes:       coreVolumes,
 		},
 	}
 	allErrs = append(allErrs, corevalidation.ValidatePod(fakePod)...)

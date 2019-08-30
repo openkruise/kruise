@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // SidecarSetSpec defines the desired state of SidecarSet
@@ -29,13 +30,31 @@ type SidecarSetSpec struct {
 	// Containers is the list of sidecar containers to be injected into the selected pod
 	Containers []SidecarContainer `json:"containers,omitempty"`
 
+	// List of volumes that can be mounted by sidecar containers
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
 	// Paused indicates that the sidecarset is paused and will not be processed by the sidecarset controller.
 	Paused bool `json:"paused,omitempty"`
+
+	// The sidecarset strategy to use to replace existing pods with new ones.
+	Strategy SidecarSetUpdateStrategy `json:"strategy,omitempty"`
 }
 
 // SidecarContainer defines the container of Sidecar
 type SidecarContainer struct {
 	corev1.Container
+}
+
+// SidecarSetUpdateStrategy indicates the strategy that the SidecarSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
+type SidecarSetUpdateStrategy struct {
+	RollingUpdate *RollingUpdateSidecarSet `json:"rollingUpdate,omitempty"`
+}
+
+// RollingUpdateSidecarSetStrategy is used to communicate parameter
+type RollingUpdateSidecarSet struct {
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }
 
 // SidecarSetStatus defines the observed state of SidecarSet

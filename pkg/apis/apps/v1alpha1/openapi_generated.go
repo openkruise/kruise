@@ -36,12 +36,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateContainerStatus":     schema_pkg_apis_apps_v1alpha1_InPlaceUpdateContainerStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateState":               schema_pkg_apis_apps_v1alpha1_InPlaceUpdateState(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.JobCondition":                     schema_pkg_apis_apps_v1alpha1_JobCondition(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateSidecarSet":          schema_pkg_apis_apps_v1alpha1_RollingUpdateSidecarSet(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateStatefulSetStrategy": schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarContainer":                 schema_pkg_apis_apps_v1alpha1_SidecarContainer(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarSet":                       schema_pkg_apis_apps_v1alpha1_SidecarSet(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarSetList":                   schema_pkg_apis_apps_v1alpha1_SidecarSetList(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarSetSpec":                   schema_pkg_apis_apps_v1alpha1_SidecarSetSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarSetStatus":                 schema_pkg_apis_apps_v1alpha1_SidecarSetStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarSetUpdateStrategy":         schema_pkg_apis_apps_v1alpha1_SidecarSetUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSet":                      schema_pkg_apis_apps_v1alpha1_StatefulSet(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetList":                  schema_pkg_apis_apps_v1alpha1_StatefulSetList(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetSpec":                  schema_pkg_apis_apps_v1alpha1_StatefulSetSpec(ref),
@@ -409,6 +411,26 @@ func schema_pkg_apis_apps_v1alpha1_JobCondition(ref common.ReferenceCallback) co
 	}
 }
 
+func schema_pkg_apis_apps_v1alpha1_RollingUpdateSidecarSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RollingUpdateSidecarSetStrategy is used to communicate parameter",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"maxUnavailable": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+	}
+}
+
 func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -589,6 +611,19 @@ func schema_pkg_apis_apps_v1alpha1_SidecarSetSpec(ref common.ReferenceCallback) 
 							},
 						},
 					},
+					"volumes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of volumes that can be mounted by sidecar containers",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Volume"),
+									},
+								},
+							},
+						},
+					},
 					"paused": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Paused indicates that the sidecarset is paused and will not be processed by the sidecarset controller.",
@@ -596,11 +631,17 @@ func schema_pkg_apis_apps_v1alpha1_SidecarSetSpec(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
+					"strategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The sidecarset strategy to use to replace existing pods with new ones.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarSetUpdateStrategy"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarContainer", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarContainer", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarSetUpdateStrategy", "k8s.io/api/core/v1.Volume", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
 	}
 }
 
@@ -643,6 +684,26 @@ func schema_pkg_apis_apps_v1alpha1_SidecarSetStatus(ref common.ReferenceCallback
 				Required: []string{"matchedPods", "updatedPods", "readyPods"},
 			},
 		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_SidecarSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SidecarSetUpdateStrategy indicates the strategy that the SidecarSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"rollingUpdate": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateSidecarSet"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateSidecarSet"},
 	}
 }
 
