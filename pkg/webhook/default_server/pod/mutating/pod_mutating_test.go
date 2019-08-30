@@ -53,6 +53,11 @@ func TestSidecarSetMutatePod(t *testing.T) {
 					},
 				},
 			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "volume1",
+				},
+			},
 		},
 	}
 
@@ -77,6 +82,11 @@ func TestSidecarSetMutatePod(t *testing.T) {
 					},
 				},
 			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "volume2",
+				},
+			},
 		},
 	}
 
@@ -91,6 +101,11 @@ func TestSidecarSetMutatePod(t *testing.T) {
 				{
 					Name:  "nginx",
 					Image: "nginx:1.15.1",
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "nginx-volume",
 				},
 			},
 		},
@@ -110,6 +125,9 @@ func TestSidecarSetMutatePod(t *testing.T) {
 
 	if len(pod1.Spec.Containers) != 3 {
 		t.Errorf("expect 3 containers, but got %v", len(pod1.Spec.Containers))
+	}
+	if len(pod1.Spec.Volumes) != 3 {
+		t.Errorf("expect 3 volumes, but got %v", len(pod1.Spec.Volumes))
 	}
 	if !isMarkedSidecar(pod1.Spec.Containers[1]) || !isMarkedSidecar(pod1.Spec.Containers[2]) {
 		t.Errorf("expect env injected, but got nothing")

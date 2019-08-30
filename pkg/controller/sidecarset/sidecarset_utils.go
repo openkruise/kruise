@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -237,19 +238,20 @@ func isPodImageConsistent(pod *corev1.Pod) bool {
 	return true
 }
 
-func (r *ReconcileSidecarSet) updateSidecarImageAndHash(sidecarSet *appsv1alpha1.SidecarSet, pods []*corev1.Pod) error {
-	if len(pods) == 0 {
-		return nil
+func (r *ReconcileSidecarSet) updateSidecarImageAndHash(sidecarSet *appsv1alpha1.SidecarSet, pods []*corev1.Pod, updateNum int) error {
+	if len(pods) < updateNum {
+		updateNum = len(pods)
 	}
 
-	// only support maxUnavailable=1 currently
-	klog.V(3).Infof("try to update sidecar of %v/%v", pods[0].Namespace, pods[0].Name)
-	if err := r.updatePodSidecarAndHash(sidecarSet, pods[0]); err != nil {
-		return err
+	for i := 0; i < updateNum; i++ {
+		klog.V(3).Infof("try to update sidecar of %v/%v", pods[i].Namespace, pods[i].Name)
+		if err := r.updatePodSidecarAndHash(sidecarSet, pods[i]); err != nil {
+			return err
+		}
+		updateCache.set(
+			fmt.Sprintf("%v/%v/%v", sidecarSet.Name, pods[i].Namespace, pods[i].Name),
+			sidecarSet.Annotations[sidecarsetmutating.SidecarSetHashAnnotation])
 	}
-	updateCache.set(
-		fmt.Sprintf("%v/%v/%v", sidecarSet.Name, pods[0].Namespace, pods[0].Name),
-		sidecarSet.Annotations[sidecarsetmutating.SidecarSetHashAnnotation])
 	return nil
 }
 
@@ -304,4 +306,13 @@ func updatePodSidecar(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) {
 			container.Image = image
 		}
 	}
+}
+
+func getMaxUnavailable(sidecarSet *appsv1alpha1.SidecarSet) int {
+	// Error caught by validation
+	unavailable, _ := intstrutil.GetValueFromIntOrPercent(
+		intstrutil.ValueOrDefault(sidecarSet.Spec.Strategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(0)),
+		int(sidecarSet.Status.MatchedPods),
+		false)
+	return unavailable
 }

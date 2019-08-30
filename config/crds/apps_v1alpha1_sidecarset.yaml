@@ -63,6 +63,23 @@ spec:
             selector:
               description: selector is a label query over pods that should be injected
               type: object
+            strategy:
+              description: The sidecarset strategy to use to replace existing pods
+                with new ones.
+              properties:
+                rollingUpdate:
+                  properties:
+                    maxUnavailable:
+                      oneOf:
+                      - type: string
+                      - type: integer
+                  type: object
+              type: object
+            volumes:
+              description: List of volumes that can be mounted by sidecar containers
+              items:
+                type: object
+              type: array
           type: object
         status:
           properties:
