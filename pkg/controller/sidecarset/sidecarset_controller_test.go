@@ -2,24 +2,26 @@ package sidecarset
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
-
-	"github.com/openkruise/kruise/pkg/webhook/default_server/sidecarset/mutating"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/default_server/sidecarset/mutating"
 )
 
 var (
 	scheme *runtime.Scheme
+
+	maxUnavailable = intstr.FromInt(1)
 
 	sidecarSetDemo = &appsv1alpha1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -30,6 +32,14 @@ var (
 			Name: "test-sidecarset",
 		},
 		Spec: appsv1alpha1.SidecarSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "nginx"},
+			},
+			Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				RollingUpdate: &appsv1alpha1.RollingUpdateSidecarSet{
+					MaxUnavailable: &maxUnavailable,
+				},
+			},
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
@@ -37,9 +47,6 @@ var (
 						Image: "test-image:v2",
 					},
 				},
-			},
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "nginx"},
 			},
 		},
 	}
@@ -181,7 +188,7 @@ func TestUpdateWhenOtherFieldsChanged(t *testing.T) {
 	}
 }
 
-func TestUpdateWhenMaxUnavailableNotZero(t *testing.T) {
+func TestUpdateWhenExceedsMaxUnavailable(t *testing.T) {
 	sidecarSetInput := sidecarSetDemo.DeepCopy()
 	updateCache.reset(sidecarSetInput)
 	podInput := podDemo.DeepCopy()
@@ -204,6 +211,6 @@ func TestUpdateWhenMaxUnavailableNotZero(t *testing.T) {
 		t.Errorf("get latest pod failed, err: %v", err)
 	}
 	if isSidecarImageUpdated(podOutput, "test-sidecar", "test-image:v2") {
-		t.Errorf("shouldn't update sidecar because unavailable number is not zero")
+		t.Errorf("shouldn't update sidecar because exceeds unavailable number")
 	}
 }

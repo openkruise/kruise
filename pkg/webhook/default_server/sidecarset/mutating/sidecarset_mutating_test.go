@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 )
@@ -31,6 +32,12 @@ func TestSidecarSetDefault(t *testing.T) {
 	expectedOutputSidecarSet.Spec.Containers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
 	expectedOutputSidecarSet.Spec.Containers[0].TerminationMessagePolicy = corev1.TerminationMessageReadFile
 	expectedOutputSidecarSet.Spec.Containers[0].ImagePullPolicy = corev1.PullIfNotPresent
+	maxUnavailable := intstr.FromInt(1)
+	expectedOutputSidecarSet.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+		RollingUpdate: &appsv1alpha1.RollingUpdateSidecarSet{
+			MaxUnavailable: &maxUnavailable,
+		},
+	}
 
 	setDefaultSidecarSet(sidecarSet)
 

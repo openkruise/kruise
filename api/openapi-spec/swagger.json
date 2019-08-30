@@ -214,6 +214,15 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.RollingUpdateSidecarSet": {
+      "description": "RollingUpdateSidecarSetStrategy is used to communicate parameter",
+      "type": "object",
+      "properties": {
+        "maxUnavailable": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.RollingUpdateStatefulSetStrategy": {
       "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
       "type": "object",
@@ -316,6 +325,17 @@
         "selector": {
           "description": "selector is a label query over pods that should be injected",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+        },
+        "strategy": {
+          "description": "The sidecarset strategy to use to replace existing pods with new ones.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.SidecarSetUpdateStrategy"
+        },
+        "volumes": {
+          "description": "List of volumes that can be mounted by sidecar containers",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.Volume"
+          }
         }
       }
     },
@@ -347,6 +367,15 @@
           "description": "updatedPods is the number of matched Pods that are injected with the latest SidecarSet's containers",
           "type": "integer",
           "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.SidecarSetUpdateStrategy": {
+      "description": "SidecarSetUpdateStrategy indicates the strategy that the SidecarSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+      "type": "object",
+      "properties": {
+        "rollingUpdate": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.RollingUpdateSidecarSet"
         }
       }
     },

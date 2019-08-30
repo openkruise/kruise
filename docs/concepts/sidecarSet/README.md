@@ -51,10 +51,19 @@ spec:
   selector:
     matchLabels:
       app: nginx
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 2
   containers:
   - name: sidecar1
     image: centos:6.7
     command: ["sleep", "999d"] # do nothing at all
+    volumeMounts:
+    - name: log-volume
+      mountPath: /var/log
+  volumes: # this field will be merged into pod.spec.volumes
+  - name: log-volume
+    emptyDir: {}
 ```
 
 Create a SidecarSet based on the YAML file:
@@ -105,7 +114,9 @@ status:
 
 Use ```kubectl edit sidecarset test-sidecarset``` to modify SidecarSet image from `centos:6.7` to `centos:6.8`. You
 should find that the matched pods will be updated in-place sequentially similar to Advanced StatefulSet.
-Note that we only support upgrading sidecar container one at a time, i.e., `maxUnavailable=1 for now.
+.spec.strategy.rollingUpdate.maxUnavailable is an optional field that specifies the maximum number of Pods that can be unavailable during the update process.
+The value can be an absolute number (for example, 5) or a percentage of desired Pods (for example, 10%). The absolute number is calculated from percentage by rounding down.
+When this value is set to 10%, it means 10% * 'matched pods number', default value is 1.
 
 You could use ```kubectl patch sidecarset test-sidecarset --type merge -p '{"spec":{"paused":true}}'``` to pause the update procedure.
 

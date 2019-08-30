@@ -164,9 +164,9 @@ func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Re
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	// we only support sequential update currently, equals to maxUnavailable = 1
-	if unavailableNum != 0 {
-		klog.V(3).Infof("current unavailable pod number: %v, skip update", unavailableNum)
+	maxUnavailableNum := getMaxUnavailable(sidecarSet)
+	if unavailableNum >= maxUnavailableNum {
+		klog.V(3).Infof("current unavailable pod number: %v(max: %v), skip update", unavailableNum, maxUnavailableNum)
 		return reconcile.Result{}, nil
 	}
 
@@ -180,5 +180,6 @@ func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Re
 			podsNeedUpdate = append(podsNeedUpdate, pod)
 		}
 	}
-	return reconcile.Result{}, r.updateSidecarImageAndHash(sidecarSet, podsNeedUpdate)
+	updateNum := maxUnavailableNum - unavailableNum
+	return reconcile.Result{}, r.updateSidecarImageAndHash(sidecarSet, podsNeedUpdate, updateNum)
 }
