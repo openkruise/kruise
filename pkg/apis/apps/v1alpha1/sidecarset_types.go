@@ -52,7 +52,7 @@ type SidecarSetUpdateStrategy struct {
 	RollingUpdate *RollingUpdateSidecarSet `json:"rollingUpdate,omitempty"`
 }
 
-// RollingUpdateSidecarSetStrategy is used to communicate parameter
+// RollingUpdateSidecarSet is used to communicate parameter
 type RollingUpdateSidecarSet struct {
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }
