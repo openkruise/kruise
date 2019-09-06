@@ -153,8 +153,7 @@ func schema_pkg_apis_apps_v1alpha1_BroadcastJobSpec(ref common.ReferenceCallback
 					"parallelism": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when the work left to do is less than max parallelism. Not setting this value means no limit.",
-							Type:        []string{"integer"},
-							Format:      "int32",
+							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
 					"template": {
@@ -174,7 +173,7 @@ func schema_pkg_apis_apps_v1alpha1_BroadcastJobSpec(ref common.ReferenceCallback
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy", "k8s.io/api/core/v1.PodTemplateSpec"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy", "k8s.io/api/core/v1.PodTemplateSpec", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 
@@ -415,7 +414,7 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateSidecarSet(ref common.ReferenceC
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "RollingUpdateSidecarSetStrategy is used to communicate parameter",
+				Description: "RollingUpdateSidecarSet is used to communicate parameter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"maxUnavailable": {

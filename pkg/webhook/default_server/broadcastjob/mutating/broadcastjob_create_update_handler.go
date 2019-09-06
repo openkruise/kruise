@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/webhook/default_server/utils"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission/types"
@@ -61,7 +62,8 @@ func setDefaultBroadcastJob(job *appsv1alpha1.BroadcastJob) {
 
 	if job.Spec.Parallelism == nil {
 		parallelism := int32(1<<31 - 1)
-		job.Spec.Parallelism = &parallelism
+		parallelismIntStr := intstr.FromInt(int(parallelism))
+		job.Spec.Parallelism = &parallelismIntStr
 	}
 }
 

@@ -20,6 +20,7 @@ package broadcastjob
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -218,7 +220,7 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 
 		// DeletionTimestamp is not set and more nodes to run pod
 		if job.DeletionTimestamp == nil && len(restNodesToRunPod) > 0 {
-			active, err = r.reconcilePods(job, restNodesToRunPod, active)
+			active, err = r.reconcilePods(job, restNodesToRunPod, active, desired)
 			if err != nil {
 				klog.Errorf("failed to reconcilePods for job %s,", job.Name)
 			}
@@ -300,7 +302,7 @@ func addLabelToPodTemplate(job *appsv1alpha1.BroadcastJob) {
 }
 
 func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
-	restNodesToRunPod []*corev1.Node, active int32) (int32, error) {
+	restNodesToRunPod []*corev1.Node, active, desired int32) (int32, error) {
 
 	// max concurrent running pods
 	var parallelism int32
@@ -308,7 +310,16 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 		// not specify,take the max int
 		parallelism = int32(1<<31 - 1)
 	} else {
-		parallelism = *job.Spec.Parallelism
+		parallelismIntStr := *job.Spec.Parallelism
+		if parallelismIntStr.Type == intstr.String {
+			absolute, err := percentageToAbsolute(parallelismIntStr.StrVal)
+			if err != nil {
+				return active, err
+			}
+			parallelism = int32(math.Ceil(float64(int32(absolute)*desired) / 100))
+		} else {
+			parallelism = parallelismIntStr.IntVal
+		}
 	}
 
 	// The rest pods to run
