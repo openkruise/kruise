@@ -33,6 +33,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.BroadcastJobSpec":                 schema_pkg_apis_apps_v1alpha1_BroadcastJobSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.BroadcastJobStatus":               schema_pkg_apis_apps_v1alpha1_BroadcastJobStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy":                 schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy":                    schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateContainerStatus":     schema_pkg_apis_apps_v1alpha1_InPlaceUpdateContainerStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateState":               schema_pkg_apis_apps_v1alpha1_InPlaceUpdateState(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.JobCondition":                     schema_pkg_apis_apps_v1alpha1_JobCondition(ref),
@@ -168,12 +169,25 @@ func schema_pkg_apis_apps_v1alpha1_BroadcastJobSpec(ref common.ReferenceCallback
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy"),
 						},
 					},
+					"paused": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Paused will pause the job.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"failurePolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FailurePolicy indicates the behavior of the job, when failed pod is found.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy"),
+						},
+					},
 				},
 				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy", "k8s.io/api/core/v1.PodTemplateSpec", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy", "k8s.io/api/core/v1.PodTemplateSpec", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 
@@ -243,6 +257,13 @@ func schema_pkg_apis_apps_v1alpha1_BroadcastJobStatus(ref common.ReferenceCallba
 							Format:      "int32",
 						},
 					},
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The phase of the job.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -272,13 +293,6 @@ func schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref common.ReferenceCallback
 							Format:      "int64",
 						},
 					},
-					"backoffLimit": {
-						SchemaProps: spec.SchemaProps{
-							Description: "BackoffLimit specifies the number of retries before marking this job failed. Not setting value means no limit. Only works for Always type.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
 					"ttlSecondsAfterFinished": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes. This field is alpha-level and is only honored by servers that enable the TTLAfterFinished feature. Only works for Always type",
@@ -287,6 +301,34 @@ func schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref common.ReferenceCallback
 						},
 					},
 				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "FailurePolicy indicates the behavior of the job, when failed pod is found.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type indicates the type of FailurePolicyType.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"RestartLimit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RestartLimit specifies the number of retries before marking the pod failed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"Type", "RestartLimit"},
 			},
 		},
 	}

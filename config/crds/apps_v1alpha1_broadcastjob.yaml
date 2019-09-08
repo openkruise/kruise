@@ -68,12 +68,6 @@ spec:
                     Only works for Always type.
                   format: int64
                   type: integer
-                backoffLimit:
-                  description: BackoffLimit specifies the number of retries before
-                    marking this job failed. Not setting value means no limit. Only
-                    works for Always type.
-                  format: int32
-                  type: integer
                 ttlSecondsAfterFinished:
                   description: ttlSecondsAfterFinished limits the lifetime of a Job
                     that has finished execution (either Complete or Failed). If this
@@ -92,6 +86,10 @@ spec:
                     is Always
                   type: string
               type: object
+            failurePolicy:
+              description: FailurePolicy indicates the behavior of the job, when failed
+                pod is found.
+              type: object
             parallelism:
               description: Parallelism specifies the maximum desired number of pods
                 the job should run at any given time. The actual number of pods running
@@ -100,6 +98,9 @@ spec:
               oneOf:
               - type: string
               - type: integer
+            paused:
+              description: Paused will pause the job.
+              type: boolean
             template:
               description: Template describes the pod that will be created when executing
                 a job.
@@ -107,6 +108,8 @@ spec:
           required:
           - template
           - completionPolicy
+          - paused
+          - failurePolicy
           type: object
         status:
           properties:
@@ -161,6 +164,9 @@ spec:
               description: The number of pods which reached phase Failed.
               format: int32
               type: integer
+            phase:
+              description: The phase of the job.
+              type: string
             startTime:
               description: Represents time when the job was acknowledged by the job
                 controller. It is not guaranteed to be set in happens-before order
@@ -177,6 +183,7 @@ spec:
           - succeeded
           - failed
           - desired
+          - phase
           type: object
   version: v1alpha1
 status:

@@ -44,7 +44,7 @@ func IsJobFinished(j *appsv1alpha1.BroadcastJob) bool {
 }
 
 // filterPods returns list of activePods and number of failed pods, number of succeeded pods
-func filterPods(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1.Pod) {
+func filterPods(restartLimit int32, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1.Pod) {
 	var activePods, succeededPods, failedPods []*v1.Pod
 	for _, p := range pods {
 		if p.Status.Phase == v1.PodSucceeded {
@@ -52,7 +52,11 @@ func filterPods(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1.Pod) {
 		} else if p.Status.Phase == v1.PodFailed {
 			failedPods = append(failedPods, p)
 		} else if p.DeletionTimestamp == nil {
-			activePods = append(activePods, p)
+			if isPodFailed(restartLimit, p) {
+				failedPods = append(failedPods, p)
+			} else {
+				activePods = append(activePods, p)
+			}
 		} else {
 			klog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
 				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
@@ -61,33 +65,25 @@ func filterPods(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1.Pod) {
 	return activePods, failedPods, succeededPods
 }
 
-// pastBackoffLimitOnFailure checks if container restartCounts sum exceeds BackoffLimit
-// this method applies only to pods with restartPolicy == OnFailure
-func pastBackoffLimitOnFailure(job *appsv1alpha1.BroadcastJob, pods []*v1.Pod) bool {
-	if job.Spec.CompletionPolicy.BackoffLimit == nil {
-		// not specify means BackoffLimit is disabled
+// isPodFailed marks the pod as a failed pod, when
+// 1. restartPolicy==Never, and exit code is not 0
+// 2. restartPolicy==OnFailure, and RestartCount > restartLimit
+func isPodFailed(restartLimit int32, pod *v1.Pod) bool {
+	if pod.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
 		return false
 	}
-	if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
-		return false
+
+	restartCount := int32(0)
+	for i := range pod.Status.InitContainerStatuses {
+		stat := pod.Status.InitContainerStatuses[i]
+		restartCount += stat.RestartCount
 	}
-	result := int32(0)
-	for i := range pods {
-		po := pods[i]
-		if po.Status.Phase != v1.PodRunning {
-			continue
-		}
-		// for only running pods
-		for j := range po.Status.InitContainerStatuses {
-			stat := po.Status.InitContainerStatuses[j]
-			result += stat.RestartCount
-		}
-		for j := range po.Status.ContainerStatuses {
-			stat := po.Status.ContainerStatuses[j]
-			result += stat.RestartCount
-		}
+	for i := range pod.Status.ContainerStatuses {
+		stat := pod.Status.ContainerStatuses[i]
+		restartCount += stat.RestartCount
 	}
-	return result >= *job.Spec.CompletionPolicy.BackoffLimit
+
+	return restartCount > restartLimit
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.

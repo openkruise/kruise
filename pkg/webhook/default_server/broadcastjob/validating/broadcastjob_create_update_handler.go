@@ -97,11 +97,6 @@ func validateBroadcastJobSpec(spec *appsv1alpha1.BroadcastJobSpec, fldPath *fiel
 				spec.CompletionPolicy.ActiveDeadlineSeconds,
 				"activeDeadlineSeconds can just work with Always CompletionPolicyType"))
 		}
-		if spec.CompletionPolicy.BackoffLimit != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("completionPolicy").Child("backoffLimit"),
-				spec.CompletionPolicy.BackoffLimit,
-				"backoffLimit can just work with Always CompletionPolicyType"))
-		}
 	default:
 	}
 	coreTemplate, err := convertPodTemplateSpec(&spec.Template)

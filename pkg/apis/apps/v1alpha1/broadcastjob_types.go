@@ -38,6 +38,14 @@ type BroadcastJobSpec struct {
 	// Default is Always CompletionPolicyType
 	// +optional
 	CompletionPolicy CompletionPolicy `json:"completionPolicy" protobuf:"bytes,3,opt,name=completionPolicy"`
+
+	// Paused will pause the job.
+	// +optional
+	Paused bool `json:"paused" protobuf:"bytes,4,opt,name=paused"`
+
+	// FailurePolicy indicates the behavior of the job, when failed pod is found.
+	// +optional
+	FailurePolicy FailurePolicy `json:"failurePolicy" protobuf:"bytes,5,opt,name=failurePolicy"`
 }
 
 // CompletionPolicy indicates the completion policy for the job
@@ -51,12 +59,6 @@ type CompletionPolicy struct {
 	// Only works for Always type.
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=activeDeadlineSeconds"`
-
-	// BackoffLimit specifies the number of retries before marking this job failed.
-	// Not setting value means no limit.
-	// Only works for Always type.
-	// +optional
-	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,3,opt,name=backoffLimit"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
 	// execution (either Complete or Failed). If this field is set,
@@ -123,7 +125,51 @@ type BroadcastJobStatus struct {
 	// The desired number of pods, this is typically equal to the number of nodes satisfied to run pods.
 	// +optional
 	Desired int32 `json:"desired" protobuf:"varint,7,opt,name=desired"`
+
+	// The phase of the job.
+	// +optional
+	Phase BroadcastJobPhase `json:"phase" protobuf:"varint,8,opt,name=phase"`
 }
+
+// BroadcastJobPhase indicates the phase of the job.
+type BroadcastJobPhase string
+
+const (
+	// PhaseCompleted means the job is completed.
+	PhaseCompleted BroadcastJobPhase = "completed"
+
+	// PhaseRunning means the job is running.
+	PhaseRunning BroadcastJobPhase = "running"
+
+	// PhasePaused means the job is paused.
+	PhasePaused BroadcastJobPhase = "paused"
+
+	// PhaseFailed means the job is failed.
+	PhaseFailed BroadcastJobPhase = "failed"
+)
+
+// FailurePolicy indicates the behavior of the job, when failed pod is found.
+type FailurePolicy struct {
+	// Type indicates the type of FailurePolicyType.
+	Type FailurePolicyType
+
+	// RestartLimit specifies the number of retries before marking the pod failed.
+	RestartLimit int32
+}
+
+// FailurePolicyType indicates the type of FailurePolicyType.
+type FailurePolicyType string
+
+const (
+	// FailurePolicyTypeContinue means the job will be still running, when failed pod is found.
+	FailurePolicyTypeContinue FailurePolicyType = "Continue"
+
+	// FailurePolicyTypeFailFast means the job will be failed, when failed pod is found.
+	FailurePolicyTypeFailFast FailurePolicyType = "FailFast"
+
+	// FailurePolicyTypePause means the the job will be paused, when failed pod is found.
+	FailurePolicyTypePause FailurePolicyType = "Pause"
+)
 
 // JobConditionType indicates valid conditions type of a job
 type JobConditionType string
