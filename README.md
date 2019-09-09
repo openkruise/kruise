@@ -158,6 +158,18 @@ Generate manifests e.g. CRD, RBAC YAML files etc.
 
 To develop/debug kruise controller manager locally, please check the [debug guide](./docs/debug/README.md).
 
+## Uninstall
+
+To uninstall kruise from a Kubernetes cluster:
+
+```bash
+export KUBECONFIG=PATH_TO_CONFIG
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/kruiseio/kruise/master/scripts/uninstall.sh)"
+```
+
+Note that this will lead to all resources created by Kruise, including webhook configurations, services, namespace, CRDs, CR instances and Pods managed by Kruise controller, to be deleted! 
+Please do this **ONLY** when you fully understand the consequence.
+
 ## Community
 
 If you have any questions or want to contribute, you are welcome to communicate most things via GitHub issues or pull requests.
