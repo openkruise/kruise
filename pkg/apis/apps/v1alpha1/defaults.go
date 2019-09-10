@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1alpha1
 
-import "k8s.io/apimachinery/pkg/runtime"
+import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
@@ -30,7 +33,7 @@ func SetDefaultsBroadcastJob(job *BroadcastJob) {
 
 	if job.Spec.Parallelism == nil {
 		parallelism := int32(1<<31 - 1)
-		job.Spec.Parallelism = &parallelism
+		parallelismIntStr := intstr.FromInt(int(parallelism))
+		job.Spec.Parallelism = &parallelismIntStr
 	}
-
 }

@@ -28,10 +28,11 @@ BroadcastJob.
 ### Parallelism
 
 `Parallelism` specifies the maximal desired number of Pods that should be run at
-any given time. By default, there's no limit.
+any given time. By default, there's no limit.`Parallelism` can be an int or a percent.
 
 For example, if a cluster has ten nodes and `Parallelism` is set to three, there can only be
-three pods running in parallel. A new Pod is created only after one running Pod finishes.
+three pods running in parallel, or if a cluster has ten nodes and `Parallelism` is set to 20%,
+there can only be two pods running in parallel. A new Pod is created only after one running Pod finishes.
 
 ### CompletionPolicy
 

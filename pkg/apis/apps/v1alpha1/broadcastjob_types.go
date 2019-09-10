@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // BroadcastJobSpec defines the desired state of BroadcastJob
@@ -28,7 +29,7 @@ type BroadcastJobSpec struct {
 	// be less than this number when the work left to do is less than max parallelism.
 	// Not setting this value means no limit.
 	// +optional
-	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
+	Parallelism *intstr.IntOrString `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Template describes the pod that will be created when executing a job.
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
