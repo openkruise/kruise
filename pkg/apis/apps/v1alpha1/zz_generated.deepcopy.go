@@ -93,7 +93,7 @@ func (in *BroadcastJobSpec) DeepCopyInto(out *BroadcastJobSpec) {
 	*out = *in
 	if in.Parallelism != nil {
 		in, out := &in.Parallelism, &out.Parallelism
-		*out = new(int32)
+		*out = new(intstr.IntOrString)
 		**out = **in
 	}
 	in.Template.DeepCopyInto(&out.Template)

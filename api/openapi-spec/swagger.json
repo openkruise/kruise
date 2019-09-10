@@ -68,8 +68,7 @@
         },
         "parallelism": {
           "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when the work left to do is less than max parallelism. Not setting this value means no limit.",
-          "type": "integer",
-          "format": "int32"
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
         },
         "template": {
           "description": "Template describes the pod that will be created when executing a job.",
@@ -215,7 +214,7 @@
       }
     },
     "kruise.apps.v1alpha1.RollingUpdateSidecarSet": {
-      "description": "RollingUpdateSidecarSetStrategy is used to communicate parameter",
+      "description": "RollingUpdateSidecarSet is used to communicate parameter",
       "type": "object",
       "properties": {
         "maxUnavailable": {

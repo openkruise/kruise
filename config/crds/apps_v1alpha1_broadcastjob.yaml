@@ -97,8 +97,9 @@ spec:
                 the job should run at any given time. The actual number of pods running
                 in steady state will be less than this number when the work left to
                 do is less than max parallelism. Not setting this value means no limit.
-              format: int32
-              type: integer
+              oneOf:
+              - type: string
+              - type: integer
             template:
               description: Template describes the pod that will be created when executing
                 a job.
