@@ -167,7 +167,7 @@ export KUBECONFIG=PATH_TO_CONFIG
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/kruiseio/kruise/master/scripts/uninstall.sh)"
 ```
 
-Note that this will lead to all resources created by Kruise, including webhook configurations, services, namespace, CRDs, CR instances and Pods managed by Kruise controller, to be deleted! 
+Note that this will lead to all resources created by Kruise, including webhook configurations, services, namespace, CRDs, CR instances and Pods managed by Kruise controller, to be deleted!
 Please do this **ONLY** when you fully understand the consequence.
 
 ## Community
