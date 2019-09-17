@@ -10,7 +10,7 @@ go_check:
 	@scripts/check_go_version "1.11.1"
 
 # Run tests
-test: generate fmt vet manifests
+test: generate fmt vet manifests kubebuilder
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Build manager binary
@@ -49,6 +49,17 @@ ifndef GOPATH
 endif
 	go generate ./pkg/... ./cmd/...
 	go run ./hack/gen-openapi-spec/main.go > ${CURRENT_DIR}/api/openapi-spec/swagger.json
+
+# kubebuilder binary
+kubebuilder:
+ifeq (, $(shell which kubebuilder))
+	# Download kubebuilder and extract it to tmp
+	curl -sL https://go.kubebuilder.io/dl/1.0.8/$(shell go env GOOS)/$(shell go env GOARCH) | tar -xz -C /tmp/
+	# You'll need to set the KUBEBUILDER_ASSETS env var if you put it somewhere else
+	sudo mv /tmp/kubebuilder_1.0.8_$(shell go env GOOS)_$(shell go env GOARCH) /usr/local/kubebuilder
+newPATH:=$(PATH):/usr/local/kubebuilder/bin
+export PATH=$(newPATH)
+endif
 
 # Build the docker image
 docker-build: #test
