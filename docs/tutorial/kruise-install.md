@@ -2,6 +2,14 @@
 
 Below steps assume you have an existing kubernetes cluster running properly.
 
+## Install with helm charts
+
+```
+git clone https://github.com/openkruise/kruise
+cd charts/kruise
+helm install kruise ./
+```
+
 ## Install with YAML files
 
 ### Install Kruise CRDs
