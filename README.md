@@ -27,6 +27,14 @@ A [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) by [Lachlan Evenson](http
 
 ## Getting started
 
+### Install with helm charts
+
+```
+git clone https://github.com/openkruise/kruise
+cd charts/kruise
+helm install kruise ./
+```
+
 ### Install with YAML files
 
 #### Install CRDs
