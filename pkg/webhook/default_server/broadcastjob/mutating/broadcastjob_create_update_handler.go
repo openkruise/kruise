@@ -65,6 +65,10 @@ func setDefaultBroadcastJob(job *appsv1alpha1.BroadcastJob) {
 		parallelismIntStr := intstr.FromInt(int(parallelism))
 		job.Spec.Parallelism = &parallelismIntStr
 	}
+
+	if job.Spec.FailurePolicy.Type == "" {
+		job.Spec.FailurePolicy.Type = appsv1alpha1.FailurePolicyTypeFailFast
+	}
 }
 
 var _ admission.Handler = &BroadcastJobCreateUpdateHandler{}
