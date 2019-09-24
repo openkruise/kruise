@@ -25,6 +25,12 @@ spec:
       ports:
         - name: sidecar-server
           containerPort: 4000 # different from main guestbook containerPort which is 3000
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log
+  volumes:
+    - name: log-volume
+      emptyDir: {}
 
 ```
 
@@ -97,7 +103,8 @@ Run `kubectl describe pod guestbook-with-sidecar-0` to check one Pod and verify 
 +       Restart Count:  0
 +       Environment:
 +         IS_INJECTED:  true
-+       Mounts:         <none>
++       Mounts:
++         /var/log from log-volume (rw)
 ```
 
 ## Access the Sidecar service

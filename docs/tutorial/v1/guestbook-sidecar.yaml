@@ -13,3 +13,9 @@ spec:
       ports:
         - name: sidecar-server
           containerPort: 4000 # different from main guestbook containerPort which is 3000
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log
+  volumes:
+    - name: log-volume
+      emptyDir: {}
