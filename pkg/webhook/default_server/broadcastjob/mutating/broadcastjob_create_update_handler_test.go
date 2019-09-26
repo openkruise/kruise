@@ -76,6 +76,10 @@ func TestHandle(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expectedPatches, resp.Patches) {
-		t.Fatalf("expected patches %+v, got patches %+v", expectedPatches, resp.Patches)
+		// The response order is not deterministic
+		expectedPatches[0], expectedPatches[1] = expectedPatches[1], expectedPatches[0]
+		if !reflect.DeepEqual(expectedPatches, resp.Patches) {
+			t.Fatalf("expected patches %+v, got patches %+v", expectedPatches, resp.Patches)
+		}
 	}
 }

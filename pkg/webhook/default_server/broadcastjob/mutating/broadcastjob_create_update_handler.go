@@ -51,12 +51,12 @@ type BroadcastJobCreateUpdateHandler struct {
 }
 
 func (h *BroadcastJobCreateUpdateHandler) mutatingBroadcastJobFn(ctx context.Context, obj *appsv1alpha1.BroadcastJob) error {
-	setDefaultBroadcastJob(obj)
+	SetDefaultBroadcastJob(obj)
 	return nil
 }
 
 // SetDefaults_BroadcastJob sets any unspecified values to defaults.
-func setDefaultBroadcastJob(job *appsv1alpha1.BroadcastJob) {
+func SetDefaultBroadcastJob(job *appsv1alpha1.BroadcastJob) {
 	utils.SetDefaultPodTemplate(&job.Spec.Template.Spec)
 	if job.Spec.CompletionPolicy.Type == "" {
 		job.Spec.CompletionPolicy.Type = appsv1alpha1.Always

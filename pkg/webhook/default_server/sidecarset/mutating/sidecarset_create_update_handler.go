@@ -62,7 +62,7 @@ type SidecarSetCreateHandler struct {
 	Decoder types.Decoder
 }
 
-func setDefaultSidecarSet(sidecarset *appsv1alpha1.SidecarSet) {
+func SetDefaultSidecarSet(sidecarset *appsv1alpha1.SidecarSet) {
 	setSidecarSetUpdateStratety(&sidecarset.Spec.Strategy)
 
 	for i := range sidecarset.Spec.Containers {
@@ -160,12 +160,12 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req types.Request)
 
 	switch req.AdmissionRequest.Operation {
 	case v1beta1.Create, v1beta1.Update:
-		setDefaultSidecarSet(copy)
+		SetDefaultSidecarSet(copy)
 		if err := setHashSidecarSet(copy); err != nil {
 			return admission.ErrorResponse(http.StatusInternalServerError, err)
 		}
 	}
-
+	klog.V(3).Infof("sidecarset after mutating: %v", util.DumpJSON(copy))
 	// related issue: https://github.com/kubernetes-sigs/kubebuilder/issues/510
 	marshaledSidecarSet, err := json.Marshal(copy)
 	if err != nil {

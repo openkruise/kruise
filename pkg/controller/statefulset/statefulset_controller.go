@@ -25,6 +25,7 @@ import (
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/default_server/statefulset/mutating"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -193,6 +194,7 @@ func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (reconcile
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve StatefulSet %v from store: %v", key, err))
 		return reconcile.Result{}, err
 	}
+	mutating.SetObjectDefaults(set)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {

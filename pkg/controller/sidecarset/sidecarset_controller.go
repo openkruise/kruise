@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/default_server/sidecarset/mutating"
 )
 
 /**
@@ -102,6 +103,7 @@ func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Re
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+	mutating.SetDefaultSidecarSet(sidecarSet)
 
 	klog.V(3).Infof("begin to process sidecarset %v", sidecarSet.Name)
 

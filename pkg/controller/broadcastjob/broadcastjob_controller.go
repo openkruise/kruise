@@ -25,6 +25,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/default_server/broadcastjob/mutating"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -131,6 +132,7 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 		klog.Errorf("failed to get job %s,", job.Name)
 		return reconcile.Result{}, err
 	}
+	mutating.SetDefaultBroadcastJob(job)
 	// Add pre-defined labels to pod template
 	addLabelToPodTemplate(job)
 

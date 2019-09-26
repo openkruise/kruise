@@ -1,12 +1,9 @@
 /*
 Copyright 2019 The Kruise Authors.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +32,19 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/webhook/default_server/sidecarset/mutating"
+)
+
+var WebhookTester = k8stypes.NamespacedName{
+	// Avoid name conflict with "real" pods
+	Name:      "webhook-tester-hje3h0rvreaj6w7z",
+	Namespace: "default",
+}
+
+const (
+	// WebhookTestAnnotationKey represents the annotation key set by admission webhook
+	WebhookTestAnnotationKey = "kruise.io/webhooktest"
+	// WebhookTestAnnotationVal represents the annotation value set by admission webhook
+	WebhookTestAnnotationVal = "successful"
 )
 
 func init() {
@@ -64,6 +75,15 @@ type PodCreateHandler struct {
 }
 
 func (h *PodCreateHandler) mutatingPodFn(ctx context.Context, obj *corev1.Pod) error {
+	// Webhook test pod is used to live check if admission webhook works properly
+	if obj.Name == WebhookTester.Name && obj.Namespace == WebhookTester.Namespace {
+		if obj.Annotations == nil {
+			obj.Annotations = make(map[string]string)
+		}
+		obj.Annotations[WebhookTestAnnotationKey] = WebhookTestAnnotationVal
+		klog.V(4).Infof("[WebhookTest] Inject annotation for webhook test pod %s/%s", obj.Namespace, obj.Name)
+		return nil
+	}
 	return h.sidecarsetMutatingPod(ctx, obj)
 }
 
@@ -160,7 +180,6 @@ var _ admission.Handler = &PodCreateHandler{}
 // Handle handles admission requests.
 func (h *PodCreateHandler) Handle(ctx context.Context, req types.Request) types.Response {
 	obj := &corev1.Pod{}
-
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.ErrorResponse(http.StatusBadRequest, err)
