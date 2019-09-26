@@ -5,9 +5,10 @@ Below steps assume you have an existing kubernetes cluster running properly.
 ## Install with helm charts
 
 ```
-git clone https://github.com/openkruise/kruise
-cd charts/kruise
-helm install kruise ./
+wget https://raw.githubusercontent.com/openkruise/kruise/auto_generate_charts/hack/auto_generate_charts.sh
+chmod +x auto_generate_charts.sh
+./auto_generate_charts.sh
+helm install kruise charts/
 ```
 
 ## Install with YAML files
