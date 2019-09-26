@@ -18,9 +18,11 @@ package mutating
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	patchutil "github.com/openkruise/kruise/pkg/util/patch"
 	"github.com/openkruise/kruise/pkg/webhook/default_server/utils"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -87,7 +89,13 @@ func (h *BroadcastJobCreateUpdateHandler) Handle(ctx context.Context, req types.
 	if err != nil {
 		return admission.ErrorResponse(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponse(obj, copy)
+
+	//related issue: https://github.com/kubernetes-sigs/kubebuilder/issues/510
+	marshaledBroadcastJob, err := json.Marshal(copy)
+	if err != nil {
+		return admission.ErrorResponse(http.StatusInternalServerError, err)
+	}
+	return patchutil.ResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaledBroadcastJob)
 }
 
 //var _ inject.Client = &BroadcastJobCreateUpdateHandler{}
