@@ -71,7 +71,11 @@ func TestHandle(t *testing.T) {
 		{
 			Operation: "add",
 			Path:      "/spec/failurePolicy",
-			Value:     map[string]interface{}{"RestartLimit": float64(0), "Type": string(appsv1alpha1.FailurePolicyTypeFailFast)},
+			Value:     map[string]interface{}{"type": string(appsv1alpha1.FailurePolicyTypeFailFast)},
+		},
+		{
+			Operation: "remove",
+			Path:      "/spec/paused",
 		},
 	}
 

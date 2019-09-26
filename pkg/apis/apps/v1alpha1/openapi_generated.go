@@ -313,14 +313,14 @@ func schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref common.ReferenceCallback) c
 				Description: "FailurePolicy indicates the behavior of the job, when failed pod is found.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"Type": {
+					"type": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Type indicates the type of FailurePolicyType.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"RestartLimit": {
+					"restartLimit": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RestartLimit specifies the number of retries before marking the pod failed.",
 							Type:        []string{"integer"},
@@ -328,7 +328,6 @@ func schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"Type", "RestartLimit"},
 			},
 		},
 	}

@@ -154,17 +154,13 @@
     "kruise.apps.v1alpha1.FailurePolicy": {
       "description": "FailurePolicy indicates the behavior of the job, when failed pod is found.",
       "type": "object",
-      "required": [
-        "Type",
-        "RestartLimit"
-      ],
       "properties": {
-        "RestartLimit": {
+        "restartLimit": {
           "description": "RestartLimit specifies the number of retries before marking the pod failed.",
           "type": "integer",
           "format": "int32"
         },
-        "Type": {
+        "type": {
           "description": "Type indicates the type of FailurePolicyType.",
           "type": "string"
         }

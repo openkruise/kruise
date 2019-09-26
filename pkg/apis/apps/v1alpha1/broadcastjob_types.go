@@ -41,11 +41,11 @@ type BroadcastJobSpec struct {
 
 	// Paused will pause the job.
 	// +optional
-	Paused bool `json:"paused" protobuf:"bytes,4,opt,name=paused"`
+	Paused bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
 
 	// FailurePolicy indicates the behavior of the job, when failed pod is found.
 	// +optional
-	FailurePolicy FailurePolicy `json:"failurePolicy" protobuf:"bytes,5,opt,name=failurePolicy"`
+	FailurePolicy FailurePolicy `json:"failurePolicy,omitempty" protobuf:"bytes,5,opt,name=failurePolicy"`
 }
 
 // CompletionPolicy indicates the completion policy for the job
@@ -151,10 +151,10 @@ const (
 // FailurePolicy indicates the behavior of the job, when failed pod is found.
 type FailurePolicy struct {
 	// Type indicates the type of FailurePolicyType.
-	Type FailurePolicyType
+	Type FailurePolicyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=FailurePolicyType"`
 
 	// RestartLimit specifies the number of retries before marking the pod failed.
-	RestartLimit int32
+	RestartLimit int32 `json:"restartLimit,omitempty" protobuf:"varint,2,opt,name=restartLimit"`
 }
 
 // FailurePolicyType indicates the type of FailurePolicyType.
