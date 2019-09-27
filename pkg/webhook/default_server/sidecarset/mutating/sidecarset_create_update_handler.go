@@ -22,9 +22,7 @@ import (
 	"net/http"
 
 	"k8s.io/api/admission/v1beta1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/apis/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -62,70 +60,6 @@ type SidecarSetCreateHandler struct {
 	Decoder types.Decoder
 }
 
-func setDefaultSidecarSet(sidecarset *appsv1alpha1.SidecarSet) {
-	setSidecarSetUpdateStratety(&sidecarset.Spec.Strategy)
-
-	for i := range sidecarset.Spec.Containers {
-		setDefaultContainer(&sidecarset.Spec.Containers[i])
-	}
-
-	klog.V(3).Infof("sidecarset after mutating: %v", util.DumpJSON(sidecarset))
-}
-
-func setSidecarSetUpdateStratety(strategy *appsv1alpha1.SidecarSetUpdateStrategy) {
-	if strategy.RollingUpdate == nil {
-		rollingUpdate := appsv1alpha1.RollingUpdateSidecarSet{}
-		strategy.RollingUpdate = &rollingUpdate
-	}
-	if strategy.RollingUpdate.MaxUnavailable == nil {
-		maxUnavailable := intstr.FromInt(1)
-		strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-	}
-}
-
-func setDefaultContainer(sidecarContainer *appsv1alpha1.SidecarContainer) {
-	container := &sidecarContainer.Container
-	v1.SetDefaults_Container(container)
-	for i := range container.Ports {
-		p := &container.Ports[i]
-		v1.SetDefaults_ContainerPort(p)
-	}
-	for i := range container.Env {
-		e := &container.Env[i]
-		if e.ValueFrom != nil {
-			if e.ValueFrom.FieldRef != nil {
-				v1.SetDefaults_ObjectFieldSelector(e.ValueFrom.FieldRef)
-			}
-		}
-	}
-	v1.SetDefaults_ResourceList(&container.Resources.Limits)
-	v1.SetDefaults_ResourceList(&container.Resources.Requests)
-	if container.LivenessProbe != nil {
-		v1.SetDefaults_Probe(container.LivenessProbe)
-		if container.LivenessProbe.Handler.HTTPGet != nil {
-			v1.SetDefaults_HTTPGetAction(container.LivenessProbe.Handler.HTTPGet)
-		}
-	}
-	if container.ReadinessProbe != nil {
-		v1.SetDefaults_Probe(container.ReadinessProbe)
-		if container.ReadinessProbe.Handler.HTTPGet != nil {
-			v1.SetDefaults_HTTPGetAction(container.ReadinessProbe.Handler.HTTPGet)
-		}
-	}
-	if container.Lifecycle != nil {
-		if container.Lifecycle.PostStart != nil {
-			if container.Lifecycle.PostStart.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PostStart.HTTPGet)
-			}
-		}
-		if container.Lifecycle.PreStop != nil {
-			if container.Lifecycle.PreStop.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PreStop.HTTPGet)
-			}
-		}
-	}
-}
-
 func setHashSidecarSet(sidecarset *appsv1alpha1.SidecarSet) error {
 	if sidecarset.Annotations == nil {
 		sidecarset.Annotations = make(map[string]string)
@@ -160,12 +94,12 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req types.Request)
 
 	switch req.AdmissionRequest.Operation {
 	case v1beta1.Create, v1beta1.Update:
-		setDefaultSidecarSet(copy)
+		appsv1alpha1.SetDefaults_SidecarSet(copy)
 		if err := setHashSidecarSet(copy); err != nil {
 			return admission.ErrorResponse(http.StatusInternalServerError, err)
 		}
 	}
-
+	klog.V(4).Infof("sidecarset after mutating: %v", util.DumpJSON(copy))
 	// related issue: https://github.com/kubernetes-sigs/kubebuilder/issues/510
 	marshaledSidecarSet, err := json.Marshal(copy)
 	if err != nil {

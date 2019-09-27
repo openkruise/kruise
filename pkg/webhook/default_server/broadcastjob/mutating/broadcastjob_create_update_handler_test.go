@@ -3,6 +3,7 @@ package mutating
 import (
 	"context"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/appscode/jsonpatch"
@@ -74,6 +75,10 @@ func TestHandle(t *testing.T) {
 			Value:     map[string]interface{}{"RestartLimit": float64(0), "Type": string(appsv1alpha1.FailurePolicyTypeFailFast)},
 		},
 	}
+	// The response order is not deterministic
+	sort.SliceStable(resp.Patches, func(i, j int) bool {
+		return resp.Patches[i].Path < resp.Patches[j].Path
+	})
 
 	if !reflect.DeepEqual(expectedPatches, resp.Patches) {
 		t.Fatalf("expected patches %+v, got patches %+v", expectedPatches, resp.Patches)
