@@ -89,6 +89,15 @@ spec:
             failurePolicy:
               description: FailurePolicy indicates the behavior of the job, when failed
                 pod is found.
+              properties:
+                restartLimit:
+                  description: RestartLimit specifies the number of retries before
+                    marking the pod failed.
+                  format: int32
+                  type: integer
+                type:
+                  description: Type indicates the type of FailurePolicyType.
+                  type: string
               type: object
             parallelism:
               description: Parallelism specifies the maximum desired number of pods
@@ -108,8 +117,6 @@ spec:
           required:
           - template
           - completionPolicy
-          - paused
-          - failurePolicy
           type: object
         status:
           properties:
