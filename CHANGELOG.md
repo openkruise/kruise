@@ -1,11 +1,12 @@
 ---
+
 # v0.2.0
 
 ## Installation
 
 - Provide a script to generate helm charts for Kruise. User can specify the release version.
 - Automatically install kubebuilder if it does not exist in the machine.
-- Add Kruise uninstall script. 
+- Add Kruise uninstall script.
 
 ## Kruise-Controller-Manager
 
@@ -21,7 +22,6 @@
 - Support `Pause` in BroadcastJob.
 - Add `FailurePolicy` in BroadcastJob, supporting `Continue`, `FastFailed`, and `Pause` polices.
 - Add `Phase` in BroadcastJob `status`.
-
 
 ## Sidecar Set
 
