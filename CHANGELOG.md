@@ -27,7 +27,7 @@
 
 ### Features
 
-- Allow parallely upgrading SidecarSet Pods by specifying `MaxUnavailable`.
+- Allow parallelly upgrading SidecarSet Pods by specifying `MaxUnavailable`.
 - Support sidecar volumes so that user can specify volume mount in sidecar containers.
 
 ---
