@@ -27,5 +27,44 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&BroadcastJob{}, func(obj interface{}) { SetObjectDefaults_BroadcastJob(obj.(*BroadcastJob)) })
+	scheme.AddTypeDefaultingFunc(&BroadcastJobList{}, func(obj interface{}) { SetObjectDefaults_BroadcastJobList(obj.(*BroadcastJobList)) })
+	scheme.AddTypeDefaultingFunc(&SidecarSet{}, func(obj interface{}) { SetObjectDefaults_SidecarSet(obj.(*SidecarSet)) })
+	scheme.AddTypeDefaultingFunc(&SidecarSetList{}, func(obj interface{}) { SetObjectDefaults_SidecarSetList(obj.(*SidecarSetList)) })
+	scheme.AddTypeDefaultingFunc(&StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*StatefulSet)) })
+	scheme.AddTypeDefaultingFunc(&StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*StatefulSetList)) })
 	return nil
+}
+
+func SetObjectDefaults_BroadcastJob(in *BroadcastJob) {
+	SetDefaults_BroadcastJob(in)
+}
+
+func SetObjectDefaults_BroadcastJobList(in *BroadcastJobList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_BroadcastJob(a)
+	}
+}
+
+func SetObjectDefaults_SidecarSet(in *SidecarSet) {
+	SetDefaults_SidecarSet(in)
+}
+
+func SetObjectDefaults_SidecarSetList(in *SidecarSetList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_SidecarSet(a)
+	}
+}
+
+func SetObjectDefaults_StatefulSet(in *StatefulSet) {
+	SetDefaults_StatefulSet(in)
+}
+
+func SetObjectDefaults_StatefulSetList(in *StatefulSetList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_StatefulSet(a)
+	}
 }

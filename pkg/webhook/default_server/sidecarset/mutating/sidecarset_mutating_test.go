@@ -39,7 +39,7 @@ func TestSidecarSetDefault(t *testing.T) {
 		},
 	}
 
-	setDefaultSidecarSet(sidecarSet)
+	appsv1alpha1.SetDefaults_SidecarSet(sidecarSet)
 
 	if !reflect.DeepEqual(expectedOutputSidecarSet, sidecarSet) {
 		t.Errorf("\nexpect:\n%+v\nbut got:\n%+v", expectedOutputSidecarSet, sidecarSet)

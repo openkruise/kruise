@@ -24,11 +24,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	patchutil "github.com/openkruise/kruise/pkg/util/patch"
-	"github.com/openkruise/kruise/pkg/webhook/default_server/utils"
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission/types"
@@ -70,7 +66,7 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req types.R
 		return admission.ErrorResponse(http.StatusBadRequest, err)
 	}
 
-	SetObjectDefaults(obj)
+	appsv1alpha1.SetDefaults_StatefulSet(obj)
 	obj.Status = appsv1alpha1.StatefulSetStatus{}
 
 	err = h.mutatingStatefulSetFn(ctx, obj)
@@ -87,58 +83,6 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req types.R
 		klog.V(5).Infof("Admit StatefulSet %s/%s patches: %v", obj.Namespace, obj.Name, util.DumpJSON(resp.Patches))
 	}
 	return resp
-}
-
-// SetObjectDefaults sets object by default
-func SetObjectDefaults(in *appsv1alpha1.StatefulSet) {
-	setDefaults(in)
-	utils.SetDefaultPodTemplate(&in.Spec.Template.Spec)
-	for i := range in.Spec.VolumeClaimTemplates {
-		a := &in.Spec.VolumeClaimTemplates[i]
-		corev1.SetDefaults_PersistentVolumeClaim(a)
-		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
-		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
-		corev1.SetDefaults_ResourceList(&a.Status.Capacity)
-	}
-}
-
-func setDefaults(obj *appsv1alpha1.StatefulSet) {
-	if len(obj.Spec.PodManagementPolicy) == 0 {
-		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-	}
-
-	if obj.Spec.UpdateStrategy.Type == "" {
-		obj.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
-
-		// UpdateStrategy.RollingUpdate will take default values below.
-		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateStatefulSetStrategy{}
-	}
-
-	if obj.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
-		if obj.Spec.UpdateStrategy.RollingUpdate == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateStatefulSetStrategy{}
-		}
-		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
-		}
-		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
-			maxUnavailable := intstr.FromInt(1)
-			obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-		}
-		if obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == "" {
-			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy = appsv1alpha1.RecreatePodUpdateStrategyType
-		}
-	}
-
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
-	}
-	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = new(int32)
-		*obj.Spec.RevisionHistoryLimit = 10
-	}
 }
 
 //var _ inject.Client = &StatefulSetCreateUpdateHandler{}
