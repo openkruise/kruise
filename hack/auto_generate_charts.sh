@@ -5,12 +5,12 @@ set -o nounset
 # receive version version
 echo "---------------------------------"
 echo "Please input Kruise version (available versions are listed in https://github.com/openkruise/kruise/releases)"
-echo "If no input, the default version of v0.1.0 will be used"
+echo "If no input, the default version of v0.2.0 will be used"
 echo "---------------------------------"
 read -p "please input version: " version
 
 if [ ! -n "$version" ]; then
-  version="v0.1.0"
+  version="v0.2.0"
 fi
 
 echo "----------------------------------"
