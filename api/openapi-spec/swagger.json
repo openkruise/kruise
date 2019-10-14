@@ -592,15 +592,15 @@
       ],
       "properties": {
         "name": {
-          "description": "Indicate the name of this subset, which will be used to generate subset workload name in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e' or its prefix in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e-' in case of ReplicasSet.",
+          "description": "Indicates the name of this subset, which will be used to generate subset workload name in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e'.",
           "type": "string"
         },
         "nodeSelector": {
-          "description": "Indicate the node select strategy to form the subset.",
+          "description": "Indicates the node select strategy to form the subset.",
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector"
         },
         "replicas": {
-          "description": "Indicate the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
+          "description": "Indicates the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
         }
       }
@@ -716,12 +716,12 @@
           "format": "int32"
         },
         "revisionHistoryLimit": {
-          "description": "Indicate the number of histories to be conserved. If unspecified, defaults to 10.",
+          "description": "Indicates the number of histories to be conserved. If unspecified, defaults to 10.",
           "type": "integer",
           "format": "int32"
         },
         "selector": {
-          "description": "selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
+          "description": "Selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
         },
         "strategy": {
@@ -748,12 +748,12 @@
       ],
       "properties": {
         "collisionCount": {
-          "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+          "description": "Count of hash collisions for the UnitedDeployment. The UnitedDeployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
           "type": "integer",
           "format": "int32"
         },
         "conditions": {
-          "description": "Represents the latest available observations of a InPlaceSet's current state.",
+          "description": "Represents the latest available observations of a UnitedDeployment's current state.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentCondition"
@@ -764,7 +764,7 @@
           "type": "string"
         },
         "observedGeneration": {
-          "description": "INSERT ADDITIONAL STATUS FIELD - define observed state of cluster Important: Run \"make\" to regenerate code after modifying this file observedGeneration is the most recent generation observed for this InPlaceSet. It corresponds to the InPlaceSet's generation, which is updated on mutation by the API Server.",
+          "description": "ObservedGeneration is the most recent generation observed for this UnitedDeployment. It corresponds to the UnitedDeployment's generation, which is updated on mutation by the API Server.",
           "type": "integer",
           "format": "int64"
         },
@@ -779,7 +779,7 @@
           "format": "int32"
         },
         "subsetReplicas": {
-          "description": "Records the topology detail information of the replicas of each unit.",
+          "description": "Records the topology detail information of the replicas of each subset.",
           "type": "object",
           "additionalProperties": {
             "type": "integer",
@@ -791,7 +791,7 @@
           "$ref": "#/definitions/kruise.apps.v1alpha1.UpdateStatus"
         },
         "updatedReadyReplicas": {
-          "description": "The number of ready current revision replicas for this InPlaceSet. A pod is updated ready means all of its container has bean updated by sigma.",
+          "description": "The number of ready current revision replicas for this UnitedDeployment.",
           "type": "integer",
           "format": "int32"
         },
@@ -807,7 +807,7 @@
       "type": "object",
       "properties": {
         "partitions": {
-          "description": "Indicate the partition of each subset.",
+          "description": "Indicates the partition of each subset.",
           "type": "object",
           "additionalProperties": {
             "type": "integer",
