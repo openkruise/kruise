@@ -2,9 +2,7 @@ package validating
 
 import (
 	"fmt"
-	"math"
 	"regexp"
-	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -14,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -23,6 +20,7 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	udctrl "github.com/openkruise/kruise/pkg/controller/uniteddeployment"
 )
 
 var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
@@ -78,7 +76,7 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 			continue
 		}
 
-		replicas, err := parseSubsetReplicas(expectedReplicas, *subset.Replicas)
+		replicas, err := udctrl.ParseSubsetReplicas(expectedReplicas, *subset.Replicas)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset", "replicas"), subset.Replicas, fmt.Sprintf("invalid replicas %s", subset.Replicas.String())))
 		} else {
@@ -194,34 +192,4 @@ func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.Statefu
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
 	return allErrs
-}
-
-func parseSubsetReplicas(replicas int32, subsetReplicas intstr.IntOrString) (int32, error) {
-	if subsetReplicas.Type == intstr.Int {
-		if subsetReplicas.IntVal < 0 {
-			return 0, fmt.Errorf("unitReplicas (%d) should not be less than 0", subsetReplicas.IntVal)
-		}
-		return subsetReplicas.IntVal, nil
-	}
-
-	strVal := subsetReplicas.StrVal
-	if !strings.HasSuffix(strVal, "%") {
-		return 0, fmt.Errorf("unitReplicas (%s) only support int value or percentage value with a suffix '%%'", strVal)
-	}
-
-	intPart := strVal[:len(strVal)-1]
-	percent64, err := strconv.ParseInt(intPart, 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("unitReplicas (%s) should be correct percentage value", strVal)
-	}
-
-	if percent64 > int64(100) || percent64 < int64(0) {
-		return 0, fmt.Errorf("unitReplicas (%s) should be in range (0, 100]", strVal)
-	}
-
-	return int32(round(float64(replicas) * float64(percent64) / 100)), nil
-}
-
-func round(x float64) int {
-	return int(math.Floor(x + 0.5))
 }
