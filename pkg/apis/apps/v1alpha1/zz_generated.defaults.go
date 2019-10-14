@@ -33,6 +33,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&SidecarSetList{}, func(obj interface{}) { SetObjectDefaults_SidecarSetList(obj.(*SidecarSetList)) })
 	scheme.AddTypeDefaultingFunc(&StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*StatefulSet)) })
 	scheme.AddTypeDefaultingFunc(&StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*StatefulSetList)) })
+	scheme.AddTypeDefaultingFunc(&UnitedDeployment{}, func(obj interface{}) { SetObjectDefaults_UnitedDeployment(obj.(*UnitedDeployment)) })
+	scheme.AddTypeDefaultingFunc(&UnitedDeploymentList{}, func(obj interface{}) { SetObjectDefaults_UnitedDeploymentList(obj.(*UnitedDeploymentList)) })
 	return nil
 }
 
@@ -66,5 +68,16 @@ func SetObjectDefaults_StatefulSetList(in *StatefulSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_StatefulSet(a)
+	}
+}
+
+func SetObjectDefaults_UnitedDeployment(in *UnitedDeployment) {
+	SetDefaults_UnitedDeployment(in)
+}
+
+func SetObjectDefaults_UnitedDeploymentList(in *UnitedDeploymentList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_UnitedDeployment(a)
 	}
 }

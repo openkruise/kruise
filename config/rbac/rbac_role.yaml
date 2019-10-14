@@ -161,6 +161,26 @@ rules:
   - update
   - patch
 - apiGroups:
+  - apps.kruise.io
+  resources:
+  - uniteddeployments
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - uniteddeployments/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations

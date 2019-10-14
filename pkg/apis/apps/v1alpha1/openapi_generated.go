@@ -49,7 +49,18 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetList":                  schema_pkg_apis_apps_v1alpha1_StatefulSetList(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetSpec":                  schema_pkg_apis_apps_v1alpha1_StatefulSetSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetStatus":                schema_pkg_apis_apps_v1alpha1_StatefulSetStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetTemplateSpec":          schema_pkg_apis_apps_v1alpha1_StatefulSetTemplateSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetUpdateStrategy":        schema_pkg_apis_apps_v1alpha1_StatefulSetUpdateStrategy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Subset":                           schema_pkg_apis_apps_v1alpha1_Subset(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SubsetTemplate":                   schema_pkg_apis_apps_v1alpha1_SubsetTemplate(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Topology":                         schema_pkg_apis_apps_v1alpha1_Topology(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeployment":                 schema_pkg_apis_apps_v1alpha1_UnitedDeployment(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentCondition":        schema_pkg_apis_apps_v1alpha1_UnitedDeploymentCondition(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentList":             schema_pkg_apis_apps_v1alpha1_UnitedDeploymentList(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentSpec":             schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentStatus":           schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentUpdateStrategy":   schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdateStatus":                     schema_pkg_apis_apps_v1alpha1_UpdateStatus(ref),
 	}
 }
 
@@ -1004,6 +1015,32 @@ func schema_pkg_apis_apps_v1alpha1_StatefulSetStatus(ref common.ReferenceCallbac
 	}
 }
 
+func schema_pkg_apis_apps_v1alpha1_StatefulSetTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StatefulSetTemplateSpec defines the subset template of StatefulSet.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/apps/v1.StatefulSetSpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/apps/v1.StatefulSetSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
 func schema_pkg_apis_apps_v1alpha1_StatefulSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1029,5 +1066,445 @@ func schema_pkg_apis_apps_v1alpha1_StatefulSetUpdateStrategy(ref common.Referenc
 		},
 		Dependencies: []string{
 			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateStatefulSetStrategy"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Subset defines the detail of a subset.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicate the name of this subset, which will be used to generate subset workload name in the format '<deployment-name>-<subset-name>' or its prefix in the format '<deployment-name>-<subset-name>-' in case of ReplicasSet.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicate the node select strategy to form the subset.",
+							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicate the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
+							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_SubsetTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SubsetTemplate defines the subset under the UnitedDeployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"statefulSetTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StatefulSet template",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetTemplateSpec"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetTemplateSpec"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_Topology(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Topology defines the spread detail of each subset under UnitedDeployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"subsets": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Contains the details of each subset.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Subset"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Subset"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UnitedDeployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnitedDeployment is the Schema for the uniteddeployments API",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentSpec", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnitedDeploymentCondition describes current state of a UnitedDeployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of in place set condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of the condition, one of True, False, Unknown.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time the condition transitioned from one status to another.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A human readable message indicating details about the transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnitedDeploymentList contains a list of UnitedDeployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeployment"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeployment", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnitedDeploymentSpec defines the desired state of UnitedDeployment",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas is the totally desired number of replicas of all the owning workloads. If unspecified, defaults to 1.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+						},
+					},
+					"template": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Template is the object that describes the subset that will be created.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SubsetTemplate"),
+						},
+					},
+					"topology": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Contains the information of subset topology.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Topology"),
+						},
+					},
+					"strategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Strategy indicates the action of updating",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentUpdateStrategy"),
+						},
+					},
+					"revisionHistoryLimit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicate the number of histories to be conserved. If unspecified, defaults to 10.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"selector"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SubsetTemplate", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Topology", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentUpdateStrategy", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnitedDeploymentStatus defines the observed state of UnitedDeployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "INSERT ADDITIONAL STATUS FIELD - define observed state of cluster Important: Run \"make\" to regenerate code after modifying this file observedGeneration is the most recent generation observed for this InPlaceSet. It corresponds to the InPlaceSet's generation, which is updated on mutation by the API Server.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"readyReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of ready replicas.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas is the most recently observed number of replicas.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"updatedReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pods in current version.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"updatedReadyReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of ready current revision replicas for this InPlaceSet. A pod is updated ready means all of its container has bean updated by sigma.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"collisionCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentRevision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CurrentRevision, if not empty, indicates the current version of the UnitedDeployment.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"subsetReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Records the topology detail information of the replicas of each unit.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"integer"},
+										Format: "int32",
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the latest available observations of a InPlaceSet's current state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentCondition"),
+									},
+								},
+							},
+						},
+					},
+					"updateStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Records the information of update progress.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdateStatus"),
+						},
+					},
+				},
+				Required: []string{"replicas", "updatedReplicas", "currentRevision"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentCondition", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdateStatus"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"partitions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicate the partition of each subset.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"integer"},
+										Format: "int32",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UpdateStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UpdateStatus defines the observed update state of UnitedDeployment.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"updatedRevision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Records the latest revision.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentPartitions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Records the current partition.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"integer"},
+										Format: "int32",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
