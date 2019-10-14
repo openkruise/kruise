@@ -154,3 +154,25 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 		v1.SetDefaults_ResourceList(&a.Status.Capacity)
 	}
 }
+
+func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+
+	if obj.Spec.Template.StatefulSetTemplate != nil {
+		utils.SetDefaultPodTemplate(&obj.Spec.Template.StatefulSetTemplate.Spec.Template.Spec)
+		for i := range obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates {
+			a := &obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates[i]
+			v1.SetDefaults_PersistentVolumeClaim(a)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+			v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		}
+	}
+}

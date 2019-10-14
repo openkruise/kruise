@@ -555,6 +555,21 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.StatefulSetTemplateSpec": {
+      "description": "StatefulSetTemplateSpec defines the subset template of StatefulSet.",
+      "type": "object",
+      "required": [
+        "spec"
+      ],
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/io.k8s.api.apps.v1.StatefulSetSpec"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.StatefulSetUpdateStrategy": {
       "description": "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
       "type": "object",
@@ -565,6 +580,256 @@
         },
         "type": {
           "description": "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.",
+          "type": "string"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.Subset": {
+      "description": "Subset defines the detail of a subset.",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "description": "Indicate the name of this subset, which will be used to generate subset workload name in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e' or its prefix in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e-' in case of ReplicasSet.",
+          "type": "string"
+        },
+        "nodeSelector": {
+          "description": "Indicate the node select strategy to form the subset.",
+          "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector"
+        },
+        "replicas": {
+          "description": "Indicate the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.SubsetTemplate": {
+      "description": "SubsetTemplate defines the subset under the UnitedDeployment.",
+      "type": "object",
+      "properties": {
+        "statefulSetTemplate": {
+          "description": "StatefulSet template",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.StatefulSetTemplateSpec"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.Topology": {
+      "description": "Topology defines the spread detail of each subset under UnitedDeployment.",
+      "type": "object",
+      "properties": {
+        "subsets": {
+          "description": "Contains the details of each subset.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.Subset"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UnitedDeployment": {
+      "description": "UnitedDeployment is the Schema for the uniteddeployments API",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentStatus"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UnitedDeploymentCondition": {
+      "description": "UnitedDeploymentCondition describes current state of a UnitedDeployment.",
+      "type": "object",
+      "properties": {
+        "lastTransitionTime": {
+          "description": "Last time the condition transitioned from one status to another.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "message": {
+          "description": "A human readable message indicating details about the transition.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "The reason for the condition's last transition.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status of the condition, one of True, False, Unknown.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of in place set condition.",
+          "type": "string"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UnitedDeploymentList": {
+      "description": "UnitedDeploymentList contains a list of UnitedDeployment.",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeployment"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UnitedDeploymentSpec": {
+      "description": "UnitedDeploymentSpec defines the desired state of UnitedDeployment",
+      "type": "object",
+      "required": [
+        "selector"
+      ],
+      "properties": {
+        "replicas": {
+          "description": "Replicas is the totally desired number of replicas of all the owning workloads. If unspecified, defaults to 1.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "revisionHistoryLimit": {
+          "description": "Indicate the number of histories to be conserved. If unspecified, defaults to 10.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "selector": {
+          "description": "selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+        },
+        "strategy": {
+          "description": "Strategy indicates the action of updating",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy"
+        },
+        "template": {
+          "description": "Template is the object that describes the subset that will be created.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.SubsetTemplate"
+        },
+        "topology": {
+          "description": "Contains the information of subset topology.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.Topology"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UnitedDeploymentStatus": {
+      "description": "UnitedDeploymentStatus defines the observed state of UnitedDeployment.",
+      "type": "object",
+      "required": [
+        "replicas",
+        "updatedReplicas",
+        "currentRevision"
+      ],
+      "properties": {
+        "collisionCount": {
+          "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "conditions": {
+          "description": "Represents the latest available observations of a InPlaceSet's current state.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentCondition"
+          }
+        },
+        "currentRevision": {
+          "description": "CurrentRevision, if not empty, indicates the current version of the UnitedDeployment.",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "INSERT ADDITIONAL STATUS FIELD - define observed state of cluster Important: Run \"make\" to regenerate code after modifying this file observedGeneration is the most recent generation observed for this InPlaceSet. It corresponds to the InPlaceSet's generation, which is updated on mutation by the API Server.",
+          "type": "integer",
+          "format": "int64"
+        },
+        "readyReplicas": {
+          "description": "The number of ready replicas.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "replicas": {
+          "description": "Replicas is the most recently observed number of replicas.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "subsetReplicas": {
+          "description": "Records the topology detail information of the replicas of each unit.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "updateStatus": {
+          "description": "Records the information of update progress.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UpdateStatus"
+        },
+        "updatedReadyReplicas": {
+          "description": "The number of ready current revision replicas for this InPlaceSet. A pod is updated ready means all of its container has bean updated by sigma.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "updatedReplicas": {
+          "description": "The number of pods in current version.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy": {
+      "description": "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
+      "type": "object",
+      "properties": {
+        "partitions": {
+          "description": "Indicate the partition of each subset.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UpdateStatus": {
+      "description": "UpdateStatus defines the observed update state of UnitedDeployment.",
+      "type": "object",
+      "properties": {
+        "currentPartitions": {
+          "description": "Records the current partition.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "updatedRevision": {
+          "description": "Records the latest revision.",
           "type": "string"
         }
       }
