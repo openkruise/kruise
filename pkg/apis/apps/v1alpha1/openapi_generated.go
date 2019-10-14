@@ -1078,20 +1078,20 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate the name of this subset, which will be used to generate subset workload name in the format '<deployment-name>-<subset-name>' or its prefix in the format '<deployment-name>-<subset-name>-' in case of ReplicasSet.",
+							Description: "Indicates the name of this subset, which will be used to generate subset workload name in the format '<deployment-name>-<subset-name>'.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate the node select strategy to form the subset.",
+							Description: "Indicates the node select strategy to form the subset.",
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
+							Description: "Indicates the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -1309,7 +1309,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref common.ReferenceCall
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
+							Description: "Selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 						},
 					},
@@ -1333,7 +1333,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref common.ReferenceCall
 					},
 					"revisionHistoryLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate the number of histories to be conserved. If unspecified, defaults to 10.",
+							Description: "Indicates the number of histories to be conserved. If unspecified, defaults to 10.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1356,7 +1356,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"observedGeneration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "INSERT ADDITIONAL STATUS FIELD - define observed state of cluster Important: Run \"make\" to regenerate code after modifying this file observedGeneration is the most recent generation observed for this InPlaceSet. It corresponds to the InPlaceSet's generation, which is updated on mutation by the API Server.",
+							Description: "ObservedGeneration is the most recent generation observed for this UnitedDeployment. It corresponds to the UnitedDeployment's generation, which is updated on mutation by the API Server.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -1384,14 +1384,14 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref common.ReferenceCa
 					},
 					"updatedReadyReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of ready current revision replicas for this InPlaceSet. A pod is updated ready means all of its container has bean updated by sigma.",
+							Description: "The number of ready current revision replicas for this UnitedDeployment.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"collisionCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+							Description: "Count of hash collisions for the UnitedDeployment. The UnitedDeployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1405,7 +1405,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref common.ReferenceCa
 					},
 					"subsetReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Records the topology detail information of the replicas of each unit.",
+							Description: "Records the topology detail information of the replicas of each subset.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -1420,7 +1420,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref common.ReferenceCa
 					},
 					"conditions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the latest available observations of a InPlaceSet's current state.",
+							Description: "Represents the latest available observations of a UnitedDeployment's current state.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1455,7 +1455,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"partitions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate the partition of each subset.",
+							Description: "Indicates the partition of each subset.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,

@@ -5,29 +5,43 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: uniteddeployment-sample
 spec:
-  replicas: 1
+  replicas: 4
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app: "foo"
+      app: foo
   template:
     statefulSetTemplate:
       metadata:
         labels:
           app: foo
       spec:
-        containers:
-        - name: "nginx"
-          image: "nginx:1.0"
+        template:
+          metadata:
+            labels:
+              app: foo
+          spec:
+            containers:
+              - name: nginx
+                image: nginx:1.0
   topology:
     subsets:
-    - name: "subsetA"
-      nodeSelector:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: "node"
-            operator: "In"
-            values:
-            - "zoneA"
+      - name: subsetA
+        nodeSelector:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node
+                  operator: In
+                  values:
+                    - zoneA
+      - name: subsetB
+        nodeSelector:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node
+                  operator: In
+                  values:
+                    - zoneB
 
 
 
