@@ -30,7 +30,7 @@ type UnitedDeploymentSpec struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// selector is a label query over pods that should match the replica count.
+	// Selector is a label query over pods that should match the replica count.
 	// It must match the pod template's labels.
 	Selector *metav1.LabelSelector `json:"selector"`
 
@@ -46,7 +46,7 @@ type UnitedDeploymentSpec struct {
 	// +optional
 	Strategy UnitedDeploymentUpdateStrategy `json:"strategy,omitempty"`
 
-	// Indicate the number of histories to be conserved.
+	// Indicates the number of histories to be conserved.
 	// If unspecified, defaults to 10.
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
@@ -67,7 +67,7 @@ type StatefulSetTemplateSpec struct {
 
 // UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.
 type UnitedDeploymentUpdateStrategy struct {
-	// Indicate the partition of each subset.
+	// Indicates the partition of each subset.
 	// +optional
 	Partitions map[string]*int32 `json:"partitions,omitempty"`
 }
@@ -81,16 +81,15 @@ type Topology struct {
 
 // Subset defines the detail of a subset.
 type Subset struct {
-	// Indicate the name of this subset, which will be used to generate
-	// subset workload name in the format '<deployment-name>-<subset-name>'
-	// or its prefix in the format '<deployment-name>-<subset-name>-' in case of ReplicasSet.
+	// Indicates the name of this subset, which will be used to generate
+	// subset workload name in the format '<deployment-name>-<subset-name>'.
 	Name string `json:"name"`
 
-	// Indicate the node select strategy to form the subset.
+	// Indicates the node select strategy to form the subset.
 	// +optional
 	NodeSelector corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
-	// Indicate the number of the subset replicas or percentage of it on the UnitedDeployment replicas.
+	// Indicates the number of the subset replicas or percentage of it on the UnitedDeployment replicas.
 	// If nil, the number of replicas in this subset is determined by controller.
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
@@ -98,10 +97,8 @@ type Subset struct {
 
 // UnitedDeploymentStatus defines the observed state of UnitedDeployment.
 type UnitedDeploymentStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// observedGeneration is the most recent generation observed for this InPlaceSet. It corresponds to the
-	// InPlaceSet's generation, which is updated on mutation by the API Server.
+	// ObservedGeneration is the most recent generation observed for this UnitedDeployment. It corresponds to the
+	// UnitedDeployment's generation, which is updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
@@ -115,12 +112,11 @@ type UnitedDeploymentStatus struct {
 	// The number of pods in current version.
 	UpdatedReplicas int32 `json:"updatedReplicas"`
 
-	// The number of ready current revision replicas for this InPlaceSet.
-	// A pod is updated ready means all of its container has bean updated by sigma.
+	// The number of ready current revision replicas for this UnitedDeployment.
 	// +optional
 	UpdatedReadyReplicas int32 `json:"updatedReadyReplicas,omitempty"`
 
-	// Count of hash collisions for the DaemonSet. The DaemonSet controller
+	// Count of hash collisions for the UnitedDeployment. The UnitedDeployment controller
 	// uses this field as a collision avoidance mechanism when it needs to
 	// create the name for the newest ControllerRevision.
 	// +optional
@@ -129,11 +125,11 @@ type UnitedDeploymentStatus struct {
 	// CurrentRevision, if not empty, indicates the current version of the UnitedDeployment.
 	CurrentRevision string `json:"currentRevision"`
 
-	// Records the topology detail information of the replicas of each unit.
+	// Records the topology detail information of the replicas of each subset.
 	// +optional
 	SubsetReplicas map[string]int32 `json:"subsetReplicas,omitempty"`
 
-	// Represents the latest available observations of a InPlaceSet's current state.
+	// Represents the latest available observations of a UnitedDeployment's current state.
 	// +optional
 	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty"`
 
