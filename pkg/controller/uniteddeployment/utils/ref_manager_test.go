@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -18,10 +19,12 @@ var (
 func Test(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
+	UID := "uid"
 	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
+			UID:       types.UID(UID),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &val,
@@ -72,7 +75,9 @@ func Test(t *testing.T) {
 		return sts, nil
 	}
 
+	var ownerRefs []metav1.OwnerReference
 	updateOwnee := func(obj runtime.Object) (err error) {
+		ownerRefs = obj.(*corev1.Pod).OwnerReferences
 		return nil
 	}
 	scheme := runtime.NewScheme()
@@ -91,6 +96,15 @@ func Test(t *testing.T) {
 	// remove pod label
 	pod := pods[0]
 	pod.Labels["app"] = "foo2"
+
+	mts = make([]metav1.Object, 1)
+	mts[0] = &pod
+	ps, err = m.ClaimOwnedObjects(mts)
+	g.Expect(err).Should(gomega.BeNil())
+	g.Expect(len(ps)).Should(gomega.BeEquivalentTo(0))
+
+	// remove pod label
+	pod.OwnerReferences = ownerRefs
 
 	mts = make([]metav1.Object, 1)
 	mts[0] = &pod
