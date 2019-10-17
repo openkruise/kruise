@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsalphav1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/utils"
+	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
 
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
@@ -37,7 +37,7 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDe
 	klog.V(1).Infof("List controller revision of UnitedDeployment %s/%s: count %d\n", ud.Namespace, ud.Name, len(histories.Items))
 
 	// Use ControllerRefManager to adopt/orphan as needed.
-	cm, err := utils.NewRefManager(r.Client, ud.Spec.Selector, ud, r.scheme)
+	cm, err := refmanager.New(r.Client, ud.Spec.Selector, ud, r.scheme)
 	if err != nil {
 		return nil, err
 	}

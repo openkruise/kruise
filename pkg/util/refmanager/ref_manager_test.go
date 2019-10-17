@@ -1,4 +1,4 @@
-package utils
+package refmanager
 
 import (
 	"testing"
@@ -83,7 +83,7 @@ func Test(t *testing.T) {
 	}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}, &appsv1.StatefulSet{})
-	m, err := NewRefManager(nil, sts.Spec.Selector, sts, scheme)
+	m, err := New(nil, sts.Spec.Selector, sts, scheme)
 	g.Expect(err).Should(gomega.BeNil())
 
 	mts := make([]metav1.Object, 1)

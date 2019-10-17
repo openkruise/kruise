@@ -1,4 +1,4 @@
-package utils
+package refmanager
 
 import (
 	"context"
@@ -27,9 +27,9 @@ type RefManager struct {
 	canAdoptErr error
 }
 
-// NewRefManager returns a RefManager that exposes
+// New returns a RefManager that exposes
 // methods to manage the controllerRef of pods.
-func NewRefManager(client client.Client, selector *metav1.LabelSelector, owner metav1.Object, schema *runtime.Scheme) (*RefManager, error) {
+func New(client client.Client, selector *metav1.LabelSelector, owner metav1.Object, schema *runtime.Scheme) (*RefManager, error) {
 	s, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
