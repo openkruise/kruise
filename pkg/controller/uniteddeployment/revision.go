@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsalphav1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	akscontrollerutil "github.com/openkruise/kruise/pkg/controller/uniteddeployment/utils"
+	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/utils"
 )
 
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
@@ -36,18 +36,12 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDe
 	}
 	klog.V(1).Infof("List controller revision of UnitedDeployment %s/%s: count %d\n", ud.Namespace, ud.Name, len(histories.Items))
 
-	getOwner := func() (runtime.Object, error) {
-		instance := &appsalphav1.UnitedDeployment{}
-		err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: ud.Namespace, Name: ud.Name}, instance)
-		return instance, err
-	}
-
-	updateOwnee := func(ownee runtime.Object) (err error) {
-		return r.Client.Update(context.TODO(), ownee)
-	}
-
 	// Use ControllerRefManager to adopt/orphan as needed.
-	cm, err := akscontrollerutil.NewRefManager(getOwner, updateOwnee, ud.Spec.Selector, ud, r.scheme)
+	cm, err := utils.NewRefManager(r.Client, ud.Spec.Selector, ud, r.scheme)
+	if err != nil {
+		return nil, err
+	}
+
 	mts := make([]metav1.Object, len(histories.Items))
 	for i, pod := range histories.Items {
 		mts[i] = pod.DeepCopy()

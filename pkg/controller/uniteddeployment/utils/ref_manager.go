@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -10,23 +11,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// GetOwner is the type of function which is provided to get the owner resource.
-type GetOwner func() (runtime.Object, error)
-
-// UpdateOwnee is the type of function which is provided to update a resource after ownerReference is updated.
-type UpdateOwnee func(runtime.Object) error
-
 // RefManager provides the method to
 type RefManager struct {
-	getOwner    GetOwner
-	updateOwnee UpdateOwnee
-	selector    labels.Selector
-	owner       metav1.Object
-	ownerType   reflect.Type
-	schema      *runtime.Scheme
+	client    client.Client
+	selector  labels.Selector
+	owner     metav1.Object
+	ownerType reflect.Type
+	schema    *runtime.Scheme
 
 	once        sync.Once
 	canAdoptErr error
@@ -34,7 +29,7 @@ type RefManager struct {
 
 // NewRefManager returns a RefManager that exposes
 // methods to manage the controllerRef of pods.
-func NewRefManager(getOwner GetOwner, updateOwnee UpdateOwnee, selector *metav1.LabelSelector, owner metav1.Object, schema *runtime.Scheme) (*RefManager, error) {
+func NewRefManager(client client.Client, selector *metav1.LabelSelector, owner metav1.Object, schema *runtime.Scheme) (*RefManager, error) {
 	s, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
@@ -45,12 +40,11 @@ func NewRefManager(getOwner GetOwner, updateOwnee UpdateOwnee, selector *metav1.
 		ownerType = ownerType.Elem()
 	}
 	return &RefManager{
-		getOwner:    getOwner,
-		updateOwnee: updateOwnee,
-		selector:    s,
-		owner:       owner,
-		ownerType:   ownerType,
-		schema:      schema,
+		client:    client,
+		selector:  s,
+		owner:     owner,
+		ownerType: ownerType,
+		schema:    schema,
 	}, nil
 }
 
@@ -89,6 +83,37 @@ func (mgr *RefManager) canAdoptOnce() error {
 	})
 
 	return mgr.canAdoptErr
+}
+
+func (mgr *RefManager) getOwner() (runtime.Object, error) {
+	return getOwner(mgr.owner, mgr.schema, mgr.client)
+}
+
+var getOwner = func(owner metav1.Object, schema *runtime.Scheme, c client.Client) (runtime.Object, error) {
+	runtimeObj, ok := owner.(runtime.Object)
+	if !ok {
+		return nil, fmt.Errorf("fail to convert %s/%s to runtime object", owner.GetNamespace(), owner.GetName())
+	}
+
+	kinds, _, err := schema.ObjectKinds(runtimeObj)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := schema.New(kinds[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, c.Get(context.TODO(), client.ObjectKey{Namespace: owner.GetNamespace(), Name: owner.GetName()}, obj)
+}
+
+func (mgr *RefManager) updateOwnee(object runtime.Object) error {
+	return updateOwnee(object, mgr.client)
+}
+
+var updateOwnee = func(object runtime.Object, c client.Client) error {
+	return c.Update(context.TODO(), object)
 }
 
 func (mgr *RefManager) canAdopt() error {

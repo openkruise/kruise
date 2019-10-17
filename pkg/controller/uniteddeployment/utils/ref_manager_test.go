@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -71,18 +72,18 @@ func Test(t *testing.T) {
 		},
 	}
 
-	getOwner := func() (runtime.Object, error) {
+	getOwner = func(owner metav1.Object, schema *runtime.Scheme, c client.Client) (runtime.Object, error) {
 		return sts, nil
 	}
 
 	var ownerRefs []metav1.OwnerReference
-	updateOwnee := func(obj runtime.Object) (err error) {
+	updateOwnee = func(obj runtime.Object, c client.Client) (err error) {
 		ownerRefs = obj.(*corev1.Pod).OwnerReferences
 		return nil
 	}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}, &appsv1.StatefulSet{})
-	m, err := NewRefManager(getOwner, updateOwnee, sts.Spec.Selector, sts, scheme)
+	m, err := NewRefManager(nil, sts.Spec.Selector, sts, scheme)
 	g.Expect(err).Should(gomega.BeNil())
 
 	mts := make([]metav1.Object, 1)
