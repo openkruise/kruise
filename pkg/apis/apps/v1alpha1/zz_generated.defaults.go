@@ -29,6 +29,8 @@ import (
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&BroadcastJob{}, func(obj interface{}) { SetObjectDefaults_BroadcastJob(obj.(*BroadcastJob)) })
 	scheme.AddTypeDefaultingFunc(&BroadcastJobList{}, func(obj interface{}) { SetObjectDefaults_BroadcastJobList(obj.(*BroadcastJobList)) })
+	scheme.AddTypeDefaultingFunc(&CloneSet{}, func(obj interface{}) { SetObjectDefaults_CloneSet(obj.(*CloneSet)) })
+	scheme.AddTypeDefaultingFunc(&CloneSetList{}, func(obj interface{}) { SetObjectDefaults_CloneSetList(obj.(*CloneSetList)) })
 	scheme.AddTypeDefaultingFunc(&SidecarSet{}, func(obj interface{}) { SetObjectDefaults_SidecarSet(obj.(*SidecarSet)) })
 	scheme.AddTypeDefaultingFunc(&SidecarSetList{}, func(obj interface{}) { SetObjectDefaults_SidecarSetList(obj.(*SidecarSetList)) })
 	scheme.AddTypeDefaultingFunc(&StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*StatefulSet)) })
@@ -46,6 +48,17 @@ func SetObjectDefaults_BroadcastJobList(in *BroadcastJobList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_BroadcastJob(a)
+	}
+}
+
+func SetObjectDefaults_CloneSet(in *CloneSet) {
+	SetDefaults_CloneSet(in)
+}
+
+func SetObjectDefaults_CloneSetList(in *CloneSetList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_CloneSet(a)
 	}
 }
 
