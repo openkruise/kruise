@@ -138,7 +138,17 @@ func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ud *appsalphav1.UnitedD
 		return sortedRevisions, nil
 	}
 
+	live := map[string]bool{}
+	live[ud.Status.CurrentRevision] = true
+	if ud.Status.UpdateStatus != nil {
+		live[ud.Status.UpdateStatus.UpdatedRevision] = true
+	}
+
 	for i, revision := range *sortedRevisions {
+		if _, exist := live[revision.Name]; exist {
+			continue
+		}
+
 		if i >= exceedNum {
 			break
 		}
