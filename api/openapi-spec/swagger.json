@@ -131,6 +131,248 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.CloneSet": {
+      "description": "CloneSet is the Schema for the clonesets API",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetStatus"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.CloneSetCondition": {
+      "description": "CloneSetCondition describes the state of a CloneSet at a certain point.",
+      "type": "object",
+      "required": [
+        "type",
+        "status"
+      ],
+      "properties": {
+        "lastTransitionTime": {
+          "description": "Last time the condition transitioned from one status to another.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "message": {
+          "description": "A human readable message indicating details about the transition.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "The reason for the condition's last transition.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status of the condition, one of True, False, Unknown.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of CloneSet condition.",
+          "type": "string"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.CloneSetInPlaceUpdateStrategy": {
+      "type": "object"
+    },
+    "kruise.apps.v1alpha1.CloneSetList": {
+      "description": "CloneSetList contains a list of CloneSet",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSet"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.CloneSetScaleStrategy": {
+      "type": "object",
+      "properties": {
+        "podsToDelete": {
+          "description": "PodsToDelete is the names of Pod should be deleted. Note that this list will be truncated for non-existing pod names.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.CloneSetSpec": {
+      "description": "CloneSetSpec defines the desired state of CloneSet",
+      "type": "object",
+      "required": [
+        "replicas",
+        "selector",
+        "template"
+      ],
+      "properties": {
+        "replicas": {
+          "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template. If unspecified, defaults to 1.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "revisionHistoryLimit": {
+          "description": "RevisionHistoryLimit is the maximum number of revisions that will be maintained in the CloneSet's revision history. The revision history consists of all revisions not represented by a currently applied CloneSetSpec version. The default value is 10.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "scaleStrategy": {
+          "description": "ScaleStrategy indicates the ScaleStrategy that will be employed to create and delete Pods in the CloneSet.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetScaleStrategy"
+        },
+        "selector": {
+          "description": "Selector is a label query over pods that should match the replica count. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+        },
+        "template": {
+          "description": "Template describes the pods that will be created.",
+          "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplateSpec"
+        },
+        "updateStrategy": {
+          "description": "UpdateStrategy indicates the UpdateStrategy that will be employed to update Pods in the CloneSet when a revision is made to Template.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetUpdateStrategy"
+        },
+        "volumeClaimTemplates": {
+          "description": "VolumeClaimTemplates is a list of claims that pods are allowed to reference. Note that PVC will be deleted when its pod has been deleted.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.CloneSetStatus": {
+      "description": "CloneSetStatus defines the observed state of CloneSet",
+      "type": "object",
+      "required": [
+        "replicas",
+        "readyReplicas",
+        "updatedReplicas",
+        "updatedReadyReplicas"
+      ],
+      "properties": {
+        "collisionCount": {
+          "description": "CollisionCount is the count of hash collisions for the CloneSet. The CloneSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "conditions": {
+          "description": "Conditions represents the latest available observations of a CloneSet's current state.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetCondition"
+          }
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the most recent generation observed for this CloneSet. It corresponds to the CloneSet's generation, which is updated on mutation by the API Server.",
+          "type": "integer",
+          "format": "int64"
+        },
+        "readyReplicas": {
+          "description": "ReadyReplicas is the number of Pods created by the CloneSet controller that have a Ready Condition.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "replicas": {
+          "description": "Replicas is the number of Pods created by the CloneSet controller.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "updateRevision": {
+          "description": "UpdateRevision, if not empty, indicates the latest revision of the CloneSet.",
+          "type": "string"
+        },
+        "updatedReadyReplicas": {
+          "description": "UpdatedReadyReplicas is the number of Pods created by the CloneSet controller from the CloneSet version indicated by updateRevision and have a Ready Condition.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "updatedReplicas": {
+          "description": "UpdatedReplicas is the number of Pods created by the CloneSet controller from the CloneSet version indicated by updateRevision.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.CloneSetUpdatePriorityTerm": {
+      "type": "object",
+      "required": [
+        "weight",
+        "matchSelector"
+      ],
+      "properties": {
+        "matchSelector": {
+          "description": "MatchSelector is used to select by pod's labels.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+        },
+        "weight": {
+          "description": "Weight associated with matching the corresponding matchExpressions, in the range 1-100.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.CloneSetUpdateStrategy": {
+      "type": "object",
+      "properties": {
+        "inPlaceUpdateStrategy": {
+          "description": "InPlaceUpdateStrategy contains strategies for in-place update.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetInPlaceUpdateStrategy"
+        },
+        "maxUnavailable": {
+          "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. Defaults to 1.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        },
+        "partition": {
+          "description": "Partition is the desired number of pods in old revisions. It means when partition is set during pods updating, (replicas - partition) number of pods will be updated. Default value is 0.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "paused": {
+          "description": "Paused indicates that the CloneSet is paused. Default value is false",
+          "type": "boolean"
+        },
+        "priorities": {
+          "description": "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetUpdatePriorityTerm"
+          }
+        },
+        "type": {
+          "description": "Type indicates the type of the CloneSetUpdateStrategy. Default is ReCreate.",
+          "type": "string"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.CompletionPolicy": {
       "description": "CompletionPolicy indicates the completion policy for the job",
       "type": "object",

@@ -176,3 +176,41 @@ func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 		}
 	}
 }
+
+func SetDefaults_CloneSet(obj *CloneSet) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+
+	utils.SetDefaultPodTemplate(&obj.Spec.Template.Spec)
+	for i := range obj.Spec.VolumeClaimTemplates {
+		a := &obj.Spec.VolumeClaimTemplates[i]
+		v1.SetDefaults_PersistentVolumeClaim(a)
+		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+		v1.SetDefaults_ResourceList(&a.Status.Capacity)
+	}
+
+	switch obj.Spec.UpdateStrategy.Type {
+	case "":
+		obj.Spec.UpdateStrategy.Type = RecreateCloneSetUpdateStrategyType
+	case InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceOnlyCloneSetUpdateStrategyType:
+		if obj.Spec.UpdateStrategy.InPlaceUpdateStrategy == nil {
+			obj.Spec.UpdateStrategy.InPlaceUpdateStrategy = &CloneSetInPlaceUpdateStrategy{}
+		}
+	}
+
+	if obj.Spec.UpdateStrategy.Partition == nil {
+		obj.Spec.UpdateStrategy.Partition = new(int32)
+		*obj.Spec.UpdateStrategy.Partition = 0
+	}
+	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
+		maxUnavailable := intstr.FromInt(1)
+		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailable
+	}
+}
