@@ -185,6 +185,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetInPlaceUpdateStrategy": {
+      "description": "CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.",
       "type": "object"
     },
     "kruise.apps.v1alpha1.CloneSetList": {
@@ -214,6 +215,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetScaleStrategy": {
+      "description": "CloneSetScaleStrategy defines the strategies for scale.",
       "type": "object",
       "properties": {
         "podsToDelete": {
@@ -323,6 +325,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetUpdatePriorityTerm": {
+      "description": "CloneSetUpdatePriorityTerm defines priority term for pods update.",
       "type": "object",
       "required": [
         "weight",
@@ -341,6 +344,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetUpdateStrategy": {
+      "description": "CloneSetUpdateStrategy defines the strategies for update.",
       "type": "object",
       "properties": {
         "inPlaceUpdateStrategy": {

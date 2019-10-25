@@ -119,6 +119,10 @@ func SetDefaultPodTemplate(in *v1.PodSpec) {
 	}
 	for i := range in.Containers {
 		a := &in.Containers[i]
+		// For in-place update, we set default imagePullPolicy to Always
+		if a.ImagePullPolicy == "" {
+			a.ImagePullPolicy = v1.PullAlways
+		}
 		v12.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
