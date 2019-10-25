@@ -28,6 +28,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+// SetDefaults_SidecarSet set default values for SidecarSet.
 func SetDefaults_SidecarSet(obj *SidecarSet) {
 	setSidecarSetUpdateStratety(&obj.Spec.Strategy)
 
@@ -90,6 +91,7 @@ func setSidecarDefaultContainer(sidecarContainer *SidecarContainer) {
 	}
 }
 
+// SetDefaults_BroadcastJob set default values for BroadcastJob.
 func SetDefaults_BroadcastJob(obj *BroadcastJob) {
 	utils.SetDefaultPodTemplate(&obj.Spec.Template.Spec)
 	if obj.Spec.CompletionPolicy.Type == "" {
@@ -107,6 +109,7 @@ func SetDefaults_BroadcastJob(obj *BroadcastJob) {
 	}
 }
 
+// SetDefaults_StatefulSet set default values for StatefulSet.
 func SetDefaults_StatefulSet(obj *StatefulSet) {
 	if len(obj.Spec.PodManagementPolicy) == 0 {
 		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
@@ -155,6 +158,7 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 	}
 }
 
+// SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
@@ -177,6 +181,7 @@ func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 	}
 }
 
+// SetDefaults_CloneSet set default values for CloneSet.
 func SetDefaults_CloneSet(obj *CloneSet) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
