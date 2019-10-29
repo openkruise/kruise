@@ -11,11 +11,10 @@ import (
 	"k8s.io/klog"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/subset"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*subset.Subset, nextReplicas, nextPartitions map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (updateErr error) {
+func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*Subset, nextReplicas, nextPartitions map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (updateErr error) {
 	_, err := r.manageSubsetProvision(ud, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		return fmt.Errorf("fail to manage Subset provision: %s", err)
@@ -24,7 +23,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	return
 }
 
-func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*subset.Subset, nextReplicas, nextPartitions map[string]int32, currentRevision, updateRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, error) {
+func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*Subset, nextReplicas, nextPartitions map[string]int32, currentRevision, updateRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, error) {
 	expectedSubsets := sets.String{}
 	gotSubsets := sets.String{}
 

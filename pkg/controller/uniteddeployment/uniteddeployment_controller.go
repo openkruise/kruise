@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/subset"
 )
 
 const (
@@ -67,7 +66,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		scheme: mgr.GetScheme(),
 
 		recorder: mgr.GetRecorder(controllerName),
-		subSetControls: map[subSetType]subset.ControlInterface{
+		subSetControls: map[subSetType]ControlInterface{
 			statefulSetSubSetType: &StatefulSetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme()},
 		},
 	}
@@ -106,7 +105,7 @@ type ReconcileUnitedDeployment struct {
 	scheme *runtime.Scheme
 
 	recorder       record.EventRecorder
-	subSetControls map[subSetType]subset.ControlInterface
+	subSetControls map[subSetType]ControlInterface
 }
 
 // Reconcile reads that state of the cluster for a UnitedDeployment object and makes changes based on the state read
@@ -147,14 +146,11 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
-	nameToExpectedSubset := getEffectiveSubsets(instance, nameToSubset)
-	allocatedReplicas := GetAllocatedReplicas(nameToExpectedSubset, instance)
-
-	nextPartitions := calcNextPartitions(instance, allocatedReplicas)
-	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
-
-	nextReplicas := calcNextReplicas(nameToSubset, allocatedReplicas, nextPartitions, subsetType)
+	nextReplicas := GetAllocatedReplicas(nameToSubset, instance)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next replicas %v", instance.Namespace, instance.Name, nextReplicas)
+
+	nextPartitions := calcNextPartitions(instance, nextReplicas)
+	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
 
 	if err := r.manageSubsets(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType); err != nil {
 		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
@@ -165,7 +161,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control subset.ControlInterface) (nameToSubset map[string]*subset.Subset, err error) {
+func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface) (nameToSubset map[string]*Subset, err error) {
 	subSets, err := control.GetAllSubsets(instance)
 	if err != nil {
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
@@ -173,7 +169,7 @@ func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.Unite
 	}
 
 	klog.V(4).Infof("Classify UnitedDeployment %s/%s by subSet name", instance.Namespace, instance.Name)
-	nameToSubsets := r.classifySubsetByName(instance, subSets)
+	nameToSubsets := r.classifySubsetBySubsetName(instance, subSets)
 
 	nameToSubset, err = r.deleteDupSubset(instance, nameToSubsets, control)
 	if err != nil {
@@ -184,69 +180,38 @@ func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.Unite
 	return
 }
 
-func getEffectiveSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*subset.Subset) (effectiveSubsets map[string]*subset.Subset) {
-	effectiveSubsets = map[string]*subset.Subset{}
-
-	for _, subsetDef := range ud.Spec.Topology.Subsets {
-		if ss, exist := nameToSubset[subsetDef.Name]; exist {
-			effectiveSubsets[subsetDef.Name] = ss
-		} else {
-			effectiveSubsets[subsetDef.Name] = &subset.Subset{}
-		}
-	}
-
-	return effectiveSubsets
-}
-
-func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, subsetReplicas map[string]int32) map[string]int32 {
+func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas map[string]int32) map[string]int32 {
 	partitions := map[string]int32{}
 	for _, subset := range ud.Spec.Topology.Subsets {
-		if partition, exist := ud.Spec.Strategy.Partitions[subset.Name]; exist {
-			partitions[subset.Name] = *partition
-		} else {
-			partitions[subset.Name] = subsetReplicas[subset.Name]
+		var subsetPartition int32
+		if isManualUpdateStrategy(ud) && ud.Spec.Strategy.ManualUpdate != nil && ud.Spec.Strategy.ManualUpdate.Partitions != nil {
+			if partition, exist := ud.Spec.Strategy.ManualUpdate.Partitions[subset.Name]; exist {
+				subsetPartition = partition
+			}
 		}
+
+		if subsetReplicas, exist := nextReplicas[subset.Name]; exist && subsetPartition > subsetReplicas {
+			subsetPartition = subsetReplicas
+		}
+
+		partitions[subset.Name] = subsetPartition
 	}
 
 	return partitions
 }
 
+func isManualUpdateStrategy(ud *appsv1alpha1.UnitedDeployment) bool {
+	return len(ud.Spec.Strategy.Type) == 0 || ud.Spec.Strategy.Type == appsv1alpha1.ManualUpdateStrategyType
+}
+
 var subsetReplicasFn = subSetReplicas
 
-func subSetReplicas(subset *subset.Subset) int32 {
+func subSetReplicas(subset *Subset) int32 {
 	return subset.Status.Replicas
 }
 
-func calcNextReplicas(nameToSubset map[string]*subset.Subset, allocatedReplicas map[string]int32, nextPartitions map[string]int32, subsetType subSetType) map[string]int32 {
-	nextReplicas := map[string]int32{}
-	for name, replicas := range allocatedReplicas {
-		var offset int32
-		if subset, exist := nameToSubset[name]; exist {
-			offset = subsetReplicasFn(subset)
-		}
-		limit := replicas
-		partition := limit
-		if specPartition, exist := nextPartitions[name]; exist {
-			partition = specPartition
-		}
-		expected := offset
-		if partition >= limit {
-			expected = limit
-		} else if offset <= partition {
-			expected = partition
-		} else if offset >= limit {
-			expected = limit
-		}
-
-		klog.V(2).Infof("Subset (%s) %s needs replicas %d", subsetType, name, expected)
-		nextReplicas[name] = expected
-	}
-
-	return nextReplicas
-}
-
-func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*subset.Subset, control subset.ControlInterface) (map[string]*subset.Subset, error) {
-	nameToSubset := map[string]*subset.Subset{}
+func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (map[string]*Subset, error) {
+	nameToSubset := map[string]*Subset{}
 	for name, subsets := range nameToSubsets {
 		if len(subsets) > 1 {
 			for _, subset := range subsets[1:] {
@@ -269,7 +234,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeplo
 	return nameToSubset, nil
 }
 
-func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.UnitedDeployment) (subset.ControlInterface, subSetType) {
+func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.UnitedDeployment) (ControlInterface, subSetType) {
 	if instance.Spec.Template.StatefulSetTemplate != nil {
 		return r.subSetControls[statefulSetSubSetType], statefulSetSubSetType
 	}
@@ -278,23 +243,23 @@ func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.Uni
 	return nil, statefulSetSubSetType
 }
 
-func (r *ReconcileUnitedDeployment) classifySubsetByName(ud *appsv1alpha1.UnitedDeployment, subSets []*subset.Subset) map[string][]*subset.Subset {
-	mapping := map[string][]*subset.Subset{}
+func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1alpha1.UnitedDeployment, subsets []*Subset) map[string][]*Subset {
+	mapping := map[string][]*Subset{}
 
-	for _, subSet := range subSets {
-		subSetName := getSubsetName(&subSet.ObjectMeta)
-		if len(subSetName) == 0 {
-			// filter out Subset without correct Subset name label
+	for _, ss := range subsets {
+		subSetName, err := getSubsetNameFrom(ss)
+		if err != nil {
+			// filter out Subset without correct Subset name
 			continue
 		}
 
 		_, exist := mapping[subSetName]
 		if !exist {
-			var subSetWithName []*subset.Subset
-			subSetWithName = append(subSetWithName, subSet)
-			mapping[subSetName] = subSetWithName
+			var subsetWithName []*Subset
+			subsetWithName = append(subsetWithName, ss)
+			mapping[subSetName] = subsetWithName
 		} else {
-			mapping[subSetName] = append(mapping[subSetName], subSet)
+			mapping[subSetName] = append(mapping[subSetName], ss)
 		}
 	}
 	return mapping

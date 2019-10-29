@@ -94,9 +94,11 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset"), sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
 	}
 
-	for subset := range spec.Strategy.Partitions {
-		if !subSetNames.Has(subset) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("strategy", "partitions"), spec.Strategy.Partitions, fmt.Sprintf("subset %s does not exist", subset)))
+	if spec.Strategy.ManualUpdate != nil {
+		for subset := range spec.Strategy.ManualUpdate.Partitions {
+			if !subSetNames.Has(subset) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("strategy", "partitions"), spec.Strategy.ManualUpdate.Partitions, fmt.Sprintf("subset %s does not exist", subset)))
+			}
 		}
 	}
 

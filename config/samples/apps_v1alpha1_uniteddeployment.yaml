@@ -5,7 +5,7 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: uniteddeployment-sample
 spec:
-  replicas: 4
+  replicas: 6
   revisionHistoryLimit: 10
   selector:
     matchLabels:
@@ -26,22 +26,29 @@ spec:
                 image: nginx:1.0
   topology:
     subsets:
-      - name: subsetA
+      - name: subset-a
+        replicas: 1
         nodeSelector:
           nodeSelectorTerms:
             - matchExpressions:
                 - key: node
                   operator: In
                   values:
-                    - zoneA
-      - name: subsetB
+                    - zone-a
+      - name: subset-b
+        replicas: 50%
         nodeSelector:
           nodeSelectorTerms:
             - matchExpressions:
                 - key: node
                   operator: In
                   values:
-                    - zoneB
-
-
-
+                    - zone-b
+      - name: subset-c
+        nodeSelector:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node
+                  operator: In
+                  values:
+                    - zone-c

@@ -77,8 +77,12 @@ spec:
             strategy:
               description: Strategy indicates the action of updating
               properties:
-                partitions:
-                  description: Indicates the partition of each subset.
+                manualUpdate:
+                  description: Indicate the partition of each subset.
+                  properties:
+                    partitions:
+                      description: Indicates number of subset partition.
+                      type: object
                   type: object
               type: object
             template:

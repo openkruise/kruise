@@ -23,6 +23,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// UpdateStrategyType is a string enumeration type that enumerates
+// all possible update strategies for the UnitedDeployment controller.
+type UpdateStrategyType string
+
+const (
+	// ManualUpdateStrategyType indicate the partition of each subset.
+	ManualUpdateStrategyType UpdateStrategyType = "Manual"
+)
+
 // UnitedDeploymentSpec defines the desired state of UnitedDeployment
 type UnitedDeploymentSpec struct {
 	// Replicas is the totally desired number of replicas of all the owning workloads.
@@ -67,9 +76,20 @@ type StatefulSetTemplateSpec struct {
 
 // UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.
 type UnitedDeploymentUpdateStrategy struct {
-	// Indicates the partition of each subset.
+	// Type of UnitedDeployment update.
+	// Default is Manual.
 	// +optional
-	Partitions map[string]*int32 `json:"partitions,omitempty"`
+	Type UpdateStrategyType
+	// Indicate the partition of each subset.
+	// +optional
+	ManualUpdate *ManualUpdate `json:"manualUpdate,omitempty"`
+}
+
+// ManualUpdate is a update strategy which allow users to provide the partition of each subset.
+type ManualUpdate struct {
+	// Indicates number of subset partition.
+	// +optional
+	Partitions map[string]int32 `json:"partitions,omitempty"`
 }
 
 // Topology defines the spread detail of each subset under UnitedDeployment.

@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/subset"
 )
 
 var c client.Client
@@ -29,10 +28,9 @@ var deploy = client.ObjectKey{Namespace: "default", Name: "foo"}
 const timeout = time.Second * 2
 
 var (
-	one  int32 = 1
-	two  int32 = 2
-	five int32 = 5
-	ten  int32 = 10
+	one int32 = 1
+	two int32 = 2
+	ten int32 = 10
 )
 
 func TestStsReconcile(t *testing.T) {
@@ -412,7 +410,7 @@ func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, chan stru
 	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
 	stopMgr, mgrStopped := StartTestManager(mgr, g)
 
-	subsetReplicasFn = func(subset *subset.Subset) int32 {
+	subsetReplicasFn = func(subset *Subset) int32 {
 		return subset.Spec.Replicas
 	}
 

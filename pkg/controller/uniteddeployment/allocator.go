@@ -8,14 +8,12 @@ import (
 	"k8s.io/klog"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/subset"
 )
 
 type nameToReplicas struct {
 	Name       string
 	SubsetName string
 	Replicas   int32
-	Partition  int32
 	Limited    bool
 }
 
@@ -47,8 +45,9 @@ func (n subsetInfos) Swap(i, j int) {
 // GetAllocatedReplicas returns a mapping from subset to next replicas.
 // Next replicas is allocated by replicasAllocator, which will consider the current replicas of each subset and
 // new replicas indicated from UnitedDeployment.Spec.Topology.Subsets.
-func GetAllocatedReplicas(nameToSubset map[string]*subset.Subset, ud *appsv1alpha1.UnitedDeployment) map[string]int32 {
-	replicaLimits, replicasAllocator := getReplicasAllocator(nameToSubset, ud)
+func GetAllocatedReplicas(nameToSubset map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) map[string]int32 {
+	effectiveSubsets := getEffectiveSubsets(ud, nameToSubset)
+	replicaLimits, replicasAllocator := getReplicasAllocator(effectiveSubsets, ud)
 	replicasAllocator.AllocateReplicas(*ud.Spec.Replicas, replicaLimits)
 
 	return replicasAllocator.AllocatedReplicas
@@ -92,7 +91,7 @@ func (s *replicasAllocator) effectiveReplicasLimitation(replicas int32, subsetRe
 	return true
 }
 
-func getReplicasAllocator(nameToSubset map[string]*subset.Subset, ud *appsv1alpha1.UnitedDeployment) (map[string]int32, *replicasAllocator) {
+func getReplicasAllocator(nameToSubset map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) (map[string]int32, *replicasAllocator) {
 	nameToSubsetDef := map[string]*appsv1alpha1.Subset{}
 	for i := range ud.Spec.Topology.Subsets {
 		nameToSubsetDef[ud.Spec.Topology.Subsets[i].Name] = &ud.Spec.Topology.Subsets[i]
@@ -138,9 +137,7 @@ func (s *replicasAllocator) AllocateReplicas(replicas int32, subsetReplicasLimit
 	index := s.subsets.Len() - 1
 	for i := index; i >= 0; i-- {
 		if s.subsets.Get(i).Limited {
-			tmp := (*s.subsets)[i]
-			(*s.subsets)[i] = (*s.subsets)[index]
-			(*s.subsets)[index] = tmp
+			(*s.subsets)[i], (*s.subsets)[index] = (*s.subsets)[index], (*s.subsets)[i]
 			index--
 		}
 	}
@@ -226,4 +223,18 @@ func (s *replicasAllocator) String() string {
 	}
 
 	return result
+}
+
+func getEffectiveSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*Subset) (effectiveSubsets map[string]*Subset) {
+	effectiveSubsets = map[string]*Subset{}
+
+	for _, subsetDef := range ud.Spec.Topology.Subsets {
+		if ss, exist := nameToSubset[subsetDef.Name]; exist {
+			effectiveSubsets[subsetDef.Name] = ss
+		} else {
+			effectiveSubsets[subsetDef.Name] = &Subset{}
+		}
+	}
+
+	return effectiveSubsets
 }

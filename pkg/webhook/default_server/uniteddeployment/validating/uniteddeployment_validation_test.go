@@ -187,7 +187,6 @@ func TestValidateUnitedDeployment(t *testing.T) {
 		})
 	}
 
-	var val1 int32 = 1
 	errorCases := map[string]appsv1alpha1.UnitedDeployment{
 		"no pod template label": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -339,8 +338,10 @@ func TestValidateUnitedDeployment(t *testing.T) {
 					},
 				},
 				Strategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
-					Partitions: map[string]*int32{
-						"notExist": &val1,
+					ManualUpdate: &appsv1alpha1.ManualUpdate{
+						Partitions: map[string]int32{
+							"notExist": 1,
+						},
 					},
 				},
 				Topology: appsv1alpha1.Topology{

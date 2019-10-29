@@ -235,6 +235,20 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.ManualUpdate": {
+      "description": "ManualUpdate is a update strategy which allow users to provide the partition of each subset.",
+      "type": "object",
+      "properties": {
+        "partitions": {
+          "description": "Indicates number of subset partition.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    },
     "kruise.apps.v1alpha1.RollingUpdateSidecarSet": {
       "description": "RollingUpdateSidecarSet is used to communicate parameter",
       "type": "object",
@@ -806,13 +820,13 @@
       "description": "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
       "type": "object",
       "properties": {
-        "partitions": {
-          "description": "Indicates the partition of each subset.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "integer",
-            "format": "int32"
-          }
+        "Type": {
+          "description": "Type of UnitedDeployment update. Default is Manual.",
+          "type": "string"
+        },
+        "manualUpdate": {
+          "description": "Indicate the partition of each subset.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.ManualUpdate"
         }
       }
     },

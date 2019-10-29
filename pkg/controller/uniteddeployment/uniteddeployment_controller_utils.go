@@ -86,11 +86,17 @@ func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subs
 	}
 }
 
-func getSubsetNameFrom(objMeta *metav1.ObjectMeta) (string, error) {
-	if name, exist := objMeta.Labels[appsv1alpha1.SubSetNameLabelKey]; exist {
-		return name, nil
+func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
+	name, exist := metaObj.GetLabels()[appsv1alpha1.SubSetNameLabelKey]
+	if !exist {
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: no label %s found", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
 	}
-	return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: no label %s found", objMeta.Namespace, objMeta.Name, appsv1alpha1.SubSetNameLabelKey)
+
+	if len(name) == 0 {
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: label %s has an empty value", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
+	}
+
+	return name, nil
 }
 
 func getRevision(objMeta *metav1.ObjectMeta) string {

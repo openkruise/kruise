@@ -165,6 +165,14 @@ func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
 
+	if len(obj.Spec.Strategy.Type) == 0 {
+		obj.Spec.Strategy.Type = ManualUpdateStrategyType
+	}
+
+	if obj.Spec.Strategy.Type == ManualUpdateStrategyType && obj.Spec.Strategy.ManualUpdate == nil {
+		obj.Spec.Strategy.ManualUpdate = &ManualUpdate{}
+	}
+
 	if obj.Spec.Template.StatefulSetTemplate != nil {
 		utils.SetDefaultPodTemplate(&obj.Spec.Template.StatefulSetTemplate.Spec.Template.Spec)
 		for i := range obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates {

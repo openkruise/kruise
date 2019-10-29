@@ -37,6 +37,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateContainerStatus":     schema_pkg_apis_apps_v1alpha1_InPlaceUpdateContainerStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateState":               schema_pkg_apis_apps_v1alpha1_InPlaceUpdateState(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.JobCondition":                     schema_pkg_apis_apps_v1alpha1_JobCondition(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate":                     schema_pkg_apis_apps_v1alpha1_ManualUpdate(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateSidecarSet":          schema_pkg_apis_apps_v1alpha1_RollingUpdateSidecarSet(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateStatefulSetStrategy": schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarContainer":                 schema_pkg_apis_apps_v1alpha1_SidecarContainer(ref),
@@ -459,6 +460,34 @@ func schema_pkg_apis_apps_v1alpha1_JobCondition(ref common.ReferenceCallback) co
 		},
 		Dependencies: []string{
 			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ManualUpdate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ManualUpdate is a update strategy which allow users to provide the partition of each subset.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"partitions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicates number of subset partition.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"integer"},
+										Format: "int32",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -1453,24 +1482,24 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref common.Ref
 				Description: "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"partitions": {
+					"Type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates the partition of each subset.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"integer"},
-										Format: "int32",
-									},
-								},
-							},
+							Description: "Type of UnitedDeployment update. Default is Manual.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"manualUpdate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicate the partition of each subset.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate"),
 						},
 					},
 				},
 			},
 		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate"},
 	}
 }
 
