@@ -30,7 +30,7 @@ type nameToReplicas struct {
 	Name       string
 	SubsetName string
 	Replicas   int32
-	Limited    bool
+	Specified  bool
 }
 
 type subsetInfos []*nameToReplicas
@@ -146,13 +146,13 @@ func (s *replicasAllocator) AllocateReplicas(replicas int32, subsetReplicasLimit
 		if limit, exist := subsetReplicasLimits[subset.SubsetName]; exist {
 			specifiedReplicas += limit
 			subset.Replicas = limit
-			subset.Limited = true
+			subset.Specified = true
 		}
 	}
 
 	index := s.subsets.Len() - 1
 	for i := index; i >= 0; i-- {
-		if s.subsets.Get(i).Limited {
+		if s.subsets.Get(i).Specified {
 			(*s.subsets)[i], (*s.subsets)[index] = (*s.subsets)[index], (*s.subsets)[i]
 			index--
 		}
