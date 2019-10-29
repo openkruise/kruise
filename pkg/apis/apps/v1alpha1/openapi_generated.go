@@ -390,7 +390,8 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetInPlaceUpdateStrategy(ref common.Refe
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "CloneSetInPlaceUpdateStrategy is strategy type for pods update.",
+				Type:        []string{"object"},
 			},
 		},
 	}
@@ -447,7 +448,8 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetScaleStrategy(ref common.ReferenceCal
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "CloneSetScaleStrategy defines strategies for pods scale.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"podsToDelete": {
 						SchemaProps: spec.SchemaProps{
@@ -618,7 +620,8 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdatePriorityTerm(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "CloneSetUpdatePriorityTerm is priority term for pods update.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"weight": {
 						SchemaProps: spec.SchemaProps{
@@ -646,7 +649,8 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "CloneSetUpdateStrategy defines strategies for pods update.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{

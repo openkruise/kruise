@@ -57,12 +57,14 @@ type CloneSetSpec struct {
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
 }
 
+// CloneSetScaleStrategy defines strategies for pods scale.
 type CloneSetScaleStrategy struct {
 	// PodsToDelete is the names of Pod should be deleted.
 	// Note that this list will be truncated for non-existing pod names.
 	PodsToDelete []string `json:"podsToDelete,omitempty"`
 }
 
+// CloneSetUpdateStrategy defines strategies for pods update.
 type CloneSetUpdateStrategy struct {
 	// Type indicates the type of the CloneSetUpdateStrategy.
 	// Default is ReCreate.
@@ -86,6 +88,7 @@ type CloneSetUpdateStrategy struct {
 	InPlaceUpdateStrategy *CloneSetInPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
 }
 
+// CloneSetUpdateStrategyType defines strategies for pods in-place update.
 type CloneSetUpdateStrategyType string
 
 const (
@@ -102,9 +105,11 @@ const (
 	InPlaceOnlyCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "InPlaceOnly"
 )
 
+// CloneSetInPlaceUpdateStrategy is strategy type for pods update.
 type CloneSetInPlaceUpdateStrategy struct {
 }
 
+// CloneSetUpdatePriorityTerm is priority term for pods update.
 type CloneSetUpdatePriorityTerm struct {
 	// Weight associated with matching the corresponding matchExpressions, in the range 1-100.
 	Weight int32 `json:"weight"`
@@ -144,6 +149,7 @@ type CloneSetStatus struct {
 	Conditions []CloneSetCondition `json:"conditions,omitempty"`
 }
 
+// CloneSetConditionType is type for CloneSet conditions.
 type CloneSetConditionType string
 
 // CloneSetCondition describes the state of a CloneSet at a certain point.
