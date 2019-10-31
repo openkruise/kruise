@@ -448,7 +448,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetScaleStrategy(ref common.ReferenceCal
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CloneSetScaleStrategy defines the strategies for scale.",
+				Description: "CloneSetScaleStrategy defines strategies for pods scale.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"podsToDelete": {
@@ -649,7 +649,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CloneSetUpdateStrategy defines the strategies for update.",
+				Description: "CloneSetUpdateStrategy defines strategies for pods update.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"type": {

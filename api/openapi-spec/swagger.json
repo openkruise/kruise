@@ -215,7 +215,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetScaleStrategy": {
-      "description": "CloneSetScaleStrategy defines the strategies for scale.",
+      "description": "CloneSetScaleStrategy defines strategies for pods scale.",
       "type": "object",
       "properties": {
         "podsToDelete": {
@@ -344,7 +344,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetUpdateStrategy": {
-      "description": "CloneSetUpdateStrategy defines the strategies for update.",
+      "description": "CloneSetUpdateStrategy defines strategies for pods update.",
       "type": "object",
       "properties": {
         "inPlaceUpdateStrategy": {

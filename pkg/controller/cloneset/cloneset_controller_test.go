@@ -39,7 +39,14 @@ const timeout = time.Second * 5
 
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	instance := &appsv1alpha1.CloneSet{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	var replicas int32 = 1
+	instance := &appsv1alpha1.CloneSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{},
+		},
+	}
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
