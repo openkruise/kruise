@@ -185,7 +185,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetInPlaceUpdateStrategy": {
-      "description": "CloneSetInPlaceUpdateStrategy is strategy type for pods update.",
+      "description": "CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.",
       "type": "object"
     },
     "kruise.apps.v1alpha1.CloneSetList": {
@@ -325,7 +325,7 @@
       }
     },
     "kruise.apps.v1alpha1.CloneSetUpdatePriorityTerm": {
-      "description": "CloneSetUpdatePriorityTerm is priority term for pods update.",
+      "description": "CloneSetUpdatePriorityTerm defines priority term for pods update.",
       "type": "object",
       "required": [
         "weight",

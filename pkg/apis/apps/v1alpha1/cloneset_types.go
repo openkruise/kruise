@@ -105,11 +105,11 @@ const (
 	InPlaceOnlyCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "InPlaceOnly"
 )
 
-// CloneSetInPlaceUpdateStrategy is strategy type for pods update.
+// CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.
 type CloneSetInPlaceUpdateStrategy struct {
 }
 
-// CloneSetUpdatePriorityTerm is priority term for pods update.
+// CloneSetUpdatePriorityTerm defines priority term for pods update.
 type CloneSetUpdatePriorityTerm struct {
 	// Weight associated with matching the corresponding matchExpressions, in the range 1-100.
 	Weight int32 `json:"weight"`

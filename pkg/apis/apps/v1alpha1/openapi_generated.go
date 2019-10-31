@@ -390,7 +390,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetInPlaceUpdateStrategy(ref common.Refe
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CloneSetInPlaceUpdateStrategy is strategy type for pods update.",
+				Description: "CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.",
 				Type:        []string{"object"},
 			},
 		},
@@ -620,7 +620,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdatePriorityTerm(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CloneSetUpdatePriorityTerm is priority term for pods update.",
+				Description: "CloneSetUpdatePriorityTerm defines priority term for pods update.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"weight": {
