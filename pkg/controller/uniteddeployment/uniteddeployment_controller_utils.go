@@ -32,14 +32,6 @@ import (
 
 const updateRetries = 5
 
-func getSubsetName(obj *metav1.ObjectMeta) string {
-	if name, exist := obj.Labels[appsv1alpha1.SubSetNameLabelKey]; exist {
-		return name
-	}
-
-	return ""
-}
-
 // ParseSubsetReplicas parses the subsetReplicas, and returns the replicas number depending on the sum replicas.
 func ParseSubsetReplicas(udReplicas int32, subsetReplicas intstr.IntOrString) (int32, error) {
 	if subsetReplicas.Type == intstr.Int {
@@ -71,11 +63,10 @@ func round(x float64) int {
 	return int(math.Floor(x + 0.5))
 }
 
-func getPodsPrefix(controllerName string) string {
-	// use the dash (if the name isn't too long) to make the pod name a bit prettier
-	prefix := fmt.Sprintf("%s-", controllerName)
+func getSubsetPrefix(controllerName, subsetName string) string {
+	prefix := fmt.Sprintf("%s-%s-", controllerName, subsetName)
 	if len(validation.NameIsDNSSubdomain(prefix, true)) != 0 {
-		prefix = controllerName
+		prefix = fmt.Sprintf("%s-", controllerName)
 	}
 	return prefix
 }

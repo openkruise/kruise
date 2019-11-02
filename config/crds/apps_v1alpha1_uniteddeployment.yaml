@@ -109,7 +109,8 @@ spec:
                     properties:
                       name:
                         description: Indicates the name of this subset, which will
-                          be used to generate subset workload name in the format '<deployment-name>-<subset-name>'.
+                          be used to generate subset workload name prefix in the format
+                          '<deployment-name>-<subset-name>-'.
                         type: string
                       nodeSelector:
                         description: Indicates the node select strategy to form the

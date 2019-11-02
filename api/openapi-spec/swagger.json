@@ -606,7 +606,7 @@
       ],
       "properties": {
         "name": {
-          "description": "Indicates the name of this subset, which will be used to generate subset workload name in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e'.",
+          "description": "Indicates the name of this subset, which will be used to generate subset workload name prefix in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e-'.",
           "type": "string"
         },
         "nodeSelector": {

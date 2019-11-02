@@ -1107,7 +1107,7 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates the name of this subset, which will be used to generate subset workload name in the format '<deployment-name>-<subset-name>'.",
+							Description: "Indicates the name of this subset, which will be used to generate subset workload name prefix in the format '<deployment-name>-<subset-name>-'.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

@@ -27,7 +27,6 @@ import (
 )
 
 type nameToReplicas struct {
-	Name       string
 	SubsetName string
 	Replicas   int32
 	Specified  bool
@@ -52,36 +51,32 @@ func (n subsetInfos) Less(i, j int) bool {
 }
 
 func (n subsetInfos) Swap(i, j int) {
-	var tmp *nameToReplicas
-	tmp = n[i]
-	n[i] = n[j]
-	n[j] = tmp
+	n[i], n[j] = n[j], n[i]
 }
 
 // GetAllocatedReplicas returns a mapping from subset to next replicas.
 // Next replicas is allocated by replicasAllocator, which will consider the current replicas of each subset and
 // new replicas indicated from UnitedDeployment.Spec.Topology.Subsets.
-func GetAllocatedReplicas(nameToSubset map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) map[string]int32 {
-	effectiveSubsets := getEffectiveSubsets(ud, nameToSubset)
-	replicaLimits, replicasAllocator := getReplicasAllocator(effectiveSubsets, ud)
-	replicasAllocator.AllocateReplicas(*ud.Spec.Replicas, replicaLimits)
+func GetAllocatedReplicas(nameToSubset map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) (map[string]int32, bool) {
+	subsetInfos := getSubsetInfos(nameToSubset, ud)
+	specifiedReplicas := getSpecifiedSubsetReplicas(ud)
 
-	return replicasAllocator.AllocatedReplicas
+	// call SortToAllocator to sort all subset by subset.Replicas in order of increment
+	return subsetInfos.SortToAllocator().AllocateReplicas(*ud.Spec.Replicas, specifiedReplicas)
 }
 
 func (n subsetInfos) SortToAllocator() *replicasAllocator {
 	sort.Sort(n)
-	return &replicasAllocator{&n, map[string]int32{}}
+	return &replicasAllocator{subsets: &n}
 }
 
 type replicasAllocator struct {
-	subsets           *subsetInfos
-	AllocatedReplicas map[string]int32
+	subsets *subsetInfos
 }
 
-func (s *replicasAllocator) effectiveReplicasLimitation(replicas int32, subsetReplicasLimits map[string]int32) bool {
+func (s *replicasAllocator) effectiveReplicas(replicas int32, subsetReplicasLimits map[string]int32) bool {
 	if subsetReplicasLimits == nil {
-		return false
+		return true
 	}
 
 	var specifiedReplicas int32
@@ -91,59 +86,73 @@ func (s *replicasAllocator) effectiveReplicasLimitation(replicas int32, subsetRe
 
 	if specifiedReplicas > replicas {
 		return false
-	}
-
-	limitedCount := 0
-	for _, subset := range *s.subsets {
-		if _, exist := subsetReplicasLimits[subset.SubsetName]; exist {
-			limitedCount++
+	} else if specifiedReplicas < replicas {
+		specifiedCount := 0
+		for _, subset := range *s.subsets {
+			if _, exist := subsetReplicasLimits[subset.SubsetName]; exist {
+				specifiedCount++
+			}
 		}
-	}
 
-	if limitedCount != len(subsetReplicasLimits) {
-		return false
+		if specifiedCount == len(*s.subsets) {
+			return false
+		}
 	}
 
 	return true
 }
 
-func getReplicasAllocator(nameToSubset map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) (map[string]int32, *replicasAllocator) {
-	nameToSubsetDef := map[string]*appsv1alpha1.Subset{}
-	for i := range ud.Spec.Topology.Subsets {
-		nameToSubsetDef[ud.Spec.Topology.Subsets[i].Name] = &ud.Spec.Topology.Subsets[i]
+func getSpecifiedSubsetReplicas(ud *appsv1alpha1.UnitedDeployment) map[string]int32 {
+	replicaLimits := map[string]int32{}
+	if ud.Spec.Topology.Subsets == nil {
+		return replicaLimits
 	}
 
-	ntr := make([]*nameToReplicas, len(nameToSubset))
-	replicaLimits := map[string]int32{}
-
-	idx := 0
-	for name, subset := range nameToSubset {
-		subsetDef, exist := nameToSubsetDef[name]
-		if exist && subsetDef.Replicas != nil {
-			if unitLimit, err := ParseSubsetReplicas(*ud.Spec.Replicas, *subsetDef.Replicas); err == nil {
-				replicaLimits[name] = unitLimit
-			} else {
-				klog.Warningf("Fail to consider the replicas of subset %s/%s when parsing replicaLimits during managing replicas of UnitedDeployment %s/%s: %s",
-					subset.Namespace, subset.Name, ud.Namespace, ud.Name, err)
-			}
+	for _, subsetDef := range ud.Spec.Topology.Subsets {
+		if subsetDef.Replicas == nil {
+			continue
 		}
 
-		ntr[idx] = &nameToReplicas{Name: subset.Name, SubsetName: name, Replicas: subset.Spec.Replicas}
-		idx++
+		if specifiedReplicas, err := ParseSubsetReplicas(*ud.Spec.Replicas, *subsetDef.Replicas); err == nil {
+			replicaLimits[subsetDef.Name] = specifiedReplicas
+		} else {
+			klog.Warningf("Fail to consider the replicas of subset %s when parsing replicaLimits during managing replicas of UnitedDeployment %s/%s: %s",
+				subsetDef.Name, ud.Namespace, ud.Name, err)
+		}
 	}
-	replicasAllocator := subsetInfos(ntr).SortToAllocator()
-	return replicaLimits, replicasAllocator
+
+	return replicaLimits
 }
 
-func (s *replicasAllocator) AllocateReplicas(replicas int32, subsetReplicasLimits map[string]int32) {
-	if !s.effectiveReplicasLimitation(replicas, subsetReplicasLimits) {
-		s.normalAllocate(replicas, 0, s.subsets.Len())
-		return
+func getSubsetInfos(nameToSubset map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) *subsetInfos {
+	infos := make(subsetInfos, len(ud.Spec.Topology.Subsets))
+	for idx, subsetDef := range ud.Spec.Topology.Subsets {
+		var replicas int32
+		if subset, exist := nameToSubset[subsetDef.Name]; exist {
+			replicas = subset.Spec.Replicas
+		}
+		infos[idx] = &nameToReplicas{SubsetName: subsetDef.Name, Replicas: replicas}
 	}
 
+	return &infos
+}
+
+// AllocateReplicas will first try to check the specifiedSubsetReplicas is effective or not.
+// If effective, it will apply these specified replicas, then average the rest replicas to left subsets.
+// If not, it will incrementally allocate all of the replicas. The current replicas spread situation will be considered,
+// in order to make the scaling smoothly
+func (s *replicasAllocator) AllocateReplicas(replicas int32, specifiedSubsetReplicas map[string]int32) (map[string]int32, bool) {
+	if !s.effectiveReplicas(replicas, specifiedSubsetReplicas) {
+		return s.incrementalAllocate(replicas), false
+	}
+
+	return s.normalAllocate(replicas, specifiedSubsetReplicas), true
+}
+
+func (s *replicasAllocator) normalAllocate(expectedReplicas int32, specifiedSubsetReplicas map[string]int32) map[string]int32 {
 	var specifiedReplicas int32
 	for _, subset := range *s.subsets {
-		if limit, exist := subsetReplicasLimits[subset.SubsetName]; exist {
+		if limit, exist := specifiedSubsetReplicas[subset.SubsetName]; exist {
 			specifiedReplicas += limit
 			subset.Replicas = limit
 			subset.Specified = true
@@ -158,34 +167,60 @@ func (s *replicasAllocator) AllocateReplicas(replicas int32, subsetReplicasLimit
 		}
 	}
 
-	// apply the replicas to the left subsets
-	s.normalAllocate(replicas, specifiedReplicas, index+1)
-	return
-}
+	consideredLen := index + 1
+	if consideredLen != 0 {
+		allocatableReplicas := expectedReplicas - specifiedReplicas
+		average := int(allocatableReplicas) / consideredLen
+		remainder := int(allocatableReplicas) % consideredLen
 
-func (s *replicasAllocator) normalAllocate(replicas, excludedReplicas int32, consideredLen int) {
-	var replicasAfterLimit int32
-	for _, nts := range *s.subsets {
-		replicasAfterLimit += nts.Replicas
+		for i := consideredLen - 1; i >= 0; i-- {
+			if remainder > 0 {
+				(*s.subsets)[i].Replicas = int32(average + 1)
+			} else {
+				(*s.subsets)[i].Replicas = int32(average)
+			}
+			remainder--
+		}
 	}
 
-	diff := replicas - replicasAfterLimit
-	replicas -= excludedReplicas
+	allocatedReplicas := map[string]int32{}
+	for _, subset := range *s.subsets {
+		allocatedReplicas[subset.SubsetName] = subset.Replicas
+	}
+
+	return allocatedReplicas
+}
+
+func (s *replicasAllocator) incrementalAllocate(expectedReplicas int32) map[string]int32 {
+	var currentReplicas int32
+	for _, nts := range *s.subsets {
+		currentReplicas += nts.Replicas
+	}
+
+	consideredLen := len(*s.subsets)
+	diff := expectedReplicas - currentReplicas
+
+	var average int32
+	var reminder int32
+	var i int
+	var leftSubsetsCount int32
 	if diff > 0 {
-		var average int32
-		var reminder int32
-		var i int
-		var leftSubsets int32
+		// UnitedDeployment is supposed to scale out replicas.
+		// The policy here is try to allocate the new replicas as average as possible.
+		// But this policy is also try not to affect the subset which has the replicas more than the average.
+		// So it starts from the biggest index subset, which has the most replicas.
 		for i = consideredLen - 1; i >= 0; i-- {
-			leftSubsets = int32(i) + 1
-			average = replicas / leftSubsets
-			max := average
-			reminder = replicas % leftSubsets
+			// Consider the subsets from index 0 to i
+			leftSubsetsCount = int32(i) + 1
+			average = expectedReplicas / leftSubsetsCount
+			consideredAverage := average
+			reminder = expectedReplicas % leftSubsetsCount
 			if reminder > 0 {
-				max++
+				consideredAverage++
 			}
-			if max < s.subsets.Get(i).Replicas {
-				replicas -= s.subsets.Get(i).Replicas
+			// If the i th subset, which currently have the most replicas, has more replicas than the average, give up this try.
+			if consideredAverage < s.subsets.Get(i).Replicas {
+				expectedReplicas -= s.subsets.Get(i).Replicas
 				continue
 			}
 			break
@@ -201,56 +236,44 @@ func (s *replicasAllocator) normalAllocate(replicas, excludedReplicas int32, con
 		}
 
 	} else if diff < 0 {
-		var average int32
-		var reminder int32
-		var i int
-		var leftSubsets int32
+		// Right now, UnitedDeployment is scaling in.
+		// It is also considering to allocate the replicas as average as possible. But this time, it is scaling in,
+		// so the subsets which have the less replicas than the average replicas are not supposed to be bothered.
 		for i = 0; i < consideredLen; i++ {
-			leftSubsets = int32(consideredLen - i)
-			average = replicas / leftSubsets
-			reminder = replicas % leftSubsets
+			leftSubsetsCount = int32(consideredLen - i)
+			average = expectedReplicas / leftSubsetsCount
+			reminder = expectedReplicas % leftSubsetsCount
 			if average > s.subsets.Get(i).Replicas {
-				replicas -= s.subsets.Get(i).Replicas
+				expectedReplicas -= s.subsets.Get(i).Replicas
 				continue
 			}
 			break
 		}
 
 		for j := i; j < consideredLen; j++ {
-			if leftSubsets <= reminder {
+			if leftSubsetsCount <= reminder {
 				s.subsets.Get(j).Replicas = average + 1
 			} else {
 				s.subsets.Get(j).Replicas = average
-				leftSubsets--
+				leftSubsetsCount--
 			}
 		}
 	}
 
+	allocatedReplicas := map[string]int32{}
 	for _, subset := range *s.subsets {
-		s.AllocatedReplicas[subset.SubsetName] = subset.Replicas
+		allocatedReplicas[subset.SubsetName] = subset.Replicas
 	}
+
+	return allocatedReplicas
 }
 
 func (s *replicasAllocator) String() string {
 	result := ""
 	sort.Sort(s.subsets)
 	for _, subset := range *s.subsets {
-		result = fmt.Sprintf("%s %s -> %d;", result, subset.Name, subset.Replicas)
+		result = fmt.Sprintf("%s %s -> %d;", result, subset.SubsetName, subset.Replicas)
 	}
 
 	return result
-}
-
-func getEffectiveSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*Subset) (effectiveSubsets map[string]*Subset) {
-	effectiveSubsets = map[string]*Subset{}
-
-	for _, subsetDef := range ud.Spec.Topology.Subsets {
-		if ss, exist := nameToSubset[subsetDef.Name]; exist {
-			effectiveSubsets[subsetDef.Name] = ss
-		} else {
-			effectiveSubsets[subsetDef.Name] = &Subset{}
-		}
-	}
-
-	return effectiveSubsets
 }

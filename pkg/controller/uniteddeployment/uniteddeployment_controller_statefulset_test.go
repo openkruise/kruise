@@ -86,7 +86,7 @@ func TestStsReconcile(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "containerA",
+										Name:  "container-a",
 										Image: "nginx:1.0",
 									},
 								},
@@ -98,7 +98,7 @@ func TestStsReconcile(t *testing.T) {
 			Topology: appsv1alpha1.Topology{
 				Subsets: []appsv1alpha1.Subset{
 					{
-						Name: "subsetA",
+						Name: "subset-a",
 						NodeSelector: corev1.NodeSelector{
 							NodeSelectorTerms: []corev1.NodeSelectorTerm{
 								{
@@ -106,7 +106,7 @@ func TestStsReconcile(t *testing.T) {
 										{
 											Key:      "node-name",
 											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
+											Values:   []string{"node-a"},
 										},
 									},
 								},
@@ -170,7 +170,7 @@ func TestStsSubsetProvision(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "containerA",
+										Name:  "container-a",
 										Image: "nginx:1.0",
 									},
 								},
@@ -182,7 +182,7 @@ func TestStsSubsetProvision(t *testing.T) {
 			Topology: appsv1alpha1.Topology{
 				Subsets: []appsv1alpha1.Subset{
 					{
-						Name: "subsetA",
+						Name: "subset-a",
 						NodeSelector: corev1.NodeSelector{
 							NodeSelectorTerms: []corev1.NodeSelectorTerm{
 								{
@@ -190,7 +190,7 @@ func TestStsSubsetProvision(t *testing.T) {
 										{
 											Key:      "node-name",
 											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
+											Values:   []string{"node-a"},
 										},
 									},
 								},
@@ -223,11 +223,11 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(gomega.BeEquivalentTo("node-name"))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("nodeA"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("node-a"))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
-		Name: "subsetB",
+		Name: "subset-b",
 		NodeSelector: corev1.NodeSelector{
 			NodeSelectorTerms: []corev1.NodeSelectorTerm{
 				{
@@ -235,7 +235,7 @@ func TestStsSubsetProvision(t *testing.T) {
 						{
 							Key:      "node-name",
 							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"nodeB"},
+							Values:   []string{"node-b"},
 						},
 					},
 				},
@@ -246,23 +246,23 @@ func TestStsSubsetProvision(t *testing.T) {
 	waitReconcilerProcessFinished(g, requests, 2)
 
 	stsList = expectedStsCount(g, 2)
-	sts = getSubsetByName(stsList, "subsetA")
+	sts = getSubsetByName(stsList, "subset-a")
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(gomega.BeEquivalentTo("node-name"))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("nodeA"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("node-a"))
 
-	sts = getSubsetByName(stsList, "subsetB")
+	sts = getSubsetByName(stsList, "subset-b")
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(gomega.BeEquivalentTo("node-name"))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("nodeB"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("node-b"))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	instance.Spec.Topology.Subsets = instance.Spec.Topology.Subsets[1:]
@@ -277,7 +277,7 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(gomega.BeEquivalentTo("node-name"))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("nodeB"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("node-b"))
 }
 
 func TestStsDupSubset(t *testing.T) {
@@ -317,7 +317,7 @@ func TestStsDupSubset(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "containerA",
+										Name:  "container-a",
 										Image: "nginx:1.0",
 									},
 								},
@@ -329,7 +329,7 @@ func TestStsDupSubset(t *testing.T) {
 			Topology: appsv1alpha1.Topology{
 				Subsets: []appsv1alpha1.Subset{
 					{
-						Name: "subsetA",
+						Name: "subset-a",
 						NodeSelector: corev1.NodeSelector{
 							NodeSelectorTerms: []corev1.NodeSelectorTerm{
 								{
@@ -337,7 +337,7 @@ func TestStsDupSubset(t *testing.T) {
 										{
 											Key:      "node-name",
 											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
+											Values:   []string{"node-a"},
 										},
 									},
 								},

@@ -39,10 +39,11 @@ import (
 const (
 	controllerName = "uniteddeployment-controller"
 
-	eventTypeRevisionProvision = "RevisionProvision"
-	eventTypeFindSubsets       = "FindSubsets"
-	eventTypeDupSubsetsDelete  = "DeleteDuplicatedSubsets"
-	eventTypeSubsetsUpdate     = "UpdateSubset"
+	eventTypeRevisionProvision      = "RevisionProvision"
+	eventTypeFindSubsets            = "FindSubsets"
+	eventTypeDupSubsetsDelete       = "DeleteDuplicatedSubsets"
+	eventTypeSubsetsUpdate          = "UpdateSubset"
+	eventTypeSpecifySubbsetReplicas = "SpecifySubsetReplicas"
 
 	slowStartInitialBatchSize = 1
 )
@@ -146,8 +147,11 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
-	nextReplicas := GetAllocatedReplicas(nameToSubset, instance)
+	nextReplicas, effectiveSpecifiedReplicas := GetAllocatedReplicas(nameToSubset, instance)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next replicas %v", instance.Namespace, instance.Name, nextReplicas)
+	if !effectiveSpecifiedReplicas {
+		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective")
+	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)

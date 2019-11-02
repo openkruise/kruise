@@ -102,7 +102,7 @@ type Topology struct {
 // Subset defines the detail of a subset.
 type Subset struct {
 	// Indicates the name of this subset, which will be used to generate
-	// subset workload name in the format '<deployment-name>-<subset-name>'.
+	// subset workload name prefix in the format '<deployment-name>-<subset-name>-'.
 	Name string `json:"name"`
 
 	// Indicates the node select strategy to form the subset.
