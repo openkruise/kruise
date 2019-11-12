@@ -30,7 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*Subset, nextReplicas, nextPartitions map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (updateErr error) {
+func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartitions *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (updateErr error) {
 	_, err := r.manageSubsetProvision(ud, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		return fmt.Errorf("fail to manage Subset provision: %s", err)
@@ -39,7 +39,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	return
 }
 
-func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset map[string]*Subset, nextReplicas, nextPartitions map[string]int32, currentRevision, updateRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, error) {
+func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartitions *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, error) {
 	expectedSubsets := sets.String{}
 	gotSubsets := sets.String{}
 
@@ -47,7 +47,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		expectedSubsets.Insert(subset.Name)
 	}
 
-	for subsetName := range nameToSubset {
+	for subsetName := range *nameToSubset {
 		gotSubsets.Insert(subsetName)
 	}
 	klog.V(4).Infof("UnitedDeployment %s/%s has subsets %v, expects subsets %v", ud.Namespace, ud.Name, gotSubsets.List(), expectedSubsets.List())
@@ -75,24 +75,23 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 	if len(creates) > 0 {
 		// do not consider deletion
 		klog.V(0).Infof("UnitedDeployment %s/%s needs creating subset (%s) with name: %v", ud.Namespace, ud.Name, subsetType, creates)
-		creatdChan := make(chan string, len(creates))
-		defer close(creatdChan)
-		for _, subset := range creates {
-			creatdChan <- subset
+		createdSubsets := make([]string, len(creates))
+		for i, subset := range creates {
+			createdSubsets[i] = subset
 		}
 
 		revision := currentRevision.Name
-		if updateRevision != nil {
-			revision = updateRevision.Name
+		if updatedRevision != nil {
+			revision = updatedRevision.Name
 		}
 
 		var createdNum int
 		var createdErr error
-		createdNum, createdErr = util.SlowStartBatch(len(creates), slowStartInitialBatchSize, func() error {
-			subsetName := <-creatdChan
+		createdNum, createdErr = util.SlowStartBatch(len(creates), slowStartInitialBatchSize, func(idx int) error {
+			subsetName := createdSubsets[idx]
 
-			replicas := nextReplicas[subsetName]
-			partition := nextPartitions[subsetName]
+			replicas := (*nextReplicas)[subsetName]
+			partition := (*nextPartitions)[subsetName]
 			err := r.subSetControls[subsetType].CreateSubset(ud, subsetName, revision, replicas, partition)
 			if err != nil {
 				if !errors.IsTimeout(err) {
@@ -114,7 +113,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		klog.V(0).Infof("UnitedDeployment %s/%s needs deleting subset (%s) with name: [%v]", ud.Namespace, ud.Name, subsetType, deletes)
 		var deleteErrs []error
 		for _, subsetName := range deletes {
-			subset := nameToSubset[subsetName]
+			subset := (*nameToSubset)[subsetName]
 			if err := r.subSetControls[subsetType].DeleteSubset(subset); err != nil {
 				deleteErrs = append(deleteErrs, fmt.Errorf("fail to delete Subset (%s) %s/%s for %s: %s", subsetType, subset.Namespace, subset.Name, subsetName, err))
 			}

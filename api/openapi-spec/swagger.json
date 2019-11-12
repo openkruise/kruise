@@ -738,10 +738,6 @@
           "description": "Selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
         },
-        "strategy": {
-          "description": "Strategy indicates the action of updating",
-          "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy"
-        },
         "template": {
           "description": "Template is the object that describes the subset that will be created.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.SubsetTemplate"
@@ -749,6 +745,10 @@
         "topology": {
           "description": "Contains the information of subset topology.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.Topology"
+        },
+        "updateStrategy": {
+          "description": "Strategy indicates the action of updating",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy"
         }
       }
     },
@@ -820,13 +820,13 @@
       "description": "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
       "type": "object",
       "properties": {
-        "Type": {
-          "description": "Type of UnitedDeployment update. Default is Manual.",
-          "type": "string"
-        },
         "manualUpdate": {
           "description": "Indicate the partition of each subset.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.ManualUpdate"
+        },
+        "type": {
+          "description": "Type of UnitedDeployment update. Default is Manual.",
+          "type": "string"
         }
       }
     },

@@ -28,7 +28,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t3", 2),
 		createSubset("t4", 2))
 	allocator := infos.SortToAllocator()
-	allocator.AllocateReplicas(5, map[string]int32{})
+	allocator.AllocateReplicas(5, &map[string]int32{})
 	if " t1 -> 1; t3 -> 1; t4 -> 1; t2 -> 2;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -38,7 +38,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t1", 2))
 	infos = subsetInfos(infos)
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(0, map[string]int32{})
+	allocator.AllocateReplicas(0, &map[string]int32{})
 	if " t1 -> 0;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -50,7 +50,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t3", 2),
 		createSubset("t4", 2))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(17, map[string]int32{})
+	allocator.AllocateReplicas(17, &map[string]int32{})
 	if " t1 -> 4; t3 -> 4; t4 -> 4; t2 -> 5;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -63,7 +63,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t4", 2))
 	infos = subsetInfos(infos)
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(9, map[string]int32{})
+	allocator.AllocateReplicas(9, &map[string]int32{})
 	if " t1 -> 2; t3 -> 2; t4 -> 2; t2 -> 3;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -73,7 +73,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t1", 0),
 		createSubset("t2", 10))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(19, map[string]int32{})
+	allocator.AllocateReplicas(19, &map[string]int32{})
 	if " t1 -> 9; t2 -> 10;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -83,7 +83,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t1", 0),
 		createSubset("t2", 10))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(21, map[string]int32{})
+	allocator.AllocateReplicas(21, &map[string]int32{})
 	if " t1 -> 10; t2 -> 11;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -97,7 +97,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t3", 2),
 		createSubset("t4", 2))
 	allocator := infos.SortToAllocator()
-	allocator.AllocateReplicas(27, map[string]int32{
+	allocator.AllocateReplicas(27, &map[string]int32{
 		"t1": 4,
 		"t3": 4,
 	})
@@ -112,7 +112,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t3", 2),
 		createSubset("t4", 2))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(8, map[string]int32{
+	allocator.AllocateReplicas(8, &map[string]int32{
 		"t1": 4,
 		"t3": 4,
 	})
@@ -127,7 +127,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t3", 2),
 		createSubset("t4", 2))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(16, map[string]int32{
+	allocator.AllocateReplicas(16, &map[string]int32{
 		"t1": 4,
 		"t2": 4,
 		"t3": 4,
@@ -144,7 +144,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t3", 2),
 		createSubset("t4", 2))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(10, map[string]int32{
+	allocator.AllocateReplicas(10, &map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -160,7 +160,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t3", 2),
 		createSubset("t4", 2))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(10, map[string]int32{
+	allocator.AllocateReplicas(10, &map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -178,7 +178,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator := infos.SortToAllocator()
-	allocator.AllocateReplicas(17, map[string]int32{
+	allocator.AllocateReplicas(17, &map[string]int32{
 		"t1": 6,
 		"t2": 6,
 	})
@@ -191,7 +191,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(17, map[string]int32{
+	allocator.AllocateReplicas(17, &map[string]int32{
 		"t1": 10,
 		"t2": 11,
 	})
@@ -204,7 +204,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(14, map[string]int32{
+	allocator.AllocateReplicas(14, &map[string]int32{
 		"t1": 6,
 		"t2": 6,
 	})
@@ -217,7 +217,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(14, map[string]int32{
+	allocator.AllocateReplicas(14, &map[string]int32{
 		"t1": 10,
 		"t2": 11,
 	})
@@ -230,7 +230,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(10, map[string]int32{
+	allocator.AllocateReplicas(10, &map[string]int32{
 		"t1": 6,
 		"t2": 6,
 	})
@@ -243,7 +243,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(10, map[string]int32{
+	allocator.AllocateReplicas(10, &map[string]int32{
 		"t1": 10,
 		"t2": 11,
 	})
@@ -256,7 +256,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(4, map[string]int32{
+	allocator.AllocateReplicas(4, &map[string]int32{
 		"t1": 6,
 		"t2": 6,
 	})
@@ -269,7 +269,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(24, map[string]int32{
+	allocator.AllocateReplicas(24, &map[string]int32{
 		"t1": 27,
 	})
 	if " t1 -> 12; t2 -> 12;" != allocator.String() {

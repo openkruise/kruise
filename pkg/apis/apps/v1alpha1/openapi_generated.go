@@ -1354,7 +1354,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref common.ReferenceCall
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Topology"),
 						},
 					},
-					"strategy": {
+					"updateStrategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Strategy indicates the action of updating",
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentUpdateStrategy"),
@@ -1482,7 +1482,7 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref common.Ref
 				Description: "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"Type": {
+					"type": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Type of UnitedDeployment update. Default is Manual.",
 							Type:        []string{"string"},

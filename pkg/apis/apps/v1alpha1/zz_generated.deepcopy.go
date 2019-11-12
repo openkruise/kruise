@@ -791,7 +791,7 @@ func (in *UnitedDeploymentSpec) DeepCopyInto(out *UnitedDeploymentSpec) {
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	in.Topology.DeepCopyInto(&out.Topology)
-	in.Strategy.DeepCopyInto(&out.Strategy)
+	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
 	if in.RevisionHistoryLimit != nil {
 		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
 		*out = new(int32)

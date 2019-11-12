@@ -337,7 +337,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 						},
 					},
 				},
-				Strategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
+				UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
 					ManualUpdate: &appsv1alpha1.ManualUpdate{
 						Partitions: map[string]int32{
 							"notExist": 1,
@@ -374,7 +374,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 					field != "spec.selector" &&
 					field != "spec.topology.subset" &&
 					field != "spec.topology.subset.name" &&
-					field != "spec.strategy.partitions" {
+					field != "spec.updateStrategy.partitions" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
 			}

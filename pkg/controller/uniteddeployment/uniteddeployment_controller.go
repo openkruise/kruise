@@ -147,10 +147,10 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
-	nextReplicas, effectiveSpecifiedReplicas := GetAllocatedReplicas(nameToSubset, instance)
+	nextReplicas, effectiveSpecifiedReplicas, ineffectiveReason := GetAllocatedReplicas(nameToSubset, instance)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next replicas %v", instance.Namespace, instance.Name, nextReplicas)
 	if !effectiveSpecifiedReplicas {
-		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective")
+		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", ineffectiveReason)
 	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
@@ -165,7 +165,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface) (nameToSubset map[string]*Subset, err error) {
+func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface) (*map[string]*Subset, error) {
 	subSets, err := control.GetAllSubsets(instance)
 	if err != nil {
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
@@ -175,37 +175,33 @@ func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.Unite
 	klog.V(4).Infof("Classify UnitedDeployment %s/%s by subSet name", instance.Namespace, instance.Name)
 	nameToSubsets := r.classifySubsetBySubsetName(instance, subSets)
 
-	nameToSubset, err = r.deleteDupSubset(instance, nameToSubsets, control)
+	nameToSubset, err := r.deleteDupSubset(instance, nameToSubsets, control)
 	if err != nil {
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeDupSubsetsDelete), err.Error())
 		return nil, fmt.Errorf("fail to manage duplicate Subset of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 	}
 
-	return
+	return nameToSubset, nil
 }
 
-func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas map[string]int32) map[string]int32 {
+func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32) *map[string]int32 {
 	partitions := map[string]int32{}
 	for _, subset := range ud.Spec.Topology.Subsets {
 		var subsetPartition int32
-		if isManualUpdateStrategy(ud) && ud.Spec.Strategy.ManualUpdate != nil && ud.Spec.Strategy.ManualUpdate.Partitions != nil {
-			if partition, exist := ud.Spec.Strategy.ManualUpdate.Partitions[subset.Name]; exist {
+		if ud.Spec.UpdateStrategy.Type == appsv1alpha1.ManualUpdateStrategyType && ud.Spec.UpdateStrategy.ManualUpdate != nil && ud.Spec.UpdateStrategy.ManualUpdate.Partitions != nil {
+			if partition, exist := ud.Spec.UpdateStrategy.ManualUpdate.Partitions[subset.Name]; exist {
 				subsetPartition = partition
 			}
 		}
 
-		if subsetReplicas, exist := nextReplicas[subset.Name]; exist && subsetPartition > subsetReplicas {
+		if subsetReplicas, exist := (*nextReplicas)[subset.Name]; exist && subsetPartition > subsetReplicas {
 			subsetPartition = subsetReplicas
 		}
 
 		partitions[subset.Name] = subsetPartition
 	}
 
-	return partitions
-}
-
-func isManualUpdateStrategy(ud *appsv1alpha1.UnitedDeployment) bool {
-	return len(ud.Spec.Strategy.Type) == 0 || ud.Spec.Strategy.Type == appsv1alpha1.ManualUpdateStrategyType
+	return &partitions
 }
 
 var subsetReplicasFn = subSetReplicas
@@ -214,7 +210,7 @@ func subSetReplicas(subset *Subset) int32 {
 	return subset.Status.Replicas
 }
 
-func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (map[string]*Subset, error) {
+func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {
 	nameToSubset := map[string]*Subset{}
 	for name, subsets := range nameToSubsets {
 		if len(subsets) > 1 {
@@ -225,7 +221,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeplo
 						continue
 					}
 
-					return nameToSubset, err
+					return &nameToSubset, err
 				}
 			}
 		}
@@ -235,7 +231,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeplo
 		}
 	}
 
-	return nameToSubset, nil
+	return &nameToSubset, nil
 }
 
 func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.UnitedDeployment) (ControlInterface, subSetType) {
@@ -257,14 +253,7 @@ func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1alpha1.
 			continue
 		}
 
-		_, exist := mapping[subSetName]
-		if !exist {
-			var subsetWithName []*Subset
-			subsetWithName = append(subsetWithName, ss)
-			mapping[subSetName] = subsetWithName
-		} else {
-			mapping[subSetName] = append(mapping[subSetName], ss)
-		}
+		mapping[subSetName] = append(mapping[subSetName], ss)
 	}
 	return mapping
 }

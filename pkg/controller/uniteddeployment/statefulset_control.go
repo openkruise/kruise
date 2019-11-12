@@ -82,22 +82,11 @@ func (m *StatefulSetControl) GetAllSubsets(ud *alpha1.UnitedDeployment) (podSets
 
 // CreateSubset creates the StatefulSet depending on the inputs.
 func (m *StatefulSetControl) CreateSubset(ud *alpha1.UnitedDeployment, subsetName string, revision string, replicas, partition int32) error {
-	set, err := createStatefulSet(ud, subsetName, m.scheme, revision, replicas, partition)
-	if err != nil {
-		klog.Errorf("Fail to create StatefulSet: %s", err)
-		return err
-	}
+	set := &appsv1.StatefulSet{}
+	applyStatefulSetTemplate(ud, subsetName, revision, m.scheme, replicas, partition, set)
 
 	klog.V(4).Infof("Have %d replicas when creating StatefulSet %s/%s", *set.Spec.Replicas, set.Namespace, set.Name)
-	err = m.Create(context.TODO(), set)
-	return err
-}
-
-func createStatefulSet(ud *alpha1.UnitedDeployment, subsetName string, scheme *runtime.Scheme, revision string, replicas, partition int32) (*appsv1.StatefulSet, error) {
-	set := &appsv1.StatefulSet{}
-	set.Spec = *ud.Spec.Template.StatefulSetTemplate.Spec.DeepCopy()
-	applyStatefulSetTemplate(ud, subsetName, revision, scheme, replicas, partition, set)
-	return set, nil
+	return m.Create(context.TODO(), set)
 }
 
 func applyStatefulSetTemplate(ud *alpha1.UnitedDeployment, subsetName string, revision string, scheme *runtime.Scheme, replicas, partition int32, set *appsv1.StatefulSet) error {
@@ -124,6 +113,7 @@ func applyStatefulSetTemplate(ud *alpha1.UnitedDeployment, subsetName string, re
 		set.Labels[k] = v
 	}
 	set.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+	// record the subset name as a label
 	set.Labels[alpha1.SubSetNameLabelKey] = subsetName
 
 	if set.Annotations == nil {
@@ -160,13 +150,6 @@ func applyStatefulSetTemplate(ud *alpha1.UnitedDeployment, subsetName string, re
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 
 	return nil
-}
-
-func (m *StatefulSetControl) applyRollingUpdateStrategyPartition(set *appsv1.StatefulSet, partition int32) {
-	if set.Spec.UpdateStrategy.RollingUpdate == nil {
-		set.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
-	}
-	set.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 }
 
 // UpdateSubset is used to update the subset. The target StatefulSet can be found with the input subset.
@@ -207,24 +190,45 @@ func (m *StatefulSetControl) applyOnDeleteUpdateStrategyPartition(set *appsv1.St
 		return err
 	}
 
+	orderedPods := make([]*corev1.Pod, len(pods))
+	updatedMarks := make([]bool, len(pods))
+	updatedCount := 0
 	for _, pod := range pods {
-		ordinal := getOrdinal(pod)
-		if ordinal >= partition && getRevision(&pod.ObjectMeta) != revision {
-			if err = m.deletePod(pod); err != nil {
+		updated := false
+		if getRevision(pod) == revision {
+			updated = true
+			updatedCount++
+		}
+
+		ordinal := int(getOrdinal(pod))
+		if ordinal > len(pods) {
+			// unexpected
+			continue
+		}
+
+		orderedPods[ordinal] = pod
+		updatedMarks[ordinal] = updated
+	}
+
+	needDelete := len(pods) - updatedCount - int(partition)
+	for i := len(pods) - 1; i >= 0; i-- {
+		if needDelete <= 0 {
+			return nil
+		}
+
+		if orderedPods[i] == nil {
+			continue
+		}
+
+		if !updatedMarks[i] {
+			if err := m.deletePod(orderedPods[i]); err != nil {
 				return err
 			}
+			needDelete--
 		}
 	}
 
 	return nil
-}
-
-func convertToNextPartition(partition int32, replicas int32) int32 {
-	if replicas > partition {
-		return replicas - partition
-	}
-
-	return 0
 }
 
 // DeleteSubset is called to delete the subset. The target StatefulSet can be found with the input subset.
@@ -252,13 +256,13 @@ func (m *StatefulSetControl) convertToSubset(set *appsv1.StatefulSet) (*Subset, 
 		return subset, err
 	}
 
-	subset.Spec.Strategy.Partition = 0
+	subset.Spec.UpdateStrategy.Partition = 0
 	if set.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
 		revision := getRevision(&set.ObjectMeta)
-		subset.Spec.Strategy.Partition = getCurrentPartition(subset.Spec.Replicas, pods, revision)
+		subset.Spec.UpdateStrategy.Partition = getCurrentPartition(pods, revision)
 	} else if set.Spec.UpdateStrategy.RollingUpdate != nil &&
 		set.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		subset.Spec.Strategy.Partition = *set.Spec.UpdateStrategy.RollingUpdate.Partition
+		subset.Spec.UpdateStrategy.Partition = *set.Spec.UpdateStrategy.RollingUpdate.Partition
 	}
 
 	subset.Spec.SubsetRef.Resources = append(subset.Spec.SubsetRef.Resources, set)
@@ -270,31 +274,19 @@ func (m *StatefulSetControl) convertToSubset(set *appsv1.StatefulSet) (*Subset, 
 	return subset, nil
 }
 
-func getCurrentPartition(replicas int32, pods []*corev1.Pod, revision string) int32 {
-	ordinalMarks := make([]bool, replicas)
+// getCurrentPartition calculates current partition by counting the pods not having the updated revision
+func getCurrentPartition(pods []*corev1.Pod, revision string) int32 {
+	var partition int32
 	for _, pod := range pods {
-		ordinal := getOrdinal(pod)
-		if ordinal >= replicas {
-			// unexpected
-			continue
-		}
-		if getRevision(&pod.ObjectMeta) == revision {
-			ordinalMarks[ordinal] = true
-		}
-	}
-
-	partition := replicas
-	for i := replicas - 1; i >= 0; i-- {
-		if ordinalMarks[i] {
-			partition = i
-		} else {
-			break
+		if getRevision(&pod.ObjectMeta) != revision {
+			partition++
 		}
 	}
 
 	return partition
 }
 
+// deleteStucckPods tries to work around the blocking issue https://github.com/kubernetes/kubernetes/issues/67250
 func (m *StatefulSetControl) deleteStuckPods(set *appsv1.StatefulSet, revision string, partition int32) error {
 	pods, err := m.getStatefulSetPods(set)
 	if err != nil {
@@ -303,7 +295,8 @@ func (m *StatefulSetControl) deleteStuckPods(set *appsv1.StatefulSet, revision s
 
 	for i := range pods {
 		pod := pods[i]
-		if isPodStuck(pod, revision, partition) {
+		// If the pod is considered as stuck, delete it.
+		if isPodStuckForRollingUpdate(pod, revision, partition) {
 			klog.V(2).Infof("Delete pod %s/%s at stuck state", pod.Namespace, pod.Name)
 			err = m.deletePod(pod)
 			if err != nil {
@@ -366,15 +359,19 @@ func calculateStatus(podList []*corev1.Pod, set *appsv1.StatefulSet) (revisionRe
 	return
 }
 
-func isPodUpgradeComplete(pod *corev1.Pod, revision string) bool {
-	if getRevision(&pod.ObjectMeta) == revision {
-		return podutil.IsPodReadyConditionTrue(pod.Status)
+// isPodStuckForRollingUpdate checks whether the pod is stuck under strategy RollingUpdate.
+// If a pod needs to upgrade (pod_ordinal >= partition && pod_revision != sts_revision)
+// and its readiness is false, or worse status like Pending, ImagePullBackOff, it will be blocked.
+func isPodStuckForRollingUpdate(pod *corev1.Pod, revision string, partition int32) bool {
+	if getOrdinal(pod) < partition {
+		return false
 	}
-	return false
-}
 
-func isPodStuck(pod *corev1.Pod, revision string, partition int32) bool {
-	return !isPodUpgradeComplete(pod, revision) && getOrdinal(pod) >= partition
+	if getRevision(pod) == revision {
+		return false
+	}
+
+	return !podutil.IsPodReadyConditionTrue(pod.Status)
 }
 
 func (m *StatefulSetControl) objectKey(objMeta *metav1.ObjectMeta) client.ObjectKey {

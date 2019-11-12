@@ -53,7 +53,7 @@ type UnitedDeploymentSpec struct {
 
 	// Strategy indicates the action of updating
 	// +optional
-	Strategy UnitedDeploymentUpdateStrategy `json:"strategy,omitempty"`
+	UpdateStrategy UnitedDeploymentUpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Indicates the number of histories to be conserved.
 	// If unspecified, defaults to 10.
@@ -79,7 +79,7 @@ type UnitedDeploymentUpdateStrategy struct {
 	// Type of UnitedDeployment update.
 	// Default is Manual.
 	// +optional
-	Type UpdateStrategyType
+	Type UpdateStrategyType `json:"type,omitempty"`
 	// Indicate the partition of each subset.
 	// +optional
 	ManualUpdate *ManualUpdate `json:"manualUpdate,omitempty"`

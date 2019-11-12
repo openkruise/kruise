@@ -106,9 +106,9 @@ func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
 	return name, nil
 }
 
-func getRevision(objMeta *metav1.ObjectMeta) string {
-	if objMeta.Labels == nil {
+func getRevision(objMeta metav1.Object) string {
+	if objMeta.GetLabels() == nil {
 		return ""
 	}
-	return objMeta.Labels[appsv1alpha1.ControllerRevisionHashLabelKey]
+	return objMeta.GetLabels()[appsv1alpha1.ControllerRevisionHashLabelKey]
 }

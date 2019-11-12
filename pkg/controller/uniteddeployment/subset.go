@@ -32,10 +32,10 @@ type Subset struct {
 
 // SubsetSpec stores the spec details of the Subset
 type SubsetSpec struct {
-	SubsetName string
-	Replicas   int32
-	Strategy   SubsetUpdateStrategy
-	SubsetRef  ResourceRef
+	SubsetName     string
+	Replicas       int32
+	UpdateStrategy SubsetUpdateStrategy
+	SubsetRef      ResourceRef
 }
 
 // SubsetStatus stores the observed state of the Subset.

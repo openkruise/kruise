@@ -165,12 +165,12 @@ func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
 
-	if len(obj.Spec.Strategy.Type) == 0 {
-		obj.Spec.Strategy.Type = ManualUpdateStrategyType
+	if len(obj.Spec.UpdateStrategy.Type) == 0 {
+		obj.Spec.UpdateStrategy.Type = ManualUpdateStrategyType
 	}
 
-	if obj.Spec.Strategy.Type == ManualUpdateStrategyType && obj.Spec.Strategy.ManualUpdate == nil {
-		obj.Spec.Strategy.ManualUpdate = &ManualUpdate{}
+	if obj.Spec.UpdateStrategy.Type == ManualUpdateStrategyType && obj.Spec.UpdateStrategy.ManualUpdate == nil {
+		obj.Spec.UpdateStrategy.ManualUpdate = &ManualUpdate{}
 	}
 
 	if obj.Spec.Template.StatefulSetTemplate != nil {
