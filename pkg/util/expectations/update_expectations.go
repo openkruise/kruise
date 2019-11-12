@@ -19,9 +19,8 @@ package expectations
 import (
 	"sync"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // UpdateExpectations is an interface that allows users to set and wait on expectations of pods update.

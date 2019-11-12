@@ -23,6 +23,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -54,12 +54,12 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
-		req := e.resoleControllerRef(pod.Namespace, controllerRef)
+		req := resoleControllerRef(pod.Namespace, controllerRef)
 		if req == nil {
 			return
 		}
 		klog.V(4).Infof("Pod %s/%s created, owner: %s", pod.Namespace, pod.Name, req.Name)
-		scaleExpectations.CreationObserved(req.String())
+		scaleExpectations.ObserveScale(req.String(), expectations.Create, pod.Name)
 		q.Add(*req)
 		return
 	}
@@ -110,14 +110,14 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		if req := e.resoleControllerRef(oldPod.Namespace, oldControllerRef); req != nil {
+		if req := resoleControllerRef(oldPod.Namespace, oldControllerRef); req != nil {
 			q.Add(*req)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		req := e.resoleControllerRef(curPod.Namespace, curControllerRef)
+		req := resoleControllerRef(curPod.Namespace, curControllerRef)
 		if req == nil {
 			return
 		}
@@ -156,13 +156,13 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 		// No controller should care about orphans being deleted.
 		return
 	}
-	req := e.resoleControllerRef(pod.Namespace, controllerRef)
+	req := resoleControllerRef(pod.Namespace, controllerRef)
 	if req == nil {
 		return
 	}
 
 	klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, req.Name)
-	scaleExpectations.DeletionObserved(req.String(), kubecontroller.PodKey(pod))
+	scaleExpectations.ObserveScale(req.String(), expectations.Delete, pod.Name)
 	q.Add(*req)
 }
 
@@ -170,7 +170,7 @@ func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimiti
 
 }
 
-func (e *podEventHandler) resoleControllerRef(namespace string, controllerRef *metav1.OwnerReference) *reconcile.Request {
+func resoleControllerRef(namespace string, controllerRef *metav1.OwnerReference) *reconcile.Request {
 	// Parse the Group out of the OwnerReference to compare it to what was parsed out of the requested OwnerType
 	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
 	if err != nil {
@@ -224,4 +224,47 @@ func (e *podEventHandler) joinCloneSetNames(csList []appsv1alpha1.CloneSet) stri
 		names = append(names, cs.Name)
 	}
 	return strings.Join(names, ",")
+}
+
+type pvcEventHandler struct {
+}
+
+var _ handler.EventHandler = &pvcEventHandler{}
+
+func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	pvc := evt.Object.(*v1.PersistentVolumeClaim)
+	if pvc.DeletionTimestamp != nil {
+		e.Delete(event.DeleteEvent{Meta: evt.Meta, Object: evt.Object}, q)
+		return
+	}
+
+	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
+		if req := resoleControllerRef(pvc.Namespace, controllerRef); req != nil {
+			scaleExpectations.ObserveScale(req.String(), expectations.Create, pvc.Name)
+			q.Add(*req)
+		}
+	}
+}
+
+func (e *pvcEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	return
+}
+
+func (e *pvcEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	pvc, ok := evt.Object.(*v1.PersistentVolumeClaim)
+	if !ok {
+		klog.Errorf("DeleteEvent parse pvc failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
+		return
+	}
+
+	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
+		if req := resoleControllerRef(pvc.Namespace, controllerRef); req != nil {
+			scaleExpectations.ObserveScale(req.String(), expectations.Delete, pvc.Name)
+			q.Add(*req)
+		}
+	}
+}
+
+func (e *pvcEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+
 }

@@ -22,6 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	// CloneSetInstanceID is a unique id for Pods and PVCs.
+	// Each pod and the pvcs it owns have the same instance-id.
+	CloneSetInstanceID = "apps.kruise.io/cloneset-instance-id"
+)
+
 // CloneSetSpec defines the desired state of CloneSet
 type CloneSetSpec struct {
 	// Replicas is the desired number of replicas of the given Template.
@@ -151,6 +157,13 @@ type CloneSetStatus struct {
 
 // CloneSetConditionType is type for CloneSet conditions.
 type CloneSetConditionType string
+
+const (
+	// CloneSetConditionFailedScale indicates cloneset controller failed to create or delete pods/pvc.
+	CloneSetConditionFailedScale CloneSetConditionType = "FailedScale"
+	// CloneSetConditionFailedUpdate indicates cloneset controller failed to update pods.
+	CloneSetConditionFailedUpdate CloneSetConditionType = "FailedUpdate"
+)
 
 // CloneSetCondition describes the state of a CloneSet at a certain point.
 type CloneSetCondition struct {

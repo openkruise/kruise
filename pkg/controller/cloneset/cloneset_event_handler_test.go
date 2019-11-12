@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/expectations"
+
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +45,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		css                           []*appsv1alpha1.CloneSet
 		e                             event.CreateEvent
 		alterExpectationCreationsKey  string
-		alterExpectationCreationsAdds int
+		alterExpectationCreationsAdds []string
 		expectedQueueLen              int
 	}{
 		{
@@ -94,7 +96,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 					},
 				},
 			},
-			e:                event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Labels: map[string]string{"key": "v1"}}}},
+			e:                event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-abc", Labels: map[string]string{"key": "v1"}}}},
 			expectedQueueLen: 2,
 		},
 		{
@@ -139,6 +141,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 				Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
+						Name:      "pod-xyz",
 						Labels:    map[string]string{"key": "v1"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -153,7 +156,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 				},
 			},
 			alterExpectationCreationsKey:  "default/cs02",
-			alterExpectationCreationsAdds: 1,
+			alterExpectationCreationsAdds: []string{"pod-xyz"},
 			expectedQueueLen:              1,
 		},
 	}
@@ -167,9 +170,11 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		enqueueHandler := newTestPodEventHandler(fakeClient)
 		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
 		modifySatisfied := false
-		if testCase.alterExpectationCreationsKey != "" && testCase.alterExpectationCreationsAdds != 0 {
-			scaleExpectations.ExpectCreations(testCase.alterExpectationCreationsKey, testCase.alterExpectationCreationsAdds)
-			if scaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey) {
+		if testCase.alterExpectationCreationsKey != "" && len(testCase.alterExpectationCreationsAdds) > 0 {
+			for _, n := range testCase.alterExpectationCreationsAdds {
+				scaleExpectations.ExpectScale(testCase.alterExpectationCreationsKey, expectations.Create, n)
+			}
+			if ok, _ := scaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
 				t.Fatalf("%s before execute, should not be satisfied", testCase.name)
 			}
 			modifySatisfied = true
@@ -180,7 +185,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
 		}
 		if modifySatisfied {
-			if !scaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey) {
+			if ok, _ := scaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
 				t.Fatalf("%s expected satisfied, but it is not", testCase.name)
 			}
 		}
