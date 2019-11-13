@@ -18,6 +18,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -90,15 +91,14 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *appsv1alpha1.Statef
 	}
 
 	// perform the main update function and get the status
-	status, err := ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods, revisions)
-	if err != nil {
-		return err
-	}
+	status, getStatusErr := ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods, revisions)
+	updateStateusErr := ssc.updateStatefulSetStatus(set, status)
 
-	// update the set's status
-	err = ssc.updateStatefulSetStatus(set, status)
-	if err != nil {
-		return err
+	if getStatusErr != nil {
+		return getStatusErr
+	}
+	if updateStateusErr != nil {
+		return updateStateusErr
 	}
 
 	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d current=%d updated=%d",
@@ -398,6 +398,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If we find a Pod that has not been created we create the Pod
 		if !isCreated(replicas[i]) {
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
+				msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
+				condition := NewStatefulsetCondition(appsv1alpha1.FailedCreatePod, v1.ConditionTrue, "", msg)
+				SetStatefulsetCondition(&status, condition)
 				return &status, err
 			}
 			status.Replicas++
@@ -457,6 +460,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// Make a deep copy so we don't mutate the shared cache
 		replica := replicas[i].DeepCopy()
 		if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
+			msg := fmt.Sprintf("StatefulPodControl failed to update Pod error: %s", err)
+			condition := NewStatefulsetCondition(appsv1alpha1.FailedUpdatePod, v1.ConditionTrue, "", msg)
+			SetStatefulsetCondition(&status, condition)
 			return &status, err
 		}
 	}
