@@ -177,58 +177,11 @@ func (m *StatefulSetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeplo
 	}
 
 	if set.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
-		return m.applyOnDeleteUpdateStrategyPartition(set, revision, *set.Spec.UpdateStrategy.RollingUpdate.Partition)
+		return nil
 	}
 
 	// If RollingUpdate, work around for issue https://github.com/kubernetes/kubernetes/issues/67250
 	return m.deleteStuckPods(set, revision, partition)
-}
-
-func (m *StatefulSetControl) applyOnDeleteUpdateStrategyPartition(set *appsv1.StatefulSet, revision string, partition int32) error {
-	pods, err := m.getStatefulSetPods(set)
-	if err != nil {
-		return err
-	}
-
-	orderedPods := make([]*corev1.Pod, len(pods))
-	updatedMarks := make([]bool, len(pods))
-	updatedCount := 0
-	for _, pod := range pods {
-		updated := false
-		if getRevision(pod) == revision {
-			updated = true
-			updatedCount++
-		}
-
-		ordinal := int(getOrdinal(pod))
-		if ordinal > len(pods) {
-			// unexpected
-			continue
-		}
-
-		orderedPods[ordinal] = pod
-		updatedMarks[ordinal] = updated
-	}
-
-	needDelete := len(pods) - updatedCount - int(partition)
-	for i := len(pods) - 1; i >= 0; i-- {
-		if needDelete <= 0 {
-			return nil
-		}
-
-		if orderedPods[i] == nil {
-			continue
-		}
-
-		if !updatedMarks[i] {
-			if err := m.deletePod(orderedPods[i]); err != nil {
-				return err
-			}
-			needDelete--
-		}
-	}
-
-	return nil
 }
 
 // DeleteSubset is called to delete the subset. The target StatefulSet can be found with the input subset.

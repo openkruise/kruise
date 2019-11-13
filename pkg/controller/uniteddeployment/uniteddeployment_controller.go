@@ -156,7 +156,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
 
-	if err := r.manageSubsets(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType); err != nil {
+	if _, err := r.manageSubsetProvision(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType); err != nil {
 		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
 		return reconcile.Result{}, nil
