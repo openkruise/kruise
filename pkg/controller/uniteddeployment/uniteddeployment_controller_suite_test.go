@@ -24,12 +24,13 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-	"github.com/openkruise/kruise/pkg/apis"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/openkruise/kruise/pkg/apis"
 )
 
 var cfg *rest.Config

@@ -74,13 +74,6 @@ spec:
               description: Selector is a label query over pods that should match the
                 replica count. It must match the pod template's labels.
               type: object
-            strategy:
-              description: Strategy indicates the action of updating
-              properties:
-                partitions:
-                  description: Indicates the partition of each subset.
-                  type: object
-              type: object
             template:
               description: Template is the object that describes the subset that will
                 be created.
@@ -105,7 +98,8 @@ spec:
                     properties:
                       name:
                         description: Indicates the name of this subset, which will
-                          be used to generate subset workload name in the format '<deployment-name>-<subset-name>'.
+                          be used to generate subset workload name prefix in the format
+                          '<deployment-name>-<subset-name>-'.
                         type: string
                       nodeSelector:
                         description: Indicates the node select strategy to form the
@@ -122,6 +116,20 @@ spec:
                     - name
                     type: object
                   type: array
+              type: object
+            updateStrategy:
+              description: Strategy indicates the action of updating
+              properties:
+                manualUpdate:
+                  description: Indicate the partition of each subset.
+                  properties:
+                    partitions:
+                      description: Indicates number of subset partition.
+                      type: object
+                  type: object
+                type:
+                  description: Type of UnitedDeployment update. Default is Manual.
+                  type: string
               type: object
           required:
           - selector

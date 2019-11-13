@@ -18,28 +18,41 @@ package uniteddeployment
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 )
 
-var log = logf.Log.WithName("controller")
+const (
+	controllerName = "uniteddeployment-controller"
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
+	eventTypeRevisionProvision      = "RevisionProvision"
+	eventTypeFindSubsets            = "FindSubsets"
+	eventTypeDupSubsetsDelete       = "DeleteDuplicatedSubsets"
+	eventTypeSubsetsUpdate          = "UpdateSubset"
+	eventTypeSpecifySubbsetReplicas = "SpecifySubsetReplicas"
+
+	slowStartInitialBatchSize = 1
+)
+
+type subSetType string
+
+const (
+	statefulSetSubSetType subSetType = "StatefulSet"
+)
 
 // Add creates a new UnitedDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -49,13 +62,21 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileUnitedDeployment{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileUnitedDeployment{
+		Client: mgr.GetClient(),
+		scheme: mgr.GetScheme(),
+
+		recorder: mgr.GetRecorder(controllerName),
+		subSetControls: map[subSetType]ControlInterface{
+			statefulSetSubSetType: &StatefulSetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme()},
+		},
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("uniteddeployment-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -66,9 +87,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by UnitedDeployment - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.UnitedDeployment{},
 	})
@@ -85,34 +104,156 @@ var _ reconcile.Reconciler = &ReconcileUnitedDeployment{}
 type ReconcileUnitedDeployment struct {
 	client.Client
 	scheme *runtime.Scheme
+
+	recorder       record.EventRecorder
+	subSetControls map[subSetType]ControlInterface
 }
 
 // Reconcile reads that state of the cluster for a UnitedDeployment object and makes changes based on the state read
 // and what is in the UnitedDeployment.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=uniteddeployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=uniteddeployments/status,verbs=get;update;patch
 func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	klog.V(4).Infof("Reconcile UnitedDeployment %s/%s", request.Namespace, request.Name)
 	// Fetch the UnitedDeployment instance
 	instance := &appsv1alpha1.UnitedDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
-	_, _, _, _, err = r.constructUnitedDeploymentRevisions(instance)
+	if instance.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
+
+	currentRevision, updatedRevision, _, _, err := r.constructUnitedDeploymentRevisions(instance)
 	if err != nil {
 		klog.Errorf("Fail to construct controller revision of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeRevisionProvision), err.Error())
 		return reconcile.Result{}, err
+	}
+
+	control, subsetType := r.getSubsetControls(instance)
+
+	klog.V(4).Infof("Get UnitedDeployment %s/%s all subsets", request.Namespace, request.Name)
+	nameToSubset, err := r.getNameToSubset(instance, control)
+	if err != nil {
+		klog.Errorf("Fail to get Subsets of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
+		return reconcile.Result{}, nil
+	}
+
+	nextReplicas, effectiveSpecifiedReplicas, ineffectiveReason := GetAllocatedReplicas(nameToSubset, instance)
+	klog.V(4).Infof("Get UnitedDeployment %s/%s next replicas %v", instance.Namespace, instance.Name, nextReplicas)
+	if !effectiveSpecifiedReplicas {
+		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", ineffectiveReason)
+	}
+
+	nextPartitions := calcNextPartitions(instance, nextReplicas)
+	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
+
+	if _, err := r.manageSubsetProvision(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType); err != nil {
+		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
+		return reconcile.Result{}, nil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface) (*map[string]*Subset, error) {
+	subSets, err := control.GetAllSubsets(instance)
+	if err != nil {
+		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
+		return nil, fmt.Errorf("fail to get all Subsets for UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+	}
+
+	klog.V(4).Infof("Classify UnitedDeployment %s/%s by subSet name", instance.Namespace, instance.Name)
+	nameToSubsets := r.classifySubsetBySubsetName(instance, subSets)
+
+	nameToSubset, err := r.deleteDupSubset(instance, nameToSubsets, control)
+	if err != nil {
+		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeDupSubsetsDelete), err.Error())
+		return nil, fmt.Errorf("fail to manage duplicate Subset of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+	}
+
+	return nameToSubset, nil
+}
+
+func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32) *map[string]int32 {
+	partitions := map[string]int32{}
+	for _, subset := range ud.Spec.Topology.Subsets {
+		var subsetPartition int32
+		if ud.Spec.UpdateStrategy.Type == appsv1alpha1.ManualUpdateStrategyType && ud.Spec.UpdateStrategy.ManualUpdate != nil && ud.Spec.UpdateStrategy.ManualUpdate.Partitions != nil {
+			if partition, exist := ud.Spec.UpdateStrategy.ManualUpdate.Partitions[subset.Name]; exist {
+				subsetPartition = partition
+			}
+		}
+
+		if subsetReplicas, exist := (*nextReplicas)[subset.Name]; exist && subsetPartition > subsetReplicas {
+			subsetPartition = subsetReplicas
+		}
+
+		partitions[subset.Name] = subsetPartition
+	}
+
+	return &partitions
+}
+
+var subsetReplicasFn = subSetReplicas
+
+func subSetReplicas(subset *Subset) int32 {
+	return subset.Status.Replicas
+}
+
+func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {
+	nameToSubset := map[string]*Subset{}
+	for name, subsets := range nameToSubsets {
+		if len(subsets) > 1 {
+			for _, subset := range subsets[1:] {
+				klog.V(0).Infof("Delete duplicated Subset %s/%s for subset name %s", subset.Namespace, subset.Name, name)
+				if err := control.DeleteSubset(subset); err != nil {
+					if errors.IsNotFound(err) {
+						continue
+					}
+
+					return &nameToSubset, err
+				}
+			}
+		}
+
+		if len(subsets) > 0 {
+			nameToSubset[name] = subsets[0]
+		}
+	}
+
+	return &nameToSubset, nil
+}
+
+func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.UnitedDeployment) (ControlInterface, subSetType) {
+	if instance.Spec.Template.StatefulSetTemplate != nil {
+		return r.subSetControls[statefulSetSubSetType], statefulSetSubSetType
+	}
+
+	// unexpected
+	return nil, statefulSetSubSetType
+}
+
+func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1alpha1.UnitedDeployment, subsets []*Subset) map[string][]*Subset {
+	mapping := map[string][]*Subset{}
+
+	for _, ss := range subsets {
+		subSetName, err := getSubsetNameFrom(ss)
+		if err != nil {
+			// filter out Subset without correct Subset name
+			continue
+		}
+
+		mapping[subSetName] = append(mapping[subSetName], ss)
+	}
+	return mapping
 }

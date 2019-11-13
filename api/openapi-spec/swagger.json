@@ -481,6 +481,20 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.ManualUpdate": {
+      "description": "ManualUpdate is a update strategy which allow users to provide the partition of each subset.",
+      "type": "object",
+      "properties": {
+        "partitions": {
+          "description": "Indicates number of subset partition.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    },
     "kruise.apps.v1alpha1.RollingUpdateSidecarSet": {
       "description": "RollingUpdateSidecarSet is used to communicate parameter",
       "type": "object",
@@ -838,7 +852,7 @@
       ],
       "properties": {
         "name": {
-          "description": "Indicates the name of this subset, which will be used to generate subset workload name in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e'.",
+          "description": "Indicates the name of this subset, which will be used to generate subset workload name prefix in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e-'.",
           "type": "string"
         },
         "nodeSelector": {
@@ -970,10 +984,6 @@
           "description": "Selector is a label query over pods that should match the replica count. It must match the pod template's labels.",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
         },
-        "strategy": {
-          "description": "Strategy indicates the action of updating",
-          "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy"
-        },
         "template": {
           "description": "Template is the object that describes the subset that will be created.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.SubsetTemplate"
@@ -981,6 +991,10 @@
         "topology": {
           "description": "Contains the information of subset topology.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.Topology"
+        },
+        "updateStrategy": {
+          "description": "Strategy indicates the action of updating",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy"
         }
       }
     },
@@ -1052,13 +1066,13 @@
       "description": "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
       "type": "object",
       "properties": {
-        "partitions": {
-          "description": "Indicates the partition of each subset.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "integer",
-            "format": "int32"
-          }
+        "manualUpdate": {
+          "description": "Indicate the partition of each subset.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.ManualUpdate"
+        },
+        "type": {
+          "description": "Type of UnitedDeployment update. Default is Manual.",
+          "type": "string"
         }
       }
     },
