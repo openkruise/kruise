@@ -213,6 +213,12 @@ type StatefulSetStatus struct {
 	Conditions []apps.StatefulSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
+// These are valid conditions of a statefulset.
+const (
+	FailedCreatePod apps.StatefulSetConditionType = "FailedCreatePod"
+	FailedUpdatePod apps.StatefulSetConditionType = "FailedUpdatePod"
+)
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

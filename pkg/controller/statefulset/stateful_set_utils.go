@@ -379,3 +379,50 @@ func (ao ascendingOrdinal) Swap(i, j int) {
 func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
 }
+
+// NewStatefulsetCondition creates a new statefulset condition.
+func NewStatefulsetCondition(conditionType apps.StatefulSetConditionType, conditionStatus v1.ConditionStatus, reason, message string) apps.StatefulSetCondition {
+	return apps.StatefulSetCondition{
+		Type:               conditionType,
+		Status:             conditionStatus,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// GetStatefulsetConditition returns the condition with the provided type.
+func GetStatefulsetConditition(status appsv1alpha1.StatefulSetStatus, condType apps.StatefulSetConditionType) *apps.StatefulSetCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetStatefulsetCondition updates the statefulset to include the provided condition. If the condition that
+func SetStatefulsetCondition(status *appsv1alpha1.StatefulSetStatus, condition apps.StatefulSetCondition) {
+	currentCond := GetStatefulsetConditition(*status, condition.Type)
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
+		return
+	}
+	if currentCond != nil && currentCond.Status == condition.Status {
+		condition.LastTransitionTime = currentCond.LastTransitionTime
+	}
+
+	newConditions := filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(newConditions, condition)
+}
+
+func filterOutCondition(conditions []apps.StatefulSetCondition, condType apps.StatefulSetConditionType) []apps.StatefulSetCondition {
+	var newCondtitions []apps.StatefulSetCondition
+	for _, c := range conditions {
+		if c.Type == condType {
+			continue
+		}
+		newCondtitions = append(newCondtitions, c)
+	}
+	return newCondtitions
+}
