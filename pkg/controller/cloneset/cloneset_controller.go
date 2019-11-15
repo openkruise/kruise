@@ -24,6 +24,8 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
+	scalecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/scale"
+	updatecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/update"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
@@ -33,8 +35,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -53,7 +55,7 @@ func init() {
 var (
 	concurrentReconciles = 10
 
-	scaleExpectations  = kubecontroller.NewUIDTrackingControllerExpectations(kubecontroller.NewControllerExpectations())
+	scaleExpectations  = expectations.NewScaleExpectations()
 	updateExpectations = expectations.NewUpdateExpectations(clonesetutils.GetPodRevision)
 )
 
@@ -68,10 +70,12 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	reconciler := &ReconcileCloneSet{
 		Client:            mgr.GetClient(),
 		scheme:            mgr.GetScheme(),
+		recorder:          mgr.GetRecorder("cloneset-controller"),
 		statusUpdater:     newStatusUpdater(mgr.GetClient()),
 		controllerHistory: historyutil.NewHistory(mgr.GetClient()),
 		revisionControl:   revisioncontrol.NewRevisionControl(),
 	}
+	reconciler.scaleControl = scalecontrol.NewScaleControl(mgr.GetClient(), reconciler.recorder, scaleExpectations)
 	reconciler.reconcileFunc = reconciler.doReconcile
 	return reconciler
 }
@@ -106,6 +110,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to PVC, just ensure cache updated
+	err = c.Watch(&source.Kind{Type: &v1.PersistentVolumeClaim{}}, &pvcEventHandler{})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -117,9 +127,12 @@ type ReconcileCloneSet struct {
 	scheme        *runtime.Scheme
 	reconcileFunc func(request reconcile.Request) (reconcile.Result, error)
 
+	recorder          record.EventRecorder
 	controllerHistory history.Interface
 	statusUpdater     StatusUpdater
 	revisionControl   revisioncontrol.Interface
+	scaleControl      scalecontrol.Interface
+	updateControl     updatecontrol.Interface
 }
 
 // Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
@@ -135,10 +148,14 @@ func (r *ReconcileCloneSet) Reconcile(request reconcile.Request) (reconcile.Resu
 	return r.reconcileFunc(request)
 }
 
-func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (_ reconcile.Result, retErr error) {
 	startTime := time.Now()
 	defer func() {
-		klog.V(3).Infof("Finished syncing CloneSet %s, cost %v", request, time.Since(startTime))
+		if retErr == nil {
+			klog.V(3).Infof("Finished syncing CloneSet %s, cost %v", request, time.Since(startTime))
+		} else {
+			klog.Errorf("Failed syncing CloneSet %s: %v", request, retErr)
+		}
 	}()
 
 	// Fetch the CloneSet instance
@@ -163,6 +180,12 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
+	// If scaling expectations have not satisfied yet, just skip this reconcile.
+	if scaleSatisfied, scaleDirtyPods := scaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
+		klog.V(4).Infof("Not satisfied scale for %v, scaleDirtyPods=%v", request.String(), scaleDirtyPods)
+		return reconcile.Result{}, nil
+	}
+
 	// list all active Pods and PVCs belongs to cs
 	filteredPods, filteredPVCs, err := r.getOwnedResource(instance)
 	if err != nil {
@@ -182,14 +205,14 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// get the current and update revisions of the set.
-	currentSet, err := r.revisionControl.ApplyRevision(instance, currentRevision)
-	if err != nil {
-		return reconcile.Result{}, err
+	// Refresh update expectations
+	for _, pod := range filteredPods {
+		updateExpectations.ObserveUpdated(request.String(), updateRevision.Name, pod)
 	}
-	updateSet, err := r.revisionControl.ApplyRevision(instance, updateRevision)
-	if err != nil {
-		return reconcile.Result{}, err
+	// If update expectations have not satisfied yet, just skip this reconcile.
+	if updateSatisfied, updateDirtyPods := updateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name); !updateSatisfied {
+		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
+		return reconcile.Result{}, nil
 	}
 
 	newStatus := appsv1alpha1.CloneSetStatus{
@@ -199,27 +222,68 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (reconcile.Re
 	}
 	*newStatus.CollisionCount = collisionCount
 
-	scaleSatisfied := scaleExpectations.SatisfiedExpectations(request.String())
-	updateSatisfied, updateDirtyPods := updateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name)
-	if scaleSatisfied && updateSatisfied {
-		// TODO(FillZpp): manage replicas
-		// TODO(FillZpp): manage update
-	} else {
-		klog.V(3).Infof("Skip scale and update for CloneSet %s, because of scaleSatisfied=%v, updateSatisfied=%v, updateDirtyPods=%v",
-			request, scaleSatisfied, updateSatisfied, updateDirtyPods)
-	}
+	// scale and update pods
+	syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, filteredPods, filteredPVCs)
 
+	// update new status
 	if err = r.statusUpdater.UpdateCloneSetStatus(instance, newStatus, filteredPods); err != nil {
 		return reconcile.Result{}, err
+	}
+
+	if err = r.truncatePodsToDelete(instance, filteredPods); err != nil {
+		klog.Warningf("Failed to truncate podsToDelete for %s: %v", request, err)
 	}
 
 	if err = r.truncateHistory(instance, filteredPods, revisions, currentRevision, updateRevision); err != nil {
 		klog.Errorf("Failed to truncate history for %s: %v", request, err)
 	}
 
-	// TODO(FillZpp): remove this debug log
-	klog.V(5).Infof("CloneSet %s got %v %v %v %v", request, filteredPVCs, currentSet, updateSet, collisionCount)
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, syncErr
+}
+
+func (r *ReconcileCloneSet) syncCloneSet(
+	instance *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus,
+	currentRevision, updateRevision *apps.ControllerRevision,
+	filteredPods []*v1.Pod, filteredPVCs []*v1.PersistentVolumeClaim,
+) error {
+	// get the current and update revisions of the set.
+	currentSet, err := r.revisionControl.ApplyRevision(instance, currentRevision)
+	if err != nil {
+		return err
+	}
+	updateSet, err := r.revisionControl.ApplyRevision(instance, updateRevision)
+	if err != nil {
+		return err
+	}
+
+	var scaling bool
+	var podsScaleErr error
+	var podsUpdateErr error
+
+	scaling, podsScaleErr = r.scaleControl.ManageReplicas(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
+	if podsScaleErr != nil {
+		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
+			Type:               appsv1alpha1.CloneSetConditionFailedScale,
+			Status:             v1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Message:            podsScaleErr.Error(),
+		})
+	}
+	if scaling {
+		return podsScaleErr
+	}
+
+	// TODO(FillZpp): manage update
+
+	if podsUpdateErr != nil {
+		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
+			Type:               appsv1alpha1.CloneSetConditionFailedUpdate,
+			Status:             v1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Message:            podsUpdateErr.Error(),
+		})
+	}
+	return podsUpdateErr
 }
 
 func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisions []*apps.ControllerRevision, podsRevisions sets.String) (
@@ -297,12 +361,42 @@ func (r *ReconcileCloneSet) getOwnedResource(cs *appsv1alpha1.CloneSet) ([]*v1.P
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim
 	for i, pvc := range pvcList.Items {
+		if pvc.DeletionTimestamp != nil {
+			continue
+		}
 		if ref := metav1.GetControllerOf(&pvc); ref != nil && ref.UID == cs.UID {
 			filteredPVCs = append(filteredPVCs, &pvcList.Items[i])
 		}
 	}
 
 	return filteredPods, filteredPVCs, nil
+}
+
+// truncatePodsToDelete truncates any non-live pod names in spec.scaleStrategy.podsToDelete.
+func (r *ReconcileCloneSet) truncatePodsToDelete(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) error {
+	if len(cs.Spec.ScaleStrategy.PodsToDelete) == 0 {
+		return nil
+	}
+
+	existingPods := sets.NewString()
+	for _, p := range pods {
+		existingPods.Insert(p.Name)
+	}
+
+	var newPodsToDelete []string
+	for _, podName := range cs.Spec.ScaleStrategy.PodsToDelete {
+		if existingPods.Has(podName) {
+			newPodsToDelete = append(newPodsToDelete, podName)
+		}
+	}
+
+	if len(newPodsToDelete) == len(cs.Spec.ScaleStrategy.PodsToDelete) {
+		return nil
+	}
+
+	newCS := cs.DeepCopy()
+	newCS.Spec.ScaleStrategy.PodsToDelete = newPodsToDelete
+	return r.Update(context.TODO(), newCS)
 }
 
 // truncateHistory truncates any non-live ControllerRevisions in revisions from cs's history. The UpdateRevision and
