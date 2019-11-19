@@ -134,19 +134,27 @@ func applyStatefulSetTemplate(ud *alpha1.UnitedDeployment, subsetName string, re
 
 	set.Spec.Selector = selectors
 	set.Spec.Replicas = &replicas
-	if set.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+	if ud.Spec.Template.StatefulSetTemplate.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
+		set.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+	} else {
 		if set.Spec.UpdateStrategy.RollingUpdate == nil {
 			set.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
 		}
 		set.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 	}
 
-	set.Spec.Template = *ud.Spec.Template.StatefulSetTemplate.Spec.Template.DeepCopy()
+	set.Spec.Template = ud.Spec.Template.StatefulSetTemplate.Spec.Template
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
 	}
 	set.Spec.Template.Labels[alpha1.SubSetNameLabelKey] = subsetName
 	set.Spec.Template.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+
+	set.Spec.RevisionHistoryLimit = ud.Spec.Template.StatefulSetTemplate.Spec.RevisionHistoryLimit
+	set.Spec.PodManagementPolicy = ud.Spec.Template.StatefulSetTemplate.Spec.PodManagementPolicy
+	set.Spec.ServiceName = ud.Spec.Template.StatefulSetTemplate.Spec.ServiceName
+	set.Spec.VolumeClaimTemplates = ud.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates
+
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 
 	return nil

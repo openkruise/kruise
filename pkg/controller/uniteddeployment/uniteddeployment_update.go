@@ -30,6 +30,49 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 )
 
+func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartitions *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (updateErr error) {
+	exists, err := r.manageSubsetProvision(ud, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
+	if err != nil {
+		return fmt.Errorf("fail to manage Subset provision: %s", err)
+	}
+
+	expectedRevision := currentRevision
+	if updatedRevision != nil {
+		expectedRevision = updatedRevision
+	}
+
+	var needUpdate []string
+	for _, name := range exists.List() {
+		subset := (*nameToSubset)[name]
+		expectedPartition := (*nextPartitions)[name]
+		if subset.Labels[appsv1alpha1.ControllerRevisionHashLabelKey] != expectedRevision.Name ||
+			subset.Spec.Replicas != (*nextReplicas)[name] ||
+			subset.Spec.UpdateStrategy.Partition != expectedPartition {
+			needUpdate = append(needUpdate, name)
+		}
+	}
+
+	if len(needUpdate) == 0 {
+		return
+	}
+
+	_, updateErr = util.SlowStartBatch(len(needUpdate), slowStartInitialBatchSize, func(index int) error {
+		cell := needUpdate[index]
+		subset := (*nameToSubset)[cell]
+		replicas := (*nextReplicas)[cell]
+		partition := (*nextPartitions)[cell]
+
+		klog.V(0).Infof("UnitedDeployment %s/%s needs to update Subset (%s) %s/%s with revision %s, replicas %d, partition %d", ud.Namespace, ud.Name, subsetType, subset.Namespace, subset.Name, expectedRevision.Name, replicas, partition)
+		updateIpsErr := r.subSetControls[subsetType].UpdateSubset(subset, ud, expectedRevision.Name, replicas, partition)
+		if updateIpsErr != nil {
+			r.recorder.Event(ud.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), fmt.Sprintf("Error updating PodSet (%s) %s when updating: %s", subsetType, subset.Name, updateIpsErr))
+		}
+		return updateIpsErr
+	})
+
+	return
+}
+
 func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartitions *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, error) {
 	expectedSubsets := sets.String{}
 	gotSubsets := sets.String{}

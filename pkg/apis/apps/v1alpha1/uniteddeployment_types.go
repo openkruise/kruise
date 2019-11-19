@@ -32,6 +32,9 @@ const (
 	ManualUpdateStrategyType UpdateStrategyType = "Manual"
 )
 
+// UnitedDeploymentConditionType indicates valid conditions type of a UnitedDeployment.
+type UnitedDeploymentConditionType string
+
 // UnitedDeploymentSpec defines the desired state of UnitedDeployment
 type UnitedDeploymentSpec struct {
 	// Replicas is the totally desired number of replicas of all the owning workloads.
@@ -158,9 +161,6 @@ type UnitedDeploymentStatus struct {
 	UpdateStatus *UpdateStatus `json:"updateStatus,omitempty"`
 }
 
-// UnitedDeploymentConditionType indicates valid conditions type of a UnitedDeployment.
-type UnitedDeploymentConditionType string
-
 // UnitedDeploymentCondition describes current state of a UnitedDeployment.
 type UnitedDeploymentCondition struct {
 	// Type of in place set condition.
@@ -168,6 +168,9 @@ type UnitedDeploymentCondition struct {
 
 	// Status of the condition, one of True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status,omitempty"`
+
+	// The last time this condition was updated.
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
 
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`

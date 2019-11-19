@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -373,17 +374,1083 @@ func TestStsDupSubset(t *testing.T) {
 	expectedStsCount(g, 1)
 }
 
+func TestStsScale(t *testing.T) {
+	g, requests, stopMgr, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &one,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "foo",
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": "foo",
+						},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": "foo",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "container-a",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeA"},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeB"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList := expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas + *stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(1))
+
+	var two int32 = 2
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.Replicas = &two
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(1))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(1))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.SubsetReplicas).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 1,
+		"subset-b": 1,
+	}))
+
+	var five int32 = 6
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.Replicas = &five
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(3))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(3))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.SubsetReplicas).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 3,
+		"subset-b": 3,
+	}))
+
+	var four int32 = 4
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.Replicas = &four
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.SubsetReplicas).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 2,
+		"subset-b": 2,
+	}))
+}
+
+func TestStsUpdate(t *testing.T) {
+	g, requests, stopMgr, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &two,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "foo",
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": "foo",
+						},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": "foo",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "containerA",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeA"},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeB"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList := expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas + *stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
+	revisionList := &appsv1.ControllerRevisionList{}
+	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList))
+	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	v1 := revisionList.Items[0].Name
+	g.Expect(instance.Status.CurrentRevision).Should(gomega.BeEquivalentTo(v1))
+
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:2.0"
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	revisionList = &appsv1.ControllerRevisionList{}
+	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList))
+	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(2))
+	v2 := revisionList.Items[0].Name
+	if v2 == v1 {
+		v2 = revisionList.Items[1].Name
+	}
+	g.Expect(instance.Status.UpdateStatus.UpdatedRevision).Should(gomega.BeEquivalentTo(v2))
+}
+
+func TestStsRollingUpdatePartition(t *testing.T) {
+	g, requests, stopMgr, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &ten,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "foo",
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": "foo",
+						},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": "foo",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "container-a",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1alpha1.ManualUpdateStrategyType,
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeA"},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeB"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList := expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+
+	// update with partition
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{
+			"subset-a": 4,
+			"subset-b": 3,
+		},
+	}
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:2.0"
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	stsA := getSubsetByName(stsList, "subset-a")
+	g.Expect(stsA).ShouldNot(gomega.BeNil())
+	g.Expect(*stsA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(4))
+
+	stsB := getSubsetByName(stsList, "subset-b")
+	g.Expect(stsB).ShouldNot(gomega.BeNil())
+	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(3))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 4,
+		"subset-b": 3,
+	}))
+
+	// move on
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{
+			"subset-a": 0,
+			"subset-b": 3,
+		},
+	}
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 4)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	stsA = getSubsetByName(stsList, "subset-a")
+	g.Expect(stsA).ShouldNot(gomega.BeNil())
+	g.Expect(*stsA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(0))
+
+	stsB = getSubsetByName(stsList, "subset-b")
+	g.Expect(stsB).ShouldNot(gomega.BeNil())
+	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(3))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 0,
+		"subset-b": 3,
+	}))
+
+	// move on
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{},
+	}
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	stsA = getSubsetByName(stsList, "subset-a")
+	g.Expect(stsA).ShouldNot(gomega.BeNil())
+	g.Expect(*stsA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(0))
+
+	stsB = getSubsetByName(stsList, "subset-b")
+	g.Expect(stsB).ShouldNot(gomega.BeNil())
+	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(0))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 0,
+		"subset-b": 0,
+	}))
+}
+
+func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
+	g, requests, stopMgr, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &ten,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "foo",
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": "foo",
+						},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": "foo",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "container-a",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1alpha1.ManualUpdateStrategyType,
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeA"},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeB"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList := expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+
+	g.Expect(provisionStatefulSetMockPod(c, &stsList.Items[0])).Should(gomega.BeNil())
+	g.Expect(provisionStatefulSetMockPod(c, &stsList.Items[1])).Should(gomega.BeNil())
+
+	g.Expect(collectPodOrdinal(c, &stsList.Items[0], "0,1,2,3,4")).Should(gomega.BeNil())
+	g.Expect(collectPodOrdinal(c, &stsList.Items[1], "0,1,2,3,4")).Should(gomega.BeNil())
+
+	// update with partition
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{
+			"subset-a": 4,
+			"subset-b": 3,
+		},
+	}
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:2.0"
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	stsA := getSubsetByName(stsList, "subset-a")
+	g.Expect(stsA).ShouldNot(gomega.BeNil())
+	g.Expect(*stsA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(4))
+	g.Expect(collectPodOrdinal(c, stsA, "0,1,2,3")).Should(gomega.BeNil())
+
+	stsB := getSubsetByName(stsList, "subset-b")
+	g.Expect(stsB).ShouldNot(gomega.BeNil())
+	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(3))
+	g.Expect(collectPodOrdinal(c, stsB, "0,1,2")).Should(gomega.BeNil())
+}
+
+func TestStsOnDelete(t *testing.T) {
+	g, requests, stopMgr, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &ten,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "foo",
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": "foo",
+						},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": "foo",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "container-a",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+						UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+							Type: appsv1.OnDeleteStatefulSetStrategyType,
+						},
+					},
+				},
+			},
+			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1alpha1.ManualUpdateStrategyType,
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeA"},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeB"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList := expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+
+	g.Expect(stsList.Items[0].Spec.UpdateStrategy.Type).Should(gomega.BeEquivalentTo(appsv1.OnDeleteStatefulSetStrategyType))
+	g.Expect(stsList.Items[1].Spec.UpdateStrategy.Type).Should(gomega.BeEquivalentTo(appsv1.OnDeleteStatefulSetStrategyType))
+
+	// update with partition
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{
+			"subset-a": 4,
+			"subset-b": 3,
+		},
+	}
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:2.0"
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	stsA := getSubsetByName(stsList, "subset-a")
+	g.Expect(stsA).ShouldNot(gomega.BeNil())
+	g.Expect(stsA.Spec.UpdateStrategy.Type).Should(gomega.BeEquivalentTo(appsv1.OnDeleteStatefulSetStrategyType))
+	g.Expect(stsA.Spec.UpdateStrategy.RollingUpdate).Should(gomega.BeNil())
+
+	stsB := getSubsetByName(stsList, "subset-b")
+	g.Expect(stsB).ShouldNot(gomega.BeNil())
+	g.Expect(stsB.Spec.UpdateStrategy.Type).Should(gomega.BeEquivalentTo(appsv1.OnDeleteStatefulSetStrategyType))
+	g.Expect(stsB.Spec.UpdateStrategy.RollingUpdate).Should(gomega.BeNil())
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+		"subset-a": 4,
+		"subset-b": 3,
+	}))
+
+	// move on
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{
+			"subset-a": 0,
+			"subset-b": 3,
+		},
+	}
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+}
+
+func TestStsSubsetCount(t *testing.T) {
+	g, requests, stopMgr, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &ten,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "foo",
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": "foo",
+						},
+					},
+					Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": "foo",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "containerA",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeA"},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelector: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "node-name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"nodeB"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList := expectedStsCount(g, 2)
+	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	nine := intstr.FromInt(9)
+	instance.Spec.Topology.Subsets[0].Replicas = &nine
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	setsubA := getSubsetByName(stsList, "subset-a")
+	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(9))
+	setsubB := getSubsetByName(stsList, "subset-b")
+	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(1))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	percentage := intstr.FromString("40%")
+	instance.Spec.Topology.Subsets[0].Replicas = &percentage
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:2.0"
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	setsubA = getSubsetByName(stsList, "subset-a")
+	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
+	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+	setsubB = getSubsetByName(stsList, "subset-b")
+	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(6))
+	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	percentage = intstr.FromString("30%")
+	instance.Spec.Topology.Subsets[0].Replicas = &percentage
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:3.0"
+	instance.Spec.UpdateStrategy.Type = appsv1alpha1.ManualUpdateStrategyType
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+		Partitions: map[string]int32{
+			"subset-a": 1,
+		},
+	}
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 2)
+	setsubA = getSubsetByName(stsList, "subset-a")
+	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(3))
+	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:3.0"))
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate).ShouldNot(gomega.BeNil())
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(gomega.BeNil())
+	g.Expect(*setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(1))
+	setsubB = getSubsetByName(stsList, "subset-b")
+	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(7))
+	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:3.0"))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	percentage = intstr.FromString("20%")
+	instance.Spec.Topology.Subsets[0].Replicas = &percentage
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:4.0"
+	instance.Spec.UpdateStrategy.ManualUpdate.Partitions = map[string]int32{
+		"subset-a": 2,
+	}
+	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
+		Name: "subset-c",
+		NodeSelector: corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{
+				{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{
+							Key:      "node-name",
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   []string{"nodeC"},
+						},
+					},
+				},
+			},
+		},
+	})
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 3)
+	setsubA = getSubsetByName(stsList, "subset-a")
+	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(2))
+	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:4.0"))
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate).ShouldNot(gomega.BeNil())
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(gomega.BeNil())
+	g.Expect(*setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(2))
+	setsubB = getSubsetByName(stsList, "subset-b")
+	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
+	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:4.0"))
+	setsubB = getSubsetByName(stsList, "subset-c")
+	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
+	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:4.0"))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	percentage = intstr.FromString("10%")
+	instance.Spec.Topology.Subsets[0].Replicas = &percentage
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:5.0"
+	instance.Spec.UpdateStrategy.ManualUpdate.Partitions = map[string]int32{
+		"subset-a": 2,
+	}
+	instance.Spec.Topology.Subsets = instance.Spec.Topology.Subsets[:2]
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList = expectedStsCount(g, 2)
+	setsubA = getSubsetByName(stsList, "subset-a")
+	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(1))
+	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate).ShouldNot(gomega.BeNil())
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(gomega.BeNil())
+	g.Expect(*setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(1))
+	setsubB = getSubsetByName(stsList, "subset-b")
+	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(9))
+	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	g.Expect(instance.Spec.UpdateStrategy.ManualUpdate.Partitions["subset-a"]).Should(gomega.BeEquivalentTo(2))
+	percentage = intstr.FromString("40%")
+	instance.Spec.Topology.Subsets[0].Replicas = &percentage
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	stsList = expectedStsCount(g, 2)
+	setsubA = getSubsetByName(stsList, "subset-a")
+	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
+	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate).ShouldNot(gomega.BeNil())
+	g.Expect(setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(gomega.BeNil())
+	g.Expect(*setsubA.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(2))
+	setsubB = getSubsetByName(stsList, "subset-b")
+	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(6))
+	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
+}
+
+func collectPodOrdinal(c client.Client, sts *appsv1.StatefulSet, expected string) error {
+	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
+	if err != nil {
+		return err
+	}
+
+	podList := &corev1.PodList{}
+	if err := c.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, podList); err != nil {
+		return err
+	}
+
+	marks := make([]bool, len(podList.Items))
+	for _, pod := range podList.Items {
+		ordinal := int(getOrdinal(&pod))
+		if ordinal >= len(marks) || ordinal < 0 {
+			continue
+		}
+
+		marks[ordinal] = true
+	}
+
+	got := ""
+	for idx, mark := range marks {
+		if mark {
+			got = fmt.Sprintf("%s,%d", got, idx)
+		}
+	}
+
+	if len(got) > 0 {
+		got = got[1:]
+	}
+
+	if got != expected {
+		return fmt.Errorf("expected %s, got %s", expected, got)
+	}
+
+	return nil
+}
+
+func provisionStatefulSetMockPod(c client.Client, sts *appsv1.StatefulSet) error {
+	if sts.Spec.Replicas == nil {
+		return nil
+	}
+
+	replicas := *sts.Spec.Replicas
+	for {
+		replicas--
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: sts.Namespace,
+				Name:      fmt.Sprintf("%s-%d", sts.Name, replicas),
+				Labels:    sts.Spec.Template.Labels,
+			},
+			Spec: sts.Spec.Template.Spec,
+		}
+
+		if err := c.Create(context.TODO(), pod); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+
+		if replicas == 0 {
+			return nil
+		}
+	}
+}
+
 func waitReconcilerProcessFinished(g *gomega.GomegaWithT, requests chan reconcile.Request, minCount int) {
-	timeout := time.After(timeout)
+	timeoutChan := time.After(timeout)
+	maxTimeoutChan := time.After(timeout * 2)
 	for {
 		minCount--
 		select {
 		case <-requests:
 			continue
-		case <-timeout:
+		case <-timeoutChan:
 			if minCount <= 0 {
 				return
 			}
+		case <-maxTimeoutChan:
+			return
 		}
 	}
 }
