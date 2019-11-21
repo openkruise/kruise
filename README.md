@@ -27,6 +27,22 @@ A [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) by [Lachlan Evenson](http
 
 ## Getting started
 
+### Check before installation
+
+You should check the cluster before installation via the command-line with either `curl` or `wget`.
+
+#### via curl
+
+```bash
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/scripts/check_for_installation.sh)"
+```
+
+#### via wget
+
+```bash
+sh -c "$(wget -O- https://raw.githubusercontent.com/openkruise/kruise/master/scripts/check_for_installation.sh)"
+```
+
 ### Install with helm charts
 
 ```
