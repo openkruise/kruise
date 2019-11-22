@@ -31,6 +31,7 @@ metadata:
   namespace: kruise-system
 spec:
   replicas: 1
+  serviceName: kruise-controller-manager-service
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   selector:
     matchLabels:
