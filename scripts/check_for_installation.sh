@@ -24,7 +24,7 @@ spec:
 
 ---
 
-apiVersion: admissionregistration.k8s.io/v1
+apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: kruise-check-install-webhook-configuration
