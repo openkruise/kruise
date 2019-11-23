@@ -35,6 +35,15 @@ const (
 // UnitedDeploymentConditionType indicates valid conditions type of a UnitedDeployment.
 type UnitedDeploymentConditionType string
 
+const (
+	// SubsetProvisioned means all the expected subsets are provisioned and unexpected subsets are deleted.
+	SubsetProvisioned UnitedDeploymentConditionType = "SubsetProvisioned"
+	// SubsetUpdated means all the subsets are updated.
+	SubsetUpdated UnitedDeploymentConditionType = "SubsetUpdated"
+	// SubsetFailure is added in a UnitedDeployment when one of its subsets has failure during its own reconciling.
+	SubsetFailure UnitedDeploymentConditionType = "SubsetFailure"
+)
+
 // UnitedDeploymentSpec defines the desired state of UnitedDeployment
 type UnitedDeploymentSpec struct {
 	// Replicas is the totally desired number of replicas of all the owning workloads.
@@ -168,9 +177,6 @@ type UnitedDeploymentCondition struct {
 
 	// Status of the condition, one of True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status,omitempty"`
-
-	// The last time this condition was updated.
-	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
 
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`

@@ -158,13 +158,13 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
 
-	if err := r.manageSubsets(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType); err != nil {
+	newStatus, err := r.manageSubsets(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
+	if err != nil {
 		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
-		return reconcile.Result{}, nil
 	}
 
-	return r.updateStatus(instance, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount)
+	return r.updateStatus(instance, newStatus, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount, control)
 }
 
 func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface) (*map[string]*Subset, error) {
@@ -260,15 +260,13 @@ func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1alpha1.
 	return mapping
 }
 
-func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1alpha1.UnitedDeployment, oldStatus *appsv1alpha1.UnitedDeploymentStatus, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32) (reconcile.Result, error) {
-	newStatus := r.calculateStatus(instance, nameToSubset, nextReplicas, nextPartition, currentRevision, updatedRevision, collisionCount)
+func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1alpha1.UnitedDeployment, newStatus, oldStatus *appsv1alpha1.UnitedDeploymentStatus, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32, control ControlInterface) (reconcile.Result, error) {
+	newStatus = r.calculateStatus(instance, newStatus, nameToSubset, nextReplicas, nextPartition, currentRevision, updatedRevision, collisionCount, control)
 	_, err := r.updateUnitedDeployment(instance, oldStatus, newStatus)
 	return reconcile.Result{}, err
 }
 
-func (r *ReconcileUnitedDeployment) calculateStatus(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32) *appsv1alpha1.UnitedDeploymentStatus {
-	newStatus := ud.Status
-
+func (r *ReconcileUnitedDeployment) calculateStatus(ud *appsv1alpha1.UnitedDeployment, newStatus *appsv1alpha1.UnitedDeploymentStatus, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32, control ControlInterface) *appsv1alpha1.UnitedDeploymentStatus {
 	expectedRevision := currentRevision.Name
 	if updatedRevision != nil {
 		expectedRevision = updatedRevision.Name
@@ -306,7 +304,22 @@ func (r *ReconcileUnitedDeployment) calculateStatus(ud *appsv1alpha1.UnitedDeplo
 		newStatus.CurrentRevision = newStatus.UpdateStatus.UpdatedRevision
 	}
 
-	return &newStatus
+	var subsetFailure *string
+	for _, subset := range *nameToSubset {
+		failureMessage := control.GetSubsetFailure(subset)
+		if failureMessage != nil {
+			subsetFailure = failureMessage
+			break
+		}
+	}
+
+	if subsetFailure == nil {
+		RemoveUnitedDeploymentCondition(newStatus, appsv1alpha1.SubsetFailure)
+	} else {
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetFailure, corev1.ConditionTrue, "Error", *subsetFailure))
+	}
+
+	return newStatus
 }
 
 var replicasStatusFn = replicasStatus
@@ -332,7 +345,8 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 		oldStatus.CollisionCount == newStatus.CollisionCount &&
 		ud.Generation == newStatus.ObservedGeneration &&
 		reflect.DeepEqual(oldStatus.SubsetReplicas, newStatus.SubsetReplicas) &&
-		reflect.DeepEqual(oldStatus.UpdateStatus, newStatus.UpdateStatus) {
+		reflect.DeepEqual(oldStatus.UpdateStatus, newStatus.UpdateStatus) &&
+		reflect.DeepEqual(oldStatus.Conditions, newStatus.Conditions) {
 		return ud, nil
 	}
 

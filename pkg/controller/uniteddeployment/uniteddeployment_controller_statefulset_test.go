@@ -561,7 +561,7 @@ func TestStsUpdate(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "containerA",
+										Name:  "container-a",
 										Image: "nginx:1.0",
 									},
 								},
@@ -1172,7 +1172,7 @@ func TestStsSubsetCount(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "containerA",
+										Name:  "container-a",
 										Image: "nginx:1.0",
 									},
 								},

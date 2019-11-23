@@ -45,7 +45,7 @@ type StatefulSetControl struct {
 }
 
 // GetAllSubsets returns all of subsets owned by the UnitedDeployment.
-func (m *StatefulSetControl) GetAllSubsets(ud *alpha1.UnitedDeployment) (podSets []*Subset, err error) {
+func (m *StatefulSetControl) GetAllSubsets(ud *alpha1.UnitedDeployment) (subSets []*Subset, err error) {
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -71,13 +71,13 @@ func (m *StatefulSetControl) GetAllSubsets(ud *alpha1.UnitedDeployment) (podSets
 	}
 
 	for _, claimedSet := range claimedSets {
-		podSet, err := m.convertToSubset(claimedSet.(*appsv1.StatefulSet))
+		subSet, err := m.convertToSubset(claimedSet.(*appsv1.StatefulSet))
 		if err != nil {
 			return nil, err
 		}
-		podSets = append(podSets, podSet)
+		subSets = append(subSets, subSet)
 	}
-	return podSets, nil
+	return subSets, nil
 }
 
 // CreateSubset creates the StatefulSet depending on the inputs.
@@ -193,9 +193,15 @@ func (m *StatefulSetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeplo
 }
 
 // DeleteSubset is called to delete the subset. The target StatefulSet can be found with the input subset.
-func (m *StatefulSetControl) DeleteSubset(podSet *Subset) error {
-	set := podSet.Spec.SubsetRef.Resources[0].(*appsv1.StatefulSet)
+func (m *StatefulSetControl) DeleteSubset(subSet *Subset) error {
+	set := subSet.Spec.SubsetRef.Resources[0].(*appsv1.StatefulSet)
 	return m.Delete(context.TODO(), set, client.PropagationPolicy(metav1.DeletePropagationBackground))
+}
+
+// GetSubsetFailure return the error message extracted form StatefulSet status conditions.
+func (m *StatefulSetControl) GetSubsetFailure(setSet *Subset) *string {
+	// StatefulSet has not condition
+	return nil
 }
 
 func (m *StatefulSetControl) convertToSubset(set *appsv1.StatefulSet) (*Subset, error) {

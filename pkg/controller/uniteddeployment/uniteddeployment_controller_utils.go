@@ -113,3 +113,56 @@ func getRevision(objMeta metav1.Object) string {
 	}
 	return objMeta.GetLabels()[appsv1alpha1.ControllerRevisionHashLabelKey]
 }
+
+// NewUnitedDeploymentCondition creates a new UnitedDeployment condition.
+func NewUnitedDeploymentCondition(condType appsv1alpha1.UnitedDeploymentConditionType, status corev1.ConditionStatus, reason, message string) *appsv1alpha1.UnitedDeploymentCondition {
+	return &appsv1alpha1.UnitedDeploymentCondition{
+		Type:               condType,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// GetUnitedDeploymentCondition returns the condition with the provided type.
+func GetUnitedDeploymentCondition(status appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) *appsv1alpha1.UnitedDeploymentCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetUnitedDeploymentCondition updates the UnitedDeployment to include the provided condition. If the condition that
+// we are about to add already exists and has the same status, reason and message then we are not going to update.
+func SetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condition *appsv1alpha1.UnitedDeploymentCondition) {
+	currentCond := GetUnitedDeploymentCondition(*status, condition.Type)
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason && currentCond.Message == condition.Message {
+		return
+	}
+
+	if currentCond != nil && currentCond.Status == condition.Status {
+		condition.LastTransitionTime = currentCond.LastTransitionTime
+	}
+	newConditions := filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(newConditions, *condition)
+}
+
+// RemoveUnitedDeploymentCondition removes the UnitedDeployment condition with the provided type.
+func RemoveUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) {
+	status.Conditions = filterOutCondition(status.Conditions, condType)
+}
+
+func filterOutCondition(conditions []appsv1alpha1.UnitedDeploymentCondition, condType appsv1alpha1.UnitedDeploymentConditionType) []appsv1alpha1.UnitedDeploymentCondition {
+	var newConditions []appsv1alpha1.UnitedDeploymentCondition
+	for _, c := range conditions {
+		if c.Type == condType {
+			continue
+		}
+		newConditions = append(newConditions, c)
+	}
+	return newConditions
+}
