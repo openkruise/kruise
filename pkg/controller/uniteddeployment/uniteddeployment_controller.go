@@ -274,24 +274,19 @@ func (r *ReconcileUnitedDeployment) calculateStatus(ud *appsv1alpha1.UnitedDeplo
 		expectedRevision = updatedRevision.Name
 	}
 
-	var replicas int32
-	var readyReplicas int32
-	var updatedReplicas int32
-	var updatedReadyReplicas int32
+	newStatus.Replicas = 0
+	newStatus.ReadyReplicas = 0
+	newStatus.UpdatedReplicas = 0
+	newStatus.UpdatedReadyReplicas = 0
 
 	// sync from status
 	for _, subset := range *nameToSubset {
 		subsetReplicas, subsetReadyReplicas, subsetUpdatedReplicas, subsetUpdatedReadyReplicas := replicasStatusFn(subset, expectedRevision)
-		replicas += subsetReplicas
-		readyReplicas += subsetReadyReplicas
-		updatedReplicas += subsetUpdatedReplicas
-		updatedReadyReplicas += subsetUpdatedReadyReplicas
+		newStatus.Replicas += subsetReplicas
+		newStatus.ReadyReplicas += subsetReadyReplicas
+		newStatus.UpdatedReplicas += subsetUpdatedReplicas
+		newStatus.UpdatedReadyReplicas += subsetUpdatedReadyReplicas
 	}
-
-	newStatus.Replicas = replicas
-	newStatus.ReadyReplicas = readyReplicas
-	newStatus.UpdatedReplicas = updatedReplicas
-	newStatus.UpdatedReadyReplicas = updatedReadyReplicas
 
 	newStatus.SubsetReplicas = *nextReplicas
 
@@ -307,7 +302,7 @@ func (r *ReconcileUnitedDeployment) calculateStatus(ud *appsv1alpha1.UnitedDeplo
 	newStatus.UpdateStatus.UpdatedRevision = expectedRevision
 	newStatus.UpdateStatus.CurrentPartitions = *nextPartition
 
-	if newStatus.UpdateStatus != nil && newStatus.UpdateStatus.UpdatedRevision != newStatus.CurrentRevision && newStatus.UpdatedReadyReplicas >= newStatus.Replicas {
+	if newStatus.UpdateStatus.UpdatedRevision != newStatus.CurrentRevision && newStatus.UpdatedReadyReplicas >= newStatus.Replicas {
 		newStatus.CurrentRevision = newStatus.UpdateStatus.UpdatedRevision
 	}
 

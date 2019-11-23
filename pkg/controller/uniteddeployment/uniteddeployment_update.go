@@ -44,10 +44,9 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	var needUpdate []string
 	for _, name := range exists.List() {
 		subset := (*nameToSubset)[name]
-		expectedPartition := (*nextPartitions)[name]
 		if subset.Labels[appsv1alpha1.ControllerRevisionHashLabelKey] != expectedRevision.Name ||
 			subset.Spec.Replicas != (*nextReplicas)[name] ||
-			subset.Spec.UpdateStrategy.Partition != expectedPartition {
+			subset.Spec.UpdateStrategy.Partition != (*nextPartitions)[name] {
 			needUpdate = append(needUpdate, name)
 		}
 	}
@@ -63,11 +62,11 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 		partition := (*nextPartitions)[cell]
 
 		klog.V(0).Infof("UnitedDeployment %s/%s needs to update Subset (%s) %s/%s with revision %s, replicas %d, partition %d", ud.Namespace, ud.Name, subsetType, subset.Namespace, subset.Name, expectedRevision.Name, replicas, partition)
-		updateIpsErr := r.subSetControls[subsetType].UpdateSubset(subset, ud, expectedRevision.Name, replicas, partition)
-		if updateIpsErr != nil {
-			r.recorder.Event(ud.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), fmt.Sprintf("Error updating PodSet (%s) %s when updating: %s", subsetType, subset.Name, updateIpsErr))
+		updateSubsetErr := r.subSetControls[subsetType].UpdateSubset(subset, ud, expectedRevision.Name, replicas, partition)
+		if updateSubsetErr != nil {
+			r.recorder.Event(ud.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), fmt.Sprintf("Error updating PodSet (%s) %s when updating: %s", subsetType, subset.Name, updateSubsetErr))
 		}
-		return updateIpsErr
+		return updateSubsetErr
 	})
 
 	return
