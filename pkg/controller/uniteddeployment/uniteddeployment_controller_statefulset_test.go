@@ -947,8 +947,8 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 	g.Expect(provisionStatefulSetMockPod(c, &stsList.Items[0])).Should(gomega.BeNil())
 	g.Expect(provisionStatefulSetMockPod(c, &stsList.Items[1])).Should(gomega.BeNil())
 
-	g.Expect(collectPodOrdinal(c, &stsList.Items[0], "0,1,2,3,4")).Should(gomega.BeNil())
-	g.Expect(collectPodOrdinal(c, &stsList.Items[1], "0,1,2,3,4")).Should(gomega.BeNil())
+	g.Expect(retry(func() error { return collectPodOrdinal(c, &stsList.Items[0], "0,1,2,3,4") })).Should(gomega.BeNil())
+	g.Expect(retry(func() error { return collectPodOrdinal(c, &stsList.Items[1], "0,1,2,3,4") })).Should(gomega.BeNil())
 
 	// update with partition
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
@@ -1367,6 +1367,19 @@ func TestStsSubsetCount(t *testing.T) {
 	setsubB = getSubsetByName(stsList, "subset-b")
 	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(6))
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
+}
+
+func retry(assert func() error) error {
+	var err error
+	for i := 0; i < 3; i++ {
+		err = assert()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return err
 }
 
 func collectPodOrdinal(c client.Client, sts *appsv1.StatefulSet, expected string) error {
