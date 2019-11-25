@@ -32,6 +32,18 @@ const (
 	ManualUpdateStrategyType UpdateStrategyType = "Manual"
 )
 
+// UnitedDeploymentConditionType indicates valid conditions type of a UnitedDeployment.
+type UnitedDeploymentConditionType string
+
+const (
+	// SubsetProvisioned means all the expected subsets are provisioned and unexpected subsets are deleted.
+	SubsetProvisioned UnitedDeploymentConditionType = "SubsetProvisioned"
+	// SubsetUpdated means all the subsets are updated.
+	SubsetUpdated UnitedDeploymentConditionType = "SubsetUpdated"
+	// SubsetFailure is added in a UnitedDeployment when one of its subsets has failure during its own reconciling.
+	SubsetFailure UnitedDeploymentConditionType = "SubsetFailure"
+)
+
 // UnitedDeploymentSpec defines the desired state of UnitedDeployment
 type UnitedDeploymentSpec struct {
 	// Replicas is the totally desired number of replicas of all the owning workloads.
@@ -157,9 +169,6 @@ type UnitedDeploymentStatus struct {
 	// +optional
 	UpdateStatus *UpdateStatus `json:"updateStatus,omitempty"`
 }
-
-// UnitedDeploymentConditionType indicates valid conditions type of a UnitedDeployment.
-type UnitedDeploymentConditionType string
 
 // UnitedDeploymentCondition describes current state of a UnitedDeployment.
 type UnitedDeploymentCondition struct {

@@ -61,7 +61,7 @@ func TestReconcile(t *testing.T) {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name:  "containerA",
+										Name:  "container-a",
 										Image: "nginx:1.0",
 									},
 								},
@@ -73,7 +73,7 @@ func TestReconcile(t *testing.T) {
 			Topology: appsv1alpha1.Topology{
 				Subsets: []appsv1alpha1.Subset{
 					{
-						Name: "subsetA",
+						Name: "subset-a",
 						NodeSelector: corev1.NodeSelector{
 							NodeSelectorTerms: []corev1.NodeSelectorTerm{
 								{

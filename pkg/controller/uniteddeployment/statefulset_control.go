@@ -45,7 +45,7 @@ type StatefulSetControl struct {
 }
 
 // GetAllSubsets returns all of subsets owned by the UnitedDeployment.
-func (m *StatefulSetControl) GetAllSubsets(ud *alpha1.UnitedDeployment) (podSets []*Subset, err error) {
+func (m *StatefulSetControl) GetAllSubsets(ud *alpha1.UnitedDeployment) (subSets []*Subset, err error) {
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -71,13 +71,13 @@ func (m *StatefulSetControl) GetAllSubsets(ud *alpha1.UnitedDeployment) (podSets
 	}
 
 	for _, claimedSet := range claimedSets {
-		podSet, err := m.convertToSubset(claimedSet.(*appsv1.StatefulSet))
+		subSet, err := m.convertToSubset(claimedSet.(*appsv1.StatefulSet))
 		if err != nil {
 			return nil, err
 		}
-		podSets = append(podSets, podSet)
+		subSets = append(subSets, subSet)
 	}
-	return podSets, nil
+	return subSets, nil
 }
 
 // CreateSubset creates the StatefulSet depending on the inputs.
@@ -134,19 +134,27 @@ func applyStatefulSetTemplate(ud *alpha1.UnitedDeployment, subsetName string, re
 
 	set.Spec.Selector = selectors
 	set.Spec.Replicas = &replicas
-	if set.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+	if ud.Spec.Template.StatefulSetTemplate.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
+		set.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+	} else {
 		if set.Spec.UpdateStrategy.RollingUpdate == nil {
 			set.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
 		}
 		set.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 	}
 
-	set.Spec.Template = *ud.Spec.Template.StatefulSetTemplate.Spec.Template.DeepCopy()
+	set.Spec.Template = ud.Spec.Template.StatefulSetTemplate.Spec.Template
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
 	}
 	set.Spec.Template.Labels[alpha1.SubSetNameLabelKey] = subsetName
 	set.Spec.Template.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+
+	set.Spec.RevisionHistoryLimit = ud.Spec.Template.StatefulSetTemplate.Spec.RevisionHistoryLimit
+	set.Spec.PodManagementPolicy = ud.Spec.Template.StatefulSetTemplate.Spec.PodManagementPolicy
+	set.Spec.ServiceName = ud.Spec.Template.StatefulSetTemplate.Spec.ServiceName
+	set.Spec.VolumeClaimTemplates = ud.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates
+
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 
 	return nil
@@ -185,9 +193,15 @@ func (m *StatefulSetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeplo
 }
 
 // DeleteSubset is called to delete the subset. The target StatefulSet can be found with the input subset.
-func (m *StatefulSetControl) DeleteSubset(podSet *Subset) error {
-	set := podSet.Spec.SubsetRef.Resources[0].(*appsv1.StatefulSet)
+func (m *StatefulSetControl) DeleteSubset(subSet *Subset) error {
+	set := subSet.Spec.SubsetRef.Resources[0].(*appsv1.StatefulSet)
 	return m.Delete(context.TODO(), set, client.PropagationPolicy(metav1.DeletePropagationBackground))
+}
+
+// GetSubsetFailure return the error message extracted form StatefulSet status conditions.
+func (m *StatefulSetControl) GetSubsetFailure(setSet *Subset) *string {
+	// StatefulSet has not condition
+	return nil
 }
 
 func (m *StatefulSetControl) convertToSubset(set *appsv1.StatefulSet) (*Subset, error) {

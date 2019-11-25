@@ -30,7 +30,58 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartitions *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, error) {
+func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartitions *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (newStatus *appsv1alpha1.UnitedDeploymentStatus, updateErr error) {
+	newStatus = ud.Status.DeepCopy()
+	exists, provisioned, err := r.manageSubsetProvision(ud, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
+	if err != nil {
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetProvisioned, corev1.ConditionFalse, "Error", err.Error()))
+		return newStatus, fmt.Errorf("fail to manage Subset provision: %s", err)
+	}
+
+	if provisioned {
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetProvisioned, corev1.ConditionTrue, "", ""))
+	}
+
+	expectedRevision := currentRevision
+	if updatedRevision != nil {
+		expectedRevision = updatedRevision
+	}
+
+	var needUpdate []string
+	for _, name := range exists.List() {
+		subset := (*nameToSubset)[name]
+		if subset.Labels[appsv1alpha1.ControllerRevisionHashLabelKey] != expectedRevision.Name ||
+			subset.Spec.Replicas != (*nextReplicas)[name] ||
+			subset.Spec.UpdateStrategy.Partition != (*nextPartitions)[name] {
+			needUpdate = append(needUpdate, name)
+		}
+	}
+
+	if len(needUpdate) > 0 {
+		_, updateErr = util.SlowStartBatch(len(needUpdate), slowStartInitialBatchSize, func(index int) error {
+			cell := needUpdate[index]
+			subset := (*nameToSubset)[cell]
+			replicas := (*nextReplicas)[cell]
+			partition := (*nextPartitions)[cell]
+
+			klog.V(0).Infof("UnitedDeployment %s/%s needs to update Subset (%s) %s/%s with revision %s, replicas %d, partition %d", ud.Namespace, ud.Name, subsetType, subset.Namespace, subset.Name, expectedRevision.Name, replicas, partition)
+			updateSubsetErr := r.subSetControls[subsetType].UpdateSubset(subset, ud, expectedRevision.Name, replicas, partition)
+			if updateSubsetErr != nil {
+				r.recorder.Event(ud.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), fmt.Sprintf("Error updating PodSet (%s) %s when updating: %s", subsetType, subset.Name, updateSubsetErr))
+			}
+			return updateSubsetErr
+		})
+	}
+
+	if updateErr == nil {
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetUpdated, corev1.ConditionTrue, "", ""))
+	} else {
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetUpdated, corev1.ConditionFalse, "Error", updateErr.Error()))
+	}
+	return
+}
+
+func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextReplicas, nextPartitions *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, bool, error) {
 	expectedSubsets := sets.String{}
 	gotSubsets := sets.String{}
 
@@ -118,6 +169,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 	}
 
 	// clean the other kind of subsets
+	cleaned := false
 	for t, control := range r.subSetControls {
 		if t == subsetType {
 			continue
@@ -130,6 +182,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		}
 
 		for _, subset := range subsets {
+			cleaned = true
 			if err := control.DeleteSubset(subset); err != nil {
 				errs = append(errs, fmt.Errorf("fail to delete Subset %s of other type %s for UnitedDeployment %s/%s: %s", subset.Name, t, ud.Namespace, ud.Name, err))
 				continue
@@ -137,5 +190,5 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		}
 	}
 
-	return expectedSubsets.Intersection(gotSubsets), utilerrors.NewAggregate(errs)
+	return expectedSubsets.Intersection(gotSubsets), len(creates) > 0 || len(deletes) > 0 || cleaned, utilerrors.NewAggregate(errs)
 }

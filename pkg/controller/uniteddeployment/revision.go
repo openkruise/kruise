@@ -60,8 +60,8 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDe
 	}
 
 	mts := make([]metav1.Object, len(histories.Items))
-	for i, pod := range histories.Items {
-		mts[i] = pod.DeepCopy()
+	for i, history := range histories.Items {
+		mts[i] = history.DeepCopy()
 	}
 	claims, err := cm.ClaimOwnedObjects(mts)
 	if err != nil {
