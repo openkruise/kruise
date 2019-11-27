@@ -4,9 +4,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/openkruise/kruise)](https://goreportcard.com/report/github.com/openkruise/kruise)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2908/badge)](https://bestpractices.coreinfrastructure.org/en/projects/2908)
 
-|![notification](docs/img/bell-outline-badge.svg)Community Meeting|
+|![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
-|The Kruise Project holds bi-weekly community calls. To join us and watch previous meeting notes and recordings, please see [meeting schedule](https://github.com/openkruise/project/blob/master/MEETING_SCHEDULE.md).|
+|Nov 24th, 2019. A blog about new UnitedDeployment controller is posted in Kruise Blog ([link](http://openkruise.io/en-us/blog/blog3.html)).|
 
 Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
 
