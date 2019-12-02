@@ -147,6 +147,29 @@ func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec
 func validateUnitedDeploymentSpecUpdate(spec, oldSpec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateSubsetTemplateUpdate(&spec.Template, &oldSpec.Template, fldPath.Child("template"))...)
+	allErrs = append(allErrs, validateUnitedDeploymentTopology(&spec.Topology, &oldSpec.Topology, fldPath.Child("topology"))...)
+
+	return allErrs
+}
+
+func validateUnitedDeploymentTopology(topology, oldTopology *appsv1alpha1.Topology, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if topology == nil || oldTopology == nil {
+		return allErrs
+	}
+
+	oldSubsets := map[string]*appsv1alpha1.Subset{}
+	for i, subset := range oldTopology.Subsets {
+		oldSubsets[subset.Name] = &oldTopology.Subsets[i]
+	}
+
+	for i, subset := range topology.Subsets {
+		if oldSubset, exist := oldSubsets[subset.Name]; exist {
+			if !apiequality.Semantic.DeepEqual(oldSubset.NodeSelector, subset.NodeSelector) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("nodeSelector"), "may not be changed in an update"))
+			}
+		}
+	}
 
 	return allErrs
 }
@@ -190,8 +213,7 @@ func validateStatefulSet(statefulSet *appsv1alpha1.StatefulSetTemplateSpec, fldP
 }
 
 func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, fldPath.Child("metadata"))
-
+	allErrs := field.ErrorList{}
 	restoreReplicas := statefulSet.Spec.Replicas
 	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
 
@@ -208,6 +230,8 @@ func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.Statefu
 	statefulSet.Spec.Template = restoreTemplate
 	statefulSet.Spec.UpdateStrategy = restoreStrategy
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	if statefulSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	}
 	return allErrs
 }

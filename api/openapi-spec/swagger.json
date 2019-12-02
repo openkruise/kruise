@@ -856,7 +856,7 @@
           "type": "string"
         },
         "nodeSelector": {
-          "description": "Indicates the node select strategy to form the subset.",
+          "description": "Indicates the node select strategy to form the subset. A subset's nodeSelector is not allowed to be updated.",
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector"
         },
         "replicas": {
