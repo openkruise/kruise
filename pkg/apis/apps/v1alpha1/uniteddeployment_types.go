@@ -118,6 +118,7 @@ type Subset struct {
 	Name string `json:"name"`
 
 	// Indicates the node select strategy to form the subset.
+	// A subset's nodeSelector is not allowed to be updated.
 	// +optional
 	NodeSelector corev1.NodeSelector `json:"nodeSelector,omitempty"`
 

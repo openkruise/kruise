@@ -1537,7 +1537,7 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates the node select strategy to form the subset.",
+							Description: "Indicates the node select strategy to form the subset. A subset's nodeSelector is not allowed to be updated.",
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},

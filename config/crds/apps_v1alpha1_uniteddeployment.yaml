@@ -103,7 +103,7 @@ spec:
                         type: string
                       nodeSelector:
                         description: Indicates the node select strategy to form the
-                          subset.
+                          subset. A subset's nodeSelector is not allowed to be updated.
                         type: object
                       replicas:
                         description: Indicates the number of the subset replicas or
