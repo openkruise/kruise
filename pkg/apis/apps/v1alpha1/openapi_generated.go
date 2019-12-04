@@ -890,7 +890,7 @@ func schema_pkg_apis_apps_v1alpha1_ManualUpdate(ref common.ReferenceCallback) co
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ManualUpdate is a update strategy which allow users to provide the partition of each subset.",
+				Description: "ManualUpdate is a update strategy which allows users to control the update progress by providing the partition of each subset.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"partitions": {
@@ -1530,20 +1530,20 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates the name of this subset, which will be used to generate subset workload name prefix in the format '<deployment-name>-<subset-name>-'.",
+							Description: "Indicates subset name as a DNS_LABEL, which will be used to generate subset workload name prefix in the format '<deployment-name>-<subset-name>-'. Name should be unique between all of the subsets under one UnitedDeployment.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates the node select strategy to form the subset. A subset's nodeSelector is not allowed to be updated.",
+							Description: "Indicates the node selector to form the subset. Depending on the node selector, pods provisioned could be distributed across multiple groups of nodes. A subset's nodeSelector is not allowed to be updated.",
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
+							Description: "Indicates the number of the pod to be created under this subset. Replicas could also be percentage like '10%', which means 10% of UnitedDeployment replicas of pods will be distributed under this subset. If nil, the number of replicas in this subset is determined by controller. Controller will try to keep all the subsets with nil replicas have average pods.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -1560,7 +1560,7 @@ func schema_pkg_apis_apps_v1alpha1_SubsetTemplate(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "SubsetTemplate defines the subset under the UnitedDeployment.",
+				Description: "SubsetTemplate defines the subset template under the UnitedDeployment. UnitedDeployment will provision every subset based on one workload templates in SubsetTemplate.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"statefulSetTemplate": {
@@ -1581,12 +1581,12 @@ func schema_pkg_apis_apps_v1alpha1_Topology(ref common.ReferenceCallback) common
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Topology defines the spread detail of each subset under UnitedDeployment.",
+				Description: "Topology defines the spread detail of each subset under UnitedDeployment. A UnitedDeployment manages multiple homogeneous workloads which are called subset. Each of subsets under the UnitedDeployment is described in Topology.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"subsets": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Contains the details of each subset.",
+							Description: "Contains the details of each subset. Each element in this array represents one subset which will be provisioned and managed by UnitedDeployment.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1749,12 +1749,12 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "UnitedDeploymentSpec defines the desired state of UnitedDeployment",
+				Description: "UnitedDeploymentSpec defines the desired state of UnitedDeployment.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Replicas is the totally desired number of replicas of all the owning workloads. If unspecified, defaults to 1.",
+							Description: "Replicas is the total desired replicas of all the subsets. If unspecified, defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1767,19 +1767,19 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref common.ReferenceCall
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Template is the object that describes the subset that will be created.",
+							Description: "Template describes the subset that will be created.",
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SubsetTemplate"),
 						},
 					},
 					"topology": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Contains the information of subset topology.",
+							Description: "Topology describes the pods distribution detail between each of subsets.",
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.Topology"),
 						},
 					},
 					"updateStrategy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Strategy indicates the action of updating",
+							Description: "UpdateStrategy indicates the strategy the UnitedDeployment use to preform the update, when template is changed.",
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentUpdateStrategy"),
 						},
 					},
@@ -1902,19 +1902,19 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref common.Ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
+				Description: "UnitedDeploymentUpdateStrategy defines the update performance when template of UnitedDeployment is changed.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type of UnitedDeployment update. Default is Manual.",
+							Description: "Type of UnitedDeployment update strategy. Default is Manual.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"manualUpdate": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate the partition of each subset.",
+							Description: "Includes all of the parameters a Manual update strategy needs.",
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate"),
 						},
 					},

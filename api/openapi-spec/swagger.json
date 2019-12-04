@@ -482,7 +482,7 @@
       }
     },
     "kruise.apps.v1alpha1.ManualUpdate": {
-      "description": "ManualUpdate is a update strategy which allow users to provide the partition of each subset.",
+      "description": "ManualUpdate is a update strategy which allows users to control the update progress by providing the partition of each subset.",
       "type": "object",
       "properties": {
         "partitions": {
@@ -852,21 +852,21 @@
       ],
       "properties": {
         "name": {
-          "description": "Indicates the name of this subset, which will be used to generate subset workload name prefix in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e-'.",
+          "description": "Indicates subset name as a DNS_LABEL, which will be used to generate subset workload name prefix in the format '\u003cdeployment-name\u003e-\u003csubset-name\u003e-'. Name should be unique between all of the subsets under one UnitedDeployment.",
           "type": "string"
         },
         "nodeSelector": {
-          "description": "Indicates the node select strategy to form the subset. A subset's nodeSelector is not allowed to be updated.",
+          "description": "Indicates the node selector to form the subset. Depending on the node selector, pods provisioned could be distributed across multiple groups of nodes. A subset's nodeSelector is not allowed to be updated.",
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector"
         },
         "replicas": {
-          "description": "Indicates the number of the subset replicas or percentage of it on the UnitedDeployment replicas. If nil, the number of replicas in this subset is determined by controller.",
+          "description": "Indicates the number of the pod to be created under this subset. Replicas could also be percentage like '10%', which means 10% of UnitedDeployment replicas of pods will be distributed under this subset. If nil, the number of replicas in this subset is determined by controller. Controller will try to keep all the subsets with nil replicas have average pods.",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
         }
       }
     },
     "kruise.apps.v1alpha1.SubsetTemplate": {
-      "description": "SubsetTemplate defines the subset under the UnitedDeployment.",
+      "description": "SubsetTemplate defines the subset template under the UnitedDeployment. UnitedDeployment will provision every subset based on one workload templates in SubsetTemplate.",
       "type": "object",
       "properties": {
         "statefulSetTemplate": {
@@ -876,11 +876,11 @@
       }
     },
     "kruise.apps.v1alpha1.Topology": {
-      "description": "Topology defines the spread detail of each subset under UnitedDeployment.",
+      "description": "Topology defines the spread detail of each subset under UnitedDeployment. A UnitedDeployment manages multiple homogeneous workloads which are called subset. Each of subsets under the UnitedDeployment is described in Topology.",
       "type": "object",
       "properties": {
         "subsets": {
-          "description": "Contains the details of each subset.",
+          "description": "Contains the details of each subset. Each element in this array represents one subset which will be provisioned and managed by UnitedDeployment.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/kruise.apps.v1alpha1.Subset"
@@ -964,14 +964,14 @@
       }
     },
     "kruise.apps.v1alpha1.UnitedDeploymentSpec": {
-      "description": "UnitedDeploymentSpec defines the desired state of UnitedDeployment",
+      "description": "UnitedDeploymentSpec defines the desired state of UnitedDeployment.",
       "type": "object",
       "required": [
         "selector"
       ],
       "properties": {
         "replicas": {
-          "description": "Replicas is the totally desired number of replicas of all the owning workloads. If unspecified, defaults to 1.",
+          "description": "Replicas is the total desired replicas of all the subsets. If unspecified, defaults to 1.",
           "type": "integer",
           "format": "int32"
         },
@@ -985,15 +985,15 @@
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
         },
         "template": {
-          "description": "Template is the object that describes the subset that will be created.",
+          "description": "Template describes the subset that will be created.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.SubsetTemplate"
         },
         "topology": {
-          "description": "Contains the information of subset topology.",
+          "description": "Topology describes the pods distribution detail between each of subsets.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.Topology"
         },
         "updateStrategy": {
-          "description": "Strategy indicates the action of updating",
+          "description": "UpdateStrategy indicates the strategy the UnitedDeployment use to preform the update, when template is changed.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy"
         }
       }
@@ -1063,15 +1063,15 @@
       }
     },
     "kruise.apps.v1alpha1.UnitedDeploymentUpdateStrategy": {
-      "description": "UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.",
+      "description": "UnitedDeploymentUpdateStrategy defines the update performance when template of UnitedDeployment is changed.",
       "type": "object",
       "properties": {
         "manualUpdate": {
-          "description": "Indicate the partition of each subset.",
+          "description": "Includes all of the parameters a Manual update strategy needs.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.ManualUpdate"
         },
         "type": {
-          "description": "Type of UnitedDeployment update. Default is Manual.",
+          "description": "Type of UnitedDeployment update strategy. Default is Manual.",
           "type": "string"
         }
       }

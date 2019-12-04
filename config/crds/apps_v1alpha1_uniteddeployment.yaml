@@ -61,8 +61,8 @@ spec:
         spec:
           properties:
             replicas:
-              description: Replicas is the totally desired number of replicas of all
-                the owning workloads. If unspecified, defaults to 1.
+              description: Replicas is the total desired replicas of all the subsets.
+                If unspecified, defaults to 1.
               format: int32
               type: integer
             revisionHistoryLimit:
@@ -75,8 +75,7 @@ spec:
                 replica count. It must match the pod template's labels.
               type: object
             template:
-              description: Template is the object that describes the subset that will
-                be created.
+              description: Template describes the subset that will be created.
               properties:
                 statefulSetTemplate:
                   description: StatefulSet template
@@ -90,25 +89,35 @@ spec:
                   type: object
               type: object
             topology:
-              description: Contains the information of subset topology.
+              description: Topology describes the pods distribution detail between
+                each of subsets.
               properties:
                 subsets:
-                  description: Contains the details of each subset.
+                  description: Contains the details of each subset. Each element in
+                    this array represents one subset which will be provisioned and
+                    managed by UnitedDeployment.
                   items:
                     properties:
                       name:
-                        description: Indicates the name of this subset, which will
+                        description: Indicates subset name as a DNS_LABEL, which will
                           be used to generate subset workload name prefix in the format
-                          '<deployment-name>-<subset-name>-'.
+                          '<deployment-name>-<subset-name>-'. Name should be unique
+                          between all of the subsets under one UnitedDeployment.
                         type: string
                       nodeSelector:
-                        description: Indicates the node select strategy to form the
-                          subset. A subset's nodeSelector is not allowed to be updated.
+                        description: Indicates the node selector to form the subset.
+                          Depending on the node selector, pods provisioned could be
+                          distributed across multiple groups of nodes. A subset's
+                          nodeSelector is not allowed to be updated.
                         type: object
                       replicas:
-                        description: Indicates the number of the subset replicas or
-                          percentage of it on the UnitedDeployment replicas. If nil,
-                          the number of replicas in this subset is determined by controller.
+                        description: Indicates the number of the pod to be created
+                          under this subset. Replicas could also be percentage like
+                          '10%', which means 10% of UnitedDeployment replicas of pods
+                          will be distributed under this subset. If nil, the number
+                          of replicas in this subset is determined by controller.
+                          Controller will try to keep all the subsets with nil replicas
+                          have average pods.
                         oneOf:
                         - type: string
                         - type: integer
@@ -118,17 +127,20 @@ spec:
                   type: array
               type: object
             updateStrategy:
-              description: Strategy indicates the action of updating
+              description: UpdateStrategy indicates the strategy the UnitedDeployment
+                use to preform the update, when template is changed.
               properties:
                 manualUpdate:
-                  description: Indicate the partition of each subset.
+                  description: Includes all of the parameters a Manual update strategy
+                    needs.
                   properties:
                     partitions:
                       description: Indicates number of subset partition.
                       type: object
                   type: object
                 type:
-                  description: Type of UnitedDeployment update. Default is Manual.
+                  description: Type of UnitedDeployment update strategy. Default is
+                    Manual.
                   type: string
               type: object
           required:
