@@ -28,7 +28,9 @@ import (
 type UpdateStrategyType string
 
 const (
-	// ManualUpdateStrategyType indicate the partition of each subset.
+	// ManualUpdateStrategyType indicates the partition of each subset.
+	// The update progress is able to be controlled by updating the partitions
+	// of each subset.
 	ManualUpdateStrategyType UpdateStrategyType = "Manual"
 )
 
@@ -40,13 +42,13 @@ const (
 	SubsetProvisioned UnitedDeploymentConditionType = "SubsetProvisioned"
 	// SubsetUpdated means all the subsets are updated.
 	SubsetUpdated UnitedDeploymentConditionType = "SubsetUpdated"
-	// SubsetFailure is added in a UnitedDeployment when one of its subsets has failure during its own reconciling.
+	// SubsetFailure is added to a UnitedDeployment when one of its subsets has failure during its own reconciling.
 	SubsetFailure UnitedDeploymentConditionType = "SubsetFailure"
 )
 
-// UnitedDeploymentSpec defines the desired state of UnitedDeployment
+// UnitedDeploymentSpec defines the desired state of UnitedDeployment.
 type UnitedDeploymentSpec struct {
-	// Replicas is the totally desired number of replicas of all the owning workloads.
+	// Replicas is the total desired replicas of all the subsets.
 	// If unspecified, defaults to 1.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
@@ -55,15 +57,16 @@ type UnitedDeploymentSpec struct {
 	// It must match the pod template's labels.
 	Selector *metav1.LabelSelector `json:"selector"`
 
-	// Template is the object that describes the subset that will be created.
+	// Template describes the subset that will be created.
 	// +optional
 	Template SubsetTemplate `json:"template,omitempty"`
 
-	// Contains the information of subset topology.
+	// Topology describes the pods distribution detail between each of subsets.
 	// +optional
 	Topology Topology `json:"topology,omitempty"`
 
-	// Strategy indicates the action of updating
+	// UpdateStrategy indicates the strategy the UnitedDeployment use to preform the update,
+	// when template is changed.
 	// +optional
 	UpdateStrategy UnitedDeploymentUpdateStrategy `json:"updateStrategy,omitempty"`
 
@@ -73,7 +76,8 @@ type UnitedDeploymentSpec struct {
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
 }
 
-// SubsetTemplate defines the subset under the UnitedDeployment.
+// SubsetTemplate defines the subset template under the UnitedDeployment.
+// UnitedDeployment will provision every subset based on one workload templates in SubsetTemplate.
 type SubsetTemplate struct {
 	// StatefulSet template
 	// +optional
@@ -86,18 +90,20 @@ type StatefulSetTemplateSpec struct {
 	Spec              appsv1.StatefulSetSpec `json:"spec"`
 }
 
-// UnitedDeploymentUpdateStrategy defines the update strategy of UnitedDeployment.
+// UnitedDeploymentUpdateStrategy defines the update performance
+// when template of UnitedDeployment is changed.
 type UnitedDeploymentUpdateStrategy struct {
-	// Type of UnitedDeployment update.
+	// Type of UnitedDeployment update strategy.
 	// Default is Manual.
 	// +optional
 	Type UpdateStrategyType `json:"type,omitempty"`
-	// Indicate the partition of each subset.
+	// Includes all of the parameters a Manual update strategy needs.
 	// +optional
 	ManualUpdate *ManualUpdate `json:"manualUpdate,omitempty"`
 }
 
-// ManualUpdate is a update strategy which allow users to provide the partition of each subset.
+// ManualUpdate is a update strategy which allows users to control the update progress
+// by providing the partition of each subset.
 type ManualUpdate struct {
 	// Indicates number of subset partition.
 	// +optional
@@ -105,25 +111,32 @@ type ManualUpdate struct {
 }
 
 // Topology defines the spread detail of each subset under UnitedDeployment.
+// A UnitedDeployment manages multiple homogeneous workloads which are called subset.
+// Each of subsets under the UnitedDeployment is described in Topology.
 type Topology struct {
-	// Contains the details of each subset.
+	// Contains the details of each subset. Each element in this array represents one subset
+	// which will be provisioned and managed by UnitedDeployment.
 	// +optional
 	Subsets []Subset `json:"subsets,omitempty"`
 }
 
 // Subset defines the detail of a subset.
 type Subset struct {
-	// Indicates the name of this subset, which will be used to generate
+	// Indicates subset name as a DNS_LABEL, which will be used to generate
 	// subset workload name prefix in the format '<deployment-name>-<subset-name>-'.
+	// Name should be unique between all of the subsets under one UnitedDeployment.
 	Name string `json:"name"`
 
-	// Indicates the node select strategy to form the subset.
+	// Indicates the node selector to form the subset. Depending on the node selector,
+	// pods provisioned could be distributed across multiple groups of nodes.
 	// A subset's nodeSelector is not allowed to be updated.
 	// +optional
 	NodeSelector corev1.NodeSelector `json:"nodeSelector,omitempty"`
 
-	// Indicates the number of the subset replicas or percentage of it on the UnitedDeployment replicas.
-	// If nil, the number of replicas in this subset is determined by controller.
+	// Indicates the number of the pod to be created under this subset. Replicas could also be
+	// percentage like '10%', which means 10% of UnitedDeployment replicas of pods will be distributed
+	// under this subset. If nil, the number of replicas in this subset is determined by controller.
+	// Controller will try to keep all the subsets with nil replicas have average pods.
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
 }
