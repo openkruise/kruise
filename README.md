@@ -18,7 +18,7 @@ Today, Kruise offers four workload controllers:
 
 - [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also is able to upgrade the sidecar containers.
 
-- [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages appliation pods spread in multiple fault domains by using multiple workloads.
+- [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
 Please see [documents](./docs/README.md) for more technical information.
 

@@ -1,7 +1,7 @@
 # UnitedDeployment
 
   This controller provides a new way to manage pods in multi-domain by using multiple workloads.
-  A high level description about this workload can be found in this [blog post](http://openkruise.io/en-us/blog/blog3.html). 
+  A high level description about this workload can be found in this [blog post](http://openkruise.io/en-us/blog/blog3.html).
 
   Different domains in one Kubernetes cluster are represented by multiple groups of
   nodes identified by labels. UnitedDeployment controller provisions one type of workload
@@ -119,7 +119,7 @@ type Subset struct {
   Each subset workload is created based on the description of UnitedDeployment `spec.template`.
   `subset` provides the necessary topology information to create a subset workload.
   Each subset has a unique name.  A subset workload is created with the name prefix in
-  format of '\<UnitedDeployment-name\>-\<Subset-name\>-'. Each subset will also be configured with 
+  format of '\<UnitedDeployment-name\>-\<Subset-name\>-'. Each subset will also be configured with
   the `nodeSelector`.
   When provisioning a StatefulSet `subset`, the `nodeSelector` will be added
   to the StatefulSet's `podTemplate`, so that the Pods of the StatefulSet will be created with the
