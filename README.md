@@ -10,13 +10,15 @@
 
 Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
 
-Today, Kruise offers three workload controllers:
+Today, Kruise offers four workload controllers:
 
 - [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, `pasue` and `MaxUnavailable`.
 
 - [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
 
 - [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also is able to upgrade the sidecar containers.
+
+- [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
 Please see [documents](./docs/README.md) for more technical information.
 
@@ -60,6 +62,7 @@ helm install kruise charts/
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_broadcastjob.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_statefulset.yaml
+kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_uniteddeployment.yaml
 ```
 
 #### Install kruise-controller-manager
@@ -154,6 +157,10 @@ spec:
     image: centos:7
     command: ["sleep", "999d"] # do nothing at all
 ```
+
+### UnitedDeployment
+
+TO BE ADDED
 
 ## Developer Guide
 

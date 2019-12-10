@@ -18,6 +18,7 @@ Currently, Kruise supports the following three new workloads.
 - [Advanced StatefulSet](./concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, `pasue` and `MaxUnavailable`.
 - [BroadcastJob](./concepts/broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
 - [SidecarSet](./concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also be able to upgrade the sidecar containers.
+- [UnitedDeployment](./concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
 ## Benefits
 
