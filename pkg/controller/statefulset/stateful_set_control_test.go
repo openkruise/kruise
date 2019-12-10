@@ -37,6 +37,7 @@ import (
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
 	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -62,7 +63,8 @@ func setupController(client clientset.Interface, kruiseClient kruiseclientset.In
 	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1alpha1().StatefulSets())
 	ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1alpha1().StatefulSets())
 	recorder := record.NewFakeRecorder(10)
-	ssc := NewDefaultStatefulSetControl(spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
+	inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), apps.ControllerRevisionHashLabelKey)
+	ssc := NewDefaultStatefulSetControl(spc, inplaceControl, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
 
 	stop := make(chan struct{})
 	informerFactory.Start(stop)
@@ -520,7 +522,8 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1alpha1().StatefulSets())
 		ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1alpha1().StatefulSets())
 		recorder := record.NewFakeRecorder(10)
-		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder}
+		inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), apps.ControllerRevisionHashLabelKey)
+		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder, inplaceControl}
 
 		stop := make(chan struct{})
 		defer close(stop)
@@ -1550,7 +1553,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 			}
 		}(),
 	}
-	set.Spec.Template.Spec.ReadinessGates = append(set.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appsv1alpha1.StatefulSetInPlaceUpdateReady})
+	set.Spec.Template.Spec.ReadinessGates = append(set.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appsv1alpha1.InPlaceUpdateReady})
 
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
@@ -1602,7 +1605,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 		pods[2].Labels[apps.StatefulSetRevisionLabel] == oldRevision {
 		t.Fatalf("Expected in-place update pod2, actually got %+v", pods[2])
 	}
-	condition := getInPlaceUpdateReadyCondition(pods[2])
+	condition := inplaceupdate.GetCondition(pods[2])
 	if condition == nil || condition.Status != v1.ConditionFalse {
 		t.Fatalf("Expected InPlaceUpdateReady condition False after in-place update, got %v", condition)
 	}
@@ -1642,11 +1645,11 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 		pods[1].Labels[apps.StatefulSetRevisionLabel] == oldRevision {
 		t.Fatalf("Expected in-place update pod1, actually got %+v", pods[2])
 	}
-	condition = getInPlaceUpdateReadyCondition(pods[1])
+	condition = inplaceupdate.GetCondition(pods[1])
 	if condition == nil || condition.Status != v1.ConditionFalse {
 		t.Fatalf("Expected InPlaceUpdateReady condition False after in-place update, got %v", condition)
 	}
-	condition = getInPlaceUpdateReadyCondition(pods[2])
+	condition = inplaceupdate.GetCondition(pods[2])
 	if condition == nil || condition.Status != v1.ConditionTrue {
 		t.Fatalf("Expected InPlaceUpdateReady condition True after in-place update completed, got %v", condition)
 	}
@@ -1671,7 +1674,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	if pods[0].Labels[apps.StatefulSetRevisionLabel] != oldRevision {
 		t.Fatalf("Expected not to update pod0, actually got %+v", pods[1])
 	}
-	condition = getInPlaceUpdateReadyCondition(pods[1])
+	condition = inplaceupdate.GetCondition(pods[1])
 	if condition == nil || condition.Status != v1.ConditionTrue {
 		t.Fatalf("Expected InPlaceUpdateReady condition True after in-place update completed, got %v", condition)
 	}
@@ -2188,29 +2191,6 @@ func (spc *fakeStatefulPodControl) UpdateStatefulPod(set *appsv1alpha1.StatefulS
 		}
 	}
 	spc.podsIndexer.Update(pod)
-	return nil
-}
-
-func (spc *fakeStatefulPodControl) InPlaceUpdateStatefulPod(set *appsv1alpha1.StatefulSet, pod *v1.Pod, spec *InPlaceUpdateSpec) error {
-	defer spc.inPlaceUpdatePodTracker.inc()
-	if spc.inPlaceUpdatePodTracker.errorReady() {
-		defer spc.inPlaceUpdatePodTracker.reset()
-		return spc.inPlaceUpdatePodTracker.err
-	}
-
-	newPod, err := podInPlaceUpdate(pod, spec)
-	if err != nil {
-		return err
-	}
-	spc.podsIndexer.Update(newPod)
-
-	return nil
-}
-
-func (spc *fakeStatefulPodControl) UpdateStatefulPodCondition(set *appsv1alpha1.StatefulSet, pod *v1.Pod, condition v1.PodCondition) error {
-	updatePodCondition(pod, condition)
-	spc.podsIndexer.Update(pod)
-
 	return nil
 }
 

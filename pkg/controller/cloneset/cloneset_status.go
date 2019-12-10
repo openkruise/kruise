@@ -53,18 +53,13 @@ func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newS
 }
 
 func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		clone := cs.DeepCopy()
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		clone := &appsv1alpha1.CloneSet{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, clone); err != nil {
+			return err
+		}
 		clone.Status = *newStatus
-		updateErr := r.Status().Update(context.TODO(), clone)
-		if updateErr == nil {
-			return nil
-		}
-		var got *appsv1alpha1.CloneSet
-		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, got); err == nil {
-			clone = got
-		}
-		return updateErr
+		return r.Status().Update(context.TODO(), clone)
 	})
 }
 

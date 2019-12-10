@@ -79,7 +79,7 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 			case appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.InPlaceOnlyPodUpdateStrategyType:
 				var containsReadinessGate bool
 				for _, r := range spec.Template.Spec.ReadinessGates {
-					if r.ConditionType == appsv1alpha1.StatefulSetInPlaceUpdateReady {
+					if r.ConditionType == appsv1alpha1.InPlaceUpdateReady {
 						containsReadinessGate = true
 						break
 					}
@@ -89,7 +89,7 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 						field.Invalid(fldPath.Child("template").Child("spec").Child("readinessGates"),
 							spec.Template.Spec.ReadinessGates,
 							fmt.Sprintf("must contains %v when podUpdatePolicy is %v",
-								appsv1alpha1.StatefulSetInPlaceUpdateReady,
+								appsv1alpha1.InPlaceUpdateReady,
 								spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy)))
 				}
 			default:

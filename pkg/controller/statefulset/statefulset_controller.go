@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -110,6 +112,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 				podLister,
 				corelisters.NewPersistentVolumeClaimLister(pvcInformer.GetIndexer()),
 				recorder),
+			inplaceupdate.New(mgr.GetClient(), appsv1.ControllerRevisionHashLabelKey),
 			NewRealStatefulSetStatusUpdater(genericClient.KruiseClient, statefulSetLister),
 			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(revInformer.GetIndexer())),
 			recorder,

@@ -26,12 +26,12 @@
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
-  digest = "1:464aef731a5f82ded547c62e249a2e9ec59fbbc9ddab53cda7b9857852630a61"
+  digest = "1:853e525e09b54a70a25308dba7884dcca5a333b08aebcf03bc4a3be3dc7557ac"
   name = "github.com/appscode/jsonpatch"
   packages = ["."]
   pruneopts = "T"
-  revision = "7c0e3b262f30165a8ec3d0b4c6059fd92703bfb2"
-  version = "1.0.0"
+  revision = "7f760186a63d02954613b9b22de68a5b2cb2b1bf"
+  version = "v1.0.1"
 
 [[projects]]
   digest = "1:7679b7fa4a39470d9ed29a6026bf1ab4a679d82414e24867f4ffc3e5875ecf54"
@@ -1196,7 +1196,6 @@
     "pkg/capabilities",
     "pkg/client/conditions",
     "pkg/controller",
-    "pkg/controller/daemon/util",
     "pkg/controller/history",
     "pkg/controller/volume/events",
     "pkg/controller/volume/persistentvolume",
@@ -1266,6 +1265,7 @@
     "pkg/client/config",
     "pkg/client/fake",
     "pkg/controller",
+    "pkg/controller/controllerutil",
     "pkg/envtest",
     "pkg/envtest/printer",
     "pkg/event",
@@ -1378,6 +1378,7 @@
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/intstr",
+    "k8s.io/apimachinery/pkg/util/rand",
     "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/strategicpatch",
@@ -1411,6 +1412,7 @@
     "k8s.io/client-go/tools/record",
     "k8s.io/client-go/tools/watch",
     "k8s.io/client-go/util/flowcontrol",
+    "k8s.io/client-go/util/integer",
     "k8s.io/client-go/util/retry",
     "k8s.io/client-go/util/workqueue",
     "k8s.io/code-generator/cmd/client-gen",
@@ -1428,8 +1430,8 @@
     "k8s.io/kubernetes/pkg/apis/core/validation",
     "k8s.io/kubernetes/pkg/client/conditions",
     "k8s.io/kubernetes/pkg/controller",
-    "k8s.io/kubernetes/pkg/controller/daemon/util",
     "k8s.io/kubernetes/pkg/controller/history",
+    "k8s.io/kubernetes/pkg/scheduler/algorithm",
     "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
     "k8s.io/kubernetes/pkg/scheduler/api",
     "k8s.io/kubernetes/pkg/scheduler/cache",
@@ -1439,9 +1441,11 @@
     "k8s.io/utils/exec",
     "k8s.io/utils/integer",
     "sigs.k8s.io/controller-runtime/pkg/client",
+    "sigs.k8s.io/controller-runtime/pkg/client/apiutil",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/client/fake",
     "sigs.k8s.io/controller-runtime/pkg/controller",
+    "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil",
     "sigs.k8s.io/controller-runtime/pkg/envtest",
     "sigs.k8s.io/controller-runtime/pkg/event",
     "sigs.k8s.io/controller-runtime/pkg/handler",

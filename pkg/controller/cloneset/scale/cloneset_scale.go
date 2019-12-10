@@ -6,17 +6,15 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/klog"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -31,15 +29,15 @@ const (
 
 // Interface for managing replicas including create and delete pod/pvc.
 type Interface interface {
-	ManageReplicas(
+	Manage(
 		currentCS, updateCS *appsv1alpha1.CloneSet,
 		currentRevision, updateRevision string,
 		pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 	) (bool, error)
 }
 
-// NewScaleControl returns a scale control.
-func NewScaleControl(c client.Client, recorder record.EventRecorder, exp expectations.ScaleExpectations) Interface {
+// New returns a scale control.
+func New(c client.Client, recorder record.EventRecorder, exp expectations.ScaleExpectations) Interface {
 	return &realControl{Client: c, recorder: recorder, exp: exp}
 }
 
@@ -49,7 +47,7 @@ type realControl struct {
 	exp      expectations.ScaleExpectations
 }
 
-func (r *realControl) ManageReplicas(
+func (r *realControl) Manage(
 	currentCS, updateCS *appsv1alpha1.CloneSet,
 	currentRevision, updateRevision string,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
@@ -160,17 +158,17 @@ func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, exist
 		r.exp.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
 		if err := r.Create(context.TODO(), &c); err != nil {
 			r.exp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
-			r.recorder.Event(cs, v1.EventTypeWarning, "FailedCreate", fmt.Sprintf("failed to create pvc %s: %v", util.DumpJSON(c), err))
+			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pvc %s: %v", util.DumpJSON(c), err)
 			return err
 		}
 	}
 
 	if err := r.Create(context.TODO(), pod); err != nil {
-		r.recorder.Event(cs, v1.EventTypeWarning, "FailedCreate", fmt.Sprintf("failed to create pod %s: %v", util.DumpJSON(pod), err))
+		r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pod %s: %v", util.DumpJSON(pod), err)
 		return err
 	}
 
-	r.recorder.Event(cs, v1.EventTypeNormal, "SuccessfulCreate", fmt.Sprintf("succeed to create pod %s", pod.Name))
+	r.recorder.Eventf(cs, v1.EventTypeNormal, "SuccessfulCreate", "succeed to create pod %s", pod.Name)
 	return nil
 }
 
@@ -179,7 +177,7 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 		r.exp.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pod.Name)
 		if err := r.Delete(context.TODO(), pod); err != nil {
 			r.exp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pod.Name)
-			r.recorder.Event(cs, v1.EventTypeWarning, "FailedDelete", fmt.Sprintf("failed to delete pod %s: %v", pod.Name, err))
+			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to delete pod %s: %v", pod.Name, err)
 			return err
 		}
 		r.recorder.Event(cs, v1.EventTypeNormal, "SuccessfulDelete", fmt.Sprintf("succeed to delete pod %s", pod.Name))
@@ -193,7 +191,7 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 			r.exp.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
 			if err := r.Delete(context.TODO(), pvc); err != nil {
 				r.exp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
-				r.recorder.Event(cs, v1.EventTypeWarning, "FailedDelete", fmt.Sprintf("failed to delete pvc %s: %v", pvc.Name, err))
+				r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to delete pvc %s: %v", pvc.Name, err)
 				return err
 			}
 		}

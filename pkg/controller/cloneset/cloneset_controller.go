@@ -23,6 +23,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	kruiseclient "github.com/openkruise/kruise/pkg/client"
 	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
 	scalecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/scale"
 	updatecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/update"
@@ -36,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -71,15 +73,23 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+	recorder := mgr.GetRecorder("cloneset-controller")
+	if cli := kruiseclient.GetGenericClient(); cli != nil {
+		eventBroadcaster := record.NewBroadcaster()
+		eventBroadcaster.StartLogging(klog.Infof)
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cli.KubeClient.CoreV1().Events("")})
+		recorder = eventBroadcaster.NewRecorder(mgr.GetScheme(), v1.EventSource{Component: "cloneset-controller"})
+	}
 	reconciler := &ReconcileCloneSet{
 		Client:            mgr.GetClient(),
 		scheme:            mgr.GetScheme(),
-		recorder:          mgr.GetRecorder("cloneset-controller"),
+		recorder:          recorder,
 		statusUpdater:     newStatusUpdater(mgr.GetClient()),
 		controllerHistory: historyutil.NewHistory(mgr.GetClient()),
 		revisionControl:   revisioncontrol.NewRevisionControl(),
 	}
-	reconciler.scaleControl = scalecontrol.NewScaleControl(mgr.GetClient(), reconciler.recorder, scaleExpectations)
+	reconciler.scaleControl = scalecontrol.New(mgr.GetClient(), reconciler.recorder, scaleExpectations)
+	reconciler.updateControl = updatecontrol.New(mgr.GetClient(), reconciler.recorder, scaleExpectations, updateExpectations)
 	reconciler.reconcileFunc = reconciler.doReconcile
 	return reconciler
 }
@@ -227,7 +237,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (_ reconcile.
 	*newStatus.CollisionCount = collisionCount
 
 	// scale and update pods
-	syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, filteredPods, filteredPVCs)
+	syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 
 	// update new status
 	if err = r.statusUpdater.UpdateCloneSetStatus(instance, newStatus, filteredPods); err != nil {
@@ -247,9 +257,13 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (_ reconcile.
 
 func (r *ReconcileCloneSet) syncCloneSet(
 	instance *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus,
-	currentRevision, updateRevision *apps.ControllerRevision,
+	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	filteredPods []*v1.Pod, filteredPVCs []*v1.PersistentVolumeClaim,
 ) error {
+	if instance.DeletionTimestamp != nil {
+		return nil
+	}
+
 	// get the current and update revisions of the set.
 	currentSet, err := r.revisionControl.ApplyRevision(instance, currentRevision)
 	if err != nil {
@@ -264,7 +278,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	var podsScaleErr error
 	var podsUpdateErr error
 
-	scaling, podsScaleErr = r.scaleControl.ManageReplicas(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
+	scaling, podsScaleErr = r.scaleControl.Manage(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
 	if podsScaleErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedScale,
@@ -277,8 +291,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 		return podsScaleErr
 	}
 
-	// TODO(FillZpp): manage update
-
+	podsUpdateErr = r.updateControl.Manage(updateSet, updateRevision, revisions, filteredPods, filteredPVCs)
 	if podsUpdateErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedUpdate,

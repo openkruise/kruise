@@ -5,6 +5,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,6 +84,7 @@ func newVersionedPods(cs *appsv1alpha1.CloneSet, revision string, replicas int, 
 		pod.Labels[apps.ControllerRevisionHashLabelKey] = revision
 
 		initIdentity(cs, pod, id)
+		inplaceupdate.InjectReadinessGate(pod)
 		clonesetutils.UpdateStorage(cs, pod)
 
 		newPods = append(newPods, pod)
