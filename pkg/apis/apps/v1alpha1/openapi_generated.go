@@ -1535,10 +1535,10 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 							Format:      "",
 						},
 					},
-					"nodeSelector": {
+					"nodeSelectorTerm": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicates the node selector to form the subset. Depending on the node selector, pods provisioned could be distributed across multiple groups of nodes. A subset's nodeSelector is not allowed to be updated.",
-							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
+							Description: "Indicates the node selector to form the subset. Depending on the node selector, pods provisioned could be distributed across multiple groups of nodes. A subset's nodeSelectorTerm is not allowed to be updated.",
+							Ref:         ref("k8s.io/api/core/v1.NodeSelectorTerm"),
 						},
 					},
 					"replicas": {
@@ -1552,7 +1552,7 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"k8s.io/api/core/v1.NodeSelectorTerm", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 

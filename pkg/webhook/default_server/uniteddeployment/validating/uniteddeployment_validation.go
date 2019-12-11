@@ -73,19 +73,26 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 	}
 	subSetNames := sets.String{}
 	count := 0
-	for _, subset := range spec.Topology.Subsets {
+	for i, subset := range spec.Topology.Subsets {
 		if len(subset.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("topology", "subset", "name"), ""))
+			allErrs = append(allErrs, field.Required(fldPath.Child("topology", "subset").Index(i).Child("name"), ""))
 		}
 
 		if subSetNames.Has(subset.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset", "name"), subset.Name, fmt.Sprintf("duplicated subset name %s", subset.Name)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset").Index(i).Child("name"), subset.Name, fmt.Sprintf("duplicated subset name %s", subset.Name)))
 		}
 
 		subSetNames.Insert(subset.Name)
 
 		if errs := apimachineryvalidation.NameIsDNSLabel(subset.Name, false); len(errs) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset", "name"), subset.Name, fmt.Sprintf("invalid subset name %s", strings.Join(errs, ", "))))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset").Index(i).Child("name"), subset.Name, fmt.Sprintf("invalid subset name %s", strings.Join(errs, ", "))))
+		}
+
+		coreNodeSelectorTerm := &core.NodeSelectorTerm{}
+		if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.NodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), subset.NodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
+		} else {
+			allErrs = append(allErrs, apivalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Child("topology", "subset").Index(i).Child("nodeSelectorTerm"))...)
 		}
 
 		if subset.Replicas == nil {
@@ -165,8 +172,8 @@ func validateUnitedDeploymentTopology(topology, oldTopology *appsv1alpha1.Topolo
 
 	for i, subset := range topology.Subsets {
 		if oldSubset, exist := oldSubsets[subset.Name]; exist {
-			if !apiequality.Semantic.DeepEqual(oldSubset.NodeSelector, subset.NodeSelector) {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("nodeSelector"), "may not be changed in an update"))
+			if !apiequality.Semantic.DeepEqual(oldSubset.NodeSelectorTerm, subset.NodeSelectorTerm) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("nodeSelectorTerm"), "may not be changed in an update"))
 			}
 		}
 	}

@@ -28,27 +28,24 @@ spec:
     subsets:
       - name: subset-a
         replicas: 1
-        nodeSelector:
-          nodeSelectorTerms:
-            - matchExpressions:
-                - key: node
-                  operator: In
-                  values:
-                    - zone-a
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: node
+              operator: In
+              values:
+                - zone-a
       - name: subset-b
         replicas: 50%
-        nodeSelector:
-          nodeSelectorTerms:
-            - matchExpressions:
-                - key: node
-                  operator: In
-                  values:
-                    - zone-b
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: node
+              operator: In
+              values:
+                - zone-b
       - name: subset-c
-        nodeSelector:
-          nodeSelectorTerms:
-            - matchExpressions:
-                - key: node
-                  operator: In
-                  values:
-                    - zone-c
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: node
+              operator: In
+              values:
+                - zone-c
