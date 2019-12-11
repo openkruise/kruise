@@ -81,7 +81,7 @@ type CloneSetUpdateStrategy struct {
 	Partition *int32 `json:"partition,omitempty"`
 	// Priorities are the rules for calculating the priority of updating pods.
 	// Each pod to be updated, will pass through these terms and get a sum of weights.
-	Priorities []CloneSetUpdatePriorityTerm `json:"priorities,omitempty"`
+	PriorityStrategy *UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down.
@@ -113,14 +113,6 @@ const (
 
 // CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.
 type CloneSetInPlaceUpdateStrategy struct {
-}
-
-// CloneSetUpdatePriorityTerm defines priority term for pods update.
-type CloneSetUpdatePriorityTerm struct {
-	// Weight associated with matching the corresponding matchExpressions, in the range 1-100.
-	Weight int32 `json:"weight"`
-	// MatchSelector is used to select by pod's labels.
-	MatchSelector metav1.LabelSelector `json:"matchSelector"`
 }
 
 // CloneSetStatus defines the observed state of CloneSet
