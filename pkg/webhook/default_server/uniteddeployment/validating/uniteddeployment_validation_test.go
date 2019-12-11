@@ -21,11 +21,13 @@ import (
 	"strings"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 )
 
 func TestValidateUnitedDeployment(t *testing.T) {
@@ -239,6 +241,39 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				},
 			},
 		},
+		"invalid subset nodeSelectorTerm": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+				Topology: appsv1alpha1.Topology{
+					Subsets: []appsv1alpha1.Subset{
+						{
+							Name: "subset",
+							NodeSelectorTerm: corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "key",
+										Operator: corev1.NodeSelectorOpExists,
+										Values:   []string{"unexpected"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"subset replicas is not enough": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.UnitedDeploymentSpec{
@@ -373,8 +408,10 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				if !strings.HasPrefix(field, "spec.template.") &&
 					field != "spec.selector" &&
 					field != "spec.topology.subset" &&
-					field != "spec.topology.subset.name" &&
-					field != "spec.updateStrategy.partitions" {
+					field != "spec.topology.subset[0]" &&
+					field != "spec.topology.subset[0].name" &&
+					field != "spec.updateStrategy.partitions" &&
+					field != "spec.topology.subset[0].nodeSelectorTerm.matchExpressions[0].values" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
 			}
@@ -424,16 +461,12 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"a"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a"},
 										},
 									},
 								},
@@ -461,32 +494,24 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"a"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a"},
 										},
 									},
 								},
 							},
 							{
 								Name: "subset-b",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"b"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"b"},
 										},
 									},
 								},
@@ -516,32 +541,24 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"a"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a"},
 										},
 									},
 								},
 							},
 							{
 								Name: "subset-b",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"b"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"b"},
 										},
 									},
 								},
@@ -569,16 +586,12 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"a"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a"},
 										},
 									},
 								},
@@ -621,16 +634,12 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"a", "b"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a", "b"},
 										},
 									},
 								},
@@ -658,32 +667,24 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"a"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a"},
 										},
 									},
 								},
 							},
 							{
 								Name: "subset-b",
-								NodeSelector: v1.NodeSelector{
-									NodeSelectorTerms: []v1.NodeSelectorTerm{
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											MatchExpressions: []v1.NodeSelectorRequirement{
-												{
-													Key:      "domain",
-													Operator: v1.NodeSelectorOpIn,
-													Values:   []string{"b"},
-												},
-											},
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"b"},
 										},
 									},
 								},
@@ -711,7 +712,7 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 					field != "spec.topology.subset" &&
 					field != "spec.topology.subset.name" &&
 					field != "spec.updateStrategy.partitions" &&
-					field != "spec.topology.subsets[0].nodeSelector" {
+					field != "spec.topology.subsets[0].nodeSelectorTerm" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
 			}

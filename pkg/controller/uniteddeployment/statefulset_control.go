@@ -143,7 +143,7 @@ func applyStatefulSetTemplate(ud *alpha1.UnitedDeployment, subsetName string, re
 		set.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 	}
 
-	set.Spec.Template = ud.Spec.Template.StatefulSetTemplate.Spec.Template
+	set.Spec.Template = *ud.Spec.Template.StatefulSetTemplate.Spec.Template.DeepCopy()
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
 	}
