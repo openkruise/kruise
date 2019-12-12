@@ -260,6 +260,11 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	var podsScaleErr error
 	var podsUpdateErr error
 
+	// TODO: although CloneSet Terminating, can update CloneSet status fields(e.g., UpdatedReplicas, UpdatedRevision).
+	if instance.DeletionTimestamp != nil {
+		return nil
+	}
+
 	scaling, podsScaleErr = r.scaleControl.ManageReplicas(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
 	if podsScaleErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{

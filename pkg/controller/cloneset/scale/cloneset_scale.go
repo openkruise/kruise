@@ -9,7 +9,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-
+	utilpointer "k8s.io/utils/pointer"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -55,9 +55,13 @@ func (r *realControl) ManageReplicas(
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (bool, error) {
 	if updateCS.Spec.Replicas == nil {
-		return false, fmt.Errorf("spec.Replicas is nil")
+		// TODO: add webook mutate to set deault value to Replicas
+		updateCS.Spec.Replicas = utilpointer.Int32Ptr(0)
 	}
 
+	// TODO: deleting pods may block pods to rolling update.
+	// If it gets stuck in deleting pod(e.g., pod becomes Unknown for node lost, you have to delete it by force),
+	// sync work will stop(by return), pods left can not be scale or update.
 	if podsToDelete := getPodsToDelete(updateCS, pods); len(podsToDelete) > 0 {
 		klog.V(3).Infof("Begin to delete pods in podsToDelete: %v", podsToDelete)
 		return true, r.deletePods(updateCS, podsToDelete, pvcs)
