@@ -25,6 +25,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
@@ -88,6 +89,11 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *appsv1alpha1.Statef
 	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)
 	if err != nil {
 		return err
+	}
+
+	// Refresh update expectations
+	for _, pod := range pods {
+		updateExpectations.ObserveUpdated(getStatefulSetKey(set), updateRevision.Name, pod)
 	}
 
 	// perform the main update function and get the status
@@ -519,6 +525,12 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return &status, nil
 	}
 
+	// If update expectations have not satisfied yet, skip updating pods
+	if updateSatisfied, updateDirtyPods := updateExpectations.SatisfiedExpectations(getStatefulSetKey(set), updateRevision.Name); !updateSatisfied {
+		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", getStatefulSetKey(set), updateDirtyPods)
+		return &status, nil
+	}
+
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	updateMin := 0
 	maxUnavailable := 1
@@ -557,8 +569,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 						set.Namespace,
 						set.Name,
 						replicas[target].Name)
-					if updateErr := ssc.inPlaceUpdatePod(set, replicas[target], inPlaceUpdateSpec); updateErr != nil && !isInPlaceOnly(set) {
-						// if it failed to in-place update and podUpdatePolicy is not InPlaceOnly, then we should try to recreate this pod
+					updateErr := ssc.inPlaceUpdatePod(set, replicas[target], inPlaceUpdateSpec)
+					if updateErr != nil && !errors.IsConflict(updateErr) && !isInPlaceOnly(set) {
+						// If it failed to in-place update && error is not conflict && podUpdatePolicy is not InPlaceOnly,
+						// then we should try to recreate this pod
 						useInPlaceUpdate = false
 					}
 				}
@@ -628,7 +642,7 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(set *appsv1alpha1.Statefu
 			err)
 		return err
 	}
-
+	updateExpectations.ExpectUpdated(getStatefulSetKey(set), inPlaceUpdateSpec.revision, pod)
 	return nil
 }
 
