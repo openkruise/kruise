@@ -25,6 +25,7 @@ import (
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,6 +51,11 @@ import (
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+
+var updateExpectations = expectations.NewUpdateExpectations(func(o metav1.Object) string {
+	p := o.(*v1.Pod)
+	return getPodRevision(p)
+})
 
 // Add creates a new StatefulSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -187,6 +193,7 @@ func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (reconcile
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		klog.Infof("StatefulSet has been deleted %v", key)
+		updateExpectations.DeleteExpectations(key)
 		return reconcile.Result{}, nil
 	}
 	if err != nil {

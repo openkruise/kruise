@@ -1606,6 +1606,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	if condition == nil || condition.Status != v1.ConditionFalse {
 		t.Fatalf("Expected InPlaceUpdateReady condition False after in-place update, got %v", condition)
 	}
+	updateExpectations.ObserveUpdated(getStatefulSetKey(set), pods[2].Labels[apps.StatefulSetRevisionLabel], pods[2])
 
 	// should not update pod 1, because of pod2 status not changed
 	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
@@ -1649,6 +1650,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	if condition == nil || condition.Status != v1.ConditionTrue {
 		t.Fatalf("Expected InPlaceUpdateReady condition True after in-place update completed, got %v", condition)
 	}
+	updateExpectations.ObserveUpdated(getStatefulSetKey(set), pods[1].Labels[apps.StatefulSetRevisionLabel], pods[1])
 
 	// should not update pod 0
 	pods[1].Status.ContainerStatuses = []v1.ContainerStatus{{

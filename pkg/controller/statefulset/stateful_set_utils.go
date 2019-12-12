@@ -426,3 +426,7 @@ func filterOutCondition(conditions []apps.StatefulSetCondition, condType apps.St
 	}
 	return newCondtitions
 }
+
+func getStatefulSetKey(o metav1.Object) string {
+	return o.GetNamespace() + "/" + o.GetName()
+}
