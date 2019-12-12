@@ -25,6 +25,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/gate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -54,6 +55,9 @@ var controllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
 // Add creates a new BroadcastJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
+	if !gate.ResourceEnabled(&appsv1alpha1.BroadcastJob{}) {
+		return nil
+	}
 	return add(mgr, newReconciler(mgr))
 }
 
