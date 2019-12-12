@@ -28,6 +28,7 @@ import (
 	updatecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/update"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/gate"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -62,6 +63,9 @@ var (
 // Add creates a new CloneSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
+	if !gate.ResourceEnabled(&appsv1alpha1.CloneSet{}) {
+		return nil
+	}
 	return add(mgr, newReconciler(mgr))
 }
 

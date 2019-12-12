@@ -100,16 +100,12 @@ func TestStsReconcile(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"node-a"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"node-a"},
 								},
 							},
 						},
@@ -184,16 +180,12 @@ func TestStsSubsetProvision(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"node-a"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"node-a"},
 								},
 							},
 						},
@@ -229,16 +221,12 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
 		Name: "subset-b",
-		NodeSelector: corev1.NodeSelector{
-			NodeSelectorTerms: []corev1.NodeSelectorTerm{
+		NodeSelectorTerm: corev1.NodeSelectorTerm{
+			MatchExpressions: []corev1.NodeSelectorRequirement{
 				{
-					MatchExpressions: []corev1.NodeSelectorRequirement{
-						{
-							Key:      "node-name",
-							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"node-b"},
-						},
-					},
+					Key:      "node-name",
+					Operator: corev1.NodeSelectorOpIn,
+					Values:   []string{"node-b"},
 				},
 			},
 		},
@@ -279,6 +267,64 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("node-b"))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+
+	nodeSelector := &corev1.NodeSelector{}
+	nodeSelector.NodeSelectorTerms = append(nodeSelector.NodeSelectorTerms, corev1.NodeSelectorTerm{
+		MatchExpressions: []corev1.NodeSelectorRequirement{
+			{
+				Key:      "test",
+				Operator: corev1.NodeSelectorOpExists,
+			},
+			{
+				Key:      "region",
+				Operator: corev1.NodeSelectorOpIn,
+				Values:   []string{"foo"},
+			},
+		},
+	})
+	nodeSelector.NodeSelectorTerms = append(nodeSelector.NodeSelectorTerms, corev1.NodeSelectorTerm{
+		MatchExpressions: []corev1.NodeSelectorRequirement{
+			{
+				Key:      "test",
+				Operator: corev1.NodeSelectorOpDoesNotExist,
+			},
+		},
+	})
+	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	stsList = expectedStsCount(g, 1)
+	sts = &stsList.Items[0]
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ShouldNot(gomega.BeNil())
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)).Should(gomega.BeEquivalentTo(2))
+
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions)).Should(gomega.BeEquivalentTo(3))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(gomega.BeEquivalentTo("test"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpExists))
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values)).Should(gomega.BeEquivalentTo(0))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Key).Should(gomega.BeEquivalentTo("region"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values[0]).Should(gomega.BeEquivalentTo("foo"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[2].Key).Should(gomega.BeEquivalentTo("node-name"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[2].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[2].Values)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[2].Values[0]).Should(gomega.BeEquivalentTo("node-b"))
+
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions)).Should(gomega.BeEquivalentTo(2))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions[0].Key).Should(gomega.BeEquivalentTo("test"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions[0].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpDoesNotExist))
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions[0].Values)).Should(gomega.BeEquivalentTo(0))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions[1].Key).Should(gomega.BeEquivalentTo("node-name"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions[1].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
+	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions[1].Values)).Should(gomega.BeEquivalentTo(1))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[1].MatchExpressions[1].Values[0]).Should(gomega.BeEquivalentTo("node-b"))
 }
 
 func TestStsDupSubset(t *testing.T) {
@@ -331,16 +377,12 @@ func TestStsDupSubset(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"node-a"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"node-a"},
 								},
 							},
 						},
@@ -424,32 +466,24 @@ func TestStsScale(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
 								},
 							},
 						},
 					},
 					{
 						Name: "subset-b",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeB"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
 								},
 							},
 						},
@@ -574,32 +608,24 @@ func TestStsUpdate(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
 								},
 							},
 						},
 					},
 					{
 						Name: "subset-b",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeB"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
 								},
 							},
 						},
@@ -703,32 +729,24 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
 								},
 							},
 						},
 					},
 					{
 						Name: "subset-b",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeB"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
 								},
 							},
 						},
@@ -892,32 +910,24 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
 								},
 							},
 						},
 					},
 					{
 						Name: "subset-b",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeB"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
 								},
 							},
 						},
@@ -1033,32 +1043,24 @@ func TestStsOnDelete(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
 								},
 							},
 						},
 					},
 					{
 						Name: "subset-b",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeB"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
 								},
 							},
 						},
@@ -1185,32 +1187,24 @@ func TestStsSubsetCount(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
 								},
 							},
 						},
 					},
 					{
 						Name: "subset-b",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeB"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
 								},
 							},
 						},
@@ -1297,16 +1291,12 @@ func TestStsSubsetCount(t *testing.T) {
 	}
 	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
 		Name: "subset-c",
-		NodeSelector: corev1.NodeSelector{
-			NodeSelectorTerms: []corev1.NodeSelectorTerm{
+		NodeSelectorTerm: corev1.NodeSelectorTerm{
+			MatchExpressions: []corev1.NodeSelectorRequirement{
 				{
-					MatchExpressions: []corev1.NodeSelectorRequirement{
-						{
-							Key:      "node-name",
-							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"nodeC"},
-						},
-					},
+					Key:      "node-name",
+					Operator: corev1.NodeSelectorOpIn,
+					Values:   []string{"nodeC"},
 				},
 			},
 		},

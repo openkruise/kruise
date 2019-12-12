@@ -104,11 +104,11 @@ spec:
                           '<deployment-name>-<subset-name>-'. Name should be unique
                           between all of the subsets under one UnitedDeployment.
                         type: string
-                      nodeSelector:
+                      nodeSelectorTerm:
                         description: Indicates the node selector to form the subset.
                           Depending on the node selector, pods provisioned could be
                           distributed across multiple groups of nodes. A subset's
-                          nodeSelector is not allowed to be updated.
+                          nodeSelectorTerm is not allowed to be updated.
                         type: object
                       replicas:
                         description: Indicates the number of the pod to be created

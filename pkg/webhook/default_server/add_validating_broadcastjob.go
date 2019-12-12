@@ -19,10 +19,15 @@ package defaultserver
 import (
 	"fmt"
 
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/webhook/default_server/broadcastjob/validating"
 )
 
 func init() {
+	if !gate.ResourceEnabled(&appsv1alpha1.BroadcastJob{}) {
+		return
+	}
 	for k, v := range validating.Builders {
 		_, found := builderMap[k]
 		if found {

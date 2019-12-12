@@ -19,10 +19,15 @@ package defaultserver
 import (
 	"fmt"
 
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/webhook/default_server/statefulset/mutating"
 )
 
 func init() {
+	if !gate.ResourceEnabled(&appsv1alpha1.StatefulSet{}) {
+		return
+	}
 	for k, v := range mutating.Builders {
 		_, found := builderMap[k]
 		if found {

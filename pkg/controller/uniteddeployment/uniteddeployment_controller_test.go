@@ -74,16 +74,12 @@ func TestReconcile(t *testing.T) {
 				Subsets: []appsv1alpha1.Subset{
 					{
 						Name: "subset-a",
-						NodeSelector: corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
-									MatchExpressions: []corev1.NodeSelectorRequirement{
-										{
-											Key:      "node-name",
-											Operator: corev1.NodeSelectorOpIn,
-											Values:   []string{"nodeA"},
-										},
-									},
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
 								},
 							},
 						},
