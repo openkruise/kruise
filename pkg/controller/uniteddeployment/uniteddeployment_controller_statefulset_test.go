@@ -1497,10 +1497,6 @@ func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, chan stru
 	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
 	stopMgr, mgrStopped := StartTestManager(mgr, g)
 
-	subsetReplicasFn = func(subset *Subset) int32 {
-		return subset.Spec.Replicas
-	}
-
 	return g, requests, stopMgr, mgrStopped
 }
 
