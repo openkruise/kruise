@@ -174,3 +174,7 @@ type ManualUpdate struct {
 
   `Manual` update strategy allows users to control the update progress by indicating
   the `partition` of each subset. The controller will pass the `partition` to each subset.
+
+## Tutorial
+
+- [Run a UnitedDeployment to manage multiple domains](../../tutorial/uniteddepoyment.md)

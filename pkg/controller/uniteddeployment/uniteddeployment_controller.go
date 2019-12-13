@@ -210,12 +210,6 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[str
 	return &partitions
 }
 
-var subsetReplicasFn = subSetReplicas
-
-func subSetReplicas(subset *Subset) int32 {
-	return subset.Status.Replicas
-}
-
 func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {
 	nameToSubset := map[string]*Subset{}
 	for name, subsets := range nameToSubsets {

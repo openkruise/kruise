@@ -18,7 +18,6 @@ package validating
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,8 +37,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	udctrl "github.com/openkruise/kruise/pkg/controller/uniteddeployment"
 )
-
-var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
 
 // ValidateUnitedDeploymentSpec tests if required fields in the UnitedDeployment spec are set.
 func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
