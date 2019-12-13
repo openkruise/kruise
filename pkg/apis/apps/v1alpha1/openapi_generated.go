@@ -39,7 +39,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetScaleStrategy":            schema_pkg_apis_apps_v1alpha1_CloneSetScaleStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetSpec":                     schema_pkg_apis_apps_v1alpha1_CloneSetSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetStatus":                   schema_pkg_apis_apps_v1alpha1_CloneSetStatus(ref),
-		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdatePriorityTerm":       schema_pkg_apis_apps_v1alpha1_CloneSetUpdatePriorityTerm(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateStrategy":           schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy":                 schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy":                    schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref),
@@ -70,6 +69,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentSpec":             schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentStatus":           schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentUpdateStrategy":   schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityOrderTerm":          schema_pkg_apis_apps_v1alpha1_UpdatePriorityOrderTerm(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy":           schema_pkg_apis_apps_v1alpha1_UpdatePriorityStrategy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityWeightTerm":         schema_pkg_apis_apps_v1alpha1_UpdatePriorityWeightTerm(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdateStatus":                     schema_pkg_apis_apps_v1alpha1_UpdateStatus(ref),
 	}
 }
@@ -617,35 +619,6 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetStatus(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_pkg_apis_apps_v1alpha1_CloneSetUpdatePriorityTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "CloneSetUpdatePriorityTerm defines priority term for pods update.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"weight": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Weight associated with matching the corresponding matchExpressions, in the range 1-100.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"matchSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "MatchSelector is used to select by pod's labels.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
-						},
-					},
-				},
-				Required: []string{"weight", "matchSelector"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
-	}
-}
-
 func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -667,17 +640,10 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 							Format:      "int32",
 						},
 					},
-					"priorities": {
+					"priorityStrategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdatePriorityTerm"),
-									},
-								},
-							},
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy"),
 						},
 					},
 					"maxUnavailable": {
@@ -703,7 +669,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetInPlaceUpdateStrategy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdatePriorityTerm", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetInPlaceUpdateStrategy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 
@@ -943,7 +909,7 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.R
 				Properties: map[string]spec.Schema{
 					"partition": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0.",
+							Description: "Partition indicates the number of pods with non-updated revisions when rolling update. This means controller will update $(replicas - partition) number of pod Default value is 0.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -968,11 +934,17 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.R
 							Format:      "",
 						},
 					},
+					"priorityStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights. Also, priorityStrategy can just be allowed to work with Parallel podManagementPolicy.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 
@@ -1923,6 +1895,97 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref common.Ref
 		},
 		Dependencies: []string{
 			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UpdatePriorityOrderTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UpdatePriorityOrder defines order priority.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"orderedKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Calculate priority by value of this key. Values of this key, will be sorted by GetInt(val). GetInt method will find the last int in value, such as getting 5 in value '5', getting 10 in value 'sts-10'.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"orderedKey"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UpdatePriorityStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UpdatePriorityStrategy is the strategy to define priority for pods update. Only one of orderPriority and weightPriority can be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"orderPriority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Order priority terms, pods will be sorted by the value of orderedKey. For example: ``` orderPriority: - orderedKey: key1 - orderedKey: key2 ``` First, all pods which have key1 in labels will be sorted by the value of key1. Then, the left pods which have no key1 but have key2 in labels will be sorted by the value of key2 and put behind those pods have key1.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityOrderTerm"),
+									},
+								},
+							},
+						},
+					},
+					"weightPriority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Weight priority terms, pods will be sorted by the sum of all terms weight.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityWeightTerm"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityOrderTerm", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityWeightTerm"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UpdatePriorityWeightTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UpdatePriorityWeightTerm defines weight priority.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"weight": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Weight associated with matching the corresponding matchExpressions, in the range 1-100.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"matchSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MatchSelector is used to select by pod's labels.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+						},
+					},
+				},
+				Required: []string{"weight", "matchSelector"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
 	}
 }
 
