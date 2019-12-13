@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"

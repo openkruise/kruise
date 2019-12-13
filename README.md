@@ -79,6 +79,15 @@ Note that use Kustomize 1.0.11. Version 2.0.3 has compatibility issues with kube
 
 The official kruise-controller-manager image is hosted under [docker hub](https://hub.docker.com/r/openkruise/kruise-manager).
 
+### Enable specified controllers
+
+If you only need some of CRDs in Kruise and want to disable others, there are two optional ways:
+ (you can also choose them all)
+
+1. Only install those CRDs you need.
+
+2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container (in kruise-controller-manager statefulset template). Value is the list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet` means only use AdvancedStatefulSet/SidecarSet and keep other controllers/webhooks closed.
+
 ## Usage examples
 
 ### Advanced StatefulSet

@@ -39,19 +39,19 @@ jobs:
             find ./ -name "*.sh" | grep -v vendor | xargs shellcheck
   code-check:
     docker: 
-      - image: pouchcontainer/pouchlinter:v0.1.2
+      - image: golangci/golangci-lint:v1.21
     working_directory: /go/src/github.com/openkruise/kruise
     steps:
       - checkout
       - run: 
-          name: validate go code with gometalinter
+          name: validate go code with golangci-lint
           command: |
-            gometalinter --disable-all --skip vendor -E gofmt -E goimports -E golint -E goconst -E ineffassign -E misspell -E vet -d ./...
+            golangci-lint run --skip-dirs=pkg/apis,pkg/client --disable-all -E gofmt -E goimports -E golint -E ineffassign -E misspell -E vet
       
       - run:
           name: detect deadcode without test folder
           command: |
-            gometalinter --disable-all --skip vendor --skip test -E deadcode -d ./...
+            golangci-lint run --disable-all --skip-dirs=vendor,test -E deadcode
 
 workflows:
   version: 2

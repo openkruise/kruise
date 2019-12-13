@@ -19,11 +19,10 @@ package v1alpha1
 import (
 	"testing"
 
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var cfg *rest.Config
+//var cfg *rest.Config
 var c client.Client
 
 func TestMain(m *testing.M) {

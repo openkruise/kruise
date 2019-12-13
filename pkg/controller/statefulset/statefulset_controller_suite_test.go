@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	stdlog "log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -39,10 +40,10 @@ func TestMain(m *testing.M) {
 	}
 	apis.AddToScheme(scheme.Scheme)
 
-	//var err error
-	//if cfg, err = t.Start(); err != nil {
-	//	stdlog.Fatal(err)
-	//}
+	var err error
+	if cfg, err = t.Start(); err != nil {
+		stdlog.Fatal(err)
+	}
 
 	code := m.Run()
 	t.Stop()
