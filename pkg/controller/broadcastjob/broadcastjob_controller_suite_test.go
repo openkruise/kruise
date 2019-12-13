@@ -16,11 +16,7 @@ limitations under the License.
 
 package broadcastjob
 
-import (
-	"k8s.io/client-go/rest"
-)
-
-var cfg *rest.Config
+//var cfg *rest.Config
 
 /*func TestMain(m *testing.M) {
 	//t := &envtest.Environment{

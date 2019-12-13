@@ -23,6 +23,7 @@ import (
 	kruiseapis "github.com/openkruise/kruise/pkg/apis"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	"k8s.io/client-go/kubernetes/scheme"
+
 	// test sources
 	_ "github.com/openkruise/kruise/test/e2e/apps"
 )

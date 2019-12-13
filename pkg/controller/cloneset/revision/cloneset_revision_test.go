@@ -23,7 +23,7 @@ import (
 
 	"github.com/openkruise/kruise/pkg/apis"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/controller/history"
 )

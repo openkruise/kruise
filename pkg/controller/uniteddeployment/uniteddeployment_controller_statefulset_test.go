@@ -40,7 +40,8 @@ import (
 var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-var deploy = client.ObjectKey{Namespace: "default", Name: "foo"}
+
+//var deploy = client.ObjectKey{Namespace: "default", Name: "foo"}
 
 const timeout = time.Second * 2
 
