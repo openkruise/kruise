@@ -20,18 +20,17 @@ Today, Kruise offers four workload controllers:
 
 - [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
-Please see [documents](./docs/README.md) for more technical information.
 
 The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
-
-Several [tutorials](./docs/tutorial/README.md) are provided to demonstrate how to use the workload controllers.
-A [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) by [Lachlan Evenson](https://github.com/lachie83) is also provided for demonstrating the controllers.
+This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is great for new users.
 
 ## Getting started
 
 ### Check before installation
 
-You should check the cluster before installation via the command-line with either `curl` or `wget`.
+Kruise requires APIServer to enable features such as `MutatingAdmissionWebhook` admission webhook. You can check your cluster qualification 
+before installing Kruise by running one of the following commands locally. The script assumes a read/write permission to /tmp and the local
+`Kubectl` is configured to access the target cluster.
 
 #### via curl
 
@@ -69,107 +68,23 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
 
-Or run from the repo root directory:
-
-`kustomize build config/default | kubectl apply -f -`
-
-To Install Kustomize, check kustomize [website](https://github.com/kubernetes-sigs/kustomize).
-
-Note that use Kustomize 1.0.11. Version 2.0.3 has compatibility issues with kube-builder
-
 The official kruise-controller-manager image is hosted under [docker hub](https://hub.docker.com/r/openkruise/kruise-manager).
 
-### Enable specified controllers
+### Enable specific controllers
 
-If you only need some of CRDs in Kruise and want to disable others, there are two optional ways:
- (you can also choose them all)
+If you only need some of CRDs in Kruise and want to disable others, you can use either one of the two options or both:
 
-1. Only install those CRDs you need.
+1. Only install the CRDs you need.
 
-2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container (in kruise-controller-manager statefulset template). Value is the list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet` means only use AdvancedStatefulSet/SidecarSet and keep other controllers/webhooks closed.
+2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container by changing kruise-controller-manager statefulset template. The
+value is a list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet`
+means only AdvancedStatefulSet and SidecarSet controllers/webhooks are enabled, all other controllers/webhooks are disabled.
 
-## Usage examples
+## Usage
 
-### Advanced StatefulSet
+Please see detailed [documents](./docs/README.md) which include examples, about Kruise controllers. 
+We also provider [**tutorials**](./docs/tutorial/README.md) to demonstrate how to use Kruise controllers.
 
-```yaml
-apiVersion: apps.kruise.io/v1alpha1
-kind: StatefulSet
-metadata:
-  name: sample
-spec:
-  replicas: 3
-  serviceName: fake-service
-  selector:
-    matchLabels:
-      app: sample
-  template:
-    metadata:
-      labels:
-        app: sample
-    spec:
-      readinessGates:
-        # A new condition must be added to ensure the pod remain at NotReady state while the in-place update is happening
-      - conditionType: InPlaceUpdateReady
-      containers:
-      - name: main
-        image: nginx:alpine
-  podManagementPolicy: Parallel  # allow parallel updates, works together with maxUnavailable
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      # Do in-place update if possible, currently only image update is supported for in-place update
-      podUpdatePolicy: InPlaceIfPossible
-      # Allow parallel updates with max number of unavailable instances equals to 2
-      maxUnavailable: 2
-```
-
-### Broadcast Job
-
-Run a BroadcastJob that each Pod computes pi, with `ttlSecondsAfterFinished` set to 30. The job
-will be deleted in 30 seconds after the job is finished.
-
-```yaml
-apiVersion: apps.kruise.io/v1alpha1
-kind: BroadcastJob
-metadata:
-  name: broadcastjob-ttl
-spec:
-  template:
-    spec:
-      containers:
-        - name: pi
-          image: perl
-          command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
-      restartPolicy: Never
-  completionPolicy:
-    type: Always
-    ttlSecondsAfterFinished: 30
-```
-
-### SidecarSet
-
-The yaml file below describes a SidecarSet that contains a sidecar container named `sidecar1`
-
-```yaml
-# sidecarset.yaml
-apiVersion: apps.kruise.io/v1alpha1
-kind: SidecarSet
-metadata:
-  name: test-sidecarset
-spec:
-  selector: # select the pods to be injected with sidecar containers
-    matchLabels:
-      app: nginx
-  containers:
-  - name: sidecar1
-    image: centos:7
-    command: ["sleep", "999d"] # do nothing at all
-```
-
-### UnitedDeployment
-
-TO BE ADDED
 
 ## Developer Guide
 

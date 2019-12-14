@@ -1,28 +1,28 @@
-# Run a UnitedDeployment to manage multiple domains
+# Run a UnitedDeployment in a multi-domain cluster
 
-This tutorial walks you through an example to manage a group of pods in multiple domains.
+This tutorial walks you through an example to manage a group of pods spread across multiple domains.
 
-## Prepare nodes for this example
+## Prepare nodes
 
-Let's say there are three nodes, each of which has an unique label to identify its domain, as following:
+Let's say there are three nodes, each of which has a unique label to identify its domain. For example,
 
 ```bash
 $ kubectl get node --show-labels
 NAME     STATUS   ROLES    AGE    VERSION   LABELS
-node-a   Ready    <none>   107d   v1.12.2   beta.kubernetes.io/arch=amd64,...,node=zone-a
-node-b   Ready    <none>   107d   v1.12.2   beta.kubernetes.io/arch=amd64,...,node=zone-b
-node-c   Ready    <none>   107d   v1.12.2   beta.kubernetes.io/arch=amd64,...,node=zone-c
+node-a   Ready    <none>   107d   v1.12.2   beta.kubernetes.io/arch=amd64,...,az=zone-a
+node-b   Ready    <none>   107d   v1.12.2   beta.kubernetes.io/arch=amd64,...,az=zone-b
+node-c   Ready    <none>   107d   v1.12.2   beta.kubernetes.io/arch=amd64,...,az=zone-c
 ```
 
-## Manage multiple domains
+## Manage multiple workloads
 
- Run below command to apply the UnitedDeployment:
+Run below command to create a UnitedDeployment:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/uniteddeployment.yaml
 ```
 
- Then check the UnitedDeployment.
+Then check the UnitedDeployment:
 
 ```bash
 $ kubectl get ud
@@ -49,10 +49,10 @@ demo-guestbook-kruise-subset-c-bxpd9-1   1/1     Running   0          3m35s
 demo-guestbook-kruise-subset-c-bxpd9-2   1/1     Running   0          3m29s
 ```
 
- There should be 3 StatefulSets created which represent three subsets. Depending on the subset name prefix format `<UnitedDeployment-name>-<subset-name>-`,
- it is easy to identify which subset a StatefulSet represents.
- For example, the StatefulSet `demo-guestbook-kruise-subset-a-c9x8n` is a subset named `subset-a` under the UnitedDeployment `demo-guestbook-kruise`.
- The desired replicas of each StatefulSet should match the value indicated in `spec.topology`.
+There should be 3 StatefulSets created. According to the subset name prefix format `<UnitedDeployment-name>-<subset-name>-`,
+it is easy to identify which subset a StatefulSet represents.
+For example, the StatefulSet `demo-guestbook-kruise-subset-a-c9x8n` represents a subset named `subset-a` under the UnitedDeployment `demo-guestbook-kruise`.
+The desired replicas of each StatefulSet should match the values specified in `spec.topology`.
 
 ```yaml
 ......
@@ -62,7 +62,7 @@ demo-guestbook-kruise-subset-c-bxpd9-2   1/1     Running   0          3m29s
         replicas: 2
         nodeSelectorTerm:
           matchExpressions:
-            - key: node
+            - key: az
               operator: In
               values:
                 - zone-a
@@ -70,26 +70,25 @@ demo-guestbook-kruise-subset-c-bxpd9-2   1/1     Running   0          3m29s
         replicas: 50%
         nodeSelectorTerm:
           matchExpressions:
-            - key: node
+            - key: az
               operator: In
               values:
                 - zone-b
       - name: subset-c
         nodeSelectorTerm:
           matchExpressions:
-            - key: node
+            - key: az
               operator: In
               values:
                 - zone-c
 ```
 
- As the yaml showing, the `subset-a` should provision 2 pods. The subset `subset-b` is supposed to provision half of `spec.replicas` pods, which is 5 pods.
- And the rest pods, which should be 3 pods, should belong to subset `subset-c`.
-
- From the UnitedDeployment status, the general detail is also showed.
+As shown above, `subset-a` should provision 2 pods, `subset-b` should provision half of `spec.replicas` pods, which is 5,
+and the remaining pods, which is 3, should belong to `subset-c`.
+From the UnitedDeployment status, we can clearly see the provision results.
 
 ```yaml
-......
+...
 status:
   conditions:
   - lastTransitionTime: "2019-12-12T16:19:06Z"
@@ -114,22 +113,22 @@ status:
     updatedRevision: demo-guestbook-kruise-55f9dbcb4b
   updatedReadyReplicas: 10
   updatedReplicas: 10
-......
+...
 ```
 
-### Manage the subset distributed topology
+### Manage the subset replica distribution
 
- It is possible to re-allocate the pods by editing each subset's replicas in `spec.topology`.
- If we change the `topology` to the following version, controller will trigger a pod re-allocation.
+It is possible to re-distribute the pods by editing each subset's replicas in `spec.topology`.
+If we change the `topology` to the following, the controller will trigger a pod re-distribution.
 
 ```yaml
-......
+...
   topology:
     subsets:
     - name: subset-a
       nodeSelectorTerm:
         matchExpressions:
-        - key: node
+        - key: az
           operator: In
           values:
           - zone-a
@@ -137,7 +136,7 @@ status:
     - name: subset-b
       nodeSelectorTerm:
         matchExpressions:
-        - key: node
+        - key: az
           operator: In
           values:
           - zone-b
@@ -145,13 +144,13 @@ status:
     - name: subset-c
       nodeSelectorTerm:
         matchExpressions:
-        - key: node
+        - key: az
           operator: In
           values:
           - zone-c
 ```
 
- Then check the StatefulSet and Pods. Controller has adjusted the pods distribution to match the `topology`.
+After a minute, we can find that controller has adjusted the pod distribution to match the above `topology`.
 
 ```bash
 $ kubectl get sts
@@ -174,7 +173,7 @@ demo-guestbook-kruise-subset-c-bxpd9-3   1/1     Running   0          31s
 demo-guestbook-kruise-subset-c-bxpd9-4   1/1     Running   0          23s
 ```
 
- If we then leave each of the subset replicas empty in `topology`, these pods will be re-allocated evenly.
+By default, if we don't set subset replicas at all, pods will be distributed evenly.
 
 ```bash
 $ kubectl -n kruise get pod
@@ -193,20 +192,20 @@ demo-guestbook-kruise-subset-c-bxpd9-3   1/1     Running   0          94s
 
 ### Manage the subset upgrade progress
 
- UnitedDeployment provide `Manual` update strategy to control subsets update progress,
- by indicating the partition of each subset in `updateStrategy.manualUpdate.partitions`.
+UnitedDeployment provides `Manual` update strategy to control the subsets update progress
+by setting the partition of each subset in `updateStrategy.manualUpdate.partitions`.
 
- Let's say the UnitedDeployment needs to update the pod's environment variable like following.
- In order to control the update progress, the partitions need to be provided.
+Let's say we want to update pod's environment variable in a UnitedDeployment and
+we provide the following partitions.
 
 ```yaml
-......
-* updateStrategy:
-*   type: Manual
-*   manualUpdate:
-*     partitions:
-*       subset-a: 1
-*       subset-b: 2
+...
++ updateStrategy:
++   type: Manual
++   manualUpdate:
++     partitions:
++       subset-a: 1
++       subset-b: 2
   template:
     statefulSetTemplate:
       metadata:
@@ -224,16 +223,16 @@ demo-guestbook-kruise-subset-c-bxpd9-3   1/1     Running   0          94s
             - image: openkruise/guestbook:v1
               imagePullPolicy: Always
               name: guestbook-kruise
-*             env:
-*             - name: version
-*               value: v2
++             env:
++             - name: version
++               value: v2
               ports:
               - containerPort: 3000
                 name: http-server
-......
+...
 ```
 
- After minutes, part of pods should be updated and look like this:
+After a minute, part of pods should be updated.
 
 ```bash
 $ kubectl get pod --show-labels
@@ -250,19 +249,20 @@ demo-guestbook-kruise-subset-c-bxpd9-2   1/1     Running   0          2m45s   ..
 demo-guestbook-kruise-subset-c-bxpd9-3   1/1     Running   0          3m3s    ...,apps.kruise.io/controller-revision-hash=demo-guestbook-kruise-64494c46ff,...
 ```
 
- With `--show-labels` appended, the revision every pod belongs to is showed.
- The label `apps.kruise.io/controller-revision-hash` attaches the revision on the pod.
+With `--show-labels` appended, the revision of every pod is shown with the
+label key `apps.kruise.io/controller-revision-hash`.
 
- Depending on the UnitedDeployment status below, it is able to know the UnitedDeployment is during a update from `currentRevision` to `updatedRevision`, and the target revision is `demo-guestbook-kruise-64494c46ff`.
- Furthermore, there are 2, 1, 4 pods in each subset have been updated.
- A empty partition of a subset means `partition=0`, so all pods of subset-c have been selected to update.
+From the UnitedDeployment status below, we can see that the UnitedDeployment is
+undergoing an update and the target revision is `demo-guestbook-kruise-64494c46ff`.
+Furthermore, there are 2, 1, 4 pods in each subset that have been updated.
+An empty partition of a subset means `partition` is 0, all pods of `subset-c` will be updated.
 
 ```yaml
-......
+...
 status:
-......
-* currentRevision: demo-guestbook-kruise-55f9dbcb4b
-  ......
+...
++ currentRevision: demo-guestbook-kruise-55f9dbcb4b
+  ...
   subsetReplicas:
     subset-a: 3
     subset-b: 3
@@ -272,26 +272,22 @@ status:
       subset-a: 1
       subset-b: 2
       subset-c: 0
-*   updatedRevision: demo-guestbook-kruise-64494c46ff
++ updatedRevision: demo-guestbook-kruise-64494c46ff
   updatedReadyReplicas: 7
   updatedReplicas: 7
 ```
 
-## Support subsets
+## Subset workload support
 
- UnitedDeployment is supposed to support multiple kinds of workload as its subset.
- Currently, only StatefulSet is included.
+UnitedDeployment might support multiple kinds of workload as its subset. Currently, only StatefulSet is supported.
+To better support StatefulSet, UnitedDeployment controller makes a few enhancements:
 
-### StatefulSet
+#### Delete stuck pods
 
- In order to support StatefulSet well, UnitedDeployment controller considers some special cases.
+To make sure a `RollingUpdate` progress will not be blocked by this [issue](https://github.com/kubernetes/kubernetes/issues/67250),
+UnitedDeployment controller helps to delete the stuck pods.
 
-#### Delete Stuck pod
+#### Support OnDelete update strategy
 
- To make sure a `RollingUpdate` progress will not be blocked by this [issue](https://github.com/kubernetes/kubernetes/issues/67250),
- UnitedDeployment controller will help to delete the stuck pods.
-
-#### support OnDelete update strategy
-
- `OnDelete` update strategy is allowed to indicate in `template.statefulSetTemplate`.
- However, the pods also need to be deleted manually to keep consistent with the behavior of StatefulSet controller.
+`OnDelete` update strategy is allowed in `template.statefulSetTemplate`.
+However, the pods need to be deleted manually to keep consistent with the behavior of StatefulSet controller.
