@@ -177,4 +177,4 @@ type ManualUpdate struct {
 
 ## Tutorial
 
-- [Run a UnitedDeployment to manage multiple domains](../../tutorial/uniteddepoyment.md)
+- [Run a UnitedDeployment in a multi-domain cluster](../../tutorial/uniteddeployment.md)
