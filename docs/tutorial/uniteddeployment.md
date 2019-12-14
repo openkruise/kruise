@@ -282,12 +282,12 @@ status:
 UnitedDeployment might support multiple kinds of workload as its subset. Currently, only StatefulSet is supported.
 To better support StatefulSet, UnitedDeployment controller makes a few enhancements:
 
-#### Delete stuck pods
+### Delete stuck pods
 
 To make sure a `RollingUpdate` progress will not be blocked by this [issue](https://github.com/kubernetes/kubernetes/issues/67250),
 UnitedDeployment controller helps to delete the stuck pods.
 
-#### Support OnDelete update strategy
+### Support OnDelete update strategy
 
 `OnDelete` update strategy is allowed in `template.statefulSetTemplate`.
 However, the pods need to be deleted manually to keep consistent with the behavior of StatefulSet controller.

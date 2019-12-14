@@ -20,7 +20,6 @@ Today, Kruise offers four workload controllers:
 
 - [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
-
 The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
 This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is great for new users.
 
@@ -28,7 +27,7 @@ This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evens
 
 ### Check before installation
 
-Kruise requires APIServer to enable features such as `MutatingAdmissionWebhook` admission webhook. You can check your cluster qualification 
+Kruise requires APIServer to enable features such as `MutatingAdmissionWebhook` admission webhook. You can check your cluster qualification
 before installing Kruise by running one of the following commands locally. The script assumes a read/write permission to /tmp and the local
 `Kubectl` is configured to access the target cluster.
 
@@ -76,15 +75,12 @@ If you only need some of CRDs in Kruise and want to disable others, you can use 
 
 1. Only install the CRDs you need.
 
-2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container by changing kruise-controller-manager statefulset template. The
-value is a list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet`
-means only AdvancedStatefulSet and SidecarSet controllers/webhooks are enabled, all other controllers/webhooks are disabled.
+2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container by changing kruise-controller-manager statefulset template. The value is a list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet` means only AdvancedStatefulSet and SidecarSet controllers/webhooks are enabled, all other controllers/webhooks are disabled.
 
 ## Usage
 
-Please see detailed [documents](./docs/README.md) which include examples, about Kruise controllers. 
+Please see detailed [documents](./docs/README.md) which include examples, about Kruise controllers.
 We also provider [**tutorials**](./docs/tutorial/README.md) to demonstrate how to use Kruise controllers.
-
 
 ## Developer Guide
 
