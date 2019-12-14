@@ -21,7 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/gate"
-	"github.com/openkruise/kruise/pkg/webhook/default_server/statefulset/validating"
+	"github.com/openkruise/kruise/pkg/webhook/default_server/uniteddeployment/validating"
 )
 
 func init() {
