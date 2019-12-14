@@ -27,7 +27,7 @@ This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evens
 
 ### Check before installation
 
-Kruise requires APIServer to enable features such as `MutatingAdmissionWebhook` admission webhook. You can check your cluster qualification
+Kruise requires APIServer to enable features such as `MutatingAdmissionWebhook` and `ValidatingAdmissionWebhook`. You can check your cluster qualification
 before installing Kruise by running one of the following commands locally. The script assumes a read/write permission to /tmp and the local
 `Kubectl` is configured to access the target cluster.
 
@@ -69,9 +69,9 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 
 The official kruise-controller-manager image is hosted under [docker hub](https://hub.docker.com/r/openkruise/kruise-manager).
 
-### Enable specific controllers
+### Optional: Enable specific controllers
 
-If you only need some of CRDs in Kruise and want to disable others, you can use either one of the two options or both:
+If you only need some of the Kruise controllers and want to disable others, you can use either one of the two options or both:
 
 1. Only install the CRDs you need.
 

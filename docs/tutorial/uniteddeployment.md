@@ -35,21 +35,22 @@ demo-guestbook-kruise-subset-a-c9x8n     2         2         3m25s
 demo-guestbook-kruise-subset-b-9c8dg     5         5         3m25s
 demo-guestbook-kruise-subset-c-bxpd9     3         3         3m25s
 
-$ kubectl get pod
-NAME                                     READY   STATUS    RESTARTS   AGE
-demo-guestbook-kruise-subset-a-c9x8n-0   1/1     Running   0          3m40s
-demo-guestbook-kruise-subset-a-c9x8n-1   1/1     Running   0          3m33s
-demo-guestbook-kruise-subset-b-9c8dg-0   1/1     Running   0          3m40s
-demo-guestbook-kruise-subset-b-9c8dg-1   1/1     Running   0          3m34s
-demo-guestbook-kruise-subset-b-9c8dg-2   1/1     Running   0          3m27s
-demo-guestbook-kruise-subset-b-9c8dg-3   1/1     Running   0          3m21s
-demo-guestbook-kruise-subset-b-9c8dg-4   1/1     Running   0          3m15s
-demo-guestbook-kruise-subset-c-bxpd9-0   1/1     Running   0          3m40s
-demo-guestbook-kruise-subset-c-bxpd9-1   1/1     Running   0          3m35s
-demo-guestbook-kruise-subset-c-bxpd9-2   1/1     Running   0          3m29s
+$ kubectl get pod -o wide
+NAME                                     READY   STATUS    RESTARTS   AGE     NODE
+demo-guestbook-kruise-subset-a-c9x8n-0   1/1     Running   0          3m40s   node-a
+demo-guestbook-kruise-subset-a-c9x8n-1   1/1     Running   0          3m33s   node-a
+demo-guestbook-kruise-subset-b-9c8dg-0   1/1     Running   0          3m40s   node-b
+demo-guestbook-kruise-subset-b-9c8dg-1   1/1     Running   0          3m34s   node-b
+demo-guestbook-kruise-subset-b-9c8dg-2   1/1     Running   0          3m27s   node-b
+demo-guestbook-kruise-subset-b-9c8dg-3   1/1     Running   0          3m21s   node-b
+demo-guestbook-kruise-subset-b-9c8dg-4   1/1     Running   0          3m15s   node-b
+demo-guestbook-kruise-subset-c-bxpd9-0   1/1     Running   0          3m40s   node-c
+demo-guestbook-kruise-subset-c-bxpd9-1   1/1     Running   0          3m35s   node-c
+demo-guestbook-kruise-subset-c-bxpd9-2   1/1     Running   0          3m29s   node-c
 ```
 
-There should be 3 StatefulSets created. According to the subset name prefix format `<UnitedDeployment-name>-<subset-name>-`,
+There should be 3 StatefulSets and 10 pods created. The pods are spread in three nodes following
+the node affinity specified in the `subset`. According to the subset name prefix format `<UnitedDeployment-name>-<subset-name>-`,
 it is easy to identify which subset a StatefulSet represents.
 For example, the StatefulSet `demo-guestbook-kruise-subset-a-c9x8n` represents a subset named `subset-a` under the UnitedDeployment `demo-guestbook-kruise`.
 The desired replicas of each StatefulSet should match the values specified in `spec.topology`.
