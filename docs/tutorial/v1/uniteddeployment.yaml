@@ -38,7 +38,7 @@ spec:
         replicas: 2
         nodeSelectorTerm:
           matchExpressions:
-            - key: node
+            - key: az
               operator: In
               values:
                 - zone-a
@@ -46,14 +46,14 @@ spec:
         replicas: 50%
         nodeSelectorTerm:
           matchExpressions:
-            - key: node
+            - key: az
               operator: In
               values:
                 - zone-b
       - name: subset-c
         nodeSelectorTerm:
           matchExpressions:
-            - key: node
+            - key: az
               operator: In
               values:
                 - zone-c
