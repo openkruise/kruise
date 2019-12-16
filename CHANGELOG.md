@@ -30,15 +30,15 @@
 ## Documents
 
 - Three blog posts are added in Kruise [website](http://openkruise.io/en-us/blog/index.html), titled:
-	- Kruise Controller Classification Guidance.
-	- Learning Concurrent Reconciling.
-	- UnitedDeploymemt - Supporting Multi-domain Workload Management.
+    1. Kruise Controller Classification Guidance.
+    2. Learning Concurrent Reconciling.
+    3. UnitedDeploymemt - Supporting Multi-domain Workload Management.
 - New documents are added for UnitedDeployment, including a [tutorial](./docs/tutorial/uniteddeployment.md).
 - Revise main README.md.
 
 ---
 
-# v0.2.0
+**v0.2.0**
 
 ## Installation
 
@@ -70,7 +70,7 @@
 
 ---
 
-# v0.1.0
+**v0.1.0**
 
 ## Kruise-Controller-Manager
 
