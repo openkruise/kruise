@@ -31,5 +31,5 @@ func init() {
 		Mutating().
 		Operations(admissionregistrationv1beta1.Create, admissionregistrationv1beta1.Update).
 		FailurePolicy(admissionregistrationv1beta1.Fail).
-		ForType(&appsv1alpha1.StatefulSet{})
+		ForType(&appsv1alpha1.UnitedDeployment{})
 }
