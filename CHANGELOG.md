@@ -1,3 +1,37 @@
+# v0.3.0
+
+## Installation
+
+- Provide a script to check if the K8s cluster has enabled MutatingAdmissionWebhook and ValidatingAdmissionWebhook admission plugins before installing Kruise.
+- Users can now install specific controllers if they only need some of the Kruise CRD/controllers.
+
+## Kruise-Controller-Manager
+
+### Bugs
+
+- Fix a jsonpatch bug by updating the vendor code.
+
+## Advanced StatefulSet
+
+### Features
+- Add condition report in `status` to indicate the scaling or rollout results.
+
+## A NEW workload controller - UnitedDeployment
+
+### Features
+- Define a set of APIs for UnitedDeployment workload which manages multiple workloads spread over multiple domains in one cluster.
+- Create one workload for each `Subset` in `Topology`.
+- Manage Pod replica distribution across subset workloads.
+- Rollout all subset workloads by specifying a new workload template.
+- Manually manage the rollout of subset workloads by specifying the `Partition` of each workload.
+
+## Documents
+- Three blog posts are added in Kruise website (http://openkruise.io/en-us/blog/index.html), titled:
+	- Kruise Controller Classification Guidance
+	- Learning Concurrent Reconciling
+	- UnitedDeploymemt - Supporting Multi-domain Workload Management
+- New documents are added for UnitedDeployment, including a [tutorial](./docs/tutorial/uniteddeployment.md).
+- Revise main README.md.
 ---
 
 # v0.2.0
