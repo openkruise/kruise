@@ -14,11 +14,13 @@
 ## Advanced StatefulSet
 
 ### Features
+
 - Add condition report in `status` to indicate the scaling or rollout results.
 
 ## A NEW workload controller - UnitedDeployment
 
 ### Features
+
 - Define a set of APIs for UnitedDeployment workload which manages multiple workloads spread over multiple domains in one cluster.
 - Create one workload for each `Subset` in `Topology`.
 - Manage Pod replica distribution across subset workloads.
@@ -26,12 +28,14 @@
 - Manually manage the rollout of subset workloads by specifying the `Partition` of each workload.
 
 ## Documents
-- Three blog posts are added in Kruise website (http://openkruise.io/en-us/blog/index.html), titled:
-	- Kruise Controller Classification Guidance
-	- Learning Concurrent Reconciling
-	- UnitedDeploymemt - Supporting Multi-domain Workload Management
+
+- Three blog posts are added in Kruise [website](http://openkruise.io/en-us/blog/index.html), titled:
+	- Kruise Controller Classification Guidance.
+	- Learning Concurrent Reconciling.
+	- UnitedDeploymemt - Supporting Multi-domain Workload Management.
 - New documents are added for UnitedDeployment, including a [tutorial](./docs/tutorial/uniteddeployment.md).
 - Revise main README.md.
+
 ---
 
 # v0.2.0
