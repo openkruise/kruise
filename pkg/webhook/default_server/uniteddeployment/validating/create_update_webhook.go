@@ -23,7 +23,7 @@ import (
 )
 
 func init() {
-	builderName := "validating-create-update-unitedDeployment"
+	builderName := "validating-create-update-uniteddeployment"
 	Builders[builderName] = builder.
 		NewWebhookBuilder().
 		Name(builderName+".kruise.io").
