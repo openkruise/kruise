@@ -25,12 +25,18 @@ import (
 	"github.com/openkruise/kruise/pkg/controller"
 	"github.com/openkruise/kruise/pkg/webhook"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+)
+
+var (
+	restConfigQPS   = flag.Int("rest-config-qps", 30, "QPS of rest config.")
+	restConfigBurst = flag.Int("rest-config-burst", 50, "Burst of rest config.")
 )
 
 func main() {
@@ -57,6 +63,7 @@ func main() {
 		log.Error(err, "unable to set up client config")
 		os.Exit(1)
 	}
+	setRestConfig(cfg)
 
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
@@ -109,5 +116,14 @@ func main() {
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
 		log.Error(err, "unable to run the manager")
 		os.Exit(1)
+	}
+}
+
+func setRestConfig(c *rest.Config) {
+	if *restConfigQPS > 0 {
+		c.QPS = float32(*restConfigQPS)
+	}
+	if *restConfigBurst > 0 {
+		c.Burst = *restConfigBurst
 	}
 }

@@ -19,6 +19,9 @@ package defaultserver
 import (
 	"fmt"
 	"os"
+	"strconv"
+
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,8 +72,17 @@ func Add(mgr manager.Manager) error {
 		}
 	}
 
+	var webhookPort int32 = 9876
+	if p := os.Getenv("WEBHOOK_PORT"); len(p) > 0 {
+		if port, err := strconv.ParseInt(p, 10, 32); err == nil {
+			webhookPort = int32(port)
+		} else {
+			klog.Errorf("failed to convert WEBHOOK_PORT=%v in env: %v", p, err)
+		}
+	}
+
 	svr, err := webhook.NewServer("kruise-admission-server", mgr, webhook.ServerOptions{
-		Port:             9876,
+		Port:             webhookPort,
 		CertDir:          "/tmp/cert",
 		BootstrapOptions: bootstrapOptions,
 	})
