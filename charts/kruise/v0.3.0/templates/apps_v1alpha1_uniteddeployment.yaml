@@ -1,0 +1,234 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: uniteddeployments.apps.kruise.io
+spec:
+  additionalPrinterColumns:
+    - JSONPath: .spec.replicas
+      description: The desired number of pods.
+      name: DESIRED
+      type: integer
+    - JSONPath: .status.replicas
+      description: The number of currently all pods.
+      name: CURRENT
+      type: integer
+    - JSONPath: .status.updatedReplicas
+      description: The number of pods updated.
+      name: UPDATED
+      type: integer
+    - JSONPath: .status.readyReplicas
+      description: The number of pods ready.
+      name: READY
+      type: integer
+    - JSONPath: .metadata.creationTimestamp
+      description: CreationTimestamp is a timestamp representing the server time when
+        this object was created. It is not guaranteed to be set in happens-before order
+        across separate operations. Clients may not set this value. It is represented
+        in RFC3339 form and is in UTC.
+      name: AGE
+      type: date
+  group: apps.kruise.io
+  names:
+    kind: UnitedDeployment
+    plural: uniteddeployments
+    shortNames:
+      - ud
+  scope: Namespaced
+  subresources:
+    scale:
+      labelSelectorPath: .status.selector
+      specReplicasPath: .spec.replicas
+      statusReplicasPath: .status.replicas
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            replicas:
+              description: Replicas is the total desired replicas of all the subsets.
+                If unspecified, defaults to 1.
+              format: int32
+              type: integer
+            revisionHistoryLimit:
+              description: Indicates the number of histories to be conserved. If unspecified,
+                defaults to 10.
+              format: int32
+              type: integer
+            selector:
+              description: Selector is a label query over pods that should match the
+                replica count. It must match the pod template's labels.
+              type: object
+            template:
+              description: Template describes the subset that will be created.
+              properties:
+                statefulSetTemplate:
+                  description: StatefulSet template
+                  properties:
+                    metadata:
+                      type: object
+                    spec:
+                      type: object
+                  required:
+                    - spec
+                  type: object
+              type: object
+            topology:
+              description: Topology describes the pods distribution detail between
+                each of subsets.
+              properties:
+                subsets:
+                  description: Contains the details of each subset. Each element in
+                    this array represents one subset which will be provisioned and
+                    managed by UnitedDeployment.
+                  items:
+                    properties:
+                      name:
+                        description: Indicates subset name as a DNS_LABEL, which will
+                          be used to generate subset workload name prefix in the format
+                          '<deployment-name>-<subset-name>-'. Name should be unique
+                          between all of the subsets under one UnitedDeployment.
+                        type: string
+                      nodeSelectorTerm:
+                        description: Indicates the node selector to form the subset.
+                          Depending on the node selector, pods provisioned could be
+                          distributed across multiple groups of nodes. A subset's
+                          nodeSelectorTerm is not allowed to be updated.
+                        type: object
+                      replicas:
+                        description: Indicates the number of the pod to be created
+                          under this subset. Replicas could also be percentage like
+                          '10%', which means 10% of UnitedDeployment replicas of pods
+                          will be distributed under this subset. If nil, the number
+                          of replicas in this subset is determined by controller.
+                          Controller will try to keep all the subsets with nil replicas
+                          have average pods.
+                        oneOf:
+                          - type: string
+                          - type: integer
+                    required:
+                      - name
+                    type: object
+                  type: array
+              type: object
+            updateStrategy:
+              description: UpdateStrategy indicates the strategy the UnitedDeployment
+                use to preform the update, when template is changed.
+              properties:
+                manualUpdate:
+                  description: Includes all of the parameters a Manual update strategy
+                    needs.
+                  properties:
+                    partitions:
+                      description: Indicates number of subset partition.
+                      type: object
+                  type: object
+                type:
+                  description: Type of UnitedDeployment update strategy. Default is
+                    Manual.
+                  type: string
+              type: object
+          required:
+            - selector
+          type: object
+        status:
+          properties:
+            collisionCount:
+              description: Count of hash collisions for the UnitedDeployment. The
+                UnitedDeployment controller uses this field as a collision avoidance
+                mechanism when it needs to create the name for the newest ControllerRevision.
+              format: int32
+              type: integer
+            conditions:
+              description: Represents the latest available observations of a UnitedDeployment's
+                current state.
+              items:
+                properties:
+                  lastTransitionTime:
+                    description: Last time the condition transitioned from one status
+                      to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: A human readable message indicating details about
+                      the transition.
+                    type: string
+                  reason:
+                    description: The reason for the condition's last transition.
+                    type: string
+                  status:
+                    description: Status of the condition, one of True, False, Unknown.
+                    type: string
+                  type:
+                    description: Type of in place set condition.
+                    type: string
+                type: object
+              type: array
+            currentRevision:
+              description: CurrentRevision, if not empty, indicates the current version
+                of the UnitedDeployment.
+              type: string
+            observedGeneration:
+              description: ObservedGeneration is the most recent generation observed
+                for this UnitedDeployment. It corresponds to the UnitedDeployment's
+                generation, which is updated on mutation by the API Server.
+              format: int64
+              type: integer
+            readyReplicas:
+              description: The number of ready replicas.
+              format: int32
+              type: integer
+            replicas:
+              description: Replicas is the most recently observed number of replicas.
+              format: int32
+              type: integer
+            subsetReplicas:
+              description: Records the topology detail information of the replicas
+                of each subset.
+              type: object
+            updateStatus:
+              description: Records the information of update progress.
+              properties:
+                currentPartitions:
+                  description: Records the current partition.
+                  type: object
+                updatedRevision:
+                  description: Records the latest revision.
+                  type: string
+              type: object
+            updatedReadyReplicas:
+              description: The number of ready current revision replicas for this
+                UnitedDeployment.
+              format: int32
+              type: integer
+            updatedReplicas:
+              description: The number of pods in current version.
+              format: int32
+              type: integer
+          required:
+            - replicas
+            - updatedReplicas
+            - currentRevision
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

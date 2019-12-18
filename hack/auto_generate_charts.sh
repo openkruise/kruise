@@ -5,12 +5,12 @@ set -o nounset
 # receive version version
 echo "---------------------------------"
 echo "Please input Kruise version (available versions are listed in https://github.com/openkruise/kruise/releases)"
-echo "If no input, the default version of v0.2.0 will be used"
+echo "If no input, the default version of v0.3.0 will be used"
 echo "---------------------------------"
 read -p "please input version: " version
 
 if [ ! -n "$version" ]; then
-  version="v0.2.0"
+  version="v0.3.0"
 fi
 
 echo "----------------------------------"
@@ -33,3 +33,7 @@ wget https://raw.githubusercontent.com/openkruise/kruise/master/charts/kruise/$v
 wget https://raw.githubusercontent.com/openkruise/kruise/master/charts/kruise/$version/templates/rbac_role.yaml -O charts/templates/rbac_role.yaml
 wget https://raw.githubusercontent.com/openkruise/kruise/master/charts/kruise/$version/templates/rbac_role_binding.yaml -O charts/templates/rbac_role_binding.yaml
 wget https://raw.githubusercontent.com/openkruise/kruise/master/charts/kruise/$version/templates/webhookconfiguration.yaml -O charts/templates/webhookconfiguration.yaml
+
+if [ "v0.3.0" == "$version" ]; then
+  wget https://raw.githubusercontent.com/openkruise/kruise/master/charts/kruise/$version/templates/apps_v1alpha1_uniteddeployment.yaml -O charts/templates/apps_v1alpha1_uniteddeployment.yaml
+fi

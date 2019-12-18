@@ -1,0 +1,27 @@
+# Default values for kruise.
+
+revisionHistoryLimit: 3
+
+spec:
+  nodeAffinity: {}
+  nodeSelector: {}
+  tolerations: []
+
+manager:
+  # settings for log print
+  log:
+    # log level for kruise-manager
+    level: "4"
+
+  # resources of kruise-manager container
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+    requests:
+      cpu: 100m
+      memory: 60Mi
+
+  metrics:
+    addr: localhost
+    port: 8080
