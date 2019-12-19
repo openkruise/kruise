@@ -99,15 +99,15 @@ func pastActiveDeadline(job *appsv1alpha1.BroadcastJob) bool {
 }
 
 // pastTTLDeadline checks if job has past the TTLSecondsAfterFinished deadline
-func pastTTLDeadline(job *appsv1alpha1.BroadcastJob) bool {
+func pastTTLDeadline(job *appsv1alpha1.BroadcastJob) (bool, time.Duration) {
 	if job.Spec.CompletionPolicy.TTLSecondsAfterFinished == nil || job.Status.CompletionTime == nil {
-		return false
+		return false, -1
 	}
 	now := metav1.Now()
 	finishTime := job.Status.CompletionTime.Time
 	duration := now.Time.Sub(finishTime)
 	allowedDuration := time.Duration(*job.Spec.CompletionPolicy.TTLSecondsAfterFinished) * time.Second
-	return duration >= allowedDuration
+	return duration >= allowedDuration, allowedDuration - duration
 }
 
 func newCondition(conditionType appsv1alpha1.JobConditionType, reason, message string) appsv1alpha1.JobCondition {
