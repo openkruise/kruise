@@ -139,12 +139,14 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 	addLabelToPodTemplate(job)
 
 	if IsJobFinished(job) {
-		if pastTTLDeadline(job) {
+		if isPast, leftTime := pastTTLDeadline(job); isPast {
 			klog.Infof("deleting the job %s", job.Name)
 			err = r.Delete(context.TODO(), job)
 			if err != nil {
 				klog.Errorf("failed to delete job %s", job.Name)
 			}
+		} else if leftTime > 0 {
+			return reconcile.Result{RequeueAfter: leftTime}, nil
 		}
 		return reconcile.Result{}, nil
 	}
