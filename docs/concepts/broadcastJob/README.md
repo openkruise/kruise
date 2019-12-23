@@ -65,6 +65,10 @@ added node in the cluster, he can deploy a BroadcastJob with `Never` policy.
 
 `Paused` will pause the job.
 
+### SlowStart
+
+`slowStart` true means pods will be created in batch mode (for example, 2, 4, 8 and so on) until reaching Parallelism number of Pods.
+
 ### FailurePolicy
 
 `FailurePolicy` indicates the behavior of the job, when failed pod is found.

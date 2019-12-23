@@ -43,6 +43,10 @@ type BroadcastJobSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
 
+	// slowStart true means pods will be created in batch mode (for example, 2, 4, 8 and so on) until reaching Parallelism number of Pods.
+	// +optional
+	SlowStart bool `json:"slowStart,omitempty"`
+
 	// FailurePolicy indicates the behavior of the job, when failed pod is found.
 	// +optional
 	FailurePolicy FailurePolicy `json:"failurePolicy,omitempty" protobuf:"bytes,5,opt,name=failurePolicy"`

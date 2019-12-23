@@ -3,7 +3,7 @@
 This controller leverages the mutating webhook admission controllers to automatically
 inject a sidecar container for every selected Pod when the Pod is created. The Sidecar
 injection process is similar to the automatic sidecar injection mechanism used in
-[istio](https://istio.io/docs/setup/kubernetes/additional-setup/sidecar-injection/).
+[istio](https://istio.io/docs/ops/configuration/mesh/injection-concepts/).
 
 Besides deployment, SidecarSet controller also provides
 additional capabilities such as in-place Sidecar container image upgrade, mounting Sidecar volumes, etc.

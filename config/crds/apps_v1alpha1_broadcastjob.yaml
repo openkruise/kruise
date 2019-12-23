@@ -110,6 +110,11 @@ spec:
             paused:
               description: Paused will pause the job.
               type: boolean
+            slowStart:
+              description: slowStart true means pods will be created in batch mode
+                (for example, 2, 4, 8 and so on) until reaching Parallelism number
+                of Pods.
+              type: boolean
             template:
               description: Template describes the pod that will be created when executing
                 a job.
