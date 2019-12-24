@@ -340,7 +340,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				currentSet,
 				updateSet,
 				currentRevision.Name,
-				updateRevision.Name, ord)
+				updateRevision.Name, ord, replicas)
 		}
 	}
 
@@ -408,7 +408,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				updateSet,
 				currentRevision.Name,
 				updateRevision.Name,
-				i)
+				i, replicas)
 		}
 		// If we find a Pod that has not been created we create the Pod
 		if !isCreated(replicas[i]) {
@@ -533,11 +533,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
-	updateMin := 0
 	maxUnavailable := 1
 	if set.Spec.UpdateStrategy.RollingUpdate != nil {
-		updateMin = int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(replicaCount), true)
+		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(replicaCount), false)
 		if err != nil {
 			return &status, err
 		}
@@ -547,8 +545,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	var unavailablePods []string
-	// we terminate the Pod with the largest ordinal that does not match the update revision.
-	for target := len(replicas) - 1; target >= updateMin; target-- {
+	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, replicas)
+	klog.V(5).Infof("Prepare to update pods indexes %v for StatefulSet %s", updateIndexes, getStatefulSetKey(set))
+
+	// update pods in sequence
+	for _, target := range updateIndexes {
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {

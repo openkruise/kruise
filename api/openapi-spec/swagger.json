@@ -491,7 +491,7 @@
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
         },
         "partition": {
-          "description": "Partition indicates the number of pods with non-updated revisions when rolling update. This means controller will update $(replicas - partition) number of pod Default value is 0.",
+          "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned by default. But if unorderedUpdate has been set:\n  - Partition indicates the number of pods with non-updated revisions when rolling update.\n  - It means controller will update $(replicas - partition) number of pod.\nDefault value is 0.",
           "type": "integer",
           "format": "int32"
         },
@@ -503,9 +503,9 @@
           "description": "PodUpdatePolicy indicates how pods should be updated Default value is \"ReCreate\"",
           "type": "string"
         },
-        "priorityStrategy": {
-          "description": "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights. Also, priorityStrategy can just be allowed to work with Parallel podManagementPolicy.",
-          "$ref": "#/definitions/kruise.apps.v1alpha1.UpdatePriorityStrategy"
+        "unorderedUpdate": {
+          "description": "UnorderedUpdate contains strategies for non-ordered update. If it is not nil, pods will be updated with non-ordered sequence. Noted that UnorderedUpdate can only be allowed to work with Parallel podManagementPolicy",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UnorderedUpdateStrategy"
         }
       }
     },
@@ -1055,6 +1055,16 @@
         "type": {
           "description": "Type of UnitedDeployment update strategy. Default is Manual.",
           "type": "string"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.UnorderedUpdateStrategy": {
+      "description": "UnorderedUpdateStrategy defines strategies for non-ordered update.",
+      "type": "object",
+      "properties": {
+        "priorityStrategy": {
+          "description": "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.UpdatePriorityStrategy"
         }
       }
     },

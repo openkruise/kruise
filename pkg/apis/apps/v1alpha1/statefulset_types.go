@@ -39,8 +39,10 @@ type StatefulSetUpdateStrategy struct {
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
-	// Partition indicates the number of pods with non-updated revisions when rolling update.
-	// This means controller will update $(replicas - partition) number of pod
+	// Partition indicates the ordinal at which the StatefulSet should be partitioned by default.
+	// But if unorderedUpdate has been set:
+	//   - Partition indicates the number of pods with non-updated revisions when rolling update.
+	//   - It means controller will update $(replicas - partition) number of pod.
 	// Default value is 0.
 	// +optional
 	Partition *int32 `json:"partition,omitempty"`
@@ -59,9 +61,17 @@ type RollingUpdateStatefulSetStrategy struct {
 	// Default value is false
 	// +optional
 	Paused bool `json:"paused,omitempty"`
+	// UnorderedUpdate contains strategies for non-ordered update.
+	// If it is not nil, pods will be updated with non-ordered sequence.
+	// Noted that UnorderedUpdate can only be allowed to work with Parallel podManagementPolicy
+	// +optional
+	UnorderedUpdate *UnorderedUpdateStrategy `json:"unorderedUpdate,omitempty"`
+}
+
+// UnorderedUpdateStrategy defines strategies for non-ordered update.
+type UnorderedUpdateStrategy struct {
 	// Priorities are the rules for calculating the priority of updating pods.
 	// Each pod to be updated, will pass through these terms and get a sum of weights.
-	// Also, priorityStrategy can just be allowed to work with Parallel podManagementPolicy.
 	// +optional
 	PriorityStrategy *UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
 }

@@ -1,0 +1,101 @@
+/*
+Copyright 2019 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package priorityupdate
+
+import (
+	"sort"
+	"strconv"
+
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+)
+
+// SortIndexesByPriority sort the indexes by UpdatePriorityStrategy
+func SortIndexesByPriority(strategy *appsv1alpha1.UpdatePriorityStrategy, pods []*v1.Pod, indexes []int) []int {
+	if strategy == nil || (len(strategy.WeightPriority) == 0 && len(strategy.OrderPriority) == 0) {
+		return indexes
+	}
+
+	f := func(i, j int) bool {
+		podI := pods[indexes[i]]
+		podJ := pods[indexes[j]]
+		return compare(strategy, podI.Labels, podJ.Labels, indexes[i] > indexes[j])
+	}
+
+	sort.Slice(indexes, f)
+	return indexes
+}
+
+func compare(strategy *appsv1alpha1.UpdatePriorityStrategy, podI, podJ map[string]string, defaultVal bool) bool {
+	if len(strategy.WeightPriority) > 0 {
+		if wI, wJ := getPodWeightPriority(strategy.WeightPriority, podI), getPodWeightPriority(strategy.WeightPriority, podJ); wI != wJ {
+			return wI > wJ
+		}
+	} else if len(strategy.OrderPriority) > 0 {
+		levelI, orderI := getPodOrderPriority(strategy.OrderPriority, podI)
+		levelJ, orderJ := getPodOrderPriority(strategy.OrderPriority, podJ)
+		if levelI != levelJ {
+			return levelI < levelJ
+		} else if orderI != orderJ {
+			return orderI > orderJ
+		}
+	}
+	return defaultVal
+}
+
+func getPodWeightPriority(weightPriority []appsv1alpha1.UpdatePriorityWeightTerm, podLabels map[string]string) int64 {
+	var weight int64
+	for _, p := range weightPriority {
+		selector, err := metav1.LabelSelectorAsSelector(&p.MatchSelector)
+		if err != nil {
+			continue
+		}
+		if selector.Matches(labels.Set(podLabels)) {
+			weight += int64(p.Weight)
+		}
+	}
+	return weight
+}
+
+func getPodOrderPriority(orderPriority []appsv1alpha1.UpdatePriorityOrderTerm, podLabels map[string]string) (int64, int64) {
+	for i, p := range orderPriority {
+		if value, ok := podLabels[p.OrderedKey]; ok {
+			return int64(i), getIntFromStringSuffix(value)
+		}
+	}
+	return -1, 0
+}
+
+func getIntFromStringSuffix(v string) int64 {
+	startIdx := -1
+	for i := len(v) - 1; i >= 0; i-- {
+		if v[i] >= '0' && v[i] <= '9' {
+			startIdx = i
+		} else {
+			break
+		}
+	}
+	if startIdx < 0 {
+		return 0
+	}
+	if order, err := strconv.ParseInt(v[startIdx:], 10, 64); err == nil {
+		return order
+	}
+	return 0
+}
