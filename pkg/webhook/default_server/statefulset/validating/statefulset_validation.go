@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -61,6 +62,23 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 					appsvalidation.ValidatePositiveIntOrPercent(
 						*spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
 						fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"))...)
+				if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(
+					intstrutil.ValueOrDefault(spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)),
+					1,
+					true,
+				); err != nil {
+					allErrs = append(allErrs, field.Invalid(
+						fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
+						spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+						fmt.Sprintf("failed getValueFromIntOrPercent for maxUnavailable: %v", err),
+					))
+				} else if maxUnavailable < 1 {
+					allErrs = append(allErrs, field.Invalid(
+						fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
+						spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+						"getValueFromIntOrPercent for maxUnavailable should not be less than 1",
+					))
+				}
 				if apps.ParallelPodManagement != spec.PodManagementPolicy &&
 					(spec.UpdateStrategy.RollingUpdate.MaxUnavailable.Type != intstr.Int ||
 						spec.UpdateStrategy.RollingUpdate.MaxUnavailable.IntVal != 1) {
