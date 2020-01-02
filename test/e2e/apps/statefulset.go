@@ -586,7 +586,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					PodUpdatePolicy: appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
 				},
 			}
-			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appsv1alpha1.StatefulSetInPlaceUpdateReady})
+			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appsv1alpha1.InPlaceUpdateReady})
 			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)

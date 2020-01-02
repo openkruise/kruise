@@ -77,6 +77,7 @@ func TestCreatePods(t *testing.T) {
 				},
 			},
 			Spec: v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
@@ -130,6 +131,7 @@ func TestCreatePods(t *testing.T) {
 				},
 			},
 			Spec: v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
@@ -184,6 +186,7 @@ func TestCreatePods(t *testing.T) {
 				},
 			},
 			Spec: v1.PodSpec{
+				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",

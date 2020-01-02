@@ -30,6 +30,8 @@ import (
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
 	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -630,7 +632,8 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
 	recorder := record.NewFakeRecorder(10)
-	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssh, recorder)
+	inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), apps.ControllerRevisionHashLabelKey)
+	ssc.control = NewDefaultStatefulSetControl(fpc, inplaceControl, ssu, ssh, recorder)
 
 	return ssc, fpc
 }
@@ -788,6 +791,7 @@ func NewStatefulSetController(
 					podInformer.Lister(),
 					pvcInformer.Lister(),
 					recorder),
+				inplaceupdate.NewForTypedClient(kubeClient, apps.ControllerRevisionHashLabelKey),
 				NewRealStatefulSetStatusUpdater(kruiseClient, setInformer.Lister()),
 				history.NewHistory(kubeClient, revInformer.Lister()),
 				recorder,

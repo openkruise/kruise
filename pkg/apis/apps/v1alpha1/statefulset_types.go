@@ -24,37 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const (
-	// StatefulSetInPlaceUpdateReady must be added into template.spec.readinessGates when pod podUpdatePolicy
-	// is InPlaceIfPossible or InPlaceOnly. The condition in podStatus will be updated to False before in-place
-	// updating and updated to True after the update is finished. This ensures pod to remain at NotReady state while
-	// in-place update is happening.
-	StatefulSetInPlaceUpdateReady v1.PodConditionType = "InPlaceUpdateReady"
-
-	// StatefulSetInPlaceUpdateStateAnnotation records the state of inplace-update.
-	// The value of annotation is inPlaceUpdateState.
-	StatefulSetInPlaceUpdateStateAnnotation string = "inplace-update-state"
-)
-
-// InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
-type InPlaceUpdateState struct {
-	// Revision is the updated statefulset revision hash.
-	Revision string `json:"revision"`
-
-	// UpdateTimestamp is the time when the in-place update happens.
-	UpdateTimestamp metav1.Time `json:"updateTimestamp"`
-
-	// LastContainerStatuses records the before-in-place-update container statuses. It is a map from ContainerName
-	// to InPlaceUpdateContainerStatus
-	LastContainerStatuses map[string]InPlaceUpdateContainerStatus `json:"lastContainerStatuses"`
-}
-
-// InPlaceUpdateContainerStatus records the statuses of the container that are mainly used
-// to determine whether the InPlaceUpdate is completed.
-type InPlaceUpdateContainerStatus struct {
-	ImageID string `json:"imageID,omitempty"`
-}
-
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.

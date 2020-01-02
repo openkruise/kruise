@@ -23,6 +23,7 @@ import (
 	"sort"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -57,10 +58,17 @@ type ControlInterface interface {
 // scenario other than testing.
 func NewDefaultStatefulSetControl(
 	podControl StatefulPodControlInterface,
+	inplaceControl inplaceupdate.Interface,
 	statusUpdater StatusUpdaterInterface,
 	controllerHistory history.Interface,
 	recorder record.EventRecorder) ControlInterface {
-	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, recorder}
+	return &defaultStatefulSetControl{
+		podControl,
+		statusUpdater,
+		controllerHistory,
+		recorder,
+		inplaceControl,
+	}
 }
 
 type defaultStatefulSetControl struct {
@@ -68,6 +76,7 @@ type defaultStatefulSetControl struct {
 	statusUpdater     StatusUpdaterInterface
 	controllerHistory history.Interface
 	recorder          record.EventRecorder
+	inplaceControl    inplaceupdate.Interface
 }
 
 // UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
@@ -434,19 +443,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				replicas[i].Name)
 			return &status, nil
 		}
-		if shouldUpdateInPlaceReady(replicas[i]) {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s update Pod %s InPlaceUpdateReady condition to true",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
-			newCondition := v1.PodCondition{
-				Type:   appsv1alpha1.StatefulSetInPlaceUpdateReady,
-				Status: v1.ConditionTrue,
-			}
-			if err := ssc.podControl.UpdateStatefulPodCondition(set, replicas[i], newCondition); err != nil {
-				return &status, err
-			}
+		// Update InPlaceUpdateReady condition for pod
+		if err := ssc.inplaceControl.UpdateCondition(replicas[i]); err != nil {
+			klog.Errorf("StatefulSet %s/%s failed to update pod %s condition for inplace: %v",
+				set.Namespace, set.Name, replicas[i].Name, err)
+			return &status, err
 		}
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
@@ -549,35 +550,21 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {
 
-		isInPlaceUpdateCompleted := checkInPlaceUpdateCompleted(replicas[target])
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			var skipUpdating bool
-			// First we use InPlaceUpdate if possible.
-			useInPlaceUpdate, inPlaceUpdateSpec := shouldDoInPlaceUpdate(set, updateRevision, getPodRevision(replicas[target]), revisions)
-			if useInPlaceUpdate {
-				// we can not in-place update a pod util its last in-place-update has completed, because
-				// controller must record last imageID in pod annotation.
-				if isInPlaceUpdateCompleted != nil {
-					klog.V(3).Infof("StatefulSet %s/%s waiting for Pod %s last in-place update completed",
-						set.Namespace,
-						set.Name,
-						replicas[target].Name)
-					skipUpdating = true
-				} else {
-					klog.V(2).Infof("StatefulSet %s/%s patching Pod %s for in-place update",
-						set.Namespace,
-						set.Name,
-						replicas[target].Name)
-					updateErr := ssc.inPlaceUpdatePod(set, replicas[target], inPlaceUpdateSpec)
-					if updateErr != nil && !errors.IsConflict(updateErr) && !isInPlaceOnly(set) {
-						// If it failed to in-place update && error is not conflict && podUpdatePolicy is not InPlaceOnly,
-						// then we should try to recreate this pod
-						useInPlaceUpdate = false
-					}
+
+			inplacing, inplaceUpdateErr := ssc.inPlaceUpdatePod(set, replicas[target], updateRevision, revisions)
+			if inplaceUpdateErr != nil {
+				if errors.IsConflict(inplaceUpdateErr) || isInPlaceOnly(set) {
+					return &status, err
 				}
+				// If it failed to in-place update && error is not conflict && podUpdatePolicy is not InPlaceOnly,
+				// then we should try to recreate this pod
+				klog.Warningf("StatefulSet %s/%s failed to in-place update Pod %s, so it will back off to ReCreate",
+					set.Namespace, set.Name, replicas[target].Name)
 			}
-			if !useInPlaceUpdate {
+
+			if !inplacing || inplaceUpdateErr != nil {
 				klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
 					set.Namespace,
 					set.Name,
@@ -586,19 +573,20 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 					return &status, err
 				}
 			}
-			if !skipUpdating && getPodRevision(replicas[target]) == currentRevision.Name {
+
+			if getPodRevision(replicas[target]) == currentRevision.Name {
 				status.CurrentReplicas--
 			}
 		}
 
 		if getPodRevision(replicas[target]) != updateRevision.Name || !isHealthy(replicas[target]) {
 			unavailablePods = append(unavailablePods, replicas[target].Name)
-		} else if isInPlaceUpdateCompleted != nil {
+		} else if completedErr := inplaceupdate.CheckInPlaceUpdateCompleted(replicas[target]); completedErr != nil {
 			klog.V(4).Infof("StatefulSet %s/%s check Pod %s in-place update not-ready: %v",
 				set.Namespace,
 				set.Name,
 				replicas[target].Name,
-				isInPlaceUpdateCompleted)
+				completedErr)
 			unavailablePods = append(unavailablePods, replicas[target].Name)
 		}
 
@@ -616,34 +604,35 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	return &status, nil
 }
 
-func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(set *appsv1alpha1.StatefulSet, pod *v1.Pod, inPlaceUpdateSpec *InPlaceUpdateSpec) error {
-	newCondition := v1.PodCondition{
-		Type:   appsv1alpha1.StatefulSetInPlaceUpdateReady,
-		Status: v1.ConditionFalse,
-		Reason: "StartInPlaceUpdate",
+func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
+	set *appsv1alpha1.StatefulSet, pod *v1.Pod,
+	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
+) (bool, error) {
+	if set.Spec.UpdateStrategy.RollingUpdate == nil {
+		return false, nil
+	}
+	if set.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy != appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType &&
+		set.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy != appsv1alpha1.InPlaceOnlyPodUpdateStrategyType {
+		return false, nil
 	}
 
-	// first, we update pod InPlaceUpdateReady condition to False, in order to make pod not-ready during in-place updating
-	if err := ssc.podControl.UpdateStatefulPodCondition(set, pod, newCondition); err != nil {
-		klog.Warningf("StatefulSet %s/%s failed to update Pod %s condition to False before in-place update: %v",
-			set.Namespace,
-			set.Name,
-			pod.Name,
-			err)
-		return err
+	var oldRevision *apps.ControllerRevision
+	for _, r := range revisions {
+		if r.Name == getPodRevision(pod) {
+			oldRevision = r
+			break
+		}
 	}
 
-	// then we update images in pod spec to trigger in-place updating
-	if err := ssc.podControl.InPlaceUpdateStatefulPod(set, pod, inPlaceUpdateSpec); err != nil {
-		klog.Warningf("StatefulSet %s/%s failed to patch Pod %s for in-place update: %v",
-			set.Namespace,
-			set.Name,
-			pod.Name,
-			err)
-		return err
+	inplacing, err := ssc.inplaceControl.UpdateInPlace(pod, oldRevision, updateRevision)
+	if inplacing && err == nil {
+		ssc.recorder.Eventf(set, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
+		updateExpectations.ExpectUpdated(getStatefulSetKey(set), updateRevision.Name, pod)
+	} else if err != nil {
+		ssc.recorder.Eventf(set, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place: %v", pod.Name, err)
 	}
-	updateExpectations.ExpectUpdated(getStatefulSetKey(set), inPlaceUpdateSpec.revision, pod)
-	return nil
+
+	return inplacing, err
 }
 
 // updateStatefulSetStatus updates set's Status to be equal to status. If status indicates a complete update, it is

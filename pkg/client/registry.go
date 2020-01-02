@@ -19,6 +19,6 @@ func NewRegistry(mgr manager.Manager) error {
 }
 
 // GetGenericClient returns clientset
-func GetGenericClient() GenericClientset {
-	return *genericClient
+func GetGenericClient() *GenericClientset {
+	return genericClient
 }
