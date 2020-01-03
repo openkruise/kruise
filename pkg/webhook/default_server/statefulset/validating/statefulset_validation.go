@@ -7,6 +7,7 @@ import (
 
 	"github.com/appscode/jsonpatch"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/priorityupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -92,7 +93,7 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 
 			switch spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy {
 			case "":
-				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("podUpdatePolicy"), ""))
+				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"), ""))
 			case appsv1alpha1.RecreatePodUpdateStrategyType:
 			case appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.InPlaceOnlyPodUpdateStrategyType:
 				var containsReadinessGate bool
@@ -118,6 +119,19 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 							appsv1alpha1.RecreatePodUpdateStrategyType,
 							appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
 							appsv1alpha1.InPlaceOnlyPodUpdateStrategyType)))
+			}
+
+			if spec.UpdateStrategy.RollingUpdate.UnorderedUpdate != nil {
+				if apps.ParallelPodManagement != spec.PodManagementPolicy {
+					allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
+						Child("rollingUpdate").Child("unorderedUpdate"),
+						"unorderedUpdate can only work with Parallel PodManagementPolicyType"))
+				}
+				if err := priorityupdate.ValidatePriorityUpdateStrategy(spec.UpdateStrategy.RollingUpdate.UnorderedUpdate.PriorityStrategy); err != nil {
+					allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
+						Child("rollingUpdate").Child("unorderedUpdate").Child("priorityStrategy"),
+						err.Error()))
+				}
 			}
 		}
 	default:

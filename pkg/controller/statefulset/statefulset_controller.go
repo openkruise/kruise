@@ -53,12 +53,14 @@ import (
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+var (
+	controllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 
-var updateExpectations = expectations.NewUpdateExpectations(func(o metav1.Object) string {
-	p := o.(*v1.Pod)
-	return getPodRevision(p)
-})
+	updateExpectations = expectations.NewUpdateExpectations(func(o metav1.Object) string {
+		p := o.(*v1.Pod)
+		return getPodRevision(p)
+	})
+)
 
 // Add creates a new StatefulSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.

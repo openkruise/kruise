@@ -240,10 +240,10 @@ func newStatefulSetPod(set *appsv1alpha1.StatefulSet, ordinal int) *v1.Pod {
 // current revision. updateSet is the representation of the set at the updateRevision. currentRevision is the name of
 // the current revision. updateRevision is the name of the update revision. ordinal is the ordinal of the Pod. If the
 // returned error is nil, the returned Pod is valid.
-func newVersionedStatefulSetPod(currentSet, updateSet *appsv1alpha1.StatefulSet, currentRevision, updateRevision string, ordinal int) *v1.Pod {
-	if currentSet.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		(currentSet.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < int(currentSet.Status.CurrentReplicas)) ||
-		(currentSet.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < int(*currentSet.Spec.UpdateStrategy.RollingUpdate.Partition)) {
+func newVersionedStatefulSetPod(currentSet, updateSet *appsv1alpha1.StatefulSet, currentRevision, updateRevision string,
+	ordinal int, replicas []*v1.Pod,
+) *v1.Pod {
+	if isCurrentRevisionNeeded(currentSet, updateRevision, ordinal, replicas) {
 		pod := newStatefulSetPod(currentSet, ordinal)
 		setPodRevision(pod, currentRevision)
 		return pod
@@ -251,6 +251,30 @@ func newVersionedStatefulSetPod(currentSet, updateSet *appsv1alpha1.StatefulSet,
 	pod := newStatefulSetPod(updateSet, ordinal)
 	setPodRevision(pod, updateRevision)
 	return pod
+}
+
+// isCurrentRevisionNeeded calculate if the 'ordinal' Pod should be current revision.
+func isCurrentRevisionNeeded(set *appsv1alpha1.StatefulSet, updateRevision string, ordinal int, replicas []*v1.Pod) bool {
+	if set.Spec.UpdateStrategy.Type != apps.RollingUpdateStatefulSetStrategyType {
+		return false
+	}
+	if set.Spec.UpdateStrategy.RollingUpdate == nil {
+		return ordinal < int(set.Status.CurrentReplicas)
+	}
+	if set.Spec.UpdateStrategy.RollingUpdate.UnorderedUpdate == nil {
+		return ordinal < int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
+	}
+
+	var noUpdatedReplicas int
+	for i, pod := range replicas {
+		if pod == nil || i == ordinal {
+			continue
+		}
+		if getPodRevision(pod) != updateRevision {
+			noUpdatedReplicas++
+		}
+	}
+	return noUpdatedReplicas < int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 }
 
 // Match check if the given StatefulSet's template matches the template stored in the given history.

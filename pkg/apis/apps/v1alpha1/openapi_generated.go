@@ -69,6 +69,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentSpec":             schema_pkg_apis_apps_v1alpha1_UnitedDeploymentSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentStatus":           schema_pkg_apis_apps_v1alpha1_UnitedDeploymentStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnitedDeploymentUpdateStrategy":   schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnorderedUpdateStrategy":          schema_pkg_apis_apps_v1alpha1_UnorderedUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityOrderTerm":          schema_pkg_apis_apps_v1alpha1_UpdatePriorityOrderTerm(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy":           schema_pkg_apis_apps_v1alpha1_UpdatePriorityStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityWeightTerm":         schema_pkg_apis_apps_v1alpha1_UpdatePriorityWeightTerm(ref),
@@ -909,7 +910,7 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.R
 				Properties: map[string]spec.Schema{
 					"partition": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Partition indicates the number of pods with non-updated revisions when rolling update. This means controller will update $(replicas - partition) number of pod Default value is 0.",
+							Description: "Partition indicates the ordinal at which the StatefulSet should be partitioned by default. But if unorderedUpdate has been set:\n  - Partition indicates the number of pods with non-updated revisions when rolling update.\n  - It means controller will update $(replicas - partition) number of pod.\nDefault value is 0.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -934,17 +935,17 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.R
 							Format:      "",
 						},
 					},
-					"priorityStrategy": {
+					"unorderedUpdate": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights. Also, priorityStrategy can just be allowed to work with Parallel podManagementPolicy.",
-							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy"),
+							Description: "UnorderedUpdate contains strategies for non-ordered update. If it is not nil, pods will be updated with non-ordered sequence. Noted that UnorderedUpdate can only be allowed to work with Parallel podManagementPolicy",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnorderedUpdateStrategy"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnorderedUpdateStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 
@@ -1895,6 +1896,27 @@ func schema_pkg_apis_apps_v1alpha1_UnitedDeploymentUpdateStrategy(ref common.Ref
 		},
 		Dependencies: []string{
 			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_UnorderedUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnorderedUpdateStrategy defines strategies for non-ordered update.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"priorityStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy"},
 	}
 }
 
