@@ -32,41 +32,36 @@ Kruise requires APIServer to enable features such as `MutatingAdmissionWebhook` 
 before installing Kruise by running one of the following commands locally. The script assumes a read/write permission to /tmp and the local
 `Kubectl` is configured to access the target cluster.
 
-#### via curl
-
 ```bash
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/scripts/check_for_installation.sh)"
 ```
 
-#### via wget
+### Install with helm charts [Recommended]
 
-```bash
-sh -c "$(wget -O- https://raw.githubusercontent.com/openkruise/kruise/master/scripts/check_for_installation.sh)"
-```
-
-### Install with helm charts
+It is recommended that you can install Kruise with helm v3.x, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
 
 ```
-wget https://raw.githubusercontent.com/openkruise/kruise/master/hack/auto_generate_charts.sh
-chmod +x auto_generate_charts.sh
-./auto_generate_charts.sh
-helm install kruise charts/
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.3.0/kruise-chart.tgz
 ```
+
+Note that installing this chart directly means it will use the default template values for kruise-manager.
+You may have to set your specific configurations when it is deployed into a production cluster or you want to enable specific controllers.
 
 ### Install with YAML files
 
-#### Install CRDs
-
-```
+```bash
+# Install CRDs
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_broadcastjob.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_statefulset.yaml
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_uniteddeployment.yaml
+
+# Install kruise-controller-manager
+kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml
 ```
 
-#### Install kruise-controller-manager
-
-`kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml`
+Note that `all_in_one.yaml` contains the daily packaged image of Kruise-manager, which might be unstable.
+So you may install with YAML files in test clusters, but it is not suitable for production.
 
 The official kruise-controller-manager image is hosted under [docker hub](https://hub.docker.com/r/openkruise/kruise-manager).
 
