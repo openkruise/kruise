@@ -151,6 +151,93 @@ spec:
       maxUnavailable: 2
 ```
 
+## `Priority` Unordered Rolling Update Strategy
+
+  This controller adds a `unorderedUpdate` field in `spec.updateStrategy.rollingUpdate`, which contains strategies for non-ordered update.
+  If `unorderedUpdate` is not nil, pods will be updated with non-ordered sequence. Noted that UnorderedUpdate can only be allowed to work with Parallel podManagementPolicy.
+
+  Currently `unorderedUpdate` only contains one field: `priorityStrategy`. It defines the rules for calculating the priority of updating pods.
+  Each pod to be updated, will pass through these terms and get a sum of weights.
+
+  With this feature, pods can be updated in specific sequence, instead of in the order of pod name.
+
+```go
+// UnorderedUpdateStrategy defines strategies for non-ordered update.
+type UnorderedUpdateStrategy struct {
+	// Priorities are the rules for calculating the priority of updating pods.
+	// Each pod to be updated, will pass through these terms and get a sum of weights.
+	// +optional
+	PriorityStrategy *UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
+}
+
+// UpdatePriorityStrategy is the strategy to define priority for pods update.
+// Only one of orderPriority and weightPriority can be set.
+type UpdatePriorityStrategy struct {
+	// Order priority terms, pods will be sorted by the value of orderedKey.
+	// For example:
+	// ```
+	// orderPriority:
+	// - orderedKey: key1
+	// - orderedKey: key2
+	// ```
+	// First, all pods which have key1 in labels will be sorted by the value of key1.
+	// Then, the left pods which have no key1 but have key2 in labels will be sorted by
+	// the value of key2 and put behind those pods have key1.
+	OrderPriority []UpdatePriorityOrderTerm `json:"orderPriority,omitempty"`
+	// Weight priority terms, pods will be sorted by the sum of all terms weight.
+	WeightPriority []UpdatePriorityWeightTerm `json:"weightPriority,omitempty"`
+}
+
+// UpdatePriorityOrder defines order priority.
+type UpdatePriorityOrderTerm struct {
+	// Calculate priority by value of this key.
+	// Values of this key, will be sorted by GetInt(val). GetInt method will find the last int in value,
+	// such as getting 5 in value '5', getting 10 in value 'sts-10'.
+	OrderedKey string `json:"orderedKey"`
+}
+
+// UpdatePriorityWeightTerm defines weight priority.
+type UpdatePriorityWeightTerm struct {
+	// Weight associated with matching the corresponding matchExpressions, in the range 1-100.
+	Weight int32 `json:"weight"`
+	// MatchSelector is used to select by pod's labels.
+	MatchSelector metav1.LabelSelector `json:"matchSelector"`
+}
+```
+
+`UpdatePriorityStrategy` contains two priority types, `weight` or `order`:
+
+- `weight`: Priority will be calculated by the sum of terms weight that matches selector.
+
+```yaml
+    # ...
+    rollingUpdate:
+      unorderedUpdate:
+        priorityStrategy:
+          weightPriority:
+          - weight: 50
+            matchSelector:
+              matchLabels:
+                test-key: foo
+          - weight: 30
+            matchSelector:
+              matchLabels:
+                test-key: bar
+```
+
+- `order`: Priority will be sorted by the value of orderKey.
+
+Values of this key, will be sorted by GetInt(val). GetInt method will find the last int in value, such as getting 5 in value '5', getting 10 in value 'sts-10'.
+
+```yaml
+    # ...
+    rollingUpdate:
+      unorderedUpdate:
+        priorityStrategy:
+          orderPriority:
+          - orderedKey: some-label-key
+```
+
 ## Tutorial
 
 - [Use advanced StatefulSet to install Guestbook app](../../tutorial/advanced-statefulset.md)
