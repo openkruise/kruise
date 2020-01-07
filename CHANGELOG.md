@@ -1,4 +1,28 @@
-# v0.3.0
+# v0.3.1
+
+## Installation
+
+- Simplify installation with helm charts, one simple command to install kruise charts, instead of downloading and executing scripts.
+
+## Advanced StatefulSet
+
+### Features
+
+- Support [priority update](./docs/concepts/astatefulset/README.md#priority-unordered-rolling-update-strategy), which allows users to configure the sequence for Pods updating.
+
+### Bugs
+
+- Fix maxUnavailable calculation, which should not be less than 1.
+
+## Broadcast Job
+
+### Bugs
+
+- Fix BroadcastJob cleaning up after TTL.
+
+---
+
+**# v0.3.0**
 
 ## Installation
 
