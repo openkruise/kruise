@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -38,10 +37,6 @@ import (
 )
 
 var c client.Client
-
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-
-//var deploy = client.ObjectKey{Namespace: "default", Name: "foo"}
 
 const timeout = time.Second * 2
 
@@ -59,30 +54,31 @@ func TestStsReconcile(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "sts-reconcile"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -139,30 +135,31 @@ func TestStsSubsetProvision(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-subset-provision"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -283,7 +280,7 @@ func TestStsSubsetProvision(t *testing.T) {
 			{
 				Key:      "region",
 				Operator: corev1.NodeSelectorOpIn,
-				Values:   []string{"foo"},
+				Values:   []string{caseName},
 			},
 		},
 	})
@@ -312,7 +309,7 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Key).Should(gomega.BeEquivalentTo("region"))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values)).Should(gomega.BeEquivalentTo(1))
-	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values[0]).Should(gomega.BeEquivalentTo("foo"))
+	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[1].Values[0]).Should(gomega.BeEquivalentTo(caseName))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[2].Key).Should(gomega.BeEquivalentTo("node-name"))
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[2].Operator).Should(gomega.BeEquivalentTo(corev1.NodeSelectorOpIn))
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[2].Values)).Should(gomega.BeEquivalentTo(1))
@@ -336,30 +333,31 @@ func TestStsDupSubset(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-dup-subset"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -425,30 +423,31 @@ func TestStsScale(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-scale"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -567,30 +566,31 @@ func TestStsUpdate(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-update"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &two,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -685,30 +685,31 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-rolling-update-partition"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -866,30 +867,31 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-rolling-update-delete-stuck-pod"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -996,30 +998,31 @@ func TestStsOnDelete(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-on-delete"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{
@@ -1146,30 +1149,31 @@ func TestStsSubsetCount(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
+	caseName := "test-sts-subset-count"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
+			Name:      caseName,
 			Namespace: "default",
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "foo",
+					"name": caseName,
 				},
 			},
 			Template: appsv1alpha1.SubsetTemplate{
 				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"name": "foo",
+							"name": caseName,
 						},
 					},
 					Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
-									"name": "foo",
+									"name": caseName,
 								},
 							},
 							Spec: corev1.PodSpec{

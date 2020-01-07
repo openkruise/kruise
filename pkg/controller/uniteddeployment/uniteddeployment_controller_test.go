@@ -28,10 +28,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"k8s.io/apimachinery/pkg/types"
+
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
 
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
+
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
