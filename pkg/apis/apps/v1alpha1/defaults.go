@@ -223,7 +223,7 @@ func SetDefaults_CloneSet(obj *CloneSet) {
 		*obj.Spec.UpdateStrategy.Partition = 0
 	}
 	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
-		maxUnavailable := intstr.FromInt(1)
+		maxUnavailable := intstr.FromString(DefaultCloneSetMaxUnavailable)
 		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailable
 	}
 }

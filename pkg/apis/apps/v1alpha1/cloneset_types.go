@@ -26,6 +26,9 @@ const (
 	// CloneSetInstanceID is a unique id for Pods and PVCs.
 	// Each pod and the pvcs it owns have the same instance-id.
 	CloneSetInstanceID = "apps.kruise.io/cloneset-instance-id"
+
+	// DefaultCloneSetMaxUnavailable is the default value of maxUnavailable for CloneSet update strategy.
+	DefaultCloneSetMaxUnavailable = "10%"
 )
 
 // CloneSetSpec defines the desired state of CloneSet
