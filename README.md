@@ -41,7 +41,7 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/s
 It is recommended that you can install Kruise with helm v3.x, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.3.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.3.1/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for kruise-manager.
