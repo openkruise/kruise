@@ -124,7 +124,7 @@ func calculateUpdateCount(strategy appsv1alpha1.CloneSetUpdateStrategy, totalRep
 		partition = int(*strategy.Partition)
 	}
 	maxUnavailable, _ := intstrutil.GetValueFromIntOrPercent(
-		intstrutil.ValueOrDefault(strategy.MaxUnavailable, intstrutil.FromString("10%")), totalReplicas, true)
+		intstrutil.ValueOrDefault(strategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), totalReplicas, true)
 
 	return integer.IntMax(integer.IntMin(
 		notUpdatedCount-partition,

@@ -61,3 +61,17 @@ func SlowStartBatch(count int, initialBatchSize int, fn func(index int) error) (
 	}
 	return successes, nil
 }
+
+// CheckDuplicate finds if there are duplicated items in a list.
+func CheckDuplicate(list []string) []string {
+	tmpMap := make(map[string]struct{})
+	var dupList []string
+	for _, name := range list {
+		if _, ok := tmpMap[name]; ok {
+			dupList = append(dupList, name)
+		} else {
+			tmpMap[name] = struct{}{}
+		}
+	}
+	return dupList
+}
