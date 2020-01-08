@@ -6,7 +6,7 @@
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
-|Dec 16th, 2019. Kruise v0.3.0 is **RELEASED**! Please check the [CHANGELOG](CHANGELOG.md) for details.|
+|Jan 8th, 2020. Kruise v0.3.1 is **RELEASED**! Please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Nov 24th, 2019. A blog about new UnitedDeployment controller is posted in Kruise Blog ([link](http://openkruise.io/en-us/blog/blog3.html)).|
 
 Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
@@ -38,7 +38,7 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/s
 
 ### Install with helm charts [Recommended]
 
-It is recommended that you can install Kruise with helm v3.x, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
+It is recommended that you should install Kruise with helm v3, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
 
 ```
 helm install kruise https://github.com/openkruise/kruise/releases/download/v0.3.1/kruise-chart.tgz
@@ -47,7 +47,7 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.3.
 Note that installing this chart directly means it will use the default template values for kruise-manager.
 You may have to set your specific configurations when it is deployed into a production cluster or you want to enable specific controllers.
 
-### Install with YAML files
+### Install with YAML files [Deprecated]
 
 ```bash
 # Install CRDs
@@ -108,15 +108,20 @@ To develop/debug kruise controller manager locally, please check the [debug guid
 
 ## Uninstall
 
-To uninstall kruise from a Kubernetes cluster:
-
-```bash
-export KUBECONFIG=PATH_TO_CONFIG
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/kruiseio/kruise/master/scripts/uninstall.sh)"
-```
-
 Note that this will lead to all resources created by Kruise, including webhook configurations, services, namespace, CRDs, CR instances and Pods managed by Kruise controller, to be deleted!
 Please do this **ONLY** when you fully understand the consequence.
+
+To uninstall kruise if it is installed with helm charts:
+
+```bash
+helm uninstall kruise
+```
+
+To uninstall kruise if it is installed with YAML files:
+
+```bash
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/kruiseio/kruise/master/scripts/uninstall.sh)"
+```
 
 ## Community
 
