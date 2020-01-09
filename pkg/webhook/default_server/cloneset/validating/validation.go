@@ -12,7 +12,6 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/priorityupdate"
 	v1 "k8s.io/api/core/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,8 +108,12 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*strategy.Partition), fldPath.Child("partition"))...)
 
-	if err := priorityupdate.ValidatePriorityUpdateStrategy(strategy.PriorityStrategy); err != nil {
+	if err := strategy.PriorityStrategy.FieldsValidation(); err != nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("priorityStrategy"), err.Error()))
+	}
+
+	if err := strategy.ScatterStrategy.FieldsValidation(); err != nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("scatterStrategy"), err.Error()))
 	}
 
 	if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(strategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), 1, true); err != nil {

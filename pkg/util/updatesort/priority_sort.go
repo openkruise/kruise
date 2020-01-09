@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package priorityupdate
+package updatesort
 
 import (
 	"sort"
@@ -26,30 +26,38 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// SortIndexesByPriority sort the indexes by UpdatePriorityStrategy
-func SortIndexesByPriority(strategy *appsv1alpha1.UpdatePriorityStrategy, pods []*v1.Pod, indexes []int) []int {
-	if strategy == nil || (len(strategy.WeightPriority) == 0 && len(strategy.OrderPriority) == 0) {
+type prioritySort struct {
+	strategy *appsv1alpha1.UpdatePriorityStrategy
+}
+
+func NewPrioritySorter(s *appsv1alpha1.UpdatePriorityStrategy) Sorter {
+	return &prioritySort{strategy: s}
+}
+
+// Sort helps sort the indexes of pods by UpdatePriorityStrategy.
+func (ps *prioritySort) Sort(pods []*v1.Pod, indexes []int) []int {
+	if ps.strategy == nil || (len(ps.strategy.WeightPriority) == 0 && len(ps.strategy.OrderPriority) == 0) {
 		return indexes
 	}
 
 	f := func(i, j int) bool {
 		podI := pods[indexes[i]]
 		podJ := pods[indexes[j]]
-		return compare(strategy, podI.Labels, podJ.Labels, indexes[i] > indexes[j])
+		return ps.compare(podI.Labels, podJ.Labels, indexes[i] > indexes[j])
 	}
 
 	sort.Slice(indexes, f)
 	return indexes
 }
 
-func compare(strategy *appsv1alpha1.UpdatePriorityStrategy, podI, podJ map[string]string, defaultVal bool) bool {
-	if len(strategy.WeightPriority) > 0 {
-		if wI, wJ := getPodWeightPriority(strategy.WeightPriority, podI), getPodWeightPriority(strategy.WeightPriority, podJ); wI != wJ {
+func (ps *prioritySort) compare(podI, podJ map[string]string, defaultVal bool) bool {
+	if len(ps.strategy.WeightPriority) > 0 {
+		if wI, wJ := ps.getPodWeightPriority(podI), ps.getPodWeightPriority(podJ); wI != wJ {
 			return wI > wJ
 		}
-	} else if len(strategy.OrderPriority) > 0 {
-		levelI, orderI := getPodOrderPriority(strategy.OrderPriority, podI)
-		levelJ, orderJ := getPodOrderPriority(strategy.OrderPriority, podJ)
+	} else if len(ps.strategy.OrderPriority) > 0 {
+		levelI, orderI := ps.getPodOrderPriority(podI)
+		levelJ, orderJ := ps.getPodOrderPriority(podJ)
 		if levelI != levelJ {
 			return levelI < levelJ
 		} else if orderI != orderJ {
@@ -59,9 +67,9 @@ func compare(strategy *appsv1alpha1.UpdatePriorityStrategy, podI, podJ map[strin
 	return defaultVal
 }
 
-func getPodWeightPriority(weightPriority []appsv1alpha1.UpdatePriorityWeightTerm, podLabels map[string]string) int64 {
+func (ps *prioritySort) getPodWeightPriority(podLabels map[string]string) int64 {
 	var weight int64
-	for _, p := range weightPriority {
+	for _, p := range ps.strategy.WeightPriority {
 		selector, err := metav1.LabelSelectorAsSelector(&p.MatchSelector)
 		if err != nil {
 			continue
@@ -73,8 +81,8 @@ func getPodWeightPriority(weightPriority []appsv1alpha1.UpdatePriorityWeightTerm
 	return weight
 }
 
-func getPodOrderPriority(orderPriority []appsv1alpha1.UpdatePriorityOrderTerm, podLabels map[string]string) (int64, int64) {
-	for i, p := range orderPriority {
+func (ps *prioritySort) getPodOrderPriority(podLabels map[string]string) (int64, int64) {
+	for i, p := range ps.strategy.OrderPriority {
 		if value, ok := podLabels[p.OrderedKey]; ok {
 			return int64(i), getIntFromStringSuffix(value)
 		}

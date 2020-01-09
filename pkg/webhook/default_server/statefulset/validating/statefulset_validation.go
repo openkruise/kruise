@@ -7,7 +7,6 @@ import (
 
 	"github.com/appscode/jsonpatch"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/priorityupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -127,7 +126,7 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 						Child("rollingUpdate").Child("unorderedUpdate"),
 						"unorderedUpdate can only work with Parallel PodManagementPolicyType"))
 				}
-				if err := priorityupdate.ValidatePriorityUpdateStrategy(spec.UpdateStrategy.RollingUpdate.UnorderedUpdate.PriorityStrategy); err != nil {
+				if err := spec.UpdateStrategy.RollingUpdate.UnorderedUpdate.PriorityStrategy.FieldsValidation(); err != nil {
 					allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
 						Child("rollingUpdate").Child("unorderedUpdate").Child("priorityStrategy"),
 						err.Error()))

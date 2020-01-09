@@ -168,6 +168,26 @@ spec:
                         type: object
                       type: array
                   type: object
+                scatterStrategy:
+                  description: ScatterStrategy defines the scatter rules to make pods
+                    been scattered when update. This will avoid pods with the same
+                    key-value to be updated in one batch. - Note that pods will be
+                    scattered after priority sort. So, although priority strategy
+                    and scatter strategy can be applied together, we suggest to use
+                    either one of them. - If scatterStrategy is used, we suggest to
+                    just use one term. Otherwise, the update order can be hard to
+                    understand.
+                  items:
+                    properties:
+                      key:
+                        type: string
+                      value:
+                        type: string
+                    required:
+                    - key
+                    - value
+                    type: object
+                  type: array
                 type:
                   description: Type indicates the type of the CloneSetUpdateStrategy.
                     Default is ReCreate.

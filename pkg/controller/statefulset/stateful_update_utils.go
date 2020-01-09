@@ -18,7 +18,7 @@ package statefulset
 
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/priorityupdate"
+	"github.com/openkruise/kruise/pkg/util/updatesort"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -51,7 +51,7 @@ func sortPodsToUpdate(rollingUpdateStrategy *appsv1alpha1.RollingUpdateStatefulS
 	}
 
 	if priorityStrategy != nil {
-		waitUpdateIdxs = priorityupdate.SortIndexesByPriority(priorityStrategy, replicas, waitUpdateIdxs)
+		waitUpdateIdxs = updatesort.NewPrioritySorter(priorityStrategy).Sort(replicas, waitUpdateIdxs)
 	}
 
 	allIdxs := append(updatedIdxs, waitUpdateIdxs...)

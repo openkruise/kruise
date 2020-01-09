@@ -24,6 +24,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/updatesort"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -75,7 +76,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	var waitUpdateIndexes []int
 	for i := range pods {
 		if err := c.inplaceControl.UpdateCondition(pods[i]); err != nil {
-			klog.Errorf("StatefulSet %s/%s failed to update pod %s condition for inplace: %v",
+			klog.Errorf("CloneSet %s/%s failed to update pod %s condition for inplace: %v",
 				cs.Namespace, cs.Name, pods[i].Name, err)
 			return err
 		}
@@ -113,7 +114,10 @@ func sortUpdateIndexes(strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.
 		return kubecontroller.ActivePods(pods).Less(waitUpdateIndexes[i], waitUpdateIndexes[j])
 	})
 	if strategy.PriorityStrategy != nil {
-		// TODO(FillZpp): sort by priority
+		waitUpdateIndexes = updatesort.NewPrioritySorter(strategy.PriorityStrategy).Sort(pods, waitUpdateIndexes)
+	}
+	if strategy.ScatterStrategy != nil {
+		waitUpdateIndexes = updatesort.NewScatterSorter(strategy.ScatterStrategy).Sort(pods, waitUpdateIndexes)
 	}
 	return waitUpdateIndexes
 }

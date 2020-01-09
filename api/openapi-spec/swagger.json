@@ -324,6 +324,21 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.CloneSetUpdateScatterTerm": {
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.CloneSetUpdateStrategy": {
       "description": "CloneSetUpdateStrategy defines strategies for pods update.",
       "type": "object",
@@ -348,6 +363,13 @@
         "priorityStrategy": {
           "description": "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.UpdatePriorityStrategy"
+        },
+        "scatterStrategy": {
+          "description": "ScatterStrategy defines the scatter rules to make pods been scattered when update. This will avoid pods with the same key-value to be updated in one batch. - Note that pods will be scattered after priority sort. So, although priority strategy and scatter strategy can be applied together, we suggest to use either one of them. - If scatterStrategy is used, we suggest to just use one term. Otherwise, the update order can be hard to understand.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetUpdateScatterTerm"
+          }
         },
         "type": {
           "description": "Type indicates the type of the CloneSetUpdateStrategy. Default is ReCreate.",

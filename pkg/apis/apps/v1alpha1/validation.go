@@ -14,17 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package priorityupdate
+package v1alpha1
 
 import (
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ValidatePriorityUpdateStrategy checks if the given UpdatePriorityStrategy is valid
-func ValidatePriorityUpdateStrategy(strategy *appsv1alpha1.UpdatePriorityStrategy) error {
+// FieldsValidation checks invalid fields in UpdatePriorityStrategy.
+func (strategy *UpdatePriorityStrategy) FieldsValidation() error {
 	if strategy == nil {
 		return nil
 	}
@@ -48,6 +47,28 @@ func ValidatePriorityUpdateStrategy(strategy *appsv1alpha1.UpdatePriorityStrateg
 	for _, o := range strategy.OrderPriority {
 		if len(o.OrderedKey) == 0 {
 			return fmt.Errorf("order key can not be empty")
+		}
+	}
+
+	return nil
+}
+
+// FieldsValidation checks invalid fields in CloneSetUpdateScatterStrategy.
+func (strategy CloneSetUpdateScatterStrategy) FieldsValidation() error {
+	if len(strategy) == 0 {
+		return nil
+	}
+
+	m := make(map[string]struct{}, len(strategy))
+	for _, term := range strategy {
+		if term.Key == "" {
+			return fmt.Errorf("key should not be empty")
+		}
+		id := term.Key + ":" + term.Value
+		if _, ok := m[id]; !ok {
+			m[id] = struct{}{}
+		} else {
+			return fmt.Errorf("duplicated key=%v value=%v", term.Key, term.Value)
 		}
 	}
 
