@@ -121,6 +121,13 @@ spec:
                         oneOf:
                         - type: string
                         - type: integer
+                      tolerations:
+                        description: Indicates the tolerations the pods under this
+                          subset have. A subset's tolerations is not allowed to be
+                          updated.
+                        items:
+                          type: object
+                        type: array
                     required:
                     - name
                     type: object

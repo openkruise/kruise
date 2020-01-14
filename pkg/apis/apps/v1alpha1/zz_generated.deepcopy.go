@@ -861,6 +861,13 @@ func (in *StatefulSetUpdateStrategy) DeepCopy() *StatefulSetUpdateStrategy {
 func (in *Subset) DeepCopyInto(out *Subset) {
 	*out = *in
 	in.NodeSelectorTerm.DeepCopyInto(&out.NodeSelectorTerm)
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(intstr.IntOrString)

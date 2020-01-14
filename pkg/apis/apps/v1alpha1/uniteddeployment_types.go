@@ -133,6 +133,11 @@ type Subset struct {
 	// +optional
 	NodeSelectorTerm corev1.NodeSelectorTerm `json:"nodeSelectorTerm,omitempty"`
 
+	// Indicates the tolerations the pods under this subset have.
+	// A subset's tolerations is not allowed to be updated.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
 	// Indicates the number of the pod to be created under this subset. Replicas could also be
 	// percentage like '10%', which means 10% of UnitedDeployment replicas of pods will be distributed
 	// under this subset. If nil, the number of replicas in this subset is determined by controller.

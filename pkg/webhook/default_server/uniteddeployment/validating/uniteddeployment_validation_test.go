@@ -407,11 +407,11 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				field := errs[i].Field
 				if !strings.HasPrefix(field, "spec.template.") &&
 					field != "spec.selector" &&
-					field != "spec.topology.subset" &&
-					field != "spec.topology.subset[0]" &&
-					field != "spec.topology.subset[0].name" &&
+					field != "spec.topology.subsets" &&
+					field != "spec.topology.subsets[0]" &&
+					field != "spec.topology.subsets[0].name" &&
 					field != "spec.updateStrategy.partitions" &&
-					field != "spec.topology.subset[0].nodeSelectorTerm.matchExpressions[0].values" {
+					field != "spec.topology.subsets[0].nodeSelectorTerm.matchExpressions[0].values" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
 			}

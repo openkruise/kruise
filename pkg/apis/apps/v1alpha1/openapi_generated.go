@@ -1514,6 +1514,19 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 							Ref:         ref("k8s.io/api/core/v1.NodeSelectorTerm"),
 						},
 					},
+					"tolerations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicates the tolerations the pods under this subset have. A subset's tolerations is not allowed to be updated.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Indicates the number of the pod to be created under this subset. Replicas could also be percentage like '10%', which means 10% of UnitedDeployment replicas of pods will be distributed under this subset. If nil, the number of replicas in this subset is determined by controller. Controller will try to keep all the subsets with nil replicas have average pods.",
@@ -1525,7 +1538,7 @@ func schema_pkg_apis_apps_v1alpha1_Subset(ref common.ReferenceCallback) common.O
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelectorTerm", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"k8s.io/api/core/v1.NodeSelectorTerm", "k8s.io/api/core/v1.Toleration", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 

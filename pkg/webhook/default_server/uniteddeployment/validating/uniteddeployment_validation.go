@@ -60,7 +60,7 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
-		allErrs = append(allErrs, validateSubsetTemplate(&spec.Template, &selector, fldPath.Child("template"))...)
+		allErrs = append(allErrs, validateSubsetTemplate(&spec.Template, selector, fldPath.Child("template"))...)
 	}
 
 	var sumReplicas int32
@@ -72,24 +72,37 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 	count := 0
 	for i, subset := range spec.Topology.Subsets {
 		if len(subset.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("topology", "subset").Index(i).Child("name"), ""))
+			allErrs = append(allErrs, field.Required(fldPath.Child("topology", "subsets").Index(i).Child("name"), ""))
 		}
 
 		if subSetNames.Has(subset.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset").Index(i).Child("name"), subset.Name, fmt.Sprintf("duplicated subset name %s", subset.Name)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("name"), subset.Name, fmt.Sprintf("duplicated subset name %s", subset.Name)))
 		}
 
 		subSetNames.Insert(subset.Name)
 
 		if errs := apimachineryvalidation.NameIsDNSLabel(subset.Name, false); len(errs) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset").Index(i).Child("name"), subset.Name, fmt.Sprintf("invalid subset name %s", strings.Join(errs, ", "))))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("name"), subset.Name, fmt.Sprintf("invalid subset name %s", strings.Join(errs, ", "))))
 		}
 
 		coreNodeSelectorTerm := &core.NodeSelectorTerm{}
 		if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.NodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Root(), subset.NodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("nodeSelectorTerm"), subset.NodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
 		} else {
-			allErrs = append(allErrs, apivalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Child("topology", "subset").Index(i).Child("nodeSelectorTerm"))...)
+			allErrs = append(allErrs, apivalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Child("topology", "subsets").Index(i).Child("nodeSelectorTerm"))...)
+		}
+
+		if subset.Tolerations != nil {
+			var coreTolerations []core.Toleration
+			for i, toleration := range subset.Tolerations {
+				coreToleration := &core.Toleration{}
+				if err := corev1.Convert_v1_Toleration_To_core_Toleration(&toleration, coreToleration, nil); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("tolerations"), subset.Tolerations, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
+				} else {
+					coreTolerations = append(coreTolerations, *coreToleration)
+				}
+			}
+			allErrs = append(allErrs, apivalidation.ValidateTolerations(coreTolerations, fldPath.Child("topology", "subsets").Index(i).Child("tolerations"))...)
 		}
 
 		if subset.Replicas == nil {
@@ -98,7 +111,7 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 
 		replicas, err := udctrl.ParseSubsetReplicas(expectedReplicas, *subset.Replicas)
 		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset", "replicas"), subset.Replicas, fmt.Sprintf("invalid replicas %s", subset.Replicas.String())))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("replicas"), subset.Replicas, fmt.Sprintf("invalid replicas %s", subset.Replicas.String())))
 		} else {
 			sumReplicas += replicas
 			count++
@@ -107,11 +120,11 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 
 	// sum of subset replicas may be less than uniteddployment replicas
 	if sumReplicas > expectedReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset"), sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
 	}
 
 	if count > 0 && count == len(spec.Topology.Subsets) && sumReplicas != expectedReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subset"), sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
 	}
 
 	if spec.UpdateStrategy.ManualUpdate != nil {
@@ -187,9 +200,13 @@ func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemp
 	return allErrs
 }
 
-func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector *labels.Selector, fldPath *field.Path) field.ErrorList {
+func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labels.Selector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template.StatefulSetTemplate != nil {
+		labels := labels.Set(template.StatefulSetTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.StatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
+		}
 		allErrs = append(allErrs, validateStatefulSet(template.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
 		template := template.StatefulSetTemplate.Spec.Template
 		coreTemplate, err := convertPodTemplateSpec(&template)
@@ -197,7 +214,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector *lab
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
 		}
-		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, *selector, fldPath.Child("template", "statefulSet"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("template", "statefulSet"))...)
 	}
 
 	return allErrs
