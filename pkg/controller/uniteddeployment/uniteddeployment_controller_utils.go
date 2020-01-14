@@ -101,6 +101,20 @@ func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subs
 	}
 }
 
+func attachTolerations(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
+	if subsetConfig.Tolerations == nil {
+		return
+	}
+
+	if podSpec.Tolerations == nil {
+		podSpec.Tolerations = []corev1.Toleration{}
+	}
+
+	for _, toleration := range subsetConfig.Tolerations {
+		podSpec.Tolerations = append(podSpec.Tolerations, toleration)
+	}
+}
+
 func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
 	name, exist := metaObj.GetLabels()[appsv1alpha1.SubSetNameLabelKey]
 	if !exist {

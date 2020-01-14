@@ -156,6 +156,7 @@ func applyStatefulSetTemplate(ud *alpha1.UnitedDeployment, subsetName string, re
 	set.Spec.VolumeClaimTemplates = ud.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
+	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
 
 	return nil
 }
