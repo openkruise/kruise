@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	k8sappsv1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -161,14 +159,6 @@ func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec
 		return nil, err
 	}
 	return coreTemplate, nil
-}
-
-func convertStatefulSetSpec(spec *appsv1.StatefulSetSpec) (*apps.StatefulSetSpec, error) {
-	statefulSetSpec := &apps.StatefulSetSpec{}
-	if err := k8sappsv1.Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(spec.DeepCopy(), statefulSetSpec, nil); err != nil {
-		return nil, err
-	}
-	return statefulSetSpec, nil
 }
 
 func validateUnitedDeploymentSpecUpdate(spec, oldSpec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
