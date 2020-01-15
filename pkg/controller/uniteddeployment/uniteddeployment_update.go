@@ -50,7 +50,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	var needUpdate []string
 	for _, name := range exists.List() {
 		subset := (*nameToSubset)[name]
-		if subset.Labels[appsv1alpha1.ControllerRevisionHashLabelKey] != expectedRevision.Name ||
+		if r.subSetControls[subsetType].IsExpected(subset, ud, expectedRevision.Name) ||
 			subset.Spec.Replicas != (*nextReplicas)[name] ||
 			subset.Spec.UpdateStrategy.Partition != (*nextPartitions)[name] {
 			needUpdate = append(needUpdate, name)
@@ -112,6 +112,11 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		deletes = append(deletes, gotSubset)
 	}
 
+	revision := currentRevision.Name
+	if updatedRevision != nil {
+		revision = updatedRevision.Name
+	}
+
 	var errs []error
 	// manage creating
 	if len(creates) > 0 {
@@ -120,11 +125,6 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		createdSubsets := make([]string, len(creates))
 		for i, subset := range creates {
 			createdSubsets[i] = subset
-		}
-
-		revision := currentRevision.Name
-		if updatedRevision != nil {
-			revision = updatedRevision.Name
 		}
 
 		var createdNum int
@@ -175,7 +175,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 			continue
 		}
 
-		subsets, err := control.GetAllSubsets(ud)
+		subsets, err := control.GetAllSubsets(ud, revision)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("fail to list Subset of other type %s for UnitedDeployment %s/%s: %s", t, ud.Namespace, ud.Name, err))
 			continue

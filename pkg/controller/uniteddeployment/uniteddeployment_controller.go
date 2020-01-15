@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/openkruise/kruise/pkg/util/gate"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
+	"github.com/openkruise/kruise/pkg/util/gate"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 )
@@ -53,7 +55,8 @@ const (
 type subSetType string
 
 const (
-	statefulSetSubSetType subSetType = "StatefulSet"
+	statefulSetSubSetType         subSetType = "StatefulSet"
+	advancedStatefulSetSubSetType subSetType = "AdvancedStatefulSet"
 )
 
 // Add creates a new UnitedDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -73,7 +76,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 		recorder: mgr.GetRecorder(controllerName),
 		subSetControls: map[subSetType]ControlInterface{
-			statefulSetSubSetType: &StatefulSetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme()},
+			statefulSetSubSetType: &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.StatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 		},
 	}
 }
@@ -93,6 +96,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &appsv1alpha1.UnitedDeployment{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.UnitedDeployment{},
 	})
@@ -121,6 +132,8 @@ type ReconcileUnitedDeployment struct {
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=uniteddeployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
 func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	klog.V(4).Infof("Reconcile UnitedDeployment %s/%s", request.Namespace, request.Name)
 	// Fetch the UnitedDeployment instance
@@ -148,7 +161,11 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	control, subsetType := r.getSubsetControls(instance)
 
 	klog.V(4).Infof("Get UnitedDeployment %s/%s all subsets", request.Namespace, request.Name)
-	nameToSubset, err := r.getNameToSubset(instance, control)
+	expectedRevision := currentRevision.Name
+	if updatedRevision != nil {
+		expectedRevision = updatedRevision.Name
+	}
+	nameToSubset, err := r.getNameToSubset(instance, control, expectedRevision)
 	if err != nil {
 		klog.Errorf("Fail to get Subsets of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
@@ -173,8 +190,8 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	return r.updateStatus(instance, newStatus, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount, control)
 }
 
-func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface) (*map[string]*Subset, error) {
-	subSets, err := control.GetAllSubsets(instance)
+func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface, expectedRevision string) (*map[string]*Subset, error) {
+	subSets, err := control.GetAllSubsets(instance, expectedRevision)
 	if err != nil {
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
 		return nil, fmt.Errorf("fail to get all Subsets for UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
@@ -241,6 +258,10 @@ func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.Uni
 		return r.subSetControls[statefulSetSubSetType], statefulSetSubSetType
 	}
 
+	if instance.Spec.Template.AdvancedStatefulSetTemplate != nil {
+		return r.subSetControls[advancedStatefulSetSubSetType], advancedStatefulSetSubSetType
+	}
+
 	// unexpected
 	return nil, statefulSetSubSetType
 }
@@ -279,7 +300,7 @@ func (r *ReconcileUnitedDeployment) calculateStatus(ud *appsv1alpha1.UnitedDeplo
 
 	// sync from status
 	for _, subset := range *nameToSubset {
-		subsetReplicas, subsetReadyReplicas, subsetUpdatedReplicas, subsetUpdatedReadyReplicas := replicasStatusFn(subset, expectedRevision)
+		subsetReplicas, subsetReadyReplicas, subsetUpdatedReplicas, subsetUpdatedReadyReplicas := replicasStatusFn(subset)
 		newStatus.Replicas += subsetReplicas
 		newStatus.ReadyReplicas += subsetReadyReplicas
 		newStatus.UpdatedReplicas += subsetUpdatedReplicas
@@ -324,15 +345,11 @@ func (r *ReconcileUnitedDeployment) calculateStatus(ud *appsv1alpha1.UnitedDeplo
 
 var replicasStatusFn = replicasStatus
 
-func replicasStatus(subset *Subset, updatedRevision string) (replicas, readyReplicas, updatedReplicas, updatedReadyReplicas int32) {
+func replicasStatus(subset *Subset) (replicas, readyReplicas, updatedReplicas, updatedReadyReplicas int32) {
 	replicas = subset.Status.Replicas
 	readyReplicas = subset.Status.ReadyReplicas
-
-	replicaStatus, exist := subset.Status.RevisionReplicas[updatedRevision]
-	if exist {
-		updatedReplicas = replicaStatus.Replicas
-		updatedReadyReplicas = replicaStatus.ReadyReplicas
-	}
+	updatedReplicas = subset.Status.UpdatedReplicas
+	updatedReadyReplicas = subset.Status.UpdatedReadyReplicas
 	return
 }
 

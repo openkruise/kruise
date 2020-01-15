@@ -94,7 +94,7 @@ type StatefulSetTemplateSpec struct {
 	Spec              appsv1.StatefulSetSpec `json:"spec"`
 }
 
-// AdvancdStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.
+// AdvancedStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.
 type AdvancedStatefulSetTemplateSpec struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              StatefulSetSpec `json:"spec"`

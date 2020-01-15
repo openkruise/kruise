@@ -1,0 +1,81 @@
+package adapter
+
+import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+)
+
+func getSubsetPrefix(controllerName, subsetName string) string {
+	prefix := fmt.Sprintf("%s-%s-", controllerName, subsetName)
+	if len(validation.NameIsDNSSubdomain(prefix, true)) != 0 {
+		prefix = fmt.Sprintf("%s-", controllerName)
+	}
+	return prefix
+}
+
+func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
+	if podSpec.Affinity == nil {
+		podSpec.Affinity = &corev1.Affinity{}
+	}
+
+	if podSpec.Affinity.NodeAffinity == nil {
+		podSpec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+	}
+
+	if podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+	}
+
+	if podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms == nil {
+		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = []corev1.NodeSelectorTerm{}
+	}
+
+	if len(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, corev1.NodeSelectorTerm{})
+	}
+
+	for _, matchExpression := range subsetConfig.NodeSelectorTerm.MatchExpressions {
+		for i, term := range podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+			term.MatchExpressions = append(term.MatchExpressions, matchExpression)
+			podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i] = term
+		}
+	}
+}
+
+func attachTolerations(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
+	if subsetConfig.Tolerations == nil {
+		return
+	}
+
+	if podSpec.Tolerations == nil {
+		podSpec.Tolerations = []corev1.Toleration{}
+	}
+
+	for _, toleration := range subsetConfig.Tolerations {
+		podSpec.Tolerations = append(podSpec.Tolerations, toleration)
+	}
+}
+
+func getRevision(objMeta metav1.Object) string {
+	if objMeta.GetLabels() == nil {
+		return ""
+	}
+	return objMeta.GetLabels()[appsv1alpha1.ControllerRevisionHashLabelKey]
+}
+
+// getCurrentPartition calculates current partition by counting the pods not having the updated revision
+func getCurrentPartition(pods []*corev1.Pod, revision string) *int32 {
+	var partition int32
+	for _, pod := range pods {
+		if getRevision(&pod.ObjectMeta) != revision {
+			partition++
+		}
+	}
+
+	return &partition
+}

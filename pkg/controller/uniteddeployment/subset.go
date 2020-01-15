@@ -40,16 +40,11 @@ type SubsetSpec struct {
 
 // SubsetStatus stores the observed state of the Subset.
 type SubsetStatus struct {
-	ObservedGeneration int64
-	Replicas           int32
-	ReadyReplicas      int32
-	RevisionReplicas   map[string]*SubsetReplicaStatus
-}
-
-// SubsetReplicaStatus store the replicas of pods under corresponding revision
-type SubsetReplicaStatus struct {
-	Replicas      int32
-	ReadyReplicas int32
+	ObservedGeneration   int64
+	Replicas             int32
+	ReadyReplicas        int32
+	UpdatedReplicas      int32
+	UpdatedReadyReplicas int32
 }
 
 // SubsetUpdateStrategy stores the strategy detail of the Subset.
@@ -65,7 +60,7 @@ type ResourceRef struct {
 // ControlInterface defines the interface that UnitedDeployment uses to list, create, update, and delete Subsets.
 type ControlInterface interface {
 	// GetAllSubsets returns the subsets which are managed by the UnitedDeployment.
-	GetAllSubsets(ud *appsv1alpha1.UnitedDeployment) ([]*Subset, error)
+	GetAllSubsets(ud *appsv1alpha1.UnitedDeployment, updatedRevision string) ([]*Subset, error)
 	// CreateSubset creates the subset depending on the inputs.
 	CreateSubset(ud *appsv1alpha1.UnitedDeployment, unit string, revision string, replicas, partition int32) error
 	// UpdateSubset updates the target subset with the input information.
@@ -74,4 +69,6 @@ type ControlInterface interface {
 	DeleteSubset(*Subset) error
 	// GetSubsetFailure extracts the subset failure message to expose on UnitedDeployment status.
 	GetSubsetFailure(*Subset) *string
+	// IsExpected check the subset is the expected revision
+	IsExpected(subSet *Subset, ud *appsv1alpha1.UnitedDeployment, revision string) bool
 }

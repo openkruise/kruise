@@ -226,9 +226,16 @@ func (r *ReconcileUnitedDeployment) newRevision(ud *appsalphav1.UnitedDeployment
 		return nil, err
 	}
 
+	var selectedLabels map[string]string
+	if ud.Spec.Template.StatefulSetTemplate != nil {
+		selectedLabels = ud.Spec.Template.StatefulSetTemplate.Labels
+	} else if ud.Spec.Template.AdvancedStatefulSetTemplate != nil {
+		selectedLabels = ud.Spec.Template.AdvancedStatefulSetTemplate.Labels
+	}
+
 	cr, err := history.NewControllerRevision(ud,
 		gvk,
-		ud.Spec.Template.StatefulSetTemplate.Labels,
+		selectedLabels,
 		runtime.RawExtension{Raw: patch},
 		revision,
 		collisionCount)

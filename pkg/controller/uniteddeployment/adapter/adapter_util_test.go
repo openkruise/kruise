@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package uniteddeployment
+package adapter
 
 import (
 	"fmt"
@@ -28,38 +28,38 @@ import (
 
 func TestGetCurrentPartitionForStrategyOnDelete(t *testing.T) {
 	currentPods := buildPodList([]int{0, 1, 2}, []string{"v1", "v2", "v2"}, t)
-	if partition := getCurrentPartition(currentPods, "v2"); partition != 1 {
-		t.Fatalf("expected partition 1, got %d", partition)
+	if partition := getCurrentPartition(currentPods, "v2"); *partition != 1 {
+		t.Fatalf("expected partition 1, got %d", *partition)
 	}
 
 	currentPods = buildPodList([]int{0, 1, 2}, []string{"v1", "v1", "v2"}, t)
-	if partition := getCurrentPartition(currentPods, "v2"); partition != 2 {
-		t.Fatalf("expected partition 2, got %d", partition)
+	if partition := getCurrentPartition(currentPods, "v2"); *partition != 2 {
+		t.Fatalf("expected partition 2, got %d", *partition)
 	}
 
 	currentPods = buildPodList([]int{0, 1, 2, 3}, []string{"v2", "v1", "v2", "v2"}, t)
-	if partition := getCurrentPartition(currentPods, "v2"); partition != 1 {
-		t.Fatalf("expected partition 1, got %d", partition)
+	if partition := getCurrentPartition(currentPods, "v2"); *partition != 1 {
+		t.Fatalf("expected partition 1, got %d", *partition)
 	}
 
 	currentPods = buildPodList([]int{1, 2, 3}, []string{"v1", "v2", "v2"}, t)
-	if partition := getCurrentPartition(currentPods, "v2"); partition != 1 {
-		t.Fatalf("expected partition 1, got %d", partition)
+	if partition := getCurrentPartition(currentPods, "v2"); *partition != 1 {
+		t.Fatalf("expected partition 1, got %d", *partition)
 	}
 
 	currentPods = buildPodList([]int{0, 1, 3}, []string{"v2", "v1", "v2"}, t)
-	if partition := getCurrentPartition(currentPods, "v2"); partition != 1 {
-		t.Fatalf("expected partition 1, got %d", partition)
+	if partition := getCurrentPartition(currentPods, "v2"); *partition != 1 {
+		t.Fatalf("expected partition 1, got %d", *partition)
 	}
 
 	currentPods = buildPodList([]int{0, 1, 2}, []string{"v1", "v1", "v1"}, t)
-	if partition := getCurrentPartition(currentPods, "v2"); partition != 3 {
-		t.Fatalf("expected partition 3, got %d", partition)
+	if partition := getCurrentPartition(currentPods, "v2"); *partition != 3 {
+		t.Fatalf("expected partition 3, got %d", *partition)
 	}
 
 	currentPods = buildPodList([]int{0, 1, 2, 4}, []string{"v1", "", "v2", "v3"}, t)
-	if partition := getCurrentPartition(currentPods, "v2"); partition != 3 {
-		t.Fatalf("expected partition 3, got %d", partition)
+	if partition := getCurrentPartition(currentPods, "v2"); *partition != 3 {
+		t.Fatalf("expected partition 3, got %d", *partition)
 	}
 }
 
