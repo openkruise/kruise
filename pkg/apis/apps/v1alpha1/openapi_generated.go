@@ -39,6 +39,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetScaleStrategy":            schema_pkg_apis_apps_v1alpha1_CloneSetScaleStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetSpec":                     schema_pkg_apis_apps_v1alpha1_CloneSetSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetStatus":                   schema_pkg_apis_apps_v1alpha1_CloneSetStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateScatterTerm":        schema_pkg_apis_apps_v1alpha1_CloneSetUpdateScatterTerm(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateStrategy":           schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy":                 schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy":                    schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref),
@@ -620,6 +621,31 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetStatus(ref common.ReferenceCallback) 
 	}
 }
 
+func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateScatterTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"key", "value"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -641,12 +667,6 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 							Format:      "int32",
 						},
 					},
-					"priorityStrategy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights.",
-							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy"),
-						},
-					},
 					"maxUnavailable": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. Defaults to 10%.",
@@ -660,6 +680,25 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 							Format:      "",
 						},
 					},
+					"priorityStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priorities are the rules for calculating the priority of updating pods. Each pod to be updated, will pass through these terms and get a sum of weights.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy"),
+						},
+					},
+					"scatterStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ScatterStrategy defines the scatter rules to make pods been scattered when update. This will avoid pods with the same key-value to be updated in one batch. - Note that pods will be scattered after priority sort. So, although priority strategy and scatter strategy can be applied together, we suggest to use either one of them. - If scatterStrategy is used, we suggest to just use one term. Otherwise, the update order can be hard to understand.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateScatterTerm"),
+									},
+								},
+							},
+						},
+					},
 					"inPlaceUpdateStrategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "InPlaceUpdateStrategy contains strategies for in-place update.",
@@ -670,7 +709,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetInPlaceUpdateStrategy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetInPlaceUpdateStrategy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateScatterTerm", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 

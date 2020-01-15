@@ -82,9 +82,6 @@ type CloneSetUpdateStrategy struct {
 	// is set during pods updating, (replicas - partition) number of pods will be updated.
 	// Default value is 0.
 	Partition *int32 `json:"partition,omitempty"`
-	// Priorities are the rules for calculating the priority of updating pods.
-	// Each pod to be updated, will pass through these terms and get a sum of weights.
-	PriorityStrategy *UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down.
@@ -93,6 +90,14 @@ type CloneSetUpdateStrategy struct {
 	// Paused indicates that the CloneSet is paused.
 	// Default value is false
 	Paused bool `json:"paused,omitempty"`
+	// Priorities are the rules for calculating the priority of updating pods.
+	// Each pod to be updated, will pass through these terms and get a sum of weights.
+	PriorityStrategy *UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
+	// ScatterStrategy defines the scatter rules to make pods been scattered when update.
+	// This will avoid pods with the same key-value to be updated in one batch.
+	// - Note that pods will be scattered after priority sort. So, although priority strategy and scatter strategy can be applied together, we suggest to use either one of them.
+	// - If scatterStrategy is used, we suggest to just use one term. Otherwise, the update order can be hard to understand.
+	ScatterStrategy CloneSetUpdateScatterStrategy `json:"scatterStrategy,omitempty"`
 	// InPlaceUpdateStrategy contains strategies for in-place update.
 	InPlaceUpdateStrategy *CloneSetInPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
 }
@@ -113,6 +118,21 @@ const (
 	// rejected by kube-apiserver
 	InPlaceOnlyCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "InPlaceOnly"
 )
+
+// CloneSetUpdateScatterStrategy defines a map for label key-value. Pods matches the key-value will be scattered when update.
+//
+// Example1: [{"Key": "labelA", "Value": "AAA"}]
+// It means all pods with label labelA=AAA will be scattered when update.
+//
+// Example2: [{"Key": "labelA", "Value": "AAA"}, {"Key": "labelB", "Value": "BBB"}]
+// Controller will calculate the two sums of pods with labelA=AAA and with labelB=BBB,
+// pods with the label that has bigger amount will be scattered first, then pods with the other label will be scattered.
+type CloneSetUpdateScatterStrategy []CloneSetUpdateScatterTerm
+
+type CloneSetUpdateScatterTerm struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 
 // CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.
 type CloneSetInPlaceUpdateStrategy struct {

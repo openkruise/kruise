@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package priorityupdate
+package updatesort
 
 import (
 	"testing"
@@ -178,7 +178,8 @@ func TestCompare(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		got := compare(tc.strategy, tc.podI, tc.podJ, true)
+		ps := prioritySort{strategy: tc.strategy}
+		got := ps.compare(tc.podI, tc.podJ, true)
 		if got != tc.expected {
 			t.Fatalf("case #%d expected %v, got %v", i, tc.expected, got)
 		}
