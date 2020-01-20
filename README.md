@@ -21,6 +21,8 @@ Today, Kruise offers four workload controllers:
 
 - [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
+- [CloneSet](./docs/concepts/cloneset/README.md): CloneSet is a workload that mainly focuses on managing stateless applications. It provides full features for more efficient, deterministic and controlled deployment, such as inplace update, specified pod deletion, configurable priority/scatter update, preUpdate/postUpdate hooks.
+
 The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
 This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is great for new users.
 

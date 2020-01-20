@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -72,7 +71,6 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	}
 
 	// 1. find currently updated and not-ready count and all pods waiting to update
-	var updatedNotReadyCount int
 	var waitUpdateIndexes []int
 	for i := range pods {
 		if err := c.inplaceControl.UpdateCondition(pods[i]); err != nil {
@@ -83,8 +81,6 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 
 		if clonesetutils.GetPodRevision(pods[i]) != updateRevision.Name {
 			waitUpdateIndexes = append(waitUpdateIndexes, i)
-		} else if !readyForUpdate(pods[i]) {
-			updatedNotReadyCount++
 		}
 	}
 
@@ -92,7 +88,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	waitUpdateIndexes = sortUpdateIndexes(cs.Spec.UpdateStrategy, pods, waitUpdateIndexes)
 
 	// 3. calculate max count of pods can update
-	needToUpdateCount := calculateUpdateCount(cs.Spec.UpdateStrategy, int(*cs.Spec.Replicas), len(waitUpdateIndexes), updatedNotReadyCount)
+	needToUpdateCount := calculateUpdateCount(cs.Spec.UpdateStrategy, int(*cs.Spec.Replicas), waitUpdateIndexes, pods)
 	if needToUpdateCount < len(waitUpdateIndexes) {
 		waitUpdateIndexes = waitUpdateIndexes[:needToUpdateCount]
 	}
@@ -122,18 +118,38 @@ func sortUpdateIndexes(strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.
 	return waitUpdateIndexes
 }
 
-func calculateUpdateCount(strategy appsv1alpha1.CloneSetUpdateStrategy, totalReplicas, notUpdatedCount, updatedNotReadyCount int) int {
+func calculateUpdateCount(strategy appsv1alpha1.CloneSetUpdateStrategy, totalReplicas int, waitUpdateIndexes []int, pods []*v1.Pod) int {
 	partition := 0
 	if strategy.Partition != nil {
 		partition = int(*strategy.Partition)
 	}
+
+	if len(waitUpdateIndexes)-partition <= 0 {
+		return 0
+	}
+	waitUpdateIndexes = waitUpdateIndexes[:(len(waitUpdateIndexes) - partition)]
+
 	maxUnavailable, _ := intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(strategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), totalReplicas, true)
 
-	return integer.IntMax(integer.IntMin(
-		notUpdatedCount-partition,
-		maxUnavailable-updatedNotReadyCount,
-	), 0)
+	var notReadyCount, updateCount int
+	for _, p := range pods {
+		if !readyForUpdate(p) {
+			notReadyCount++
+		}
+	}
+	for _, i := range waitUpdateIndexes {
+		if readyForUpdate(pods[i]) {
+			if notReadyCount >= maxUnavailable {
+				break
+			} else {
+				notReadyCount++
+			}
+		}
+		updateCount++
+	}
+
+	return updateCount
 }
 
 func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet,

@@ -28,7 +28,7 @@ const (
 	CloneSetInstanceID = "apps.kruise.io/cloneset-instance-id"
 
 	// DefaultCloneSetMaxUnavailable is the default value of maxUnavailable for CloneSet update strategy.
-	DefaultCloneSetMaxUnavailable = "10%"
+	DefaultCloneSetMaxUnavailable = "20%"
 )
 
 // CloneSetSpec defines the desired state of CloneSet
@@ -85,7 +85,7 @@ type CloneSetUpdateStrategy struct {
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down.
-	// Defaults to 10%.
+	// Defaults to 20%.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 	// Paused indicates that the CloneSet is paused.
 	// Default value is false

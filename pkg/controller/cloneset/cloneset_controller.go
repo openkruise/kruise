@@ -22,6 +22,8 @@ import (
 	"flag"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
 	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
@@ -56,7 +58,7 @@ func init() {
 }
 
 var (
-	concurrentReconciles = 10
+	concurrentReconciles = 3
 
 	scaleExpectations  = expectations.NewScaleExpectations()
 	updateExpectations = expectations.NewUpdateExpectations(clonesetutils.GetPodRevision)
@@ -73,6 +75,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
 	recorder := mgr.GetRecorder("cloneset-controller")
 	if cli := kruiseclient.GetGenericClient(); cli != nil {
 		eventBroadcaster := record.NewBroadcaster()
@@ -361,27 +364,20 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 }
 
 func (r *ReconcileCloneSet) getOwnedResource(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, []*v1.PersistentVolumeClaim, error) {
-	activePods, err := clonesetutils.GetActivePods(r.Client, cs.Namespace)
+	filteredPods, err := clonesetutils.GetActivePods(r.Client,
+		client.InNamespace(cs.Namespace).MatchingField(fieldindex.IndexNameForOwnerRefUID, string(cs.UID)))
 	if err != nil {
 		return nil, nil, err
 	}
-	var filteredPods []*v1.Pod
-	for _, p := range activePods {
-		if ref := metav1.GetControllerOf(p); ref != nil && ref.UID == cs.UID {
-			filteredPods = append(filteredPods, p)
-		}
-	}
 
 	pvcList := v1.PersistentVolumeClaimList{}
-	if err := r.List(context.TODO(), client.InNamespace(cs.Namespace), &pvcList); err != nil {
+	if err := r.List(context.TODO(),
+		client.InNamespace(cs.Namespace).MatchingField(fieldindex.IndexNameForOwnerRefUID, string(cs.UID)), &pvcList); err != nil {
 		return nil, nil, err
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim
 	for i, pvc := range pvcList.Items {
-		if pvc.DeletionTimestamp != nil {
-			continue
-		}
-		if ref := metav1.GetControllerOf(&pvc); ref != nil && ref.UID == cs.UID {
+		if pvc.DeletionTimestamp == nil {
 			filteredPVCs = append(filteredPVCs, &pvcList.Items[i])
 		}
 	}

@@ -61,6 +61,26 @@ rules:
   - update
   - patch
 - apiGroups:
+  - apps.kruise.io
+  resources:
+  - clonesets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - clonesets/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
   - ""
   resources:
   - configmaps
@@ -169,45 +189,45 @@ rules:
   - update
   - patch
 - apiGroups:
-    - apps.kruise.io
+  - apps.kruise.io
   resources:
-    - uniteddeployments
+  - uniteddeployments
   verbs:
-    - get
-    - list
-    - watch
-    - create
-    - update
-    - patch
-    - delete
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
-    - apps.kruise.io
+  - apps.kruise.io
   resources:
-    - uniteddeployments/status
+  - uniteddeployments/status
   verbs:
-    - get
-    - update
-    - patch
+  - get
+  - update
+  - patch
 - apiGroups:
-    - apps
+  - apps
   resources:
-    - statefulsets
+  - statefulsets
   verbs:
-    - get
-    - list
-    - watch
-    - create
-    - update
-    - patch
-    - delete
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
-    - apps
+  - apps
   resources:
-    - statefulsets/status
+  - statefulsets/status
   verbs:
-    - get
-    - update
-    - patch
+  - get
+  - update
+  - patch
 - apiGroups:
   - admissionregistration.k8s.io
   resources:

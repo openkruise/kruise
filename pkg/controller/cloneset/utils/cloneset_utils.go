@@ -42,9 +42,9 @@ func GetControllerKey(cs *appsv1alpha1.CloneSet) string {
 }
 
 // GetActivePods returns all active pods in this namespace.
-func GetActivePods(reader client.Reader, namespace string) ([]*v1.Pod, error) {
+func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, error) {
 	podList := &v1.PodList{}
-	if err := reader.List(context.TODO(), client.InNamespace(namespace), podList); err != nil {
+	if err := reader.List(context.TODO(), opts, podList); err != nil {
 		return nil, err
 	}
 

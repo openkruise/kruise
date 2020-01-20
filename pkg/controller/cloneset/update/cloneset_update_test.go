@@ -22,20 +22,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-
 	"github.com/openkruise/kruise/pkg/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -337,52 +335,62 @@ func TestSortUpdateIndexes(t *testing.T) {
 }
 
 func TestCalculateUpdateCount(t *testing.T) {
+	readyPod := func() *v1.Pod {
+		return &v1.Pod{Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}}}
+	}
 	cases := []struct {
-		strategy             appsv1alpha1.CloneSetUpdateStrategy
-		totalReplicas        int
-		notUpdatedCount      int
-		updatedNotReadyCount int
-		expectedResult       int
+		strategy          appsv1alpha1.CloneSetUpdateStrategy
+		totalReplicas     int
+		waitUpdateIndexes []int
+		pods              []*v1.Pod
+		expectedResult    int
 	}{
 		{
-			strategy:             appsv1alpha1.CloneSetUpdateStrategy{},
-			totalReplicas:        3,
-			notUpdatedCount:      9,
-			updatedNotReadyCount: 0,
-			expectedResult:       1,
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{},
+			totalReplicas:     3,
+			waitUpdateIndexes: []int{0, 1, 2},
+			pods:              []*v1.Pod{readyPod(), readyPod(), readyPod()},
+			expectedResult:    1,
 		},
 		{
-			strategy:             appsv1alpha1.CloneSetUpdateStrategy{},
-			totalReplicas:        3,
-			notUpdatedCount:      8,
-			updatedNotReadyCount: 1,
-			expectedResult:       0,
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{},
+			totalReplicas:     3,
+			waitUpdateIndexes: []int{0, 1, 2},
+			pods:              []*v1.Pod{readyPod(), {}, readyPod()},
+			expectedResult:    0,
 		},
 		{
-			strategy:             appsv1alpha1.CloneSetUpdateStrategy{},
-			totalReplicas:        25,
-			notUpdatedCount:      8,
-			updatedNotReadyCount: 1,
-			expectedResult:       2,
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{},
+			totalReplicas:     3,
+			waitUpdateIndexes: []int{0, 1, 2},
+			pods:              []*v1.Pod{{}, readyPod(), readyPod()},
+			expectedResult:    1,
 		},
 		{
-			strategy:             appsv1alpha1.CloneSetUpdateStrategy{Partition: getInt32Pointer(8)},
-			totalReplicas:        10,
-			notUpdatedCount:      6,
-			updatedNotReadyCount: 2,
-			expectedResult:       0,
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{},
+			totalReplicas:     10,
+			waitUpdateIndexes: []int{0, 1, 2, 3, 4, 5, 6, 7, 8},
+			pods:              []*v1.Pod{{}, readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), {}, readyPod()},
+			expectedResult:    1,
 		},
 		{
-			strategy:             appsv1alpha1.CloneSetUpdateStrategy{MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromString("50%"))},
-			totalReplicas:        10,
-			notUpdatedCount:      6,
-			updatedNotReadyCount: 3,
-			expectedResult:       2,
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{Partition: getInt32Pointer(2), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(3))},
+			totalReplicas:     3,
+			waitUpdateIndexes: []int{0, 1},
+			pods:              []*v1.Pod{{}, readyPod(), readyPod()},
+			expectedResult:    0,
+		},
+		{
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{Partition: getInt32Pointer(2), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromString("50%"))},
+			totalReplicas:     8,
+			waitUpdateIndexes: []int{0, 1, 2, 3, 4, 5, 6},
+			pods:              []*v1.Pod{{}, readyPod(), {}, readyPod(), readyPod(), readyPod(), readyPod(), {}},
+			expectedResult:    3,
 		},
 	}
 
 	for i, tc := range cases {
-		res := calculateUpdateCount(tc.strategy, tc.totalReplicas, tc.notUpdatedCount, tc.updatedNotReadyCount)
+		res := calculateUpdateCount(tc.strategy, tc.totalReplicas, tc.waitUpdateIndexes, tc.pods)
 		if res != tc.expectedResult {
 			t.Fatalf("case #%d failed, expected %d, got %d", i, tc.expectedResult, res)
 		}

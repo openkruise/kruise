@@ -32,3 +32,4 @@ helm repo add apphub https://apphub.aliyuncs.com
 - [Use SidecarSet to inject a sidecar container](./sidecarset.md)
 - [Use Broadcast Job to pre-download image](./broadcastjob.md)
 - [Run a UnitedDeployment in a multi-domain cluster](./uniteddeployment.md)
+- [Deploy Guestbook using CloneSet](./cloneset.md)
