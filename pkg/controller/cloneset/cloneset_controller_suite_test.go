@@ -20,6 +20,7 @@ import (
 	stdlog "log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -35,6 +36,7 @@ import (
 var cfg *rest.Config
 
 func TestMain(m *testing.M) {
+	runtime.GOMAXPROCS(4)
 	t := &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
 	}

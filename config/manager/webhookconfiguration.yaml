@@ -35,6 +35,28 @@ webhooks:
       service:
         name: webhook-server-service
         namespace: kruise-system
+        path: /validating-create-update-cloneset
+    failurePolicy: Fail
+    name: validating-create-update-cloneset.kruise.io
+    namespaceSelector:
+      matchExpressions:
+        - key: control-plane
+          operator: DoesNotExist
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - clonesets
+  - clientConfig:
+      caBundle: fake
+      service:
+        name: webhook-server-service
+        namespace: kruise-system
         path: /validating-create-update-sidecarset
     failurePolicy: Fail
     name: validating-create-update-sidecarset.kruise.io

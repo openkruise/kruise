@@ -23,6 +23,7 @@ import (
 	"github.com/openkruise/kruise/pkg/apis"
 	extclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/controller"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/webhook"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
@@ -88,6 +89,12 @@ func main() {
 	log.Info("setting up scheme")
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable add APIs to scheme")
+		os.Exit(1)
+	}
+
+	// Register field indexes
+	if err := fieldindex.RegisterFieldIndexes(mgr.GetCache()); err != nil {
+		log.Error(err, "failed to register field index")
 		os.Exit(1)
 	}
 
