@@ -82,12 +82,22 @@ type SubsetTemplate struct {
 	// StatefulSet template
 	// +optional
 	StatefulSetTemplate *StatefulSetTemplateSpec `json:"statefulSetTemplate,omitempty"`
+
+	// AdvancedStatefulSet template
+	// +optional
+	AdvancedStatefulSetTemplate *AdvancedStatefulSetTemplateSpec `json:"advancedStatefulSetTemplate,omitempty"`
 }
 
 // StatefulSetTemplateSpec defines the subset template of StatefulSet.
 type StatefulSetTemplateSpec struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              appsv1.StatefulSetSpec `json:"spec"`
+}
+
+// AdvancdStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.
+type AdvancedStatefulSetTemplateSpec struct {
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              StatefulSetSpec `json:"spec"`
 }
 
 // UnitedDeploymentUpdateStrategy defines the update performance

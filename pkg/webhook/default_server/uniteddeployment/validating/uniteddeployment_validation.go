@@ -52,10 +52,6 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		}
 	}
 
-	if spec.Template.StatefulSetTemplate == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("template", "statefulSetTemplate"), ""))
-	}
-
 	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
@@ -185,6 +181,9 @@ func validateUnitedDeploymentTopology(topology, oldTopology *appsv1alpha1.Topolo
 			if !apiequality.Semantic.DeepEqual(oldSubset.NodeSelectorTerm, subset.NodeSelectorTerm) {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("nodeSelectorTerm"), "may not be changed in an update"))
 			}
+			if !apiequality.Semantic.DeepEqual(oldSubset.Tolerations, subset.Tolerations) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("tolerations"), "may not be changed in an update"))
+			}
 		}
 	}
 
@@ -195,6 +194,8 @@ func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemp
 	allErrs := field.ErrorList{}
 	if template.StatefulSetTemplate != nil && oldTemplate.StatefulSetTemplate != nil {
 		allErrs = append(allErrs, validateStatefulSetUpdate(template.StatefulSetTemplate, oldTemplate.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
+	} else if template.AdvancedStatefulSetTemplate != nil && oldTemplate.AdvancedStatefulSetTemplate != nil {
+		allErrs = append(allErrs, validateAdvancedStatefulSetUpdate(template.AdvancedStatefulSetTemplate, oldTemplate.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
 	}
 
 	return allErrs
@@ -202,10 +203,19 @@ func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemp
 
 func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labels.Selector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if template.StatefulSetTemplate == nil && template.AdvancedStatefulSetTemplate == nil {
+		allErrs = append(allErrs, field.Required(fldPath, "should provide one of statefulSetTemplate or advancedStatefulSetTemplate"))
+	}
+
+	if template.StatefulSetTemplate != nil && template.AdvancedStatefulSetTemplate != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, template, "should provide only one of statefulSetTemplate or advancedStatefulSetTemplate"))
+	}
+
 	if template.StatefulSetTemplate != nil {
 		labels := labels.Set(template.StatefulSetTemplate.Labels)
 		if !selector.Matches(labels) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.StatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("statefulSetTemplate", "metadata", "labels"), template.StatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
 		}
 		allErrs = append(allErrs, validateStatefulSet(template.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
 		template := template.StatefulSetTemplate.Spec.Template
@@ -214,7 +224,20 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
 		}
-		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("template", "statefulSet"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("statefulSetTemplate", "spec", "template"))...)
+	} else if template.AdvancedStatefulSetTemplate != nil {
+		labels := labels.Set(template.AdvancedStatefulSetTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("statefulSetTemplate", "metadata", "labels"), template.AdvancedStatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
+		}
+		allErrs = append(allErrs, validateAdvancedStatefulSet(template.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
+		template := template.AdvancedStatefulSetTemplate.Spec.Template
+		coreTemplate, err := convertPodTemplateSpec(&template)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+			return allErrs
+		}
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("advancedStatefulSetTemplate", "spec", "template"))...)
 	}
 
 	return allErrs
@@ -233,6 +256,19 @@ func validateStatefulSet(statefulSet *appsv1alpha1.StatefulSetTemplateSpec, fldP
 	return allErrs
 }
 
+func validateAdvancedStatefulSet(statefulSet *appsv1alpha1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if statefulSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *statefulSet.Spec.Replicas, "replicas in advancedStatefulSetTemplate will not be used"))
+	}
+	if statefulSet.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate != nil &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "updateStrategy", "rollingUpdate", "partition"), *statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition, "partition in advancedStatefulSetTemplate will not be used"))
+	}
+	return allErrs
+}
+
 func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	restoreReplicas := statefulSet.Spec.Replicas
@@ -246,6 +282,30 @@ func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.Statefu
 
 	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec"), "updates to statefulsetTemplate spec for fields other than 'template', and 'updateStrategy' are forbidden"))
+	}
+	statefulSet.Spec.Replicas = restoreReplicas
+	statefulSet.Spec.Template = restoreTemplate
+	statefulSet.Spec.UpdateStrategy = restoreStrategy
+
+	if statefulSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	}
+	return allErrs
+}
+
+func validateAdvancedStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	restoreReplicas := statefulSet.Spec.Replicas
+	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
+
+	restoreTemplate := statefulSet.Spec.Template
+	statefulSet.Spec.Template = oldStatefulSet.Spec.Template
+
+	restoreStrategy := statefulSet.Spec.UpdateStrategy
+	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
+
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec"), "updates to advancedStatefulsetTemplate spec for fields other than 'template', and 'updateStrategy' are forbidden"))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template = restoreTemplate

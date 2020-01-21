@@ -393,6 +393,31 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				},
 			},
 		},
+		"duplicated templates": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+					AdvancedStatefulSetTemplate: &appsv1alpha1.AdvancedStatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: appsv1alpha1.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
@@ -405,7 +430,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 
 			for i := range errs {
 				field := errs[i].Field
-				if !strings.HasPrefix(field, "spec.template.") &&
+				if !strings.HasPrefix(field, "spec.template") &&
 					field != "spec.selector" &&
 					field != "spec.topology.subsets" &&
 					field != "spec.topology.subsets[0]" &&

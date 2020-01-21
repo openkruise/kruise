@@ -6,6 +6,21 @@
   },
   "paths": {},
   "definitions": {
+    "kruise.apps.v1alpha1.AdvancedStatefulSetTemplateSpec": {
+      "description": "AdvancdStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.",
+      "type": "object",
+      "required": [
+        "spec"
+      ],
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.StatefulSetSpec"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.BroadcastJob": {
       "description": "BroadcastJob is the Schema for the broadcastjobs API",
       "type": "object",
@@ -880,6 +895,10 @@
       "description": "SubsetTemplate defines the subset template under the UnitedDeployment. UnitedDeployment will provision every subset based on one workload templates in SubsetTemplate.",
       "type": "object",
       "properties": {
+        "advancedStatefulSetTemplate": {
+          "description": "AdvancedStatefulSet template",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.AdvancedStatefulSetTemplateSpec"
+        },
         "statefulSetTemplate": {
           "description": "StatefulSet template",
           "$ref": "#/definitions/kruise.apps.v1alpha1.StatefulSetTemplateSpec"
