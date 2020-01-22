@@ -247,7 +247,7 @@ func TestMange(t *testing.T) {
 						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
 							Revision:              "rev-new",
-							UpdateTimestamp:       metav1.Now(),
+							UpdateTimestamp:       now,
 							LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 						})},
 					},

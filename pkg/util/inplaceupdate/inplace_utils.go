@@ -166,7 +166,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *updateSpec) error {
 		// record old containerStatuses
 		inPlaceUpdateState := appsv1alpha1.InPlaceUpdateState{
 			Revision:              spec.revision,
-			UpdateTimestamp:       metav1.Now(),
+			UpdateTimestamp:       c.now(),
 			LastContainerStatuses: make(map[string]appsv1alpha1.InPlaceUpdateContainerStatus, len(spec.containerImages)),
 		}
 		for _, c := range clone.Status.ContainerStatuses {
