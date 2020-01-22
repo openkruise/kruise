@@ -28,6 +28,7 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.AdvancedStatefulSetTemplateSpec":  schema_pkg_apis_apps_v1alpha1_AdvancedStatefulSetTemplateSpec(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.BroadcastJob":                     schema_pkg_apis_apps_v1alpha1_BroadcastJob(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.BroadcastJobList":                 schema_pkg_apis_apps_v1alpha1_BroadcastJobList(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.BroadcastJobSpec":                 schema_pkg_apis_apps_v1alpha1_BroadcastJobSpec(ref),
@@ -75,6 +76,32 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy":           schema_pkg_apis_apps_v1alpha1_UpdatePriorityStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityWeightTerm":         schema_pkg_apis_apps_v1alpha1_UpdatePriorityWeightTerm(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdateStatus":                     schema_pkg_apis_apps_v1alpha1_UpdateStatus(ref),
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_AdvancedStatefulSetTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AdvancdStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetSpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -1594,11 +1621,17 @@ func schema_pkg_apis_apps_v1alpha1_SubsetTemplate(ref common.ReferenceCallback) 
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetTemplateSpec"),
 						},
 					},
+					"advancedStatefulSetTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AdvancedStatefulSet template",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.AdvancedStatefulSetTemplateSpec"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetTemplateSpec"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.AdvancedStatefulSetTemplateSpec", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.StatefulSetTemplateSpec"},
 	}
 }
 
