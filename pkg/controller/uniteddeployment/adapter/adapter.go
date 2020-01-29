@@ -1,3 +1,19 @@
+/*
+Copyright 2019 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package adapter
 
 import (
@@ -11,16 +27,12 @@ type Adapter interface {
 	NewResourceObject() runtime.Object
 	// NewResourceListObject creates a empty subset list object.
 	NewResourceListObject() runtime.Object
-	// GetObjectMeta returns the ObjectMeta of the subset.
-	GetObjectMeta(subset metav1.Object) *metav1.ObjectMeta
 	// GetStatusObservedGeneration returns the observed generation of the subset.
 	GetStatusObservedGeneration(subset metav1.Object) int64
 	// GetReplicaDetails returns the replicas information of the subset status.
 	GetReplicaDetails(subset metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error)
 	// GetSubsetFailure returns failure information of the subset.
 	GetSubsetFailure() *string
-	// ConvertToResourceList converts subset list object to subset array.
-	ConvertToResourceList(subsetList runtime.Object) []metav1.Object
 	// ApplySubsetTemplate updates the subset to the latest revision.
 	ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, subset runtime.Object) error
 	// IsExpected checks the subset is the expected revision or not.

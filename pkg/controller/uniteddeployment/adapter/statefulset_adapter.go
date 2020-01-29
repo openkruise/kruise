@@ -1,3 +1,19 @@
+/*
+Copyright 2019 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package adapter
 
 import (
@@ -34,11 +50,6 @@ func (a *StatefulSetAdapter) NewResourceListObject() runtime.Object {
 	return &appsv1.StatefulSetList{}
 }
 
-// GetObjectMeta returns the ObjectMeta of the subset of StatefulSet.
-func (a *StatefulSetAdapter) GetObjectMeta(obj metav1.Object) *metav1.ObjectMeta {
-	return &obj.(*appsv1.StatefulSet).ObjectMeta
-}
-
 // GetStatusObservedGeneration returns the observed generation of the subset.
 func (a *StatefulSetAdapter) GetStatusObservedGeneration(obj metav1.Object) int64 {
 	return obj.(*appsv1.StatefulSet).Status.ObservedGeneration
@@ -73,17 +84,6 @@ func (a *StatefulSetAdapter) GetReplicaDetails(obj metav1.Object, updatedRevisio
 // StatefulSet has no condition.
 func (a *StatefulSetAdapter) GetSubsetFailure() *string {
 	return nil
-}
-
-// ConvertToResourceList converts StatefulSetList object to StatefulSet array.
-func (a *StatefulSetAdapter) ConvertToResourceList(obj runtime.Object) []metav1.Object {
-	stsList := obj.(*appsv1.StatefulSetList)
-	objList := make([]metav1.Object, len(stsList.Items))
-	for i, set := range stsList.Items {
-		objList[i] = set.DeepCopy()
-	}
-
-	return objList
 }
 
 // ApplySubsetTemplate updates the subset to the latest revision, depending on the StatefulSetTemplate.

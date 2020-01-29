@@ -18,6 +18,7 @@ package uniteddeployment
 
 import (
 	"context"
+	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,7 +56,12 @@ func (m *SubsetControl) GetAllSubsets(ud *alpha1.UnitedDeployment, updatedRevisi
 	if err != nil {
 		return nil, err
 	}
-	selected := m.adapter.ConvertToResourceList(setList)
+
+	v := reflect.ValueOf(setList).Elem().FieldByName("Items")
+	selected := make([]metav1.Object, v.Len())
+	for i := 0; i < v.Len(); i++ {
+		selected[i] = v.Index(i).Addr().Interface().(metav1.Object)
+	}
 	claimedSets, err := manager.ClaimOwnedObjects(selected)
 	if err != nil {
 		return nil, err
@@ -130,7 +136,24 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 	}
 
 	subset := &Subset{}
-	subset.ObjectMeta = *m.adapter.GetObjectMeta(set).DeepCopy()
+	subset.ObjectMeta = metav1.ObjectMeta{
+		Name:                       set.GetName(),
+		GenerateName:               set.GetGenerateName(),
+		Namespace:                  set.GetNamespace(),
+		SelfLink:                   set.GetSelfLink(),
+		UID:                        set.GetUID(),
+		ResourceVersion:            set.GetResourceVersion(),
+		Generation:                 set.GetGeneration(),
+		CreationTimestamp:          set.GetCreationTimestamp(),
+		DeletionTimestamp:          set.GetDeletionTimestamp(),
+		DeletionGracePeriodSeconds: set.GetDeletionGracePeriodSeconds(),
+		Labels:                     set.GetLabels(),
+		Annotations:                set.GetAnnotations(),
+		OwnerReferences:            set.GetOwnerReferences(),
+		Initializers:               set.GetInitializers(),
+		Finalizers:                 set.GetFinalizers(),
+		ClusterName:                set.GetClusterName(),
+	}
 	subset.Spec.SubsetName = subSetName
 
 	specReplicas, specPartition, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas, err := m.adapter.GetReplicaDetails(set, updatedRevision)
