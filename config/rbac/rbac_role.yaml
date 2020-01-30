@@ -277,6 +277,26 @@ rules:
   - update
   - patch
 - apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations

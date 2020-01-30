@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -64,57 +63,6 @@ func round(x float64) int {
 	return int(math.Floor(x + 0.5))
 }
 
-func getSubsetPrefix(controllerName, subsetName string) string {
-	prefix := fmt.Sprintf("%s-%s-", controllerName, subsetName)
-	if len(validation.NameIsDNSSubdomain(prefix, true)) != 0 {
-		prefix = fmt.Sprintf("%s-", controllerName)
-	}
-	return prefix
-}
-
-func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
-	if podSpec.Affinity == nil {
-		podSpec.Affinity = &corev1.Affinity{}
-	}
-
-	if podSpec.Affinity.NodeAffinity == nil {
-		podSpec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
-	}
-
-	if podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
-	}
-
-	if podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms == nil {
-		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = []corev1.NodeSelectorTerm{}
-	}
-
-	if len(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
-		podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, corev1.NodeSelectorTerm{})
-	}
-
-	for _, matchExpression := range subsetConfig.NodeSelectorTerm.MatchExpressions {
-		for i, term := range podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-			term.MatchExpressions = append(term.MatchExpressions, matchExpression)
-			podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i] = term
-		}
-	}
-}
-
-func attachTolerations(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
-	if subsetConfig.Tolerations == nil {
-		return
-	}
-
-	if podSpec.Tolerations == nil {
-		podSpec.Tolerations = []corev1.Toleration{}
-	}
-
-	for _, toleration := range subsetConfig.Tolerations {
-		podSpec.Tolerations = append(podSpec.Tolerations, toleration)
-	}
-}
-
 func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
 	name, exist := metaObj.GetLabels()[appsv1alpha1.SubSetNameLabelKey]
 	if !exist {
@@ -126,13 +74,6 @@ func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
 	}
 
 	return name, nil
-}
-
-func getRevision(objMeta metav1.Object) string {
-	if objMeta.GetLabels() == nil {
-		return ""
-	}
-	return objMeta.GetLabels()[appsv1alpha1.ControllerRevisionHashLabelKey]
 }
 
 // NewUnitedDeploymentCondition creates a new UnitedDeployment condition.
@@ -161,7 +102,7 @@ func GetUnitedDeploymentCondition(status appsv1alpha1.UnitedDeploymentStatus, co
 // we are about to add already exists and has the same status, reason and message then we are not going to update.
 func SetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condition *appsv1alpha1.UnitedDeploymentCondition) {
 	currentCond := GetUnitedDeploymentCondition(*status, condition.Type)
-	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason && currentCond.Message == condition.Message {
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
 	}
 

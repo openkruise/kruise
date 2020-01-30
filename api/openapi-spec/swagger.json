@@ -7,7 +7,7 @@
   "paths": {},
   "definitions": {
     "kruise.apps.v1alpha1.AdvancedStatefulSetTemplateSpec": {
-      "description": "AdvancdStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.",
+      "description": "AdvancedStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.",
       "type": "object",
       "required": [
         "spec"

@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	kruisectlutil "github.com/openkruise/kruise/pkg/controller/util"
 )
 
 var c client.Client
@@ -125,7 +126,7 @@ func TestStsReconcile(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
-	expectedStsCount(g, 1)
+	expectedStsCount(g, instance, 1)
 }
 
 func TestStsSubsetProvision(t *testing.T) {
@@ -207,7 +208,7 @@ func TestStsSubsetProvision(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 1)
+	stsList := expectedStsCount(g, instance, 1)
 	sts := &stsList.Items[0]
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)).Should(gomega.BeEquivalentTo(1))
@@ -233,7 +234,7 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	sts = getSubsetByName(stsList, "subset-a")
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)).Should(gomega.BeEquivalentTo(1))
@@ -257,7 +258,7 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 1)
+	stsList = expectedStsCount(g, instance, 1)
 	sts = &stsList.Items[0]
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)).Should(gomega.BeEquivalentTo(1))
@@ -298,7 +299,7 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 1)
+	stsList = expectedStsCount(g, instance, 1)
 	sts = &stsList.Items[0]
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)).Should(gomega.BeEquivalentTo(2))
@@ -408,7 +409,7 @@ func TestStsSubsetProvisionWithToleration(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 1)
+	stsList := expectedStsCount(g, instance, 1)
 	sts := &stsList.Items[0]
 	g.Expect(sts.Spec.Template.Spec.Tolerations).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Tolerations)).Should(gomega.BeEquivalentTo(2))
@@ -424,7 +425,7 @@ func TestStsSubsetProvisionWithToleration(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 1)
+	stsList = expectedStsCount(g, instance, 1)
 	sts = &stsList.Items[0]
 	g.Expect(sts.Spec.Template.Spec.Tolerations).ShouldNot(gomega.BeNil())
 	g.Expect(len(sts.Spec.Template.Spec.Tolerations)).Should(gomega.BeEquivalentTo(3))
@@ -511,7 +512,7 @@ func TestStsDupSubset(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 1)
+	stsList := expectedStsCount(g, instance, 1)
 
 	subsetA := stsList.Items[0]
 	dupSts := subsetA.DeepCopy()
@@ -519,7 +520,7 @@ func TestStsDupSubset(t *testing.T) {
 	dupSts.ResourceVersion = ""
 	g.Expect(c.Create(context.TODO(), dupSts)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 3)
-	expectedStsCount(g, 1)
+	expectedStsCount(g, instance, 1)
 }
 
 func TestStsScale(t *testing.T) {
@@ -613,7 +614,7 @@ func TestStsScale(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 2)
+	stsList := expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas + *stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(1))
 
 	var two int32 = 2
@@ -622,7 +623,7 @@ func TestStsScale(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(1))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(1))
 
@@ -638,7 +639,7 @@ func TestStsScale(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(3))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(3))
 
@@ -654,7 +655,7 @@ func TestStsScale(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
 
@@ -756,7 +757,7 @@ func TestStsUpdate(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 2)
+	stsList := expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas + *stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
 	revisionList := &appsv1.ControllerRevisionList{}
 	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList))
@@ -769,7 +770,7 @@ func TestStsUpdate(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 
@@ -878,7 +879,7 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 2)
+	stsList := expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 
@@ -894,7 +895,7 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 
@@ -922,7 +923,7 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 4)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 
@@ -947,7 +948,7 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 
@@ -1060,7 +1061,7 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 2)
+	stsList := expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 
@@ -1082,7 +1083,7 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 
@@ -1194,7 +1195,7 @@ func TestStsOnDelete(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 2)
+	stsList := expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 
@@ -1213,7 +1214,7 @@ func TestStsOnDelete(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 
@@ -1243,7 +1244,7 @@ func TestStsOnDelete(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	g.Expect(stsList.Items[0].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 	g.Expect(stsList.Items[1].Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
 }
@@ -1339,7 +1340,7 @@ func TestStsSubsetCount(t *testing.T) {
 	defer c.Delete(context.TODO(), instance)
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList := expectedStsCount(g, 2)
+	stsList := expectedStsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 
@@ -1349,7 +1350,7 @@ func TestStsSubsetCount(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	setsubA := getSubsetByName(stsList, "subset-a")
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(9))
 	setsubB := getSubsetByName(stsList, "subset-b")
@@ -1362,7 +1363,7 @@ func TestStsSubsetCount(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	setsubA = getSubsetByName(stsList, "subset-a")
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:2.0"))
@@ -1383,7 +1384,7 @@ func TestStsSubsetCount(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	setsubA = getSubsetByName(stsList, "subset-a")
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(3))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:3.0"))
@@ -1416,7 +1417,7 @@ func TestStsSubsetCount(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
 
-	stsList = expectedStsCount(g, 3)
+	stsList = expectedStsCount(g, instance, 3)
 	setsubA = getSubsetByName(stsList, "subset-a")
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(2))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:4.0"))
@@ -1441,7 +1442,7 @@ func TestStsSubsetCount(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	setsubA = getSubsetByName(stsList, "subset-a")
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(1))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
@@ -1459,7 +1460,7 @@ func TestStsSubsetCount(t *testing.T) {
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 3)
 
-	stsList = expectedStsCount(g, 2)
+	stsList = expectedStsCount(g, instance, 2)
 	setsubA = getSubsetByName(stsList, "subset-a")
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
@@ -1497,7 +1498,7 @@ func collectPodOrdinal(c client.Client, sts *appsv1.StatefulSet, expected string
 
 	marks := make([]bool, len(podList.Items))
 	for _, pod := range podList.Items {
-		ordinal := int(getOrdinal(&pod))
+		ordinal := int(kruisectlutil.GetOrdinal(&pod))
 		if ordinal >= len(marks) || ordinal < 0 {
 			continue
 		}
@@ -1580,10 +1581,14 @@ func getSubsetByName(stsList *appsv1.StatefulSetList, name string) *appsv1.State
 	return nil
 }
 
-func expectedStsCount(g *gomega.GomegaWithT, count int) *appsv1.StatefulSetList {
+func expectedStsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, count int) *appsv1.StatefulSetList {
 	stsList := &appsv1.StatefulSetList{}
+
+	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
+	g.Expect(err).Should(gomega.BeNil())
+
 	g.Eventually(func() error {
-		if err := c.List(context.TODO(), &client.ListOptions{}, stsList); err != nil {
+		if err := c.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, stsList); err != nil {
 			return err
 		}
 
@@ -1661,6 +1666,24 @@ func clean(g *gomega.GomegaWithT, c client.Client) {
 
 		if len(stsList.Items) != 0 {
 			return fmt.Errorf("expected %d sts, got %d", 0, len(stsList.Items))
+		}
+
+		return nil
+	}, timeout, time.Second).Should(gomega.Succeed())
+
+	astsList := &appsv1alpha1.StatefulSetList{}
+	if err := c.List(context.TODO(), &client.ListOptions{}, astsList); err == nil {
+		for _, asts := range astsList.Items {
+			c.Delete(context.TODO(), &asts)
+		}
+	}
+	g.Eventually(func() error {
+		if err := c.List(context.TODO(), &client.ListOptions{}, astsList); err != nil {
+			return err
+		}
+
+		if len(astsList.Items) != 0 {
+			return fmt.Errorf("expected %d asts, got %d", 0, len(astsList.Items))
 		}
 
 		return nil

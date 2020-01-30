@@ -1,6 +1,5 @@
 /*
 Copyright 2019 The Kruise Authors.
-Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,15 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package uniteddeployment
+package util
 
 import (
+	"regexp"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func getOrdinal(pod *corev1.Pod) int32 {
+var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+func GetOrdinal(pod *corev1.Pod) int32 {
 	_, ordinal := getParentNameAndOrdinal(pod)
 	return ordinal
 }

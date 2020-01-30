@@ -83,7 +83,7 @@ func schema_pkg_apis_apps_v1alpha1_AdvancedStatefulSetTemplateSpec(ref common.Re
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AdvancdStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.",
+				Description: "AdvancedStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"metadata": {
