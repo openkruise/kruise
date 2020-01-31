@@ -17,9 +17,10 @@ limitations under the License.
 package adapter
 
 import (
-	alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 )
 
 type Adapter interface {
@@ -37,7 +38,7 @@ type Adapter interface {
 	ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, subset runtime.Object) error
 	// IsExpected checks the subset is the expected revision or not.
 	// If not, UnitedDeployment will call ApplySubsetTemplate to update it.
-	IsExpected(ud *alpha1.UnitedDeployment, subset metav1.Object, revision string) bool
+	IsExpected(subset metav1.Object, revision string) bool
 	// PostUpdate does some works after subset updated
 	PostUpdate(ud *alpha1.UnitedDeployment, subset runtime.Object, revision string, partition int32) error
 }

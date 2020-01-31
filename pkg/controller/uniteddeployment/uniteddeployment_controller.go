@@ -76,7 +76,8 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 		recorder: mgr.GetRecorder(controllerName),
 		subSetControls: map[subSetType]ControlInterface{
-			statefulSetSubSetType: &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.StatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
+			statefulSetSubSetType:         &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.StatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
+			advancedStatefulSetSubSetType: &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.AdvancedStatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 		},
 	}
 }

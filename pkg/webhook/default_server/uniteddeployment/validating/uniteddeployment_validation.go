@@ -187,6 +187,14 @@ func validateUnitedDeploymentTopology(topology, oldTopology *appsv1alpha1.Topolo
 		}
 	}
 
+	for i, subset := range topology.Subsets {
+		if oldSubset, exist := oldSubsets[subset.Name]; exist {
+			if !apiequality.Semantic.DeepEqual(oldSubset.Tolerations, subset.Tolerations) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("tolerations"), "may not be changed in an update"))
+			}
+		}
+	}
+
 	return allErrs
 }
 
