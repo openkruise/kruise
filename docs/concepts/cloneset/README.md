@@ -1,7 +1,7 @@
 # CloneSet
 
-This controller provides advanced features to efficiently manage stateless applications that 
-do not have instance order requirement during scaling and rollout. Analogously, 
+This controller provides advanced features to efficiently manage stateless applications that
+do not have instance order requirement during scaling and rollout. Analogously,
 CloneSet can be recognized as an enhanced version of upstream `Deployment` workload, but it does many more.
 
 As name suggests, CloneSet is a [**Set** -suffix controller](http://openkruise.io/en-us/blog/blog1.html) which
@@ -46,6 +46,7 @@ A few reminders:
 - When a Pod is updated using **in-place** policy, all PVCs related to it are preserved.
 
 The following shows a sample CloneSet yaml file which contains PVC templates.
+
 ```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: CloneSet
@@ -81,7 +82,7 @@ spec:
 
 ### Selective Pod deletion
 
-When a CloneSet is scaled down, sometimes user has preference to deleting specific Pods. 
+When a CloneSet is scaled down, sometimes user has preference to deleting specific Pods.
 This cannot be done using `StatefulSet` or `Deployment`, because `StatefulSet` always delete Pod
 in order and `Deployment`/`ReplicaSet` only delete Pod by its own sorted sequence.
 
@@ -153,7 +154,9 @@ status:
   updatedReplicas: 5
   # ...
 ```
+
 Here are the explanations for the counters presented in Pod status:
+
 - `status.replicas`: Number of pods
 - `status.readyReplicas`: Number of **ready** pods
 - `status.updateRevision`: Latest revision hash of this CloneSet
@@ -162,7 +165,7 @@ Here are the explanations for the counters presented in Pod status:
 
 ### Partition
 
-Partition is the **desired number of Pods in old revisions**, defaults to `0`. 
+Partition is the **desired number of Pods in old revisions**, defaults to `0`.
 When `partition` is set during update, `(replicas - partition)` number of pods will be updated with the new version. This field does **NOT** imply any update order.
 
 For example, when we update sample CloneSet's container image to nginx:mainline and set `partition=3`, after a while, the sample CloneSet yaml looks like the following:
@@ -195,6 +198,7 @@ status:
   updatedReadyReplicas: 2
   updatedReplicas: 2
 ```
+
 Note that `status.updateRevision` has been updated to `sample-56dfb978d4`, a new hash.
 Since we set `partition=3`, controller only updates two Pods to the latest revision.
 
@@ -277,6 +281,7 @@ spec:
 ```
 
 Note that:
+
 - Although priority strategy and scatter strategy can be applied together, we strongly suggest to just use one of them to avoid confusion.
 - If `scatter` Strategy is used, we suggest to just use one term. Otherwise, the update order can be hard to understand.
 
