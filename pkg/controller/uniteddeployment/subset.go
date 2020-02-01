@@ -70,5 +70,5 @@ type ControlInterface interface {
 	// GetSubsetFailure extracts the subset failure message to expose on UnitedDeployment status.
 	GetSubsetFailure(*Subset) *string
 	// IsExpected check the subset is the expected revision
-	IsExpected(subSet *Subset, ud *appsv1alpha1.UnitedDeployment, revision string) bool
+	IsExpected(subSet *Subset, revision string) bool
 }

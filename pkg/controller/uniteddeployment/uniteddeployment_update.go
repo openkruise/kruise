@@ -50,7 +50,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	var needUpdate []string
 	for _, name := range exists.List() {
 		subset := (*nameToSubset)[name]
-		if r.subSetControls[subsetType].IsExpected(subset, ud, expectedRevision.Name) ||
+		if r.subSetControls[subsetType].IsExpected(subset, expectedRevision.Name) ||
 			subset.Spec.Replicas != (*nextReplicas)[name] ||
 			subset.Spec.UpdateStrategy.Partition != (*nextPartitions)[name] {
 			needUpdate = append(needUpdate, name)

@@ -125,8 +125,8 @@ func (m *SubsetControl) GetSubsetFailure(subset *Subset) *string {
 }
 
 // IsExpected checks the subset is expected revision or not.
-func (m *SubsetControl) IsExpected(subSet *Subset, ud *alpha1.UnitedDeployment, revision string) bool {
-	return m.adapter.IsExpected(ud, subSet.Spec.SubsetRef.Resources[0], revision)
+func (m *SubsetControl) IsExpected(subSet *Subset, revision string) bool {
+	return m.adapter.IsExpected(subSet.Spec.SubsetRef.Resources[0], revision)
 }
 
 func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision string) (*Subset, error) {
