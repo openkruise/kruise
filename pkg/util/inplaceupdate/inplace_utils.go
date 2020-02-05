@@ -28,6 +28,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -46,7 +47,7 @@ type Interface interface {
 type updateSpec struct {
 	revision        string
 	containerImages map[string]string
-	// TODO(FillZpp): this should be strategic patch if we have to inplace update other fields like labels/annotations
+	metaDataPatch   []byte
 }
 
 type realControl struct {
@@ -151,6 +152,17 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *updateSpec) error {
 			return err
 		}
 
+		if spec.metaDataPatch != nil {
+			cloneBytes, _ := json.Marshal(clone)
+			modified, err := strategicpatch.StrategicMergePatch(cloneBytes, spec.metaDataPatch, &v1.Pod{})
+			if err != nil {
+				return err
+			}
+			if err = json.Unmarshal(modified, clone); err != nil {
+				return err
+			}
+		}
+
 		// update images
 		for i := range clone.Spec.Containers {
 			if newImage, ok := spec.containerImages[clone.Spec.Containers[i].Name]; ok {
@@ -199,25 +211,26 @@ func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevisio
 		return nil
 	}
 
-	var patchObj *struct {
-		Spec struct {
-			Template v1.PodTemplateSpec `json:"template"`
-		} `json:"spec"`
-	}
-	if err = json.Unmarshal(oldRevision.Data.Raw, &patchObj); err != nil {
+	oldTemp, err := getTemplateFromRevision(oldRevision)
+	if err != nil {
 		return nil
 	}
-	temp := patchObj.Spec.Template
+	newTemp, err := getTemplateFromRevision(newRevision)
+	if err != nil {
+		return nil
+	}
 
 	updateSpec := &updateSpec{
 		revision:        newRevision.Name,
 		containerImages: make(map[string]string),
 	}
-	// all patches can just update images
+	// all patches for podSpec can just update images
+	var metadataChanged bool
 	for _, jsonPatchOperation := range patches {
 		jsonPatchOperation.Path = strings.Replace(jsonPatchOperation.Path, "/spec/template", "", 1)
 
 		if !strings.HasPrefix(jsonPatchOperation.Path, "/spec/") {
+			metadataChanged = true
 			continue
 		}
 		if jsonPatchOperation.Operation != "replace" || !inPlaceUpdatePatchRexp.MatchString(jsonPatchOperation.Path) {
@@ -226,12 +239,33 @@ func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevisio
 		// for example: /spec/containers/0/image
 		words := strings.Split(jsonPatchOperation.Path, "/")
 		idx, _ := strconv.Atoi(words[3])
-		if len(temp.Spec.Containers) <= idx {
+		if len(oldTemp.Spec.Containers) <= idx {
 			return nil
 		}
-		updateSpec.containerImages[temp.Spec.Containers[idx].Name] = jsonPatchOperation.Value.(string)
+		updateSpec.containerImages[oldTemp.Spec.Containers[idx].Name] = jsonPatchOperation.Value.(string)
+	}
+	if metadataChanged {
+		oldBytes, _ := json.Marshal(v1.Pod{ObjectMeta: oldTemp.ObjectMeta})
+		newBytes, _ := json.Marshal(v1.Pod{ObjectMeta: newTemp.ObjectMeta})
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldBytes, newBytes, &v1.Pod{})
+		if err != nil {
+			return nil
+		}
+		updateSpec.metaDataPatch = patchBytes
 	}
 	return updateSpec
+}
+
+func getTemplateFromRevision(revision *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
+	var patchObj *struct {
+		Spec struct {
+			Template v1.PodTemplateSpec `json:"template"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(revision.Data.Raw, &patchObj); err != nil {
+		return nil, err
+	}
+	return &patchObj.Spec.Template, nil
 }
 
 // CheckInPlaceUpdateCompleted checks whether imageID in pod status has been changed since in-place update.

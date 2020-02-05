@@ -64,6 +64,50 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 		{
 			oldRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "old-revision"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"metadata":{"labels":{"k":"v"}},"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
+			},
+			newRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"metadata":{"labels":{"k":"v"}},"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
+			},
+			expectedSpec: &updateSpec{
+				revision:        "new-revision",
+				containerImages: map[string]string{"c1": "foo2"},
+			},
+		},
+		{
+			oldRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "old-revision"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v"}},"spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
+			},
+			newRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v","k1":"v1"}},"spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
+			},
+			expectedSpec: &updateSpec{
+				revision:        "new-revision",
+				containerImages: map[string]string{"c1": "foo2"},
+				metaDataPatch:   []byte(`{"metadata":{"labels":{"k1":"v1"}}}`),
+			},
+		},
+		{
+			oldRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "old-revision"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v","k2":"v2"},"finalizers":["fz1","fz2"]},"spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
+			},
+			newRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v","k1":"v1"},"finalizers":["fz2"]},"spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
+			},
+			expectedSpec: &updateSpec{
+				revision:        "new-revision",
+				containerImages: map[string]string{"c1": "foo2"},
+				metaDataPatch:   []byte(`{"metadata":{"$deleteFromPrimitiveList/finalizers":["fz1"],"$setElementOrder/finalizers":["fz2"],"labels":{"k1":"v1","k2":null}}}`),
+			},
+		},
+		{
+			oldRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "old-revision"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"name":"c1","containers":[{"image":"foo1"}]}}}}`)},
 			},
 			newRevision: &apps.ControllerRevision{
