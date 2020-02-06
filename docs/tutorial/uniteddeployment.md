@@ -278,6 +278,96 @@ status:
   updatedReplicas: 7
 ```
 
+### Manage the subset type
+
+UnitedDeployment now supports two types of subset which are `StatefulSet` and `AdvancedStatefulSet`.
+It is allowed to change subset type from one to another at runtime. Take the above UnitedDeployment as an example.
+
+Create a new UnitedDeployment with the same definition.
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/uniteddeployment.yaml
+```
+
+We get the three subsets of StatefulSet as expected.
+
+```bash
+$ kubectl get sts
+NAME                                     DESIRED   CURRENT   AGE
+demo-guestbook-kruise-subset-a-jtz9t     2         2         82s
+demo-guestbook-kruise-subset-b-bhjm6     5         5         82s
+demo-guestbook-kruise-subset-c-bj7f2     3         3         82s
+```
+
+Then we update the subset type from StatefulSet to AdvancedStatefulSet
+by using the `advancedStatefulSetTemplate` to describe the subset template.
+By the way, let's enable the in-place update of the subset pod.
+
+```yaml
+...
+spec:
+  replicas: 10
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: demo
+      app.kubernetes.io/name: guestbook-kruise
+  template:
+-   statefulSetTemplate:
++   advancedStatefulSetTemplate:
+      metadata:
+        labels:
+          app.kubernetes.io/instance: demo
+          app.kubernetes.io/name: guestbook-kruise
+      spec:
++       updateStrategy:
++         type: RollingUpdate
++         rollingUpdate:
++           podUpdatePolicy: InPlaceIfPossible
++       selector:
++         matchLabels:
++           app.kubernetes.io/instance: demo
++           app.kubernetes.io/name: guestbook-kruise
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/instance: demo
+              app.kubernetes.io/name: guestbook-kruise
+          spec:
+            containers:
+            - image: openkruise/guestbook:v1
+              imagePullPolicy: Always
+              name: guestbook-kruise
+              ports:
+              - containerPort: 3000
+                name: http-server
+...
+```
+
+Then three StatefulSets are all deleted. Instead, three AdvancedStatefulSets are created with in-place update feature enabled.
+
+```bash
+$ kubectl get sts
+No resources found.
+
+$ kubectl get statefulset.apps.kruise.io
+NAME                                   DESIRED   CURRENT   UPDATED   READY   AGE
+demo-guestbook-kruise-subset-a-2r8dm   2         2         2         2       1m
+demo-guestbook-kruise-subset-b-tj2n6   5         5         5         5       1m
+demo-guestbook-kruise-subset-c-qflc9   3         3         3         3       1m
+
+$ kubectl get statefulset.apps.kruise.io -o custom-columns=NAME:.metadata.name,POD-UPDATE-POLICY:.spec.updateStrategy.rollingUpdate.podUpdatePolicy
+NAME                                   POD-UPDATE-POLICY
+demo-guestbook-kruise-subset-a-2r8dm   InPlaceIfPossible
+demo-guestbook-kruise-subset-b-tj2n6   InPlaceIfPossible
+demo-guestbook-kruise-subset-c-qflc9   InPlaceIfPossible
+```
+
+Now it is possible to in-place update each pod of these subsets by updating the UnitedDeployment.
+More details of AdvancedStatefulSet are provided in this [tutorial](../concepts/astatefulset/README.md).
+
+Please note that the process of switching subset type is not graceful, so the service may be unavailable during it.
+
 ## Subset workload support
 
 UnitedDeployment might support multiple kinds of workload as its subset. Currently, only StatefulSet is supported.
