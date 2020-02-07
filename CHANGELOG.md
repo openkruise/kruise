@@ -1,4 +1,28 @@
-# v0.3.1
+# v0.4.0
+
+## A NEW workload controller - CloneSet
+
+Mainly focuses on managing stateless applications. ([Concept for CloneSet](./docs/concepts/cloneset/README.md))
+
+It provides full features for more efficient, deterministic and controlled deployment, such as:
+
+- **inplace update**
+- **specified pod deletion**
+- **configurable priority/scatter update**
+- **preUpdate/postUpdate hooks**
+
+## Features
+
+- UnitedDeployment supports both StatefulSet and AdvancedStatefulSet.
+- UnitedDeployment supports toleration config in subset.
+
+## Bugs
+
+- Fix statefulset inplace update fields in pod metadata such as labels/annotations.
+
+---
+
+**# v0.3.1**
 
 ## Installation
 
