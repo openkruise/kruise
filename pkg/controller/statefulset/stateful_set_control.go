@@ -278,11 +278,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// get the current and update revisions of the set.
 	currentSet, err := ApplyRevision(set, currentRevision)
 	if err != nil {
-		return nil, err
+		return set.Status.DeepCopy(), err
 	}
 	updateSet, err := ApplyRevision(set, updateRevision)
 	if err != nil {
-		return nil, err
+		return set.Status.DeepCopy(), err
 	}
 
 	// set the generation, and revisions in the returned status
