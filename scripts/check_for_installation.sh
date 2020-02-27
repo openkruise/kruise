@@ -29,9 +29,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: kruise-check-install-webhook-configuration
 webhooks:
-- admissionReviewVersions:
-  - v1beta1
-  clientConfig:
+- clientConfig:
     caBundle: Cg==
     url: https://127.0.0.1:9876/validating-kruise-check-install
   failurePolicy: Fail
@@ -45,9 +43,7 @@ webhooks:
     - CREATE
     resources:
     - enablewebhooks
-    scope: '*'
   sideEffects: None
-  timeoutSeconds: 1
 EOM
 
 cat > "${CR_FILE}" <<- EOM
