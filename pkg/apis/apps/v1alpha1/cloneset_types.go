@@ -64,6 +64,11 @@ type CloneSetSpec struct {
 	// consists of all revisions not represented by a currently applied
 	// CloneSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 }
 
 // CloneSetScaleStrategy defines strategies for pods scale.

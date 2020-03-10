@@ -88,7 +88,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	waitUpdateIndexes = sortUpdateIndexes(cs.Spec.UpdateStrategy, pods, waitUpdateIndexes)
 
 	// 3. calculate max count of pods can update
-	needToUpdateCount := calculateUpdateCount(cs.Spec.UpdateStrategy, int(*cs.Spec.Replicas), waitUpdateIndexes, pods)
+	needToUpdateCount := calculateUpdateCount(cs.Spec.UpdateStrategy, cs.Spec.MinReadySeconds, int(*cs.Spec.Replicas), waitUpdateIndexes, pods)
 	if needToUpdateCount < len(waitUpdateIndexes) {
 		waitUpdateIndexes = waitUpdateIndexes[:needToUpdateCount]
 	}
@@ -118,7 +118,7 @@ func sortUpdateIndexes(strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.
 	return waitUpdateIndexes
 }
 
-func calculateUpdateCount(strategy appsv1alpha1.CloneSetUpdateStrategy, totalReplicas int, waitUpdateIndexes []int, pods []*v1.Pod) int {
+func calculateUpdateCount(strategy appsv1alpha1.CloneSetUpdateStrategy, minReadySeconds int32, totalReplicas int, waitUpdateIndexes []int, pods []*v1.Pod) int {
 	partition := 0
 	if strategy.Partition != nil {
 		partition = int(*strategy.Partition)
@@ -134,12 +134,12 @@ func calculateUpdateCount(strategy appsv1alpha1.CloneSetUpdateStrategy, totalRep
 
 	var notReadyCount, updateCount int
 	for _, p := range pods {
-		if !readyForUpdate(p) {
+		if !readyForUpdate(p, minReadySeconds) {
 			notReadyCount++
 		}
 	}
 	for _, i := range waitUpdateIndexes {
-		if readyForUpdate(pods[i]) {
+		if readyForUpdate(pods[i], minReadySeconds) {
 			if notReadyCount >= maxUnavailable {
 				break
 			} else {
@@ -212,8 +212,8 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet,
 	return nil
 }
 
-func readyForUpdate(pod *v1.Pod) bool {
-	if !clonesetutils.IsRunningAndReady(pod) {
+func readyForUpdate(pod *v1.Pod, minReadySeconds int32) bool {
+	if !clonesetutils.IsRunningAndAvailable(pod, minReadySeconds) {
 		return false
 	}
 	c := inplaceupdate.GetCondition(pod)

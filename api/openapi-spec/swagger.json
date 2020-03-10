@@ -251,6 +251,11 @@
         "template"
       ],
       "properties": {
+        "minReadySeconds": {
+          "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+          "type": "integer",
+          "format": "int32"
+        },
         "replicas": {
           "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template. If unspecified, defaults to 1.",
           "type": "integer",

@@ -390,7 +390,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		res := calculateUpdateCount(tc.strategy, tc.totalReplicas, tc.waitUpdateIndexes, tc.pods)
+		res := calculateUpdateCount(tc.strategy, 0, tc.totalReplicas, tc.waitUpdateIndexes, tc.pods)
 		if res != tc.expectedResult {
 			t.Fatalf("case #%d failed, expected %d, got %d", i, tc.expectedResult, res)
 		}
