@@ -168,6 +168,9 @@ type CloneSetStatus struct {
 
 	// Conditions represents the latest available observations of a CloneSet's current state.
 	Conditions []CloneSetCondition `json:"conditions,omitempty"`
+
+	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
+	LabelSelector string `json:"labelSelector,omitempty"`
 }
 
 // CloneSetConditionType is type for CloneSet conditions.

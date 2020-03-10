@@ -236,6 +236,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (_ reconcile.
 		ObservedGeneration: instance.Generation,
 		UpdateRevision:     updateRevision.Name,
 		CollisionCount:     new(int32),
+		LabelSelector:      selector.String(),
 	}
 	*newStatus.CollisionCount = collisionCount
 

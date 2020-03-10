@@ -241,6 +241,10 @@ spec:
                 - status
                 type: object
               type: array
+            labelSelector:
+              description: LabelSelector is label selectors for query over pods that
+                should match the replica count used by HPA.
+              type: string
             observedGeneration:
               description: ObservedGeneration is the most recent generation observed
                 for this CloneSet. It corresponds to the CloneSet's generation, which

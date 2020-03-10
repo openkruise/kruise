@@ -639,6 +639,13 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetStatus(ref common.ReferenceCallback) 
 							},
 						},
 					},
+					"labelSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LabelSelector is label selectors for query over pods that should match the replica count used by HPA.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"replicas", "readyReplicas", "updatedReplicas", "updatedReadyReplicas"},
 			},
@@ -1495,6 +1502,13 @@ func schema_pkg_apis_apps_v1alpha1_StatefulSetStatus(ref common.ReferenceCallbac
 									},
 								},
 							},
+						},
+					},
+					"labelSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LabelSelector is label selectors for query over pods that should match the replica count used by HPA.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},

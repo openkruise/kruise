@@ -371,7 +371,8 @@ func inconsistentStatus(set *appsv1alpha1.StatefulSet, status *appsv1alpha1.Stat
 		status.ReadyReplicas != set.Status.ReadyReplicas ||
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
-		status.UpdateRevision != set.Status.UpdateRevision
+		status.UpdateRevision != set.Status.UpdateRevision ||
+		status.LabelSelector != set.Status.LabelSelector
 }
 
 // completeRollingUpdate completes a rolling update when all of set's replica Pods have been updated
