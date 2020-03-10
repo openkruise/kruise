@@ -195,6 +195,9 @@ type StatefulSetStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []apps.StatefulSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
+	LabelSelector string `json:"labelSelector,omitempty"`
 }
 
 // These are valid conditions of a statefulset.

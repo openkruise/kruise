@@ -308,6 +308,10 @@
             "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetCondition"
           }
         },
+        "labelSelector": {
+          "description": "LabelSelector is label selectors for query over pods that should match the replica count used by HPA.",
+          "type": "string"
+        },
         "observedGeneration": {
           "description": "ObservedGeneration is the most recent generation observed for this CloneSet. It corresponds to the CloneSet's generation, which is updated on mutation by the API Server.",
           "type": "integer",
@@ -806,6 +810,10 @@
         },
         "currentRevision": {
           "description": "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).",
+          "type": "string"
+        },
+        "labelSelector": {
+          "description": "LabelSelector is label selectors for query over pods that should match the replica count used by HPA.",
           "type": "string"
         },
         "observedGeneration": {

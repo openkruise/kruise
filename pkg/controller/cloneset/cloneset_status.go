@@ -70,7 +70,8 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.ReadyReplicas != oldStatus.ReadyReplicas ||
 		newStatus.UpdatedReadyReplicas != oldStatus.UpdatedReadyReplicas ||
 		newStatus.UpdatedReplicas != oldStatus.UpdatedReplicas ||
-		newStatus.UpdateRevision != oldStatus.UpdateRevision
+		newStatus.UpdateRevision != oldStatus.UpdateRevision ||
+		newStatus.LabelSelector != oldStatus.LabelSelector
 }
 
 func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) {

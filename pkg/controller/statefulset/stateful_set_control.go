@@ -275,6 +275,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	collisionCount int32,
 	pods []*v1.Pod,
 	revisions []*apps.ControllerRevision) (*appsv1alpha1.StatefulSetStatus, error) {
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return set.Status.DeepCopy(), err
+	}
+
 	// get the current and update revisions of the set.
 	currentSet, err := ApplyRevision(set, currentRevision)
 	if err != nil {
@@ -292,6 +297,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.UpdateRevision = updateRevision.Name
 	status.CollisionCount = new(int32)
 	*status.CollisionCount = collisionCount
+	status.LabelSelector = selector.String()
 
 	replicaCount := int(*set.Spec.Replicas)
 	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < set.Spec.Replicas
