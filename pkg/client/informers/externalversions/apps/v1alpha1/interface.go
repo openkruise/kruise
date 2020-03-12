@@ -1,5 +1,5 @@
 /*
-Copyright The The Kruise Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,10 +26,14 @@ import (
 type Interface interface {
 	// BroadcastJobs returns a BroadcastJobInformer.
 	BroadcastJobs() BroadcastJobInformer
+	// CloneSets returns a CloneSetInformer.
+	CloneSets() CloneSetInformer
 	// SidecarSets returns a SidecarSetInformer.
 	SidecarSets() SidecarSetInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
+	// UnitedDeployments returns a UnitedDeploymentInformer.
+	UnitedDeployments() UnitedDeploymentInformer
 }
 
 type version struct {
@@ -48,6 +52,11 @@ func (v *version) BroadcastJobs() BroadcastJobInformer {
 	return &broadcastJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// CloneSets returns a CloneSetInformer.
+func (v *version) CloneSets() CloneSetInformer {
+	return &cloneSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // SidecarSets returns a SidecarSetInformer.
 func (v *version) SidecarSets() SidecarSetInformer {
 	return &sidecarSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
@@ -56,4 +65,9 @@ func (v *version) SidecarSets() SidecarSetInformer {
 // StatefulSets returns a StatefulSetInformer.
 func (v *version) StatefulSets() StatefulSetInformer {
 	return &statefulSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// UnitedDeployments returns a UnitedDeploymentInformer.
+func (v *version) UnitedDeployments() UnitedDeploymentInformer {
+	return &unitedDeploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

@@ -561,6 +561,13 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetSpec(ref common.ReferenceCallback) co
 							Format:      "int32",
 						},
 					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"replicas", "selector", "template"},
 			},

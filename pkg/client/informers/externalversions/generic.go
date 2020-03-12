@@ -1,5 +1,5 @@
 /*
-Copyright The The Kruise Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,10 +55,14 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=apps.kruise.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("broadcastjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().BroadcastJobs().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("clonesets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().CloneSets().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("sidecarsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().SidecarSets().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().StatefulSets().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("uniteddeployments"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().UnitedDeployments().Informer()}, nil
 
 	}
 

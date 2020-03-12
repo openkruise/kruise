@@ -31,59 +31,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// BroadcastJobInformer provides access to a shared informer and lister for
-// BroadcastJobs.
-type BroadcastJobInformer interface {
+// UnitedDeploymentInformer provides access to a shared informer and lister for
+// UnitedDeployments.
+type UnitedDeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.BroadcastJobLister
+	Lister() v1alpha1.UnitedDeploymentLister
 }
 
-type broadcastJobInformer struct {
+type unitedDeploymentInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewBroadcastJobInformer constructs a new informer for BroadcastJob type.
+// NewUnitedDeploymentInformer constructs a new informer for UnitedDeployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewBroadcastJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredBroadcastJobInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewUnitedDeploymentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredUnitedDeploymentInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredBroadcastJobInformer constructs a new informer for BroadcastJob type.
+// NewFilteredUnitedDeploymentInformer constructs a new informer for UnitedDeployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredBroadcastJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredUnitedDeploymentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().BroadcastJobs(namespace).List(options)
+				return client.AppsV1alpha1().UnitedDeployments(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().BroadcastJobs(namespace).Watch(options)
+				return client.AppsV1alpha1().UnitedDeployments(namespace).Watch(options)
 			},
 		},
-		&appsv1alpha1.BroadcastJob{},
+		&appsv1alpha1.UnitedDeployment{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *broadcastJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredBroadcastJobInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *unitedDeploymentInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredUnitedDeploymentInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *broadcastJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.BroadcastJob{}, f.defaultInformer)
+func (f *unitedDeploymentInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&appsv1alpha1.UnitedDeployment{}, f.defaultInformer)
 }
 
-func (f *broadcastJobInformer) Lister() v1alpha1.BroadcastJobLister {
-	return v1alpha1.NewBroadcastJobLister(f.Informer().GetIndexer())
+func (f *unitedDeploymentInformer) Lister() v1alpha1.UnitedDeploymentLister {
+	return v1alpha1.NewUnitedDeploymentLister(f.Informer().GetIndexer())
 }

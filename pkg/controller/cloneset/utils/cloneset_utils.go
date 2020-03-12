@@ -84,9 +84,9 @@ func NextRevision(revisions []*apps.ControllerRevision) int64 {
 	return revisions[count-1].Revision + 1
 }
 
-// IsRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
-func IsRunningAndReady(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
+// IsRunningAndAvailable returns true if pod is in the PodRunning Phase, if it is available.
+func IsRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
+	return pod.Status.Phase == v1.PodRunning && podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
 // GetUpdatedPods returns Pods already reach latest revision

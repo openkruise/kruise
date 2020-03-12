@@ -1,5 +1,5 @@
 /*
-Copyright The The Kruise Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,12 +32,20 @@ func (c *FakeAppsV1alpha1) BroadcastJobs(namespace string) v1alpha1.BroadcastJob
 	return &FakeBroadcastJobs{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) CloneSets(namespace string) v1alpha1.CloneSetInterface {
+	return &FakeCloneSets{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) SidecarSets() v1alpha1.SidecarSetInterface {
 	return &FakeSidecarSets{c}
 }
 
 func (c *FakeAppsV1alpha1) StatefulSets(namespace string) v1alpha1.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) UnitedDeployments(namespace string) v1alpha1.UnitedDeploymentInterface {
+	return &FakeUnitedDeployments{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

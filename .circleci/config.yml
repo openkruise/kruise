@@ -51,7 +51,7 @@ jobs:
       - run:
           name: detect deadcode without test folder
           command: |
-            golangci-lint run --disable-all --skip-dirs=vendor,test -E deadcode
+            golangci-lint run --disable-all --skip-dirs=vendor,test,pkg/client -E deadcode
 
 workflows:
   version: 2
