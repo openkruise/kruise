@@ -155,6 +155,9 @@ type CloneSetStatus struct {
 	// ReadyReplicas is the number of Pods created by the CloneSet controller that have a Ready Condition.
 	ReadyReplicas int32 `json:"readyReplicas"`
 
+	// AvailableReplicas is the number of Pods created by the CloneSet controller that have a Ready Condition for at least minReadySeconds.
+	AvailableReplicas int32 `json:"availableReplicas"`
+
 	// UpdatedReplicas is the number of Pods created by the CloneSet controller from the CloneSet version
 	// indicated by updateRevision.
 	UpdatedReplicas int32 `json:"updatedReplicas"`

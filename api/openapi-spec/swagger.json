@@ -297,10 +297,16 @@
       "required": [
         "replicas",
         "readyReplicas",
+        "availableReplicas",
         "updatedReplicas",
         "updatedReadyReplicas"
       ],
       "properties": {
+        "availableReplicas": {
+          "description": "AvailableReplicas is the number of Pods created by the CloneSet controller that have a Ready Condition for at least minReadySeconds.",
+          "type": "integer",
+          "format": "int32"
+        },
         "collisionCount": {
           "description": "CollisionCount is the count of hash collisions for the CloneSet. The CloneSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
           "type": "integer",

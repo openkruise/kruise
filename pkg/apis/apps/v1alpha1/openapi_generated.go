@@ -605,6 +605,13 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetStatus(ref common.ReferenceCallback) 
 							Format:      "int32",
 						},
 					},
+					"availableReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AvailableReplicas is the number of Pods created by the CloneSet controller that have a Ready Condition for at least minReadySeconds.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"updatedReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "UpdatedReplicas is the number of Pods created by the CloneSet controller from the CloneSet version indicated by updateRevision.",
@@ -654,7 +661,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetStatus(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"replicas", "readyReplicas", "updatedReplicas", "updatedReadyReplicas"},
+				Required: []string{"replicas", "readyReplicas", "availableReplicas", "updatedReplicas", "updatedReadyReplicas"},
 			},
 		},
 		Dependencies: []string{
