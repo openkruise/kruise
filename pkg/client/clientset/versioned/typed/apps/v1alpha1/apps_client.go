@@ -1,5 +1,5 @@
 /*
-Copyright The The Kruise Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,10 @@ import (
 type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	BroadcastJobsGetter
+	CloneSetsGetter
 	SidecarSetsGetter
 	StatefulSetsGetter
+	UnitedDeploymentsGetter
 }
 
 // AppsV1alpha1Client is used to interact with features provided by the apps.kruise.io group.
@@ -41,12 +43,20 @@ func (c *AppsV1alpha1Client) BroadcastJobs(namespace string) BroadcastJobInterfa
 	return newBroadcastJobs(c, namespace)
 }
 
+func (c *AppsV1alpha1Client) CloneSets(namespace string) CloneSetInterface {
+	return newCloneSets(c, namespace)
+}
+
 func (c *AppsV1alpha1Client) SidecarSets() SidecarSetInterface {
 	return newSidecarSets(c)
 }
 
 func (c *AppsV1alpha1Client) StatefulSets(namespace string) StatefulSetInterface {
 	return newStatefulSets(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) UnitedDeployments(namespace string) UnitedDeploymentInterface {
+	return newUnitedDeployments(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1alpha1Client for the given config.
