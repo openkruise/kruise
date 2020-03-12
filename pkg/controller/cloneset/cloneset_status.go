@@ -47,8 +47,8 @@ func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newS
 		return nil
 	}
 
-	klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d updated=%d updatedReady=%d, revisions update=%s",
-		cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.UpdateRevision)
+	klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions update=%s",
+		cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.UpdateRevision)
 	return r.updateStatus(cs, &newStatus)
 }
 
@@ -68,6 +68,7 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 	return newStatus.ObservedGeneration > oldStatus.ObservedGeneration ||
 		newStatus.Replicas != oldStatus.Replicas ||
 		newStatus.ReadyReplicas != oldStatus.ReadyReplicas ||
+		newStatus.AvailableReplicas != oldStatus.AvailableReplicas ||
 		newStatus.UpdatedReadyReplicas != oldStatus.UpdatedReadyReplicas ||
 		newStatus.UpdatedReplicas != oldStatus.UpdatedReplicas ||
 		newStatus.UpdateRevision != oldStatus.UpdateRevision ||
@@ -77,13 +78,16 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) {
 	for _, pod := range pods {
 		newStatus.Replicas++
-		if clonesetutils.IsRunningAndAvailable(pod, cs.Spec.MinReadySeconds) {
+		if clonesetutils.IsRunningAndReady(pod) {
 			newStatus.ReadyReplicas++
+		}
+		if clonesetutils.IsRunningAndAvailable(pod, cs.Spec.MinReadySeconds) {
+			newStatus.AvailableReplicas++
 		}
 		if clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision {
 			newStatus.UpdatedReplicas++
 		}
-		if clonesetutils.IsRunningAndAvailable(pod, cs.Spec.MinReadySeconds) && clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision {
+		if clonesetutils.IsRunningAndReady(pod) && clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision {
 			newStatus.UpdatedReadyReplicas++
 		}
 	}
