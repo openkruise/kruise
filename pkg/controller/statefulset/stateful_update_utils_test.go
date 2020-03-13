@@ -68,6 +68,16 @@ func TestSortPodsToUpdate(t *testing.T) {
 			},
 			expected: []int{7, 6, 9, 8},
 		},
+		{
+			strategy:       nil,
+			updateRevision: "r1",
+			replicas: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+			},
+			expected: []int{2, 1, 0},
+		},
 	}
 
 	for i, tc := range cases {

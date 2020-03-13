@@ -24,15 +24,19 @@ import (
 
 func sortPodsToUpdate(rollingUpdateStrategy *appsv1alpha1.RollingUpdateStatefulSetStrategy, updateRevision string, replicas []*v1.Pod) []int {
 	var updateMin int
-	var priorityStrategy *appsv1alpha1.UpdatePriorityStrategy
-	if rollingUpdateStrategy != nil {
-		if rollingUpdateStrategy.Partition != nil {
-			updateMin = int(*rollingUpdateStrategy.Partition)
-		}
-		if rollingUpdateStrategy.UnorderedUpdate != nil {
-			priorityStrategy = rollingUpdateStrategy.UnorderedUpdate.PriorityStrategy
-		}
+	if rollingUpdateStrategy != nil && rollingUpdateStrategy.Partition != nil {
+		updateMin = int(*rollingUpdateStrategy.Partition)
 	}
+
+	if rollingUpdateStrategy == nil || rollingUpdateStrategy.UnorderedUpdate == nil {
+		var indexes []int
+		for target := len(replicas) - 1; target >= updateMin; target-- {
+			indexes = append(indexes, target)
+		}
+		return indexes
+	}
+
+	priorityStrategy := rollingUpdateStrategy.UnorderedUpdate.PriorityStrategy
 	maxUpdate := len(replicas) - updateMin
 	if maxUpdate <= 0 {
 		return []int{}
