@@ -31,6 +31,10 @@ const (
 	// InPlaceUpdateStateKey records the state of inplace-update.
 	// The value of annotation is InPlaceUpdateState.
 	InPlaceUpdateStateKey string = "inplace-update-state"
+
+	// InPlaceUpdateGraceKey records the spec that Pod should be updated when
+	// grace period ends.
+	InPlaceUpdateGraceKey string = "inplace-update-grace"
 )
 
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.

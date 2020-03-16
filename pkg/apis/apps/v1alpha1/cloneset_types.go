@@ -141,6 +141,9 @@ type CloneSetUpdateScatterTerm struct {
 
 // CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.
 type CloneSetInPlaceUpdateStrategy struct {
+	// GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
+	// when in-place update a Pod.
+	GracePeriodSeconds int32 `json:"gracePeriodSeconds,omitempty"`
 }
 
 // CloneSetStatus defines the observed state of CloneSet

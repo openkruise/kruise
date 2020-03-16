@@ -111,6 +111,13 @@ spec:
                 inPlaceUpdateStrategy:
                   description: InPlaceUpdateStrategy contains strategies for in-place
                     update.
+                  properties:
+                    gracePeriodSeconds:
+                      description: GracePeriodSeconds is the timespan between set
+                        Pod status to not-ready and update images in Pod spec when
+                        in-place update a Pod.
+                      format: int32
+                      type: integer
                   type: object
                 maxUnavailable:
                   description: 'The maximum number of pods that can be unavailable

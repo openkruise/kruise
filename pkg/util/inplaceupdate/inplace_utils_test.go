@@ -57,8 +57,8 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			expectedSpec: &updateSpec{
-				revision:        "new-revision",
-				containerImages: map[string]string{"c1": "foo2"},
+				Revision:        "new-revision",
+				ContainerImages: map[string]string{"c1": "foo2"},
 			},
 		},
 		{
@@ -71,8 +71,8 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				Data:       runtime.RawExtension{Raw: []byte(`{"metadata":{"labels":{"k":"v"}},"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			expectedSpec: &updateSpec{
-				revision:        "new-revision",
-				containerImages: map[string]string{"c1": "foo2"},
+				Revision:        "new-revision",
+				ContainerImages: map[string]string{"c1": "foo2"},
 			},
 		},
 		{
@@ -85,9 +85,9 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v","k1":"v1"}},"spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			expectedSpec: &updateSpec{
-				revision:        "new-revision",
-				containerImages: map[string]string{"c1": "foo2"},
-				metaDataPatch:   []byte(`{"metadata":{"labels":{"k1":"v1"}}}`),
+				Revision:        "new-revision",
+				ContainerImages: map[string]string{"c1": "foo2"},
+				MetaDataPatch:   []byte(`{"metadata":{"labels":{"k1":"v1"}}}`),
 			},
 		},
 		{
@@ -100,9 +100,9 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v","k1":"v1"},"finalizers":["fz2"]},"spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			expectedSpec: &updateSpec{
-				revision:        "new-revision",
-				containerImages: map[string]string{"c1": "foo2"},
-				metaDataPatch:   []byte(`{"metadata":{"$deleteFromPrimitiveList/finalizers":["fz1"],"$setElementOrder/finalizers":["fz2"],"labels":{"k1":"v1","k2":null}}}`),
+				Revision:        "new-revision",
+				ContainerImages: map[string]string{"c1": "foo2"},
+				MetaDataPatch:   []byte(`{"metadata":{"$deleteFromPrimitiveList/finalizers":["fz1"],"$setElementOrder/finalizers":["fz2"],"labels":{"k1":"v1","k2":null}}}`),
 			},
 		},
 		{
@@ -221,8 +221,10 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 	}
 }
 
-func TestUpdateCondition(t *testing.T) {
-	now := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
+func TestRefresh(t *testing.T) {
+	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
+	tenSecondsAgo := metav1.NewTime(time.Now().Add(-time.Second * 10))
+
 	cases := []struct {
 		name        string
 		pod         *v1.Pod
@@ -274,7 +276,7 @@ func TestUpdateCondition(t *testing.T) {
 					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
 				},
 				Status: v1.PodStatus{
-					Conditions: []v1.PodCondition{{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue, LastTransitionTime: now}},
+					Conditions: []v1.PodCondition{{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue, LastTransitionTime: aHourAgo}},
 				},
 			},
 		},
@@ -310,7 +312,7 @@ func TestUpdateCondition(t *testing.T) {
 						{
 							Type:               appsv1alpha1.InPlaceUpdateReady,
 							Status:             v1.ConditionTrue,
-							LastTransitionTime: now,
+							LastTransitionTime: aHourAgo,
 						},
 					},
 				},
@@ -353,6 +355,71 @@ func TestUpdateCondition(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "in-place update still in grace",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{Revision: "new-revision", UpdateTimestamp: tenSecondsAgo, LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "img01"}}}),
+						appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"new-revision","containerImages":{"main":"img-name02"},"graceSeconds":30}`,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "main", Image: "img-name01"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+				},
+			},
+			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{Revision: "new-revision", UpdateTimestamp: tenSecondsAgo, LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "img01"}}}),
+						appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"new-revision","containerImages":{"main":"img-name02"},"graceSeconds":30}`,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "main", Image: "img-name01"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+				},
+			},
+		},
+		{
+			name: "in-place update reach grace period",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{Revision: "new-revision", UpdateTimestamp: tenSecondsAgo, LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "img01"}}}),
+						appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"new-revision","containerImages":{"main":"img-name02"},"graceSeconds":5}`,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "main", Image: "img-name01"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+				},
+			},
+			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{Revision: "new-revision", UpdateTimestamp: tenSecondsAgo, LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "img01"}}}),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "main", Image: "img-name02"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+				},
+			},
+		},
 	}
 
 	for i, testCase := range cases {
@@ -360,9 +427,9 @@ func TestUpdateCondition(t *testing.T) {
 		testCase.expectedPod.Name = fmt.Sprintf("pod-%d", i)
 
 		cli := fake.NewFakeClient(testCase.pod)
-		ctrl := NewForTest(cli, apps.ControllerRevisionHashLabelKey, func() metav1.Time { return now })
-		if err := ctrl.UpdateCondition(testCase.pod); err != nil {
-			t.Fatalf("failed to update condition: %v", err)
+		ctrl := NewForTest(cli, apps.ControllerRevisionHashLabelKey, func() metav1.Time { return aHourAgo })
+		if res := ctrl.Refresh(testCase.pod); res.RefreshErr != nil {
+			t.Fatalf("failed to update condition: %v", res.RefreshErr)
 		}
 
 		got := &v1.Pod{}
