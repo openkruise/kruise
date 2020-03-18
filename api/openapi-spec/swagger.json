@@ -201,7 +201,14 @@
     },
     "kruise.apps.v1alpha1.CloneSetInPlaceUpdateStrategy": {
       "description": "CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.",
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "gracePeriodSeconds": {
+          "description": "GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec when in-place update a Pod.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
     },
     "kruise.apps.v1alpha1.CloneSetList": {
       "description": "CloneSetList contains a list of CloneSet",

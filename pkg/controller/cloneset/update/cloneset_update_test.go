@@ -271,6 +271,241 @@ func TestMange(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
 			},
 		},
+		{
+			name: "inplace update with grace period",
+			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+				Replicas:       getInt32Pointer(1),
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.CloneSetInPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+			}},
+			updateRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
+			},
+			revisions: []*apps.ControllerRevision{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
+						apps.ControllerRevisionHashLabelKey: "rev-old",
+						appsv1alpha1.CloneSetInstanceID:     "id-0",
+					}},
+					Spec: v1.PodSpec{
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{Type: v1.PodReady, Status: v1.ConditionTrue},
+							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+						},
+						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
+					},
+				},
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+			},
+			expectedPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Annotations: map[string]string{
+							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+								Revision:              "rev-new",
+								UpdateTimestamp:       now,
+								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							}),
+							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+						},
+					},
+					Spec: v1.PodSpec{
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{Type: v1.PodReady, Status: v1.ConditionTrue},
+							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+						},
+						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
+					},
+				},
+			},
+			expectedPVCs: []*v1.PersistentVolumeClaim{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+			},
+		},
+		{
+			name: "inplace update during grace period",
+			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+				Replicas:       getInt32Pointer(1),
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.CloneSetInPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+			}},
+			updateRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
+			},
+			revisions: []*apps.ControllerRevision{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Annotations: map[string]string{
+							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+								Revision:              "rev-new",
+								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
+								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							}),
+							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+						},
+					},
+					Spec: v1.PodSpec{
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{Type: v1.PodReady, Status: v1.ConditionTrue},
+							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+						},
+						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
+					},
+				},
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+			},
+			expectedPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Annotations: map[string]string{
+							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+								Revision:              "rev-new",
+								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
+								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							}),
+							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+						},
+					},
+					Spec: v1.PodSpec{
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{Type: v1.PodReady, Status: v1.ConditionTrue},
+							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+						},
+						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
+					},
+				},
+			},
+			expectedPVCs: []*v1.PersistentVolumeClaim{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+			},
+		},
+		{
+			name: "inplace update continuously after grace period",
+			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+				Replicas:       getInt32Pointer(1),
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.CloneSetInPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+			}},
+			updateRevision: &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
+			},
+			revisions: []*apps.ControllerRevision{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Annotations: map[string]string{
+							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+								Revision:              "rev-new",
+								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
+								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							}),
+							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+						},
+					},
+					Spec: v1.PodSpec{
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{Type: v1.PodReady, Status: v1.ConditionTrue},
+							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+						},
+						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
+					},
+				},
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+			},
+			expectedPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Annotations: map[string]string{
+							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+								Revision:              "rev-new",
+								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
+								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							}),
+						},
+					},
+					Spec: v1.PodSpec{
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						Containers:     []v1.Container{{Name: "c1", Image: "foo2"}},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{Type: v1.PodReady, Status: v1.ConditionTrue},
+							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+						},
+						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
+					},
+				},
+			},
+			expectedPVCs: []*v1.PersistentVolumeClaim{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+			},
+		},
 	}
 
 	for _, mc := range cases {
@@ -283,7 +518,7 @@ func TestMange(t *testing.T) {
 			expectations.NewScaleExpectations(),
 			expectations.NewUpdateExpectations(clonesetutils.GetPodRevision),
 		}
-		if err := ctrl.Manage(mc.cs, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
+		if _, err := ctrl.Manage(mc.cs, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
 			t.Fatalf("Failed to test %s, manage error: %v", mc.name, err)
 		}
 		podList := v1.PodList{}

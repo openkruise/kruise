@@ -30,7 +30,7 @@ import (
 
 // StatusUpdater is interface for updating CloneSet status.
 type StatusUpdater interface {
-	UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error
+	UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error
 }
 
 func newStatusUpdater(c client.Client) StatusUpdater {
@@ -41,15 +41,15 @@ type realStatusUpdater struct {
 	client.Client
 }
 
-func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
-	r.calculateStatus(cs, &newStatus, pods)
-	if !r.inconsistentStatus(cs, &newStatus) {
+func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
+	r.calculateStatus(cs, newStatus, pods)
+	if !r.inconsistentStatus(cs, newStatus) {
 		return nil
 	}
 
 	klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions update=%s",
 		cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.UpdateRevision)
-	return r.updateStatus(cs, &newStatus)
+	return r.updateStatus(cs, newStatus)
 }
 
 func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {

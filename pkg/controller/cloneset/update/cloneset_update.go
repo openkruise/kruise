@@ -19,6 +19,7 @@ package update
 import (
 	"context"
 	"sort"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -40,7 +41,7 @@ type Interface interface {
 	Manage(cs *appsv1alpha1.CloneSet,
 		updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 		pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
-	) error
+	) (time.Duration, error)
 }
 
 func New(c client.Client, recorder record.EventRecorder, scaleExp expectations.ScaleExpectations, updateExp expectations.UpdateExpectations) Interface {
@@ -64,19 +65,23 @@ type realControl struct {
 func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
-) error {
+) (time.Duration, error) {
+
+	var delayDuration time.Duration
 
 	if cs.Spec.UpdateStrategy.Paused {
-		return nil
+		return delayDuration, nil
 	}
 
 	// 1. find currently updated and not-ready count and all pods waiting to update
 	var waitUpdateIndexes []int
 	for i := range pods {
-		if err := c.inplaceControl.UpdateCondition(pods[i]); err != nil {
+		if res := c.inplaceControl.Refresh(pods[i]); res.RefreshErr != nil {
 			klog.Errorf("CloneSet %s/%s failed to update pod %s condition for inplace: %v",
-				cs.Namespace, cs.Name, pods[i].Name, err)
-			return err
+				cs.Namespace, cs.Name, pods[i].Name, res.RefreshErr)
+			return delayDuration, res.RefreshErr
+		} else if res.DelayDuration > 0 && (delayDuration == 0 || res.DelayDuration < delayDuration) {
+			delayDuration = res.DelayDuration
 		}
 
 		if clonesetutils.GetPodRevision(pods[i]) != updateRevision.Name {
@@ -96,12 +101,14 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	// 4. update pods
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
-		if err := c.updatePod(cs, updateRevision, revisions, pod, pvcs); err != nil {
-			return err
+		if duration, err := c.updatePod(cs, updateRevision, revisions, pod, pvcs); err != nil {
+			return delayDuration, err
+		} else if duration > 0 && (delayDuration == 0 || duration < delayDuration) {
+			delayDuration = duration
 		}
 	}
 
-	return nil
+	return delayDuration, nil
 }
 
 func sortUpdateIndexes(strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {
@@ -155,7 +162,8 @@ func calculateUpdateCount(strategy appsv1alpha1.CloneSetUpdateStrategy, minReady
 func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet,
 	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pod *v1.Pod, pvcs []*v1.PersistentVolumeClaim,
-) error {
+) (time.Duration, error) {
+
 	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType ||
 		cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
 		var oldRevision *apps.ControllerRevision
@@ -166,16 +174,22 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet,
 			}
 		}
 
-		inplacing, err := c.inplaceControl.UpdateInPlace(pod, oldRevision, updateRevision)
-		if inplacing && err == nil {
+		opts := &inplaceupdate.UpdateOptions{}
+		if cs.Spec.UpdateStrategy.InPlaceUpdateStrategy != nil {
+			opts.GracePeriodSeconds = cs.Spec.UpdateStrategy.InPlaceUpdateStrategy.GracePeriodSeconds
+		}
+
+		res := c.inplaceControl.Update(pod, oldRevision, updateRevision, opts)
+
+		if res.InPlaceUpdate && res.UpdateErr == nil {
 			c.recorder.Eventf(cs, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
 			c.updateExp.ExpectUpdated(clonesetutils.GetControllerKey(cs), updateRevision.Name, pod)
-			return nil
+			return res.DelayDuration, nil
 		}
-		if err != nil {
-			c.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place: %v", pod.Name, err)
-			if errors.IsConflict(err) || cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-				return err
+		if res.UpdateErr != nil {
+			c.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place: %v", pod.Name, res.UpdateErr)
+			if errors.IsConflict(res.UpdateErr) || cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+				return 0, res.UpdateErr
 			}
 			// If it failed to in-place update && error is not conflict && podUpdatePolicy is not InPlaceOnly,
 			// then we should try to recreate this pod
@@ -190,7 +204,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet,
 		c.scaleExp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pod.Name)
 		c.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdatePodReCreate",
 			"failed to delete pod %s for update: %v", pod.Name, err)
-		return err
+		return 0, err
 	}
 
 	// TODO(FillZpp): add a strategy controlling if the PVCs of this pod should be deleted
@@ -203,13 +217,13 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet,
 		if err := c.Delete(context.TODO(), pvc); err != nil {
 			c.scaleExp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
 			c.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to delete pvc %s: %v", pvc.Name, err)
-			return err
+			return 0, err
 		}
 	}
 
 	c.recorder.Eventf(cs, v1.EventTypeNormal, "SuccessfulUpdatePodReCreate",
 		"successfully delete pod %s for update", pod.Name)
-	return nil
+	return 0, nil
 }
 
 func readyForUpdate(pod *v1.Pod, minReadySeconds int32) bool {

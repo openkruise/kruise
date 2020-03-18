@@ -143,6 +143,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneS
 	clone.Spec.Template = oldCloneSet.Spec.Template
 	clone.Spec.ScaleStrategy = oldCloneSet.Spec.ScaleStrategy
 	clone.Spec.UpdateStrategy = oldCloneSet.Spec.UpdateStrategy
+	clone.Spec.MinReadySeconds = oldCloneSet.Spec.MinReadySeconds
 	if !reflect.DeepEqual(clone.Spec, oldCloneSet.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'scaleStrategy', and 'updateStrategy' are forbidden"))
 	}

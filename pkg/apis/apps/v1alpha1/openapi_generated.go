@@ -424,6 +424,15 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetInPlaceUpdateStrategy(ref common.Refe
 			SchemaProps: spec.SchemaProps{
 				Description: "CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"gracePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec when in-place update a Pod.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
 			},
 		},
 	}

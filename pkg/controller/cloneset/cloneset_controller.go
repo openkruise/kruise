@@ -165,11 +165,15 @@ func (r *ReconcileCloneSet) Reconcile(request reconcile.Request) (reconcile.Resu
 	return r.reconcileFunc(request)
 }
 
-func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (_ reconcile.Result, retErr error) {
+func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
 	startTime := time.Now()
 	defer func() {
 		if retErr == nil {
-			klog.V(3).Infof("Finished syncing CloneSet %s, cost %v", request, time.Since(startTime))
+			if res.Requeue || res.RequeueAfter > 0 {
+				klog.Infof("Finished syncing CloneSet %s, cost %v, result: %v", request, time.Since(startTime), res)
+			} else {
+				klog.Infof("Finished syncing CloneSet %s, cost %v", request, time.Since(startTime))
+			}
 		} else {
 			klog.Errorf("Failed syncing CloneSet %s: %v", request, retErr)
 		}
@@ -241,10 +245,10 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (_ reconcile.
 	*newStatus.CollisionCount = collisionCount
 
 	// scale and update pods
-	syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
+	delayDuration, syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 
 	// update new status
-	if err = r.statusUpdater.UpdateCloneSetStatus(instance, newStatus, filteredPods); err != nil {
+	if err = r.statusUpdater.UpdateCloneSetStatus(instance, &newStatus, filteredPods); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -256,26 +260,33 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (_ reconcile.
 		klog.Errorf("Failed to truncate history for %s: %v", request, err)
 	}
 
-	return reconcile.Result{}, syncErr
+	if syncErr == nil && instance.Spec.MinReadySeconds > 0 && newStatus.AvailableReplicas != newStatus.ReadyReplicas {
+		minReadyDuration := time.Second * time.Duration(instance.Spec.MinReadySeconds)
+		if delayDuration == 0 || minReadyDuration < delayDuration {
+			delayDuration = minReadyDuration
+		}
+	}
+	return reconcile.Result{RequeueAfter: delayDuration}, syncErr
 }
 
 func (r *ReconcileCloneSet) syncCloneSet(
 	instance *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus,
 	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	filteredPods []*v1.Pod, filteredPVCs []*v1.PersistentVolumeClaim,
-) error {
+) (time.Duration, error) {
+	var delayDuration time.Duration
 	if instance.DeletionTimestamp != nil {
-		return nil
+		return delayDuration, nil
 	}
 
 	// get the current and update revisions of the set.
 	currentSet, err := r.revisionControl.ApplyRevision(instance, currentRevision)
 	if err != nil {
-		return err
+		return delayDuration, err
 	}
 	updateSet, err := r.revisionControl.ApplyRevision(instance, updateRevision)
 	if err != nil {
-		return err
+		return delayDuration, err
 	}
 
 	var scaling bool
@@ -292,10 +303,10 @@ func (r *ReconcileCloneSet) syncCloneSet(
 		})
 	}
 	if scaling {
-		return podsScaleErr
+		return delayDuration, podsScaleErr
 	}
 
-	podsUpdateErr = r.updateControl.Manage(updateSet, updateRevision, revisions, filteredPods, filteredPVCs)
+	delayDuration, podsUpdateErr = r.updateControl.Manage(updateSet, updateRevision, revisions, filteredPods, filteredPVCs)
 	if podsUpdateErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedUpdate,
@@ -304,7 +315,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 			Message:            podsUpdateErr.Error(),
 		})
 	}
-	return podsUpdateErr
+	return delayDuration, podsUpdateErr
 }
 
 func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisions []*apps.ControllerRevision, podsRevisions sets.String) (
