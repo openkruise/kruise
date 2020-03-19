@@ -104,7 +104,7 @@ type CloneSetUpdateStrategy struct {
 	// - If scatterStrategy is used, we suggest to just use one term. Otherwise, the update order can be hard to understand.
 	ScatterStrategy CloneSetUpdateScatterStrategy `json:"scatterStrategy,omitempty"`
 	// InPlaceUpdateStrategy contains strategies for in-place update.
-	InPlaceUpdateStrategy *CloneSetInPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
+	InPlaceUpdateStrategy *InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
 }
 
 // CloneSetUpdateStrategyType defines strategies for pods in-place update.
@@ -137,13 +137,6 @@ type CloneSetUpdateScatterStrategy []CloneSetUpdateScatterTerm
 type CloneSetUpdateScatterTerm struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
-}
-
-// CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.
-type CloneSetInPlaceUpdateStrategy struct {
-	// GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
-	// when in-place update a Pod.
-	GracePeriodSeconds int32 `json:"gracePeriodSeconds,omitempty"`
 }
 
 // CloneSetStatus defines the observed state of CloneSet

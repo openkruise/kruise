@@ -66,6 +66,9 @@ type RollingUpdateStatefulSetStrategy struct {
 	// Noted that UnorderedUpdate can only be allowed to work with Parallel podManagementPolicy
 	// +optional
 	UnorderedUpdate *UnorderedUpdateStrategy `json:"unorderedUpdate,omitempty"`
+	// InPlaceUpdateStrategy contains strategies for in-place update.
+	// +optional
+	InPlaceUpdateStrategy *InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
 }
 
 // UnorderedUpdateStrategy defines strategies for non-ordered update.

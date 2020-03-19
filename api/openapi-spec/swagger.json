@@ -199,17 +199,6 @@
         }
       }
     },
-    "kruise.apps.v1alpha1.CloneSetInPlaceUpdateStrategy": {
-      "description": "CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.",
-      "type": "object",
-      "properties": {
-        "gracePeriodSeconds": {
-          "description": "GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec when in-place update a Pod.",
-          "type": "integer",
-          "format": "int32"
-        }
-      }
-    },
     "kruise.apps.v1alpha1.CloneSetList": {
       "description": "CloneSetList contains a list of CloneSet",
       "type": "object",
@@ -382,7 +371,7 @@
       "properties": {
         "inPlaceUpdateStrategy": {
           "description": "InPlaceUpdateStrategy contains strategies for in-place update.",
-          "$ref": "#/definitions/kruise.apps.v1alpha1.CloneSetInPlaceUpdateStrategy"
+          "$ref": "#/definitions/kruise.apps.v1alpha1.InPlaceUpdateStrategy"
         },
         "maxUnavailable": {
           "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. Defaults to 20%.",
@@ -484,6 +473,17 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.InPlaceUpdateStrategy": {
+      "description": "InPlaceUpdateStrategy defines the strategies for in-place update.",
+      "type": "object",
+      "properties": {
+        "gracePeriodSeconds": {
+          "description": "GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec when in-place update a Pod.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.JobCondition": {
       "description": "JobCondition describes current state of a job.",
       "type": "object",
@@ -545,6 +545,10 @@
       "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
       "type": "object",
       "properties": {
+        "inPlaceUpdateStrategy": {
+          "description": "InPlaceUpdateStrategy contains strategies for in-place update.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.InPlaceUpdateStrategy"
+        },
         "maxUnavailable": {
           "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. Also, maxUnavailable can just be allowed to work with Parallel podManagementPolicy. Defaults to 1.",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
