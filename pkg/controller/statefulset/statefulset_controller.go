@@ -28,6 +28,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -60,6 +61,8 @@ var (
 		p := o.(*v1.Pod)
 		return getPodRevision(p)
 	})
+
+	durationStore = requeueduration.DurationStore{}
 )
 
 // Add creates a new StatefulSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -190,14 +193,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
-func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
 	key := request.NamespacedName.String()
 	namespace := request.Namespace
 	name := request.Name
 
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
+		if retErr == nil {
+			if res.Requeue || res.RequeueAfter > 0 {
+				klog.Infof("Finished syncing statefulset %q (%v), result: %v", key, time.Since(startTime), res)
+			} else {
+				klog.Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
+			}
+		} else {
+			klog.Infof("Finished syncing statefulset %q (%v), error: %v", key, time.Since(startTime), retErr)
+		}
 	}()
 
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
@@ -227,7 +238,8 @@ func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	return reconcile.Result{}, ssc.syncStatefulSet(set, pods)
+	err = ssc.syncStatefulSet(set, pods)
+	return reconcile.Result{RequeueAfter: durationStore.Pop(getStatefulSetKey(set))}, err
 }
 
 // adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.

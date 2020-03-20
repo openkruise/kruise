@@ -214,7 +214,7 @@ func SetDefaults_CloneSet(obj *CloneSet) {
 		obj.Spec.UpdateStrategy.Type = RecreateCloneSetUpdateStrategyType
 	case InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceOnlyCloneSetUpdateStrategyType:
 		if obj.Spec.UpdateStrategy.InPlaceUpdateStrategy == nil {
-			obj.Spec.UpdateStrategy.InPlaceUpdateStrategy = &CloneSetInPlaceUpdateStrategy{}
+			obj.Spec.UpdateStrategy.InPlaceUpdateStrategy = &InPlaceUpdateStrategy{}
 		}
 	}
 

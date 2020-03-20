@@ -275,7 +275,7 @@ func TestMange(t *testing.T) {
 			name: "inplace update with grace period",
 			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.CloneSetInPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
@@ -349,7 +349,7 @@ func TestMange(t *testing.T) {
 			name: "inplace update during grace period",
 			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.CloneSetInPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
@@ -430,7 +430,7 @@ func TestMange(t *testing.T) {
 			name: "inplace update continuously after grace period",
 			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.CloneSetInPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},

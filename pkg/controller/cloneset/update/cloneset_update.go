@@ -21,6 +21,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/requeueduration"
+
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -67,10 +69,10 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (time.Duration, error) {
 
-	var delayDuration time.Duration
+	requeueDuration := requeueduration.Duration{}
 
 	if cs.Spec.UpdateStrategy.Paused {
-		return delayDuration, nil
+		return requeueDuration.Get(), nil
 	}
 
 	// 1. find currently updated and not-ready count and all pods waiting to update
@@ -79,9 +81,9 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 		if res := c.inplaceControl.Refresh(pods[i]); res.RefreshErr != nil {
 			klog.Errorf("CloneSet %s/%s failed to update pod %s condition for inplace: %v",
 				cs.Namespace, cs.Name, pods[i].Name, res.RefreshErr)
-			return delayDuration, res.RefreshErr
-		} else if res.DelayDuration > 0 && (delayDuration == 0 || res.DelayDuration < delayDuration) {
-			delayDuration = res.DelayDuration
+			return requeueDuration.Get(), res.RefreshErr
+		} else if res.DelayDuration > 0 {
+			requeueDuration.Update(res.DelayDuration)
 		}
 
 		if clonesetutils.GetPodRevision(pods[i]) != updateRevision.Name {
@@ -102,13 +104,13 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
 		if duration, err := c.updatePod(cs, updateRevision, revisions, pod, pvcs); err != nil {
-			return delayDuration, err
-		} else if duration > 0 && (delayDuration == 0 || duration < delayDuration) {
-			delayDuration = duration
+			return requeueDuration.Get(), err
+		} else if duration > 0 {
+			requeueDuration.Update(duration)
 		}
 	}
 
-	return delayDuration, nil
+	return requeueDuration.Get(), nil
 }
 
 func sortUpdateIndexes(strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {

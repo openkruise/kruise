@@ -454,6 +454,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			klog.Errorf("StatefulSet %s/%s failed to update pod %s condition for inplace: %v",
 				set.Namespace, set.Name, replicas[i].Name, res.RefreshErr)
 			return &status, res.RefreshErr
+		} else if res.DelayDuration > 0 {
+			durationStore.Push(getStatefulSetKey(set), res.DelayDuration)
 		}
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
@@ -631,12 +633,20 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 		}
 	}
 
-	res := ssc.inplaceControl.Update(pod, oldRevision, updateRevision, nil)
+	opts := &inplaceupdate.UpdateOptions{}
+	if set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil {
+		opts.GracePeriodSeconds = set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.GracePeriodSeconds
+	}
+
+	res := ssc.inplaceControl.Update(pod, oldRevision, updateRevision, opts)
 	if res.InPlaceUpdate && res.UpdateErr == nil {
 		ssc.recorder.Eventf(set, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
 		updateExpectations.ExpectUpdated(getStatefulSetKey(set), updateRevision.Name, pod)
 	} else if res.UpdateErr != nil {
 		ssc.recorder.Eventf(set, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place: %v", pod.Name, res.UpdateErr)
+	}
+	if res.DelayDuration > 0 {
+		durationStore.Push(getStatefulSetKey(set), res.DelayDuration)
 	}
 
 	return res.InPlaceUpdate, res.UpdateErr

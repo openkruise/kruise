@@ -8,8 +8,6 @@ import (
 	"regexp"
 
 	"github.com/appscode/jsonpatch"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -17,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"

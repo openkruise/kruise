@@ -35,7 +35,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.BroadcastJobStatus":               schema_pkg_apis_apps_v1alpha1_BroadcastJobStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSet":                         schema_pkg_apis_apps_v1alpha1_CloneSet(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetCondition":                schema_pkg_apis_apps_v1alpha1_CloneSetCondition(ref),
-		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetInPlaceUpdateStrategy":    schema_pkg_apis_apps_v1alpha1_CloneSetInPlaceUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetList":                     schema_pkg_apis_apps_v1alpha1_CloneSetList(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetScaleStrategy":            schema_pkg_apis_apps_v1alpha1_CloneSetScaleStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetSpec":                     schema_pkg_apis_apps_v1alpha1_CloneSetSpec(ref),
@@ -46,6 +45,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy":                    schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateContainerStatus":     schema_pkg_apis_apps_v1alpha1_InPlaceUpdateContainerStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateState":               schema_pkg_apis_apps_v1alpha1_InPlaceUpdateState(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateStrategy":            schema_pkg_apis_apps_v1alpha1_InPlaceUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.JobCondition":                     schema_pkg_apis_apps_v1alpha1_JobCondition(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate":                     schema_pkg_apis_apps_v1alpha1_ManualUpdate(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateSidecarSet":          schema_pkg_apis_apps_v1alpha1_RollingUpdateSidecarSet(ref),
@@ -418,26 +418,6 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetCondition(ref common.ReferenceCallbac
 	}
 }
 
-func schema_pkg_apis_apps_v1alpha1_CloneSetInPlaceUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "CloneSetInPlaceUpdateStrategy defines the strategies for in-place update.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"gracePeriodSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec when in-place update a Pod.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func schema_pkg_apis_apps_v1alpha1_CloneSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -759,14 +739,14 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 					"inPlaceUpdateStrategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "InPlaceUpdateStrategy contains strategies for in-place update.",
-							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetInPlaceUpdateStrategy"),
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateStrategy"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetInPlaceUpdateStrategy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateScatterTerm", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateScatterTerm", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateStrategy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UpdatePriorityStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 
@@ -890,6 +870,26 @@ func schema_pkg_apis_apps_v1alpha1_InPlaceUpdateState(ref common.ReferenceCallba
 		},
 		Dependencies: []string{
 			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateContainerStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_InPlaceUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "InPlaceUpdateStrategy defines the strategies for in-place update.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"gracePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec when in-place update a Pod.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -1037,11 +1037,17 @@ func schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref common.R
 							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnorderedUpdateStrategy"),
 						},
 					},
+					"inPlaceUpdateStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "InPlaceUpdateStrategy contains strategies for in-place update.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateStrategy"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnorderedUpdateStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateStrategy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.UnorderedUpdateStrategy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
 	}
 }
 
