@@ -1,4 +1,32 @@
-# v0.4.0
+# v0.4.1
+
+## CloneSet
+
+### Features
+
+- add `labelSelector` to optimize scale subresource for HPA
+- Add `minReadySeconds`, `availableReplicas` fields for CloneSet
+- Add `gracePeriodSeconds` for graceful in-place update
+
+## Advanced StatefulSet
+
+### Features
+
+- Support label selector in scale for HPA
+- Add `gracePeriodSeconds` for graceful in-place update
+
+### Bugs
+
+- Fix StatefulSet default update sequence
+- Fix ControllerRevision adoption
+
+## Installation
+
+- Fix `check_for_installation.sh` script for k8s 1.11 to 1.13
+
+---
+
+**# v0.4.0**
 
 ## A NEW workload controller - CloneSet
 
