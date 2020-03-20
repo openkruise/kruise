@@ -6,7 +6,8 @@
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
-|Feb 7th, 2020. Kruise v0.4.0 is **RELEASED**! It provides a new CloneSet controller, please check the [CHANGELOG](CHANGELOG.md) for details.|
+|Mar 20th, 2020. Kruise v0.4.1 is **RELEASED**! It provides **graceful in-place update** for Advanced StatefulSet and CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
+|Feb 7th,  2020. Kruise v0.4.0 is **RELEASED**! It provides a new CloneSet controller, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Nov 24th, 2019. A blog about new UnitedDeployment controller is posted in Kruise Blog ([link](http://openkruise.io/en-us/blog/blog3.html)).|
 
 Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
@@ -43,7 +44,7 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/s
 It is recommended that you should install Kruise with helm v3, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.4.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.4.1/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for kruise-manager.
