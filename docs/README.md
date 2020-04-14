@@ -6,12 +6,12 @@ express more and more diverse requirements for workload upgrade and deployment, 
 in many cases, cannot be satisfied by the default workload controllers.
 
 Kruise attempts to fill such gap by offering a set of controllers as the supplement
-to manage new workloads in Kubernetes. The target user cases are representative,
+to manage new workloads in Kubernetes. The target use cases are representative,
 originally collected from the users of Alibaba cloud container services and the
 developers of the in-house large scale on-line/off-line container applications.
 Most of the use cases can be easily applied to other similar cloud user scenarios.
 
-Currently, Kruise supports the following three new workloads.
+Currently, Kruise supports the following workloads.
 
 ## Workloads
 
@@ -19,6 +19,7 @@ Currently, Kruise supports the following three new workloads.
 - [BroadcastJob](./concepts/broadcastJob/README.md): A job that runs pods to completion across all the nodes in the cluster.
 - [SidecarSet](./concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also be able to upgrade the sidecar containers.
 - [UnitedDeployment](./concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
+- [CloneSet](./concepts/cloneset/README.md): CloneSet is a workload that mainly focuses on managing stateless applications. It provides full features for more efficient, deterministic and controlled deployment, such as inplace update, specified pod deletion, configurable priority/scatter update, preUpdate/postUpdate hooks.
 
 ## Benefits
 
