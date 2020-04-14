@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -56,8 +57,15 @@ func (r *realControl) Manage(
 		return false, fmt.Errorf("spec.Replicas is nil")
 	}
 
+	controllerKey := clonesetutils.GetControllerKey(updateCS)
+	coreControl := clonesetcore.New(updateCS)
+	if !coreControl.IsReadyToScale() {
+		klog.Warningf("CloneSet %s skip scaling for not ready to scale", controllerKey)
+		return false, nil
+	}
+
 	if podsToDelete := getPodsToDelete(updateCS, pods); len(podsToDelete) > 0 {
-		klog.V(3).Infof("Begin to delete pods in podsToDelete: %v", podsToDelete)
+		klog.V(3).Infof("CloneSet %s begin to delete pods in podsToDelete: %v", controllerKey, podsToDelete)
 		return true, r.deletePods(updateCS, podsToDelete, pvcs)
 	}
 
@@ -74,7 +82,7 @@ func (r *realControl) Manage(
 			expectedCurrentCreations = int(*updateCS.Spec.UpdateStrategy.Partition) - notUpdatedNum
 		}
 
-		klog.V(3).Infof("Begin to scale out %d pods", expectedCreations)
+		klog.V(3).Infof("CloneSet %s begin to scale out %d pods", controllerKey, expectedCreations)
 
 		// available instance-id come from free pvc
 		availableIDs := getOrGenAvailableIDs(expectedCreations, pods, pvcs)
@@ -89,8 +97,7 @@ func (r *realControl) Manage(
 		return true, err
 
 	} else if diff > 0 {
-
-		klog.V(3).Infof("Begin to scale in %d pods", diff)
+		klog.V(3).Infof("CloneSet %s begin to scale in %d pods", controllerKey, diff)
 
 		podsToDelete := r.choosePodsToDelete(pods, diff)
 		err = r.deletePods(updateCS, podsToDelete, pvcs)
@@ -107,13 +114,12 @@ func (r *realControl) createPods(
 	currentRevision, updateRevision string,
 	availableIDs []string, existingPVCNames sets.String,
 ) error {
-	// list of all pods need to create
-	var newPods []*v1.Pod
-	if expectedCreations <= expectedCurrentCreations {
-		newPods = newVersionedPods(currentCS, currentRevision, expectedCreations, &availableIDs)
-	} else {
-		newPods = newVersionedPods(currentCS, currentRevision, expectedCurrentCreations, &availableIDs)
-		newPods = append(newPods, newVersionedPods(updateCS, updateRevision, expectedCreations-expectedCurrentCreations, &availableIDs)...)
+	// new all pods need to create
+	coreControl := clonesetcore.New(updateCS)
+	newPods, err := coreControl.NewVersionedPods(currentCS, updateCS, currentRevision, updateRevision,
+		expectedCreations, expectedCurrentCreations, availableIDs)
+	if err != nil {
+		return err
 	}
 
 	podsCreationChan := make(chan *v1.Pod, len(newPods))
@@ -123,7 +129,7 @@ func (r *realControl) createPods(
 	}
 
 	successPodNames := sync.Map{}
-	_, err := clonesetutils.DoItSlowly(len(newPods), initialBatchSize, func() error {
+	_, err = clonesetutils.DoItSlowly(len(newPods), initialBatchSize, func() error {
 		pod := <-podsCreationChan
 
 		cs := updateCS

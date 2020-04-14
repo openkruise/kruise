@@ -450,7 +450,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// Update InPlaceUpdateReady condition for pod
-		if res := ssc.inplaceControl.Refresh(replicas[i]); res.RefreshErr != nil {
+		if res := ssc.inplaceControl.Refresh(replicas[i], nil); res.RefreshErr != nil {
 			klog.Errorf("StatefulSet %s/%s failed to update pod %s condition for inplace: %v",
 				set.Namespace, set.Name, replicas[i].Name, res.RefreshErr)
 			return &status, res.RefreshErr

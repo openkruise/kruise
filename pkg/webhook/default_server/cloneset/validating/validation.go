@@ -2,13 +2,11 @@ package validating
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 
-	"github.com/appscode/jsonpatch"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -22,8 +20,6 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
-
-var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("^/containers/([0-9]+)/image$")
 
 func (h *CloneSetCreateUpdateHandler) validateCloneSet(cloneSet *appsv1alpha1.CloneSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&cloneSet.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
@@ -148,29 +144,13 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneS
 	}
 
 	if cloneSet.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-		if err := validateTemplateInPlaceOnly(&oldCloneSet.Spec.Template, &cloneSet.Spec.Template); err != nil {
+		coreControl := clonesetcore.New(cloneSet)
+		if err := coreControl.ValidateTemplateUpdateForInPlace(&oldCloneSet.Spec.Template, &cloneSet.Spec.Template); err != nil {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("template"),
-				"forbid to update fields in template other than image, when updateStrategy type is InPlaceOnly"))
+				fmt.Sprintf("forbid to update for InPlaceOnly updateStrategy type: %v", err)))
 		}
 	}
 
 	allErrs = append(allErrs, h.validateCloneSet(cloneSet)...)
 	return allErrs
-}
-
-func validateTemplateInPlaceOnly(oldTemp, newTemp *v1.PodTemplateSpec) error {
-	oldTempJSON, _ := json.Marshal(oldTemp.Spec)
-	newTempJSON, _ := json.Marshal(newTemp.Spec)
-	patches, err := jsonpatch.CreatePatch(oldTempJSON, newTempJSON)
-	if err != nil {
-		return fmt.Errorf("failed calculate patches between old/new template spec")
-	}
-
-	for _, p := range patches {
-		if p.Operation != "replace" || !inPlaceUpdateTemplateSpecPatchRexp.MatchString(p.Path) {
-			return fmt.Errorf("%s %s", p.Operation, p.Path)
-		}
-	}
-
-	return nil
 }

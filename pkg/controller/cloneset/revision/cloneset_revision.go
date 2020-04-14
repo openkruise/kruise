@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,15 +42,15 @@ type Interface interface {
 
 // NewRevisionControl create a normal revision control.
 func NewRevisionControl() Interface {
-	return &realControl{getPatch: getPatch}
+	return &realControl{}
 }
 
 type realControl struct {
-	getPatch func(cs *appsv1alpha1.CloneSet) ([]byte, error)
 }
 
 func (c *realControl) NewRevision(cs *appsv1alpha1.CloneSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
-	patch, err := c.getPatch(cs)
+	coreControl := clonesetcore.New(cs)
+	patch, err := c.getPatch(cs, coreControl)
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +63,7 @@ func (c *realControl) NewRevision(cs *appsv1alpha1.CloneSet, revision int64, col
 	if err != nil {
 		return nil, err
 	}
-	if cr.ObjectMeta.Annotations == nil {
-		cr.ObjectMeta.Annotations = make(map[string]string)
-	}
-	for key, value := range cs.Annotations {
-		cr.ObjectMeta.Annotations[key] = value
-	}
+	coreControl.SetRevisionAnnotations(cr)
 	return cr, nil
 }
 
@@ -75,7 +71,7 @@ func (c *realControl) NewRevision(cs *appsv1alpha1.CloneSet, revision int64, col
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func getPatch(cs *appsv1alpha1.CloneSet) ([]byte, error) {
+func (c *realControl) getPatch(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control) ([]byte, error) {
 	str, err := runtime.Encode(patchCodec, cs)
 	if err != nil {
 		return nil, err
@@ -86,8 +82,8 @@ func getPatch(cs *appsv1alpha1.CloneSet) ([]byte, error) {
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
 	template := spec["template"].(map[string]interface{})
-	specCopy["template"] = template
-	template["$patch"] = "replace"
+
+	coreControl.SetRevisionTemplate(specCopy, template)
 	objCopy["spec"] = specCopy
 	patch, err := json.Marshal(objCopy)
 	return patch, err

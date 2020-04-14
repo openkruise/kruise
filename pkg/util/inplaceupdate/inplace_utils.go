@@ -39,8 +39,11 @@ import (
 
 var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
 
+type CustomizeUpdateFunc func(pod *v1.Pod, spec *UpdateSpec) error
+
 type UpdateOptions struct {
-	GracePeriodSeconds int32
+	GracePeriodSeconds  int32
+	CustomizeUpdateFunc CustomizeUpdateFunc
 }
 
 type RefreshResult struct {
@@ -56,16 +59,21 @@ type UpdateResult struct {
 
 // Interface for managing pods in-place update.
 type Interface interface {
-	Refresh(pod *v1.Pod) RefreshResult
+	Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult
 	Update(pod *v1.Pod, oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) UpdateResult
 }
 
-// updateSpec records the images of containers which need to in-place update.
-type updateSpec struct {
-	Revision        string            `json:"revision"`
+// UpdateSpec records the images of containers which need to in-place update.
+type UpdateSpec struct {
+	Revision    string            `json:"revision"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	ContainerImages map[string]string `json:"containerImages,omitempty"`
 	MetaDataPatch   []byte            `json:"metaDataPatch,omitempty"`
 	GraceSeconds    int32             `json:"graceSeconds,omitempty"`
+
+	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
+	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
 }
 
 type realControl struct {
@@ -92,7 +100,7 @@ func NewForTest(c client.Client, revisionKey string, now func() metav1.Time) Int
 	return &realControl{adp: &adapterRuntimeClient{Client: c}, revisionKey: revisionKey, now: now}
 }
 
-func (c *realControl) Refresh(pod *v1.Pod) RefreshResult {
+func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 	if err := c.refreshCondition(pod); err != nil {
 		return RefreshResult{RefreshErr: err}
 	}
@@ -100,7 +108,7 @@ func (c *realControl) Refresh(pod *v1.Pod) RefreshResult {
 	var delayDuration time.Duration
 	var err error
 	if pod.Annotations[appsv1alpha1.InPlaceUpdateGraceKey] != "" {
-		if delayDuration, err = c.finishGracePeriod(pod); err != nil {
+		if delayDuration, err = c.finishGracePeriod(pod, opts); err != nil {
 			return RefreshResult{RefreshErr: err}
 		}
 	}
@@ -109,15 +117,8 @@ func (c *realControl) Refresh(pod *v1.Pod) RefreshResult {
 }
 
 func (c *realControl) refreshCondition(pod *v1.Pod) error {
-	var containsReadinessGate bool
-	for _, r := range pod.Spec.ReadinessGates {
-		if r.ConditionType == appsv1alpha1.InPlaceUpdateReady {
-			containsReadinessGate = true
-			break
-		}
-	}
 	// no need to update condition because of no readiness-gate
-	if !containsReadinessGate {
+	if !containsReadinessGate(pod) {
 		return nil
 	}
 
@@ -153,7 +154,7 @@ func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) er
 	})
 }
 
-func (c *realControl) finishGracePeriod(pod *v1.Pod) (time.Duration, error) {
+func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.Duration, error) {
 	var delayDuration time.Duration
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clone, err := c.adp.getPod(pod.Namespace, pod.Name)
@@ -161,7 +162,7 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod) (time.Duration, error) {
 			return err
 		}
 
-		spec := updateSpec{}
+		spec := UpdateSpec{}
 		updateSpecJSON, ok := clone.Annotations[appsv1alpha1.InPlaceUpdateGraceKey]
 		if !ok {
 			return nil
@@ -189,7 +190,7 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod) (time.Duration, error) {
 				return nil
 			}
 
-			if err := patchUpdateSpecToPod(clone, &spec); err != nil {
+			if err := patchUpdateSpecToPod(clone, &spec, opts); err != nil {
 				return err
 			}
 			delete(clone.Annotations, appsv1alpha1.InPlaceUpdateGraceKey)
@@ -203,7 +204,7 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod) (time.Duration, error) {
 
 func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) UpdateResult {
 	// 1. calculate inplace update spec
-	spec := calculateInPlaceUpdateSpec(oldRevision, newRevision)
+	spec := calculateInPlaceUpdateSpec(oldRevision, newRevision, opts)
 	if spec == nil {
 		return UpdateResult{}
 	}
@@ -213,19 +214,21 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 
 	// TODO(FillZpp): maybe we should check if the previous in-place update has completed
 
-	// 2. update condition
-	newCondition := v1.PodCondition{
-		Type:               appsv1alpha1.InPlaceUpdateReady,
-		LastTransitionTime: c.now(),
-		Status:             v1.ConditionFalse,
-		Reason:             "StartInPlaceUpdate",
-	}
-	if err := c.updateCondition(pod, newCondition); err != nil {
-		return UpdateResult{InPlaceUpdate: true, UpdateErr: err}
+	// 2. update condition for pod with readiness-gate
+	if containsReadinessGate(pod) {
+		newCondition := v1.PodCondition{
+			Type:               appsv1alpha1.InPlaceUpdateReady,
+			LastTransitionTime: c.now(),
+			Status:             v1.ConditionFalse,
+			Reason:             "StartInPlaceUpdate",
+		}
+		if err := c.updateCondition(pod, newCondition); err != nil {
+			return UpdateResult{InPlaceUpdate: true, UpdateErr: err}
+		}
 	}
 
 	// 3. update container images
-	if err := c.updatePodInPlace(pod, spec); err != nil {
+	if err := c.updatePodInPlace(pod, spec, opts); err != nil {
 		return UpdateResult{InPlaceUpdate: true, UpdateErr: err}
 	}
 
@@ -236,7 +239,7 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 	return UpdateResult{InPlaceUpdate: true, DelayDuration: delayDuration}
 }
 
-func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *updateSpec) error {
+func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clone, err := c.adp.getPod(pod.Namespace, pod.Name)
 		if err != nil {
@@ -268,7 +271,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *updateSpec) error {
 		clone.Annotations[appsv1alpha1.InPlaceUpdateStateKey] = string(inPlaceUpdateStateJSON)
 
 		if spec.GraceSeconds <= 0 {
-			if err := patchUpdateSpecToPod(clone, spec); err != nil {
+			if err := patchUpdateSpecToPod(clone, spec, opts); err != nil {
 				return err
 			}
 			delete(clone.Annotations, appsv1alpha1.InPlaceUpdateGraceKey)
@@ -281,7 +284,10 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *updateSpec) error {
 	})
 }
 
-func patchUpdateSpecToPod(pod *v1.Pod, spec *updateSpec) error {
+func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) error {
+	if opts != nil && opts.CustomizeUpdateFunc != nil {
+		return opts.CustomizeUpdateFunc(pod, spec)
+	}
 	if spec.MetaDataPatch != nil {
 		cloneBytes, _ := json.Marshal(pod)
 		modified, err := strategicpatch.StrategicMergePatch(cloneBytes, spec.MetaDataPatch, &v1.Pod{})
@@ -304,7 +310,7 @@ func patchUpdateSpecToPod(pod *v1.Pod, spec *updateSpec) error {
 // calculateInPlaceUpdateSpec calculates diff between old and update revisions.
 // If the diff just contains replace operation of spec.containers[x].image, it will returns an UpdateSpec.
 // Otherwise, it returns nil which means can not use in-place update.
-func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision) *updateSpec {
+func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec {
 	if oldRevision == nil || newRevision == nil {
 		return nil
 	}
@@ -314,19 +320,28 @@ func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevisio
 		return nil
 	}
 
-	oldTemp, err := getTemplateFromRevision(oldRevision)
+	oldTemp, err := GetTemplateFromRevision(oldRevision)
 	if err != nil {
 		return nil
 	}
-	newTemp, err := getTemplateFromRevision(newRevision)
+	newTemp, err := GetTemplateFromRevision(newRevision)
 	if err != nil {
 		return nil
 	}
 
-	updateSpec := &updateSpec{
+	updateSpec := &UpdateSpec{
 		Revision:        newRevision.Name,
 		ContainerImages: make(map[string]string),
 	}
+
+	// If the CustomizeUpdateFunc in UpdateOptions has been set, we just record templates instead of calculating the patches.
+	if opts != nil && opts.CustomizeUpdateFunc != nil {
+		updateSpec.Annotations = newRevision.Annotations
+		updateSpec.OldTemplate = oldTemp
+		updateSpec.NewTemplate = newTemp
+		return updateSpec
+	}
+
 	// all patches for podSpec can just update images
 	var metadataChanged bool
 	for _, jsonPatchOperation := range patches {
@@ -359,7 +374,8 @@ func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevisio
 	return updateSpec
 }
 
-func getTemplateFromRevision(revision *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
+// GetTemplateFromRevision returns the pod template parsed from ControllerRevision.
+func GetTemplateFromRevision(revision *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
 	var patchObj *struct {
 		Spec struct {
 			Template v1.PodTemplateSpec `json:"template"`
@@ -413,6 +429,15 @@ func InjectReadinessGate(pod *v1.Pod) {
 		}
 	}
 	pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appsv1alpha1.InPlaceUpdateReady})
+}
+
+func containsReadinessGate(pod *v1.Pod) bool {
+	for _, r := range pod.Spec.ReadinessGates {
+		if r.ConditionType == appsv1alpha1.InPlaceUpdateReady {
+			return true
+		}
+	}
+	return false
 }
 
 // GetCondition returns the InPlaceUpdateReady condition in Pod.

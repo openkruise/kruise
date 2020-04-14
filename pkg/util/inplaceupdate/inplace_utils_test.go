@@ -37,7 +37,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 	cases := []struct {
 		oldRevision  *apps.ControllerRevision
 		newRevision  *apps.ControllerRevision
-		expectedSpec *updateSpec
+		expectedSpec *UpdateSpec
 	}{
 		{
 			oldRevision: nil,
@@ -56,7 +56,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
-			expectedSpec: &updateSpec{
+			expectedSpec: &UpdateSpec{
 				Revision:        "new-revision",
 				ContainerImages: map[string]string{"c1": "foo2"},
 			},
@@ -70,7 +70,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"metadata":{"labels":{"k":"v"}},"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
-			expectedSpec: &updateSpec{
+			expectedSpec: &UpdateSpec{
 				Revision:        "new-revision",
 				ContainerImages: map[string]string{"c1": "foo2"},
 			},
@@ -84,7 +84,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v","k1":"v1"}},"spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
-			expectedSpec: &updateSpec{
+			expectedSpec: &UpdateSpec{
 				Revision:        "new-revision",
 				ContainerImages: map[string]string{"c1": "foo2"},
 				MetaDataPatch:   []byte(`{"metadata":{"labels":{"k1":"v1"}}}`),
@@ -99,7 +99,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"labels":{"k":"v","k1":"v1"},"finalizers":["fz2"]},"spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
-			expectedSpec: &updateSpec{
+			expectedSpec: &UpdateSpec{
 				Revision:        "new-revision",
 				ContainerImages: map[string]string{"c1": "foo2"},
 				MetaDataPatch:   []byte(`{"metadata":{"$deleteFromPrimitiveList/finalizers":["fz1"],"$setElementOrder/finalizers":["fz2"],"labels":{"k1":"v1","k2":null}}}`),
@@ -119,7 +119,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		res := calculateInPlaceUpdateSpec(tc.oldRevision, tc.newRevision)
+		res := calculateInPlaceUpdateSpec(tc.oldRevision, tc.newRevision, nil)
 		if !reflect.DeepEqual(res, tc.expectedSpec) {
 			t.Fatalf("case #%d failed, expected %v, got %v", i, tc.expectedSpec, res)
 		}
@@ -428,7 +428,7 @@ func TestRefresh(t *testing.T) {
 
 		cli := fake.NewFakeClient(testCase.pod)
 		ctrl := NewForTest(cli, apps.ControllerRevisionHashLabelKey, func() metav1.Time { return aHourAgo })
-		if res := ctrl.Refresh(testCase.pod); res.RefreshErr != nil {
+		if res := ctrl.Refresh(testCase.pod, nil); res.RefreshErr != nil {
 			t.Fatalf("failed to update condition: %v", res.RefreshErr)
 		}
 
