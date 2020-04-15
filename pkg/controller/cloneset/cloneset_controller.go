@@ -22,15 +22,15 @@ import (
 	"flag"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
-
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
 	scalecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/scale"
 	updatecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/update"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
 	apps "k8s.io/api/apps/v1"
@@ -192,6 +192,12 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
+	}
+
+	coreControl := clonesetcore.New(instance)
+	if coreControl.IsInitializing() {
+		klog.V(4).Infof("CloneSet %s skip reconcile for initializing", request)
+		return reconcile.Result{}, nil
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(instance.Spec.Selector)

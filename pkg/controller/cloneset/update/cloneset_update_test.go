@@ -24,6 +24,7 @@ import (
 
 	"github.com/openkruise/kruise/pkg/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -561,8 +562,9 @@ func TestSortUpdateIndexes(t *testing.T) {
 		},
 	}
 
+	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
 	for i, tc := range cases {
-		got := sortUpdateIndexes(tc.strategy, tc.pods, tc.waitUpdateIndexes)
+		got := sortUpdateIndexes(coreControl, tc.strategy, tc.pods, tc.waitUpdateIndexes)
 		if !reflect.DeepEqual(got, tc.expectedIndexes) {
 			t.Fatalf("case #%d failed, expected %v, got %v", i, tc.expectedIndexes, got)
 		}
@@ -624,8 +626,9 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 	}
 
+	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
 	for i, tc := range cases {
-		res := calculateUpdateCount(tc.strategy, 0, tc.totalReplicas, tc.waitUpdateIndexes, tc.pods)
+		res := calculateUpdateCount(coreControl, tc.strategy, 0, tc.totalReplicas, tc.waitUpdateIndexes, tc.pods)
 		if res != tc.expectedResult {
 			t.Fatalf("case #%d failed, expected %d, got %d", i, tc.expectedResult, res)
 		}

@@ -1,17 +1,10 @@
 package scale
 
 import (
-	"fmt"
-
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 func getPodsToDelete(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) []*v1.Pod {
@@ -66,34 +59,4 @@ func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
 		}
 	}
 	return id
-}
-
-func newVersionedPods(cs *appsv1alpha1.CloneSet, revision string, replicas int, availableIDs *[]string) []*v1.Pod {
-	var newPods []*v1.Pod
-	for i := 0; i < replicas; i++ {
-		if len(*availableIDs) == 0 {
-			return newPods
-		}
-		id := (*availableIDs)[0]
-		*availableIDs = (*availableIDs)[1:]
-
-		pod, _ := controller.GetPodFromTemplate(&cs.Spec.Template, cs, metav1.NewControllerRef(cs, clonesetutils.ControllerKind))
-		if pod.Labels == nil {
-			pod.Labels = make(map[string]string)
-		}
-		pod.Labels[apps.ControllerRevisionHashLabelKey] = revision
-
-		initIdentity(cs, pod, id)
-		inplaceupdate.InjectReadinessGate(pod)
-		clonesetutils.UpdateStorage(cs, pod)
-
-		newPods = append(newPods, pod)
-	}
-	return newPods
-}
-
-func initIdentity(cs *appsv1alpha1.CloneSet, pod *v1.Pod, id string) {
-	pod.Name = fmt.Sprintf("%s-%s", cs.Name, id)
-	pod.Namespace = cs.Namespace
-	pod.Labels[appsv1alpha1.CloneSetInstanceID] = id
 }
