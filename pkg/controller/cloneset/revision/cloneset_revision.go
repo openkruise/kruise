@@ -63,7 +63,12 @@ func (c *realControl) NewRevision(cs *appsv1alpha1.CloneSet, revision int64, col
 	if err != nil {
 		return nil, err
 	}
-	coreControl.SetRevisionAnnotations(cr)
+	if cr.ObjectMeta.Annotations == nil {
+		cr.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for key, value := range cs.Annotations {
+		cr.ObjectMeta.Annotations[key] = value
+	}
 	return cr, nil
 }
 
@@ -95,10 +100,6 @@ func (c *realControl) ApplyRevision(cs *appsv1alpha1.CloneSet, revision *apps.Co
 	if err != nil {
 		return nil, err
 	}
-	restoredSet := &appsv1alpha1.CloneSet{}
-	err = json.Unmarshal(patched, restoredSet)
-	if err != nil {
-		return nil, err
-	}
-	return restoredSet, nil
+	coreControl := clonesetcore.New(clone)
+	return coreControl.ApplyRevisionPatch(patched)
 }

@@ -39,11 +39,16 @@ import (
 
 var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
 
-type CustomizeUpdateFunc func(pod *v1.Pod, spec *UpdateSpec) error
+type (
+	CustomizeSpecCalculateFunc func(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec
+	CustomizeSpecPatchFunc     func(pod *v1.Pod, spec *UpdateSpec) error
+)
 
 type UpdateOptions struct {
-	GracePeriodSeconds  int32
-	CustomizeUpdateFunc CustomizeUpdateFunc
+	GracePeriodSeconds int32
+
+	CustomizeSpecCalculate CustomizeSpecCalculateFunc
+	CustomizeSpecPatch     CustomizeSpecPatchFunc
 }
 
 type RefreshResult struct {
@@ -204,7 +209,12 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 
 func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) UpdateResult {
 	// 1. calculate inplace update spec
-	spec := calculateInPlaceUpdateSpec(oldRevision, newRevision, opts)
+	var spec *UpdateSpec
+	if opts == nil || opts.CustomizeSpecCalculate == nil {
+		spec = calculateInPlaceUpdateSpec(oldRevision, newRevision)
+	} else {
+		spec = opts.CustomizeSpecCalculate(oldRevision, newRevision)
+	}
 	if spec == nil {
 		return UpdateResult{}
 	}
@@ -285,8 +295,8 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 }
 
 func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) error {
-	if opts != nil && opts.CustomizeUpdateFunc != nil {
-		return opts.CustomizeUpdateFunc(pod, spec)
+	if opts != nil && opts.CustomizeSpecPatch != nil {
+		return opts.CustomizeSpecPatch(pod, spec)
 	}
 	if spec.MetaDataPatch != nil {
 		cloneBytes, _ := json.Marshal(pod)
@@ -310,7 +320,7 @@ func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) er
 // calculateInPlaceUpdateSpec calculates diff between old and update revisions.
 // If the diff just contains replace operation of spec.containers[x].image, it will returns an UpdateSpec.
 // Otherwise, it returns nil which means can not use in-place update.
-func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec {
+func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec {
 	if oldRevision == nil || newRevision == nil {
 		return nil
 	}
@@ -332,14 +342,6 @@ func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevisio
 	updateSpec := &UpdateSpec{
 		Revision:        newRevision.Name,
 		ContainerImages: make(map[string]string),
-	}
-
-	// If the CustomizeUpdateFunc in UpdateOptions has been set, we just record templates instead of calculating the patches.
-	if opts != nil && opts.CustomizeUpdateFunc != nil {
-		updateSpec.Annotations = newRevision.Annotations
-		updateSpec.OldTemplate = oldTemp
-		updateSpec.NewTemplate = newTemp
-		return updateSpec
 	}
 
 	// all patches for podSpec can just update images

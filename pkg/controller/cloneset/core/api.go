@@ -27,7 +27,7 @@ type Control interface {
 	// common
 	IsInitializing() bool
 	SetRevisionTemplate(revisionSpec map[string]interface{}, template map[string]interface{})
-	SetRevisionAnnotations(cr *apps.ControllerRevision)
+	ApplyRevisionPatch(patched []byte) (*appsv1alpha1.CloneSet, error)
 
 	// scale
 	IsReadyToScale() bool
