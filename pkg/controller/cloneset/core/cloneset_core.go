@@ -51,21 +51,16 @@ func (c *commonControl) SetRevisionTemplate(revisionSpec map[string]interface{},
 	template["$patch"] = "replace"
 }
 
-func (c *commonControl) SetRevisionAnnotations(cr *apps.ControllerRevision) {
-	if cr.ObjectMeta.Annotations == nil {
-		cr.ObjectMeta.Annotations = make(map[string]string)
+func (c *commonControl) ApplyRevisionPatch(patched []byte) (*appsv1alpha1.CloneSet, error) {
+	restoredSet := &appsv1alpha1.CloneSet{}
+	if err := json.Unmarshal(patched, restoredSet); err != nil {
+		return nil, err
 	}
-	for key, value := range c.Annotations {
-		cr.ObjectMeta.Annotations[key] = value
-	}
+	return restoredSet, nil
 }
 
 func (c *commonControl) IsReadyToScale() bool {
 	return true
-}
-
-func (c *commonControl) IsAllowedRandomDelete() error {
-	return nil
 }
 
 func (c *commonControl) NewVersionedPods(currentCS, updateCS *appsv1alpha1.CloneSet,

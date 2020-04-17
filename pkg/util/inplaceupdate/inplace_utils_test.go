@@ -119,7 +119,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		res := calculateInPlaceUpdateSpec(tc.oldRevision, tc.newRevision, nil)
+		res := calculateInPlaceUpdateSpec(tc.oldRevision, tc.newRevision)
 		if !reflect.DeepEqual(res, tc.expectedSpec) {
 			t.Fatalf("case #%d failed, expected %v, got %v", i, tc.expectedSpec, res)
 		}
