@@ -75,7 +75,11 @@ If you only need some of the Kruise controllers and want to disable others, you 
 
 1. Only install the CRDs you need.
 
-2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container by changing kruise-controller-manager statefulset template. The value is a list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet` means only AdvancedStatefulSet and SidecarSet controllers/webhooks are enabled, all other controllers/webhooks are disabled.
+2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container by changing kruise-controller-manager statefulset template. The value is a list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet` means only AdvancedStatefulSet and SidecarSet controllers/webhooks are enabled, all other controllers/webhooks are disabled. This option can also be applied by using helm chart:
+
+```
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.4.1/kruise-chart.tgz --set manager.custom_resource_enable="StatefulSet\,SidecarSet"
+```
 
 ## Usage
 
