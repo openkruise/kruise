@@ -59,6 +59,8 @@ spec:
                   fieldPath: metadata.namespace
             - name: SECRET_NAME
               value: kruise-webhook-server-secret
+            - name: CUSTOM_RESOURCE_ENABLE
+              value: {{ .Values.manager.custom_resource_enable }}
           image: openkruise/kruise-manager:v0.4.1
           imagePullPolicy: IfNotPresent
           name: manager

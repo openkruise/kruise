@@ -25,3 +25,5 @@ manager:
   metrics:
     addr: localhost
     port: 8080
+
+  custom_resource_enable:
