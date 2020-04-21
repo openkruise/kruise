@@ -180,12 +180,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			}
 		}
 
-		var res inplaceupdate.UpdateResult
-		if oldRevision != nil {
-			res = c.inplaceControl.Update(pod, oldRevision, updateRevision, coreControl.GetUpdateOptions())
-		} else {
-			res = coreControl.OverwriteUpdate(updateRevision, pod)
-		}
+		res := c.inplaceControl.Update(pod, oldRevision, updateRevision, coreControl.GetUpdateOptions())
 
 		if res.InPlaceUpdate {
 			if res.UpdateErr == nil {

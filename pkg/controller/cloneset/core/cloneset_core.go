@@ -135,10 +135,6 @@ func (c *commonControl) GetUpdateOptions() *inplaceupdate.UpdateOptions {
 	return opts
 }
 
-func (c *commonControl) OverwriteUpdate(updateRevision *apps.ControllerRevision, pod *v1.Pod) inplaceupdate.UpdateResult {
-	return inplaceupdate.UpdateResult{}
-}
-
 func (c *commonControl) ValidateTemplateUpdateForInPlace(oldTemp, newTemp *v1.PodTemplateSpec) error {
 	oldTempJSON, _ := json.Marshal(oldTemp.Spec)
 	newTempJSON, _ := json.Marshal(newTemp.Spec)
