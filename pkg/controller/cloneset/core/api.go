@@ -19,7 +19,6 @@ package core
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -42,7 +41,6 @@ type Control interface {
 	IsPodUpdateReady(pod *v1.Pod, minReadySeconds int32) bool
 	GetPodsSortFunc(pods []*v1.Pod, waitUpdateIndexes []int) func(i, j int) bool
 	GetUpdateOptions() *inplaceupdate.UpdateOptions
-	OverwriteUpdate(updateRevision *apps.ControllerRevision, pod *v1.Pod) inplaceupdate.UpdateResult
 
 	// validation
 	ValidateTemplateUpdateForInPlace(oldTemp, newTemp *v1.PodTemplateSpec) error
