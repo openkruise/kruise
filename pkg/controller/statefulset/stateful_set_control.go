@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/history"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // ControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
@@ -295,8 +296,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
-	status.CollisionCount = new(int32)
-	*status.CollisionCount = collisionCount
+	status.CollisionCount = utilpointer.Int32Ptr(collisionCount)
 	status.LabelSelector = selector.String()
 
 	replicaCount := int(*set.Spec.Replicas)
