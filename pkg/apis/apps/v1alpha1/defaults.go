@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/core/v1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -127,8 +128,7 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 			obj.Spec.UpdateStrategy.RollingUpdate = &RollingUpdateStatefulSetStrategy{}
 		}
 		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = utilpointer.Int32Ptr(0)
 		}
 		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 			maxUnavailable := intstr.FromInt(1)
@@ -140,12 +140,10 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 	}
 
 	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
+		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = new(int32)
-		*obj.Spec.RevisionHistoryLimit = 10
+		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
 	}
 
 	utils.SetDefaultPodTemplate(&obj.Spec.Template.Spec)
@@ -161,12 +159,10 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
+		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = new(int32)
-		*obj.Spec.RevisionHistoryLimit = 10
+		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
 	}
 
 	if len(obj.Spec.UpdateStrategy.Type) == 0 {
@@ -192,12 +188,10 @@ func SetDefaults_UnitedDeployment(obj *UnitedDeployment) {
 // SetDefaults_CloneSet set default values for CloneSet.
 func SetDefaults_CloneSet(obj *CloneSet) {
 	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
+		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = new(int32)
-		*obj.Spec.RevisionHistoryLimit = 10
+		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
 	}
 
 	utils.SetDefaultPodTemplate(&obj.Spec.Template.Spec)
@@ -219,8 +213,7 @@ func SetDefaults_CloneSet(obj *CloneSet) {
 	}
 
 	if obj.Spec.UpdateStrategy.Partition == nil {
-		obj.Spec.UpdateStrategy.Partition = new(int32)
-		*obj.Spec.UpdateStrategy.Partition = 0
+		obj.Spec.UpdateStrategy.Partition = utilpointer.Int32Ptr(0)
 	}
 	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
 		maxUnavailable := intstr.FromString(DefaultCloneSetMaxUnavailable)
