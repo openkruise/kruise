@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -119,7 +120,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 	// 1. apply containers
 	pod.Spec.Containers = append(pod.Spec.Containers, sidecarContainers...)
 	// 2. apply volumes
-	pod.Spec.Volumes = append(pod.Spec.Volumes, sidecarVolumes...)
+	pod.Spec.Volumes = mergeVolumes(pod.Spec.Volumes, sidecarVolumes)
 	// 3. apply annotations
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
@@ -153,6 +154,23 @@ func PodMatchSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bo
 		return true, nil
 	}
 	return false, nil
+}
+
+func mergeVolumes(original []corev1.Volume, additional []corev1.Volume) []corev1.Volume {
+	exists := sets.NewString()
+	for _, volume := range original {
+		exists.Insert(volume.Name)
+	}
+
+	for _, volume := range additional {
+		if exists.Has(volume.Name) {
+			continue
+		}
+		original = append(original, volume)
+		exists.Insert(volume.Name)
+	}
+
+	return original
 }
 
 var _ admission.Handler = &PodCreateHandler{}

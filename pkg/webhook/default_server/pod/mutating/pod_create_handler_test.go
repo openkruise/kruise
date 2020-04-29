@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/openkruise/kruise/pkg/util"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -156,4 +158,66 @@ func isMarkedSidecar(container corev1.Container) bool {
 		}
 	}
 	return false
+}
+
+func TestMergeVolumes(t *testing.T) {
+	original := []corev1.Volume{
+		{
+			Name: "vol01",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "vol02",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{},
+			},
+		},
+	}
+	additional := []corev1.Volume{
+		{
+			Name: "vol02",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "vol03",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{},
+			},
+		},
+		{
+			Name: "vol03",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+	expected := []corev1.Volume{
+		{
+			Name: "vol01",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "vol02",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{},
+			},
+		},
+		{
+			Name: "vol03",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{},
+			},
+		},
+	}
+
+	got := mergeVolumes(original, additional)
+	if !reflect.DeepEqual(got, expected) {
+		t.Fatalf("expected %v, got %v", util.DumpJSON(expected), util.DumpJSON(got))
+	}
 }
