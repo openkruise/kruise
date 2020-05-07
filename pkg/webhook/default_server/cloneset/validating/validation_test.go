@@ -75,8 +75,8 @@ func TestValidate(t *testing.T) {
 	var val1 int32 = 1
 	var val2 int32 = 2
 	var minus1 int32 = -1
-	maxUnavailable0 := intstr.FromInt(0)
-	maxUnavailable1 := intstr.FromInt(1)
+	intOrStr0 := intstr.FromInt(0)
+	intOrStr1 := intstr.FromInt(1)
 	maxUnavailable120Percent := intstr.FromString("120%")
 
 	uid := uuid.NewUUID()
@@ -97,10 +97,36 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0"},
+				},
+			},
+		},
+		{
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+					Partition:      &val2,
+					MaxUnavailable: &intOrStr1,
+					MaxSurge:       &intOrStr1,
+				},
+			},
+		},
+		{
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+					Partition:      &val2,
+					MaxUnavailable: &intOrStr0,
+					MaxSurge:       &intOrStr1,
 				},
 			},
 		},
@@ -141,7 +167,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 			oldSpec: &appsv1alpha1.CloneSetSpec{
@@ -151,7 +177,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
@@ -189,7 +215,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
@@ -201,7 +227,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
@@ -213,7 +239,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
@@ -225,7 +251,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           "",
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
@@ -237,7 +263,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &minus1,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
@@ -249,7 +275,20 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable0,
+					MaxUnavailable: &intOrStr0,
+				},
+			},
+		},
+		"invalid-maxSurge": {
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+					Partition:      &val2,
+					MaxUnavailable: &intOrStr0,
+					MaxSurge:       &intOrStr0,
 				},
 			},
 		},
@@ -261,7 +300,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0", "p0"},
@@ -276,7 +315,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0", "p1"},
@@ -292,7 +331,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 			oldSpec: &appsv1alpha1.CloneSetSpec{
@@ -303,7 +342,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
@@ -315,7 +354,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 			oldSpec: &appsv1alpha1.CloneSetSpec{
@@ -325,7 +364,7 @@ func TestValidate(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      &val2,
-					MaxUnavailable: &maxUnavailable1,
+					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},

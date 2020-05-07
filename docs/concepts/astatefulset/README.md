@@ -151,6 +151,30 @@ spec:
       maxUnavailable: 2
 ```
 
+## Graceful in-place update
+
+When a Pod being in-place update, controller will firstly update Pod status to make it become not-ready using readinessGate,
+and then update images in Pod spec to trigger Kubelet recreate the container on Node.
+
+However, sometimes Kubelet recreate containers so fast that other controllers such as endpoints-controller in kcm
+have not noticed the Pod has turned to not-ready. This may lead to requests damaged.
+
+So we bring **graceful period** into in-place update. Advanced StatefulSet has supported `gracePeriodSeconds`, which is a period
+duration between controller update pod status and update pod images.
+So that endpoints-controller could have enough time to remove this Pod from endpoints.
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: StatefulSet
+spec:
+  # ...
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      inPlaceUpdateStrategy:
+        gracePeriodSeconds: 10
+```
+
 ## `Priority` Unordered Rolling Update Strategy
 
   This controller adds a `unorderedUpdate` field in `spec.updateStrategy.rollingUpdate`, which contains strategies for non-ordered update.

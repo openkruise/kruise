@@ -3,7 +3,6 @@ package scale
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
@@ -16,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -69,20 +67,22 @@ func (r *realControl) Manage(
 		return true, r.deletePods(updateCS, podsToDelete, pvcs)
 	}
 
+	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
+
 	var err error
-	diff := len(pods) - int(*updateCS.Spec.Replicas)
+	diff, currentRevDiff := calculateDiffs(updateCS, updateRevision == currentRevision, len(pods), len(notUpdatedPods))
 
 	if diff < 0 {
 		// total number of this creation
 		expectedCreations := diff * -1
 		// lack number of current version
 		expectedCurrentCreations := 0
-		if updateCS.Spec.UpdateStrategy.Partition != nil {
-			notUpdatedNum := len(pods) - len(clonesetutils.GetUpdatedPods(pods, updateRevision))
-			expectedCurrentCreations = int(*updateCS.Spec.UpdateStrategy.Partition) - notUpdatedNum
+		if currentRevDiff < 0 {
+			expectedCurrentCreations = currentRevDiff * -1
 		}
 
-		klog.V(3).Infof("CloneSet %s begin to scale out %d pods", controllerKey, expectedCreations)
+		klog.V(3).Infof("CloneSet %s begin to scale out %d pods including %d (current rev)",
+			controllerKey, expectedCreations, expectedCurrentCreations)
 
 		// available instance-id come from free pvc
 		availableIDs := getOrGenAvailableIDs(expectedCreations, pods, pvcs)
@@ -97,11 +97,12 @@ func (r *realControl) Manage(
 		return true, err
 
 	} else if diff > 0 {
-		klog.V(3).Infof("CloneSet %s begin to scale in %d pods", controllerKey, diff)
+		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev)",
+			controllerKey, diff, currentRevDiff)
 
-		podsToDelete := r.choosePodsToDelete(pods, diff)
+		podsToDelete := choosePodsToDelete(diff, currentRevDiff, notUpdatedPods, updatedPods)
+
 		err = r.deletePods(updateCS, podsToDelete, pvcs)
-
 		return true, err
 	}
 
@@ -204,16 +205,4 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 	}
 
 	return nil
-}
-
-func (r *realControl) choosePodsToDelete(pods []*v1.Pod, diff int) []*v1.Pod {
-	// No need to sort pods if we are about to delete all of them.
-	// diff will always be <= len(filteredPods), so not need to handle > case.
-	if diff < len(pods) {
-		// Sort the pods in the order such that not-ready < ready, unscheduled
-		// < scheduled, and pending < running. This ensures that we delete pods
-		// in the earlier stages whenever possible.
-		sort.Sort(kubecontroller.ActivePods(pods))
-	}
-	return pods[:diff]
 }

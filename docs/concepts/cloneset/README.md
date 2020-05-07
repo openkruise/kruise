@@ -218,6 +218,59 @@ MaxUnavailable is the maximum number of Pods that can be unavailable during the 
 Value can be an absolute number (e.g., 5) or a percentage of desired number of Pods (e.g., 10%).
 Default value is 20%.
 
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: CloneSet
+spec:
+  # ...
+  updateStrategy:
+    maxUnavailable: 20%
+```
+
+### MaxSurge
+
+MaxSurge is the maximum number of pods that can be scheduled above the desired replicas during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+Defaults to 0.
+
+If maxSurge is set somewhere, cloneset-controller will create `maxSurge` number of Pods above the `replicas`,
+when it finds multiple active revisions of Pods which means the CloneSet is in the update stage.
+
+What's more, maxSurge is forbidden to use with `InPlaceOnly` policy.
+When maxSurge is used with `InPlaceIfPossible`, controller will create additional Pods with latest revision first,
+and then update the rest Pods with old revisions,
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: CloneSet
+spec:
+  # ...
+  updateStrategy:
+    maxSurge: 3
+```
+
+### Graceful in-place update
+
+When a Pod being in-place update, controller will firstly update Pod status to make it become not-ready using readinessGate,
+and then update images in Pod spec to trigger Kubelet recreate the container on Node.
+
+However, sometimes Kubelet recreate containers so fast that other controllers such as endpoints-controller in kcm
+have not noticed the Pod has turned to not-ready. This may lead to requests damaged.
+
+So we bring **graceful period** into in-place update. CloneSet has supported `gracePeriodSeconds`, which is a period
+duration between controller update pod status and update pod images.
+So that endpoints-controller could have enough time to remove this Pod from endpoints.
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: CloneSet
+spec:
+  # ...
+  updateStrategy:
+    inPlaceUpdateStrategy:
+      gracePeriodSeconds: 10
+```
+
 ### Update sequence
 
 When controller chooses Pods to update, it has default sort logic based on Pod phase and conditions:
