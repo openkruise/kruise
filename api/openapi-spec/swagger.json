@@ -373,8 +373,12 @@
           "description": "InPlaceUpdateStrategy contains strategies for in-place update.",
           "$ref": "#/definitions/kruise.apps.v1alpha1.InPlaceUpdateStrategy"
         },
+        "maxSurge": {
+          "description": "The maximum number of pods that can be scheduled above the desired replicas during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. Defaults to nil.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        },
         "maxUnavailable": {
-          "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. Defaults to 20%.",
+          "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. Defaults to 20%.",
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
         },
         "partition": {

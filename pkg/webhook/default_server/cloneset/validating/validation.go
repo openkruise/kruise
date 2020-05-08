@@ -60,7 +60,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec *appsv1alpha1.Cl
 	}
 
 	allErrs = append(allErrs, h.validateScaleStrategy(&spec.ScaleStrategy, metadata, fldPath.Child("scaleStrategy"))...)
-	allErrs = append(allErrs, h.validateUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
+	allErrs = append(allErrs, h.validateUpdateStrategy(&spec.UpdateStrategy, int(*spec.Replicas), fldPath.Child("updateStrategy"))...)
 
 	return allErrs
 }
@@ -87,8 +87,9 @@ func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy *appsv1alph
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alpha1.CloneSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alpha1.CloneSetUpdateStrategy, replicas int, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	var err error
 
 	switch strategy.Type {
 	case appsv1alpha1.RecreateCloneSetUpdateStrategyType,
@@ -111,12 +112,31 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 		allErrs = append(allErrs, field.Required(fldPath.Child("scatterStrategy"), err.Error()))
 	}
 
-	if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(strategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), 1, true); err != nil {
+	var maxUnavailable int
+	if strategy.MaxUnavailable != nil {
+		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(strategy.MaxUnavailable, replicas, true)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), strategy.MaxUnavailable.String(),
+				fmt.Sprintf("failed getValueFromIntOrPercent for maxUnavailable: %v", err)))
+		}
+	}
+
+	var maxSurge int
+	if strategy.MaxSurge != nil {
+		if strategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
+				fmt.Sprintf("can not use maxSurge with strategy type InPlaceOnly")))
+		}
+		maxSurge, err = intstrutil.GetValueFromIntOrPercent(strategy.MaxSurge, replicas, true)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
+				fmt.Sprintf("failed getValueFromIntOrPercent for maxSurge: %v", err)))
+		}
+	}
+
+	if replicas > 0 && maxUnavailable < 1 && maxSurge < 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), strategy.MaxUnavailable,
-			fmt.Sprintf("failed getValueFromIntOrPercent for maxUnavailable: %v", err)))
-	} else if maxUnavailable < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), strategy.MaxUnavailable,
-			"getValueFromIntOrPercent for maxUnavailable should not be less than 1"))
+			"maxUnavailable and maxSurge should not both be less than 1"))
 	}
 
 	return allErrs

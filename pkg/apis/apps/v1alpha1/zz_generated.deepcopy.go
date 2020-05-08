@@ -378,6 +378,11 @@ func (in *CloneSetUpdateStrategy) DeepCopyInto(out *CloneSetUpdateStrategy) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.MaxSurge != nil {
+		in, out := &in.MaxSurge, &out.MaxSurge
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	if in.PriorityStrategy != nil {
 		in, out := &in.PriorityStrategy, &out.PriorityStrategy
 		*out = new(UpdatePriorityStrategy)

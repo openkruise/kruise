@@ -219,4 +219,8 @@ func SetDefaults_CloneSet(obj *CloneSet) {
 		maxUnavailable := intstr.FromString(DefaultCloneSetMaxUnavailable)
 		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailable
 	}
+	if obj.Spec.UpdateStrategy.MaxSurge == nil {
+		maxSurge := intstr.FromInt(0)
+		obj.Spec.UpdateStrategy.MaxSurge = &maxSurge
+	}
 }
