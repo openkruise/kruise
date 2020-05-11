@@ -712,7 +712,7 @@ func schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref common.ReferenceCa
 					},
 					"maxSurge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of pods that can be scheduled above the desired replicas during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. Defaults to nil.",
+							Description: "The maximum number of pods that can be scheduled above the desired replicas during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. Defaults to 0.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
