@@ -195,7 +195,7 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 				return nil
 			}
 
-			if err := patchUpdateSpecToPod(clone, &spec, opts); err != nil {
+			if clone, err = patchUpdateSpecToPod(clone, &spec, opts); err != nil {
 				return err
 			}
 			delete(clone.Annotations, appsv1alpha1.InPlaceUpdateGraceKey)
@@ -281,7 +281,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 		clone.Annotations[appsv1alpha1.InPlaceUpdateStateKey] = string(inPlaceUpdateStateJSON)
 
 		if spec.GraceSeconds <= 0 {
-			if err := patchUpdateSpecToPod(clone, spec, opts); err != nil {
+			if clone, err = patchUpdateSpecToPod(clone, spec, opts); err != nil {
 				return err
 			}
 			delete(clone.Annotations, appsv1alpha1.InPlaceUpdateGraceKey)
@@ -294,18 +294,23 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 	})
 }
 
-func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) error {
+// patchUpdateSpecToPod returns new pod that merges spec into old pod
+func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) (*v1.Pod, error) {
 	if opts != nil && opts.CustomizeSpecPatch != nil {
-		return opts.CustomizeSpecPatch(pod, spec)
+		if err := opts.CustomizeSpecPatch(pod, spec); err != nil {
+			return nil, err
+		}
+		return pod, nil
 	}
 	if spec.MetaDataPatch != nil {
 		cloneBytes, _ := json.Marshal(pod)
 		modified, err := strategicpatch.StrategicMergePatch(cloneBytes, spec.MetaDataPatch, &v1.Pod{})
 		if err != nil {
-			return err
+			return nil, err
 		}
+		pod = &v1.Pod{}
 		if err = json.Unmarshal(modified, pod); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -314,7 +319,7 @@ func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) er
 			pod.Spec.Containers[i].Image = newImage
 		}
 	}
-	return nil
+	return pod, nil
 }
 
 // calculateInPlaceUpdateSpec calculates diff between old and update revisions.
