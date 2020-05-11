@@ -144,6 +144,10 @@ func calculateUpdateCount(coreControl clonesetcore.Control, strategy appsv1alpha
 
 	maxUnavailable, _ := intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(strategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), totalReplicas, true)
+	var maxSurge int
+	if strategy.MaxSurge != nil {
+		maxSurge, _ = intstrutil.GetValueFromIntOrPercent(strategy.MaxSurge, totalReplicas, true)
+	}
 
 	var notReadyCount, updateCount int
 	for _, p := range pods {
@@ -153,7 +157,7 @@ func calculateUpdateCount(coreControl clonesetcore.Control, strategy appsv1alpha
 	}
 	for _, i := range waitUpdateIndexes {
 		if coreControl.IsPodUpdateReady(pods[i], minReadySeconds) {
-			if notReadyCount >= maxUnavailable {
+			if notReadyCount >= (maxUnavailable + maxSurge) {
 				break
 			} else {
 				notReadyCount++
