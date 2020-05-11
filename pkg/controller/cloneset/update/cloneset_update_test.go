@@ -624,6 +624,13 @@ func TestCalculateUpdateCount(t *testing.T) {
 			pods:              []*v1.Pod{{}, readyPod(), {}, readyPod(), readyPod(), readyPod(), readyPod(), {}},
 			expectedResult:    3,
 		},
+		{
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{MaxSurge: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2))},
+			totalReplicas:     4,
+			waitUpdateIndexes: []int{0, 1},
+			pods:              []*v1.Pod{readyPod(), readyPod(), readyPod(), readyPod()},
+			expectedResult:    2,
+		},
 	}
 
 	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
