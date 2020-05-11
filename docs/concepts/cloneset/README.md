@@ -235,6 +235,8 @@ Defaults to 0.
 
 If maxSurge is set somewhere, cloneset-controller will create `maxSurge` number of Pods above the `replicas`,
 when it finds multiple active revisions of Pods which means the CloneSet is in the update stage.
+After all Pods have been updated to the latest revision, `maxSurge` number Pods will be deleted,
+and the number of Pods will be equal to the `replica` number.
 
 What's more, maxSurge is forbidden to use with `InPlaceOnly` policy.
 When maxSurge is used with `InPlaceIfPossible`, controller will create additional Pods with latest revision first,
