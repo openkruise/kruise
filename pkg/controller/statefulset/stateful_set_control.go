@@ -547,6 +547,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if err != nil {
 			return &status, err
 		}
+		// maxUnavailable should not less than 1
+		if maxUnavailable < 1 {
+			maxUnavailable = 1
+		}
+
 		if set.Spec.UpdateStrategy.RollingUpdate.Paused {
 			return &status, nil
 		}
