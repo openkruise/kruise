@@ -147,9 +147,9 @@ func TestCalculateDiffs(t *testing.T) {
 			},
 			revConsistent:          false,
 			totalPods:              8,
-			notUpdatedPods:         0,
+			notUpdatedPods:         1,
 			expectedTotalDiff:      -3,
-			expectedCurrentRevDiff: 0,
+			expectedCurrentRevDiff: 1,
 		},
 		{
 			name: "scale out without revConsistent 3",
@@ -158,14 +158,14 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: utilpointer.Int32Ptr(1),
 					},
 				},
 			},
 			revConsistent:          false,
 			totalPods:              10,
-			notUpdatedPods:         0,
-			expectedTotalDiff:      -1,
+			notUpdatedPods:         1,
+			expectedTotalDiff:      0,
 			expectedCurrentRevDiff: 0,
 		},
 		{
@@ -181,9 +181,9 @@ func TestCalculateDiffs(t *testing.T) {
 			},
 			revConsistent:          false,
 			totalPods:              11,
-			notUpdatedPods:         0,
+			notUpdatedPods:         1,
 			expectedTotalDiff:      0,
-			expectedCurrentRevDiff: 0,
+			expectedCurrentRevDiff: 1,
 		},
 		{
 			name: "scale out without revConsistent 5",
@@ -199,7 +199,7 @@ func TestCalculateDiffs(t *testing.T) {
 			revConsistent:          false,
 			totalPods:              8,
 			notUpdatedPods:         6,
-			expectedTotalDiff:      -3,
+			expectedTotalDiff:      -2,
 			expectedCurrentRevDiff: -2,
 		},
 		{
@@ -267,11 +267,28 @@ func TestCalculateDiffs(t *testing.T) {
 			revConsistent:          false,
 			totalPods:              11,
 			notUpdatedPods:         0,
-			expectedTotalDiff:      0,
+			expectedTotalDiff:      1,
 			expectedCurrentRevDiff: 0,
 		},
 		{
-			name: "scale in without revConsistent 2",
+			name: "scale in without revConsistent 3",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					Replicas: utilpointer.Int32Ptr(10),
+					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+						MaxSurge:  &intOrStr1,
+						Partition: utilpointer.Int32Ptr(0),
+					},
+				},
+			},
+			revConsistent:          false,
+			totalPods:              11,
+			notUpdatedPods:         1,
+			expectedTotalDiff:      0,
+			expectedCurrentRevDiff: 1,
+		},
+		{
+			name: "scale in without revConsistent 4",
 			cs: &appsv1alpha1.CloneSet{
 				Spec: appsv1alpha1.CloneSetSpec{
 					Replicas: utilpointer.Int32Ptr(10),
@@ -283,12 +300,12 @@ func TestCalculateDiffs(t *testing.T) {
 			},
 			revConsistent:          false,
 			totalPods:              12,
-			notUpdatedPods:         0,
+			notUpdatedPods:         2,
 			expectedTotalDiff:      1,
-			expectedCurrentRevDiff: 0,
+			expectedCurrentRevDiff: 2,
 		},
 		{
-			name: "scale in without revConsistent 3",
+			name: "scale in without revConsistent 5",
 			cs: &appsv1alpha1.CloneSet{
 				Spec: appsv1alpha1.CloneSetSpec{
 					Replicas: utilpointer.Int32Ptr(10),

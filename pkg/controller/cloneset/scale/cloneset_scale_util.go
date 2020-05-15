@@ -70,12 +70,15 @@ func calculateDiffs(cs *appsv1alpha1.CloneSet, revConsistent bool, totalPods int
 	var maxSurge int
 
 	if !revConsistent {
-		if cs.Spec.UpdateStrategy.MaxSurge != nil {
-			maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, int(*cs.Spec.Replicas), true)
-		}
-
 		if cs.Spec.UpdateStrategy.Partition != nil {
 			currentRevDiff = notUpdatedPods - int(*cs.Spec.UpdateStrategy.Partition)
+		}
+
+		// Use maxSurge only if partition has not satisfied
+		if currentRevDiff > 0 {
+			if cs.Spec.UpdateStrategy.MaxSurge != nil {
+				maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, int(*cs.Spec.Replicas), true)
+			}
 		}
 	}
 	totalDiff = totalPods - int(*cs.Spec.Replicas) - maxSurge
