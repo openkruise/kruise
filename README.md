@@ -4,6 +4,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/openkruise/kruise)](https://goreportcard.com/report/github.com/openkruise/kruise)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2908/badge)](https://bestpractices.coreinfrastructure.org/en/projects/2908)
 
+English | [简体中文](./README-zh_CN.md)
+
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
 |Mar 20th, 2020. Kruise v0.4.1 is **RELEASED**! It provides **graceful in-place update** for Advanced StatefulSet and CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
@@ -14,15 +16,15 @@ Kruise is the core of the OpenKruise project. It is a set of controllers which e
 
 Today, Kruise offers five workload controllers:
 
-- [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, `pause` and `MaxUnavailable`.
+- [CloneSet](./docs/concepts/cloneset/README.md): CloneSet is a workload that mainly focuses on managing stateless applications. It provides full features for more efficient, deterministic and controlled deployment, such as inplace update, specified pod deletion, configurable priority/scatter update, preUpdate/postUpdate hooks.
 
-- [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
+- [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, `pause` and `MaxUnavailable`.
 
 - [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also is able to upgrade the sidecar containers.
 
 - [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
-- [CloneSet](./docs/concepts/cloneset/README.md): CloneSet is a workload that mainly focuses on managing stateless applications. It provides full features for more efficient, deterministic and controlled deployment, such as inplace update, specified pod deletion, configurable priority/scatter update, preUpdate/postUpdate hooks.
+- [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
 
 The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
 This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is great for new users.
