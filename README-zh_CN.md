@@ -8,6 +8,7 @@
 
 |![notification](docs/img/bell-outline-badge.svg) 最新进展：|
 |------------------|
+|May 19th, 2020. Kruise v0.5.0 发布! CloneSet 支持 `maxSurge` 策略、为 StatefulSet/SidecarSet 修复部分 bug, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Mar 20th, 2020. Kruise v0.4.1 发布! 为 Advanced StatefulSet 和 CloneSet 提供了 **优雅原地升级** 功能，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Feb 7th,  2020. Kruise v0.4.0 发布! **新增 CloneSet 控制器**，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Nov 24th, 2019. 发布 UnitedDeployment 控制器的博客 ([link](http://openkruise.io/en-us/blog/blog3.html)).|
@@ -45,7 +46,7 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/s
 推荐使用 helm v3 安装 Kruise，helm 是一个简单的命令行工具可以从[这里](https://github.com/helm/helm/releases) 获取。
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.4.1/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz
 ```
 
 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者只启用某些特定的控制器能力。
@@ -80,7 +81,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config
 如果使用 helm chart 安装，可以通过以下参数来生效这个配置：
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.4.1/kruise-chart.tgz --set manager.custom_resource_enable="CloneSet\,StatefulSet"
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz --set manager.custom_resource_enable="CloneSet\,StatefulSet"
 ```
 
 ## 使用说明

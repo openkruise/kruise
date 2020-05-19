@@ -1,10 +1,40 @@
-# v0.4.1
+# v0.5.0
 
 ## CloneSet
 
 ### Features
 
-- add `labelSelector` to optimize scale subresource for HPA
+- Support `maxSurge` strategy which could work well with `maxUnavailable` and `partition`
+- Add CloneSet core interface to support multiple implementations
+
+### Bugs
+
+- Fix in-place update for metadata in template
+
+## StatefulSet
+
+### Bugs
+
+- Make sure `maxUnavailable` should not be less than 1
+- Fix in-place update for metadata in template
+
+## SidecarSet
+
+### Bugs
+
+- Merge volumes during injecting sidecars into Pod
+
+## Installation
+
+- Expose `CUSTOM_RESOURCE_ENABLE` env by chart set option
+
+**# v0.4.1**
+
+## CloneSet
+
+### Features
+
+- Add `labelSelector` to optimize scale subresource for HPA
 - Add `minReadySeconds`, `availableReplicas` fields for CloneSet
 - Add `gracePeriodSeconds` for graceful in-place update
 
