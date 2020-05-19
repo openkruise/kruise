@@ -61,8 +61,8 @@ spec:
               value: kruise-webhook-server-secret
             - name: CUSTOM_RESOURCE_ENABLE
               value: {{ .Values.manager.custom_resource_enable }}
-          image: openkruise/kruise-manager:v0.5.0
-          imagePullPolicy: IfNotPresent
+          image: 614624372165.dkr.ecr.us-west-2.amazonaws.com/kruise-manager:hari
+          imagePullPolicy: Always
           name: manager
           ports:
             - containerPort: {{ .Values.manager.metrics.port }}

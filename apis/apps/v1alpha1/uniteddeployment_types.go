@@ -90,6 +90,10 @@ type SubsetTemplate struct {
 	// CloneSet template
 	// +optional
 	CloneSetTemplate *CloneSetTemplateSpec `json:"cloneSetTemplate,omitempty"`
+
+	// Deployment template
+	// +optional
+	DeploymentTemplate *DeploymentTemplateSpec `json:"deploymentTemplate,omitempty"`
 }
 
 // StatefulSetTemplateSpec defines the subset template of StatefulSet.
@@ -104,9 +108,16 @@ type AdvancedStatefulSetTemplateSpec struct {
 	Spec              StatefulSetSpec `json:"spec"`
 }
 
+// CloneSetTemplateSpec defines the subset template of CloneSet.
 type CloneSetTemplateSpec struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CloneSetSpec `json:"spec"`
+}
+
+// DeploymentTemplateSpec defines the subset template of Deployment.
+type DeploymentTemplateSpec struct {
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              appsv1.DeploymentSpec `json:"spec"`
 }
 
 // UnitedDeploymentUpdateStrategy defines the update performance

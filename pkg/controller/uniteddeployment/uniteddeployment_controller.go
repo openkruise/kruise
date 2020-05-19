@@ -67,6 +67,7 @@ const (
 	statefulSetSubSetType         subSetType = "StatefulSet"
 	advancedStatefulSetSubSetType subSetType = "AdvancedStatefulSet"
 	cloneSetSubSetType            subSetType = "CloneSet"
+	deploymentSubSetType          subSetType = "Deployment"
 )
 
 // Add creates a new UnitedDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -89,6 +90,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 			statefulSetSubSetType:         &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.StatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 			advancedStatefulSetSubSetType: &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.AdvancedStatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 			cloneSetSubSetType:            &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.CloneSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
+			deploymentSubSetType:          &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.DeploymentAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 		},
 	}
 }
@@ -284,6 +286,10 @@ func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.Uni
 
 	if instance.Spec.Template.CloneSetTemplate != nil {
 		return r.subSetControls[cloneSetSubSetType], cloneSetSubSetType
+	}
+
+	if instance.Spec.Template.DeploymentTemplate != nil {
+		return r.subSetControls[deploymentSubSetType], deploymentSubSetType
 	}
 
 	// unexpected
