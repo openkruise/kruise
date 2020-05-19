@@ -8,6 +8,7 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
+|May 19th, 2020. Kruise v0.5.0 is **RELEASED**! It supports `maxSurge` for CloneSet and fixes bugs for StatefulSet/SidecarSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Mar 20th, 2020. Kruise v0.4.1 is **RELEASED**! It provides **graceful in-place update** for Advanced StatefulSet and CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Feb 7th,  2020. Kruise v0.4.0 is **RELEASED**! It provides a new CloneSet controller, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Nov 24th, 2019. A blog about new UnitedDeployment controller is posted in Kruise Blog ([link](http://openkruise.io/en-us/blog/blog3.html)).|
@@ -46,7 +47,7 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/s
 It is recommended that you should install Kruise with helm v3, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.4.1/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for kruise-manager.
@@ -80,7 +81,7 @@ If you only need some of the Kruise controllers and want to disable others, you 
 2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container by changing kruise-controller-manager statefulset template. The value is a list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet` means only AdvancedStatefulSet and SidecarSet controllers/webhooks are enabled, all other controllers/webhooks are disabled. This option can also be applied by using helm chart:
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.4.1/kruise-chart.tgz --set manager.custom_resource_enable="StatefulSet\,SidecarSet"
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz --set manager.custom_resource_enable="StatefulSet\,SidecarSet"
 ```
 
 ## Usage
