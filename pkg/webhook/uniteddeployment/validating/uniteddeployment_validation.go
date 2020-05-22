@@ -257,6 +257,20 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 			return allErrs
 		}
 		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("advancedStatefulSetTemplate", "spec", "template"))...)
+	} else if template.DeploymentTemplate != nil {
+		// TODO: NEEDS WORK
+		labels := labels.Set(template.DeploymentTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("deploymentTemplate", "metadata", "labels"), template.DeploymentTemplate.Labels, "`selector` does not match template `labels`"))
+		}
+		// allErrs = append(allErrs, validateAdvancedStatefulSet(template.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
+		template := template.DeploymentTemplate.Spec.Template
+		_, err := convertPodTemplateSpec(&template)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+			return allErrs
+		}
+		//allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForReplicaSet(coreTemplate, selector, fldPath.Child("advancedStatefulSetTemplate", "spec", "template"))...)
 	}
 
 	return allErrs
