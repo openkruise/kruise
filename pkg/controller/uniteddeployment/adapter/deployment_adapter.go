@@ -17,18 +17,15 @@ limitations under the License.
 package adapter
 
 import (
-	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
 
 // DeploymentAdapter implements the Adapter interface for Deployment objects
@@ -57,13 +54,6 @@ func (a *DeploymentAdapter) GetStatusObservedGeneration(obj metav1.Object) int64
 func (a *DeploymentAdapter) GetReplicaDetails(obj metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error) {
 	// Convert to Deployment Object
 	set := obj.(*appsv1.Deployment)
-
-	// Get all pods belonging to deployment
-	// var pods []*corev1.Pod
-	// pods, err = a.getDeploymentPods(set)
-	// if err != nil {
-	// 	return
-	// }
 
 	// Set according replica counts
 	specReplicas = set.Spec.Replicas
@@ -159,101 +149,4 @@ func (a *DeploymentAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj runtime.
 // The revision label can tell the current subset revision.
 func (a *DeploymentAdapter) IsExpected(obj metav1.Object, revision string) bool {
 	return obj.GetLabels()[appsv1.ControllerRevisionHashLabelKey] != revision
-}
-
-// Gets all Pods under a Deployment object
-func (a *DeploymentAdapter) getDeploymentPods(set *appsv1.Deployment) ([]*corev1.Pod, error) {
-	deploymentReplicaSets, err := a.getDeploymentReplicaSets(set)
-	if err != nil {
-		return nil, err
-	}
-
-	var deploymentPods []*corev1.Pod
-	for _, replicaSet := range deploymentReplicaSets {
-		replicaSetPods, err := a.getReplicaSetPods(replicaSet)
-		if err != nil {
-			return nil, err
-		}
-
-		deploymentPods = append(deploymentPods, replicaSetPods...)
-	}
-
-	return deploymentPods, nil
-}
-
-// Gets all ReplicaSets under a Deployment object
-func (a *DeploymentAdapter) getDeploymentReplicaSets(set *appsv1.Deployment) ([]*appsv1.ReplicaSet, error) {
-	// Retrieve correct selectors to use
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-
-	// Retrieve ReplicaSets based on selectors
-	replicaSetList := &appsv1.ReplicaSetList{}
-	err = a.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, replicaSetList)
-	if err != nil {
-		return nil, err
-	}
-
-	// The remainder of the function retrieves ReplicaSets owned by the set Deployment argument
-	manager, err := refmanager.New(a.Client, set.Spec.Selector, set, a.Scheme)
-	if err != nil {
-		return nil, err
-	}
-
-	selected := make([]metav1.Object, len(replicaSetList.Items))
-	for i, replicaSet := range replicaSetList.Items {
-		selected[i] = replicaSet.DeepCopy()
-	}
-
-	claimed, err := manager.ClaimOwnedObjects(selected)
-	if err != nil {
-		return nil, err
-	}
-
-	claimedReplicaSets := make([]*appsv1.ReplicaSet, len(claimed))
-	for i, replicaSet := range claimed {
-		claimedReplicaSets[i] = replicaSet.(*appsv1.ReplicaSet)
-	}
-
-	return claimedReplicaSets, nil
-}
-
-func (a *DeploymentAdapter) getReplicaSetPods(set *appsv1.ReplicaSet) ([]*corev1.Pod, error) {
-	// Retrieve correct selectors to use
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-
-	// Retrieve all pods using selector
-	podList := &corev1.PodList{}
-	err = a.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, podList)
-	if err != nil {
-		return nil, err
-	}
-
-	// The remainder of this function retrieves Pods owned by the set ReplicaSet argument
-	manager, err := refmanager.New(a.Client, set.Spec.Selector, set, a.Scheme)
-	if err != nil {
-		return nil, err
-	}
-
-	selected := make([]metav1.Object, len(podList.Items))
-	for i, pod := range podList.Items {
-		selected[i] = pod.DeepCopy()
-	}
-
-	claimed, err := manager.ClaimOwnedObjects(selected)
-	if err != nil {
-		return nil, err
-	}
-
-	claimedPods := make([]*corev1.Pod, len(claimed))
-	for i, pod := range claimed {
-		claimedPods[i] = pod.(*corev1.Pod)
-	}
-
-	return claimedPods, nil
 }
