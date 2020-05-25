@@ -123,14 +123,14 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 
 	var maxSurge int
 	if strategy.MaxSurge != nil {
-		if strategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
-				fmt.Sprintf("can not use maxSurge with strategy type InPlaceOnly")))
-		}
 		maxSurge, err = intstrutil.GetValueFromIntOrPercent(strategy.MaxSurge, replicas, true)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
 				fmt.Sprintf("failed getValueFromIntOrPercent for maxSurge: %v", err)))
+		}
+		if strategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType && maxSurge > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
+				fmt.Sprintf("can not use maxSurge with strategy type InPlaceOnly")))
 		}
 	}
 
