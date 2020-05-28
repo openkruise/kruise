@@ -41,7 +41,7 @@ var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/imag
 
 type (
 	CustomizeSpecCalculateFunc func(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec
-	CustomizeSpecPatchFunc     func(pod *v1.Pod, spec *UpdateSpec) error
+	CustomizeSpecPatchFunc     func(pod *v1.Pod, spec *UpdateSpec) (*v1.Pod, error)
 )
 
 type UpdateOptions struct {
@@ -297,10 +297,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 // patchUpdateSpecToPod returns new pod that merges spec into old pod
 func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) (*v1.Pod, error) {
 	if opts != nil && opts.CustomizeSpecPatch != nil {
-		if err := opts.CustomizeSpecPatch(pod, spec); err != nil {
-			return nil, err
-		}
-		return pod, nil
+		return opts.CustomizeSpecPatch(pod, spec)
 	}
 	if spec.MetaDataPatch != nil {
 		cloneBytes, _ := json.Marshal(pod)
