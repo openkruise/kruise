@@ -442,6 +442,261 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.ImagePullJob": {
+      "description": "ImagePullJob is the Schema for the imagepulljobs API",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.ImagePullJobSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.ImagePullJobStatus"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImagePullJobList": {
+      "description": "ImagePullJobList contains a list of ImagePullJob",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.ImagePullJob"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImagePullJobSpec": {
+      "description": "ImagePullJobSpec defines the desired state of ImagePullJob",
+      "type": "object",
+      "required": [
+        "image",
+        "completionPolicy"
+      ],
+      "properties": {
+        "completionPolicy": {
+          "description": "CompletionPolicy indicates the completion policy of the job. Default is Always CompletionPolicyType.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.CompletionPolicy"
+        },
+        "image": {
+          "description": "Image is the image to be pulled by the job",
+          "type": "string"
+        },
+        "parallelism": {
+          "description": "Parallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified, it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        },
+        "pullPolicy": {
+          "description": "PullPolicy is an optional field to set parameters of the pulling task. If not specified, the system will use the default values.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.PullPolicy"
+        },
+        "pullSecrets": {
+          "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image. If specified, these secrets will be passed to individual puller implementations for them to use.  For example, in the case of docker, only DockerConfig type secrets are honored.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "selector": {
+          "description": "Selector is a query over nodes that should match the job. nil to match all nodes.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.NodeSelector"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImagePullJobStatus": {
+      "description": "ImagePullJobStatus defines the observed state of ImagePullJob",
+      "type": "object",
+      "required": [
+        "desired"
+      ],
+      "properties": {
+        "active": {
+          "description": "The number of actively running pulling tasks.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "completionTime": {
+          "description": "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "desired": {
+          "description": "The desired number of pulling tasks, this is typically equal to the number of nodes satisfied.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "failed": {
+          "description": "The number of pulling tasks  which reached phase Failed.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "description": "The text prompt for job running status.",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "succeeded": {
+          "description": "The number of pulling tasks which reached phase Succeeded.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImageSpec": {
+      "description": "ImageSpec defines the pulling spec of an image",
+      "type": "object",
+      "required": [
+        "tags"
+      ],
+      "properties": {
+        "pullSecrets": {
+          "description": "PullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image. If specified, these secrets will be passed to individual puller implementations for them to use.  For example, in the case of docker, only DockerConfig type secrets are honored.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.ReferenceObject"
+          }
+        },
+        "tags": {
+          "description": "Tags is a list of versions of this image",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.ImageTagSpec"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImageStatus": {
+      "description": "ImageStatus defines the pulling status of an image",
+      "type": "object",
+      "required": [
+        "tags"
+      ],
+      "properties": {
+        "tags": {
+          "description": "Represents statuses of pulling tasks on this node",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.ImageTagStatus"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImageTagPullPolicy": {
+      "description": "ImageTagPullPolicy defines the policy of the pulling task",
+      "type": "object",
+      "properties": {
+        "activeDeadlineSeconds": {
+          "description": "ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the task may be active before the system tries to terminate it; value must be positive integer. if not specified, the system will never terminate it.",
+          "type": "integer",
+          "format": "int64"
+        },
+        "backoffLimit": {
+          "description": "Specifies the number of retries before marking the pulling task failed. Defaults to 3",
+          "type": "integer",
+          "format": "int32"
+        },
+        "timeoutSeconds": {
+          "description": "Specifies the timeout of the pulling task. Defaults to 600",
+          "type": "integer",
+          "format": "int32"
+        },
+        "ttlSecondsAfterFinished": {
+          "description": "TTLSecondsAfterFinished limits the lifetime of a pulling task that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the task finishes, it is eligible to be automatically deleted. If this field is unset, the task won't be automatically deleted. If this field is set to zero, the task becomes eligible to be deleted immediately after it finishes.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImageTagSpec": {
+      "description": "ImageTagSpec defines the pulling spec of an image tag",
+      "type": "object",
+      "required": [
+        "tag"
+      ],
+      "properties": {
+        "createdAt": {
+          "description": "Specifies the create time of this tag",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "ownerReferences": {
+          "description": "List of objects depended by this object. If this image is managed by a controller, then an entry in this list will point to this controller.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+          }
+        },
+        "pullPolicy": {
+          "description": "PullPolicy is an optional field to set parameters of the pulling task. If not specified, the system will use the default values.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.ImageTagPullPolicy"
+        },
+        "tag": {
+          "description": "Specifies the image tag",
+          "type": "string"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ImageTagStatus": {
+      "description": "ImageTagStatus defines the pulling status of an image tag",
+      "type": "object",
+      "required": [
+        "tag",
+        "phase"
+      ],
+      "properties": {
+        "completionTime": {
+          "description": "Represents time when the pulling task was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "message": {
+          "description": "Represents the summary informations of this node",
+          "type": "string"
+        },
+        "phase": {
+          "description": "Represents the image pulling task phase.",
+          "type": "string"
+        },
+        "progress": {
+          "description": "Represents the pulling progress of this tag, which is beetween 0-100. There is no guarantee of monotonic consistency, and it may be a rollback due to retry during pulling.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "startTime": {
+          "description": "Represents time when the pulling task was acknowledged by the image puller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "tag": {
+          "description": "Represents the image tag.",
+          "type": "string"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.InPlaceUpdateContainerStatus": {
       "description": "InPlaceUpdateContainerStatus records the statuses of the container that are mainly used to determine whether the InPlaceUpdate is completed.",
       "type": "object",
@@ -533,6 +788,164 @@
             "type": "integer",
             "format": "int32"
           }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.NodeImage": {
+      "description": "NodeImage is the Schema for the imagepullnodes API",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.NodeImageSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.NodeImageStatus"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.NodeImageList": {
+      "description": "NodeImageList contains a list of NodeImage",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.NodeImage"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.NodeImageSpec": {
+      "description": "NodeImageSpec defines the desired state of NodeImage",
+      "type": "object",
+      "properties": {
+        "images": {
+          "description": "Specifies images to be pulled on this node",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.ImageSpec"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.NodeImageStatus": {
+      "description": "NodeImageStatus defines the observed state of NodeImage",
+      "type": "object",
+      "required": [
+        "desired"
+      ],
+      "properties": {
+        "desired": {
+          "description": "The desired number of pulling tasks, this is typically equal to the number of images in spec.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "failed": {
+          "description": "The number of pulling tasks  which reached phase Failed.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "imageStatuses": {
+          "description": "all statuses of active image pulling tasks",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.ImageStatus"
+          }
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the most recent generation observed for this Node.",
+          "type": "integer",
+          "format": "int64"
+        },
+        "pulling": {
+          "description": "The number of pulling tasks which are not finished.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "succeeded": {
+          "description": "The number of pulling tasks which reached phase Succeeded.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.NodeSelector": {
+      "description": "NodeSelector is a selector over nodes",
+      "type": "object",
+      "properties": {
+        "matchExpressions": {
+          "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
+          }
+        },
+        "matchLabels": {
+          "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "names": {
+          "description": "Names specify a set of nodes to execute the job.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.PullPolicy": {
+      "description": "PullPolicy defines the policy of the pulling task",
+      "type": "object",
+      "properties": {
+        "backoffLimit": {
+          "description": "Specifies the number of retries before marking the pulling task failed. Defaults to 3",
+          "type": "integer",
+          "format": "int32"
+        },
+        "timeoutSeconds": {
+          "description": "Specifies the timeout of the pulling task. Defaults to 600",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.ReferenceObject": {
+      "description": "ReferenceObject comprises a resource name, with a mandatory namespace, rendered as \"\u003cnamespace\u003e/\u003cname\u003e\".",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
         }
       }
     },

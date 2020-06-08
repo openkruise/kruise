@@ -43,11 +43,27 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateStrategy":           schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy":                 schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy":                    schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJob":                     schema_pkg_apis_apps_v1alpha1_ImagePullJob(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobList":                 schema_pkg_apis_apps_v1alpha1_ImagePullJobList(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobSpec":                 schema_pkg_apis_apps_v1alpha1_ImagePullJobSpec(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobStatus":               schema_pkg_apis_apps_v1alpha1_ImagePullJobStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageSpec":                        schema_pkg_apis_apps_v1alpha1_ImageSpec(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageStatus":                      schema_pkg_apis_apps_v1alpha1_ImageStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagPullPolicy":               schema_pkg_apis_apps_v1alpha1_ImageTagPullPolicy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagSpec":                     schema_pkg_apis_apps_v1alpha1_ImageTagSpec(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagStatus":                   schema_pkg_apis_apps_v1alpha1_ImageTagStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateContainerStatus":     schema_pkg_apis_apps_v1alpha1_InPlaceUpdateContainerStatus(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateState":               schema_pkg_apis_apps_v1alpha1_InPlaceUpdateState(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.InPlaceUpdateStrategy":            schema_pkg_apis_apps_v1alpha1_InPlaceUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.JobCondition":                     schema_pkg_apis_apps_v1alpha1_JobCondition(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ManualUpdate":                     schema_pkg_apis_apps_v1alpha1_ManualUpdate(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImage":                        schema_pkg_apis_apps_v1alpha1_NodeImage(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImageList":                    schema_pkg_apis_apps_v1alpha1_NodeImageList(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImageSpec":                    schema_pkg_apis_apps_v1alpha1_NodeImageSpec(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImageStatus":                  schema_pkg_apis_apps_v1alpha1_NodeImageStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeSelector":                     schema_pkg_apis_apps_v1alpha1_NodeSelector(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.PullPolicy":                       schema_pkg_apis_apps_v1alpha1_PullPolicy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ReferenceObject":                  schema_pkg_apis_apps_v1alpha1_ReferenceObject(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateSidecarSet":          schema_pkg_apis_apps_v1alpha1_RollingUpdateSidecarSet(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateStatefulSetStrategy": schema_pkg_apis_apps_v1alpha1_RollingUpdateStatefulSetStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.SidecarContainer":                 schema_pkg_apis_apps_v1alpha1_SidecarContainer(ref),
@@ -817,6 +833,437 @@ func schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref common.ReferenceCallback) c
 	}
 }
 
+func schema_pkg_apis_apps_v1alpha1_ImagePullJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullJob is the Schema for the imagepulljobs API",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobSpec", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImagePullJobList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullJobList contains a list of ImagePullJob",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJob"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJob", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImagePullJobSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullJobSpec defines the desired state of ImagePullJob",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Image is the image to be pulled by the job",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"pullSecrets": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image. If specified, these secrets will be passed to individual puller implementations for them to use.  For example, in the case of docker, only DockerConfig type secrets are honored.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selector is a query over nodes that should match the job. nil to match all nodes.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeSelector"),
+						},
+					},
+					"parallelism": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Parallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified, it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.",
+							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+						},
+					},
+					"pullPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PullPolicy is an optional field to set parameters of the pulling task. If not specified, the system will use the default values.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.PullPolicy"),
+						},
+					},
+					"completionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CompletionPolicy indicates the completion policy of the job. Default is Always CompletionPolicyType.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy"),
+						},
+					},
+				},
+				Required: []string{"image", "completionPolicy"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeSelector", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.PullPolicy", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImagePullJobStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullJobStatus defines the observed state of ImagePullJob",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"startTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"completionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"desired": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The desired number of pulling tasks, this is typically equal to the number of nodes satisfied.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"active": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of actively running pulling tasks.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"succeeded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pulling tasks which reached phase Succeeded.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"failed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pulling tasks  which reached phase Failed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The text prompt for job running status.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"desired"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImageSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImageSpec defines the pulling spec of an image",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"pullSecrets": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image. If specified, these secrets will be passed to individual puller implementations for them to use.  For example, in the case of docker, only DockerConfig type secrets are honored.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ReferenceObject"),
+									},
+								},
+							},
+						},
+					},
+					"tags": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Tags is a list of versions of this image",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagSpec"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"tags"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagSpec", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ReferenceObject"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImageStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImageStatus defines the pulling status of an image",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"tags": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents statuses of pulling tasks on this node",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagStatus"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"tags"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagStatus"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImageTagPullPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImageTagPullPolicy defines the policy of the pulling task",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"timeoutSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the timeout of the pulling task. Defaults to 600",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"backoffLimit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the number of retries before marking the pulling task failed. Defaults to 3",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"ttlSecondsAfterFinished": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TTLSecondsAfterFinished limits the lifetime of a pulling task that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the task finishes, it is eligible to be automatically deleted. If this field is unset, the task won't be automatically deleted. If this field is set to zero, the task becomes eligible to be deleted immediately after it finishes.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the task may be active before the system tries to terminate it; value must be positive integer. if not specified, the system will never terminate it.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImageTagSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImageTagSpec defines the pulling spec of an image tag",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"tag": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the image tag",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"createdAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the create time of this tag",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"pullPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PullPolicy is an optional field to set parameters of the pulling task. If not specified, the system will use the default values.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagPullPolicy"),
+						},
+					},
+					"ownerReferences": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of objects depended by this object. If this image is managed by a controller, then an entry in this list will point to this controller.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.ObjectReference"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"tag"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageTagPullPolicy", "k8s.io/api/core/v1.ObjectReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ImageTagStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImageTagStatus defines the pulling status of an image tag",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"tag": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the image tag.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the image pulling task phase.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"progress": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the pulling progress of this tag, which is beetween 0-100. There is no guarantee of monotonic consistency, and it may be a rollback due to retry during pulling.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"startTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents time when the pulling task was acknowledged by the image puller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"completionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents time when the pulling task was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the summary informations of this node",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"tag", "phase"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
 func schema_pkg_apis_apps_v1alpha1_InPlaceUpdateContainerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -975,6 +1422,300 @@ func schema_pkg_apis_apps_v1alpha1_ManualUpdate(ref common.ReferenceCallback) co
 									},
 								},
 							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_NodeImage(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeImage is the Schema for the imagepullnodes API",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImageSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImageStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImageSpec", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImageStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_NodeImageList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeImageList contains a list of NodeImage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImage"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.NodeImage", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_NodeImageSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeImageSpec defines the desired state of NodeImage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"images": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies images to be pulled on this node",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageSpec"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageSpec"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_NodeImageStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeImageStatus defines the observed state of NodeImage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ObservedGeneration is the most recent generation observed for this Node.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"desired": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The desired number of pulling tasks, this is typically equal to the number of images in spec.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"succeeded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pulling tasks which reached phase Succeeded.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"failed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pulling tasks  which reached phase Failed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"pulling": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pulling tasks which are not finished.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"imageStatuses": {
+						SchemaProps: spec.SchemaProps{
+							Description: "all statuses of active image pulling tasks",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageStatus"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"desired"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImageStatus"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_NodeSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeSelector is a selector over nodes",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"names": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Names specify a set of nodes to execute the job.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"matchLabels": {
+						SchemaProps: spec.SchemaProps{
+							Description: "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"matchExpressions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_PullPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PullPolicy defines the policy of the pulling task",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"timeoutSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the timeout of the pulling task. Defaults to 600",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"backoffLimit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the number of retries before marking the pulling task failed. Defaults to 3",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_ReferenceObject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ReferenceObject comprises a resource name, with a mandatory namespace, rendered as \"<namespace>/<name>\".",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
 				},
