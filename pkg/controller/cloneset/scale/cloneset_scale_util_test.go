@@ -56,6 +56,7 @@ func TestGetOrGenAvailableIDs(t *testing.T) {
 func TestCalculateDiffs(t *testing.T) {
 	intOrStr0 := intstr.FromInt(0)
 	intOrStr1 := intstr.FromInt(1)
+	intOrStr2 := intstr.FromInt(2)
 
 	cases := []struct {
 		name                   string
@@ -201,6 +202,23 @@ func TestCalculateDiffs(t *testing.T) {
 			notUpdatedPods:         6,
 			expectedTotalDiff:      -2,
 			expectedCurrentRevDiff: -2,
+		},
+		{
+			name: "scale out with maxSurge < currentRevDiff",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					Replicas: utilpointer.Int32Ptr(1),
+					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+						MaxSurge:  &intOrStr2,
+						Partition: utilpointer.Int32Ptr(0),
+					},
+				},
+			},
+			revConsistent:          false,
+			totalPods:              1,
+			notUpdatedPods:         1,
+			expectedTotalDiff:      -1,
+			expectedCurrentRevDiff: 1,
 		},
 		{
 			name: "scale in with revConsistent 1",

@@ -625,11 +625,26 @@ func TestCalculateUpdateCount(t *testing.T) {
 			expectedResult:    3,
 		},
 		{
-			strategy:          appsv1alpha1.CloneSetUpdateStrategy{MaxSurge: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2))},
+			// maxUnavailable = 0 and maxSurge = 2, usedSurge = 1
+			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(0)),
+				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
+			},
 			totalReplicas:     4,
 			waitUpdateIndexes: []int{0, 1},
-			pods:              []*v1.Pod{readyPod(), readyPod(), readyPod(), readyPod()},
-			expectedResult:    2,
+			pods:              []*v1.Pod{readyPod(), readyPod(), readyPod(), readyPod(), readyPod()},
+			expectedResult:    1,
+		},
+		{
+			// maxUnavailable = 1 and maxSurge = 2, usedSurge = 2
+			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(1)),
+				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
+			},
+			totalReplicas:     4,
+			waitUpdateIndexes: []int{0, 1, 2},
+			pods:              []*v1.Pod{readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), readyPod()},
+			expectedResult:    3,
 		},
 	}
 

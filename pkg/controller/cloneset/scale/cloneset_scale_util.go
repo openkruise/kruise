@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/integer"
 )
 
 func getPodsToDelete(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) []*v1.Pod {
@@ -78,6 +79,7 @@ func calculateDiffs(cs *appsv1alpha1.CloneSet, revConsistent bool, totalPods int
 		if currentRevDiff > 0 {
 			if cs.Spec.UpdateStrategy.MaxSurge != nil {
 				maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, int(*cs.Spec.Replicas), true)
+				maxSurge = integer.IntMin(maxSurge, currentRevDiff)
 			}
 		}
 	}
