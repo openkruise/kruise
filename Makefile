@@ -1,13 +1,15 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= openkruise/kruise-manager:test
+# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
+CRD_OPTIONS ?= "crd:trivialVersions=true"
 
 CURRENT_DIR=$(shell pwd)
 
 all: test manager
 
 go_check:
-	@scripts/check_go_version "1.11.1"
+	@scripts/check_go_version "1.12.0"
 
 # Run tests
 test: generate fmt vet manifests kubebuilder
@@ -31,8 +33,8 @@ deploy: manifests
 	kustomize build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+manifests: controller-gen
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role paths="./..." output:crd:artifacts:config=config/crds
 
 # Run go fmt against code
 fmt: go_check
@@ -43,11 +45,10 @@ vet:
 	go vet ./pkg/... ./cmd/...
 
 # Generate code
-generate:
-ifndef GOPATH
-	$(error GOPATH not defined, please define GOPATH. Run "go help gopath" to learn more about GOPATH)
-endif
-	go generate ./pkg/... ./cmd/...
+generate: controller-gen
+	cd ${CURRENT_DIR}
+	go env
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./pkg/apis/..."
 	go run ./hack/gen-openapi-spec/main.go > ${CURRENT_DIR}/api/openapi-spec/swagger.json
 
 # kubebuilder binary
@@ -62,11 +63,27 @@ export PATH=$(newPATH)
 endif
 
 # Build the docker image
-docker-build: #test
+docker-build:
+	go mod vendor
 	docker build . -t ${IMG}
-	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml ./config/manager/all_in_one.yaml
 
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+
+# find or download controller-gen
+# download controller-gen if necessary
+controller-gen:
+ifeq (, $(shell which controller-gen))
+	@{ \
+	set -e ;\
+	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$CONTROLLER_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.9 ;\
+	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	}
+CONTROLLER_GEN=$(GOPATH)/bin/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif

@@ -1,7 +1,0 @@
-approvers:
-- sig-auth-encryption-at-rest-approvers
-reviewers:
-- sig-auth-encryption-at-rest-reviewers
-labels:
-- sig/auth
-
