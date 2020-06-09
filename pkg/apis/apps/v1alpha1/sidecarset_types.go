@@ -42,7 +42,7 @@ type SidecarSetSpec struct {
 
 // SidecarContainer defines the container of Sidecar
 type SidecarContainer struct {
-	corev1.Container
+	corev1.Container `json:",inline"`
 }
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet
