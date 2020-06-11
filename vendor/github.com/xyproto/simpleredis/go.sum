@@ -1,0 +1,4 @@
+github.com/gomodule/redigo v2.0.0+incompatible h1:K/R+8tc58AaqLkqG2Ol3Qk+DR/TlNuhuh457pBFPtt0=
+github.com/gomodule/redigo v2.0.0+incompatible/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
+github.com/xyproto/pinterface v0.0.0-20200201214933-70763765f31f h1:x97Isxzsv8Aj1QMh8vNxKzI85Fvgg2areAJlIaMQ4zY=
+github.com/xyproto/pinterface v0.0.0-20200201214933-70763765f31f/go.mod h1:X5B5pKE49ak7SpyDh5QvJvLH9cC9XuZNDcl5hEyYc34=
