@@ -17,9 +17,6 @@ bin
 
 !vendor/**/zz_generated.*
 
-# go vendor
-vendor/
-
 # editor and IDE paraphernalia
 .idea
 *.swp
