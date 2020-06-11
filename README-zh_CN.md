@@ -3,6 +3,10 @@
 [![License](https://img.shields.io/badge/license-Apache%202-4EB1BA.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Go Report Card](https://goreportcard.com/badge/github.com/openkruise/kruise)](https://goreportcard.com/report/github.com/openkruise/kruise)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2908/badge)](https://bestpractices.coreinfrastructure.org/en/projects/2908)
+[![Build Status](https://travis-ci.org/openkruise/kruise.svg?branch=master)](https://travis-ci.org/openkruise/kruise)
+[![CircleCI](https://circleci.com/gh/openkruise/kruise.svg?style=svg)](https://circleci.com/gh/openkruise/kruise)
+[![codecov](https://codecov.io/gh/openkruise/kruise/branch/master/graph/badge.svg)](https://codecov.io/gh/openkruise/kruise)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](./CODE_OF_CONDUCT.md)
 
 [English](./README.md) | 简体中文
 
@@ -10,8 +14,9 @@
 |------------------|
 |May 19th, 2020. Kruise v0.5.0 发布! CloneSet 支持 `maxSurge` 策略、为 StatefulSet/SidecarSet 修复部分 bug, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Mar 20th, 2020. Kruise v0.4.1 发布! 为 Advanced StatefulSet 和 CloneSet 提供了 **优雅原地升级** 功能，详情参见 [CHANGELOG](CHANGELOG.md).|
-|Feb 7th,  2020. Kruise v0.4.0 发布! **新增 CloneSet 控制器**，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Nov 24th, 2019. 发布 UnitedDeployment 控制器的博客 ([link](http://openkruise.io/en-us/blog/blog3.html)).|
+
+## 介绍
 
 Kruise 是 OpenKruise 中的核心项目之一，它提供一套在[Kubernetes核心控制器](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)之外的扩展 workload 管理和实现。
 
@@ -41,7 +46,7 @@ Kruise 是 OpenKruise 中的核心项目之一，它提供一套在[Kubernetes�
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/scripts/check_for_installation.sh)"
 ```
 
-### 使用 helm charts 安装 [推荐]
+### 使用 helm charts 安装
 
 推荐使用 helm v3 安装 Kruise，helm 是一个简单的命令行工具可以从[这里](https://github.com/helm/helm/releases) 获取。
 
@@ -50,23 +55,6 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.
 ```
 
 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者只启用某些特定的控制器能力。
-
-### 使用 YAML files 安装 [不推荐]
-
-```bash
-# Install CRDs
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_broadcastjob.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_sidecarset.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_statefulset.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_uniteddeployment.yaml
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/crds/apps_v1alpha1_cloneset.yaml
-
-# Install kruise-controller-manager
-kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/config/manager/all_in_one.yaml
-```
-
-注意 `all_in_one.yaml`  中包含的 Kruise-manager 镜像是每天周期性从 master 分支打出来的，无法保证功能的稳定性。
-所以你可以通过 YAML 部署到测试集群做验证，但不推荐在生产环境使用。
 
 官方的 kruise-manager 镜像维护在 [docker hub](https://hub.docker.com/r/openkruise/kruise-manager) 。
 
@@ -100,17 +88,13 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.
 helm uninstall kruise
 ```
 
-卸载使用 YAML files 安装的 Kruise:
+## 贡献
 
-```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/kruiseio/kruise/master/scripts/uninstall.sh)"
-```
+我们非常欢迎每一位社区同学共同参与 Kruise 的建设，你可以从 [CONTRIBUTING.md](CONTRIBUTING.md) 手册开始。
 
 ## 社区
 
-如果有任何问题或想要参与贡献，我们非常欢迎你在 Github 上提出 issues 或是 pull requests。
-
-其他活跃的社区途径：
+活跃的社区途径：
 
 - Slack: [channel address](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWJlZGJiZjUwNGU5Y2U2ODI3N2JiODI4N2M1OWFlOTgzMDgyOWVkZGRjNzdmZTBjYzgxZmM5MjAyNjhhZTdmMjQ)
 - 钉钉讨论群
@@ -119,6 +103,6 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/kruiseio/kruise/master/scr
   <img src="docs/img/openkruise-dev-group.JPG" width="250" title="dingtalk">
 </div>
 
-## Copyright
+## License
 
-Certain implementation relies on existing code from Kubernetes and the credit goes to original Kubernetes authors.
+Kruise is licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE.md) for the full license text.
