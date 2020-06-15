@@ -1,0 +1,889 @@
+package daemonset
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+)
+
+func newTestPodEventHandler(reader client.Reader) *podEventHandler {
+	return &podEventHandler{
+		Reader: reader,
+	}
+}
+
+func TestEnqueueRequestForPodCreate(t *testing.T) {
+	lTrue := true
+	cases := []struct {
+		name                          string
+		dss                           []*appsv1alpha1.DaemonSet
+		e                             event.CreateEvent
+		alterExpectationCreationsKey  string
+		alterExpectationCreationsAdds []string
+		expectedQueueLen              int
+	}{
+		{
+			name: "no ds",
+			e:    event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}}},
+
+			expectedQueueLen: 0,
+		},
+		{
+			name: "no ds",
+			e:    event.CreateEvent{Object: &v1.Pod{}},
+
+			expectedQueueLen: 0,
+		},
+		{
+			name: "multi ds",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e:                event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-abc", Labels: map[string]string{"key": "v1"}}}},
+			expectedQueueLen: 2,
+		},
+		{
+			name: "correct owner reference",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e: event.CreateEvent{
+				Object: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "pod-xyz",
+						Labels:    map[string]string{"key": "v1"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds02",
+								UID:        "002",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+			},
+			alterExpectationCreationsKey:  "default/ds02",
+			alterExpectationCreationsAdds: []string{"pod-xyz"},
+			expectedQueueLen:              1,
+		},
+	}
+
+	for _, testCase := range cases {
+		fakeClient := fake.NewFakeClient()
+		for _, ds := range testCase.dss {
+			fakeClient.Create(context.TODO(), ds)
+		}
+
+		enqueueHandler := newTestPodEventHandler(fakeClient)
+		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+
+		for i := 0; i < len(testCase.alterExpectationCreationsAdds); i++ {
+			expectations.ExpectCreations(testCase.alterExpectationCreationsKey, 1)
+		}
+
+		if testCase.alterExpectationCreationsKey != "" {
+			if ok := expectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
+				t.Fatalf("%s before execute, should not be satisfied", testCase.name)
+			}
+		}
+
+		enqueueHandler.Create(testCase.e, q)
+		if q.Len() != testCase.expectedQueueLen {
+			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
+		}
+
+		if testCase.alterExpectationCreationsKey != "" {
+			if ok := expectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
+				t.Fatalf("%s after execute, should be satisfied", testCase.name)
+			}
+		}
+	}
+}
+
+func TestEnqueueRequestForPodUpdate(t *testing.T) {
+	lTrue := true
+	cases := []struct {
+		name             string
+		dss              []*appsv1alpha1.DaemonSet
+		e                event.UpdateEvent
+		expectedQueueLen int
+	}{
+		{
+			name:             "resourceVersion no changed",
+			e:                event.UpdateEvent{ObjectNew: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}, ObjectOld: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}},
+			expectedQueueLen: 0,
+		},
+		{
+			name: "label changed and update 1",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "01",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+				ObjectNew: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "default",
+						ResourceVersion:   "02",
+						Labels:            map[string]string{"key": "v1", "test": "false"},
+						DeletionTimestamp: &metav1.Time{Time: time.Now()},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedQueueLen: 1,
+		},
+		{
+			name: "label changed and update 2",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "01",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+				ObjectNew: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "default",
+						ResourceVersion:   "02",
+						Labels:            map[string]string{"key": "v2", "test": "true"},
+						DeletionTimestamp: &metav1.Time{Time: time.Now()},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds02",
+								UID:        "002",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedQueueLen: 2,
+		},
+		{
+			name: "reference changed",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "01",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+				ObjectNew: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "02",
+						Labels:          map[string]string{"key": "v2", "test": "true"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds02",
+								UID:        "002",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedQueueLen: 2,
+		},
+		{
+			name: "reference not changed",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "01",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+				ObjectNew: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "02",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedQueueLen: 1,
+		},
+		{
+			name: "orphan changed",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "01",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+					},
+				},
+				ObjectNew: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "02",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+					},
+				},
+			},
+			expectedQueueLen: 0,
+		},
+		{
+			name: "reference changed",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs03",
+						Namespace: "default",
+						UID:       "003",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "01",
+						Labels:          map[string]string{"key": "v1", "test": "true"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "DaemonSet",
+								Name:       "ds01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+				ObjectNew: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "02",
+						Labels:          map[string]string{"key": "v2", "test": "true"},
+					},
+				},
+			},
+			expectedQueueLen: 3,
+		},
+	}
+
+	for _, testCase := range cases {
+		fakeClient := fake.NewFakeClient()
+		for _, ds := range testCase.dss {
+			fakeClient.Create(context.TODO(), ds)
+		}
+		enqueueHandler := newTestPodEventHandler(fakeClient)
+		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+
+		enqueueHandler.Update(testCase.e, q)
+		time.Sleep(time.Millisecond * 10)
+		if q.Len() != testCase.expectedQueueLen {
+			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
+		}
+	}
+}
+
+func newTestNodeEventHandler(client client.Client) *nodeEventHandler {
+	return &nodeEventHandler{
+		client: client,
+	}
+}
+
+func TestEnqueueRequestForNodeCreate(t *testing.T) {
+	cases := []struct {
+		name             string
+		dss              []*appsv1alpha1.DaemonSet
+		e                event.CreateEvent
+		expectedQueueLen int
+	}{
+		{
+			name: "add one ummatched node",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds01",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e: event.CreateEvent{
+				Object: &v1.Node{
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key:    "aaa",
+								Value:  "bbb",
+								Effect: v1.TaintEffectNoSchedule,
+							},
+						},
+					},
+				},
+			},
+			expectedQueueLen: 0,
+		},
+		{
+			name: "add one matched node",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds01",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e: event.CreateEvent{
+				Object: &v1.Node{},
+			},
+			expectedQueueLen: 2,
+		},
+	}
+	for _, testCase := range cases {
+		fakeClient := fake.NewFakeClient()
+		for _, ds := range testCase.dss {
+			fakeClient.Create(context.TODO(), ds)
+		}
+		enqueueHandler := newTestNodeEventHandler(fakeClient)
+		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+
+		enqueueHandler.Create(testCase.e, q)
+		if q.Len() != testCase.expectedQueueLen {
+			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
+		}
+	}
+}
+
+func TestEnqueueRequestForNodeUpdate(t *testing.T) {
+	cases := []struct {
+		name             string
+		dss              []*appsv1alpha1.DaemonSet
+		e                event.UpdateEvent
+		expectedQueueLen int
+	}{
+		{
+			name: "ShouldIgnoreNodeUpdate",
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "name0",
+					},
+				},
+				ObjectNew: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "name1",
+					},
+				},
+			},
+			expectedQueueLen: 0,
+		},
+		{
+			name: "from unmatched to matched",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds01",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "name0",
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key:    "aaa",
+								Value:  "bbb",
+								Effect: v1.TaintEffectNoSchedule,
+							},
+						},
+					},
+				},
+				ObjectNew: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "name1",
+					},
+				},
+			},
+			expectedQueueLen: 1,
+		},
+		{
+			name: "from matched to unmatched",
+			dss: []*appsv1alpha1.DaemonSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ds01",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.DaemonSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "name0",
+					},
+				},
+				ObjectNew: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "name1",
+					},
+					Spec: v1.NodeSpec{
+						Taints: []v1.Taint{
+							{
+								Key:    "aaa",
+								Value:  "bbb",
+								Effect: v1.TaintEffectNoSchedule,
+							},
+						},
+					},
+				},
+			},
+			expectedQueueLen: 1,
+		},
+	}
+	for _, testCase := range cases {
+		fakeClient := fake.NewFakeClient()
+		for _, ds := range testCase.dss {
+			fakeClient.Create(context.TODO(), ds)
+		}
+		enqueueHandler := newTestNodeEventHandler(fakeClient)
+		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+
+		enqueueHandler.Update(testCase.e, q)
+		if q.Len() != testCase.expectedQueueLen {
+			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
+		}
+	}
+}
