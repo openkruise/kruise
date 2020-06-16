@@ -34,7 +34,7 @@ spec:
     listKind: SidecarSetList
     plural: sidecarsets
     singular: sidecarset
-  scope: Namespaced
+  scope: Cluster
   subresources:
     status: {}
   validation:

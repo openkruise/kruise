@@ -79,6 +79,7 @@ type SidecarSetStatus struct {
 
 // SidecarSet is the Schema for the sidecarsets API
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="MATCHED",type="integer",JSONPath=".status.matchedPods",description="The number of pods matched."
 // +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedPods",description="The number of pods matched and updated."
