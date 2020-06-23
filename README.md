@@ -18,39 +18,44 @@ English | [简体中文](./README-zh_CN.md)
 
 ## Introduction
 
-Kruise is the core of the OpenKruise project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
+Kruise is the core of the OpenKruise (official site: [https://openkruise.io](https://openkruise.io)) project. It is a set of controllers which extends and complements [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) on workload management.
 
 Today, Kruise offers five workload controllers:
 
-- [CloneSet](./docs/concepts/cloneset/README.md): CloneSet is a workload that mainly focuses on managing stateless applications. It provides full features for more efficient, deterministic and controlled deployment, such as inplace update, specified pod deletion, configurable priority/scatter update, preUpdate/postUpdate hooks.
+- [CloneSet](https://openkruise.io/en-us/docs/cloneset.html): CloneSet is a workload that mainly focuses on managing stateless applications. It provides full features for more efficient, deterministic and controlled deployment, such as inplace update, specified pod deletion, configurable priority/scatter update, preUpdate/postUpdate hooks.
 
-- [Advanced StatefulSet](./docs/concepts/astatefulset/README.md): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, `pause` and `MaxUnavailable`.
+- [Advanced StatefulSet](https://openkruise.io/en-us/docs/advanced_statefulset.html): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `inplace-update`, `pause` and `MaxUnavailable`.
 
-- [SidecarSet](./docs/concepts/sidecarSet/README.md): A controller that injects sidecar containers into the Pod spec based on selectors and also is able to upgrade the sidecar containers.
+- [SidecarSet](https://openkruise.io/en-us/docs/sidecarset.html): A controller that injects sidecar containers into the Pod spec based on selectors and also is able to upgrade the sidecar containers.
 
-- [UnitedDeployment](./docs/concepts/uniteddeployment/README.md): This controller manages application pods spread in multiple fault domains by using multiple workloads.
+- [UnitedDeployment](https://openkruise.io/en-us/docs/uniteddeployment.html): This controller manages application pods spread in multiple fault domains by using multiple workloads.
 
-- [BroadcastJob](./docs/concepts/broadcastJob/README.md): A job that runs Pods to completion across all the nodes in the cluster.
+- [BroadcastJob](https://openkruise.io/en-us/docs/broadcastjob.html): A job that runs Pods to completion across all the nodes in the cluster.
 
 The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
 This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is great for new users.
 
-## Getting started
+## Key features
 
-### Check before installation
+- **In-place update**
 
-Kruise requires APIServer to enable features such as `MutatingAdmissionWebhook` and `ValidatingAdmissionWebhook`.
-If your Kubernetes version is lower than 1.12, you should check your cluster qualification
-before installing Kruise by running one of the following commands locally.
-The script assumes a read/write permission to /tmp and the local `Kubectl` is configured to access the target cluster.
+    In-place update is a way to update container images without deleting and creating Pod. It is quite faster than re-create update used by original Deployment/StatefulSet and less side-effect on other containers.
 
-```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/openkruise/kruise/master/scripts/check_for_installation.sh)"
-```
+- **Sidecar management**
 
-### Install with helm charts
+    Define sidecar containers in one CR and OpenKruise will inject them into all Pods matched. It's just like istio, but you can manage your own sidecars.
 
-It is recommended that you should install Kruise with helm v3, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
+- **Multiple fault domains deployment**
+
+    Define a global workload over multiple fault domains, and OpenKruise will spread a sub workload for each domain. You can manage replicas, template and update strategies for workloads in different fault domains.
+
+- **...**
+
+## Quick Start
+
+It is super easy to get started with OpenKruise.
+
+For a Kubernetes cluster with its version higher than v1.12+, you can simply install Kruise with helm v3:
 
 ```
 helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz
@@ -59,35 +64,13 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.
 Note that installing this chart directly means it will use the default template values for kruise-manager.
 You may have to set your specific configurations when it is deployed into a production cluster or you want to enable specific controllers.
 
-The official kruise-controller-manager image is hosted under [docker hub](https://hub.docker.com/r/openkruise/kruise-manager).
+For more details, see [quick-start](https://openkruise.io/en-us/docs/quick_start.html).
 
-### Optional: Enable specific controllers
+## Documentation
 
-If you only need some of the Kruise controllers and want to disable others, you can use either one of the two options or both:
+You can view the full documentation from the [OpenKruise website](https://openkruise.io/en-us/docs/what_is_openkruise.html).
 
-1. Only install the CRDs you need.
-
-2. Set env `CUSTOM_RESOURCE_ENABLE` in kruise-manager container by changing kruise-controller-manager statefulset template. The value is a list of resource names that you want to enable. For example, `CUSTOM_RESOURCE_ENABLE=StatefulSet,SidecarSet` means only AdvancedStatefulSet and SidecarSet controllers/webhooks are enabled, all other controllers/webhooks are disabled. This option can also be applied by using helm chart:
-
-```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz --set manager.custom_resource_enable="StatefulSet\,SidecarSet"
-```
-
-## Usage
-
-Please see detailed [documents](./docs/README.md) which include examples, about Kruise controllers.
 We also provider [**tutorials**](./docs/tutorial/README.md) to demonstrate how to use Kruise controllers.
-
-## Uninstall
-
-Note that this will lead to all resources created by Kruise, including webhook configurations, services, namespace, CRDs, CR instances and Pods managed by Kruise controller, to be deleted!
-Please do this **ONLY** when you fully understand the consequence.
-
-To uninstall kruise if it is installed with helm charts:
-
-```bash
-helm uninstall kruise
-```
 
 ## Contributing
 
@@ -101,8 +84,8 @@ Active communication channels:
 - Mailing List: todo
 - Dingtalk Group(钉钉讨论群)
 
-<div align="center">
-  <img src="docs/img/openkruise-dev-group.JPG" width="250" title="dingtalk">
+<div>
+  <img src="docs/img/openkruise-dev-group.JPG" width="280" title="dingtalk">
 </div>
 
 ## License
