@@ -46,8 +46,6 @@ vet:
 
 # Generate code
 generate: controller-gen
-	cd ${CURRENT_DIR}
-	go env
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./pkg/apis/..."
 	go run ./hack/gen-openapi-spec/main.go > ${CURRENT_DIR}/api/openapi-spec/swagger.json
 

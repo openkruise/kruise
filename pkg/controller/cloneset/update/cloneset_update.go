@@ -31,7 +31,6 @@ import (
 	"github.com/openkruise/kruise/pkg/util/updatesort"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
@@ -191,19 +190,14 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			}
 
 			c.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place: %v", pod.Name, res.UpdateErr)
-			if errors.IsConflict(res.UpdateErr) || cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-				return res.DelayDuration, res.UpdateErr
-			}
-			// If it failed to in-place update && error is not conflict && podUpdatePolicy is not InPlaceOnly,
-			// then we should try to recreate this pod
-			klog.Warningf("CloneSet %s/%s failed to in-place update Pod %s, so it will back off to ReCreate", cs.Namespace, cs.Name, pod.Name)
+			return res.DelayDuration, res.UpdateErr
 
-		} else {
-			if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-				return res.DelayDuration, fmt.Errorf("find Pod %s update strategy is InPlaceOnly but can not update in-place", pod.Name)
-			}
-			klog.Warningf("CloneSet %s/%s can not update Pod %s in-place, so it will back off to ReCreate", cs.Namespace, cs.Name, pod.Name)
 		}
+
+		if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+			return res.DelayDuration, fmt.Errorf("find Pod %s update strategy is InPlaceOnly but can not update in-place", pod.Name)
+		}
+		klog.Warningf("CloneSet %s/%s can not update Pod %s in-place, so it will back off to ReCreate", cs.Namespace, cs.Name, pod.Name)
 	}
 
 	klog.V(2).Infof("CloneSet %s/%s deleting Pod %s for update %s", cs.Namespace, cs.Name, pod.Name, updateRevision.Name)
