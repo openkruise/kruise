@@ -28,6 +28,8 @@ type Interface interface {
 	BroadcastJobs() BroadcastJobInformer
 	// CloneSets returns a CloneSetInformer.
 	CloneSets() CloneSetInformer
+	// DaemonSets returns a DaemonSetInformer.
+	DaemonSets() DaemonSetInformer
 	// SidecarSets returns a SidecarSetInformer.
 	SidecarSets() SidecarSetInformer
 	// StatefulSets returns a StatefulSetInformer.
@@ -55,6 +57,11 @@ func (v *version) BroadcastJobs() BroadcastJobInformer {
 // CloneSets returns a CloneSetInformer.
 func (v *version) CloneSets() CloneSetInformer {
 	return &cloneSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// DaemonSets returns a DaemonSetInformer.
+func (v *version) DaemonSets() DaemonSetInformer {
+	return &daemonSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // SidecarSets returns a SidecarSetInformer.

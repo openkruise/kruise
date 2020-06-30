@@ -427,6 +427,207 @@
         }
       }
     },
+    "kruise.apps.v1alpha1.DaemonSet": {
+      "description": "DaemonSet is the Schema for the daemonsets API",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.DaemonSetSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/kruise.apps.v1alpha1.DaemonSetStatus"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.DaemonSetCondition": {
+      "description": "DaemonSetCondition describes the state of a DaemonSet at a certain point.",
+      "type": "object",
+      "required": [
+        "type",
+        "status"
+      ],
+      "properties": {
+        "lastTransitionTime": {
+          "description": "Last time the condition transitioned from one status to another.",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+        },
+        "message": {
+          "description": "A human readable message indicating details about the transition.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "The reason for the condition's last transition.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status of the condition, one of True, False, Unknown.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of DaemonSet condition.",
+          "type": "string"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.DaemonSetList": {
+      "description": "DaemonSetList contains a list of DaemonSet",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.DaemonSet"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.DaemonSetSpec": {
+      "description": "DaemonSetSpec defines the desired state of DaemonSet",
+      "type": "object",
+      "required": [
+        "selector",
+        "template"
+      ],
+      "properties": {
+        "burstReplicas": {
+          "description": "BurstReplicas is a rate limiter for booting pods on a lot of pods. The default value is 250",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+        },
+        "minReadySeconds": {
+          "description": "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+          "type": "integer",
+          "format": "int32"
+        },
+        "revisionHistoryLimit": {
+          "description": "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "selector": {
+          "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+        },
+        "template": {
+          "description": "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+          "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplateSpec"
+        },
+        "updateStrategy": {
+          "description": "An update strategy to replace existing DaemonSet pods with new pods.",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.DaemonSetUpdateStrategy"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.DaemonSetStatus": {
+      "description": "DaemonSetStatus defines the observed state of DaemonSet",
+      "type": "object",
+      "required": [
+        "currentNumberScheduled",
+        "numberMisscheduled",
+        "desiredNumberScheduled",
+        "numberReady",
+        "updatedNumberScheduled",
+        "daemonSetHash"
+      ],
+      "properties": {
+        "collisionCount": {
+          "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "conditions": {
+          "description": "Represents the latest available observations of a DaemonSet's current state.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kruise.apps.v1alpha1.DaemonSetCondition"
+          },
+          "x-kubernetes-patch-merge-key": "type",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "currentNumberScheduled": {
+          "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+          "type": "integer",
+          "format": "int32"
+        },
+        "daemonSetHash": {
+          "description": "DaemonSetHash is the controller-revision-hash, which represents the latest version of the DaemonSet.",
+          "type": "string"
+        },
+        "desiredNumberScheduled": {
+          "description": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+          "type": "integer",
+          "format": "int32"
+        },
+        "numberAvailable": {
+          "description": "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
+          "type": "integer",
+          "format": "int32"
+        },
+        "numberMisscheduled": {
+          "description": "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+          "type": "integer",
+          "format": "int32"
+        },
+        "numberReady": {
+          "description": "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "numberUnavailable": {
+          "description": "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)",
+          "type": "integer",
+          "format": "int32"
+        },
+        "observedGeneration": {
+          "description": "The most recent generation observed by the daemon set controller.",
+          "type": "integer",
+          "format": "int64"
+        },
+        "updatedNumberScheduled": {
+          "description": "The total number of nodes that are running updated daemon pod",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "kruise.apps.v1alpha1.DaemonSetUpdateStrategy": {
+      "description": "EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN! NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized. DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.",
+      "type": "object",
+      "properties": {
+        "rollingUpdate": {
+          "description": "Rolling update config params. Present only if type = \"RollingUpdate\".",
+          "$ref": "#/definitions/kruise.apps.v1alpha1.RollingUpdateDaemonSet"
+        },
+        "type": {
+          "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate.",
+          "type": "string"
+        }
+      }
+    },
     "kruise.apps.v1alpha1.FailurePolicy": {
       "description": "FailurePolicy indicates the behavior of the job, when failed pod is found.",
       "type": "object",

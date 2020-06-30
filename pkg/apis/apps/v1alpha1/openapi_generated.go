@@ -42,6 +42,12 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateScatterTerm":        schema_pkg_apis_apps_v1alpha1_CloneSetUpdateScatterTerm(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CloneSetUpdateStrategy":           schema_pkg_apis_apps_v1alpha1_CloneSetUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.CompletionPolicy":                 schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSet":                        schema_pkg_apis_apps_v1alpha1_DaemonSet(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetCondition":               schema_pkg_apis_apps_v1alpha1_DaemonSetCondition(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetList":                    schema_pkg_apis_apps_v1alpha1_DaemonSetList(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetSpec":                    schema_pkg_apis_apps_v1alpha1_DaemonSetSpec(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetStatus":                  schema_pkg_apis_apps_v1alpha1_DaemonSetStatus(ref),
+		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetUpdateStrategy":          schema_pkg_apis_apps_v1alpha1_DaemonSetUpdateStrategy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.FailurePolicy":                    schema_pkg_apis_apps_v1alpha1_FailurePolicy(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJob":                     schema_pkg_apis_apps_v1alpha1_ImagePullJob(ref),
 		"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.ImagePullJobList":                 schema_pkg_apis_apps_v1alpha1_ImagePullJobList(ref),
@@ -803,6 +809,334 @@ func schema_pkg_apis_apps_v1alpha1_CompletionPolicy(ref common.ReferenceCallback
 				},
 			},
 		},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_DaemonSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSet is the Schema for the daemonsets API",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetSpec", "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_DaemonSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSetCondition describes the state of a DaemonSet at a certain point.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of DaemonSet condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of the condition, one of True, False, Unknown.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time the condition transitioned from one status to another.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A human readable message indicating details about the transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type", "status"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_DaemonSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSetList contains a list of DaemonSet",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSet"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSet", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_DaemonSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSetSpec defines the desired state of DaemonSet",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A label query over pods that are managed by the daemon set. Must match in order to be controlled. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+						},
+					},
+					"template": {
+						SchemaProps: spec.SchemaProps{
+							Description: "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
+						},
+					},
+					"updateStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "An update strategy to replace existing DaemonSet pods with new pods.",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetUpdateStrategy"),
+						},
+					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"burstReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BurstReplicas is a rate limiter for booting pods on a lot of pods. The default value is 250",
+							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+						},
+					},
+					"revisionHistoryLimit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"selector", "template"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetUpdateStrategy", "k8s.io/api/core/v1.PodTemplateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_DaemonSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSetStatus defines the observed state of DaemonSet",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"currentNumberScheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"numberMisscheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"desiredNumberScheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"numberReady": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The most recent generation observed by the daemon set controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"updatedNumberScheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The total number of nodes that are running updated daemon pod",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"numberAvailable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"numberUnavailable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"collisionCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the latest available observations of a DaemonSet's current state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetCondition"),
+									},
+								},
+							},
+						},
+					},
+					"daemonSetHash": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DaemonSetHash is the controller-revision-hash, which represents the latest version of the DaemonSet.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "numberReady", "updatedNumberScheduled", "daemonSetHash"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.DaemonSetCondition"},
+	}
+}
+
+func schema_pkg_apis_apps_v1alpha1_DaemonSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN! NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized. DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"rollingUpdate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Rolling update config params. Present only if type = \"RollingUpdate\".",
+							Ref:         ref("github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateDaemonSet"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1.RollingUpdateDaemonSet"},
 	}
 }
 

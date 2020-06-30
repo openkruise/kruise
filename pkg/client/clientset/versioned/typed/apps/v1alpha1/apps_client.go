@@ -29,6 +29,7 @@ type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	BroadcastJobsGetter
 	CloneSetsGetter
+	DaemonSetsGetter
 	SidecarSetsGetter
 	StatefulSetsGetter
 	UnitedDeploymentsGetter
@@ -45,6 +46,10 @@ func (c *AppsV1alpha1Client) BroadcastJobs(namespace string) BroadcastJobInterfa
 
 func (c *AppsV1alpha1Client) CloneSets(namespace string) CloneSetInterface {
 	return newCloneSets(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) DaemonSets(namespace string) DaemonSetInterface {
+	return newDaemonSets(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) SidecarSets() SidecarSetInterface {

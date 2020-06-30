@@ -224,3 +224,48 @@ func SetDefaults_CloneSet(obj *CloneSet) {
 		obj.Spec.UpdateStrategy.MaxSurge = &maxSurge
 	}
 }
+
+// SetDefaults_DaemonSet set default values for DaemonSet.
+func SetDefaults_DaemonSet(obj *DaemonSet) {
+	if obj.Spec.BurstReplicas == nil {
+		BurstReplicas := intstr.FromInt(250)
+		obj.Spec.BurstReplicas = &BurstReplicas
+	}
+
+	if obj.Spec.UpdateStrategy.Type == "" {
+		obj.Spec.UpdateStrategy.Type = RollingUpdateDaemonSetStrategyType
+
+		// UpdateStrategy.RollingUpdate will take default values below.
+		obj.Spec.UpdateStrategy.RollingUpdate = &RollingUpdateDaemonSet{}
+	}
+
+	if obj.Spec.UpdateStrategy.Type == RollingUpdateDaemonSetStrategyType {
+		if obj.Spec.UpdateStrategy.RollingUpdate == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate = &RollingUpdateDaemonSet{}
+		}
+		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+		}
+		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+			maxUnavailable := intstr.FromInt(1)
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+
+		if obj.Spec.UpdateStrategy.RollingUpdate.Type == "" {
+			obj.Spec.UpdateStrategy.RollingUpdate.Type = StandardRollingUpdateType
+		}
+		// Only when RollingUpdate Type is SurgingRollingUpdateType, it need to initialize the MaxSurge.
+		if obj.Spec.UpdateStrategy.RollingUpdate.Type == SurgingRollingUpdateType {
+			if obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
+				MaxSurge := intstr.FromInt(1)
+				obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &MaxSurge
+			}
+		}
+	}
+
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+}
