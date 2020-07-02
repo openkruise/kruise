@@ -43,7 +43,7 @@ type Control interface {
 	GetUpdateOptions() *inplaceupdate.UpdateOptions
 
 	// validation
-	ValidateTemplateUpdateForInPlace(oldTemp, newTemp *v1.PodTemplateSpec) error
+	ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneSet) error
 }
 
 func New(cs *appsv1alpha1.CloneSet) Control {

@@ -163,12 +163,9 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneS
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'scaleStrategy', and 'updateStrategy' are forbidden"))
 	}
 
-	if cloneSet.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-		coreControl := clonesetcore.New(cloneSet)
-		if err := coreControl.ValidateTemplateUpdateForInPlace(&oldCloneSet.Spec.Template, &cloneSet.Spec.Template); err != nil {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("template"),
-				fmt.Sprintf("forbid to update for InPlaceOnly updateStrategy type: %v", err)))
-		}
+	coreControl := clonesetcore.New(cloneSet)
+	if err := coreControl.ValidateCloneSetUpdate(oldCloneSet, cloneSet); err != nil {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), err.Error()))
 	}
 
 	allErrs = append(allErrs, h.validateCloneSet(cloneSet)...)
