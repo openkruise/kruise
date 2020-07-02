@@ -30,11 +30,9 @@ import (
 	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -52,34 +50,18 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var (
-	simpleDaemonSetLabel  = map[string]string{"name": "simple-daemon", "type": "production"}
-	simpleDaemonSetLabel2 = map[string]string{"name": "simple-daemon", "type": "test"}
-	simpleNodeLabel       = map[string]string{"color": "blue", "speed": "fast"}
-	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
-	alwaysReady           = func() bool { return true }
-)
-
-var (
-	noScheduleTolerations = []corev1.Toleration{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}
-	noScheduleTaints      = []corev1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}
-	noExecuteTaints       = []corev1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoExecute"}}
+	simpleDaemonSetLabel = map[string]string{"name": "simple-daemon", "type": "production"}
 )
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 
 const timeout = time.Second * 5
-
-func nowPointer() *metav1.Time {
-	now := metav1.Now()
-	return &now
-}
 
 func newDaemonSet(name string) *appsv1alpha1.DaemonSet {
 	two := int32(2)
@@ -115,122 +97,12 @@ func newDaemonSet(name string) *appsv1alpha1.DaemonSet {
 	}
 }
 
-func newStandardRollingUpdateStrategy() appsv1alpha1.DaemonSetUpdateStrategy {
-	one := intstr.FromInt(1)
-	return appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-			MaxUnavailable: &one,
-			Selector:       nil,
-			Type:           appsv1alpha1.StandardRollingUpdateType,
-		},
-	}
-}
-
-func newSurgingRollingUpdateStrategy() appsv1alpha1.DaemonSetUpdateStrategy {
-	one := intstr.FromInt(1)
-	return appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-			MaxUnavailable: &one,
-			MaxSurge:       &one,
-			Selector:       nil,
-			Type:           appsv1alpha1.SurgingRollingUpdateType,
-		},
-	}
-}
-
-func newOnDeleteStrategy() appsv1alpha1.DaemonSetUpdateStrategy {
-	return appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.OnDeleteDaemonSetStrategyType,
-	}
-}
-
-func updateStrategies() []appsv1alpha1.DaemonSetUpdateStrategy {
-	return []appsv1alpha1.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newStandardRollingUpdateStrategy(), newSurgingRollingUpdateStrategy()}
-}
-
-func newNode(name string, label map[string]string) *corev1.Node {
-	return &corev1.Node{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Labels:    label,
-			Namespace: metav1.NamespaceNone,
-		},
-		Status: corev1.NodeStatus{
-			Conditions: []corev1.NodeCondition{
-				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
-			},
-			Allocatable: corev1.ResourceList{
-				corev1.ResourcePods: resource.MustParse("100"),
-			},
-		},
-	}
-}
-
-func newPod(podName string, nodeName string, label map[string]string, ds *appsv1alpha1.DaemonSet) *corev1.Pod {
-	// Add hash unique label to the pod
-	newLabels := label
-	var podSpec corev1.PodSpec
-	// Copy pod spec from DaemonSet template, or use a default one if DaemonSet is nil
-	if ds != nil {
-		hash := controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
-		newLabels = labelsutil.CloneAndAddLabel(label, apps.DefaultDaemonSetUniqueLabelKey, hash)
-		podSpec = ds.Spec.Template.Spec
-	} else {
-		podSpec = corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Image:                  "foo/bar",
-					TerminationMessagePath: corev1.TerminationMessagePathDefault,
-					ImagePullPolicy:        corev1.PullIfNotPresent,
-					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
-				},
-			},
-		}
-	}
-	// Add node name to the pod
-	if len(nodeName) > 0 {
-		podSpec.NodeName = nodeName
-	}
-
-	pod := &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: podName,
-			Labels:       newLabels,
-			Namespace:    metav1.NamespaceDefault,
-		},
-		Spec: podSpec,
-	}
-	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
-	if ds != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)}
-	}
-	return pod
-}
-
-func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]string) {
-	for i := startIndex; i < startIndex+numNodes; i++ {
-		nodeStore.Add(newNode(fmt.Sprintf("node-%d", i), label))
-	}
-}
-
-func addFailedPods(podStore cache.Store, nodeName string, label map[string]string, ds *appsv1alpha1.DaemonSet, number int) {
-	for i := 0; i < number; i++ {
-		pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, label, ds)
-		pod.Status = corev1.PodStatus{Phase: corev1.PodFailed}
-		podStore.Add(pod)
-	}
-}
-
 type fakePodControl struct {
 	sync.Mutex
 	*controller.FakePodControl
 	podStore cache.Store
 	podIDMap map[string]*corev1.Pod
-	dsc      *daemonSetsController
+	dsc      *DaemonSetsController
 }
 
 func newFakePodControl() *fakePodControl {
@@ -324,20 +196,8 @@ func (f *fakePodControl) DeletePod(namespace string, podID string, object runtim
 	return nil
 }
 
-// clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
-func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1alpha1.DaemonSet, fakePodControl *fakePodControl) {
-	fakePodControl.Clear()
-
-	key, err := controller.KeyFunc(ds)
-	if err != nil {
-		t.Errorf("Could not get key for daemon.")
-		return
-	}
-	expectations.DeleteExpectations(key)
-}
-
 // just define for test
-type daemonSetsController struct {
+type DaemonSetsController struct {
 	ReconcileDaemonSet
 	// podListerSynced returns true if the pod shared informer has synced at least once
 	podListerSynced cache.InformerSynced
@@ -360,7 +220,7 @@ func splitObjects(initialObjects []runtime.Object) ([]runtime.Object, []runtime.
 	return kubeObjects, kruiseObjects
 }
 
-func newTestController(c kubeClient.Client, initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset, error) {
+func newTestController(c kubeClient.Client, initialObjects ...runtime.Object) (*DaemonSetsController, *fakePodControl, *fake.Clientset, error) {
 	kubeObjects, kruiseObjects := splitObjects(initialObjects)
 	client := fake.NewSimpleClientset(kubeObjects...)
 	kruiseClient := kruisefake.NewSimpleClientset(kruiseObjects...)
@@ -386,12 +246,12 @@ func NewDaemonSetController(
 	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
 	client kubeClient.Client,
-) *daemonSetsController {
+) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "daemonset-controller"})
-	dsc := &daemonSetsController{
+	dsc := &DaemonSetsController{
 		ReconcileDaemonSet: ReconcileDaemonSet{
 			client:        client,
 			eventRecorder: recorder,

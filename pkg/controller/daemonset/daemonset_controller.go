@@ -605,7 +605,7 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 		}
 
 		if !reflect.DeepEqual(re, reconcile.Result{}) {
-			result = re
+			return re, nil
 		}
 
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)
