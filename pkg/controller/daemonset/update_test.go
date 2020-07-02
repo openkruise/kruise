@@ -21,13 +21,13 @@ func Test_maxRevision(t *testing.T) {
 			name: "GetMaxRevision",
 			args: args{
 				histories: []*apps.ControllerRevision{
-					&apps.ControllerRevision{
+					{
 						Revision: 123456789,
 					},
-					&apps.ControllerRevision{
+					{
 						Revision: 213456789,
 					},
-					&apps.ControllerRevision{
+					{
 						Revision: 312456789,
 					},
 				},

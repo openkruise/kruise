@@ -533,7 +533,7 @@ func (dsc *ReconcileDaemonSet) getSurgeNumbers(ds *appsv1alpha1.DaemonSet, nodeT
 
 		for _, pod := range nodeToDaemonPods[node.Name] {
 			if util.IsPodUpdated(pod, hash, generation) && len(nodeToDaemonPods[node.Name]) > 1 {
-				numSurge += 1
+				numSurge++
 				break
 			}
 		}
@@ -677,7 +677,7 @@ func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 		}
 		if newPod == nil && numSurge < maxSurge && wantToRun {
 			if !foundAvailable && len(pods) >= 2 {
-				klog.Warningf("Node %s already has %d unavailble pods, need clean first, skip surge new pod", node, len(pods))
+				klog.Warningf("Node %s already has %d unavailable pods, need clean first, skip surge new pod", node, len(pods))
 			} else {
 				klog.V(6).Infof("Surging new pod on node %s", node)
 				numSurge++

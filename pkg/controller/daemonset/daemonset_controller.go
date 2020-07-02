@@ -269,13 +269,13 @@ type ReconcileDaemonSet struct {
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=daemonsets/status,verbs=get;update;patch
-func (r *ReconcileDaemonSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (dsc *ReconcileDaemonSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing DaemonSet %q (%v)", request.String(), time.Since(startTime))
 	}()
 
-	return r.syncDaemonSet(request)
+	return dsc.syncDaemonSet(request)
 }
 
 // getDaemonPods returns daemon pods owned by the given ds.

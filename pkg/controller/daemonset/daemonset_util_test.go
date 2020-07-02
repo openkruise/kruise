@@ -24,13 +24,13 @@ func Test_nodeInSameCondition(t *testing.T) {
 			name: "nodeInSameCondition",
 			args: args{
 				old: []corev1.NodeCondition{
-					corev1.NodeCondition{
+					{
 						Type:   "test-1",
 						Status: corev1.ConditionTrue,
 					},
 				},
 				cur: []corev1.NodeCondition{
-					corev1.NodeCondition{
+					{
 						Type:   "test-1",
 						Status: corev1.ConditionTrue,
 					},
@@ -42,17 +42,17 @@ func Test_nodeInSameCondition(t *testing.T) {
 			name: "nodeInSameCondition2",
 			args: args{
 				old: []corev1.NodeCondition{
-					corev1.NodeCondition{
+					{
 						Type:   "test-1",
 						Status: corev1.ConditionTrue,
 					},
 				},
 				cur: []corev1.NodeCondition{
-					corev1.NodeCondition{
+					{
 						Type:   "test-1",
 						Status: corev1.ConditionTrue,
 					},
-					corev1.NodeCondition{
+					{
 						Type:   "test-2",
 						Status: corev1.ConditionFalse,
 					},
@@ -64,21 +64,21 @@ func Test_nodeInSameCondition(t *testing.T) {
 			name: "nodeNotInSameCondition",
 			args: args{
 				old: []corev1.NodeCondition{
-					corev1.NodeCondition{
+					{
 						Type:   "test-1",
 						Status: corev1.ConditionTrue,
 					},
-					corev1.NodeCondition{
+					{
 						Type:   "test-3",
 						Status: corev1.ConditionTrue,
 					},
 				},
 				cur: []corev1.NodeCondition{
-					corev1.NodeCondition{
+					{
 						Type:   "test-1",
 						Status: corev1.ConditionTrue,
 					},
-					corev1.NodeCondition{
+					{
 						Type:   "test-2",
 						Status: corev1.ConditionFalse,
 					},
@@ -140,11 +140,11 @@ func TestShouldIgnoreNodeUpdate(t *testing.T) {
 					},
 					Status: corev1.NodeStatus{
 						Conditions: []corev1.NodeCondition{
-							corev1.NodeCondition{
+							{
 								Type:   "test-1",
 								Status: corev1.ConditionTrue,
 							},
-							corev1.NodeCondition{
+							{
 								Type:   "test-3",
 								Status: corev1.ConditionTrue,
 							},
@@ -158,11 +158,11 @@ func TestShouldIgnoreNodeUpdate(t *testing.T) {
 					},
 					Status: corev1.NodeStatus{
 						Conditions: []corev1.NodeCondition{
-							corev1.NodeCondition{
+							{
 								Type:   "test-1",
 								Status: corev1.ConditionTrue,
 							},
-							corev1.NodeCondition{
+							{
 								Type:   "test-2",
 								Status: corev1.ConditionFalse,
 							},
