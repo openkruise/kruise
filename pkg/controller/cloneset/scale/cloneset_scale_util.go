@@ -94,12 +94,13 @@ func calculateDiffs(cs *appsv1alpha1.CloneSet, revConsistent bool, totalPods int
 func choosePodsToDelete(totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
 		// No need to sort pods if we are about to delete all of them.
-		// diff will always be <= len(filteredPods), so not need to handle > case.
 		if diff < len(pods) {
 			// Sort the pods in the order such that not-ready < ready, unscheduled
 			// < scheduled, and pending < running. This ensures that we delete pods
 			// in the earlier stages whenever possible.
 			sort.Sort(kubecontroller.ActivePods(pods))
+		} else if diff > len(pods) {
+			return []*v1.Pod{}
 		}
 		return pods[:diff]
 	}
