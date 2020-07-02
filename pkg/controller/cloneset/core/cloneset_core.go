@@ -135,9 +135,13 @@ func (c *commonControl) GetUpdateOptions() *inplaceupdate.UpdateOptions {
 	return opts
 }
 
-func (c *commonControl) ValidateTemplateUpdateForInPlace(oldTemp, newTemp *v1.PodTemplateSpec) error {
-	oldTempJSON, _ := json.Marshal(oldTemp.Spec)
-	newTempJSON, _ := json.Marshal(newTemp.Spec)
+func (c *commonControl) ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneSet) error {
+	if newCS.Spec.UpdateStrategy.Type != appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+		return nil
+	}
+
+	oldTempJSON, _ := json.Marshal(oldCS.Spec.Template.Spec)
+	newTempJSON, _ := json.Marshal(newCS.Spec.Template.Spec)
 	patches, err := jsonpatch.CreatePatch(oldTempJSON, newTempJSON)
 	if err != nil {
 		return fmt.Errorf("failed calculate patches between old/new template spec")
@@ -145,7 +149,8 @@ func (c *commonControl) ValidateTemplateUpdateForInPlace(oldTemp, newTemp *v1.Po
 
 	for _, p := range patches {
 		if p.Operation != "replace" || !inPlaceUpdateTemplateSpecPatchRexp.MatchString(p.Path) {
-			return fmt.Errorf("only allowed to update images but found %s %s", p.Operation, p.Path)
+			return fmt.Errorf("only allowed to update images in spec for %s, but found %s %s",
+				appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType, p.Operation, p.Path)
 		}
 	}
 	return nil

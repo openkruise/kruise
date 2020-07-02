@@ -40,15 +40,17 @@ import (
 var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
 
 type (
-	CustomizeSpecCalculateFunc func(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec
-	CustomizeSpecPatchFunc     func(pod *v1.Pod, spec *UpdateSpec) (*v1.Pod, error)
+	CustomizeSpecCalculateFunc        func(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec
+	CustomizeSpecPatchFunc            func(pod *v1.Pod, spec *UpdateSpec) (*v1.Pod, error)
+	CustomizeCheckUpdateCompletedFunc func(pod *v1.Pod) error
 )
 
 type UpdateOptions struct {
 	GracePeriodSeconds int32
 
-	CustomizeSpecCalculate CustomizeSpecCalculateFunc
-	CustomizeSpecPatch     CustomizeSpecPatchFunc
+	CustomizeSpecCalculate        CustomizeSpecCalculateFunc
+	CustomizeSpecPatch            CustomizeSpecPatchFunc
+	CustomizeCheckUpdateCompleted CustomizeCheckUpdateCompletedFunc
 }
 
 type RefreshResult struct {
@@ -106,7 +108,7 @@ func NewForTest(c client.Client, revisionKey string, now func() metav1.Time) Int
 }
 
 func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
-	if err := c.refreshCondition(pod); err != nil {
+	if err := c.refreshCondition(pod, opts); err != nil {
 		return RefreshResult{RefreshErr: err}
 	}
 
@@ -121,15 +123,19 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 	return RefreshResult{DelayDuration: delayDuration}
 }
 
-func (c *realControl) refreshCondition(pod *v1.Pod) error {
+func (c *realControl) refreshCondition(pod *v1.Pod, opts *UpdateOptions) error {
 	// no need to update condition because of no readiness-gate
 	if !containsReadinessGate(pod) {
 		return nil
 	}
 
 	// in-place updating has not completed yet
-	if checkErr := CheckInPlaceUpdateCompleted(pod); checkErr != nil {
-		klog.V(5).Infof("Check Pod %s/%s in-place update not-ready: %v", pod.Namespace, pod.Name, checkErr)
+	checkFunc := CheckInPlaceUpdateCompleted
+	if opts != nil && opts.CustomizeCheckUpdateCompleted != nil {
+		checkFunc = opts.CustomizeCheckUpdateCompleted
+	}
+	if checkErr := checkFunc(pod); checkErr != nil {
+		klog.V(6).Infof("Check Pod %s/%s in-place update not completed yet: %v", pod.Namespace, pod.Name, checkErr)
 		return nil
 	}
 
