@@ -204,6 +204,39 @@ func TestCalculateDiffs(t *testing.T) {
 			expectedCurrentRevDiff: -2,
 		},
 		{
+			name: "scale in without revConsistent 6",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					Replicas: utilpointer.Int32Ptr(9),
+					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+						Partition: utilpointer.Int32Ptr(10),
+					},
+				},
+			},
+			revConsistent:          false,
+			totalPods:              10,
+			notUpdatedPods:         10,
+			expectedTotalDiff:      1,
+			expectedCurrentRevDiff: 1,
+		},
+		{
+			name: "scale in without revConsistent 7",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					Replicas: utilpointer.Int32Ptr(9),
+					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+						MaxSurge:  &intOrStr1,
+						Partition: utilpointer.Int32Ptr(10),
+					},
+				},
+			},
+			revConsistent:          false,
+			totalPods:              10,
+			notUpdatedPods:         10,
+			expectedTotalDiff:      0,
+			expectedCurrentRevDiff: 1,
+		},
+		{
 			name: "scale out with maxSurge < currentRevDiff",
 			cs: &appsv1alpha1.CloneSet{
 				Spec: appsv1alpha1.CloneSetSpec{
