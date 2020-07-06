@@ -72,7 +72,7 @@ func calculateDiffs(cs *appsv1alpha1.CloneSet, revConsistent bool, totalPods int
 
 	if !revConsistent {
 		if cs.Spec.UpdateStrategy.Partition != nil {
-			currentRevDiff = notUpdatedPods - int(*cs.Spec.UpdateStrategy.Partition)
+			currentRevDiff = notUpdatedPods - integer.IntMin(int(*cs.Spec.UpdateStrategy.Partition), int(*cs.Spec.Replicas))
 		}
 
 		// Use maxSurge only if partition has not satisfied
@@ -94,12 +94,14 @@ func calculateDiffs(cs *appsv1alpha1.CloneSet, revConsistent bool, totalPods int
 func choosePodsToDelete(totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
 		// No need to sort pods if we are about to delete all of them.
-		// diff will always be <= len(filteredPods), so not need to handle > case.
 		if diff < len(pods) {
 			// Sort the pods in the order such that not-ready < ready, unscheduled
 			// < scheduled, and pending < running. This ensures that we delete pods
 			// in the earlier stages whenever possible.
 			sort.Sort(kubecontroller.ActivePods(pods))
+		} else if diff > len(pods) {
+			klog.Warningf("Diff > len(pods) in choosePodsToDelete func which is not expected.")
+			return pods
 		}
 		return pods[:diff]
 	}
