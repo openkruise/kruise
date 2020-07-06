@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission/builder"
+
+	"github.com/openkruise/kruise/pkg/util/healthz"
 )
 
 var (
@@ -111,5 +113,12 @@ func Add(mgr manager.Manager) error {
 		}
 		webhooks = append(webhooks, wh)
 	}
-	return svr.Register(webhooks...)
+	if err := svr.Register(webhooks...); err != nil {
+		return err
+	}
+
+	healthz.InstallHandler(svr)
+	healthz.InstallReadyzHandler(svr)
+	healthz.InstallLivezHandler(svr)
+	return nil
 }

@@ -2,10 +2,8 @@
 ## explicit
 cloud.google.com/go/compute/metadata
 # github.com/PuerkitoBio/purell v1.1.1
-## explicit
 github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
-## explicit
 github.com/PuerkitoBio/urlesc
 # github.com/appscode/jsonpatch v1.0.1
 ## explicit
@@ -17,7 +15,6 @@ github.com/beorn7/perks/quantile
 ## explicit
 github.com/codegangsta/negroni
 # github.com/davecgh/go-spew v1.1.1
-## explicit
 github.com/davecgh/go-spew/spew
 # github.com/docker/distribution v2.7.1+incompatible
 ## explicit
@@ -30,8 +27,6 @@ github.com/emicklei/go-restful/log
 # github.com/evanphx/json-patch v4.1.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
-# github.com/fsnotify/fsnotify v1.4.7
-## explicit
 # github.com/ghodss/yaml v1.0.0
 ## explicit
 github.com/ghodss/yaml
@@ -42,10 +37,8 @@ github.com/go-logr/logr
 ## explicit
 github.com/go-logr/zapr
 # github.com/go-openapi/jsonpointer v0.19.2
-## explicit
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonreference v0.19.2
-## explicit
 github.com/go-openapi/jsonreference
 # github.com/go-openapi/spec v0.19.2
 ## explicit
@@ -70,7 +63,6 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 # github.com/gomodule/redigo v2.0.0+incompatible
-## explicit
 github.com/gomodule/redigo/internal
 github.com/gomodule/redigo/redis
 # github.com/google/btree v1.0.0
@@ -99,7 +91,6 @@ github.com/gregjones/httpcache/diskcache
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
 # github.com/hpcloud/tail v1.0.0
-## explicit
 github.com/hpcloud/tail
 github.com/hpcloud/tail/ratelimiter
 github.com/hpcloud/tail/util
@@ -109,8 +100,6 @@ github.com/hpcloud/tail/winfile
 ## explicit
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0
-## explicit
-# github.com/joho/godotenv v1.3.0
 ## explicit
 # github.com/json-iterator/go v1.1.6
 ## explicit
@@ -123,10 +112,8 @@ github.com/mailru/easyjson/jwriter
 # github.com/markbates/inflect v1.0.4
 ## explicit
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
-## explicit
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
-## explicit
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742
 ## explicit
@@ -182,10 +169,8 @@ github.com/peterbourgon/diskv
 ## explicit
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
-## explicit
 github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829
-## explicit
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
@@ -232,7 +217,6 @@ go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
 # golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-## explicit
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/pbkdf2
@@ -256,11 +240,9 @@ golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
-## explicit
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.2
-## explicit
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -285,8 +267,6 @@ golang.org/x/text/width
 # golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190614205625-5aca471b1d59
-## explicit
 # google.golang.org/appengine v1.5.0
 ## explicit
 google.golang.org/appengine
@@ -311,10 +291,8 @@ gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
 gopkg.in/square/go-jose.v2/jwt
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
-## explicit
 gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.2.2
-## explicit
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0-20181213150558-05914d821849
 ## explicit
