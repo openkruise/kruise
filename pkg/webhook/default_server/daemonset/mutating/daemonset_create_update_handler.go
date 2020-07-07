@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kruise Authors.
+Copyright 2020 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,11 +50,6 @@ type DaemonSetCreateUpdateHandler struct {
 	Decoder types.Decoder
 }
 
-func (h *DaemonSetCreateUpdateHandler) mutatingDaemonSetFn(ctx context.Context, obj *appsv1alpha1.DaemonSet) error {
-	// TODO(user): implement your admission logic
-	return nil
-}
-
 var _ admission.Handler = &DaemonSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
@@ -69,11 +64,6 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req types.Req
 	//copy := obj.DeepCopy()
 	appsv1alpha1.SetDefaults_DaemonSet(obj)
 	obj.Status = appsv1alpha1.DaemonSetStatus{}
-
-	err = h.mutatingDaemonSetFn(ctx, obj)
-	if err != nil {
-		return admission.ErrorResponse(http.StatusInternalServerError, err)
-	}
 
 	marshaledDaemonSet, err := json.Marshal(obj)
 	if err != nil {
