@@ -688,19 +688,16 @@ func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 			oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
 		} else {
 			if ds.Spec.MinReadySeconds > 0 {
-				// TODO: use return reconcile.Result{RequeueAfter: time.Duration(ds.Spec.MinReadySeconds) * time.Second}, nil
-				time.Sleep(time.Duration(ds.Spec.MinReadySeconds) * time.Second)
 				if newPod != nil {
-					if podutil.IsPodAvailable(newPod, 0, metav1.Now()) {
+					if podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Now()) {
 						if oldPod != nil && oldPod.DeletionTimestamp == nil {
 							klog.V(6).Infof("Marking pod %s/%s for deletion", ds.Name, oldPod.Name)
 							oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
 						}
 					} else {
-						return reconcile.Result{Requeue: true}, nil
+						return reconcile.Result{RequeueAfter: time.Duration(ds.Spec.MinReadySeconds) * time.Second}, nil
 					}
 				}
-
 			}
 		}
 	}

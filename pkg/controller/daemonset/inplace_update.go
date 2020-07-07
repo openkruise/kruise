@@ -125,7 +125,7 @@ func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.Daemo
 			}
 
 			if res.UpdateErr != nil {
-				klog.Warningf("CloneSet %s/%s failed to in-place update Pod %s, so it will back off to ReCreate", ds.Namespace, ds.Name, pod.Name)
+				klog.Warningf("DaemonSet %s/%s failed to in-place update Pod %s, so it will back off to ReCreate", ds.Namespace, ds.Name, pod.Name)
 				errCh <- res.UpdateErr
 				utilruntime.HandleError(res.UpdateErr)
 			}
