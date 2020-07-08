@@ -25,7 +25,7 @@ run: generate fmt vet
 
 # Install CRDs into a cluster
 install: manifests
-	kubectl replace -f config/crds || kubectl create -f config/crds
+	kubectl apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
@@ -72,16 +72,18 @@ docker-push:
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
-ifeq (, $(shell which controller-gen))
+ifeq (, $(shell which controller-gen-kruise))
 	@{ \
 	set -e ;\
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
+	echo "replace sigs.k8s.io/controller-tools => github.com/openkruise/controller-tools v0.2.9-kruise" >> go.mod ;\
 	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.9 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	mv $(GOPATH)/bin/controller-gen $(GOPATH)/bin/controller-gen-kruise ;\
 	}
-CONTROLLER_GEN=$(GOPATH)/bin/controller-gen
+CONTROLLER_GEN=$(GOPATH)/bin/controller-gen-kruise
 else
-CONTROLLER_GEN=$(shell which controller-gen)
+CONTROLLER_GEN=$(shell which controller-gen-kruise)
 endif
