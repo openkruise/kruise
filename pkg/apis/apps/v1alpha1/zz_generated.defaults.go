@@ -31,6 +31,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&BroadcastJobList{}, func(obj interface{}) { SetObjectDefaults_BroadcastJobList(obj.(*BroadcastJobList)) })
 	scheme.AddTypeDefaultingFunc(&CloneSet{}, func(obj interface{}) { SetObjectDefaults_CloneSet(obj.(*CloneSet)) })
 	scheme.AddTypeDefaultingFunc(&CloneSetList{}, func(obj interface{}) { SetObjectDefaults_CloneSetList(obj.(*CloneSetList)) })
+	scheme.AddTypeDefaultingFunc(&DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*DaemonSet)) })
+	scheme.AddTypeDefaultingFunc(&DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*DaemonSetList)) })
 	scheme.AddTypeDefaultingFunc(&SidecarSet{}, func(obj interface{}) { SetObjectDefaults_SidecarSet(obj.(*SidecarSet)) })
 	scheme.AddTypeDefaultingFunc(&SidecarSetList{}, func(obj interface{}) { SetObjectDefaults_SidecarSetList(obj.(*SidecarSetList)) })
 	scheme.AddTypeDefaultingFunc(&StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*StatefulSet)) })
@@ -59,6 +61,17 @@ func SetObjectDefaults_CloneSetList(in *CloneSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CloneSet(a)
+	}
+}
+
+func SetObjectDefaults_DaemonSet(in *DaemonSet) {
+	SetDefaults_DaemonSet(in)
+}
+
+func SetObjectDefaults_DaemonSetList(in *DaemonSetList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_DaemonSet(a)
 	}
 }
 
