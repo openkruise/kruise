@@ -1,5 +1,6 @@
 /*
 Copyright 2020 The Kruise Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -460,7 +461,7 @@ func Test_ignoreNotReady(t *testing.T) {
 	}
 }
 
-func TestCanNodBeDeployed(t *testing.T) {
+func TestCanNodeBeDeployed(t *testing.T) {
 	type args struct {
 		node *corev1.Node
 		ds   *appsv1alpha1.DaemonSet
@@ -527,8 +528,8 @@ func TestCanNodBeDeployed(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CanNodBeDeployed(tt.args.node, tt.args.ds); got != tt.want {
-				t.Errorf("CanNodBeDeployed() = %v, want %v", got, tt.want)
+			if got := CanNodeBeDeployed(tt.args.node, tt.args.ds); got != tt.want {
+				t.Errorf("CanNodeBeDeployed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

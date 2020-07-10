@@ -240,7 +240,7 @@ func (dsc *ReconcileDaemonSet) getUnavailableNumbers(ds *appsv1alpha1.DaemonSet,
 	var numUnavailable, desiredNumberScheduled int
 	for i := range nodeList {
 		node := nodeList[i]
-		if !CanNodBeDeployed(node, ds) {
+		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
 		wantToRun, _, _, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
@@ -534,7 +534,7 @@ func (dsc *ReconcileDaemonSet) getSurgeNumbers(ds *appsv1alpha1.DaemonSet, nodeT
 	var desiredNumberScheduled, numSurge int
 	for i := range nodeList {
 		node := nodeList[i]
-		if !CanNodBeDeployed(node, ds) {
+		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
 		wantToRun, _, _, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
@@ -575,7 +575,7 @@ func (dsc *ReconcileDaemonSet) getNodesShouldRunDaemonPod(ds *appsv1alpha1.Daemo
 	nodesWantToRun = sets.String{}
 	nodesShouldContinueRunning = sets.String{}
 	for _, node := range nodeList {
-		if !CanNodBeDeployed(node, ds) {
+		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
 		wantToRun, _, shouldContinueRunning, err := NodeShouldRunDaemonPod(dsc.client, node, ds)

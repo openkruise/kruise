@@ -1,5 +1,6 @@
 /*
 Copyright 2020 The Kruise Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -517,7 +518,7 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet,
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable = 0, 0, 0, 0, 0, 0
 	for _, node := range nodeList {
-		if !CanNodBeDeployed(node, ds) {
+		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
 		wantToRun, _, _, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
@@ -528,7 +529,7 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet,
 		scheduled := len(nodeToDaemonPods[node.Name]) > 0
 
 		if wantToRun {
-			if CanNodBeDeployed(node, ds) {
+			if CanNodeBeDeployed(node, ds) {
 				desiredNumberScheduled++
 			}
 			if scheduled {
@@ -596,7 +597,7 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 	var failedPodsObserved int
 
 	for _, node := range nodeList {
-		if !CanNodBeDeployed(node, ds) {
+		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
 		re, nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, failedPodsObserverdOnNode, err := dsc.podsShouldBeOnNode(node, nodeToDaemonPods, ds, hash)
@@ -931,7 +932,7 @@ func (dsc *ReconcileDaemonSet) getNodesToDaemonPods(ds *appsv1alpha1.DaemonSet) 
 		}
 		node := &corev1.Node{}
 		err = dsc.client.Get(context.TODO(), types.NamespacedName{Name: nodeName}, node)
-		if err == nil && CanNodBeDeployed(node, ds) {
+		if err == nil && CanNodeBeDeployed(node, ds) {
 			nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 		} else {
 			klog.V(4).Infof("get node: %s failed", nodeName)
@@ -941,7 +942,8 @@ func (dsc *ReconcileDaemonSet) getNodesToDaemonPods(ds *appsv1alpha1.DaemonSet) 
 	return nodeToDaemonPods, nil
 }
 
-func CanNodBeDeployed(node *corev1.Node, ds *appsv1alpha1.DaemonSet) bool {
+// CanNodeBeDployed checks if the node is ready for new daemon Pod.
+func CanNodeBeDeployed(node *corev1.Node, ds *appsv1alpha1.DaemonSet) bool {
 	isNodeScheduable := true
 	isNodeReady := true
 

@@ -282,7 +282,7 @@ func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitin
 		if err != nil {
 			continue
 		}
-		if (CanNodBeDeployed(oldNode, &ds) != CanNodBeDeployed(curNode, &ds)) || (oldShouldSchedule != currentShouldSchedule) || (oldShouldContinueRunning != currentShouldContinueRunning) {
+		if (CanNodeBeDeployed(oldNode, &ds) != CanNodeBeDeployed(curNode, &ds)) || (oldShouldSchedule != currentShouldSchedule) || (oldShouldContinueRunning != currentShouldContinueRunning) {
 			klog.V(6).Infof("update node: %s triggers DaemonSet %s/%s to reconcile.", curNode.Name, ds.GetNamespace(), ds.GetName())
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      ds.GetName(),
