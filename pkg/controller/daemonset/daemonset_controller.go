@@ -594,13 +594,12 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 	}
 
 	var nodesNeedingDaemonPods, podsToDelete []string
-	var failedPodsObserved int
 
 	for _, node := range nodeList {
 		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
-		re, nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, failedPodsObserverdOnNode, err := dsc.podsShouldBeOnNode(node, nodeToDaemonPods, ds, hash)
+		re, nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(node, nodeToDaemonPods, ds, hash)
 		if err != nil {
 			continue
 		}
@@ -611,7 +610,6 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)
 		podsToDelete = append(podsToDelete, podsToDeleteOnNode...)
-		failedPodsObserved += failedPodsObserverdOnNode
 	}
 
 	// This is the first deploy process.
@@ -654,11 +652,6 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 	// Label new pods using the hash label value of the current history when creating them
 	if result, err = dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash); err != nil {
 		return result, err
-	}
-
-	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
-	if failedPodsObserved > 0 {
-		return result, fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name)
 	}
 
 	return result, nil
@@ -800,14 +793,13 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 // podsShouldBeOnNode figures out the DaemonSet pods to be created and deleted on the given node:
 //   - nodesNeedingDaemonPods: the pods need to start on the node
 //   - podsToDelete: the Pods need to be deleted on the node
-//   - failedPodsObserved: the number of failed pods on node
 //   - err: unexpected error
 func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 	node *corev1.Node,
 	nodeToDaemonPods map[string][]*corev1.Pod,
 	ds *appsv1alpha1.DaemonSet,
 	hash string,
-) (result reconcile.Result, nodesNeedingDaemonPods, podsToDelete []string, failedPodsObserved int, err error) {
+) (result reconcile.Result, nodesNeedingDaemonPods, podsToDelete []string, err error) {
 	wantToRun, shouldSchedule, shouldContinueRunning, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
 	if err != nil {
 		return
@@ -838,8 +830,6 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 				continue
 			}
 			if pod.Status.Phase == corev1.PodFailed {
-				failedPodsObserved++
-
 				// This is a critical place where DS is often fighting with kubelet that rejects pods.
 				// We need to avoid hot looping and backoff.
 				backoffKey := failedPodsBackoffKey(ds, node.Name)
@@ -876,12 +866,15 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 	case !shouldContinueRunning && exists:
 		// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 		for _, pod := range daemonPods {
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
 			klog.V(5).Infof("If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.")
 			podsToDelete = append(podsToDelete, pod.Name)
 		}
 	}
 
-	return result, nodesNeedingDaemonPods, podsToDelete, failedPodsObserved, nil
+	return result, nodesNeedingDaemonPods, podsToDelete, nil
 }
 
 // removeSuspendedDaemonPods removes DaemonSet which has pods that 'want to run,
@@ -1057,5 +1050,3 @@ func (dsc *ReconcileDaemonSet) cleanupHistory(ds *appsv1alpha1.DaemonSet, old []
 	}
 	return nil
 }
-
-//
