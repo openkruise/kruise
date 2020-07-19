@@ -64,7 +64,7 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 		return
 	}
 
-	// Otherwise, it's an orphan. Get a list of all matching CloneSets and sync
+	// Otherwise, it's an orphan. Get a list of all matching DaemonSets and sync
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
@@ -282,7 +282,8 @@ func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitin
 		if err != nil {
 			continue
 		}
-		if (CanNodeBeDeployed(oldNode, &ds) != CanNodeBeDeployed(curNode, &ds)) || (oldShouldSchedule != currentShouldSchedule) || (oldShouldContinueRunning != currentShouldContinueRunning) {
+		if (CanNodeBeDeployed(oldNode, &ds) != CanNodeBeDeployed(curNode, &ds)) || (oldShouldSchedule != currentShouldSchedule) || (oldShouldContinueRunning != currentShouldContinueRunning) ||
+			(NodeShouldUpdateBySelector(oldNode, &ds) != NodeShouldUpdateBySelector(curNode, &ds)) {
 			klog.V(6).Infof("update node: %s triggers DaemonSet %s/%s to reconcile.", curNode.Name, ds.GetNamespace(), ds.GetName())
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      ds.GetName(),

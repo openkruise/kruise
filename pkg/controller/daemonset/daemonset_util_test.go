@@ -19,11 +19,12 @@ package daemonset
 import (
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
 )
 
 func Test_nodeInSameCondition(t *testing.T) {
@@ -260,5 +261,81 @@ func TestGetPodRevision(t *testing.T) {
 				t.Errorf("GetPodRevision() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func newNode(name string, label map[string]string) *corev1.Node {
+	return &corev1.Node{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: label,
+		},
+	}
+}
+
+func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1alpha1.DaemonSetUpdateStrategy {
+	one := intstr.FromInt(1)
+	strategy := appsv1alpha1.DaemonSetUpdateStrategy{
+		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+			MaxUnavailable: &one,
+			Selector:       nil,
+			Type:           appsv1alpha1.StandardRollingUpdateType,
+		},
+	}
+	if len(matchLabels) > 0 {
+		strategy.RollingUpdate.Selector = &metav1.LabelSelector{MatchLabels: matchLabels}
+	}
+	return strategy
+}
+
+func TestNodeShouldUpdateBySelector(t *testing.T) {
+	for _, tt := range []struct {
+		Title    string
+		Node     *corev1.Node
+		Ds       *appsv1alpha1.DaemonSet
+		Expected bool
+	}{
+		{
+			"node with no label",
+			newNode("node1", nil),
+			newDaemonSet("ds1"),
+			false,
+		},
+		{
+			"node with label, not selected",
+			newNode("node1", map[string]string{
+				"key1": "value1",
+			}),
+			func() *appsv1alpha1.DaemonSet {
+				ds := newDaemonSet("ds1")
+				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
+					"key1": "value2",
+				})
+				return ds
+			}(),
+			false,
+		},
+		{
+			"node with label, selected",
+			newNode("node1", map[string]string{
+				"key1": "value1",
+			}),
+			func() *appsv1alpha1.DaemonSet {
+				ds := newDaemonSet("ds1")
+				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
+					"key1": "value1",
+				})
+				return ds
+			}(),
+			true,
+		},
+	} {
+		t.Logf("\t%s", tt.Title)
+		should := NodeShouldUpdateBySelector(tt.Node, tt.Ds)
+		if should != tt.Expected {
+			t.Errorf("NodeShouldUpdateBySelector() = %v, want %v", should, tt.Expected)
+		}
 	}
 }

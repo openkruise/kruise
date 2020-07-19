@@ -1057,3 +1057,5 @@ func (dsc *ReconcileDaemonSet) cleanupHistory(ds *appsv1alpha1.DaemonSet, old []
 	}
 	return nil
 }
+
+//
