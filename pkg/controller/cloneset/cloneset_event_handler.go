@@ -247,6 +247,10 @@ func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 }
 
 func (e *pvcEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	pvc := evt.ObjectNew.(*v1.PersistentVolumeClaim)
+	if pvc.DeletionTimestamp != nil {
+		e.Delete(event.DeleteEvent{Meta: evt.MetaNew, Object: evt.ObjectNew}, q)
+	}
 	return
 }
 
