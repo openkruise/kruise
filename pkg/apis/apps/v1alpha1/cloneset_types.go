@@ -89,7 +89,8 @@ type CloneSetUpdateStrategy struct {
 	Partition *int32 `json:"partition,omitempty"`
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding up.
+	// Absolute number is calculated from percentage by rounding up by default.
+	// When maxSurge > 0, absolute number is calculated from percentage by rounding down.
 	// Defaults to 20%.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 	// The maximum number of pods that can be scheduled above the desired replicas during the update.
