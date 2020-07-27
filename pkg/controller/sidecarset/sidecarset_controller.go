@@ -88,9 +88,6 @@ type ReconcileSidecarSet struct {
 
 // Reconcile reads that state of the cluster for a SidecarSet object and makes changes based on the state read
 // and what is in the SidecarSet.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=sidecarsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=sidecarsets/status,verbs=get;update;patch
 func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
