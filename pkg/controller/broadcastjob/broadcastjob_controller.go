@@ -114,7 +114,6 @@ type ReconcileBroadcastJob struct {
 
 // Reconcile reads that state of the cluster for a BroadcastJob object and makes changes based on the state read
 // and what is in the BroadcastJob.Spec
-// Automatically generate RBAC rules to allow the Controller to read and write Pods
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
