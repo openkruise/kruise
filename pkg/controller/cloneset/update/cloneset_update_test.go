@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/apis"
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/apis"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -116,7 +116,7 @@ func TestMange(t *testing.T) {
 			},
 			expectedPods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}, ResourceVersion: "1"},
 					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
@@ -251,6 +251,7 @@ func TestMange(t *testing.T) {
 							UpdateTimestamp:       now,
 							LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 						})},
+						ResourceVersion: "2",
 					},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
@@ -325,6 +326,7 @@ func TestMange(t *testing.T) {
 							}),
 							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
+						ResourceVersion: "2",
 					},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
@@ -486,6 +488,7 @@ func TestMange(t *testing.T) {
 								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
 						},
+						ResourceVersion: "1",
 					},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
@@ -523,13 +526,17 @@ func TestMange(t *testing.T) {
 			t.Fatalf("Failed to test %s, manage error: %v", mc.name, err)
 		}
 		podList := v1.PodList{}
-		if err := ctrl.Client.List(context.TODO(), &client.ListOptions{}, &podList); err != nil {
+		if err := ctrl.Client.List(context.TODO(), &podList, &client.ListOptions{}); err != nil {
 			t.Fatalf("Failed to test %s, get pods error: %v", mc.name, err)
 		}
 		if len(podList.Items) != len(mc.expectedPods) {
 			t.Fatalf("Failed to test %s, unexpected pods length, expected %v, got %v", mc.name, util.DumpJSON(mc.expectedPods), util.DumpJSON(podList.Items))
 		}
 		for _, p := range mc.expectedPods {
+			p.APIVersion = "v1"
+			p.Kind = "Pod"
+			appsv1alpha1.SetDefaultPod(p)
+
 			gotPod := &v1.Pod{}
 			if err := ctrl.Client.Get(context.TODO(), types.NamespacedName{Namespace: p.Namespace, Name: p.Name}, gotPod); err != nil {
 				t.Fatalf("Failed to test %s, get pod %s error: %v", mc.name, p.Name, err)

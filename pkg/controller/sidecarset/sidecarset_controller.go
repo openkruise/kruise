@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 /**
@@ -86,10 +86,11 @@ type ReconcileSidecarSet struct {
 	scheme *runtime.Scheme
 }
 
-// Reconcile reads that state of the cluster for a SidecarSet object and makes changes based on the state read
-// and what is in the SidecarSet.Spec
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=sidecarsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=sidecarsets/status,verbs=get;update;patch
+
+// Reconcile reads that state of the cluster for a SidecarSet object and makes changes based on the state read
+// and what is in the SidecarSet.Spec
 func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the SidecarSet instance
 	sidecarSet := &appsv1alpha1.SidecarSet{}
@@ -111,7 +112,7 @@ func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 	matchedPods := &corev1.PodList{}
-	if err := r.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, matchedPods); err != nil {
+	if err := r.List(context.TODO(), matchedPods, &client.ListOptions{LabelSelector: selector}); err != nil {
 		return reconcile.Result{}, err
 	}
 

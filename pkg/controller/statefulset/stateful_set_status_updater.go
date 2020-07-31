@@ -20,7 +20,7 @@ package statefulset
 import (
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	appslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

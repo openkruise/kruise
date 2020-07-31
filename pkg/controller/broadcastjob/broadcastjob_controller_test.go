@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"k8s.io/apimachinery/pkg/labels"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
@@ -85,7 +87,7 @@ func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 
 	podList := &v1.PodList{}
 	listOptions := client.InNamespace(request.Namespace)
-	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	err = reconcileJob.List(context.TODO(), podList, listOptions)
 	assert.NoError(t, err)
 
 	// 2 pods active
@@ -145,7 +147,7 @@ func TestReconcileJobCreatePodPercentage(t *testing.T) {
 
 	podList := &v1.PodList{}
 	listOptions := client.InNamespace(request.Namespace)
-	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	err = reconcileJob.List(context.TODO(), podList, listOptions)
 	assert.NoError(t, err)
 
 	// 2 pods active
@@ -196,7 +198,7 @@ func TestPodsOnUnschedulableNodes(t *testing.T) {
 
 	podList := &v1.PodList{}
 	listOptions := client.InNamespace(request.Namespace)
-	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	err = reconcileJob.List(context.TODO(), podList, listOptions)
 	assert.NoError(t, err)
 
 	// 1 pod active on node2,  node1 is unschedulable hence no pod
@@ -241,9 +243,11 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 	assert.Equal(t, int32(10), retrievedJob.Status.Active)
 
 	podList := &v1.PodList{}
-	listOptions := client.InNamespace(request.Namespace)
-	listOptions.MatchingLabels(labelsAsMap(job1))
-	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	listOptions := &client.ListOptions{
+		Namespace:     request.Namespace,
+		LabelSelector: labels.SelectorFromSet(labelsAsMap(job1)),
+	}
+	err = reconcileJob.List(context.TODO(), podList, listOptions)
 	assert.NoError(t, err)
 
 	// 10 new pods created
@@ -552,7 +556,7 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 	// The active pods are deleted
 	podList := &v1.PodList{}
 	listOptions := client.InNamespace(request.Namespace)
-	err = reconcileJob.List(context.TODO(), listOptions, podList)
+	err = reconcileJob.List(context.TODO(), podList, listOptions)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(podList.Items))
 }

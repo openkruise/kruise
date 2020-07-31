@@ -14,9 +14,9 @@ import (
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	podmutating "github.com/openkruise/kruise/pkg/webhook/default_server/pod/mutating"
-	sidecarsetmutating "github.com/openkruise/kruise/pkg/webhook/default_server/sidecarset/mutating"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	podmutating "github.com/openkruise/kruise/pkg/webhook/pod/mutating"
+	sidecarsetmutating "github.com/openkruise/kruise/pkg/webhook/sidecarset/mutating"
 )
 
 var (

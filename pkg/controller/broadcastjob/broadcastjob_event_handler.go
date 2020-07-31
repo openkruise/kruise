@@ -3,7 +3,7 @@ package broadcastjob
 import (
 	"context"
 
-	"github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +40,7 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 		return
 	}
 	jobList := &v1alpha1.BroadcastJobList{}
-	err := p.client.List(context.TODO(), &client.ListOptions{}, jobList)
+	err := p.client.List(context.TODO(), jobList)
 	if err != nil {
 		klog.Errorf("Error enqueueing broadcastjob on addNode %v", err)
 	}
@@ -71,7 +71,7 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterfac
 		return
 	}
 	jobList := &v1alpha1.BroadcastJobList{}
-	err := p.client.List(context.TODO(), &client.ListOptions{}, jobList)
+	err := p.client.List(context.TODO(), jobList)
 	if err != nil {
 		klog.Errorf("Error enqueueing broadcastjob on updateNode %v", err)
 	}

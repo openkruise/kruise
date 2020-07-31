@@ -41,16 +41,15 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"k8s.io/utils/integer"
 	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -60,7 +59,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
@@ -149,9 +148,9 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	if err != nil {
 		return nil, err
 	}
-	historyLister := appslisters.NewControllerRevisionLister(revInformer.GetIndexer())
-	podLister := corelisters.NewPodLister(podInformer.GetIndexer())
-	nodeLister := corelisters.NewNodeLister(nodeInformer.GetIndexer())
+	historyLister := appslisters.NewControllerRevisionLister(revInformer.(cache.SharedIndexInformer).GetIndexer())
+	podLister := corelisters.NewPodLister(podInformer.(cache.SharedIndexInformer).GetIndexer())
+	nodeLister := corelisters.NewNodeLister(nodeInformer.(cache.SharedIndexInformer).GetIndexer())
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 1*time.Minute)
 
 	dsc := &ReconcileDaemonSet{
@@ -169,7 +168,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		inplaceControl:      inplaceupdate.New(mgr.GetClient(), apps.ControllerRevisionHashLabelKey),
 		updateExp:           updateExpectations,
 	}
-	dsc.podNodeIndex = podInformer.GetIndexer()
+	dsc.podNodeIndex = podInformer.(cache.SharedIndexInformer).GetIndexer()
 	return dsc, err
 }
 
@@ -258,8 +257,6 @@ type ReconcileDaemonSet struct {
 	updateExp kruiseExpectations.UpdateExpectations
 }
 
-// Reconcile reads that state of the cluster for a DaemonSet object and makes changes based on the state read
-// and what is in the DaemonSet.Spec
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
@@ -267,6 +264,9 @@ type ReconcileDaemonSet struct {
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=daemonsets/status,verbs=get;update;patch
+
+// Reconcile reads that state of the cluster for a DaemonSet object and makes changes based on the state read
+// and what is in the DaemonSet.Spec
 func (dsc *ReconcileDaemonSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	startTime := time.Now()
 	defer func() {
@@ -409,8 +409,8 @@ func (dsc *ReconcileDaemonSet) getDaemonSetsForPod(pod *corev1.Pod) []*appsv1alp
 
 // Predicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
 // and PodToleratesNodeTaints predicate
-func Predicates(pod *corev1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	var predicateFails []algorithm.PredicateFailureReason
+func Predicates(pod *corev1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+	var predicateFails []predicates.PredicateFailureReason
 
 	// If ScheduleDaemonSetPods is enabled, only check nodeSelector, nodeAffinity and toleration/taint match.
 	// https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
@@ -458,8 +458,8 @@ func Predicates(pod *corev1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []alg
 //   - PodFitsHost: checks pod's NodeName against node
 //   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
 //   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
-func checkNodeFitness(pod *corev1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	var predicateFails []algorithm.PredicateFailureReason
+func checkNodeFitness(pod *corev1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+	var predicateFails []predicates.PredicateFailureReason
 	fit, reasons, err := predicates.PodFitsHost(pod, meta, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
@@ -502,7 +502,7 @@ func NewPod(ds *appsv1alpha1.DaemonSet, nodeName string) *corev1.Pod {
 	newPod.Spec.NodeName = nodeName
 
 	// Added default tolerations for DaemonSet pods.
-	daemonsetutil.AddOrUpdateDaemonPodTolerations(&newPod.Spec, false)
+	daemonsetutil.AddOrUpdateDaemonPodTolerations(&newPod.Spec)
 
 	return newPod
 }
@@ -684,7 +684,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 	if err != nil {
 		generation = nil
 	}
-	template := util.CreatePodTemplate(ds.Namespace, ds.Spec.Template, generation, hash)
+	template := util.CreatePodTemplate(ds.Spec.Template, generation, hash)
 
 	if ds.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateDaemonSetStrategyType &&
 		ds.Spec.UpdateStrategy.RollingUpdate != nil &&

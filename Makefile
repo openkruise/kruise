@@ -4,65 +4,62 @@ IMG ?= openkruise/kruise-manager:test
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
-CURRENT_DIR=$(shell pwd)
+# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
+ifeq (,$(shell go env GOBIN))
+GOBIN=$(shell go env GOPATH)/bin
+else
+GOBIN=$(shell go env GOBIN)
+endif
 
-all: test manager
+all: manager
 
 go_check:
-	@scripts/check_go_version "1.12.0"
+	@scripts/check_go_version "1.13.0"
 
 # Run tests
-test: generate fmt vet manifests kubebuilder
-	go test ./pkg/... ./cmd/... -coverprofile cover.out
+test: generate fmt vet manifests
+	go test ./pkg/... -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/manager github.com/openkruise/kruise/cmd/manager
+	go build -o bin/manager main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet
-	go run ./cmd/manager/main.go
+run: generate fmt vet manifests
+	go run ./main.go --enable-leader-election=false
 
 # Install CRDs into a cluster
 install: manifests
-	kubectl apply -f config/crds
+	kustomize build config/crd | kubectl apply -f -
+
+# Uninstall CRDs from a cluster
+uninstall: manifests
+	kustomize build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
-	kubectl apply -f config/crds
+	cd config/manager && kustomize edit set image controller=${IMG}
 	kustomize build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role paths="./..." output:crd:artifacts:config=config/crds
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
 fmt: go_check
-	go fmt ./pkg/... ./cmd/...
+	go fmt ./...
 
 # Run go vet against code
 vet:
-	go vet ./pkg/... ./cmd/...
+	go vet ./...
 
 # Generate code
 generate: controller-gen
-	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./pkg/apis/..."
-	go run ./hack/gen-openapi-spec/main.go > ${CURRENT_DIR}/api/openapi-spec/swagger.json
-
-# kubebuilder binary
-kubebuilder:
-ifeq (, $(shell which kubebuilder))
-	# Download kubebuilder and extract it to tmp
-	curl -sL https://go.kubebuilder.io/dl/1.0.8/$(shell go env GOOS)/$(shell go env GOARCH) | tar -xz -C /tmp/
-	# You'll need to set the KUBEBUILDER_ASSETS env var if you put it somewhere else
-	sudo mv /tmp/kubebuilder_1.0.8_$(shell go env GOOS)_$(shell go env GOARCH) /usr/local/kubebuilder
-newPATH:=$(PATH):/usr/local/kubebuilder/bin
-export PATH=$(newPATH)
-endif
+	@scripts/generate_client.sh
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 # Build the docker image
-docker-build:
-	go mod vendor
+docker-build: test
 	docker build . -t ${IMG}
 
 # Push the docker image

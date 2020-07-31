@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,9 +38,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -63,7 +62,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	recorder := mgr.GetRecorder("broadcastjob-controller")
+	recorder := mgr.GetEventRecorderFor("broadcastjob-controller")
 	return &ReconcileBroadcastJob{
 		Client:   mgr.GetClient(),
 		scheme:   mgr.GetScheme(),
@@ -112,14 +111,14 @@ type ReconcileBroadcastJob struct {
 	podModifier func(pod *corev1.Pod)
 }
 
-// Reconcile reads that state of the cluster for a BroadcastJob object and makes changes based on the state read
-// and what is in the BroadcastJob.Spec
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=broadcastjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=broadcastjobs/status,verbs=get;update;patch
+
+// Reconcile reads that state of the cluster for a BroadcastJob object and makes changes based on the state read
+// and what is in the BroadcastJob.Spec
 func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the BroadcastJob instance
 	job := &appsv1alpha1.BroadcastJob{}
@@ -170,9 +169,11 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 
 	// list pods for this job
 	podList := &corev1.PodList{}
-	listOptions := client.InNamespace(request.Namespace)
-	listOptions.MatchingLabels(labelsAsMap(job))
-	err = r.List(context.TODO(), listOptions, podList)
+	listOptions := &client.ListOptions{
+		Namespace:     request.Namespace,
+		LabelSelector: labels.SelectorFromSet(labelsAsMap(job)),
+	}
+	err = r.List(context.TODO(), podList, listOptions)
 	if err != nil {
 		klog.Errorf("failed to get podList for job %s,", job.Name)
 		return reconcile.Result{}, err
@@ -188,7 +189,7 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 	existingNodeToPodMap := r.getNodeToPodMap(pods, job)
 	// list all nodes in cluster
 	nodes := &corev1.NodeList{}
-	err = r.List(context.TODO(), &client.ListOptions{}, nodes)
+	err = r.List(context.TODO(), nodes)
 	if err != nil {
 		klog.Errorf("failed to get nodeList for job %s,", job.Name)
 		return reconcile.Result{}, err
@@ -556,7 +557,7 @@ func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
 //   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
 //   - CheckNodeUnschedulablePredicate: check if the pod can tolerate node unschedulable
 func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
-	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	_ = nodeInfo.SetNode(node)
 
 	fit, reasons, err := predicates.PodFitsHost(pod, nil, nodeInfo)
@@ -585,7 +586,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	return true, nil
 }
 
-func logPredicateFailedReason(reasons []algorithm.PredicateFailureReason, node *corev1.Node) {
+func logPredicateFailedReason(reasons []predicates.PredicateFailureReason, node *corev1.Node) {
 	if len(reasons) == 0 {
 		return
 	}

@@ -1,0 +1,20 @@
+# permissions for end users to view statefulsets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: statefulset-viewer-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets/status
+  verbs:
+  - get

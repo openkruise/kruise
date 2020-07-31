@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	uexec "k8s.io/utils/exec"
 )
@@ -1085,7 +1085,7 @@ func isNodeUntainted(node *v1.Node) bool {
 			},
 		},
 	}
-	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(node)
 	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
 	if err != nil {

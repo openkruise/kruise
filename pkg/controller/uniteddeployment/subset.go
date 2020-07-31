@@ -19,7 +19,7 @@ package uniteddeployment
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 // Subset stores the details of a subset resource owned by one UnitedDeployment.

@@ -10,14 +10,17 @@ COPY go.sum go.sum
 #RUN go mod download
 
 # Copy the go source
-COPY cmd/ cmd/
+COPY main.go main.go
+COPY apis/ apis/
 COPY pkg/ pkg/
 COPY vendor/ vendor/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod=vendor -a -o manager ./cmd/manager
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod=vendor -a -o manager main.go
 
-# Copy the controller-manager into a thin image
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+#FROM gcr.io/distroless/static:nonroot
 FROM ubuntu:latest
 WORKDIR /
 COPY --from=builder /workspace/manager .

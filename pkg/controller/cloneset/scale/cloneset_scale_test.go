@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -51,7 +52,7 @@ func TestCreatePods(t *testing.T) {
 	}
 
 	pods := v1.PodList{}
-	if err := ctrl.List(context.TODO(), client.InNamespace("default"), &pods); err != nil {
+	if err := ctrl.List(context.TODO(), &pods, client.InNamespace("default")); err != nil {
 		t.Fatalf("failed to list pods: %v", err)
 	}
 	expectedPods := []v1.Pod{
@@ -75,6 +76,7 @@ func TestCreatePods(t *testing.T) {
 						BlockOwnerDeletion: func() *bool { a := true; return &a }(),
 					},
 				},
+				ResourceVersion: "1",
 			},
 			Spec: v1.PodSpec{
 				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
@@ -129,6 +131,7 @@ func TestCreatePods(t *testing.T) {
 						BlockOwnerDeletion: func() *bool { a := true; return &a }(),
 					},
 				},
+				ResourceVersion: "1",
 			},
 			Spec: v1.PodSpec{
 				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
@@ -184,6 +187,7 @@ func TestCreatePods(t *testing.T) {
 						BlockOwnerDeletion: func() *bool { a := true; return &a }(),
 					},
 				},
+				ResourceVersion: "1",
 			},
 			Spec: v1.PodSpec{
 				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
@@ -220,13 +224,17 @@ func TestCreatePods(t *testing.T) {
 			},
 		},
 	}
+	for i := range expectedPods {
+		appsv1alpha1.SetDefaultPod(&expectedPods[i])
+	}
+
 	sort.Slice(pods.Items, func(i, j int) bool { return pods.Items[i].Name < pods.Items[j].Name })
 	if !reflect.DeepEqual(expectedPods, pods.Items) {
 		t.Fatalf("expected pods \n%s\ngot pods\n%s", util.DumpJSON(expectedPods), util.DumpJSON(pods.Items))
 	}
 
 	pvcs := v1.PersistentVolumeClaimList{}
-	if err := ctrl.List(context.TODO(), client.InNamespace("default"), &pvcs); err != nil {
+	if err := ctrl.List(context.TODO(), &pvcs, client.InNamespace("default")); err != nil {
 		t.Fatalf("failed to list pvcs: %v", err)
 	}
 	expectedPVCs := []v1.PersistentVolumeClaim{
@@ -248,6 +256,7 @@ func TestCreatePods(t *testing.T) {
 						BlockOwnerDeletion: func() *bool { a := true; return &a }(),
 					},
 				},
+				ResourceVersion: "1",
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
 				Resources: v1.ResourceRequirements{
@@ -275,6 +284,7 @@ func TestCreatePods(t *testing.T) {
 						BlockOwnerDeletion: func() *bool { a := true; return &a }(),
 					},
 				},
+				ResourceVersion: "1",
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
 				Resources: v1.ResourceRequirements{
@@ -284,6 +294,9 @@ func TestCreatePods(t *testing.T) {
 				},
 			},
 		},
+	}
+	for i := range expectedPVCs {
+		corev1.SetDefaults_PersistentVolumeClaim(&expectedPVCs[i])
 	}
 	sort.Slice(pvcs.Items, func(i, j int) bool { return pvcs.Items[i].Name < pvcs.Items[j].Name })
 	if !reflect.DeepEqual(expectedPVCs, pvcs.Items) {
@@ -423,7 +436,7 @@ func TestDeletePods(t *testing.T) {
 	}
 
 	gotPods := v1.PodList{}
-	if err := ctrl.List(context.TODO(), client.InNamespace("default"), &gotPods); err != nil {
+	if err := ctrl.List(context.TODO(), &gotPods, client.InNamespace("default")); err != nil {
 		t.Fatalf("failed to list pods: %v", err)
 	}
 	if len(gotPods.Items) > 0 {
@@ -431,7 +444,7 @@ func TestDeletePods(t *testing.T) {
 	}
 
 	gotPVCs := v1.PersistentVolumeClaimList{}
-	if err := ctrl.List(context.TODO(), client.InNamespace("default"), &gotPVCs); err != nil {
+	if err := ctrl.List(context.TODO(), &gotPVCs, client.InNamespace("default")); err != nil {
 		t.Fatalf("failed to list pvcs: %v", err)
 	}
 	if len(gotPVCs.Items) != 1 || reflect.DeepEqual(gotPVCs.Items[0], pvcs[1]) {

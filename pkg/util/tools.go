@@ -20,7 +20,7 @@ package util
 import (
 	"sync"
 
-	"k8s.io/client-go/util/integer"
+	"k8s.io/utils/integer"
 )
 
 // SlowStartBatch tries to call the provided function a total of 'count' times,

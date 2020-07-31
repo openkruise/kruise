@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -272,6 +272,7 @@ func TestRefresh(t *testing.T) {
 				},
 			},
 			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"},
 				Spec: v1.PodSpec{
 					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
 				},
@@ -300,6 +301,7 @@ func TestRefresh(t *testing.T) {
 				},
 			},
 			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"},
 				Spec: v1.PodSpec{
 					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
 				},
@@ -413,6 +415,7 @@ func TestRefresh(t *testing.T) {
 					Annotations: map[string]string{
 						appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{Revision: "new-revision", UpdateTimestamp: tenSecondsAgo, LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "img01"}}}),
 					},
+					ResourceVersion: "1",
 				},
 				Spec: v1.PodSpec{
 					Containers:     []v1.Container{{Name: "main", Image: "img-name02"}},
@@ -425,6 +428,8 @@ func TestRefresh(t *testing.T) {
 	for i, testCase := range cases {
 		testCase.pod.Name = fmt.Sprintf("pod-%d", i)
 		testCase.expectedPod.Name = fmt.Sprintf("pod-%d", i)
+		testCase.expectedPod.APIVersion = "v1"
+		testCase.expectedPod.Kind = "Pod"
 
 		cli := fake.NewFakeClient(testCase.pod)
 		ctrl := NewForTest(cli, apps.ControllerRevisionHashLabelKey, func() metav1.Time { return aHourAgo })

@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var _ handler.EventHandler = &podEventHandler{}
@@ -204,7 +204,7 @@ func resoleControllerRef(namespace string, controllerRef *metav1.OwnerReference)
 
 func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []appsv1alpha1.DaemonSet {
 	dsList := appsv1alpha1.DaemonSetList{}
-	if err := e.List(context.TODO(), client.InNamespace(pod.Namespace), &dsList); err != nil {
+	if err := e.List(context.TODO(), &dsList, client.InNamespace(pod.Namespace)); err != nil {
 		return nil
 	}
 
@@ -235,7 +235,7 @@ type nodeEventHandler struct {
 
 func (e *nodeEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	dsList := &appsv1alpha1.DaemonSetList{}
-	err := e.client.List(context.TODO(), &client.ListOptions{}, dsList)
+	err := e.client.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(6).Infof("Error enqueueing daemon sets: %v", err)
 		return
@@ -267,7 +267,7 @@ func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitin
 	}
 
 	dsList := &appsv1alpha1.DaemonSetList{}
-	err := e.client.List(context.TODO(), &client.ListOptions{}, dsList)
+	err := e.client.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(6).Infof("Error enqueueing daemon sets: %v", err)
 		return

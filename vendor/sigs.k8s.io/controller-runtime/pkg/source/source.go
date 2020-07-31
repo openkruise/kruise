@@ -17,6 +17,7 @@ limitations under the License.
 package source
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -25,16 +26,15 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	logf "sigs.k8s.io/controller-runtime/pkg/internal/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source/internal"
 
-	toolscache "k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-var log = logf.KBLog.WithName("source")
+var log = logf.RuntimeLog.WithName("source")
 
 const (
 	// defaultBufferSize is the default number of event notifications that can be buffered.
@@ -56,6 +56,33 @@ type Source interface {
 	Start(handler.EventHandler, workqueue.RateLimitingInterface, ...predicate.Predicate) error
 }
 
+// SyncingSource is a source that needs syncing prior to being usable. The controller
+// will call its WaitForSync prior to starting workers.
+type SyncingSource interface {
+	Source
+	WaitForSync(stop <-chan struct{}) error
+}
+
+// NewKindWithCache creates a Source without InjectCache, so that it is assured that the given cache is used
+// and not overwritten. It can be used to watch objects in a different cluster by passing the cache
+// from that other cluster
+func NewKindWithCache(object runtime.Object, cache cache.Cache) SyncingSource {
+	return &kindWithCache{kind: Kind{Type: object, cache: cache}}
+}
+
+type kindWithCache struct {
+	kind Kind
+}
+
+func (ks *kindWithCache) Start(handler handler.EventHandler, queue workqueue.RateLimitingInterface,
+	prct ...predicate.Predicate) error {
+	return ks.kind.Start(handler, queue, prct...)
+}
+
+func (ks *kindWithCache) WaitForSync(stop <-chan struct{}) error {
+	return ks.kind.WaitForSync(stop)
+}
+
 // Kind is used to provide a source of events originating inside the cluster from Watches (e.g. Pod Create)
 type Kind struct {
 	// Type is the type of object to watch.  e.g. &v1.Pod{}
@@ -65,7 +92,7 @@ type Kind struct {
 	cache cache.Cache
 }
 
-var _ Source = &Kind{}
+var _ SyncingSource = &Kind{}
 
 // Start is internal and should be called only by the Controller to register an EventHandler with the Informer
 // to enqueue reconcile.Requests.
@@ -100,6 +127,16 @@ func (ks *Kind) String() string {
 		return fmt.Sprintf("kind source: %v", ks.Type.GetObjectKind().GroupVersionKind().String())
 	}
 	return fmt.Sprintf("kind source: unknown GVK")
+}
+
+// WaitForSync implements SyncingSource to allow controllers to wait with starting
+// workers until the cache is synced.
+func (ks *Kind) WaitForSync(stop <-chan struct{}) error {
+	if !ks.cache.WaitForCacheSync(stop) {
+		// Would be great to return something more informative here
+		return errors.New("cache did not sync")
+	}
+	return nil
 }
 
 var _ inject.Cache = &Kind{}
@@ -243,8 +280,8 @@ func (cs *Channel) syncLoop() {
 
 // Informer is used to provide a source of events originating inside the cluster from Watches (e.g. Pod Create)
 type Informer struct {
-	// Informer is the generated client-go Informer
-	Informer toolscache.SharedIndexInformer
+	// Informer is the controller-runtime Informer
+	Informer cache.Informer
 }
 
 var _ Source = &Informer{}
@@ -266,6 +303,8 @@ func (is *Informer) Start(handler handler.EventHandler, queue workqueue.RateLimi
 func (is *Informer) String() string {
 	return fmt.Sprintf("informer source: %p", is.Informer)
 }
+
+var _ Source = Func(nil)
 
 // Func is a function that implements Source
 type Func func(handler.EventHandler, workqueue.RateLimitingInterface, ...predicate.Predicate) error

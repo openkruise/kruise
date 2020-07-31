@@ -1,3 +1,29 @@
-version: "1"
 domain: kruise.io
+multigroup: true
 repo: github.com/openkruise/kruise
+resources:
+- group: apps
+  kind: CloneSet
+  version: v1alpha1
+- group: apps
+  kind: BroadcastJob
+  version: v1alpha1
+- group: apps
+  kind: SidecarSet
+  version: v1alpha1
+- group: apps
+  kind: StatefulSet
+  version: v1alpha1
+- group: apps
+  kind: UnitedDeployment
+  version: v1alpha1
+- group: apps
+  kind: DaemonSet
+  version: v1alpha1
+- group: apps
+  kind: NodeImage
+  version: v1alpha1
+- group: apps
+  kind: ImagePullJob
+  version: v1alpha1
+version: "2"

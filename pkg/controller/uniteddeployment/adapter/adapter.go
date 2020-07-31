@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 type Adapter interface {
