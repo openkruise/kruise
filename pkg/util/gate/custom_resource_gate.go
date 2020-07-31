@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/openkruise/kruise/pkg/apis"
+	"github.com/openkruise/kruise/apis"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"

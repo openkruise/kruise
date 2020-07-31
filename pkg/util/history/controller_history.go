@@ -44,7 +44,7 @@ type realHistory struct {
 func (rh *realHistory) ListControllerRevisions(parent metav1.Object, selector labels.Selector) ([]*apps.ControllerRevision, error) {
 	// List all revisions in the namespace that match the selector
 	revisions := apps.ControllerRevisionList{}
-	err := rh.List(context.TODO(), &client.ListOptions{Namespace: parent.GetNamespace(), LabelSelector: selector}, &revisions)
+	err := rh.List(context.TODO(), &revisions, &client.ListOptions{Namespace: parent.GetNamespace(), LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,7 +59,7 @@ func TestRevisionHistory(t *testing.T) {
 	}
 
 	cr, err := history.NewControllerRevision(parent,
-		appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet"),
+		appsv1alpha1.GroupVersion.WithKind("CloneSet"),
 		parent.Spec.Template.Labels,
 		runtime.RawExtension{Raw: []byte(`{}`)},
 		revisionNum,

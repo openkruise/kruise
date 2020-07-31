@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +44,7 @@ func GetControllerKey(cs *appsv1alpha1.CloneSet) string {
 // GetActivePods returns all active pods in this namespace.
 func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, error) {
 	podList := &v1.PodList{}
-	if err := reader.List(context.TODO(), opts, podList); err != nil {
+	if err := reader.List(context.TODO(), podList, opts); err != nil {
 		return nil, err
 	}
 

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
@@ -40,6 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -98,9 +99,9 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		return nil, err
 	}
 
-	statefulSetLister := kruiseappslisters.NewStatefulSetLister(statefulSetInformer.GetIndexer())
-	podLister := corelisters.NewPodLister(podInformer.GetIndexer())
-	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcInformer.GetIndexer())
+	statefulSetLister := kruiseappslisters.NewStatefulSetLister(statefulSetInformer.(toolscache.SharedIndexInformer).GetIndexer())
+	podLister := corelisters.NewPodLister(podInformer.(toolscache.SharedIndexInformer).GetIndexer())
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcInformer.(toolscache.SharedIndexInformer).GetIndexer())
 
 	genericClient := client.GetGenericClient()
 	//recorder := mgr.GetRecorder("statefulset-controller")
@@ -120,7 +121,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 				recorder),
 			inplaceupdate.New(mgr.GetClient(), appsv1.ControllerRevisionHashLabelKey),
 			NewRealStatefulSetStatusUpdater(genericClient.KruiseClient, statefulSetLister),
-			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(revInformer.GetIndexer())),
+			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(revInformer.(toolscache.SharedIndexInformer).GetIndexer())),
 			recorder,
 		),
 		podControl: kubecontroller.RealPodControl{KubeClient: genericClient.KubeClient, Recorder: recorder},
@@ -183,9 +184,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-// Reconcile reads that state of the cluster for a StatefulSet object and makes changes based on the state read
-// and what is in the StatefulSet.Spec
-// Automatically generate RBAC rules to allow the Controller to read and write Pods
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
@@ -193,6 +191,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
+
+// Reconcile reads that state of the cluster for a StatefulSet object and makes changes based on the state read
+// and what is in the StatefulSet.Spec
+// Automatically generate RBAC rules to allow the Controller to read and write Pods
 func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
 	key := request.NamespacedName.String()
 	namespace := request.Namespace

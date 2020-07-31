@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func TestRevisionManage(t *testing.T) {
@@ -109,7 +109,7 @@ func TestRevisionManage(t *testing.T) {
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 
 	revisionList := &appsv1.ControllerRevisionList{}
-	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList)).Should(gomega.BeNil())
+	g.Expect(c.List(context.TODO(), revisionList, &client.ListOptions{})).Should(gomega.BeNil())
 	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(1))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
@@ -118,7 +118,7 @@ func TestRevisionManage(t *testing.T) {
 	waitReconcilerProcessFinished(g, requests, 0)
 
 	revisionList = &appsv1.ControllerRevisionList{}
-	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList)).Should(gomega.BeNil())
+	g.Expect(c.List(context.TODO(), revisionList, &client.ListOptions{})).Should(gomega.BeNil())
 	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(2))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
@@ -127,6 +127,6 @@ func TestRevisionManage(t *testing.T) {
 	waitReconcilerProcessFinished(g, requests, 0)
 
 	revisionList = &appsv1.ControllerRevisionList{}
-	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList)).Should(gomega.BeNil())
+	g.Expect(c.List(context.TODO(), revisionList, &client.ListOptions{})).Should(gomega.BeNil())
 	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(2))
 }

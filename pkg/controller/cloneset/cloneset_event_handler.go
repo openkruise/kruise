@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
@@ -195,7 +195,7 @@ func resoleControllerRef(namespace string, controllerRef *metav1.OwnerReference)
 
 func (e *podEventHandler) getPodCloneSets(pod *v1.Pod) []appsv1alpha1.CloneSet {
 	csList := appsv1alpha1.CloneSetList{}
-	if err := e.List(context.TODO(), client.InNamespace(pod.Namespace), &csList); err != nil {
+	if err := e.List(context.TODO(), &csList, client.InNamespace(pod.Namespace)); err != nil {
 		return nil
 	}
 

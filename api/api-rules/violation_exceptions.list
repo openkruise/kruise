@@ -1,2 +1,0 @@
-API rule violation: names_match,github.com/openkruise/kruise/pkg/apis/apps/v1alpha1,RollingUpdateDaemonSet,Type
-API rule violation: names_match,github.com/openkruise/kruise/pkg/apis/apps/v1alpha1,SidecarContainer,Container

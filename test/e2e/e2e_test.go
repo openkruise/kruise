@@ -20,7 +20,7 @@ package e2e
 import (
 	"testing"
 
-	kruiseapis "github.com/openkruise/kruise/pkg/apis"
+	kruiseapis "github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	"k8s.io/client-go/kubernetes/scheme"
 

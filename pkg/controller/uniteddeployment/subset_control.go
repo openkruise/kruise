@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
@@ -47,7 +47,7 @@ func (m *SubsetControl) GetAllSubsets(ud *alpha1.UnitedDeployment, updatedRevisi
 	}
 
 	setList := m.adapter.NewResourceListObject()
-	err = m.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, setList)
+	err = m.Client.List(context.TODO(), setList, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,6 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 		Labels:                     set.GetLabels(),
 		Annotations:                set.GetAnnotations(),
 		OwnerReferences:            set.GetOwnerReferences(),
-		Initializers:               set.GetInitializers(),
 		Finalizers:                 set.GetFinalizers(),
 		ClusterName:                set.GetClusterName(),
 	}

@@ -1,0 +1,20 @@
+# permissions for end users to view daemonsets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: daemonset-viewer-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - daemonsets/status
+  verbs:
+  - get

@@ -17,8 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/webhook/default_server/pod/mutating"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPod{}
@@ -128,7 +128,7 @@ func (p *enqueueRequestForPod) getPodSidecarSetMemberships(pod *corev1.Pod) (set
 
 func (p *enqueueRequestForPod) getPodSidecarSets(pod *corev1.Pod) ([]appsv1alpha1.SidecarSet, error) {
 	sidecarSets := appsv1alpha1.SidecarSetList{}
-	if err := p.client.List(context.TODO(), &client.ListOptions{}, &sidecarSets); err != nil {
+	if err := p.client.List(context.TODO(), &sidecarSets); err != nil {
 		return nil, err
 	}
 

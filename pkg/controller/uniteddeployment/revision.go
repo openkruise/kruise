@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	appsalphav1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
 
@@ -47,7 +47,7 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDe
 		return nil, err
 	}
 	histories := &apps.ControllerRevisionList{}
-	err = r.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, histories)
+	err = r.Client.List(context.TODO(), histories, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}

@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func TestAstsReconcile(t *testing.T) {
@@ -905,7 +905,7 @@ func TestAstsUpdate(t *testing.T) {
 	stsList := expectedAstsCount(g, instance, 2)
 	g.Expect(*stsList.Items[0].Spec.Replicas + *stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
 	revisionList := &appsv1.ControllerRevisionList{}
-	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList))
+	g.Expect(c.List(context.TODO(), revisionList))
 	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(1))
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	v1 := revisionList.Items[0].Name
@@ -921,7 +921,7 @@ func TestAstsUpdate(t *testing.T) {
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	revisionList = &appsv1.ControllerRevisionList{}
-	g.Expect(c.List(context.TODO(), &client.ListOptions{}, revisionList))
+	g.Expect(c.List(context.TODO(), revisionList))
 	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(2))
 	v2 := revisionList.Items[0].Name
 	if v2 == v1 {
@@ -1508,7 +1508,7 @@ func expectedAstsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment,
 	g.Expect(err).Should(gomega.BeNil())
 
 	g.Eventually(func() error {
-		if err := c.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, stsList); err != nil {
+		if err := c.List(context.TODO(), stsList, &client.ListOptions{LabelSelector: selector}); err != nil {
 			return err
 		}
 

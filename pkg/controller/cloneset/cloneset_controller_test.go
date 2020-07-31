@@ -21,8 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/fields"
+
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"golang.org/x/net/context"
@@ -74,7 +76,7 @@ func TestReconcile(t *testing.T) {
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{})
+	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
 
@@ -103,7 +105,7 @@ func TestReconcile(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// Create the CloneSet object and expect the Reconcile
-	appsv1alpha1.SetDefaults_CloneSet(instance)
+	appsv1alpha1.SetDefaultsCloneSet(instance)
 	err = c.Create(context.TODO(), instance)
 	// The instance object may not be a valid object because it might be missing some required fields.
 	// Please modify the instance object by adding required fields and then remove the following if statement.
@@ -303,7 +305,11 @@ func checkInstances(g *gomega.GomegaWithT, cs *appsv1alpha1.CloneSet, podNum int
 	var pods []*v1.Pod
 	g.Eventually(func() int {
 		var err error
-		pods, err = clonesetutils.GetActivePods(c, client.InNamespace("default").MatchingField(fieldindex.IndexNameForOwnerRefUID, string(cs.UID)))
+		opts := &client.ListOptions{
+			Namespace:     "default",
+			FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
+		}
+		pods, err = clonesetutils.GetActivePods(c, opts)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		return len(pods)
 	}, time.Second*3, time.Millisecond*500).Should(gomega.Equal(podNum))
@@ -311,7 +317,11 @@ func checkInstances(g *gomega.GomegaWithT, cs *appsv1alpha1.CloneSet, podNum int
 	var pvcs []*v1.PersistentVolumeClaim
 	g.Eventually(func() int {
 		pvcList := v1.PersistentVolumeClaimList{}
-		err := c.List(context.TODO(), client.InNamespace(cs.Namespace).MatchingField(fieldindex.IndexNameForOwnerRefUID, string(cs.UID)), &pvcList)
+		opts := &client.ListOptions{
+			Namespace:     cs.Namespace,
+			FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
+		}
+		err := c.List(context.TODO(), &pvcList, opts)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		pvcs = []*v1.PersistentVolumeClaim{}
 		for i, pvc := range pvcList.Items {

@@ -22,7 +22,9 @@ import (
 	"flag"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	"k8s.io/apimachinery/pkg/fields"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
@@ -76,7 +78,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
-	recorder := mgr.GetRecorder("cloneset-controller")
+	recorder := mgr.GetEventRecorderFor("cloneset-controller")
 	if cli := kruiseclient.GetGenericClient(); cli != nil {
 		eventBroadcaster := record.NewBroadcaster()
 		eventBroadcaster.StartLogging(klog.Infof)
@@ -152,8 +154,6 @@ type ReconcileCloneSet struct {
 	updateControl     updatecontrol.Interface
 }
 
-// Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
-// and what is in the CloneSet.Spec
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
@@ -161,6 +161,9 @@ type ReconcileCloneSet struct {
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets/status,verbs=get;update;patch
+
+// Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
+// and what is in the CloneSet.Spec
 func (r *ReconcileCloneSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	return r.reconcileFunc(request)
 }
@@ -382,15 +385,18 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 }
 
 func (r *ReconcileCloneSet) getOwnedResource(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, []*v1.PersistentVolumeClaim, error) {
-	filteredPods, err := clonesetutils.GetActivePods(r.Client,
-		client.InNamespace(cs.Namespace).MatchingField(fieldindex.IndexNameForOwnerRefUID, string(cs.UID)))
+	opts := &client.ListOptions{
+		Namespace:     cs.Namespace,
+		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
+	}
+
+	filteredPods, err := clonesetutils.GetActivePods(r.Client, opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	pvcList := v1.PersistentVolumeClaimList{}
-	if err := r.List(context.TODO(),
-		client.InNamespace(cs.Namespace).MatchingField(fieldindex.IndexNameForOwnerRefUID, string(cs.UID)), &pvcList); err != nil {
+	if err := r.List(context.TODO(), &pvcList, opts); err != nil {
 		return nil, nil, err
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim

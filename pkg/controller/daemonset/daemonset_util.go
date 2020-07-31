@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -29,14 +29,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // nodeInSameCondition returns true if all effective types ("Status" is true) equals;
@@ -165,14 +163,14 @@ func NodeShouldRunDaemonPod(client client.Client, node *corev1.Node, ds *appsv1a
 	return
 }
 
-func Simulate(kubeclient client.Client, newPod *corev1.Pod, node *corev1.Node, ds *appsv1alpha1.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
+func Simulate(kubeclient client.Client, newPod *corev1.Pod, node *corev1.Node, ds *appsv1alpha1.DaemonSet) ([]predicates.PredicateFailureReason, *schedulernodeinfo.NodeInfo, error) {
 	podList := corev1.PodList{}
-	err := kubeclient.List(context.TODO(), &client.ListOptions{FieldSelector: fields.ParseSelectorOrDie("spec.nodeName=" + node.Name)}, &podList)
+	err := kubeclient.List(context.TODO(), &podList, client.MatchingFields{"spec.nodeName": node.Name})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(node)
 
 	for index := range podList.Items {
@@ -216,7 +214,7 @@ func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha
 	}
 
 	list := &appsv1alpha1.DaemonSetList{}
-	err := dsc.client.List(context.TODO(), &client.ListOptions{}, list)
+	err := dsc.client.List(context.TODO(), list)
 	if err != nil {
 		return nil, err
 	}

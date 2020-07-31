@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openkruise/kruise/pkg/apis"
+	"github.com/openkruise/kruise/apis"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"

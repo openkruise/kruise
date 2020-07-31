@@ -22,7 +22,7 @@ jobs:
             set +e
             for name in $(find . -name \*.md | grep -v vendor | grep -v CHANGELOG); do 
               if [ -f $name ]; then 
-                markdown-link-check -q $name; 
+                markdown-link-check -q $name -c .circleci/markdown-link-check.config.json;
                 if [ $? -ne 0 ]; then
                   code=1
                 fi
@@ -46,7 +46,7 @@ jobs:
       - run: 
           name: validate go code with golangci-lint
           command: |
-            golangci-lint run --skip-dirs=pkg/apis,pkg/client --disable-all -E gofmt -E goimports -E golint -E ineffassign -E misspell -E vet
+            golangci-lint run --skip-dirs=apis,pkg/client --disable-all -E gofmt -E goimports -E golint -E ineffassign -E misspell -E vet
       
       - run:
           name: detect deadcode without test folder

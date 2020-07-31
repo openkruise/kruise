@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/klog"
 
-	appsv1alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 type nameToReplicas struct {
