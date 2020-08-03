@@ -37,7 +37,7 @@ func TestCreatePods(t *testing.T) {
 	updateRevision := "revision-xyz"
 
 	ctrl := newFakeControl()
-	err := ctrl.createPods(
+	created, err := ctrl.createPods(
 		3,
 		1,
 		currentCS,
@@ -49,6 +49,8 @@ func TestCreatePods(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatalf("got unexpected error: %v", err)
+	} else if !created {
+		t.Fatalf("got unexpected created: %v", created)
 	}
 
 	pods := v1.PodList{}
@@ -430,9 +432,11 @@ func TestDeletePods(t *testing.T) {
 		_ = ctrl.Create(context.TODO(), p)
 	}
 
-	err := ctrl.deletePods(cs, podsToDelete, pvcs)
+	deleted, err := ctrl.deletePods(cs, podsToDelete, pvcs)
 	if err != nil {
 		t.Fatalf("failed to delete got pods: %v", err)
+	} else if !deleted {
+		t.Fatalf("failed to delete got pods: not deleted")
 	}
 
 	gotPods := v1.PodList{}

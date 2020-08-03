@@ -64,12 +64,11 @@ func (r *realControl) Manage(
 
 	if podsToDelete := getPodsToDelete(updateCS, pods); len(podsToDelete) > 0 {
 		klog.V(3).Infof("CloneSet %s begin to delete pods in podsToDelete: %v", controllerKey, podsToDelete)
-		return true, r.deletePods(updateCS, podsToDelete, pvcs)
+		return r.deletePods(updateCS, podsToDelete, pvcs)
 	}
 
 	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
 
-	var err error
 	diff, currentRevDiff := calculateDiffs(updateCS, updateRevision == currentRevision, len(pods), len(notUpdatedPods))
 
 	if diff < 0 {
@@ -92,9 +91,8 @@ func (r *realControl) Manage(
 			existingPVCNames.Insert(pvc.Name)
 		}
 
-		err = r.createPods(expectedCreations, expectedCurrentCreations,
+		return r.createPods(expectedCreations, expectedCurrentCreations,
 			currentCS, updateCS, currentRevision, updateRevision, availableIDs.List(), existingPVCNames)
-		return true, err
 
 	} else if diff > 0 {
 		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev)",
@@ -102,8 +100,7 @@ func (r *realControl) Manage(
 
 		podsToDelete := choosePodsToDelete(diff, currentRevDiff, notUpdatedPods, updatedPods)
 
-		err = r.deletePods(updateCS, podsToDelete, pvcs)
-		return true, err
+		return r.deletePods(updateCS, podsToDelete, pvcs)
 	}
 
 	return false, nil
@@ -114,13 +111,13 @@ func (r *realControl) createPods(
 	currentCS, updateCS *appsv1alpha1.CloneSet,
 	currentRevision, updateRevision string,
 	availableIDs []string, existingPVCNames sets.String,
-) error {
+) (bool, error) {
 	// new all pods need to create
 	coreControl := clonesetcore.New(updateCS)
 	newPods, err := coreControl.NewVersionedPods(currentCS, updateCS, currentRevision, updateRevision,
 		expectedCreations, expectedCurrentCreations, availableIDs)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	podsCreationChan := make(chan *v1.Pod, len(newPods))
@@ -129,6 +126,7 @@ func (r *realControl) createPods(
 		podsCreationChan <- p
 	}
 
+	var created bool
 	successPodNames := sync.Map{}
 	_, err = clonesetutils.DoItSlowly(len(newPods), initialBatchSize, func() error {
 		pod := <-podsCreationChan
@@ -142,6 +140,7 @@ func (r *realControl) createPods(
 		if createErr = r.createOnePod(cs, pod, existingPVCNames); createErr != nil {
 			return createErr
 		}
+		created = true
 		successPodNames.Store(pod.Name, struct{}{})
 		return nil
 	})
@@ -153,7 +152,7 @@ func (r *realControl) createPods(
 		}
 	}
 
-	return err
+	return created, err
 }
 
 func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, existingPVCNames sets.String) error {
@@ -165,13 +164,13 @@ func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, exist
 		r.exp.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
 		if err := r.Create(context.TODO(), &c); err != nil {
 			r.exp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
-			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pvc %s: %v", util.DumpJSON(c), err)
+			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pvc: %v, pvc: %v", err, util.DumpJSON(c))
 			return err
 		}
 	}
 
 	if err := r.Create(context.TODO(), pod); err != nil {
-		r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pod %s: %v", util.DumpJSON(pod), err)
+		r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pod: %v, pod: %v", err, util.DumpJSON(pod))
 		return err
 	}
 
@@ -179,14 +178,16 @@ func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, exist
 	return nil
 }
 
-func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) error {
+func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) (bool, error) {
+	var deleted bool
 	for _, pod := range podsToDelete {
 		r.exp.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pod.Name)
 		if err := r.Delete(context.TODO(), pod); err != nil {
 			r.exp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pod.Name)
 			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to delete pod %s: %v", pod.Name, err)
-			return err
+			return deleted, err
 		}
+		deleted = true
 		r.recorder.Event(cs, v1.EventTypeNormal, "SuccessfulDelete", fmt.Sprintf("succeed to delete pod %s", pod.Name))
 
 		// delete pvcs which have the same instance-id
@@ -199,10 +200,10 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 			if err := r.Delete(context.TODO(), pvc); err != nil {
 				r.exp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
 				r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to delete pvc %s: %v", pvc.Name, err)
-				return err
+				return deleted, err
 			}
 		}
 	}
 
-	return nil
+	return deleted, nil
 }

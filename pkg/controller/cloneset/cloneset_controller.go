@@ -310,6 +310,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 			LastTransitionTime: metav1.Now(),
 			Message:            podsScaleErr.Error(),
 		})
+		err = podsScaleErr
 	}
 	if scaling {
 		return delayDuration, podsScaleErr
@@ -323,8 +324,12 @@ func (r *ReconcileCloneSet) syncCloneSet(
 			LastTransitionTime: metav1.Now(),
 			Message:            podsUpdateErr.Error(),
 		})
+		if err == nil {
+			err = podsUpdateErr
+		}
 	}
-	return delayDuration, podsUpdateErr
+
+	return delayDuration, err
 }
 
 func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisions []*apps.ControllerRevision, podsRevisions sets.String) (
