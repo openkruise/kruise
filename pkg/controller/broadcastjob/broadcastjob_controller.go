@@ -19,6 +19,7 @@ package broadcastjob
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"math"
 	"sync"
@@ -49,7 +50,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var controllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
+func init() {
+	flag.IntVar(&concurrentReconciles, "broadcastjob-workers", concurrentReconciles, "Max concurrent workers for BroadCastJob controller.")
+}
+
+var (
+	concurrentReconciles = 3
+	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
+)
 
 // Add creates a new BroadcastJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -73,7 +81,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("broadcastjob-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("broadcastjob-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
 	if err != nil {
 		return err
 	}
