@@ -66,7 +66,7 @@ func discoveryEnabled(gvk schema.GroupVersionKind) bool {
 	}
 	resourceList, err := discoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
 	if err != nil {
-		klog.Warningf("custom resource gate not found groupVersionKind %v in discovery: %v", gvk, err)
+		klog.V(4).Infof("custom resource gate not found groupVersionKind %v in discovery: %v", gvk, err)
 		return false
 	}
 

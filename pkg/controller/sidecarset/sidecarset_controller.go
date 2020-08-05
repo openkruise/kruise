@@ -18,7 +18,9 @@ package sidecarset
 
 import (
 	"context"
+	"flag"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,15 +28,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	controllerutil "k8s.io/kubernetes/pkg/controller"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+)
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+func init() {
+	flag.IntVar(&concurrentReconciles, "sidecarset-workers", concurrentReconciles, "Max concurrent workers for SidecarSet controller.")
+}
+
+var (
+	concurrentReconciles = 3
 )
 
 /**
@@ -59,7 +66,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("sidecarset-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("sidecarset-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
 	if err != nil {
 		return err
 	}
