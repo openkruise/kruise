@@ -28,8 +28,8 @@ import (
 type SidecarSetLister interface {
 	// List lists all SidecarSets in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.SidecarSet, err error)
-	// SidecarSets returns an object that can list and get SidecarSets.
-	SidecarSets(namespace string) SidecarSetNamespaceLister
+	// Get retrieves the SidecarSet from the index for a given name.
+	Get(name string) (*v1alpha1.SidecarSet, error)
 	SidecarSetListerExpansion
 }
 
@@ -51,38 +51,9 @@ func (s *sidecarSetLister) List(selector labels.Selector) (ret []*v1alpha1.Sidec
 	return ret, err
 }
 
-// SidecarSets returns an object that can list and get SidecarSets.
-func (s *sidecarSetLister) SidecarSets(namespace string) SidecarSetNamespaceLister {
-	return sidecarSetNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// SidecarSetNamespaceLister helps list and get SidecarSets.
-type SidecarSetNamespaceLister interface {
-	// List lists all SidecarSets in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*v1alpha1.SidecarSet, err error)
-	// Get retrieves the SidecarSet from the indexer for a given namespace and name.
-	Get(name string) (*v1alpha1.SidecarSet, error)
-	SidecarSetNamespaceListerExpansion
-}
-
-// sidecarSetNamespaceLister implements the SidecarSetNamespaceLister
-// interface.
-type sidecarSetNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all SidecarSets in the indexer for a given namespace.
-func (s sidecarSetNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.SidecarSet, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.SidecarSet))
-	})
-	return ret, err
-}
-
-// Get retrieves the SidecarSet from the indexer for a given namespace and name.
-func (s sidecarSetNamespaceLister) Get(name string) (*v1alpha1.SidecarSet, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the SidecarSet from the index for a given name.
+func (s *sidecarSetLister) Get(name string) (*v1alpha1.SidecarSet, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

@@ -74,12 +74,12 @@ func (v *version) ImagePullJobs() ImagePullJobInformer {
 
 // NodeImages returns a NodeImageInformer.
 func (v *version) NodeImages() NodeImageInformer {
-	return &nodeImageInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // SidecarSets returns a SidecarSetInformer.
 func (v *version) SidecarSets() SidecarSetInformer {
-	return &sidecarSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &sidecarSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // StatefulSets returns a StatefulSetInformer.

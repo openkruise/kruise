@@ -56,12 +56,12 @@ func (c *AppsV1alpha1Client) ImagePullJobs(namespace string) ImagePullJobInterfa
 	return newImagePullJobs(c, namespace)
 }
 
-func (c *AppsV1alpha1Client) NodeImages(namespace string) NodeImageInterface {
-	return newNodeImages(c, namespace)
+func (c *AppsV1alpha1Client) NodeImages() NodeImageInterface {
+	return newNodeImages(c)
 }
 
-func (c *AppsV1alpha1Client) SidecarSets(namespace string) SidecarSetInterface {
-	return newSidecarSets(c, namespace)
+func (c *AppsV1alpha1Client) SidecarSets() SidecarSetInterface {
+	return newSidecarSets(c)
 }
 
 func (c *AppsV1alpha1Client) StatefulSets(namespace string) StatefulSetInterface {
