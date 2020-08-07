@@ -1,8 +1,9 @@
 # Contributor Covenant Code of Conduct
+This document defines the code of conduct that applies to the entire Openkruise project hosted and managed by the [Openkruise organization](https://github.com/openkruise).
 
 ## Our Pledge
 
-We as members, contributors, and leaders pledge to make participation in our
+We as members, contributors, and maintainers pledge to make participation in our
 community a harassment-free experience for everyone, regardless of age, body
 size, visible or invisible disability, ethnicity, sex characteristics, gender
 identity and expression, level of experience, education, socio-economic status,
