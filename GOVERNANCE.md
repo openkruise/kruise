@@ -31,7 +31,7 @@ They normally take the following responsibilities:
 ## Process of becoming a maintainer
 
 * Talk to one of the existing project [maintainers](MAINTAINERS.md) that you are interested in becoming a
-  maintainer and he will nominate you as a new maintainer. After nomination, you will need to
+  maintainer, and he will nominate you as a new maintainer. After nomination, you will need to
   create a PR to update the list in [MAINTAINERS.md](MAINTAINERS.md). 
 * We will expect you to start contributing increasingly complicated PRs, under the guidance
   of the existing maintainers.
