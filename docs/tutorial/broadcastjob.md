@@ -14,10 +14,10 @@ kubectl get nodes -o yaml | grep "openkruise/guestbook:v3"
 
 `kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/broadcastjob.yaml`
 
-Check the broadcastjob is completed. `bj` is short for `broadcastjob`
+Check the broadcastjob is completed. `bcj` is short for `broadcastjob`
 
 ```
-$ kubectl get bj
+$ kubectl get bcj
 NAME             DESIRED   ACTIVE   SUCCEEDED   FAILED   AGE
 download-image   3         0        3           0        7s
 ```
