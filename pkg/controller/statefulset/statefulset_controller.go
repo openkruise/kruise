@@ -18,6 +18,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"flag"
 	"fmt"
 	"time"
 
@@ -54,9 +55,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
+func init() {
+	flag.IntVar(&concurrentReconciles, "statefulset-workers", concurrentReconciles, "Max concurrent workers for StatefulSet controller.")
+}
+
 var (
-	controllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	concurrentReconciles = 3
 
 	updateExpectations = expectations.NewUpdateExpectations(func(o metav1.Object) string {
 		p := o.(*v1.Pod)
@@ -150,7 +156,7 @@ type ReconcileStatefulSet struct {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("statefulset-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("statefulset-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
 	if err != nil {
 		return err
 	}

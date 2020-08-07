@@ -28,8 +28,8 @@ import (
 type NodeImageLister interface {
 	// List lists all NodeImages in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.NodeImage, err error)
-	// NodeImages returns an object that can list and get NodeImages.
-	NodeImages(namespace string) NodeImageNamespaceLister
+	// Get retrieves the NodeImage from the index for a given name.
+	Get(name string) (*v1alpha1.NodeImage, error)
 	NodeImageListerExpansion
 }
 
@@ -51,38 +51,9 @@ func (s *nodeImageLister) List(selector labels.Selector) (ret []*v1alpha1.NodeIm
 	return ret, err
 }
 
-// NodeImages returns an object that can list and get NodeImages.
-func (s *nodeImageLister) NodeImages(namespace string) NodeImageNamespaceLister {
-	return nodeImageNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// NodeImageNamespaceLister helps list and get NodeImages.
-type NodeImageNamespaceLister interface {
-	// List lists all NodeImages in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*v1alpha1.NodeImage, err error)
-	// Get retrieves the NodeImage from the indexer for a given namespace and name.
-	Get(name string) (*v1alpha1.NodeImage, error)
-	NodeImageNamespaceListerExpansion
-}
-
-// nodeImageNamespaceLister implements the NodeImageNamespaceLister
-// interface.
-type nodeImageNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all NodeImages in the indexer for a given namespace.
-func (s nodeImageNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.NodeImage, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.NodeImage))
-	})
-	return ret, err
-}
-
-// Get retrieves the NodeImage from the indexer for a given namespace and name.
-func (s nodeImageNamespaceLister) Get(name string) (*v1alpha1.NodeImage, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the NodeImage from the index for a given name.
+func (s *nodeImageLister) Get(name string) (*v1alpha1.NodeImage, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

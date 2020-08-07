@@ -18,6 +18,7 @@ package uniteddeployment
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"reflect"
 
@@ -38,6 +39,14 @@ import (
 	"github.com/openkruise/kruise/pkg/util/gate"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+)
+
+func init() {
+	flag.IntVar(&concurrentReconciles, "uniteddeployment-workers", concurrentReconciles, "Max concurrent workers for UnitedDeployment controller.")
+}
+
+var (
+	concurrentReconciles = 3
 )
 
 const (
@@ -85,7 +94,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
 	if err != nil {
 		return err
 	}

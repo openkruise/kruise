@@ -43,12 +43,12 @@ func (c *FakeAppsV1alpha1) ImagePullJobs(namespace string) v1alpha1.ImagePullJob
 	return &FakeImagePullJobs{c, namespace}
 }
 
-func (c *FakeAppsV1alpha1) NodeImages(namespace string) v1alpha1.NodeImageInterface {
-	return &FakeNodeImages{c, namespace}
+func (c *FakeAppsV1alpha1) NodeImages() v1alpha1.NodeImageInterface {
+	return &FakeNodeImages{c}
 }
 
-func (c *FakeAppsV1alpha1) SidecarSets(namespace string) v1alpha1.SidecarSetInterface {
-	return &FakeSidecarSets{c, namespace}
+func (c *FakeAppsV1alpha1) SidecarSets() v1alpha1.SidecarSetInterface {
+	return &FakeSidecarSets{c}
 }
 
 func (c *FakeAppsV1alpha1) StatefulSets(namespace string) v1alpha1.StatefulSetInterface {

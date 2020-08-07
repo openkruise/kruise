@@ -108,6 +108,10 @@ type ImagePullJobStatus struct {
 	// The text prompt for job running status.
 	// +optional
 	Message string `json:"message,omitempty"`
+
+	// The nodes that failed to pull the image.
+	// +optional
+	FailedNodes []string `json:"failedNodes,omitempty"`
 }
 
 // +genclient
