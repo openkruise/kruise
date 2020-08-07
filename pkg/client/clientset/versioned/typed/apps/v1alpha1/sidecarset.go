@@ -31,7 +31,7 @@ import (
 // SidecarSetsGetter has a method to return a SidecarSetInterface.
 // A group's client should implement this interface.
 type SidecarSetsGetter interface {
-	SidecarSets(namespace string) SidecarSetInterface
+	SidecarSets() SidecarSetInterface
 }
 
 // SidecarSetInterface has methods to work with SidecarSet resources.
@@ -51,14 +51,12 @@ type SidecarSetInterface interface {
 // sidecarSets implements SidecarSetInterface
 type sidecarSets struct {
 	client rest.Interface
-	ns     string
 }
 
 // newSidecarSets returns a SidecarSets
-func newSidecarSets(c *AppsV1alpha1Client, namespace string) *sidecarSets {
+func newSidecarSets(c *AppsV1alpha1Client) *sidecarSets {
 	return &sidecarSets{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -66,7 +64,6 @@ func newSidecarSets(c *AppsV1alpha1Client, namespace string) *sidecarSets {
 func (c *sidecarSets) Get(name string, options v1.GetOptions) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -83,7 +80,6 @@ func (c *sidecarSets) List(opts v1.ListOptions) (result *v1alpha1.SidecarSetList
 	}
 	result = &v1alpha1.SidecarSetList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -100,7 +96,6 @@ func (c *sidecarSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,7 +106,6 @@ func (c *sidecarSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 func (c *sidecarSets) Create(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		Body(sidecarSet).
 		Do().
@@ -123,7 +117,6 @@ func (c *sidecarSets) Create(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.
 func (c *sidecarSets) Update(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		Name(sidecarSet.Name).
 		Body(sidecarSet).
@@ -138,7 +131,6 @@ func (c *sidecarSets) Update(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.
 func (c *sidecarSets) UpdateStatus(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		Name(sidecarSet.Name).
 		SubResource("status").
@@ -151,7 +143,6 @@ func (c *sidecarSets) UpdateStatus(sidecarSet *v1alpha1.SidecarSet) (result *v1a
 // Delete takes name of the sidecarSet and deletes it. Returns an error if one occurs.
 func (c *sidecarSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		Name(name).
 		Body(options).
@@ -166,7 +157,6 @@ func (c *sidecarSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -179,7 +169,6 @@ func (c *sidecarSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 func (c *sidecarSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("sidecarsets").
 		SubResource(subresources...).
 		Name(name).

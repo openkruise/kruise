@@ -31,7 +31,7 @@ import (
 // NodeImagesGetter has a method to return a NodeImageInterface.
 // A group's client should implement this interface.
 type NodeImagesGetter interface {
-	NodeImages(namespace string) NodeImageInterface
+	NodeImages() NodeImageInterface
 }
 
 // NodeImageInterface has methods to work with NodeImage resources.
@@ -51,14 +51,12 @@ type NodeImageInterface interface {
 // nodeImages implements NodeImageInterface
 type nodeImages struct {
 	client rest.Interface
-	ns     string
 }
 
 // newNodeImages returns a NodeImages
-func newNodeImages(c *AppsV1alpha1Client, namespace string) *nodeImages {
+func newNodeImages(c *AppsV1alpha1Client) *nodeImages {
 	return &nodeImages{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -66,7 +64,6 @@ func newNodeImages(c *AppsV1alpha1Client, namespace string) *nodeImages {
 func (c *nodeImages) Get(name string, options v1.GetOptions) (result *v1alpha1.NodeImage, err error) {
 	result = &v1alpha1.NodeImage{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -83,7 +80,6 @@ func (c *nodeImages) List(opts v1.ListOptions) (result *v1alpha1.NodeImageList, 
 	}
 	result = &v1alpha1.NodeImageList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -100,7 +96,6 @@ func (c *nodeImages) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,7 +106,6 @@ func (c *nodeImages) Watch(opts v1.ListOptions) (watch.Interface, error) {
 func (c *nodeImages) Create(nodeImage *v1alpha1.NodeImage) (result *v1alpha1.NodeImage, err error) {
 	result = &v1alpha1.NodeImage{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		Body(nodeImage).
 		Do().
@@ -123,7 +117,6 @@ func (c *nodeImages) Create(nodeImage *v1alpha1.NodeImage) (result *v1alpha1.Nod
 func (c *nodeImages) Update(nodeImage *v1alpha1.NodeImage) (result *v1alpha1.NodeImage, err error) {
 	result = &v1alpha1.NodeImage{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		Name(nodeImage.Name).
 		Body(nodeImage).
@@ -138,7 +131,6 @@ func (c *nodeImages) Update(nodeImage *v1alpha1.NodeImage) (result *v1alpha1.Nod
 func (c *nodeImages) UpdateStatus(nodeImage *v1alpha1.NodeImage) (result *v1alpha1.NodeImage, err error) {
 	result = &v1alpha1.NodeImage{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		Name(nodeImage.Name).
 		SubResource("status").
@@ -151,7 +143,6 @@ func (c *nodeImages) UpdateStatus(nodeImage *v1alpha1.NodeImage) (result *v1alph
 // Delete takes name of the nodeImage and deletes it. Returns an error if one occurs.
 func (c *nodeImages) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		Name(name).
 		Body(options).
@@ -166,7 +157,6 @@ func (c *nodeImages) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("nodeimages").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -179,7 +169,6 @@ func (c *nodeImages) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 func (c *nodeImages) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.NodeImage, err error) {
 	result = &v1alpha1.NodeImage{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("nodeimages").
 		SubResource(subresources...).
 		Name(name).

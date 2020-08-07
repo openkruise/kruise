@@ -64,6 +64,17 @@ type ImageTagSpec struct {
 	// then an entry in this list will point to this controller.
 	// +optional
 	OwnerReferences []v1.ObjectReference `json:"ownerReferences,omitempty"`
+
+	// An opaque value that represents the internal version of this tag that can
+	// be used by clients to determine when objects have changed. May be used for optimistic
+	// concurrency, change detection, and the watch operation on a resource or set of resources.
+	// Clients must treat these values as opaque and passed unmodified back to the server.
+	//
+	// Populated by the system.
+	// Read-only.
+	// Value must be treated as opaque by clients and .
+	// +optional
+	Version int64 `json:"version,omitempty"`
 }
 
 // ImageTagPullPolicy defines the policy of the pulling task
@@ -94,9 +105,6 @@ type ImageTagPullPolicy struct {
 
 // NodeImageStatus defines the observed state of NodeImage
 type NodeImageStatus struct {
-	// ObservedGeneration is the most recent generation observed for this Node.
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
 	// The desired number of pulling tasks, this is typically equal to the number of images in spec.
 	Desired int32 `json:"desired"`
 
@@ -114,6 +122,11 @@ type NodeImageStatus struct {
 
 	// all statuses of active image pulling tasks
 	ImageStatuses map[string]ImageStatus `json:"imageStatuses,omitempty"`
+
+	// The first of all job has finished on this node. When a node is added to the cluster, we want to know
+	// the time when the node's image pulling is completed, and use it to trigger the operation of the upper system.
+	// +optional
+	FirstSyncStatus *SyncStatus `json:"firstSyncStatus,omitempty"`
 }
 
 // ImageStatus defines the pulling status of an image
@@ -146,6 +159,14 @@ type ImageTagStatus struct {
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 
+	// Represents the internal version of this tag that the daemon handled.
+	// +optional
+	Version int64 `json:"version,omitempty"`
+
+	// Represents the ID of this image.
+	// +optional
+	ImageID string `json:"imageID,omitempty"`
+
 	// Represents the summary informations of this node
 	// +optional
 	Message string `json:"message,omitempty"`
@@ -165,7 +186,25 @@ const (
 	ImagePhaseFailed ImagePullPhase = "Failed"
 )
 
+// SyncStatus is summary of the status of all images pulling tasks on the node.
+type SyncStatus struct {
+	SyncAt  metav1.Time     `json:"syncAt,omitempty"`
+	Status  SyncStatusPhase `json:"status,omitempty"`
+	Message string          `json:"message,omitempty"`
+}
+
+// SyncStatusPhase defines the node status
+type SyncStatusPhase string
+
+const (
+	// SyncStatusSucceeded means all tasks has succeeded on this node
+	SyncStatusSucceeded SyncStatusPhase = "Succeeded"
+	// SyncStatusFailed means some task has failed on this node
+	SyncStatusFailed SyncStatusPhase = "Failed"
+)
+
 // +genclient
+// +genclient:nonNamespaced
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
