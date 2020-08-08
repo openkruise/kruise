@@ -1,4 +1,5 @@
 # Contributor Covenant Code of Conduct
+
 This document defines the code of conduct that applies to the entire Openkruise project hosted and managed by the [Openkruise organization](https://github.com/openkruise).
 
 ## Our Pledge
