@@ -3,7 +3,6 @@ package broadcastjob
 import (
 	"context"
 
-	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -13,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 type enqueueBroadcastJobForNode struct {
@@ -44,23 +45,23 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 	if err != nil {
 		klog.Errorf("Error enqueueing broadcastjob on addNode %v", err)
 	}
-	for _, bj := range jobList.Items {
-		mockPod := NewPod(&bj, node.Name)
+	for _, bcj := range jobList.Items {
+		mockPod := NewPod(&bcj, node.Name)
 		canFit, err := checkNodeFitness(mockPod, node)
 		if err != nil {
-			klog.Errorf("failed to checkNodeFitness for job %s/%s, on node %s, %v", bj.Namespace, bj.Name, node.Name, err)
+			klog.Errorf("failed to checkNodeFitness for job %s/%s, on node %s, %v", bcj.Namespace, bcj.Name, node.Name, err)
 			continue
 		}
 		if !canFit {
-			klog.Infof("Job %s/%s does not fit on node %s", bj.Namespace, bj.Name, node.Name)
+			klog.Infof("Job %s/%s does not fit on node %s", bcj.Namespace, bcj.Name, node.Name)
 			continue
 		}
 
-		// enqueue the bj for matching node
+		// enqueue the bcj for matching node
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
-				Namespace: bj.Namespace,
-				Name:      bj.Name}})
+				Namespace: bcj.Namespace,
+				Name:      bcj.Name}})
 	}
 }
 
@@ -75,26 +76,26 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterfac
 	if err != nil {
 		klog.Errorf("Error enqueueing broadcastjob on updateNode %v", err)
 	}
-	for _, bj := range jobList.Items {
-		mockPod := NewPod(&bj, oldNode.Name)
+	for _, bcj := range jobList.Items {
+		mockPod := NewPod(&bcj, oldNode.Name)
 		canOldNodeFit, err := checkNodeFitness(mockPod, oldNode)
 		if err != nil {
-			klog.Errorf("failed to checkNodeFitness for job %s/%s, on old node %s, %v", bj.Namespace, bj.Name, oldNode.Name, err)
+			klog.Errorf("failed to checkNodeFitness for job %s/%s, on old node %s, %v", bcj.Namespace, bcj.Name, oldNode.Name, err)
 			continue
 		}
 
 		canCurNodeFit, err := checkNodeFitness(mockPod, curNode)
 		if err != nil {
-			klog.Errorf("failed to checkNodeFitness for job %s/%s, on cur node %s, %v", bj.Namespace, bj.Name, curNode.Name, err)
+			klog.Errorf("failed to checkNodeFitness for job %s/%s, on cur node %s, %v", bcj.Namespace, bcj.Name, curNode.Name, err)
 			continue
 		}
 
 		if canOldNodeFit != canCurNodeFit {
-			// enqueue the bj for matching node
+			// enqueue the broadcast job for matching node
 			q.Add(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: bj.Namespace,
-					Name:      bj.Name}})
+					Namespace: bcj.Namespace,
+					Name:      bcj.Name}})
 		}
 	}
 }
