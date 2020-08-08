@@ -1,14 +1,14 @@
-# Contributing to Kruise
+# Contributing to Openkruise
 
-Welcome to Kruise!It is warmly welcomed if you have interest to hack on Kruise.
-
-We encourage this kind of willing very much, and here is a list of contributing guide for you.
+Welcome to Openkruise! Openkruise consists serveral repositories under the organization.
+We encourage you to help out by reporting issues, improving documentation, fixing bugs, or adding new features.
+Please also take a look at our code of conduct, which details how contributors are expected to conduct themselves as part of the Openkruise community.
 
 ## Reporting issues
 
-To be honest, we regard every user of Kruise as a very kind contributor.
-After experiencing Kruise, you may have some feedback for the project.
-Then feel free to open an issue via [NEW ISSUE](https://github.com/openkruise/kruise/issues/new/choose).
+To be honest, we regard every user of Openkruise as a very kind contributor.
+After experiencing Openkruise, you may have some feedback for the project.
+Then feel free to open an issue.
 
 There are lot of cases when you could open an issue:
 
@@ -28,8 +28,8 @@ Sensitive data could be password, secret key, network locations, private busines
 
 ## Code and doc contribution
 
-Every action to make Kruise better is encouraged.
-On GitHub, every improvement for Kruise could be via a PR (short for pull request).
+Every action to make Openkruise better is encouraged.
+On GitHub, every improvement for Openkruise could be via a PR (short for pull request).
 
 - If you find a typo, try to fix it!
 - If you find a bug, try to fix it!
@@ -47,12 +47,12 @@ On GitHub, every improvement for Kruise could be via a PR (short for pull reques
 To put forward a PR, we assume you have registered a GitHub ID.
 Then you could finish the preparation in the following steps:
 
-1. **Fork** Kruise to your repository. You just need to click the button Fork in right-left of openkruise/kruise main page. Then you will end up with your repository in `https://github.com/<your-username>/kruise`, in which `your-username` is your GitHub username.
-2. **Clone** your own repository to develop locally. Use `git clone https://github.com/<your-username>/kruise.git` to clone repository to your local machine. Then you can create new branches to finish the change you wish to make.
-3. **Set remote** upstream to be `https://github.com/openkruise/kruise.git` using the following two commands:
+1. **Fork** Fork the repository you wish to work on. You just need to click the button Fork in right-left of project repository main page. Then you will end up with your repository in your GitHub username.
+2. **Clone** your own repository to develop locally. Use `git clone https://github.com/<your-username>/<project>.git` to clone repository to your local machine. Then you can create new branches to finish the change you wish to make.
+3. **Set remote** upstream to be `https://github.com/openkruise/<project>.git` using the following two commands:
 
 ```bash
-git remote add upstream https://github.com/openkruise/kruise.git
+git remote add upstream https://github.com/openkruise/<project>.git
 git remote set-url --push upstream no-pushing
 ```
 
@@ -63,7 +63,7 @@ Adding this, we can easily synchronize local branches with upstream branches.
 Update local working directory:
 
 ```bash
-cd kruise
+cd <project>
 git fetch upstream
 git checkout master
 git rebase upstream/master
@@ -110,27 +110,27 @@ If you want to start kruise-controller-manager locally to work with a Kubernetes
 
 ## Engage to help anything
 
-We choose GitHub as the primary place for Kruise to collaborate.
-So the latest updates of Kruise are always here.
+We choose GitHub as the primary place for Openkruise to collaborate.
+So the latest updates of Openkruise are always here.
 Although contributions via PR is an explicit way to help, we still call for any other ways.
 
 - reply to other's issues if you could;
 - help solve other user's problems;
 - help review other's PR design;
 - help review other's codes in PR;
-- discuss about Kruise to make things clearer;
-- advocate Kruise technology beyond GitHub;
-- write blogs on Kruise and so on.
+- discuss about Openkruise to make things clearer;
+- advocate Openkruise technology beyond GitHub;
+- write blogs on Openkruise and so on.
 
 In a word, **ANY HELP IS CONTRIBUTION**.
 
-## Join Kruise as a member
+## Join Openkruise as a member
 
-It is also welcomed to join Kruise team if you are willing to participate in Kruise community continuously and keep active.
+It is also welcomed to join Openkruise team if you are willing to participate in Openkruise community continuously and keep active.
 
 ### Requirements
 
-- Have read the [Contributing to Kruise](./CONTRIBUTING.md) carefully
+- Have read the [Contributing to Openkruise](./CONTRIBUTING.md) carefully
 - Have read the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md)
 - Have submitted multi PRs to the community
 - Be active in the community, may including but not limited
@@ -142,5 +142,5 @@ It is also welcomed to join Kruise team if you are willing to participate in Kru
 
 You can do it in either of two ways:
 
-- Submit a PR in the [openkruise/kruise](https://github.com/openkruise/kruise) repo
-- Contact with the [community](./README.md#community) offline
+- Submit a PR in the project repo
+- Contact via the [community](./README.md#community) channels offline
