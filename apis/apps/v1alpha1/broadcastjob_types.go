@@ -210,7 +210,7 @@ type JobCondition struct {
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=bj
+// +kubebuilder:resource:shortName=bcj
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".status.desired",description="The desired number of pods. This is typically equal to the number of nodes satisfied to run pods."
 // +kubebuilder:printcolumn:name="Active",type="integer",JSONPath=".status.active",description="The number of actively running pods."
 // +kubebuilder:printcolumn:name="Succeeded",type="integer",JSONPath=".status.succeeded",description="The number of pods which reached phase Succeeded."
