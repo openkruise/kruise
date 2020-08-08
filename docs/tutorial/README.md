@@ -7,7 +7,7 @@ These tutorials walk through several examples to demonstrate how to use the Krui
 Install Kruise with helm v3, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
 
 ```bash
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.3.1/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz
 ```
 
 Verify Kruise-manager is running:

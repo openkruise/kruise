@@ -66,11 +66,11 @@ For more details, see [quick-start](https://openkruise.io/en-us/docs/quick_start
 
 You can view the full documentation from the [OpenKruise website](https://openkruise.io/en-us/docs/what_is_openkruise.html).
 
-We also provider [**tutorials**](./docs/tutorial/README.md) to demonstrate how to use Kruise controllers.
+We also provide [**tutorials**](./docs/tutorial/README.md) to demonstrate how to use Kruise controllers.
 
 ## Contributing
 
-You are warmly welcomed to hack on Kruise. We have prepared a detailed guide [CONTRIBUTING.md](CONTRIBUTING.md).
+You are warmly welcome to hack on Kruise. We have prepared a detailed guide [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Community
 

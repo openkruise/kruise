@@ -39,7 +39,7 @@ spec:
     listKind: BroadcastJobList
     plural: broadcastjobs
     shortNames:
-    - bj
+    - bcj
     singular: broadcastjob
   scope: Namespaced
   subresources:

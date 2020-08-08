@@ -40,7 +40,7 @@ Run following command to install the [helm chart](https://github.com/cloudnative
 name (application name) of `demo-v1`, replica of `20`:
 
 ```bash
-helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook,image.tag=v2
+helm install demo-v1 apphub/guestbook-kruise --set replicaCount=20,image.repository=openkruise/guestbook,image.tag=v2 nameOverride=guestbook-with-sidecar
 ```
 
 Alternatively, install the application using YAML files:
