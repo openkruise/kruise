@@ -45,6 +45,7 @@ should volunteer to be moved to emeritus status.
 - In extreme cases this can also occur by a vote of the maintainers per the voting process. The voting
 process is a simple majority in which each maintainer receives one vote.
 
+
 ## Decision making process
 
 Decisions are made based on consensus between maintainers.
