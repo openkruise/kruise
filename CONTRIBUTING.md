@@ -1,7 +1,7 @@
 # Contributing to Openkruise
 
 Welcome to Openkruise! Openkruise consists serveral repositories under the organization.
-We encourage you to help out by reporting issues, improving documentation, fixing bugs, or adding new features.   
+We encourage you to help out by reporting issues, improving documentation, fixing bugs, or adding new features.
 Please also take a look at our code of conduct, which details how contributors are expected to conduct themselves as part of the Openkruise community.
 
 ## Reporting issues
