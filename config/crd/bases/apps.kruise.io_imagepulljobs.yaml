@@ -204,6 +204,11 @@ spec:
               description: The number of pulling tasks  which reached phase Failed.
               format: int32
               type: integer
+            failedNodes:
+              description: The nodes that failed to pull the image.
+              items:
+                type: string
+              type: array
             message:
               description: The text prompt for job running status.
               type: string

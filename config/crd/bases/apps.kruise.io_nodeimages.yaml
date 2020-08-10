@@ -137,6 +137,17 @@ spec:
                         tag:
                           description: Specifies the image tag
                           type: string
+                        version:
+                          description: "An opaque value that represents the internal
+                            version of this tag that can be used by clients to determine
+                            when objects have changed. May be used for optimistic
+                            concurrency, change detection, and the watch operation
+                            on a resource or set of resources. Clients must treat
+                            these values as opaque and passed unmodified back to the
+                            server. \n Populated by the system. Read-only. Value must
+                            be treated as opaque by clients and ."
+                          format: int64
+                          type: integer
                       required:
                       - tag
                       type: object
@@ -159,6 +170,21 @@ spec:
               description: The number of pulling tasks  which reached phase Failed.
               format: int32
               type: integer
+            firstSyncStatus:
+              description: The first of all job has finished on this node. When a
+                node is added to the cluster, we want to know the time when the node's
+                image pulling is completed, and use it to trigger the operation of
+                the upper system.
+              properties:
+                message:
+                  type: string
+                status:
+                  description: SyncStatusPhase defines the node status
+                  type: string
+                syncAt:
+                  format: date-time
+                  type: string
+              type: object
             imageStatuses:
               additionalProperties:
                 description: ImageStatus defines the pulling status of an image
@@ -175,6 +201,9 @@ spec:
                             across separate operations. It is represented in RFC3339
                             form and is in UTC.
                           format: date-time
+                          type: string
+                        imageID:
+                          description: Represents the ID of this image.
                           type: string
                         message:
                           description: Represents the summary informations of this
@@ -200,6 +229,11 @@ spec:
                         tag:
                           description: Represents the image tag.
                           type: string
+                        version:
+                          description: Represents the internal version of this tag
+                            that the daemon handled.
+                          format: int64
+                          type: integer
                       required:
                       - phase
                       - tag
@@ -210,11 +244,6 @@ spec:
                 type: object
               description: all statuses of active image pulling tasks
               type: object
-            observedGeneration:
-              description: ObservedGeneration is the most recent generation observed
-                for this Node.
-              format: int64
-              type: integer
             pulling:
               description: The number of pulling tasks which are not finished.
               format: int32
