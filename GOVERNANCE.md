@@ -40,10 +40,8 @@ They normally take the following responsibilities:
 
 ## When does a maintainer lose maintainer status
 
-- If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they
-should volunteer to be moved to emeritus status.
-- In extreme cases this can also occur by a vote of the maintainers per the voting process. The voting
-process is a simple majority in which each maintainer receives one vote.
+- If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they should volunteer to be moved to emeritus status.
+- In extreme cases this can also occur by a vote of the maintainers per the voting process. The voting process is a simple majority in which each maintainer receives one vote.
 
 ## Decision making process
 
