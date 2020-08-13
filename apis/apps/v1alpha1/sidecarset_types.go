@@ -43,6 +43,10 @@ type SidecarSetSpec struct {
 // SidecarContainer defines the container of Sidecar
 type SidecarContainer struct {
 	corev1.Container `json:",inline"`
+	// the sidecar container resource requirement that is proportional to the pod total resource
+	// this will override the corresponding resources fields in the container with the same resourceName
+	// the key of the map is the percentage
+	ProportionalResource map[corev1.ResourceName]uint8 `json:"proportionalResource,omitempty"`
 }
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet

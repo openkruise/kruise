@@ -61,6 +61,14 @@ spec:
                 into the selected pod
               items:
                 description: SidecarContainer defines the container of Sidecar
+                properties:
+                  ProportionalResource:
+                    additionalProperties:
+                      type: integer
+                    description: the sidecar container resource requirement that is
+                      proportional to the pod total resource this will override the
+                      Resources fields in the container
+                    type: object
                 type: object
               type: array
             paused:
