@@ -3,6 +3,7 @@
 This file lists the maintainers of the OpenKruise project. The responsibilities of maintainers are listed in the [GOVERNANCE.md](GOVERNANCE.md) file.
 
 ## Project Maintainers
+
 | Name | GitHub ID | Affiliation |
 | ---- | --------- | ----------- |
 | [Fei Guo](mailto:f.guo@alibaba-inc.com) | [Fei-Guo](https://github.com/Fei-Guo) | Alibaba |
