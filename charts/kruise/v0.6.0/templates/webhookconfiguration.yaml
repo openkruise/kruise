@@ -3,6 +3,8 @@ kind: MutatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: kruise-mutating-webhook-configuration
+  annotations:
+    template: ""
 webhooks:
   - clientConfig:
       caBundle: Cg==
@@ -139,6 +141,8 @@ kind: ValidatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: kruise-validating-webhook-configuration
+  annotations:
+    template: ""
 webhooks:
   - clientConfig:
       caBundle: Cg==

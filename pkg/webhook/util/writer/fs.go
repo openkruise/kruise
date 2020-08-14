@@ -83,7 +83,7 @@ func (f *fsCertWriter) write() (*generator.Artifacts, error) {
 	return f.doWrite()
 }
 
-func (f *fsCertWriter) overwrite() (*generator.Artifacts, error) {
+func (f *fsCertWriter) overwrite(_ string) (*generator.Artifacts, error) {
 	return f.doWrite()
 }
 

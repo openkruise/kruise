@@ -28,6 +28,8 @@ type Artifacts struct {
 	CAKey []byte
 	// PEM encoded CA certificate
 	CACert []byte
+	// Resource version of the certs
+	ResourceVersion string
 }
 
 // CertGenerator is an interface to provision the serving certificate.

@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -106,13 +107,16 @@ func (s *secretCertWriter) write() (*generator.Artifacts, error) {
 	return certs, err
 }
 
-func (s *secretCertWriter) overwrite() (
+func (s *secretCertWriter) overwrite(resourceVersion string) (
 	*generator.Artifacts, error) {
 	secret, certs, err := s.buildSecret()
 	if err != nil {
 		return nil, err
 	}
+	secret.ResourceVersion = resourceVersion
 	err = s.Client.Update(nil, secret)
+	klog.Infof("Cert writer update secret %s resourceVersion from %s to %s",
+		secret.Name, resourceVersion, secret.ResourceVersion)
 	return certs, err
 }
 
@@ -137,13 +141,14 @@ func (s *secretCertWriter) read() (*generator.Artifacts, error) {
 
 func secretToCerts(secret *corev1.Secret) *generator.Artifacts {
 	if secret.Data == nil {
-		return nil
+		return &generator.Artifacts{ResourceVersion: secret.ResourceVersion}
 	}
 	return &generator.Artifacts{
-		CAKey:  secret.Data[CAKeyName],
-		CACert: secret.Data[CACertName],
-		Cert:   secret.Data[ServerCertName],
-		Key:    secret.Data[ServerKeyName],
+		CAKey:           secret.Data[CAKeyName],
+		CACert:          secret.Data[CACertName],
+		Cert:            secret.Data[ServerCertName],
+		Key:             secret.Data[ServerKeyName],
+		ResourceVersion: secret.ResourceVersion,
 	}
 }
 
