@@ -66,7 +66,7 @@ func handleCommon(dnsName string, ch certReadWriter) (*generator.Artifacts, bool
 	valid := validCert(certs, dnsName)
 	if !valid {
 		klog.Info("cert is invalid or expiring, regenerating a new one")
-		certs, err = ch.overwrite()
+		certs, err = ch.overwrite(certs.ResourceVersion)
 		if err != nil {
 			return nil, false, err
 		}
@@ -100,11 +100,11 @@ type certReadWriter interface {
 	// write writes the certs and return the certs it wrote.
 	write() (*generator.Artifacts, error)
 	// overwrite overwrites the existing certs and return the certs it wrote.
-	overwrite() (*generator.Artifacts, error)
+	overwrite(resourceVersion string) (*generator.Artifacts, error)
 }
 
 func validCert(certs *generator.Artifacts, dnsName string) bool {
-	if certs == nil {
+	if certs == nil || certs.Cert == nil || certs.Key == nil || certs.CACert == nil {
 		return false
 	}
 

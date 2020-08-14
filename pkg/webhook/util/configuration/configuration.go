@@ -18,14 +18,14 @@ package configuration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
-
-	"k8s.io/klog"
 
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -45,8 +45,18 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 		return fmt.Errorf("not found ValidatingWebhookConfiguration %s", validatingWebhookConfigurationName)
 	}
 
-	for i := range mutatingConfig.Webhooks {
-		wh := &mutatingConfig.Webhooks[i]
+	mutatingTemplate, err := parseMutatingTemplate(mutatingConfig)
+	if err != nil {
+		return err
+	}
+	validatingTemplate, err := parseValidatingTemplate(validatingConfig)
+	if err != nil {
+		return err
+	}
+
+	var mutatingWHs []v1beta1.MutatingWebhook
+	for i := range mutatingTemplate {
+		wh := &mutatingTemplate[i]
 		wh.ClientConfig.CABundle = caBundle
 		path, err := getPath(&wh.ClientConfig)
 		if err != nil {
@@ -54,14 +64,22 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 		}
 		if _, ok := handlers[path]; !ok {
 			klog.Warningf("Find path %s not in handlers %v", path, handlers)
-			wh.Rules = nil
+			continue
+		}
+		if wh.ClientConfig.Service != nil {
+			wh.ClientConfig.Service.Namespace = webhookutil.GetNamespace()
+			wh.ClientConfig.Service.Name = webhookutil.GetServiceName()
 		}
 		if host := webhookutil.GetHost(); len(host) > 0 && wh.ClientConfig.Service != nil {
 			convertClientConfig(&wh.ClientConfig, host, webhookutil.GetPort())
 		}
+		mutatingWHs = append(mutatingWHs, *wh)
 	}
-	for i := range validatingConfig.Webhooks {
-		wh := &validatingConfig.Webhooks[i]
+	mutatingConfig.Webhooks = mutatingWHs
+
+	var validatingWHs []v1beta1.ValidatingWebhook
+	for i := range validatingTemplate {
+		wh := &validatingTemplate[i]
 		wh.ClientConfig.CABundle = caBundle
 		path, err := getPath(&wh.ClientConfig)
 		if err != nil {
@@ -69,12 +87,18 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 		}
 		if _, ok := handlers[path]; !ok {
 			klog.Warningf("Find path %s not in handlers %v", path, handlers)
-			wh.Rules = nil
+			continue
+		}
+		if wh.ClientConfig.Service != nil {
+			wh.ClientConfig.Service.Namespace = webhookutil.GetNamespace()
+			wh.ClientConfig.Service.Name = webhookutil.GetServiceName()
 		}
 		if host := webhookutil.GetHost(); len(host) > 0 && wh.ClientConfig.Service != nil {
 			convertClientConfig(&wh.ClientConfig, host, webhookutil.GetPort())
 		}
+		validatingWHs = append(validatingWHs, *wh)
 	}
+	validatingConfig.Webhooks = validatingWHs
 
 	if err := c.Update(context.TODO(), validatingConfig); err != nil {
 		return fmt.Errorf("failed to update %s: %v", validatingWebhookConfigurationName, err)
@@ -103,4 +127,44 @@ func convertClientConfig(clientConfig *v1beta1.WebhookClientConfig, host string,
 	url := fmt.Sprintf("https://%s:%d%s", host, port, *clientConfig.Service.Path)
 	clientConfig.URL = &url
 	clientConfig.Service = nil
+}
+
+func parseMutatingTemplate(mutatingConfig *v1beta1.MutatingWebhookConfiguration) ([]v1beta1.MutatingWebhook, error) {
+	if templateStr := mutatingConfig.Annotations["template"]; len(templateStr) > 0 {
+		var mutatingWHs []v1beta1.MutatingWebhook
+		if err := json.Unmarshal([]byte(templateStr), &mutatingWHs); err != nil {
+			return nil, err
+		}
+		return mutatingWHs, nil
+	}
+
+	templateBytes, err := json.Marshal(mutatingConfig.Webhooks)
+	if err != nil {
+		return nil, err
+	}
+	if mutatingConfig.Annotations == nil {
+		mutatingConfig.Annotations = make(map[string]string, 1)
+	}
+	mutatingConfig.Annotations["template"] = string(templateBytes)
+	return mutatingConfig.Webhooks, nil
+}
+
+func parseValidatingTemplate(validatingConfig *v1beta1.ValidatingWebhookConfiguration) ([]v1beta1.ValidatingWebhook, error) {
+	if templateStr := validatingConfig.Annotations["template"]; len(templateStr) > 0 {
+		var validatingWHs []v1beta1.ValidatingWebhook
+		if err := json.Unmarshal([]byte(templateStr), &validatingWHs); err != nil {
+			return nil, err
+		}
+		return validatingWHs, nil
+	}
+
+	templateBytes, err := json.Marshal(validatingConfig.Webhooks)
+	if err != nil {
+		return nil, err
+	}
+	if validatingConfig.Annotations == nil {
+		validatingConfig.Annotations = make(map[string]string, 1)
+	}
+	validatingConfig.Annotations["template"] = string(templateBytes)
+	return validatingConfig.Webhooks, nil
 }
