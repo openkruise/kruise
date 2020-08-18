@@ -43,6 +43,7 @@ type (
 	CustomizeSpecCalculateFunc        func(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec
 	CustomizeSpecPatchFunc            func(pod *v1.Pod, spec *UpdateSpec) (*v1.Pod, error)
 	CustomizeCheckUpdateCompletedFunc func(pod *v1.Pod) error
+	GetRevisionFunc                   func(rev *apps.ControllerRevision) string
 )
 
 type UpdateOptions struct {
@@ -51,6 +52,7 @@ type UpdateOptions struct {
 	CustomizeSpecCalculate        CustomizeSpecCalculateFunc
 	CustomizeSpecPatch            CustomizeSpecPatchFunc
 	CustomizeCheckUpdateCompleted CustomizeCheckUpdateCompletedFunc
+	GetRevision                   GetRevisionFunc
 }
 
 type RefreshResult struct {
@@ -217,7 +219,7 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 	// 1. calculate inplace update spec
 	var spec *UpdateSpec
 	if opts == nil || opts.CustomizeSpecCalculate == nil {
-		spec = calculateInPlaceUpdateSpec(oldRevision, newRevision)
+		spec = calculateInPlaceUpdateSpec(oldRevision, newRevision, opts)
 	} else {
 		spec = opts.CustomizeSpecCalculate(oldRevision, newRevision)
 	}
@@ -328,7 +330,7 @@ func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) (*
 // calculateInPlaceUpdateSpec calculates diff between old and update revisions.
 // If the diff just contains replace operation of spec.containers[x].image, it will returns an UpdateSpec.
 // Otherwise, it returns nil which means can not use in-place update.
-func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec {
+func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec {
 	if oldRevision == nil || newRevision == nil {
 		return nil
 	}
@@ -350,6 +352,9 @@ func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevisio
 	updateSpec := &UpdateSpec{
 		Revision:        newRevision.Name,
 		ContainerImages: make(map[string]string),
+	}
+	if opts != nil && opts.GetRevision != nil {
+		updateSpec.Revision = opts.GetRevision(newRevision)
 	}
 
 	// all patches for podSpec can just update images
