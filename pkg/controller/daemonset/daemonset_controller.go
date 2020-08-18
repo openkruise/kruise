@@ -202,6 +202,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				klog.Errorf("couldn't get key for object %#v: %v", ds, err)
 			} else {
 				expectations.DeleteExpectations(dsKey)
+				updateExpectations.DeleteExpectations(dsKey)
 			}
 
 			return true
@@ -329,7 +330,6 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconci
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.V(4).Infof("DaemonSet has been deleted %s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name)
-			// dsc.updateExp.DeleteExpectations(request.String())
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, fmt.Errorf("Unable to retrieve DaemonSet %s/%s from store: %v", request.NamespacedName.Namespace, request.NamespacedName.Name, err)
@@ -688,14 +688,14 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 	}
 	template := util.CreatePodTemplate(ds.Spec.Template, generation, hash)
 
-	if ds.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateDaemonSetStrategyType &&
-		ds.Spec.UpdateStrategy.RollingUpdate != nil &&
-		ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
-		readinessGate := corev1.PodReadinessGate{
-			ConditionType: appsv1alpha1.InPlaceUpdateReady,
-		}
-		template.Spec.ReadinessGates = append(template.Spec.ReadinessGates, readinessGate)
-	}
+	//if ds.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateDaemonSetStrategyType &&
+	//	ds.Spec.UpdateStrategy.RollingUpdate != nil &&
+	//	ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
+	//	readinessGate := corev1.PodReadinessGate{
+	//		ConditionType: appsv1alpha1.InPlaceUpdateReady,
+	//	}
+	//	template.Spec.ReadinessGates = append(template.Spec.ReadinessGates, readinessGate)
+	//}
 
 	// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 	// and double with each successful iteration in a kind of "slow start".

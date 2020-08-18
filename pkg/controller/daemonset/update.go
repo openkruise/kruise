@@ -58,8 +58,7 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur
 		// We use history name instead of computing hash, so that we don't need to worry about hash collision
 		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; !ok {
 			history.Labels[apps.DefaultDaemonSetUniqueLabelKey] = history.Name
-			dsc.client.Update(context.TODO(), history)
-			if err != nil {
+			if err = dsc.client.Update(context.TODO(), history); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -108,8 +107,8 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, hash st
 		return dsc.standardRollingUpdate(ds, hash)
 	} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.SurgingRollingUpdateType {
 		return dsc.surgingRollingUpdate(ds, hash)
-	} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
-		return dsc.inplaceRollingUpdate(ds, hash)
+		//} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
+		//	return dsc.inplaceRollingUpdate(ds, hash)
 	} else {
 		klog.Errorf("no matched RollingUpdate type")
 	}
@@ -172,17 +171,15 @@ func (dsc *ReconcileDaemonSet) standardRollingUpdate(ds *appsv1alpha1.DaemonSet,
 		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
 	}
 
-	// reset numUnavailable as 0, when execute the gray update.
-	partitionNumUnavailable := 0
 	for _, pod := range oldAvailablePods {
-		if partitionNumUnavailable >= maxUnavailable {
-			klog.V(0).Infof("%s/%s number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", ds.Namespace, ds.Name, numUnavailable+partitionNumUnavailable, maxUnavailable)
-			dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "numUnavailable >= maxUnavailable", "%s/%s number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", ds.Namespace, ds.Name, numUnavailable+partitionNumUnavailable, maxUnavailable)
+		if numUnavailable >= maxUnavailable {
+			klog.V(0).Infof("%s/%s number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", ds.Namespace, ds.Name, numUnavailable, maxUnavailable)
+			dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "numUnavailable >= maxUnavailable", "%s/%s number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", ds.Namespace, ds.Name, numUnavailable, maxUnavailable)
 			break
 		}
 		klog.V(6).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
 		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
-		partitionNumUnavailable++
+		numUnavailable++
 	}
 	return dsc.syncNodes(ds, oldPodsToDelete, []string{}, hash)
 }

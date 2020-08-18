@@ -17,7 +17,6 @@ limitations under the License.
 package daemonset
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -31,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
 func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, hash string) (reconcile.Result, error) {
@@ -115,14 +115,16 @@ func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.Daemo
 	// error channel to communicate back failures.  make the buffer big enough to avoid any blocking
 	errCh := make(chan error, updateDiff)
 
-	klog.V(4).Infof("Pods to delete for daemon set %s: %+v, updating %d", ds.Name, oldPodsToInplaceUpdate, updateDiff)
+	klog.V(4).Infof("Pods to in-place update for daemon set %s: %+v, updating %d", ds.Name, oldPodsToInplaceUpdate, updateDiff)
 	updateWait := sync.WaitGroup{}
 	updateWait.Add(updateDiff)
 	for i := 0; i < updateDiff; i++ {
 		go func(ix int, ds *appsv1alpha1.DaemonSet, pod *corev1.Pod) {
 			defer updateWait.Done()
 
-			res := dsc.inplaceControl.Update(pod, last, cur, nil)
+			res := dsc.inplaceControl.Update(pod, last, cur, &inplaceupdate.UpdateOptions{GetRevision: func(rev *apps.ControllerRevision) string {
+				return rev.Labels[apps.DefaultDaemonSetUniqueLabelKey]
+			}})
 			if res.InPlaceUpdate && res.UpdateErr == nil {
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
 				dsKey, err := kubecontroller.KeyFunc(ds)
@@ -135,8 +137,6 @@ func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.Daemo
 				if refreshRes.RefreshErr != nil {
 					klog.Errorf("failed to update pod condition: %v", err)
 				}
-				pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] = hash
-				dsc.client.Update(context.TODO(), pod)
 				return
 			}
 
