@@ -1360,7 +1360,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 				if !isRunningAndReady(pods[0]) {
 					return fmt.Errorf("pod %s is not ready yet, status = %v", pods[0].Name, pods[0].Status)
 				}
-				if isRunningAndAvailable(pods[0], 60) {
+				if avail, wait := isRunningAndAvailable(pods[0], 60); !avail || wait == 0 {
 					return fmt.Errorf("pod %s is should not be ready yet, status = %v", pods[0].Name, pods[0].Status)
 				}
 				return nil

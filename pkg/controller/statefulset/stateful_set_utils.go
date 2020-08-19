@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -182,9 +183,27 @@ func updateIdentity(set *appsv1alpha1.StatefulSet, pod *v1.Pod) {
 }
 
 // isRunningAndAvailable returns true if pod is in the PodRunning Phase,
-// and it has a condition of PodReady for a minimum of minReadySeconds
-func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
-	return pod.Status.Phase == v1.PodRunning && podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
+// and it has a condition of PodReady for a minimum of minReadySeconds.
+// return true if it's available
+// return false with zero means it's not ready
+// return false with a positive value means it's not available and should recheck with that time
+func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) (bool, time.Duration) {
+	if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(pod) {
+		return false, 0
+	}
+	c := podutil.GetPodReadyCondition(pod.Status)
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	if minReadySeconds == 0 {
+		return true, 0
+	}
+	if c.LastTransitionTime.IsZero() {
+		return false, minReadySecondsDuration
+	}
+	waitTime := c.LastTransitionTime.Time.Add(minReadySecondsDuration).Sub(time.Now())
+	if waitTime > 0 {
+		return false, waitTime
+	}
+	return true, 0
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.

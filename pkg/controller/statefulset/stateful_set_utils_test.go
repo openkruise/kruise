@@ -238,29 +238,37 @@ func TestGetMinReadySeconds(t *testing.T) {
 func TestIsRunningAndAvailable(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
-	if isRunningAndAvailable(pod, 0) {
-		t.Error("isRunningAndAvailable does not respect Pod phase")
+	if avail, wait := isRunningAndAvailable(pod, 0); avail || wait != 0 {
+		t.Errorf("isRunningAndAvailable does not respect Pod phase, avail = %t, wait = %d", avail, wait)
 	}
 	pod.Status.Phase = v1.PodPending
-	if isRunningAndAvailable(pod, 0) {
-		t.Error("isRunningAndAvailable does not respect Pod phase")
+	if avail, wait := isRunningAndAvailable(pod, 0); avail || wait != 0 {
+		t.Errorf("isRunningAndAvailable does not respect Pod phase, avail = %t, wait = %d", avail, wait)
 	}
 	pod.Status.Phase = v1.PodRunning
-	if isRunningAndAvailable(pod, 0) {
-		t.Error("isRunningAndAvailable does not respect Pod condition")
+	if avail, wait := isRunningAndAvailable(pod, 0); avail || wait != 0 {
+		t.Errorf("isRunningAndAvailable does not respect Pod condition, avail = %t, wait = %d", avail, wait)
 	}
 	pod.Status.Conditions = []corev1.PodCondition{
 		{
-			Type:               corev1.PodReady,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.NewTime(time.Now().Add(-5 * time.Second)),
+			Type:   corev1.PodReady,
+			Status: corev1.ConditionTrue,
 		},
 	}
-	if isRunningAndAvailable(pod, 10) {
-		t.Error("isRunningAndAvailable does not respect Pod condition")
+	if avail, wait := isRunningAndAvailable(pod, 0); !avail || wait != 0 {
+		t.Errorf("isRunningAndAvailable does not respect 0 minReadySecond, avail = %t, wait = %d", avail, wait)
 	}
-	if !isRunningAndAvailable(pod, 0) {
-		t.Error("isRunningAndAvailable does not respect Pod condition")
+	if avail, wait := isRunningAndAvailable(pod, 10); avail || wait != 10*time.Second {
+		t.Errorf("isRunningAndAvailable does not respect non 0 minReadySecond, avail = %t, wait = %d", avail, wait)
+	}
+	pod.Status.Conditions[0].LastTransitionTime = metav1.NewTime(time.Now().Add(-5 * time.Second))
+	if avail, wait := isRunningAndAvailable(pod, 10); avail || wait < 4*time.Second {
+		t.Errorf("isRunningAndAvailable does not respect Pod condition last transaction, avail = %t, wait = %d",
+			avail, wait)
+	}
+	if avail, wait := isRunningAndAvailable(pod, 3); !avail || wait != 0 {
+		t.Errorf("isRunningAndAvailable does not respect Pod condition  last transaction, avail = %t, wait = %d",
+			avail, wait)
 	}
 }
 

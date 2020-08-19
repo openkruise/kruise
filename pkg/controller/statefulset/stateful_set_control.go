@@ -469,14 +469,20 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If we have a Pod that has been created but is not running and available we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Available.
-		if !isRunningAndAvailable(replicas[i], minReadySeconds) && monotonic {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Running and Available with %d seconds",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name,
-				minReadySeconds)
-			return &status, nil
+		if monotonic {
+			if isAvailable, waitTime := isRunningAndAvailable(replicas[i], minReadySeconds); !isAvailable {
+				klog.V(4).Infof(
+					"StatefulSet %s/%s is waiting for Pod %s to be Running and Available with %d seconds",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name,
+					minReadySeconds)
+				if waitTime != 0 {
+					// make sure we check later
+					durationStore.Push(getStatefulSetKey(set), waitTime)
+				}
+				return &status, nil
+			}
 		}
 		// Enforce the StatefulSet invariants
 		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) {
@@ -615,9 +621,16 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				replicas[target].Name,
 				completedErr)
 			unavailablePods = append(unavailablePods, replicas[target].Name)
-		} else if !isRunningAndAvailable(replicas[target], minReadySeconds) {
-			// the pod is not available yet given the minReadySeconds requirement
-			unavailablePods = append(unavailablePods, replicas[target].Name)
+		} else {
+			// check if the updated pod is running and available given minReadySeconds
+			if isAvailable, waitTime := isRunningAndAvailable(replicas[target], minReadySeconds); !isAvailable {
+				// the pod is not available yet given the minReadySeconds requirement
+				unavailablePods = append(unavailablePods, replicas[target].Name)
+				// make sure that
+				if waitTime != 0 {
+					durationStore.Push(getStatefulSetKey(set), waitTime)
+				}
+			}
 		}
 
 		// wait for unhealthy Pods on update
