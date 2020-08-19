@@ -17,11 +17,16 @@ limitations under the License.
 package daemonset
 
 import (
+	"reflect"
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func Test_maxRevision(t *testing.T) {
@@ -100,6 +105,180 @@ func TestGetTemplateGeneration(t *testing.T) {
 			if *got != *tt.want {
 				t.Errorf("GetTemplateGeneration() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
+	now := metav1.Now()
+	type testcase struct {
+		name             string
+		rolling          *appsv1alpha1.RollingUpdateDaemonSet
+		hash             string
+		nodeToDaemonPods map[string][]*corev1.Pod
+		nodes            []*corev1.Node
+		expectNodes      []string
+	}
+
+	tests := []testcase{
+		{
+			name: "Standard,partition=0",
+			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
+				Type:      appsv1alpha1.StandardRollingUpdateType,
+				Partition: utilpointer.Int32Ptr(0),
+			},
+			hash: "v2",
+			nodeToDaemonPods: map[string][]*corev1.Pod{
+				"n1": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+				"n2": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v2"}}},
+				},
+				"n3": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+			},
+			expectNodes: []string{"n2", "n3", "n1"},
+		},
+		{
+			name: "Standard,partition=1",
+			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
+				Type:      appsv1alpha1.StandardRollingUpdateType,
+				Partition: utilpointer.Int32Ptr(1),
+			},
+			hash: "v2",
+			nodeToDaemonPods: map[string][]*corev1.Pod{
+				"n1": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v2"}}},
+				},
+				"n2": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+				"n3": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+			},
+			expectNodes: []string{"n1", "n3"},
+		},
+		{
+			name: "Standard,partition=1,selector=1",
+			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
+				Type:      appsv1alpha1.StandardRollingUpdateType,
+				Partition: utilpointer.Int32Ptr(1),
+				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
+			},
+			hash: "v2",
+			nodeToDaemonPods: map[string][]*corev1.Pod{
+				"n1": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+				"n2": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v2"}}},
+				},
+				"n3": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+				"n4": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+			},
+			nodes: []*corev1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "n1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n2"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n3", Labels: map[string]string{"node-type": "canary"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n4"}},
+			},
+			expectNodes: []string{"n2", "n3"},
+		},
+		{
+			name: "Standard,partition=2,selector=3",
+			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
+				Type:      appsv1alpha1.StandardRollingUpdateType,
+				Partition: utilpointer.Int32Ptr(2),
+				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
+			},
+			hash: "v2",
+			nodeToDaemonPods: map[string][]*corev1.Pod{
+				"n1": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+				"n2": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v2"}}},
+				},
+				"n3": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+				"n4": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+			},
+			nodes: []*corev1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "n1", Labels: map[string]string{"node-type": "canary"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n2"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n3", Labels: map[string]string{"node-type": "canary"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n4", Labels: map[string]string{"node-type": "canary"}}},
+			},
+			expectNodes: []string{"n2", "n4"},
+		},
+		{
+			name: "Standard,partition=0,selector=3,terminating",
+			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
+				Type:      appsv1alpha1.StandardRollingUpdateType,
+				Partition: utilpointer.Int32Ptr(0),
+				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
+			},
+			hash: "v2",
+			nodeToDaemonPods: map[string][]*corev1.Pod{
+				"n1": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+				"n2": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v2"}}},
+				},
+				"n3": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}, DeletionTimestamp: &now}},
+				},
+				"n4": {
+					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
+				},
+			},
+			nodes: []*corev1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "n1", Labels: map[string]string{"node-type": "canary"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n2"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n3", Labels: map[string]string{"node-type": "canary"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "n4"}},
+			},
+			expectNodes: []string{"n3", "n2", "n1"},
+		},
+	}
+
+	testFn := func(test *testcase, t *testing.T) {
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		for _, node := range test.nodes {
+			if err := indexer.Add(node); err != nil {
+				t.Fatalf("failed to add node into indexer: %v", err)
+			}
+		}
+		nodeLister := corelisters.NewNodeLister(indexer)
+		dsc := &ReconcileDaemonSet{nodeLister: nodeLister}
+
+		ds := &appsv1alpha1.DaemonSet{Spec: appsv1alpha1.DaemonSetSpec{UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
+			Type:          appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+			RollingUpdate: test.rolling,
+		}}}
+		got, err := dsc.filterDaemonPodsNodeToUpdate(ds, test.hash, test.nodeToDaemonPods)
+		if err != nil {
+			t.Fatalf("failed to call filterDaemonPodsNodeToUpdate: %v", err)
+		}
+		if !reflect.DeepEqual(got, test.expectNodes) {
+			t.Fatalf("expected %v, got %v", test.expectNodes, got)
+		}
+	}
+
+	for i := range tests {
+		t.Run(tests[i].name, func(t *testing.T) {
+			testFn(&tests[i], t)
 		})
 	}
 }

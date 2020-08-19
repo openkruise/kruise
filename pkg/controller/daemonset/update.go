@@ -145,16 +145,9 @@ func (dsc *ReconcileDaemonSet) standardRollingUpdate(ds *appsv1alpha1.DaemonSet,
 		return dsc.syncNodes(ds, oldPodsToDelete, []string{}, hash)
 	}
 
-	// if the rollingUpdate continue, respect gray update choice.
-	if ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
-		if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil &&
-			*ds.Spec.UpdateStrategy.RollingUpdate.Partition != 0 {
-			// respect partitioned nodes to keep old versions.
-			nodeToDaemonPods = dsc.getNodeToDaemonPodsByPartition(ds, nodeToDaemonPods)
-		}
-	} else {
-		// respect selected nodes to update.
-		nodeToDaemonPods = dsc.getNodeToDaemonPodsBySelector(ds, nodeToDaemonPods)
+	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, hash, nodeToDaemonPods)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
 	}
 
 	_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
@@ -463,56 +456,90 @@ func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *appsv1alpha1.DaemonSet, cur
 	return keepCur, nil
 }
 
-func (dsc *ReconcileDaemonSet) getNodeToDaemonPodsByPartition(ds *appsv1alpha1.DaemonSet, nodeToDaemonPods map[string][]*corev1.Pod) map[string][]*corev1.Pod {
+func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1alpha1.DaemonSet, hash string, nodeToDaemonPods map[string][]*corev1.Pod) ([]string, error) {
+	var err error
 	var partition int32
-	switch ds.Spec.UpdateStrategy.Type {
-	case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
+	var selector labels.Selector
+	var generation *int64
+	if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
 		partition = *ds.Spec.UpdateStrategy.RollingUpdate.Partition
 	}
-
-	// sort Nodes by their Names
-	var nodeNames []string
-	for nodeName := range nodeToDaemonPods {
-		nodeNames = append(nodeNames, nodeName)
-	}
-	sort.Strings(nodeNames)
-
-	// keep the old version pods whose count is no more than Partition value.
-	for i := int32(0); i < int32(len(nodeNames)); i++ {
-		if i == partition {
-			break
-		}
-		delete(nodeToDaemonPods, nodeNames[i])
-	}
-
-	return nodeToDaemonPods
-}
-
-func (dsc *ReconcileDaemonSet) getNodeToDaemonPodsBySelector(ds *appsv1alpha1.DaemonSet, nodeToDaemonPods map[string][]*corev1.Pod) map[string][]*corev1.Pod {
-	var selector labels.Selector
-	var err error
-	switch ds.Spec.UpdateStrategy.Type {
-	case appsv1alpha1.OnDeleteDaemonSetStrategyType:
-		return nodeToDaemonPods
-	case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
-		selector, err = metav1.LabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
-		if err != nil {
-			return nodeToDaemonPods
+	if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Selector != nil {
+		if selector, err = metav1.LabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector); err != nil {
+			return nil, err
 		}
 	}
+	if generation, err = GetTemplateGeneration(ds); err != nil {
+		return nil, err
+	}
 
+	var allNames []string
 	for nodeName := range nodeToDaemonPods {
-		node, err := dsc.nodeLister.Get(nodeName)
-		if err != nil {
-			klog.Errorf("could not get node: %s nodeInfo", nodeName)
+		allNames = append(allNames, nodeName)
+	}
+	sort.Strings(allNames)
+
+	var updated []string
+	var selected []string
+	var rest []string
+	for i := len(allNames) - 1; i >= 0; i-- {
+		nodeName := allNames[i]
+		pods := nodeToDaemonPods[nodeName]
+
+		var hasUpdated bool
+		var terminatingCount int
+		for i := range pods {
+			pod := pods[i]
+			if util.IsPodUpdated(pod, hash, generation) {
+				hasUpdated = true
+				break
+			}
+			if pod.DeletionTimestamp != nil {
+				terminatingCount++
+			}
+		}
+		if hasUpdated || terminatingCount == len(pods) {
+			updated = append(updated, nodeName)
 			continue
 		}
-		if !selector.Matches(labels.Set(node.Labels)) {
-			delete(nodeToDaemonPods, nodeName)
+
+		if selector != nil {
+			node, err := dsc.nodeLister.Get(nodeName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get node %v: %v", nodeName, err)
+			}
+			if selector.Matches(labels.Set(node.Labels)) {
+				selected = append(selected, nodeName)
+				continue
+			}
 		}
+
+		rest = append(rest, nodeName)
 	}
 
-	return nodeToDaemonPods
+	var sorted []string
+	if selector != nil {
+		sorted = append(updated, selected...)
+	} else {
+		sorted = append(updated, rest...)
+	}
+	if maxUpdate := len(allNames) - int(partition); maxUpdate < len(sorted) {
+		sorted = sorted[:maxUpdate]
+	}
+	return sorted, nil
+}
+
+func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *appsv1alpha1.DaemonSet, hash string, nodeToDaemonPods map[string][]*corev1.Pod) (map[string][]*corev1.Pod, error) {
+	nodeNames, err := dsc.filterDaemonPodsNodeToUpdate(ds, hash, nodeToDaemonPods)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make(map[string][]*corev1.Pod, len(nodeNames))
+	for _, name := range nodeNames {
+		ret[name] = nodeToDaemonPods[name]
+	}
+	return ret, nil
 }
 
 // getSurgeNumbers returns the max allowable number of surging pods and the current number of
@@ -626,15 +653,9 @@ func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 		return reconcile.Result{}, fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
 
-	// respect gray update choice.
-	if ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
-		if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil && *ds.Spec.UpdateStrategy.RollingUpdate.Partition != 0 {
-			// respect partitioned nodes to keep old versions.
-			nodeToDaemonPods = dsc.getNodeToDaemonPodsByPartition(ds, nodeToDaemonPods)
-		}
-	} else {
-		// respect selected nodes to update.
-		nodeToDaemonPods = dsc.getNodeToDaemonPodsBySelector(ds, nodeToDaemonPods)
+	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, hash, nodeToDaemonPods)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
 	}
 
 	maxSurge, numSurge, err := dsc.getSurgeNumbers(ds, nodeToDaemonPods, hash)
