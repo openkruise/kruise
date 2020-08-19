@@ -6,23 +6,25 @@ import (
 	"regexp"
 
 	"github.com/appscode/jsonpatch"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
 
+// TODO (rz): break this giant function down further and use unit testing
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -53,72 +55,23 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 				apivalidation.ValidateNonnegativeField(
 					int64(*spec.UpdateStrategy.RollingUpdate.Partition),
 					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
-
-			if spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
-				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
-					Child("rollingUpdate").Child("maxUnavailable"), ""))
-			} else {
+			// validate `minReadySeconds` field's range
+			allErrs = append(allErrs,
+				apivalidation.ValidateNonnegativeField(
+					int64(*spec.UpdateStrategy.RollingUpdate.MinReadySeconds),
+					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"))...)
+			if *spec.UpdateStrategy.RollingUpdate.MinReadySeconds > appsv1alpha1.MaxMinReadySeconds {
 				allErrs = append(allErrs,
-					appsvalidation.ValidatePositiveIntOrPercent(
-						*spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-						fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"))...)
-				if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(
-					intstrutil.ValueOrDefault(spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)),
-					1,
-					true,
-				); err != nil {
-					allErrs = append(allErrs, field.Invalid(
-						fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
-						spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-						fmt.Sprintf("failed getValueFromIntOrPercent for maxUnavailable: %v", err),
-					))
-				} else if maxUnavailable < 1 {
-					allErrs = append(allErrs, field.Invalid(
-						fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
-						spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-						"getValueFromIntOrPercent for maxUnavailable should not be less than 1",
-					))
-				}
-				if apps.ParallelPodManagement != spec.PodManagementPolicy &&
-					(spec.UpdateStrategy.RollingUpdate.MaxUnavailable.Type != intstr.Int ||
-						spec.UpdateStrategy.RollingUpdate.MaxUnavailable.IntVal != 1) {
-					allErrs = append(allErrs, field.Invalid(
-						fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
-						spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-						"maxUnavailable can just work with Parallel PodManagementPolicyType",
-					))
-				}
+					field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"),
+						*spec.UpdateStrategy.RollingUpdate.MinReadySeconds,
+						fmt.Sprintf("must be less than 5 mins")))
 			}
 
-			switch spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy {
-			case "":
-				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"), ""))
-			case appsv1alpha1.RecreatePodUpdateStrategyType:
-			case appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.InPlaceOnlyPodUpdateStrategyType:
-				var containsReadinessGate bool
-				for _, r := range spec.Template.Spec.ReadinessGates {
-					if r.ConditionType == appsv1alpha1.InPlaceUpdateReady {
-						containsReadinessGate = true
-						break
-					}
-				}
-				if !containsReadinessGate {
-					allErrs = append(allErrs,
-						field.Invalid(fldPath.Child("template").Child("spec").Child("readinessGates"),
-							spec.Template.Spec.ReadinessGates,
-							fmt.Sprintf("must contains %v when podUpdatePolicy is %v",
-								appsv1alpha1.InPlaceUpdateReady,
-								spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy)))
-				}
-			default:
-				allErrs = append(allErrs,
-					field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"),
-						spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy,
-						fmt.Sprintf("must be '%s', %s or '%s'",
-							appsv1alpha1.RecreatePodUpdateStrategyType,
-							appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
-							appsv1alpha1.InPlaceOnlyPodUpdateStrategyType)))
-			}
+			// validate the `maxUnavailable` field
+			allErrs = append(allErrs, validateMaxUnavailableField(spec, fldPath)...)
+
+			// validate the `PodUpdatePolicy` related fields
+			allErrs = append(allErrs, validatePodUpdatePolicy(spec, fldPath)...)
 
 			if spec.UpdateStrategy.RollingUpdate.UnorderedUpdate != nil {
 				if apps.ParallelPodManagement != spec.PodManagementPolicy {
@@ -170,6 +123,80 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in StatefulSet is not Supported"))
 	}
 
+	return allErrs
+}
+
+func validatePodUpdatePolicy(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	switch spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"), ""))
+	case appsv1alpha1.RecreatePodUpdateStrategyType:
+	case appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.InPlaceOnlyPodUpdateStrategyType:
+		var containsReadinessGate bool
+		for _, r := range spec.Template.Spec.ReadinessGates {
+			if r.ConditionType == appsv1alpha1.InPlaceUpdateReady {
+				containsReadinessGate = true
+				break
+			}
+		}
+		if !containsReadinessGate {
+			allErrs = append(allErrs,
+				field.Invalid(fldPath.Child("template").Child("spec").Child("readinessGates"),
+					spec.Template.Spec.ReadinessGates,
+					fmt.Sprintf("must contains %v when podUpdatePolicy is %v",
+						appsv1alpha1.InPlaceUpdateReady,
+						spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy)))
+		}
+	default:
+		allErrs = append(allErrs,
+			field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"),
+				spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy,
+				fmt.Sprintf("must be '%s', %s or '%s'",
+					appsv1alpha1.RecreatePodUpdateStrategyType,
+					appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+					appsv1alpha1.InPlaceOnlyPodUpdateStrategyType)))
+	}
+	return allErrs
+}
+
+func validateMaxUnavailableField(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
+			Child("rollingUpdate").Child("maxUnavailable"), ""))
+	} else {
+		allErrs = append(allErrs,
+			appsvalidation.ValidatePositiveIntOrPercent(
+				*spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"))...)
+		if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(
+			intstrutil.ValueOrDefault(spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)),
+			1,
+			true,
+		); err != nil {
+			allErrs = append(allErrs, field.Invalid(
+				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
+				spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+				fmt.Sprintf("failed getValueFromIntOrPercent for maxUnavailable: %v", err),
+			))
+		} else if maxUnavailable < 1 {
+			allErrs = append(allErrs, field.Invalid(
+				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
+				spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+				"getValueFromIntOrPercent for maxUnavailable should not be less than 1",
+			))
+		}
+		if apps.ParallelPodManagement != spec.PodManagementPolicy &&
+			(spec.UpdateStrategy.RollingUpdate.MaxUnavailable.Type != intstr.Int ||
+				spec.UpdateStrategy.RollingUpdate.MaxUnavailable.IntVal != 1) {
+			allErrs = append(allErrs, field.Invalid(
+				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
+				spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+				"maxUnavailable can just work with Parallel PodManagementPolicyType",
+			))
+		}
+	}
 	return allErrs
 }
 

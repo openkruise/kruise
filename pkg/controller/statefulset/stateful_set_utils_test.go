@@ -26,15 +26,17 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
-	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
+	utilpointer "k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
@@ -211,6 +213,54 @@ func TestIsRunningAndReady(t *testing.T) {
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	if !isRunningAndReady(pod) {
 		t.Error("Pod should be running and ready")
+	}
+}
+
+func TestGetMinReadySeconds(t *testing.T) {
+	set := newStatefulSet(3)
+	if getMinReadySeconds(set) != 0 {
+		t.Error("getMinReadySeconds should be zero")
+	}
+	set.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateStatefulSetStrategy{}
+	if getMinReadySeconds(set) != 0 {
+		t.Error("getMinReadySeconds should be zero")
+	}
+	set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = utilpointer.Int32Ptr(3)
+	if getMinReadySeconds(set) != 3 {
+		t.Error("getMinReadySeconds should be 3")
+	}
+	set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = utilpointer.Int32Ptr(30)
+	if getMinReadySeconds(set) != 30 {
+		t.Error("getMinReadySeconds should be 3")
+	}
+}
+
+func TestIsRunningAndAvailable(t *testing.T) {
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+	if isRunningAndAvailable(pod, 0) {
+		t.Error("isRunningAndAvailable does not respect Pod phase")
+	}
+	pod.Status.Phase = v1.PodPending
+	if isRunningAndAvailable(pod, 0) {
+		t.Error("isRunningAndAvailable does not respect Pod phase")
+	}
+	pod.Status.Phase = v1.PodRunning
+	if isRunningAndAvailable(pod, 0) {
+		t.Error("isRunningAndAvailable does not respect Pod condition")
+	}
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:               corev1.PodReady,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.NewTime(time.Now().Add(-5 * time.Second)),
+		},
+	}
+	if isRunningAndAvailable(pod, 10) {
+		t.Error("isRunningAndAvailable does not respect Pod condition")
+	}
+	if !isRunningAndAvailable(pod, 0) {
+		t.Error("isRunningAndAvailable does not respect Pod condition")
 	}
 }
 

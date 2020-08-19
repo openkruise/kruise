@@ -24,7 +24,6 @@ import (
 	"regexp"
 	"strconv"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +33,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(appsv1alpha1.SchemeGroupVersion)
@@ -180,6 +181,12 @@ func updateIdentity(set *appsv1alpha1.StatefulSet, pod *v1.Pod) {
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
 }
 
+// isRunningAndAvailable returns true if pod is in the PodRunning Phase,
+// and it has a condition of PodReady for a minimum of minReadySeconds
+func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
+	return pod.Status.Phase == v1.PodRunning && podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
+}
+
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
 func isRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
@@ -208,6 +215,16 @@ func isHealthy(pod *v1.Pod) bool {
 // allowsBurst is true if the alpha burst annotation is set.
 func allowsBurst(set *appsv1alpha1.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
+}
+
+// getMinReadySeconds returns the minReadySeconds set in the rollingUpdate, default is 0
+func getMinReadySeconds(set *appsv1alpha1.StatefulSet) int32 {
+	if set.Spec.UpdateStrategy.RollingUpdate == nil ||
+		set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds == nil {
+		return 0
+	} else {
+		return *set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds
+	}
 }
 
 // setPodRevision sets the revision of Pod to revision by adding the StatefulSetRevisionLabel

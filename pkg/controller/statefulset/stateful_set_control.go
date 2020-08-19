@@ -22,8 +22,6 @@ import (
 	"math"
 	"sort"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +31,9 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
 // ControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
@@ -71,6 +72,9 @@ func NewDefaultStatefulSetControl(
 		inplaceControl,
 	}
 }
+
+// defaultStatefulSetControl implements ControlInterface
+var _ ControlInterface = &defaultStatefulSetControl{}
 
 type defaultStatefulSetControl struct {
 	podControl        StatefulPodControlInterface
@@ -225,17 +229,19 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	equalRevisions := history.FindEqualRevisions(revisions, updateRevision)
 	equalCount := len(equalRevisions)
 
-	if equalCount > 0 && history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
-		// if the equivalent revision is immediately prior the update revision has not changed
-		updateRevision = revisions[revisionCount-1]
-	} else if equalCount > 0 {
-		// if the equivalent revision is not immediately prior we will roll back by incrementing the
-		// Revision of the equivalent revision
-		updateRevision, err = ssc.controllerHistory.UpdateControllerRevision(
-			equalRevisions[equalCount-1],
-			updateRevision.Revision)
-		if err != nil {
-			return nil, nil, collisionCount, err
+	if equalCount > 0 {
+		if history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
+			// if the equivalent revision is immediately prior the update revision has not changed
+			updateRevision = revisions[revisionCount-1]
+		} else {
+			// if the equivalent revision is not immediately prior we will roll back by incrementing the
+			// Revision of the equivalent revision
+			updateRevision, err = ssc.controllerHistory.UpdateControllerRevision(
+				equalRevisions[equalCount-1],
+				updateRevision.Revision)
+			if err != nil {
+				return nil, nil, collisionCount, err
+			}
 		}
 	} else {
 		//if there is no equivalent revision we create a new one
@@ -269,6 +275,8 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 // all Pods with ordinal less than UpdateStrategy.Partition.Ordinal must be at Status.CurrentRevision and all other
 // Pods must be at Status.UpdateRevision. If the returned error is nil, the returned StatefulSetStatus is valid and the
 // update must be recorded. If the error is not nil, the method should be retried until successful.
+
+// TODO (RZ): Break the below spaghetti code into smaller chucks with unit tests
 func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	set *appsv1alpha1.StatefulSet,
 	currentRevision *apps.ControllerRevision,
@@ -389,6 +397,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	monotonic := !allowsBurst(set)
+	minReadySeconds := getMinReadySeconds(set)
 
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
@@ -457,15 +466,16 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		} else if res.DelayDuration > 0 {
 			durationStore.Push(getStatefulSetKey(set), res.DelayDuration)
 		}
-		// If we have a Pod that has been created but is not running and ready we can not make progress.
+		// If we have a Pod that has been created but is not running and available we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
-		// ordinal, are Running and Ready.
-		if !isRunningAndReady(replicas[i]) && monotonic {
+		// ordinal, are Running and Available.
+		if !isRunningAndAvailable(replicas[i], minReadySeconds) && monotonic {
 			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready",
+				"StatefulSet %s/%s is waiting for Pod %s to be Running and Available with %d seconds",
 				set.Namespace,
 				set.Name,
-				replicas[i].Name)
+				replicas[i].Name,
+				minReadySeconds)
 			return &status, nil
 		}
 		// Enforce the StatefulSet invariants
@@ -534,6 +544,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return &status, nil
 	}
 
+	// TODO: separate out the below update only related logic
+
 	// If update expectations have not satisfied yet, skip updating pods
 	if updateSatisfied, updateDirtyPods := updateExpectations.SatisfiedExpectations(getStatefulSetKey(set), updateRevision.Name); !updateSatisfied {
 		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", getStatefulSetKey(set), updateDirtyPods)
@@ -547,7 +559,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if err != nil {
 			return &status, err
 		}
-		// maxUnavailable should not less than 1
+		// maxUnavailable should not be less than 1
 		if maxUnavailable < 1 {
 			maxUnavailable = 1
 		}
@@ -595,12 +607,16 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		if getPodRevision(replicas[target]) != updateRevision.Name || !isHealthy(replicas[target]) {
 			unavailablePods = append(unavailablePods, replicas[target].Name)
-		} else if completedErr := inplaceupdate.CheckInPlaceUpdateCompleted(replicas[target]); completedErr != nil {
+		} else if completedErr := inplaceupdate.CheckInPlaceUpdateCompleted(
+			replicas[target]); completedErr != nil {
 			klog.V(4).Infof("StatefulSet %s/%s check Pod %s in-place update not-ready: %v",
 				set.Namespace,
 				set.Name,
 				replicas[target].Name,
 				completedErr)
+			unavailablePods = append(unavailablePods, replicas[target].Name)
+		} else if !isRunningAndAvailable(replicas[target], minReadySeconds) {
+			// the pod is not available yet given the minReadySeconds requirement
 			unavailablePods = append(unavailablePods, replicas[target].Name)
 		}
 
@@ -680,5 +696,3 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 
 	return nil
 }
-
-var _ ControlInterface = &defaultStatefulSetControl{}
