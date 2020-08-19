@@ -222,9 +222,8 @@ func getMinReadySeconds(set *appsv1alpha1.StatefulSet) int32 {
 	if set.Spec.UpdateStrategy.RollingUpdate == nil ||
 		set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds == nil {
 		return 0
-	} else {
-		return *set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds
 	}
+	return *set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds
 }
 
 // setPodRevision sets the revision of Pod to revision by adding the StatefulSetRevisionLabel
