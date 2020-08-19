@@ -44,16 +44,9 @@ func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 		return reconcile.Result{}, fmt.Errorf("Couldn't get unavailable numbers: %v", err)
 	}
 
-	// respect gray update choice.
-	if ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
-		if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil &&
-			*ds.Spec.UpdateStrategy.RollingUpdate.Partition != 0 {
-			// respect partitioned nodes to keep old versions.
-			nodeToDaemonPods = dsc.getNodeToDaemonPodsByPartition(ds, nodeToDaemonPods)
-		}
-	} else {
-		// respect selected nodes to update.
-		nodeToDaemonPods = dsc.getNodeToDaemonPodsBySelector(ds, nodeToDaemonPods)
+	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, hash, nodeToDaemonPods)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
 	}
 
 	_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
