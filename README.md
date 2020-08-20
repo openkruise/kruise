@@ -56,7 +56,7 @@ This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evens
 For a Kubernetes cluster with its version higher than v1.12, you can simply install Kruise with helm v3:
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for the kruise-manager.
