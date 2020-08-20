@@ -1,64 +1,99 @@
-# v0.5.0
+# Change Log
 
-## CloneSet
+## v0.6.0
 
-### Features
+### Project
+
+- Update dependencies: k8s v1.13 -> v1.16, controller-runtime v0.1.10 -> v0.5.7
+- Support multiple active webhooks
+- Fix CRDs using openkruise/controller-tools
+
+### A NEW workload controller - Advanced DaemonSet
+
+An enhanced version of default DaemonSet with extra functionalities such as:
+
+- **inplace update** and **surging update**
+- **node selector for update**
+- **partial update**
+
+### CloneSet
+
+#### Features
+
+- Not create excessive pods when updating with maxSurge
+- Round down maxUnavaliable when maxSurge > 0
+
+#### Bugs
+
+- Skip recreate when inplace update failed
+- Fix scale panic when replicas < partition
+- Fix CloneSet blocked by terminating PVC
+
+---
+
+## v0.5.0
+
+### CloneSet
+
+#### Features
 
 - Support `maxSurge` strategy which could work well with `maxUnavailable` and `partition`
 - Add CloneSet core interface to support multiple implementations
 
-### Bugs
+#### Bugs
 
 - Fix in-place update for metadata in template
 
-## StatefulSet
+### StatefulSet
 
-### Bugs
+#### Bugs
 
 - Make sure `maxUnavailable` should not be less than 1
 - Fix in-place update for metadata in template
 
-## SidecarSet
+### SidecarSet
 
-### Bugs
+#### Bugs
 
 - Merge volumes during injecting sidecars into Pod
 
-## Installation
+### Installation
 
 - Expose `CUSTOM_RESOURCE_ENABLE` env by chart set option
 
-**# v0.4.1**
+---
 
-## CloneSet
+## v0.4.1
 
-### Features
+### CloneSet
+
+#### Features
 
 - Add `labelSelector` to optimize scale subresource for HPA
 - Add `minReadySeconds`, `availableReplicas` fields for CloneSet
 - Add `gracePeriodSeconds` for graceful in-place update
 
-## Advanced StatefulSet
+### Advanced StatefulSet
 
-### Features
+#### Features
 
 - Support label selector in scale for HPA
 - Add `gracePeriodSeconds` for graceful in-place update
 
-### Bugs
+#### Bugs
 
 - Fix StatefulSet default update sequence
 - Fix ControllerRevision adoption
 
-## Installation
+### Installation
 
 - Fix `check_for_installation.sh` script for k8s 1.11 to 1.13
 
 ---
 
-**# v0.4.0**
+## v0.4.0**
 
-## A NEW workload controller - CloneSet
+### A NEW workload controller - CloneSet
 
 Mainly focuses on managing stateless applications. ([Concept for CloneSet](./docs/concepts/cloneset/README.md))
 
@@ -69,63 +104,63 @@ It provides full features for more efficient, deterministic and controlled deplo
 - **configurable priority/scatter update**
 - **preUpdate/postUpdate hooks**
 
-## Features
+### Features
 
 - UnitedDeployment supports both StatefulSet and AdvancedStatefulSet.
 - UnitedDeployment supports toleration config in subset.
 
-## Bugs
+### Bugs
 
 - Fix statefulset inplace update fields in pod metadata such as labels/annotations.
 
 ---
 
-**# v0.3.1**
+## v0.3.1**
 
-## Installation
+### Installation
 
 - Simplify installation with helm charts, one simple command to install kruise charts, instead of downloading and executing scripts.
 
-## Advanced StatefulSet
+### Advanced StatefulSet
 
-### Features
+#### Features
 
 - Support [priority update](./docs/concepts/astatefulset/README.md#priority-unordered-rolling-update-strategy), which allows users to configure the sequence for Pods updating.
 
-### Bugs
+#### Bugs
 
 - Fix maxUnavailable calculation, which should not be less than 1.
 
-## Broadcast Job
+### Broadcast Job
 
-### Bugs
+#### Bugs
 
 - Fix BroadcastJob cleaning up after TTL.
 
 ---
 
-**# v0.3.0**
+## v0.3.0**
 
-## Installation
+### Installation
 
 - Provide a script to check if the K8s cluster has enabled MutatingAdmissionWebhook and ValidatingAdmissionWebhook admission plugins before installing Kruise.
 - Users can now install specific controllers if they only need some of the Kruise CRD/controllers.
 
-## Kruise-Controller-Manager
+### Kruise-Controller-Manager
 
-### Bugs
+#### Bugs
 
 - Fix a jsonpatch bug by updating the vendor code.
 
-## Advanced StatefulSet
+### Advanced StatefulSet
 
-### Features
+#### Features
 
 - Add condition report in `status` to indicate the scaling or rollout results.
 
-## A NEW workload controller - UnitedDeployment
+### A NEW workload controller - UnitedDeployment
 
-### Features
+#### Features
 
 - Define a set of APIs for UnitedDeployment workload which manages multiple workloads spread over multiple domains in one cluster.
 - Create one workload for each `Subset` in `Topology`.
@@ -133,7 +168,7 @@ It provides full features for more efficient, deterministic and controlled deplo
 - Rollout all subset workloads by specifying a new workload template.
 - Manually manage the rollout of subset workloads by specifying the `Partition` of each workload.
 
-## Documents
+### Documents
 
 - Three blog posts are added in Kruise [website](http://openkruise.io/en-us/blog/index.html), titled:
     1. Kruise Controller Classification Guidance.
@@ -144,74 +179,74 @@ It provides full features for more efficient, deterministic and controlled deplo
 
 ---
 
-**v0.2.0**
+## v0.2.0**
 
-## Installation
+### Installation
 
 - Provide a script to generate helm charts for Kruise. User can specify the release version.
 - Automatically install kubebuilder if it does not exist in the machine.
 - Add Kruise uninstall script.
 
-## Kruise-Controller-Manager
+### Kruise-Controller-Manager
 
-### Bugs
+#### Bugs
 
 - Fix a potential controller crash problem when APIServer disables MutatingAdmissionWebhook and ValidatingAdmissionWebhook admission plugins.
 
-## Broadcast Job
+### Broadcast Job
 
-### Features
+#### Features
 
 - Change the type of `Parallelism` field in BroadcastJob from `*int32` to `intOrString`.
 - Support `Pause` in BroadcastJob.
 - Add `FailurePolicy` in BroadcastJob, supporting `Continue`, `FastFailed`, and `Pause` polices.
 - Add `Phase` in BroadcastJob `status`.
 
-## Sidecar Set
+### Sidecar Set
 
-### Features
+#### Features
 
 - Allow parallelly upgrading SidecarSet Pods by specifying `MaxUnavailable`.
 - Support sidecar volumes so that user can specify volume mount in sidecar containers.
 
 ---
 
-**v0.1.0**
+## v0.1.0**
 
-## Kruise-Controller-Manager
+### Kruise-Controller-Manager
 
-### Features
+#### Features
 
 - Support to run kruise-controller-manager locally
 - Allow selectively install required CRDs for kruise controllers
 
-### Bugs
+#### Bugs
 
 - Remove `sideEffects` in kruise-manager all-in-one YAML file to avoid start failure
 
-## Advanced Statefulset
+### Advanced Statefulset
 
-### Features
+#### Features
 
 - Add MaxUnavailable rolling upgrade strategy
 - Add In-Place pod update strategy
 - Add paused functionality during rolling upgrade
 
-## Broadcast Job
+### Broadcast Job
 
-### Features
+#### Features
 
 - Add BroadcastJob that runs pods on all nodes to completion
 - Add `Never` termination policy to have job running after it finishes all pods
 - Add `ttlSecondsAfterFinished` to delete the job after it finishes in x seconds.
 
-### Bugs
+#### Bugs
 
 - Make broadcastjob honor node unschedulable condition
 
-## Sidecar Set
+### Sidecar Set
 
-### Features
+#### Features
 
 - Add SidecarSet that automatically injects sidecar container into selected pods
 - Support sidecar update functionality for SidecarSet
