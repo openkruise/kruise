@@ -145,6 +145,9 @@ func CreatesPods(t *testing.T, set *appsv1alpha1.StatefulSet, invariants invaria
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set ReadyReplicas correctly")
 	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
+	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
@@ -174,6 +177,9 @@ func ScalesUp(t *testing.T, set *appsv1alpha1.StatefulSet, invariants invariantF
 	if set.Status.ReadyReplicas != 4 {
 		t.Error("Failed to set readyReplicas correctly")
 	}
+	if set.Status.AvailableReplicas != 4 {
+		t.Error("Failed to set availableReplicas correctly")
+	}
 	if set.Status.UpdatedReplicas != 4 {
 		t.Error("Failed to set updatedReplicas correctly")
 	}
@@ -197,6 +203,9 @@ func ScalesDown(t *testing.T, set *appsv1alpha1.StatefulSet, invariants invarian
 	}
 	if set.Status.ReadyReplicas != 0 {
 		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.AvailableReplicas != 0 {
+		t.Error("Failed to set availableReplicas correctly")
 	}
 	if set.Status.UpdatedReplicas != 0 {
 		t.Error("Failed to set updatedReplicas correctly")
@@ -339,6 +348,9 @@ func CreatePodFailure(t *testing.T, set *appsv1alpha1.StatefulSet, invariants in
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set readyReplicas correctly")
 	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
+	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to updatedReplicas correctly")
 	}
@@ -365,6 +377,9 @@ func UpdatePodFailure(t *testing.T, set *appsv1alpha1.StatefulSet, invariants in
 	}
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
 	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set updatedReplicas correctly")
@@ -411,6 +426,9 @@ func UpdateSetStatusFailure(t *testing.T, set *appsv1alpha1.StatefulSet, invaria
 	}
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set readyReplicas to 3")
+	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
 	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set updatedReplicas to 3")
@@ -497,6 +515,9 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 		t.Error("Failed to scale statefulset to 0 replicas")
 	}
 	if set.Status.ReadyReplicas != 0 {
+		t.Error("Failed to set readyReplicas to 0")
+	}
+	if set.Status.AvailableReplicas != 0 {
 		t.Error("Failed to set readyReplicas to 0")
 	}
 	if set.Status.UpdatedReplicas != 0 {
@@ -1283,30 +1304,23 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 		validate        func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error
 	}
 
-	readyFirstPod := func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
-		pod := pods[0].DeepCopy()
-		pod.Status.Phase = v1.PodRunning
-		condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-		podutil.UpdatePodCondition(&pod.Status, &condition)
-		fakeResourceVersion(pod)
-		if err := spc.podsIndexer.Update(pod); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	readyAllPods := func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
-		for i := 0; i < 5; i++ {
-			pod := pods[i].DeepCopy()
-			pod.Status.Phase = v1.PodRunning
-			condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-			podutil.UpdatePodCondition(&pod.Status, &condition)
-			fakeResourceVersion(pod)
-			if err := spc.podsIndexer.Update(pod); err != nil {
-				return err
+	readyPods := func(partition, pauseSecond int) func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet,
+		pods []*v1.Pod) error {
+		return func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+			sort.Sort(ascendingOrdinal(pods))
+			for i := 0; i < partition; i++ {
+				pod := pods[i].DeepCopy()
+				pod.Status.Phase = v1.PodRunning
+				condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+				podutil.UpdatePodCondition(&pod.Status, &condition)
+				fakeResourceVersion(pod)
+				if err := spc.podsIndexer.Update(pod); err != nil {
+					return err
+				}
 			}
+			time.Sleep(time.Duration(pauseSecond) * time.Second)
+			return nil
 		}
-		return nil
 	}
 
 	validateAllPodsReady := func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
@@ -1329,7 +1343,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 			initial: func() *appsv1alpha1.StatefulSet {
 				return newStatefulSet(3)
 			},
-			updatePod: readyAllPods,
+			updatePod: readyPods(1, 0),
 			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
 				sort.Sort(ascendingOrdinal(pods))
 				if len(pods) != 2 {
@@ -1351,7 +1365,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 			initial: func() *appsv1alpha1.StatefulSet {
 				return newStatefulSet(3)
 			},
-			updatePod: readyAllPods,
+			updatePod: readyPods(1, 0),
 			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
 				sort.Sort(ascendingOrdinal(pods))
 				if len(pods) != 1 {
@@ -1360,25 +1374,20 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 				if !isRunningAndReady(pods[0]) {
 					return fmt.Errorf("pod %s is not ready yet, status = %v", pods[0].Name, pods[0].Status)
 				}
-				if avail, wait := isRunningAndAvailable(pods[0], 60); !avail || wait == 0 {
-					return fmt.Errorf("pod %s is should not be ready yet, status = %v", pods[0].Name, pods[0].Status)
+				if avail, wait := isRunningAndAvailable(pods[0], 60); avail || wait == 0 {
+					return fmt.Errorf("pod %s should not be ready yet, wait time = %s", pods[0].Name, wait)
 				}
 				return nil
 			},
 		},
 		{
-			name:            "monotonic scaleup with 3 seconds ready seconds and sleep",
+			name:            "monotonic scale up with 3 seconds ready seconds and sleep",
 			minReadySeconds: 3,
 			invariants:      assertMonotonicInvariants,
 			initial: func() *appsv1alpha1.StatefulSet {
 				return newStatefulSet(3)
 			},
-			updatePod: func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
-				readyFirstPod(spc, set, pods)
-				// delay the next reconcile loop
-				time.Sleep(5 * time.Second)
-				return nil
-			},
+			updatePod: readyPods(1, 5),
 			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
 				sort.Sort(ascendingOrdinal(pods))
 				if len(pods) != 2 {
@@ -1400,7 +1409,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 			initial: func() *appsv1alpha1.StatefulSet {
 				return burst(newStatefulSet(5))
 			},
-			updatePod: readyAllPods,
+			updatePod: readyPods(5, 0),
 			validate:  validateAllPodsReady,
 		},
 		{
@@ -1410,7 +1419,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 			initial: func() *appsv1alpha1.StatefulSet {
 				return burst(newStatefulSet(5))
 			},
-			updatePod: readyAllPods,
+			updatePod: readyPods(5, 0),
 			validate:  validateAllPodsReady,
 		},
 	}

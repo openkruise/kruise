@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -121,11 +122,12 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *appsv1alpha1.Statef
 		return updateStateusErr
 	}
 
-	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d current=%d updated=%d",
+	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d available=%d current=%d updated=%d",
 		set.Namespace,
 		set.Name,
 		status.Replicas,
 		status.ReadyReplicas,
+		status.AvailableReplicas,
 		status.CurrentReplicas,
 		status.UpdatedReplicas)
 
@@ -315,6 +317,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	unhealthy := 0
 	firstUnhealthyOrdinal := math.MaxInt32
 	var firstUnhealthyPod *v1.Pod
+	monotonic := !allowsBurst(set)
+	minReadySeconds := getMinReadySeconds(set)
 
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
@@ -323,6 +327,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// count the number of running and ready replicas
 		if isRunningAndReady(pods[i]) {
 			status.ReadyReplicas++
+			if avail, _ := isRunningAndAvailable(pods[i], minReadySeconds); avail {
+				status.AvailableReplicas++
+			}
 		}
 
 		// count the number of current and update replicas
@@ -396,9 +403,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return &status, nil
 	}
 
-	monotonic := !allowsBurst(set)
-	minReadySeconds := getMinReadySeconds(set)
-
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
 		// delete and recreate failed pods
@@ -471,15 +475,23 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// ordinal, are Running and Available.
 		if monotonic {
 			if isAvailable, waitTime := isRunningAndAvailable(replicas[i], minReadySeconds); !isAvailable {
-				klog.V(4).Infof(
-					"StatefulSet %s/%s is waiting for Pod %s to be Running and Available with %d seconds",
-					set.Namespace,
-					set.Name,
-					replicas[i].Name,
-					minReadySeconds)
-				if waitTime != 0 {
+				if waitTime > 0 {
 					// make sure we check later
 					durationStore.Push(getStatefulSetKey(set), waitTime)
+					klog.V(4).Infof(
+						"StatefulSet %s/%s needs to wait %s for the Pod %s to be Running and Available after being"+
+							" Ready for %d seconds",
+						set.Namespace,
+						set.Name,
+						waitTime,
+						replicas[i].Name,
+						minReadySeconds)
+				} else {
+					klog.V(4).Infof(
+						"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready",
+						set.Namespace,
+						set.Name,
+						replicas[i].Name)
 				}
 				return &status, nil
 			}
@@ -578,7 +590,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	var unavailablePods []string
 	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, replicas)
 	klog.V(5).Infof("Prepare to update pods indexes %v for StatefulSet %s", updateIndexes, getStatefulSetKey(set))
-
+	minWaitTime := appsv1alpha1.MaxMinReadySeconds * time.Second
 	// update pods in sequence
 	for _, target := range updateIndexes {
 
@@ -626,8 +638,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			if isAvailable, waitTime := isRunningAndAvailable(replicas[target], minReadySeconds); !isAvailable {
 				// the pod is not available yet given the minReadySeconds requirement
 				unavailablePods = append(unavailablePods, replicas[target].Name)
-				// make sure that
-				if waitTime != 0 {
+				// make sure that we will wait for the first pod to get available
+				if waitTime != 0 && waitTime <= minWaitTime {
+					minWaitTime = waitTime
 					durationStore.Push(getStatefulSetKey(set), waitTime)
 				}
 			}

@@ -182,6 +182,10 @@ type StatefulSetStatus struct {
 	// readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
 	ReadyReplicas int32 `json:"readyReplicas"`
 
+	// AvailableReplicas is the number of Pods created by the StatefulSet controller that have been ready for
+	//minReadySeconds.
+	AvailableReplicas int32 `json:"availableReplicas"`
+
 	// currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
 	// indicated by currentRevision.
 	CurrentReplicas int32 `json:"currentReplicas"`

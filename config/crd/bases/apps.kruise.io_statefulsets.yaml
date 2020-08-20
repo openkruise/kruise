@@ -338,6 +338,11 @@ spec:
         status:
           description: StatefulSetStatus defines the observed state of StatefulSet
           properties:
+            availableReplicas:
+              description: AvailableReplicas is the number of Pods created by the
+                StatefulSet controller that have been ready for minReadySeconds.
+              format: int32
+              type: integer
             collisionCount:
               description: collisionCount is the count of hash collisions for the
                 StatefulSet. The StatefulSet controller uses this field as a collision
@@ -392,6 +397,7 @@ spec:
               format: int32
               type: integer
           required:
+          - availableReplicas
           - currentReplicas
           - readyReplicas
           - replicas
