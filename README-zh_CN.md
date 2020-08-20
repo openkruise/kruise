@@ -12,15 +12,15 @@
 
 |![notification](docs/img/bell-outline-badge.svg) 最新进展：|
 |------------------|
-|May 19th, 2020. Kruise v0.5.0 发布! CloneSet 支持 `maxSurge` 策略、为 StatefulSet/SidecarSet 修复部分 bug, please check the [CHANGELOG](CHANGELOG.md) for details.|
+|Aug 19th, 2020. Kruise v0.6.0 发布! 升级新的项目结构和依赖，并提供新的 Advanced DaemonSet 控制器，详情参见 [CHANGELOG](CHANGELOG.md).|
+|May 19th, 2020. Kruise v0.5.0 发布! CloneSet 支持 `maxSurge` 策略、为 StatefulSet/SidecarSet 修复部分 bug，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Mar 20th, 2020. Kruise v0.4.1 发布! 为 Advanced StatefulSet 和 CloneSet 提供了 **优雅原地升级** 功能，详情参见 [CHANGELOG](CHANGELOG.md).|
-|Nov 24th, 2019. 发布 UnitedDeployment 控制器的博客 ([link](http://openkruise.io/en-us/blog/blog3.html)).|
 
 ## 介绍
 
 Kruise 是 OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 中的核心项目之一，它提供一套在[Kubernetes核心控制器](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)之外的扩展 workload 管理和实现。
 
-目前，Kruise 提供了以下 5 个 workload 控制器：
+目前，Kruise 提供了以下 workload 控制器：
 
 - [CloneSet](https://openkruise.io/zh-cn/docs/cloneset.html): 提供了更加高效、确定可控的应用管理和部署能力，支持优雅原地升级、指定删除、发布顺序可配置、并行/灰度发布等丰富的策略，可以满足更多样化的应用场景。
 
@@ -31,6 +31,8 @@ Kruise 是 OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) �
 - [UnitedDeployment](https://openkruise.io/zh-cn/docs/uniteddeployment.html): 通过多个 subset workload 将应用部署到多个可用区。
 
 - [BroadcastJob](https://openkruise.io/zh-cn/docs/broadcastjob.html): 配置一个 job，在集群中所有满足条件的 Node 上都跑一个 Pod 任务。
+
+- [Advanced DaemonSet](https://openkruise.io/zh-cn/docs/advanced_daemonset.html): 基于原生 DaemonSet 之上的增强版本，默认行为与原生一致，在此之外提供了灰度分批、按 Node label 选择、暂停、热升级等发布策略。
 
 项目的 **roadmap** 参考[这里](https://github.com/openkruise/kruise/projects)。
 [Video](https://www.youtube.com/watch?v=elB7reZ6eAQ) by [Lachlan Evenson](https://github.com/lachie83) 是一个对于新人很友好的 demo。

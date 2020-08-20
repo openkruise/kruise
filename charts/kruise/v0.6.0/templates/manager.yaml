@@ -17,6 +17,12 @@ spec:
   selector:
     control-plane: controller-manager
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kruise-webhook-certs
+  namespace: kruise-system
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,6 +50,7 @@ spec:
           command:
             - /manager
           image: {{ .Values.manager.image }}
+          imagePullPolicy: Always
           name: manager
           env:
             - name: POD_NAMESPACE
@@ -71,9 +78,18 @@ spec:
           resources:
             {{- toYaml .Values.manager.resources | nindent 12 }}
       terminationGracePeriodSeconds: 10
-{{- if .Values.spec.nodeAffinity }}
       affinity:
-{{- end }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: control-plane
+                  operator: In
+                  values:
+                  - controller-manager
+              topologyKey: kubernetes.io/hostname
+            weight: 100
 {{- with .Values.spec.nodeAffinity }}
         nodeAffinity:
 {{ toYaml . | indent 10 }}

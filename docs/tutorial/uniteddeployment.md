@@ -364,7 +364,7 @@ demo-guestbook-kruise-subset-c-qflc9   InPlaceIfPossible
 ```
 
 Now it is possible to in-place update each pod of these subsets by updating the UnitedDeployment.
-More details of AdvancedStatefulSet are provided in this [tutorial](../concepts/astatefulset/README.md).
+More details of AdvancedStatefulSet are provided in this [tutorial](./advanced-statefulset.md).
 
 Please note that the process of switching subset type is not graceful, so the service may be unavailable during it.
 
