@@ -59,7 +59,7 @@ Kruise 是 OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) �
 对于版本高于 v1.12+ 的 Kubernetes 集群来说，只要使用 helm v3 执行安装即可：
 
 ```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz
 ```
 
 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者只启用某些特定的控制器能力。
