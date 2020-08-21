@@ -12,7 +12,7 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
-|Aug 19th, 2020. Kruise v0.6.0 is **RELEASED**! It updates project structure and supports a new controller called Advanced DaemonSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
+|Aug 19th, 2020. Kruise v0.6.0 is **RELEASED**! It updates Kubernetes dependency and switches to new controller runtime framework. It also supports a new controller called Advanced DaemonSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |May 19th, 2020. Kruise v0.5.0 is **RELEASED**! It supports `maxSurge` for CloneSet and fixes bugs for StatefulSet/SidecarSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Mar 20th, 2020. Kruise v0.4.1 is **RELEASED**! It provides **graceful in-place update** for Advanced StatefulSet and CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 
@@ -32,7 +32,7 @@ As of now, Kruise offers these workload controllers:
 
 - [BroadcastJob](https://openkruise.io/en-us/docs/broadcastjob.html): A job that runs Pods to completion across all the nodes in the cluster.
 
-- [Advanced DaemonSet](https://openkruise.io/en-us/docs/advanced_daemonset.html): An enhanced version of default DaemonSet with extra functionalities such as partition, node selector, pause and surging.
+- [Advanced DaemonSet](https://openkruise.io/en-us/docs/advanced_daemonset.html): An enhanced version of default [DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) with extra upgrade strategies such as partition, node selector, pause and surging.
 
 The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
 This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is a good introduction for new users.
@@ -68,7 +68,7 @@ For more details, see [quick-start](https://openkruise.io/en-us/docs/quick_start
 
 You can view the full documentation from the [OpenKruise website](https://openkruise.io/en-us/docs/what_is_openkruise.html).
 
-We also provide [**tutorials**](./docs/tutorial/README.md) to demonstrate how to use Kruise controllers.
+We also provide [**tutorials**](./docs/tutorial/README.md) for **ALL** Kruise controllers to demonstrate how to use them.
 
 ## Contributing
 
