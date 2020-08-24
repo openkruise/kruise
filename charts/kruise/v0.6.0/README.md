@@ -32,6 +32,7 @@ The following table lists the configurable parameters of the kruise chart and th
 |-------------------------------------------|--------------------------------------------------------------------|-------------------------------------|
 | `log.level`                               | Log level that kruise-manager printed                              | `4`                                 |
 | `revisionHistoryLimit`                    | Limit of revision history                                          | `3`                                 |
+| `manager.replicas`                        | Replicas of kruise-controller-manager deployment                   | `2`                                 |
 | `manager.resources.limits.cpu`            | CPU resource limit of kruise-manager container                     | `100m`                              |
 | `manager.resources.limits.memory`         | Memory resource limit of kruise-manager container                  | `256Mi`                             |
 | `manager.resources.requests.cpu`          | CPU resource request of kruise-manager container                   | `100m`                              |
@@ -40,12 +41,13 @@ The following table lists the configurable parameters of the kruise chart and th
 | `manager.metrics.port`                    | Port of metrics served                                             | `8080`                              |
 | `manager.webhook.port`                    | Port of webhook served                                             | `9443`                              |
 | `manager.custom_resource_enable`          | Custom resources enabled by kruise-manager                         | `""(empty means all enabled)`       |
-| `spec.nodeAffinity`                       | Node affinity policy for kruise-manager pod                        | `{}`                                |
+| `spec.nodeAffinity`                        | Node affinity policy for kruise-manager pod                         | `{}`                                |
 | `spec.nodeSelector`                       | Node labels for kruise-manager pod                                 | `{}`                                |
-| `spec.tolerations`                        | Tolerations for kruise-manager pod                                 | `[]`
+| `spec.tolerations`                        | Tolerations for kruise-manager pod                                 | `[]`                                |
+| `webhookConfiguration.failurePolicy.pods`  | The failurePolicy for pods in mutating webhook configuration        | `Ignore`                            |
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example,
 
 ```bash
-# helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz --set manager.log.level=5,manager.custom_resource_enable="StatefulSet\,SidecarSet"
+# helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz --set manager.log.level=5,manager.custom_resource_enable="CloneSet\,SidecarSet"
 ```

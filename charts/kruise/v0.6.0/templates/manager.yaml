@@ -31,7 +31,7 @@ metadata:
   name: kruise-controller-manager
   namespace: kruise-system
 spec:
-  replicas: 2
+  replicas: {{ .Values.manager.replicas }}
   selector:
     matchLabels:
       control-plane: controller-manager
@@ -61,6 +61,8 @@ spec:
               value: "{{ .Values.manager.webhook.port }}"
             - name: CUSTOM_RESOURCE_ENABLE
               value: {{ .Values.manager.custom_resource_enable }}
+            - name: WEBHOOK_CONFIGURATION_FAILURE_POLICY_PODS
+              value: {{ .Values.webhookConfiguration.failurePolicy.pods }}
           ports:
             - containerPort: {{ .Values.manager.webhook.port }}
               name: webhook-server
