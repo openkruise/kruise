@@ -30,7 +30,7 @@ webhooks:
         name: kruise-webhook-service
         namespace: kruise-system
         path: /mutate-pod
-    failurePolicy: Fail
+    failurePolicy: {{ .Values.webhookConfiguration.failurePolicy.pods }}
     name: mpod.kb.io
     namespaceSelector:
       matchExpressions:

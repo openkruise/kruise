@@ -13,6 +13,7 @@ manager:
     # log level for kruise-manager
     level: "4"
 
+  replicas: 2
   image: openkruise/kruise-manager:v0.6.0
 
   webhook:
@@ -35,3 +36,7 @@ manager:
     port: 8000
 
   custom_resource_enable:
+
+webhookConfiguration:
+  failurePolicy:
+    pods: Ignore
