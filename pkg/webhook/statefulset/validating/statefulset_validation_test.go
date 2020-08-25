@@ -21,12 +21,13 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilpointer "k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func TestValidateStatefulSet(t *testing.T) {
@@ -128,6 +129,7 @@ func TestValidateStatefulSet(t *testing.T) {
 							Partition:       &val2,
 							PodUpdatePolicy: appsv1alpha1.RecreatePodUpdateStrategyType,
 							MaxUnavailable:  &maxUnavailable1,
+							MinReadySeconds: utilpointer.Int32Ptr(10),
 						}
 					}()},
 			},
@@ -143,6 +145,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		})
 	}
 
+	//  TODO: break the failed cases out with expected error instead of just pass with any error
 	errorCases := map[string]appsv1alpha1.StatefulSet{
 		"zero-length ID": {
 			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
@@ -354,7 +357,7 @@ func TestValidateStatefulSet(t *testing.T) {
 					}()},
 			},
 		},
-		"negative parition": {
+		"negative partition": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -367,8 +370,43 @@ func TestValidateStatefulSet(t *testing.T) {
 							Partition:       &minus1,
 							PodUpdatePolicy: appsv1alpha1.RecreatePodUpdateStrategyType,
 							MaxUnavailable:  &maxUnavailable1,
+							MinReadySeconds: utilpointer.Int32Ptr(1),
 						}
 					}()},
+			},
+		},
+		"negative minReadySeconds": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            &val3,
+				UpdateStrategy: appsv1alpha1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+					RollingUpdate: &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+						Partition:       &minus1,
+						PodUpdatePolicy: appsv1alpha1.RecreatePodUpdateStrategyType,
+						MaxUnavailable:  &maxUnavailable1,
+						MinReadySeconds: utilpointer.Int32Ptr(-1),
+					},
+				},
+			},
+		},
+		"too large minReadySeconds": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            &val3,
+				UpdateStrategy: appsv1alpha1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+					RollingUpdate: &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+						Partition:       &minus1,
+						PodUpdatePolicy: appsv1alpha1.RecreatePodUpdateStrategyType,
+						MaxUnavailable:  &maxUnavailable1,
+						MinReadySeconds: utilpointer.Int32Ptr(appsv1alpha1.MaxMinReadySeconds + 1),
+					},
+				},
 			},
 		},
 		"empty pod management policy": {
@@ -428,6 +466,7 @@ func TestValidateStatefulSet(t *testing.T) {
 					field != "spec.updateStrategy.rollingUpdate" &&
 					field != "spec.updateStrategy.rollingUpdate.partition" &&
 					field != "spec.updateStrategy.rollingUpdate.maxUnavailable" &&
+					field != "spec.updateStrategy.rollingUpdate.minReadySeconds" &&
 					field != "spec.updateStrategy.rollingUpdate.podUpdatePolicy" &&
 					field != "spec.template.spec.readinessGates" &&
 					field != "spec.podManagementPolicy" &&

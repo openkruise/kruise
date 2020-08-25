@@ -74,7 +74,11 @@ type adapterInformer struct {
 }
 
 func (c *adapterInformer) getPod(namespace, name string) (*v1.Pod, error) {
-	return c.podInformer.Lister().Pods(namespace).Get(name)
+	pod, err := c.podInformer.Lister().Pods(namespace).Get(name)
+	if err == nil {
+		return pod.DeepCopy(), nil
+	}
+	return nil, err
 }
 
 func (c *adapterInformer) updatePod(pod *v1.Pod) error {

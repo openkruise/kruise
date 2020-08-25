@@ -18,7 +18,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -29,20 +28,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
-	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
-	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -53,6 +45,15 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	utilpointer "k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
+	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
+	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
+	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
 type invariantFunc func(set *appsv1alpha1.StatefulSet, spc *fakeStatefulPodControl) error
@@ -144,6 +145,9 @@ func CreatesPods(t *testing.T, set *appsv1alpha1.StatefulSet, invariants invaria
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set ReadyReplicas correctly")
 	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
+	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
@@ -173,6 +177,9 @@ func ScalesUp(t *testing.T, set *appsv1alpha1.StatefulSet, invariants invariantF
 	if set.Status.ReadyReplicas != 4 {
 		t.Error("Failed to set readyReplicas correctly")
 	}
+	if set.Status.AvailableReplicas != 4 {
+		t.Error("Failed to set availableReplicas correctly")
+	}
 	if set.Status.UpdatedReplicas != 4 {
 		t.Error("Failed to set updatedReplicas correctly")
 	}
@@ -196,6 +203,9 @@ func ScalesDown(t *testing.T, set *appsv1alpha1.StatefulSet, invariants invarian
 	}
 	if set.Status.ReadyReplicas != 0 {
 		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.AvailableReplicas != 0 {
+		t.Error("Failed to set availableReplicas correctly")
 	}
 	if set.Status.UpdatedReplicas != 0 {
 		t.Error("Failed to set updatedReplicas correctly")
@@ -338,6 +348,9 @@ func CreatePodFailure(t *testing.T, set *appsv1alpha1.StatefulSet, invariants in
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set readyReplicas correctly")
 	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
+	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to updatedReplicas correctly")
 	}
@@ -364,6 +377,9 @@ func UpdatePodFailure(t *testing.T, set *appsv1alpha1.StatefulSet, invariants in
 	}
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
 	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set updatedReplicas correctly")
@@ -410,6 +426,9 @@ func UpdateSetStatusFailure(t *testing.T, set *appsv1alpha1.StatefulSet, invaria
 	}
 	if set.Status.ReadyReplicas != 3 {
 		t.Error("Failed to set readyReplicas to 3")
+	}
+	if set.Status.AvailableReplicas != 3 {
+		t.Error("Failed to set availableReplicas correctly")
 	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set updatedReplicas to 3")
@@ -496,6 +515,9 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 		t.Error("Failed to scale statefulset to 0 replicas")
 	}
 	if set.Status.ReadyReplicas != 0 {
+		t.Error("Failed to set readyReplicas to 0")
+	}
+	if set.Status.AvailableReplicas != 0 {
 		t.Error("Failed to set readyReplicas to 0")
 	}
 	if set.Status.UpdatedReplicas != 0 {
@@ -1267,6 +1289,373 @@ func TestStatefulSetControlRollingUpdateWithPaused(t *testing.T) {
 			},
 		},
 	}
+	for i := range tests {
+		testFn(&tests[i], t)
+	}
+}
+
+func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
+	type testcase struct {
+		name            string
+		minReadySeconds int32
+		invariants      func(set *appsv1alpha1.StatefulSet, spc *fakeStatefulPodControl) error
+		initial         func() *appsv1alpha1.StatefulSet
+		updatePod       func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error
+		validate        func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error
+	}
+
+	readyPods := func(partition, pauseSecond int) func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet,
+		pods []*v1.Pod) error {
+		return func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+			sort.Sort(ascendingOrdinal(pods))
+			for i := 0; i < partition; i++ {
+				pod := pods[i].DeepCopy()
+				pod.Status.Phase = v1.PodRunning
+				condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+				podutil.UpdatePodCondition(&pod.Status, &condition)
+				fakeResourceVersion(pod)
+				if err := spc.podsIndexer.Update(pod); err != nil {
+					return err
+				}
+			}
+			time.Sleep(time.Duration(pauseSecond) * time.Second)
+			return nil
+		}
+	}
+
+	validateAllPodsReady := func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+		sort.Sort(ascendingOrdinal(pods))
+		if len(pods) != 5 {
+			return fmt.Errorf("we didn't get 5 pods exactly, num of pods = %d", len(pods))
+		}
+		for i := 0; i < 5; i++ {
+			if !isRunningAndReady(pods[i]) {
+				return fmt.Errorf("pod %s is not ready yet, status = %v", pods[i].Name, pods[i].Status)
+			}
+		}
+		return nil
+	}
+	tests := []testcase{
+		{
+			name:            "monotonic scale up with 0 min ready seconds",
+			minReadySeconds: 0,
+			invariants:      assertMonotonicInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return newStatefulSet(3)
+			},
+			updatePod: readyPods(1, 0),
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				if len(pods) != 2 {
+					return fmt.Errorf("we didn't get 2 pods exactly, num of pods = %d", len(pods))
+				}
+				if !isRunningAndReady(pods[0]) {
+					return fmt.Errorf("pod %s is not ready yet, status = %v", pods[0].Name, pods[0].Status)
+				}
+				if isRunningAndReady(pods[1]) {
+					return fmt.Errorf("pod %s is should not be ready yet, status = %v", pods[1].Name, pods[1].Status)
+				}
+				return nil
+			},
+		},
+		{
+			name:            "monotonic scaleup with 1 min ready seconds",
+			minReadySeconds: 60,
+			invariants:      assertMonotonicInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return newStatefulSet(3)
+			},
+			updatePod: readyPods(1, 0),
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				if len(pods) != 1 {
+					return fmt.Errorf("we didn't get 1 pod exactly, num of pods = %d", len(pods))
+				}
+				if !isRunningAndReady(pods[0]) {
+					return fmt.Errorf("pod %s is not ready yet, status = %v", pods[0].Name, pods[0].Status)
+				}
+				if avail, wait := isRunningAndAvailable(pods[0], 60); avail || wait == 0 {
+					return fmt.Errorf("pod %s should not be ready yet, wait time = %s", pods[0].Name, wait)
+				}
+				return nil
+			},
+		},
+		{
+			name:            "monotonic scale up with 3 seconds ready seconds and sleep",
+			minReadySeconds: 3,
+			invariants:      assertMonotonicInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return newStatefulSet(3)
+			},
+			updatePod: readyPods(1, 5),
+			validate: func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+				sort.Sort(ascendingOrdinal(pods))
+				if len(pods) != 2 {
+					return fmt.Errorf("we didn't get 2 pods exactly, num of pods = %d", len(pods))
+				}
+				if !isRunningAndReady(pods[0]) {
+					return fmt.Errorf("pod %s is not ready yet, status = %v", pods[0].Name, pods[0].Status)
+				}
+				if isRunningAndReady(pods[1]) {
+					return fmt.Errorf("pod %s is should not be ready yet, status = %v", pods[1].Name, pods[1].Status)
+				}
+				return nil
+			},
+		},
+		{
+			name:            "burst scale with 0 min ready seconds burst",
+			minReadySeconds: 0,
+			invariants:      assertBurstInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return burst(newStatefulSet(5))
+			},
+			updatePod: readyPods(5, 0),
+			validate:  validateAllPodsReady,
+		},
+		{
+			name:            "burst scale with 1 min ready seconds still burst",
+			minReadySeconds: 60,
+			invariants:      assertBurstInvariants,
+			initial: func() *appsv1alpha1.StatefulSet {
+				return burst(newStatefulSet(5))
+			},
+			updatePod: readyPods(5, 0),
+			validate:  validateAllPodsReady,
+		},
+	}
+
+	testFn := func(test *testcase, t *testing.T) {
+		// init according to test
+		set := test.initial()
+		// modify according to test
+		set.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			Type: apps.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+				return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+					Partition:       utilpointer.Int32Ptr(0),
+					MinReadySeconds: &test.minReadySeconds,
+				}
+			}(),
+		}
+		// setup
+		client := fake.NewSimpleClientset()
+		kruiseClient := kruisefake.NewSimpleClientset(set)
+		spc, _, ssc, stop := setupController(client, kruiseClient)
+		defer close(stop)
+		// reconcile once, start with no pod
+		if err := ssc.UpdateStatefulSet(set, []*v1.Pod{}); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		// update the pods
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		sort.Sort(ascendingOrdinal(pods))
+		if err := test.updatePod(spc, set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		// reconcile once more
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		sort.Sort(ascendingOrdinal(pods))
+		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		// validate the result
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if err := test.validate(set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+	}
+
+	for i := range tests {
+		testFn(&tests[i], t)
+	}
+}
+
+func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
+	type testcase struct {
+		name            string
+		minReadySeconds int32
+		maxUnavailable  intstr.IntOrString
+		partition       int
+		updatePod       func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error
+		validate        func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error
+	}
+	const setSize = 5
+	//originalImage := newStatefulSet(1).Spec.Template.Spec.Containers[0].Image
+	newImage := "foo"
+
+	readyPods := func(partition, pauseSecond int) func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet,
+		pods []*v1.Pod) error {
+		return func(spc *fakeStatefulPodControl, set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+			sort.Sort(ascendingOrdinal(pods))
+			for i := setSize - 1; i >= partition; i-- {
+				pod := pods[i].DeepCopy()
+				pod.Status.Phase = v1.PodRunning
+				condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+				podutil.UpdatePodCondition(&pod.Status, &condition)
+				fakeResourceVersion(pod)
+				if err := spc.podsIndexer.Update(pod); err != nil {
+					return err
+				}
+			}
+			time.Sleep(time.Duration(pauseSecond) * time.Second)
+			return nil
+		}
+	}
+
+	validatePodsUpdated := func(partition int) func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+		return func(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+			sort.Sort(ascendingOrdinal(pods))
+			i := setSize - 1
+			for ; i >= partition; i-- {
+				if !isRunningAndReady(pods[i]) {
+					return fmt.Errorf("pod %s is not ready yet, status = %v", pods[i].Name, pods[i].Status)
+				}
+				if pods[i].Spec.Containers[0].Image != newImage {
+					return fmt.Errorf("pod %s is not updated yet, pod revision = %s", pods[i].Name, getPodRevision(pods[i]))
+				}
+			}
+			if i >= 0 {
+				if pods[i].Spec.Containers[0].Image == newImage {
+					return fmt.Errorf("pod %s should not be updated yet, pod revision = %s", pods[i].Name,
+						getPodRevision(pods[i]))
+				}
+			}
+			return nil
+		}
+	}
+
+	tests := []testcase{
+		{
+			name:            "update with 0 min ready seconds",
+			minReadySeconds: 0,
+			maxUnavailable:  intstr.FromInt(1),
+			partition:       4,
+			updatePod:       readyPods(4, 0),
+			validate:        validatePodsUpdated(3), // only 2 are upgraded
+		},
+		{
+			name:            "update with 1 min ready seconds",
+			minReadySeconds: 60,
+			maxUnavailable:  intstr.FromInt(1),
+			partition:       4,
+			updatePod:       readyPods(4, 0),
+			validate:        validatePodsUpdated(4), // only one is upgraded
+		},
+		{
+			name:            "update with 1 min ready seconds and sleep",
+			minReadySeconds: 5,
+			maxUnavailable:  intstr.FromInt(1),
+			partition:       4,
+			updatePod:       readyPods(4, 10),
+			validate:        validatePodsUpdated(3), // only 2 are upgraded
+		},
+		{
+			name:            "update with 0 min ready seconds and 2 max unavailable",
+			minReadySeconds: 0,
+			maxUnavailable:  intstr.FromInt(2),
+			partition:       4,
+			updatePod:       readyPods(3, 0),
+			validate:        validatePodsUpdated(1), // 4 are upgraded
+		},
+		{
+			name:            "update with 1 min ready seconds and 2 max unavailable",
+			minReadySeconds: 60,
+			maxUnavailable:  intstr.FromInt(2),
+			partition:       4,
+			updatePod:       readyPods(3, 0),
+			validate:        validatePodsUpdated(3), // only 2 are upgraded
+		},
+		{
+			name:            "update with 1 min ready seconds and 2 max unavailable and sleep",
+			minReadySeconds: 5,
+			maxUnavailable:  intstr.FromInt(2),
+			partition:       4,
+			updatePod:       readyPods(3, 10),
+			validate:        validatePodsUpdated(1), // 4 are upgraded
+		},
+	}
+
+	testFn := func(test *testcase, t *testing.T) {
+		// use burst mode to get around minReadyMin
+		set := burst(newStatefulSet(setSize))
+		// modify according to test
+		set.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			Type: apps.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+				return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+					Partition:       utilpointer.Int32Ptr(0),
+					MaxUnavailable:  &test.maxUnavailable,
+					PodUpdatePolicy: appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+					MinReadySeconds: &test.minReadySeconds,
+				}
+			}(),
+		}
+		// setup
+		client := fake.NewSimpleClientset()
+		kruiseClient := kruisefake.NewSimpleClientset(set)
+		spc, _, ssc, stop := setupController(client, kruiseClient)
+		defer close(stop)
+		// scale the statefulset up to the target first
+		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		// update the image
+		set.Spec.Template.Spec.Containers[0].Image = "foo"
+		// reconcile once, start with no pod
+		if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		// get the pods
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if err := test.updatePod(spc, set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		// reconcile once more
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		// validate the result
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if err := test.validate(set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+	}
+
 	for i := range tests {
 		testFn(&tests[i], t)
 	}

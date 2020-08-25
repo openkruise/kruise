@@ -68,7 +68,7 @@ var (
 		p := o.(*v1.Pod)
 		return getPodRevision(p)
 	})
-
+	// this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
 	durationStore = requeueduration.DurationStore{}
 )
 

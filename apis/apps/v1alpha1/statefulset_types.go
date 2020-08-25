@@ -23,6 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	// MaxMinReadySeconds is the max value of MinReadySeconds
+	MaxMinReadySeconds = 300
+)
+
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
@@ -68,6 +73,13 @@ type RollingUpdateStatefulSetStrategy struct {
 	// InPlaceUpdateStrategy contains strategies for in-place update.
 	// +optional
 	InPlaceUpdateStrategy *InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
+	// MinReadySeconds indicates how long will the pod be considered ready after it's updated.
+	// MinReadySeconds works with both OrderedReady and Parallel podManagementPolicy.
+	// It affects the pod scale up speed when the podManagementPolicy is set to be OrderedReady.
+	// Combined with MaxUnavailable, it affects the pod update speed regardless of podManagementPolicy.
+	// Default value is 0, max is 300.
+	// +optional
+	MinReadySeconds *int32 `json:"minReadySeconds,omitempty"`
 }
 
 // UnorderedUpdateStrategy defines strategies for non-ordered update.
@@ -169,6 +181,10 @@ type StatefulSetStatus struct {
 
 	// readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
 	ReadyReplicas int32 `json:"readyReplicas"`
+
+	// AvailableReplicas is the number of Pods created by the StatefulSet controller that have been ready for
+	//minReadySeconds.
+	AvailableReplicas int32 `json:"availableReplicas"`
 
 	// currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
 	// indicated by currentRevision.

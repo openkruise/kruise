@@ -132,6 +132,9 @@ func SetDefaultsStatefulSet(obj *StatefulSet) {
 		if obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == "" {
 			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy = RecreatePodUpdateStrategyType
 		}
+		if obj.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = utilpointer.Int32Ptr(0)
+		}
 	}
 
 	if obj.Spec.Replicas == nil {

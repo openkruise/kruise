@@ -256,6 +256,18 @@ spec:
                                     can just be allowed to work with Parallel podManagementPolicy.
                                     Defaults to 1.'
                                   x-kubernetes-int-or-string: true
+                                minReadySeconds:
+                                  description: MinReadySeconds indicates how long
+                                    will the pod be considered ready after it's updated.
+                                    MinReadySeconds works with both OrderedReady and
+                                    Parallel podManagementPolicy. It affects the pod
+                                    scale up speed when the podManagementPolicy is
+                                    set to be OrderedReady. Combined with MaxUnavailable,
+                                    it affects the pod update speed regardless of
+                                    podManagementPolicy. Default value is 0, max is
+                                    300.
+                                  format: int32
+                                  type: integer
                                 partition:
                                   description: 'Partition indicates the ordinal at
                                     which the StatefulSet should be partitioned by
