@@ -14,8 +14,9 @@ manager:
     level: "4"
 
   replicas: 2
-  image: openkruise/kruise-manager:v0.6.0
-
+  image:
+    repository: openkruise/kruise-manager
+    tag: v0.6.0
   webhook:
     port: 9876
 

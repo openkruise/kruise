@@ -28,23 +28,25 @@ release "kruise" uninstalled
 
 The following table lists the configurable parameters of the kruise chart and their default values.
 
-| Parameter                                 | Description                                                        | Default                             |
-|-------------------------------------------|--------------------------------------------------------------------|-------------------------------------|
-| `log.level`                               | Log level that kruise-manager printed                              | `4`                                 |
-| `revisionHistoryLimit`                    | Limit of revision history                                          | `3`                                 |
-| `manager.replicas`                        | Replicas of kruise-controller-manager deployment                   | `2`                                 |
-| `manager.resources.limits.cpu`            | CPU resource limit of kruise-manager container                     | `100m`                              |
-| `manager.resources.limits.memory`         | Memory resource limit of kruise-manager container                  | `256Mi`                             |
-| `manager.resources.requests.cpu`          | CPU resource request of kruise-manager container                   | `100m`                              |
-| `manager.resources.requests.memory`       | Memory resource request of kruise-manager container                | `256Mi`                             |
-| `manager.metrics.addr`                    | Addr of metrics served                                             | `localhost`                         |
-| `manager.metrics.port`                    | Port of metrics served                                             | `8080`                              |
-| `manager.webhook.port`                    | Port of webhook served                                             | `9443`                              |
-| `manager.custom_resource_enable`          | Custom resources enabled by kruise-manager                         | `""(empty means all enabled)`       |
-| `spec.nodeAffinity`                        | Node affinity policy for kruise-manager pod                         | `{}`                                |
-| `spec.nodeSelector`                       | Node labels for kruise-manager pod                                 | `{}`                                |
-| `spec.tolerations`                        | Tolerations for kruise-manager pod                                 | `[]`                                |
-| `webhookConfiguration.failurePolicy.pods`  | The failurePolicy for pods in mutating webhook configuration        | `Ignore`                            |
+| Parameter                                 | Description                                                  | Default                       |
+| ----------------------------------------- | ------------------------------------------------------------ | ----------------------------- |
+| `log.level`                               | Log level that kruise-manager printed                        | `4`                           |
+| `revisionHistoryLimit`                    | Limit of revision history                                    | `3`                           |
+| `manager.replicas`                        | Replicas of kruise-controller-manager deployment             | `2`                           |
+| `manager.image.repository`                | Repository for kruise-manager image                          | openkruise/kruise-manager     |
+| `manager.image.tag`                       | Tag for kruise-manager image                                 | v0.6.0                        |
+| `manager.resources.limits.cpu`            | CPU resource limit of kruise-manager container               | `100m`                        |
+| `manager.resources.limits.memory`         | Memory resource limit of kruise-manager container            | `256Mi`                       |
+| `manager.resources.requests.cpu`          | CPU resource request of kruise-manager container             | `100m`                        |
+| `manager.resources.requests.memory`       | Memory resource request of kruise-manager container          | `256Mi`                       |
+| `manager.metrics.addr`                    | Addr of metrics served                                       | `localhost`                   |
+| `manager.metrics.port`                    | Port of metrics served                                       | `8080`                        |
+| `manager.webhook.port`                    | Port of webhook served                                       | `9443`                        |
+| `manager.custom_resource_enable`          | Custom resources enabled by kruise-manager                   | `""(empty means all enabled)` |
+| `spec.nodeAffinity`                       | Node affinity policy for kruise-manager pod                  | `{}`                          |
+| `spec.nodeSelector`                       | Node labels for kruise-manager pod                           | `{}`                          |
+| `spec.tolerations`                        | Tolerations for kruise-manager pod                           | `[]`                          |
+| `webhookConfiguration.failurePolicy.pods` | The failurePolicy for pods in mutating webhook configuration | `Ignore`                      |
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example,
 
