@@ -49,7 +49,7 @@ spec:
             - --v={{ .Values.manager.log.level }}
           command:
             - /manager
-          image: {{ .Values.manager.image }}
+          image: {{ .Values.manager.image.repository }}:{{.Values.manager.image.tag}}
           imagePullPolicy: Always
           name: manager
           env:
