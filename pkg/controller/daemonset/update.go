@@ -523,7 +523,9 @@ func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1alpha1.Dae
 	} else {
 		sorted = append(updated, rest...)
 	}
-	if maxUpdate := len(allNames) - int(partition); maxUpdate < len(sorted) {
+	if maxUpdate := len(allNames) - int(partition); maxUpdate <= 0 {
+		return nil, nil
+	} else if maxUpdate < len(sorted) {
 		sorted = sorted[:maxUpdate]
 	}
 	return sorted, nil
