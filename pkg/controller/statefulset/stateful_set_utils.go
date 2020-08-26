@@ -404,6 +404,7 @@ func inconsistentStatus(set *appsv1alpha1.StatefulSet, status *appsv1alpha1.Stat
 		status.Replicas != set.Status.Replicas ||
 		status.CurrentReplicas != set.Status.CurrentReplicas ||
 		status.ReadyReplicas != set.Status.ReadyReplicas ||
+		status.AvailableReplicas != set.Status.AvailableReplicas ||
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
 		status.UpdateRevision != set.Status.UpdateRevision ||
