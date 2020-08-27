@@ -3,9 +3,9 @@
 FAQ contains some frequently asked questions about two aspects:
 
 - First, user-facing functionalities.
-- Second, underlying concept and thoery.
+- Second, underlying concept and theory.
 
-Techinical questions will not be included in openkruise/kruise's FAQ.
+Technical questions will not be included in openkruise/kruise's FAQ.
 
 ## Advanced Statefulset
 
