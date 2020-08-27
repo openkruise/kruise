@@ -1,6 +1,7 @@
 # Kruise
 
 ## Install
+
 Install with Helm 3:
 
 If your Kubernetes version is lower than 1.15 and you'd like to install Kruise via Helm 3, you'll need Helm v3.1.0+ that has the flag --disable-openapi-validation.
