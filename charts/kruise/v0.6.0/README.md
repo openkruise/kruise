@@ -2,15 +2,15 @@
 
 ## Install
 
-
 Install with Helm 3:
 
-If your Kubernetes version is lower than 1.15 and you'd like to install Crossplane via Helm 3, you'll need Helm v3.1.0+ that has the flag --disable-openapi-validation.
+If your Kubernetes version is lower than 1.15 and you'd like to install Kruise via Helm 3, you'll need Helm v3.1.0+ that has the flag --disable-openapi-validation.
+
 ```bash
 # Kubernetes 1.14 and older versions
 helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz --disable-openapi-validation
 # Kubernetes 1.15 and newer versions
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz 
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz
 ```
 
 you will see follow:
