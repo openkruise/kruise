@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -126,6 +127,7 @@ func (r *realControl) createPods(
 		podsCreationChan <- p
 	}
 
+	var created int64
 	successPodNames := sync.Map{}
 	_, err = clonesetutils.DoItSlowly(len(newPods), initialBatchSize, func() error {
 		pod := <-podsCreationChan
@@ -140,6 +142,8 @@ func (r *realControl) createPods(
 			return createErr
 		}
 
+		atomic.AddInt64(&created, 1)
+
 		successPodNames.Store(pod.Name, struct{}{})
 		return nil
 	})
@@ -151,10 +155,10 @@ func (r *realControl) createPods(
 		}
 	}
 
-	if err != nil {
+	if created == 0 {
 		return false, err
 	}
-	return true, nil
+	return true, err
 }
 
 func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, existingPVCNames sets.String) error {
