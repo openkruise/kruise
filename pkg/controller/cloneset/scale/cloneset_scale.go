@@ -126,7 +126,6 @@ func (r *realControl) createPods(
 		podsCreationChan <- p
 	}
 
-	var created bool
 	successPodNames := sync.Map{}
 	_, err = clonesetutils.DoItSlowly(len(newPods), initialBatchSize, func() error {
 		pod := <-podsCreationChan
@@ -140,7 +139,7 @@ func (r *realControl) createPods(
 		if createErr = r.createOnePod(cs, pod, existingPVCNames); createErr != nil {
 			return createErr
 		}
-		created = true
+
 		successPodNames.Store(pod.Name, struct{}{})
 		return nil
 	})
@@ -152,7 +151,10 @@ func (r *realControl) createPods(
 		}
 	}
 
-	return created, err
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, existingPVCNames sets.String) error {
