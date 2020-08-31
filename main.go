@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	extclient "github.com/openkruise/kruise/pkg/client"
@@ -53,9 +55,9 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
+	var metricsAddr, pprofAddr string
 	var healthProbeAddr string
-	var enableLeaderElection bool
+	var enableLeaderElection, enablePprof bool
 	var leaderElectionNamespace string
 	var namespace string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -65,9 +67,19 @@ func main() {
 		"This determines the namespace in which the leader election configmap will be created, it will use in-cluster namespace if empty.")
 	flag.StringVar(&namespace, "namespace", "",
 		"Namespace if specified restricts the manager's cache to watch objects in the desired namespace. Defaults to all namespaces.")
+	flag.BoolVar(&enablePprof, "enable-pprof", false, "Enable pprof for controller manager.")
+	flag.StringVar(&pprofAddr, "pprof-addr", ":8090", "The address the pprof binds to.")
 
 	klog.InitFlags(nil)
 	flag.Parse()
+
+	if enablePprof {
+		go func() {
+			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+				setupLog.Error(err, "unable to start pprof")
+			}
+		}()
+	}
 
 	//ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	ctrl.SetLogger(klogr.New())
