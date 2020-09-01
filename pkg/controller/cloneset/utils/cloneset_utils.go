@@ -137,8 +137,8 @@ func GetPersistentVolumeClaims(cs *appsv1alpha1.CloneSet, pod *v1.Pod) map[strin
 	templates := cs.Spec.VolumeClaimTemplates
 	claims := make(map[string]v1.PersistentVolumeClaim, len(templates))
 	for i := range templates {
-		claim := templates[i]
-		claim.Name = getPersistentVolumeClaimName(cs, &claim, pod.Labels[appsv1alpha1.CloneSetInstanceID])
+		claim := templates[i].DeepCopy()
+		claim.Name = getPersistentVolumeClaimName(cs, claim, pod.Labels[appsv1alpha1.CloneSetInstanceID])
 		claim.Namespace = cs.Namespace
 		if claim.Labels == nil {
 			claim.Labels = make(map[string]string)
@@ -150,7 +150,7 @@ func GetPersistentVolumeClaims(cs *appsv1alpha1.CloneSet, pod *v1.Pod) map[strin
 		if ref := metav1.GetControllerOf(pod); ref != nil {
 			claim.OwnerReferences = append(claim.OwnerReferences, *ref)
 		}
-		claims[templates[i].Name] = claim
+		claims[templates[i].Name] = *claim
 	}
 	return claims
 }
