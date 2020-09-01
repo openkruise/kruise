@@ -139,7 +139,10 @@ func (r *realControl) createPods(
 		}
 
 		var createErr error
-		if createErr = r.createOnePod(cs, pod, existingPVCNames); createErr != nil {
+		r.mu.Lock()
+		createErr = r.createOnePod(cs, pod, existingPVCNames)
+		r.mu.Unlock()
+		if createErr != nil {
 			return createErr
 		}
 
@@ -169,8 +172,7 @@ func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, exist
 			continue
 		}
 		r.exp.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
-		r.mu.Lock()
-		defer r.mu.Unlock()
+
 		if err := r.Create(context.TODO(), &c); err != nil {
 			r.exp.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
 			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pvc: %v, pvc: %v", err, util.DumpJSON(c))
