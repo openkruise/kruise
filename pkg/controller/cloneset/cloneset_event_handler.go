@@ -59,7 +59,7 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 			return
 		}
 		klog.V(4).Infof("Pod %s/%s created, owner: %s", pod.Namespace, pod.Name, req.Name)
-		scaleExpectations.ObserveScale(req.String(), expectations.Create, pod.Name)
+		clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pod.Name)
 		q.Add(*req)
 		return
 	}
@@ -89,6 +89,7 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
+	clonesetutils.ResourceVersionExpectations.Observe(curPod)
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if curPod.DeletionTimestamp != nil {
@@ -150,6 +151,7 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 		klog.Errorf("DeleteEvent parse pod failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
 		return
 	}
+	clonesetutils.ResourceVersionExpectations.Delete(pod)
 
 	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
@@ -162,7 +164,7 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	}
 
 	klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, req.Name)
-	scaleExpectations.ObserveScale(req.String(), expectations.Delete, pod.Name)
+	clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pod.Name)
 	q.Add(*req)
 }
 
@@ -240,7 +242,7 @@ func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
 		if req := resoleControllerRef(pvc.Namespace, controllerRef); req != nil {
-			scaleExpectations.ObserveScale(req.String(), expectations.Create, pvc.Name)
+			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pvc.Name)
 			q.Add(*req)
 		}
 	}
@@ -263,7 +265,7 @@ func (e *pvcEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
 		if req := resoleControllerRef(pvc.Namespace, controllerRef); req != nil {
-			scaleExpectations.ObserveScale(req.String(), expectations.Delete, pvc.Name)
+			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pvc.Name)
 			q.Add(*req)
 		}
 	}

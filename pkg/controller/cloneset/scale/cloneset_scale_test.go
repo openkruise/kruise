@@ -8,6 +8,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	apps "k8s.io/api/apps/v1"
@@ -25,7 +26,6 @@ func newFakeControl() *realControl {
 	return &realControl{
 		Client:   fake.NewFakeClient(),
 		recorder: record.NewFakeRecorder(10),
-		exp:      expectations.NewScaleExpectations(),
 	}
 }
 
@@ -67,6 +67,7 @@ func TestCreatePods(t *testing.T) {
 					appsv1alpha1.CloneSetInstanceID:     "id1",
 					apps.ControllerRevisionHashLabelKey: "revision-abc",
 					"foo":                               "bar",
+					appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -122,6 +123,7 @@ func TestCreatePods(t *testing.T) {
 					appsv1alpha1.CloneSetInstanceID:     "id3",
 					apps.ControllerRevisionHashLabelKey: "revision-xyz",
 					"foo":                               "bar",
+					appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -178,6 +180,7 @@ func TestCreatePods(t *testing.T) {
 					appsv1alpha1.CloneSetInstanceID:     "id4",
 					apps.ControllerRevisionHashLabelKey: "revision-xyz",
 					"foo":                               "bar",
+					appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -226,11 +229,22 @@ func TestCreatePods(t *testing.T) {
 			},
 		},
 	}
-	for i := range expectedPods {
-		appsv1alpha1.SetDefaultPod(&expectedPods[i])
-	}
 
 	sort.Slice(pods.Items, func(i, j int) bool { return pods.Items[i].Name < pods.Items[j].Name })
+	if len(pods.Items) != len(expectedPods) {
+		t.Fatalf("expected pods \n%s\ngot pods\n%s", util.DumpJSON(expectedPods), util.DumpJSON(pods.Items))
+	}
+
+	for i := range expectedPods {
+		appsv1alpha1.SetDefaultPod(&expectedPods[i])
+		if v, ok := pods.Items[i].Annotations[appsv1alpha1.LifecycleTimestampKey]; ok {
+			if expectedPods[i].Annotations == nil {
+				expectedPods[i].Annotations = make(map[string]string)
+			}
+			expectedPods[i].Annotations[appsv1alpha1.LifecycleTimestampKey] = v
+		}
+	}
+
 	if !reflect.DeepEqual(expectedPods, pods.Items) {
 		t.Fatalf("expected pods \n%s\ngot pods\n%s", util.DumpJSON(expectedPods), util.DumpJSON(pods.Items))
 	}
@@ -305,7 +319,7 @@ func TestCreatePods(t *testing.T) {
 		t.Fatalf("expected pvcs \n%s\ngot pvcs\n%s", util.DumpJSON(expectedPVCs), util.DumpJSON(pvcs.Items))
 	}
 
-	exp := ctrl.exp.GetExpectations("default/foo")
+	exp := clonesetutils.ScaleExpectations.GetExpectations("default/foo")
 	expectedExp := map[expectations.ScaleAction]sets.String{
 		expectations.Create: sets.NewString("foo-id1", "foo-id3", "foo-id4", "datadir-foo-id1", "datadir-foo-id4"),
 	}

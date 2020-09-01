@@ -70,6 +70,33 @@ spec:
         spec:
           description: CloneSetSpec defines the desired state of CloneSet
           properties:
+            lifecycle:
+              description: Lifecycle defines the lifecycle hooks for Pods pre-delete,
+                in-place update.
+              properties:
+                inPlaceUpdate:
+                  properties:
+                    finalizersHandler:
+                      items:
+                        type: string
+                      type: array
+                    labelsHandler:
+                      additionalProperties:
+                        type: string
+                      type: object
+                  type: object
+                preDelete:
+                  properties:
+                    finalizersHandler:
+                      items:
+                        type: string
+                      type: array
+                    labelsHandler:
+                      additionalProperties:
+                        type: string
+                      type: object
+                  type: object
+              type: object
             minReadySeconds:
               description: Minimum number of seconds for which a newly created pod
                 should be ready without any of its container crashing, for it to be

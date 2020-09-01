@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,8 +34,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ControllerKind is GroupVersionKind for CloneSet.
-var ControllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+var (
+	// ControllerKind is GroupVersionKind for CloneSet.
+	ControllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+
+	ScaleExpectations           = expectations.NewScaleExpectations()
+	UpdateExpectations          = expectations.NewUpdateExpectations(GetPodRevision)
+	ResourceVersionExpectations = expectations.NewResourceVersionExpectation()
+)
 
 // GetControllerKey return key of CloneSet.
 func GetControllerKey(cs *appsv1alpha1.CloneSet) string {

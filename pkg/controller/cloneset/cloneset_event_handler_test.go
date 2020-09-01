@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util/expectations"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
@@ -172,9 +172,9 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		modifySatisfied := false
 		if testCase.alterExpectationCreationsKey != "" && len(testCase.alterExpectationCreationsAdds) > 0 {
 			for _, n := range testCase.alterExpectationCreationsAdds {
-				scaleExpectations.ExpectScale(testCase.alterExpectationCreationsKey, expectations.Create, n)
+				clonesetutils.ScaleExpectations.ExpectScale(testCase.alterExpectationCreationsKey, expectations.Create, n)
 			}
-			if ok, _ := scaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
+			if ok, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
 				t.Fatalf("%s before execute, should not be satisfied", testCase.name)
 			}
 			modifySatisfied = true
@@ -185,7 +185,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
 		}
 		if modifySatisfied {
-			if ok, _ := scaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
+			if ok, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
 				t.Fatalf("%s expected satisfied, but it is not", testCase.name)
 			}
 		}
