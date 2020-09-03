@@ -22,6 +22,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -335,6 +336,65 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 		should := NodeShouldUpdateBySelector(tt.Node, tt.Ds)
 		if should != tt.Expected {
 			t.Errorf("NodeShouldUpdateBySelector() = %v, want %v", should, tt.Expected)
+		}
+	}
+}
+
+func TestGetSchedulerNodeInfo(t *testing.T) {
+	for _, tt := range []struct {
+		Title                    string
+		Node                     *corev1.Node
+		SetExtraAllowedPodNumber int64
+		ExpectedAllowedPodNumber int
+	}{
+		{
+			"node with no pod resource, without set extra allowed pod number",
+			func() *corev1.Node {
+				n := newNode("node1", nil)
+				return n
+			}(),
+			0,
+			0,
+		},
+		{
+			"node with no pod resource, with set extra allowed pod number",
+			func() *corev1.Node {
+				n := newNode("node1", nil)
+				return n
+			}(),
+			9,
+			0,
+		},
+		{
+			"node with pod resource, without set extra allowed pod number",
+			func() *corev1.Node {
+				n := newNode("node1", nil)
+				n.Status.Allocatable = corev1.ResourceList{
+					corev1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				}
+				return n
+			}(),
+			0,
+			110,
+		},
+		{
+			"node with pod resource, with set extra allowed pod number",
+			func() *corev1.Node {
+				n := newNode("node1", nil)
+				n.Status.Allocatable = corev1.ResourceList{
+					corev1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				}
+				return n
+			}(),
+			9,
+			119,
+		},
+	} {
+		t.Logf("\t%s", tt.Title)
+		extraAllowedPodNumber = tt.SetExtraAllowedPodNumber
+		nodeInfo := newSchedulerNodeInfo(tt.Node)
+		if nodeInfo.AllowedPodNumber() != tt.ExpectedAllowedPodNumber {
+			t.Errorf("actual allowed pod number = %v, want %v", nodeInfo.AllowedPodNumber(), tt.ExpectedAllowedPodNumber)
 		}
 	}
 }
