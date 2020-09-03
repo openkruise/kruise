@@ -70,11 +70,14 @@ import (
 func init() {
 	flag.BoolVar(&scheduleDaemonSetPods, "assign-pods-by-scheduler", true, "Use scheduler to assign pod to node.")
 	flag.IntVar(&concurrentReconciles, "daemonset-workers", concurrentReconciles, "Max concurrent workers for DaemonSet controller.")
+	flag.Int64Var(&extraAllowedPodNumber, "daemonset-extra-allowed-pod-number", extraAllowedPodNumber,
+		"Extra allowed number of Pods that can run on one node, ensure daemonset pod to be assigned")
 }
 
 var (
 	concurrentReconciles  = 3
 	scheduleDaemonSetPods bool
+	extraAllowedPodNumber = int64(0)
 
 	// controllerKind contains the schema.GroupVersionKind for this controller type.
 	controllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("DaemonSet")

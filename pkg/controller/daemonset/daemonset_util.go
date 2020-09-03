@@ -24,6 +24,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -163,6 +164,22 @@ func NodeShouldRunDaemonPod(client client.Client, node *corev1.Node, ds *appsv1a
 	return
 }
 
+func newSchedulerNodeInfo(node *corev1.Node) *schedulernodeinfo.NodeInfo {
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	if extraAllowedPodNumber > 0 {
+		rQuant, ok := node.Status.Allocatable[corev1.ResourcePods]
+		if ok {
+			rQuant.Add(*resource.NewQuantity(extraAllowedPodNumber, resource.DecimalSI))
+			nodeCopy := node.DeepCopy()
+			nodeCopy.Status.Allocatable[corev1.ResourcePods] = rQuant
+			nodeInfo.SetNode(nodeCopy)
+			return nodeInfo
+		}
+	}
+	nodeInfo.SetNode(node)
+	return nodeInfo
+}
+
 func Simulate(kubeclient client.Client, newPod *corev1.Pod, node *corev1.Node, ds *appsv1alpha1.DaemonSet) ([]predicates.PredicateFailureReason, *schedulernodeinfo.NodeInfo, error) {
 	podList := corev1.PodList{}
 	err := kubeclient.List(context.TODO(), &podList, client.MatchingFields{"spec.nodeName": node.Name})
@@ -170,8 +187,7 @@ func Simulate(kubeclient client.Client, newPod *corev1.Pod, node *corev1.Node, d
 		return nil, nil, err
 	}
 
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
-	nodeInfo.SetNode(node)
+	nodeInfo := newSchedulerNodeInfo(node)
 
 	for index := range podList.Items {
 		if isControlledByDaemonSet(&podList.Items[index], ds.GetUID()) {
