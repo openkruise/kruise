@@ -191,6 +191,7 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 					{
 						Name:    "c1",
 						ImageID: "img01",
+						Image:   "image01",
 					},
 				},
 			},

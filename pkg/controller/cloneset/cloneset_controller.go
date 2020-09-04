@@ -29,7 +29,6 @@ import (
 	scalecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/scale"
 	updatecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/update"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
@@ -60,9 +59,6 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-
-	scaleExpectations  = expectations.NewScaleExpectations()
-	updateExpectations = expectations.NewUpdateExpectations(clonesetutils.GetPodRevision)
 )
 
 // Add creates a new CloneSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -92,8 +88,8 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		controllerHistory: historyutil.NewHistory(mgr.GetClient()),
 		revisionControl:   revisioncontrol.NewRevisionControl(),
 	}
-	reconciler.scaleControl = scalecontrol.New(mgr.GetClient(), reconciler.recorder, scaleExpectations)
-	reconciler.updateControl = updatecontrol.New(mgr.GetClient(), reconciler.recorder, scaleExpectations, updateExpectations)
+	reconciler.scaleControl = scalecontrol.New(mgr.GetClient(), reconciler.recorder)
+	reconciler.updateControl = updatecontrol.New(mgr.GetClient(), reconciler.recorder)
 	reconciler.reconcileFunc = reconciler.doReconcile
 	return reconciler
 }
@@ -189,8 +185,8 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			klog.V(3).Infof("CloneSet %s has been deleted.", request)
-			scaleExpectations.DeleteExpectations(request.String())
-			updateExpectations.DeleteExpectations(request.String())
+			clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
+			clonesetutils.UpdateExpectations.DeleteExpectations(request.String())
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
@@ -210,7 +206,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}
 
 	// If scaling expectations have not satisfied yet, just skip this reconcile.
-	if scaleSatisfied, scaleDirtyPods := scaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
+	if scaleSatisfied, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
 		klog.V(4).Infof("Not satisfied scale for %v, scaleDirtyPods=%v", request.String(), scaleDirtyPods)
 		return reconcile.Result{}, nil
 	}
@@ -236,12 +232,19 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// Refresh update expectations
 	for _, pod := range filteredPods {
-		updateExpectations.ObserveUpdated(request.String(), updateRevision.Name, pod)
+		clonesetutils.UpdateExpectations.ObserveUpdated(request.String(), updateRevision.Name, pod)
 	}
 	// If update expectations have not satisfied yet, just skip this reconcile.
-	if updateSatisfied, updateDirtyPods := updateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name); !updateSatisfied {
+	if updateSatisfied, updateDirtyPods := clonesetutils.UpdateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name); !updateSatisfied {
 		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
 		return reconcile.Result{}, nil
+	}
+	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
+	for _, pod := range filteredPods {
+		if !clonesetutils.ResourceVersionExpectations.IsSatisfied(pod) {
+			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for pod %v updating", request.String(), pod.Name)
+			return reconcile.Result{}, nil
+		}
 	}
 
 	newStatus := appsv1alpha1.CloneSetStatus{

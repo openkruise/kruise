@@ -48,6 +48,7 @@ type (
 
 type UpdateOptions struct {
 	GracePeriodSeconds int32
+	AdditionalFuncs    []func(*v1.Pod)
 
 	CustomizeSpecCalculate        CustomizeSpecCalculateFunc
 	CustomizeSpecPatch            CustomizeSpecPatchFunc
@@ -69,6 +70,7 @@ type UpdateResult struct {
 // Interface for managing pods in-place update.
 type Interface interface {
 	Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult
+	CanUpdateInPlace(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) bool
 	Update(pod *v1.Pod, oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) UpdateResult
 }
 
@@ -215,14 +217,13 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 	return delayDuration, err
 }
 
+func (c *realControl) CanUpdateInPlace(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) bool {
+	return calculateInPlaceUpdateSpec(oldRevision, newRevision, opts) != nil
+}
+
 func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) UpdateResult {
 	// 1. calculate inplace update spec
-	var spec *UpdateSpec
-	if opts == nil || opts.CustomizeSpecCalculate == nil {
-		spec = calculateInPlaceUpdateSpec(oldRevision, newRevision, opts)
-	} else {
-		spec = opts.CustomizeSpecCalculate(oldRevision, newRevision)
-	}
+	spec := calculateInPlaceUpdateSpec(oldRevision, newRevision, opts)
 	if spec == nil {
 		return UpdateResult{}
 	}
@@ -270,6 +271,11 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 		}
 		if clone.Annotations == nil {
 			clone.Annotations = map[string]string{}
+		}
+		if opts != nil {
+			for _, f := range opts.AdditionalFuncs {
+				f(clone)
+			}
 		}
 
 		// record old containerStatuses
@@ -331,6 +337,10 @@ func patchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) (*
 // If the diff just contains replace operation of spec.containers[x].image, it will returns an UpdateSpec.
 // Otherwise, it returns nil which means can not use in-place update.
 func calculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec {
+	if opts != nil && opts.CustomizeSpecCalculate != nil {
+		return opts.CustomizeSpecCalculate(oldRevision, newRevision)
+	}
+
 	if oldRevision == nil || newRevision == nil {
 		return nil
 	}
@@ -419,10 +429,16 @@ func CheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 			pod.Labels[apps.StatefulSetRevisionLabel], inPlaceUpdateState.Revision)
 	}
 
+	containerImages := make(map[string]string, len(pod.Spec.Containers))
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		containerImages[c.Name] = c.Image
+	}
+
 	for _, cs := range pod.Status.ContainerStatuses {
 		if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
 			// TODO: we assume that users should not update workload template with new image which actually has the same imageID as the old image
-			if oldStatus.ImageID == cs.ImageID {
+			if oldStatus.ImageID == cs.ImageID && containerImages[cs.Name] != cs.Image {
 				return fmt.Errorf("container %s imageID not changed", cs.Name)
 			}
 			delete(inPlaceUpdateState.LastContainerStatuses, cs.Name)
