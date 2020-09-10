@@ -13,6 +13,14 @@ import (
 var (
 	sidecarSetDemo = &appsv1alpha1.SidecarSet{
 		Spec: appsv1alpha1.SidecarSetSpec{
+			InitContainers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "test-init-containers",
+						Image: "test-init-image:latest",
+					},
+				},
+			},
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
@@ -32,6 +40,9 @@ func TestSidecarSetDefault(t *testing.T) {
 	expectedOutputSidecarSet.Spec.Containers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
 	expectedOutputSidecarSet.Spec.Containers[0].TerminationMessagePolicy = corev1.TerminationMessageReadFile
 	expectedOutputSidecarSet.Spec.Containers[0].ImagePullPolicy = corev1.PullIfNotPresent
+	expectedOutputSidecarSet.Spec.InitContainers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
+	expectedOutputSidecarSet.Spec.InitContainers[0].TerminationMessagePolicy = corev1.TerminationMessageReadFile
+	expectedOutputSidecarSet.Spec.InitContainers[0].ImagePullPolicy = corev1.PullAlways
 	maxUnavailable := intstr.FromInt(1)
 	expectedOutputSidecarSet.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
 		RollingUpdate: &appsv1alpha1.RollingUpdateSidecarSet{

@@ -100,6 +100,7 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, validateContainersForSidecarSet(spec.Containers, vols, fldPath.Child("containers"))...)
+	allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, vols, fldPath.Child("initContainers"))...)
 
 	return allErrs
 }
