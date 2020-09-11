@@ -40,6 +40,9 @@ func SidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 // SidecarSetHashWithoutImage calculates hash without sidecars's image
 func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	ss := sidecarSet.DeepCopy()
+	for i := range ss.Spec.InitContainers {
+		ss.Spec.InitContainers[i].Image = ""
+	}
 	for i := range ss.Spec.Containers {
 		ss.Spec.Containers[i].Image = ""
 	}
@@ -48,7 +51,7 @@ func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, er
 
 func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
-	m := map[string]interface{}{"containers": sidecarSet.Spec.Containers}
+	m := map[string]interface{}{"initContainers": sidecarSet.Spec.InitContainers, "containers": sidecarSet.Spec.Containers}
 	data, err := json.Marshal(m)
 	if err != nil {
 		return "", err

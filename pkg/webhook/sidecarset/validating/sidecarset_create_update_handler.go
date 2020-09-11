@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"regexp"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +34,8 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const (
@@ -99,8 +100,7 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 	allErrs = append(allErrs, validateSidecarSetStratety(&spec.Strategy, fldPath.Child("strategy"))...)
 	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
-	allErrs = append(allErrs, validateContainersForSidecarSet(spec.Containers, vols, fldPath.Child("containers"))...)
-	allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, vols, fldPath.Child("initContainers"))...)
+	allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, spec.Containers, vols, fldPath.Child("containers"))...)
 
 	return allErrs
 }
@@ -132,9 +132,18 @@ func getCoreVolumes(volumes []v1.Volume, fldPath *field.Path) ([]core.Volume, fi
 }
 
 func validateContainersForSidecarSet(
-	containers []appsv1alpha1.SidecarContainer, coreVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
+	initContainers, containers []appsv1alpha1.SidecarContainer, coreVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	coreInitContainers := []core.Container{}
+	for _, container := range initContainers {
+		coreContainer := core.Container{}
+		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
+			return allErrs
+		}
+		coreInitContainers = append(coreInitContainers, coreContainer)
+	}
 	coreContainers := []core.Container{}
 	for _, container := range containers {
 		coreContainer := core.Container{}
@@ -145,15 +154,31 @@ func validateContainersForSidecarSet(
 		coreContainers = append(coreContainers, coreContainer)
 	}
 
-	// use fakePod to reuse unexported 'validateContainers' function
-	fakePod := &core.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-		Spec: core.PodSpec{
-			DNSPolicy:     core.DNSClusterFirst,
-			RestartPolicy: core.RestartPolicyAlways,
-			Containers:    coreContainers,
-			Volumes:       coreVolumes,
-		},
+	// hack, use fakePod to reuse unexported 'validateContainers' function
+	var fakePod *core.Pod
+	if len(coreContainers) == 0 {
+		// hack, the ValidatePod requires containers, so validate the initContainers as containers instead,
+		// the only difference is that init containers can have the same port as they are running in sequence
+		fakePod = &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+			Spec: core.PodSpec{
+				DNSPolicy:     core.DNSClusterFirst,
+				RestartPolicy: core.RestartPolicyAlways,
+				Containers:    coreInitContainers,
+				Volumes:       coreVolumes,
+			},
+		}
+	} else {
+		fakePod = &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+			Spec: core.PodSpec{
+				DNSPolicy:      core.DNSClusterFirst,
+				RestartPolicy:  core.RestartPolicyAlways,
+				InitContainers: coreInitContainers,
+				Containers:     coreContainers,
+				Volumes:        coreVolumes,
+			},
+		}
 	}
 	allErrs = append(allErrs, corevalidation.ValidatePod(fakePod)...)
 

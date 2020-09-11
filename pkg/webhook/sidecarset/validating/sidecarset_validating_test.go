@@ -38,6 +38,60 @@ func TestValidateSidecarSet(t *testing.T) {
 				},
 			},
 		},
+		"wrong-init-containers": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+					RollingUpdate: &appsv1alpha1.RollingUpdateSidecarSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				InitContainers: []appsv1alpha1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name:            "test-initcontainer",
+							Image:           "test-initimage",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+				},
+				Containers: []appsv1alpha1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name:                     "test-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		"wrong-init-containers-only": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+					RollingUpdate: &appsv1alpha1.RollingUpdateSidecarSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				InitContainers: []appsv1alpha1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name:            "test-initcontainer",
+							Image:           "test-initimage",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+				},
+			},
+		},
 		"wrong-containers": {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
 			Spec: appsv1alpha1.SidecarSetSpec{
