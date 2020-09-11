@@ -37,12 +37,10 @@ func SidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	return h, nil
 }
 
-// SidecarSetHashWithoutImage calculates hash without sidecars's image
+// SidecarSetHashWithoutImage calculates hash without sidecars's container image
+// This is used to determine if the sidecar reconcile needs to update a pod image
 func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	ss := sidecarSet.DeepCopy()
-	for i := range ss.Spec.InitContainers {
-		ss.Spec.InitContainers[i].Image = ""
-	}
 	for i := range ss.Spec.Containers {
 		ss.Spec.Containers[i].Image = ""
 	}

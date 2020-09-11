@@ -64,8 +64,10 @@ spec:
                 type: object
               type: array
             initContainers:
-              description: Containers is the list of sidecar containers to be injected
-                into the selected pod
+              description: Containers is the list of init containers to be injected
+                into the selected pod We will inject those containers by their name
+                in ascending order We only inject init containers when a new pod is
+                created, it does not apply to any existing pod
               items:
                 description: SidecarContainer defines the container of Sidecar
                 type: object
