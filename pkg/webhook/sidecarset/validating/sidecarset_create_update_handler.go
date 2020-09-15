@@ -157,29 +157,28 @@ func validateContainersForSidecarSet(
 	// hack, use fakePod to reuse unexported 'validateContainers' function
 	var fakePod *core.Pod
 	if len(coreContainers) == 0 {
-		// hack, the ValidatePod requires containers, so validate the initContainers as containers instead,
-		// the only difference is that init containers can have the same port as they are running in sequence
-		fakePod = &core.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-			Spec: core.PodSpec{
-				DNSPolicy:     core.DNSClusterFirst,
-				RestartPolicy: core.RestartPolicyAlways,
-				Containers:    coreInitContainers,
-				Volumes:       coreVolumes,
-			},
-		}
-	} else {
-		fakePod = &core.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-			Spec: core.PodSpec{
-				DNSPolicy:      core.DNSClusterFirst,
-				RestartPolicy:  core.RestartPolicyAlways,
-				InitContainers: coreInitContainers,
-				Containers:     coreContainers,
-				Volumes:        coreVolumes,
+		// hack, the ValidatePod requires containers, so create a fake coreContainer
+		coreContainers = []core.Container{
+			{
+				Name:                     "test",
+				Image:                    "busybox",
+				ImagePullPolicy:          core.PullIfNotPresent,
+				TerminationMessagePolicy: core.TerminationMessageReadFile,
 			},
 		}
 	}
+
+	fakePod = &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+		Spec: core.PodSpec{
+			DNSPolicy:      core.DNSClusterFirst,
+			RestartPolicy:  core.RestartPolicyAlways,
+			InitContainers: coreInitContainers,
+			Containers:     coreContainers,
+			Volumes:        coreVolumes,
+		},
+	}
+
 	allErrs = append(allErrs, corevalidation.ValidatePod(fakePod)...)
 
 	return allErrs
