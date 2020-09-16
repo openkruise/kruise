@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sort"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -71,7 +72,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 		return err
 	}
 
-	var sidecarContainers []corev1.Container
+	var sidecarInitContainers, sidecarContainers []corev1.Container
 	var sidecarVolumes []corev1.Volume
 	sidecarSetHash := make(map[string]string)
 	sidecarSetHashWithoutImage := make(map[string]string)
@@ -89,10 +90,19 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 		sidecarSetHash[sidecarSet.Name] = sidecarSet.Annotations[mutating.SidecarSetHashAnnotation]
 		sidecarSetHashWithoutImage[sidecarSet.Name] = sidecarSet.Annotations[mutating.SidecarSetHashWithoutImageAnnotation]
 
+		for i := range sidecarSet.Spec.InitContainers {
+			initContainer := &sidecarSet.Spec.InitContainers[i]
+
+			// add "Injected" env to the init container
+			initContainer.Env = append(initContainer.Env, corev1.EnvVar{Name: SidecarEnvKey, Value: "true"})
+
+			sidecarInitContainers = append(sidecarInitContainers, initContainer.Container)
+		}
+
 		for i := range sidecarSet.Spec.Containers {
 			sidecarContainer := &sidecarSet.Spec.Containers[i]
 
-			// add env to container
+			// add the "Injected" env to the sidecar container
 			sidecarContainer.Env = append(sidecarContainer.Env, corev1.EnvVar{Name: SidecarEnvKey, Value: "true"})
 
 			sidecarContainers = append(sidecarContainers, sidecarContainer.Container)
@@ -105,12 +115,17 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 	}
 
 	klog.V(4).Infof("[sidecar inject] before mutating: %v", util.DumpJSON(pod))
-	// apply sidecar info into pod
-	// 1. apply containers
+	// apply sidecar set info into pod
+	// 1. inject init containers, sort by their name, after the original init containers
+	sort.SliceStable(sidecarInitContainers, func(i, j int) bool {
+		return sidecarInitContainers[i].Name < sidecarInitContainers[j].Name
+	})
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers, sidecarInitContainers...)
+	// 2. inject containers
 	pod.Spec.Containers = append(pod.Spec.Containers, sidecarContainers...)
-	// 2. apply volumes
+	// 3. inject volumes
 	pod.Spec.Volumes = mergeVolumes(pod.Spec.Volumes, sidecarVolumes)
-	// 3. apply annotations
+	// 4. apply annotations
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}

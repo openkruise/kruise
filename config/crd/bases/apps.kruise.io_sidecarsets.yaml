@@ -63,6 +63,15 @@ spec:
                 description: SidecarContainer defines the container of Sidecar
                 type: object
               type: array
+            initContainers:
+              description: Containers is the list of init containers to be injected
+                into the selected pod We will inject those containers by their name
+                in ascending order We only inject init containers when a new pod is
+                created, it does not apply to any existing pod
+              items:
+                description: SidecarContainer defines the container of Sidecar
+                type: object
+              type: array
             paused:
               description: Paused indicates that the sidecarset is paused and will
                 not be processed by the sidecarset controller.

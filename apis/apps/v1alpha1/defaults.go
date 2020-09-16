@@ -28,6 +28,10 @@ import (
 func SetDefaultsSidecarSet(obj *SidecarSet) {
 	setSidecarSetUpdateStratety(&obj.Spec.Strategy)
 
+	for i := range obj.Spec.InitContainers {
+		setSidecarDefaultContainer(&obj.Spec.InitContainers[i])
+	}
+
 	for i := range obj.Spec.Containers {
 		setSidecarDefaultContainer(&obj.Spec.Containers[i])
 	}

@@ -29,7 +29,7 @@ import (
 // SidecarSetHash returns a hash of the SidecarSet.
 // The Containers are taken into account.
 func SidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
-	encoded, err := encodeSidecarSet(sidecarSet)
+	encoded, err := encodeSidecarSet(sidecarSet, true)
 	if err != nil {
 		return "", err
 	}
@@ -37,18 +37,26 @@ func SidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	return h, nil
 }
 
-// SidecarSetHashWithoutImage calculates hash without sidecars's image
+// SidecarSetHashWithoutImage calculates sidecars's container hash without its image
+// we use this to determine if the sidecar reconcile needs to update a pod image
 func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	ss := sidecarSet.DeepCopy()
 	for i := range ss.Spec.Containers {
 		ss.Spec.Containers[i].Image = ""
 	}
-	return SidecarSetHash(ss)
+	encoded, err := encodeSidecarSet(ss, false)
+	if err != nil {
+		return "", err
+	}
+	return rand.SafeEncodeString(hash(encoded)), nil
 }
 
-func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
+func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet, includeInit bool) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
 	m := map[string]interface{}{"containers": sidecarSet.Spec.Containers}
+	if includeInit {
+		m["initContainers"] = sidecarSet.Spec.InitContainers
+	}
 	data, err := json.Marshal(m)
 	if err != nil {
 		return "", err

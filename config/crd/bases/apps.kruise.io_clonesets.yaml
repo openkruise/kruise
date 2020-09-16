@@ -75,6 +75,8 @@ spec:
                 in-place update.
               properties:
                 inPlaceUpdate:
+                  description: InPlaceUpdate is the hook before Pod to update and
+                    after Pod has been updated.
                   properties:
                     finalizersHandler:
                       items:
@@ -86,6 +88,7 @@ spec:
                       type: object
                   type: object
                 preDelete:
+                  description: PreDelete is the hook before Pod to be deleted.
                   properties:
                     finalizersHandler:
                       items:

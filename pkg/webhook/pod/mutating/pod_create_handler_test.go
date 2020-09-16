@@ -47,6 +47,20 @@ func TestSidecarSetMutatePod(t *testing.T) {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "nginx"},
 			},
+			InitContainers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "init1",
+						Image: "init-image1",
+					},
+				},
+				{
+					Container: corev1.Container{
+						Name:  "init3",
+						Image: "init-image3",
+					},
+				},
+			},
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
@@ -75,6 +89,14 @@ func TestSidecarSetMutatePod(t *testing.T) {
 		Spec: appsv1alpha1.SidecarSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "nginx"},
+			},
+			InitContainers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "init2",
+						Image: "init-image2",
+					},
+				},
 			},
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
@@ -125,6 +147,18 @@ func TestSidecarSetMutatePod(t *testing.T) {
 	_ = podHandler.mutatingPodFn(context.TODO(), pod1)
 	_ = podHandler.mutatingPodFn(context.TODO(), pod2)
 
+	if len(pod1.Spec.InitContainers) != 3 {
+		t.Errorf("expect 3 init containers, but got %v", len(pod1.Spec.InitContainers))
+	}
+	if pod1.Spec.InitContainers[0].Name != "init1" {
+		t.Errorf("expect first init container `init1`, but got %s", pod1.Spec.InitContainers[0].Name)
+	}
+	if pod1.Spec.InitContainers[1].Name != "init2" {
+		t.Errorf("expect first init container `init2`, but got %s", pod1.Spec.InitContainers[0].Name)
+	}
+	if pod1.Spec.InitContainers[2].Name != "init3" {
+		t.Errorf("expect first init container `init3`, but got %s", pod1.Spec.InitContainers[0].Name)
+	}
 	if len(pod1.Spec.Containers) != 3 {
 		t.Errorf("expect 3 containers, but got %v", len(pod1.Spec.Containers))
 	}

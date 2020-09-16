@@ -27,6 +27,11 @@ type SidecarSetSpec struct {
 	// selector is a label query over pods that should be injected
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
+	// Containers is the list of init containers to be injected into the selected pod
+	// We will inject those containers by their name in ascending order
+	// We only inject init containers when a new pod is created, it does not apply to any existing pod
+	InitContainers []SidecarContainer `json:"initContainers,omitempty"`
+
 	// Containers is the list of sidecar containers to be injected into the selected pod
 	Containers []SidecarContainer `json:"containers,omitempty"`
 
