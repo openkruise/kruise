@@ -377,6 +377,9 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 
 	// attempt to find the revision that corresponds to the current revision
 	for i := range revisions {
+		if revisions[i].Name == updateRevision.Name {
+			continue
+		}
 		if podsRevisions.Has(revisions[i].Name) {
 			currentRevision = revisions[i]
 			break
