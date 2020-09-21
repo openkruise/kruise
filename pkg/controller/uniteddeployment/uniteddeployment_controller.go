@@ -66,6 +66,7 @@ type subSetType string
 const (
 	statefulSetSubSetType         subSetType = "StatefulSet"
 	advancedStatefulSetSubSetType subSetType = "AdvancedStatefulSet"
+	cloneSetSubSetType            subSetType = "CloneSet"
 )
 
 // Add creates a new UnitedDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -87,6 +88,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		subSetControls: map[subSetType]ControlInterface{
 			statefulSetSubSetType:         &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.StatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 			advancedStatefulSetSubSetType: &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.AdvancedStatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
+			cloneSetSubSetType:            &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.CloneSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 		},
 	}
 }
@@ -114,6 +116,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &appsv1alpha1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &appsv1alpha1.UnitedDeployment{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CloneSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.UnitedDeployment{},
 	})
@@ -270,6 +280,10 @@ func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.Uni
 
 	if instance.Spec.Template.AdvancedStatefulSetTemplate != nil {
 		return r.subSetControls[advancedStatefulSetSubSetType], advancedStatefulSetSubSetType
+	}
+
+	if instance.Spec.Template.CloneSetTemplate != nil {
+		return r.subSetControls[cloneSetSubSetType], cloneSetSubSetType
 	}
 
 	// unexpected

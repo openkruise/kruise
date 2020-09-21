@@ -280,7 +280,7 @@ status:
 
 ### Manage the subset type
 
-UnitedDeployment now supports two types of subset which are `StatefulSet` and `AdvancedStatefulSet`.
+UnitedDeployment now supports three types of subset which are `StatefulSet`、`AdvancedStatefulSet`、`CloneSet`.
 It is allowed to change subset type from one to another at runtime. Take the above UnitedDeployment as an example.
 
 Create a new UnitedDeployment with the same definition.
@@ -302,6 +302,7 @@ demo-guestbook-kruise-subset-c-bj7f2     3         3         82s
 Then we update the subset type from StatefulSet to AdvancedStatefulSet
 by using the `advancedStatefulSetTemplate` to describe the subset template.
 By the way, let's enable the in-place update of the subset pod.
+(and use `cloneSetTemplate` if you need CloneSet)
 
 ```yaml
 ...
