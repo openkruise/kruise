@@ -20,6 +20,7 @@ import (
 	"context"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,7 +44,8 @@ type realStatusUpdater struct {
 
 func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
 	r.calculateStatus(cs, newStatus, pods)
-	if !r.inconsistentStatus(cs, newStatus) {
+	isChanged := clonesetcore.New(cs).ExtraStatusCalculation(cs, pods)
+	if !r.inconsistentStatus(cs, newStatus) && !isChanged {
 		return nil
 	}
 
