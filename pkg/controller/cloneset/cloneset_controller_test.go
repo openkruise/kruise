@@ -312,7 +312,7 @@ func checkInstances(g *gomega.GomegaWithT, cs *appsv1alpha1.CloneSet, podNum int
 		pods, err = clonesetutils.GetActivePods(c, opts)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		return len(pods)
-	}, time.Second*3, time.Millisecond*500).Should(gomega.Equal(podNum))
+	}, time.Second*10, time.Millisecond*500).Should(gomega.Equal(podNum))
 
 	var pvcs []*v1.PersistentVolumeClaim
 	g.Eventually(func() int {

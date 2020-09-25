@@ -202,6 +202,7 @@ func TestTemplateTypeSwtichToCS(t *testing.T) {
 			},
 		},
 		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
