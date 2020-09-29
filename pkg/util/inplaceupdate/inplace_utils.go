@@ -435,11 +435,14 @@ func CheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 		containerImages[c.Name] = c.Image
 	}
 
+	_, isInGraceState := pod.Annotations[appsv1alpha1.InPlaceUpdateGraceKey]
 	for _, cs := range pod.Status.ContainerStatuses {
 		if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
 			// TODO: we assume that users should not update workload template with new image which actually has the same imageID as the old image
-			if oldStatus.ImageID == cs.ImageID && containerImages[cs.Name] != cs.Image {
-				return fmt.Errorf("container %s imageID not changed", cs.Name)
+			if oldStatus.ImageID == cs.ImageID {
+				if containerImages[cs.Name] != cs.Image || isInGraceState {
+					return fmt.Errorf("container %s imageID not changed", cs.Name)
+				}
 			}
 			delete(inPlaceUpdateState.LastContainerStatuses, cs.Name)
 		}
