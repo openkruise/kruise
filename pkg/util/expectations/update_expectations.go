@@ -27,6 +27,7 @@ import (
 type UpdateExpectations interface {
 	ExpectUpdated(controllerKey, revision string, obj metav1.Object)
 	ObserveUpdated(controllerKey, revision string, obj metav1.Object)
+	DeleteObject(controllerKey string, obj metav1.Object)
 	SatisfiedExpectations(controllerKey, revision string) (bool, []string)
 	DeleteExpectations(controllerKey string)
 }
@@ -86,6 +87,18 @@ func (r *realUpdateExpectations) ObserveUpdated(controllerKey, revision string, 
 	if expectations.revision != revision || expectations.objsUpdated.Len() == 0 {
 		delete(r.controllerCache, controllerKey)
 	}
+}
+
+func (r *realUpdateExpectations) DeleteObject(controllerKey string, obj metav1.Object) {
+	r.Lock()
+	defer r.Unlock()
+
+	expectations := r.controllerCache[controllerKey]
+	if expectations == nil {
+		return
+	}
+
+	expectations.objsUpdated.Delete(getKey(obj))
 }
 
 func (r *realUpdateExpectations) SatisfiedExpectations(controllerKey, revision string) (bool, []string) {
