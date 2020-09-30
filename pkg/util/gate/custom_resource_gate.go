@@ -21,10 +21,13 @@ import (
 	"strings"
 
 	"github.com/openkruise/kruise/apis"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -37,6 +40,8 @@ const (
 var (
 	internalScheme  = runtime.NewScheme()
 	discoveryClient discovery.DiscoveryInterface
+
+	isNotNotFound = func(err error) bool { return !errors.IsNotFound(err) }
 )
 
 func init() {
@@ -64,10 +69,22 @@ func discoveryEnabled(gvk schema.GroupVersionKind) bool {
 	if discoveryClient == nil {
 		return true
 	}
-	resourceList, err := discoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
+	var resourceList *metav1.APIResourceList
+	err := retry.OnError(retry.DefaultBackoff, isNotNotFound, func() error {
+		var err error
+		resourceList, err = discoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
+		if err != nil && !errors.IsNotFound(err) {
+			klog.Infof("custom resource gate failed to get groupVersionKind %v in discovery: %v", gvk, err)
+		}
+		return err
+	})
 	if err != nil {
-		klog.V(4).Infof("custom resource gate not found groupVersionKind %v in discovery: %v", gvk, err)
-		return false
+		if errors.IsNotFound(err) {
+			klog.Infof("custom resource gate not found groupVersionKind %v in discovery: %v", gvk, err)
+			return false
+		}
+		// This might be caused by abnormal apiserver or etcd, ignore the discovery and just use envEnable
+		return true
 	}
 
 	for _, r := range resourceList.APIResources {
