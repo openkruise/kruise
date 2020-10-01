@@ -39,6 +39,7 @@ spec:
     plural: statefulsets
     shortNames:
     - sts
+    - asts
     singular: statefulset
   scope: Namespaced
   subresources:

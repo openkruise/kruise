@@ -152,7 +152,9 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 			}
 		}
 	case appsv1alpha1.LifecycleStateUpdated:
-		if cs.Spec.Lifecycle == nil || lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
+		if cs.Spec.Lifecycle == nil ||
+			cs.Spec.Lifecycle.InPlaceUpdate == nil ||
+			lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 			state = appsv1alpha1.LifecycleStateNormal
 		}
 	}

@@ -746,7 +746,6 @@ spec:
                             type: object
                           type: array
                       required:
-                      - replicas
                       - selector
                       - template
                       type: object
