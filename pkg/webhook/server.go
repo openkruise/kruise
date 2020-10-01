@@ -18,13 +18,11 @@ package webhook
 
 import (
 	"fmt"
+	"time"
 
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	"github.com/openkruise/kruise/pkg/webhook/util/configuration"
-	"github.com/openkruise/kruise/pkg/webhook/util/generator"
+	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
 	"github.com/openkruise/kruise/pkg/webhook/util/health"
-	"github.com/openkruise/kruise/pkg/webhook/util/writer"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -78,44 +76,27 @@ func SetupWithManager(mgr manager.Manager) error {
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 
-func Initialize(mgr manager.Manager) error {
-	c := &client.DelegatingClient{
+func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
+	cli := &client.DelegatingClient{
 		Reader:       mgr.GetAPIReader(),
 		Writer:       mgr.GetClient(),
 		StatusClient: mgr.GetClient(),
 	}
 
-	var dnsName string
-	var certWriter writer.CertWriter
-	var err error
-
-	if dnsName = webhookutil.GetHost(); len(dnsName) > 0 {
-		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{
-			Path: webhookutil.GetCertDir(),
-		})
-	} else {
-		dnsName = generator.ServiceToCommonName(webhookutil.GetNamespace(), webhookutil.GetServiceName())
-		certWriter, err = writer.NewSecretCertWriter(writer.SecretCertWriterOptions{
-			Client: c,
-			Secret: &types.NamespacedName{Namespace: webhookutil.GetNamespace(), Name: webhookutil.GetSecretName()},
-		})
-	}
-
+	c, err := webhookcontroller.New(cli, HandlerMap)
 	if err != nil {
-		return fmt.Errorf("failed to ensure certs: %v", err)
+		return err
 	}
+	go func() {
+		c.Start(stopCh)
+	}()
 
-	certs, _, err := certWriter.EnsureCert(dnsName)
-	if err != nil {
-		return fmt.Errorf("failed to ensure certs: %v", err)
+	timer := time.NewTimer(time.Second * 5)
+	defer timer.Stop()
+	select {
+	case <-webhookcontroller.Inited():
+		return nil
+	case <-timer.C:
+		return fmt.Errorf("failed to start webhook controller for waiting more than 5s")
 	}
-	if err := writer.WriteCertsToDir(webhookutil.GetCertDir(), certs); err != nil {
-		return fmt.Errorf("failed to write certs to dir: %v", err)
-	}
-
-	if err := configuration.Ensure(c, HandlerMap, certs.CACert); err != nil {
-		return fmt.Errorf("failed to ensure configuration: %v", err)
-	}
-
-	return nil
 }
