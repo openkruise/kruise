@@ -37,7 +37,7 @@ type CloneSetSpec struct {
 	// These are replicas in the sense that they are instantiations of the
 	// same Template.
 	// If unspecified, defaults to 1.
-	Replicas *int32 `json:"replicas"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Selector is a label query over pods that should match the replica count.
 	// It must match the pod template's labels.

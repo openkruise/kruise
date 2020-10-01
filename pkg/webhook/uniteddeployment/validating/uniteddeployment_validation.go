@@ -212,12 +212,20 @@ func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemp
 func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labels.Selector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if template.StatefulSetTemplate == nil && template.AdvancedStatefulSetTemplate == nil {
-		allErrs = append(allErrs, field.Required(fldPath, "should provide one of statefulSetTemplate or advancedStatefulSetTemplate"))
+	var templateCount int
+	if template.StatefulSetTemplate != nil {
+		templateCount++
 	}
-
-	if template.StatefulSetTemplate != nil && template.AdvancedStatefulSetTemplate != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, template, "should provide only one of statefulSetTemplate or advancedStatefulSetTemplate"))
+	if template.AdvancedStatefulSetTemplate != nil {
+		templateCount++
+	}
+	if template.CloneSetTemplate != nil {
+		templateCount++
+	}
+	if templateCount < 1 {
+		allErrs = append(allErrs, field.Required(fldPath, "should provide one of statefulSetTemplate or advancedStatefulSetTemplate or cloneSetTemplate"))
+	} else if templateCount > 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath, template, "should provide only one of statefulSetTemplate or advancedStatefulSetTemplate or cloneSetTemplate"))
 	}
 
 	if template.StatefulSetTemplate != nil {
