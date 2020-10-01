@@ -1,0 +1,43 @@
+# Default values for kruise.
+
+revisionHistoryLimit: 3
+
+spec:
+  nodeAffinity: {}
+  nodeSelector: {}
+  tolerations: []
+
+manager:
+  # settings for log print
+  log:
+    # log level for kruise-manager
+    level: "4"
+
+  replicas: 2
+  image:
+    repository: openkruise/kruise-manager
+    tag: v0.6.1
+  webhook:
+    port: 9876
+
+  # resources of kruise-manager container
+  resources:
+    limits:
+      cpu: 100m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  metrics:
+    addr: 0.0.0.0
+    port: 8080
+
+  healthProbe:
+    port: 8000
+
+  custom_resource_enable:
+
+webhookConfiguration:
+  failurePolicy:
+    pods: Ignore
