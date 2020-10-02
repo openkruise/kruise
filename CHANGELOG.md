@@ -1,5 +1,43 @@
 # Change Log
 
+## v0.6.1
+
+### CloneSet
+
+#### Features
+
+- Support lifecycle hooks for pre-delete and in-place update
+
+#### Bugs
+
+- Fix map concurrent write
+- Fix current revision during rollback
+- Fix update expectation for pod deletion
+
+### SidecarSet
+
+#### Features
+
+- Support initContainers definition and injection
+
+### UnitedDeployment
+
+#### Features
+
+- Support to define CloneSet as UnitedDeployment's subset
+
+### StatefulSet
+
+#### Features
+
+- Support minReadySeconds strategy
+
+### Others
+
+- Add webhook controller to optimize certs and configurations generation
+- Add pprof server and flag
+- Optimize discovery logic in custom resource gate
+
 ## v0.6.0
 
 ### Project

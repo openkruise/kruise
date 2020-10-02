@@ -12,6 +12,7 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
+|Oct 1st, 2020. Kruise v0.6.1 is **RELEASED**! It provides various features and bugfix, such as CloneSet lifecycle hook and UnitedDeployment supported CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Aug 19th, 2020. Kruise v0.6.0 is **RELEASED**! It updates Kubernetes dependency and switches to new controller runtime framework. It also supports a new controller called Advanced DaemonSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |May 19th, 2020. Kruise v0.5.0 is **RELEASED**! It supports `maxSurge` for CloneSet and fixes bugs for StatefulSet/SidecarSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Mar 20th, 2020. Kruise v0.4.1 is **RELEASED**! It provides **graceful in-place update** for Advanced StatefulSet and CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
@@ -53,10 +54,14 @@ This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evens
 
 ## Quick Start
 
-For a Kubernetes cluster with its version higher than v1.12, you can simply install Kruise with helm v3:
+For a Kubernetes cluster with its version higher than v1.12, you can simply install Kruise with helm v3.1.0+:
 
-```
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.0/kruise-chart.tgz
+```bash
+# Kubernetes 1.14 and older versions
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.1/kruise-chart.tgz --disable-openapi-validation
+
+# Kubernetes 1.15 and newer versions
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.1/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for the kruise-manager.
