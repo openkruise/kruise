@@ -272,16 +272,6 @@ spec:
                   required:
                   - spec
                   type: object
-                deploymentTemplate:
-                  description: Deployment template
-                  properties:
-                    metadata:
-                      type: object
-                    spec:
-                      type: object
-                  required:
-                  - spec
-                  type: object
                 statefulSetTemplate:
                   description: StatefulSet template
                   properties:
