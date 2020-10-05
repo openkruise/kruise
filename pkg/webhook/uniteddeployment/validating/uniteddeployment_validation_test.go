@@ -40,7 +40,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyAlways,
 				DNSPolicy:     v1.DNSClusterFirst,
-				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 	}
@@ -178,6 +178,23 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.DeploymentSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for i, successCase := range successCases {
@@ -198,6 +215,27 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				Template: appsv1alpha1.SubsetTemplate{
 					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 						Spec: apps.StatefulSetSpec{
+							Template: v1.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{},
+								Spec: v1.PodSpec{
+									RestartPolicy: v1.RestartPolicyAlways,
+									DNSPolicy:     v1.DNSClusterFirst,
+									Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"deployment no pod template label": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+						Spec: apps.DeploymentSpec{
 							Template: v1.PodTemplateSpec{
 								ObjectMeta: metav1.ObjectMeta{},
 								Spec: v1.PodSpec{
@@ -357,6 +395,35 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				},
 			},
 		},
+		"deployment subset replicas is too much": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.DeploymentSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+				Topology: appsv1alpha1.Topology{
+					Subsets: []appsv1alpha1.Subset{
+						{
+							Name:     "subset1",
+							Replicas: &replicas3,
+						},
+						{
+							Name:     "subset2",
+							Replicas: &replicas2,
+						},
+					},
+				},
+			},
+		},
 		"partition not exist": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.UnitedDeploymentSpec{
@@ -413,6 +480,87 @@ func TestValidateUnitedDeployment(t *testing.T) {
 						},
 						Spec: appsv1alpha1.StatefulSetSpec{
 							Template: validPodTemplate.Template,
+						},
+					},
+				},
+			},
+		},
+		"triple duplicated templates": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+					AdvancedStatefulSetTemplate: &appsv1alpha1.AdvancedStatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: appsv1alpha1.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.DeploymentSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+			},
+		},
+		"deployment duplicated templates": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.DeploymentSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+			},
+		},
+		"deployment no pod template termination policy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+						Spec: apps.DeploymentSpec{
+							Template: v1.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: validLabels,
+								},
+								Spec: v1.PodSpec{
+									RestartPolicy: v1.RestartPolicyAlways,
+									DNSPolicy:     v1.DNSClusterFirst,
+									Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+								},
+							},
 						},
 					},
 				},
@@ -617,6 +765,86 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 											Key:      "domain",
 											Operator: v1.NodeSelectorOpIn,
 											Values:   []string{"a"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Old: appsv1alpha1.UnitedDeployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "1"},
+				Spec: appsv1alpha1.UnitedDeploymentSpec{
+					Replicas: &val,
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: appsv1alpha1.SubsetTemplate{
+						DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: validLabels,
+							},
+							Spec: apps.DeploymentSpec{
+								Template: validPodTemplate.Template,
+							},
+						},
+					},
+					Topology: appsv1alpha1.Topology{
+						Subsets: []appsv1alpha1.Subset{
+							{
+								Name: "subset-a",
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			New: appsv1alpha1.UnitedDeployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "1"},
+				Spec: appsv1alpha1.UnitedDeploymentSpec{
+					Replicas: &val,
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: appsv1alpha1.SubsetTemplate{
+						DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: validLabels,
+							},
+							Spec: apps.DeploymentSpec{
+								Template: validPodTemplate.Template,
+							},
+						},
+					},
+					Topology: appsv1alpha1.Topology{
+						Subsets: []appsv1alpha1.Subset{
+							{
+								Name: "subset-a",
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"a"},
+										},
+									},
+								},
+							},
+							{
+								Name: "subset-b",
+								NodeSelectorTerm: v1.NodeSelectorTerm{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "domain",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"b"},
 										},
 									},
 								},

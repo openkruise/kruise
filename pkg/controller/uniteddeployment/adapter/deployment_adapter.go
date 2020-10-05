@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	alpha1 "github.com/openkruise/kruise/pkg/apis/apps/v1alpha1"
+	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
 
@@ -190,7 +190,7 @@ func (a *DeploymentAdapter) getDeploymentReplicaSets(set *appsv1.Deployment) ([]
 
 	// Retrieve ReplicaSets based on selectors
 	replicaSetList := &appsv1.ReplicaSetList{}
-	err = a.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, replicaSetList)
+	err = a.Client.List(context.TODO(), replicaSetList, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func (a *DeploymentAdapter) getReplicaSetPods(set *appsv1.ReplicaSet) ([]*corev1
 
 	// Retrieve all pods using selector
 	podList := &corev1.PodList{}
-	err = a.Client.List(context.TODO(), &client.ListOptions{LabelSelector: selector}, podList)
+	err = a.Client.List(context.TODO(), podList, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
