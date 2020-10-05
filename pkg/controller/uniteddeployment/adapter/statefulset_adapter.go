@@ -212,7 +212,9 @@ func (a *StatefulSetAdapter) getStatefulSetPods(set *appsv1.StatefulSet) ([]*cor
 func calculateUpdatedReplicas(podList []*corev1.Pod, updatedRevision string) (updatedReplicas, updatedReadyReplicas int32) {
 	for _, pod := range podList {
 		revision := getRevision(&pod.ObjectMeta)
-		if revision == updatedRevision {
+
+		// Only count pods that are updated and are not terminating
+		if revision == updatedRevision && pod.GetDeletionTimestamp() == nil {
 			updatedReplicas++
 			if podutil.IsPodReady(pod) {
 				updatedReadyReplicas++

@@ -38,7 +38,7 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
-// ValidateUnitedDeploymentSpec tests if required fields in the UnitedDeployment spec are set.
+// validateUnitedDeploymentSpec tests if required fields in the UnitedDeployment spec are set.
 func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -196,6 +196,8 @@ func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemp
 		allErrs = append(allErrs, validateStatefulSetUpdate(template.StatefulSetTemplate, oldTemplate.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
 	} else if template.AdvancedStatefulSetTemplate != nil && oldTemplate.AdvancedStatefulSetTemplate != nil {
 		allErrs = append(allErrs, validateAdvancedStatefulSetUpdate(template.AdvancedStatefulSetTemplate, oldTemplate.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
+	} else if template.DeploymentTemplate != nil && oldTemplate.DeploymentTemplate != nil {
+		allErrs = append(allErrs, validateDeploymentUpdate(template.DeploymentTemplate, oldTemplate.DeploymentTemplate, fldPath.Child("deploymentTemplate"))...)
 	}
 
 	return allErrs
@@ -214,10 +216,13 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 	if template.CloneSetTemplate != nil {
 		templateCount++
 	}
+	if template.DeploymentTemplate != nil {
+		templateCount++
+	}
 	if templateCount < 1 {
-		allErrs = append(allErrs, field.Required(fldPath, "should provide one of statefulSetTemplate or advancedStatefulSetTemplate or cloneSetTemplate"))
+		allErrs = append(allErrs, field.Required(fldPath, "should provide one of statefulSetTemplate, advancedStatefulSetTemplate, cloneSetTemplate, or deploymentTemplate"))
 	} else if templateCount > 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath, template, "should provide only one of statefulSetTemplate or advancedStatefulSetTemplate or cloneSetTemplate"))
+		allErrs = append(allErrs, field.Invalid(fldPath, template, "should provide only one of statefulSetTemplate, advancedStatefulSetTemplate, cloneSetTemplate, or deploymentTemplate"))
 	}
 
 	if template.StatefulSetTemplate != nil {
@@ -246,6 +251,19 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 			return allErrs
 		}
 		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("advancedStatefulSetTemplate", "spec", "template"))...)
+	} else if template.DeploymentTemplate != nil {
+		labels := labels.Set(template.DeploymentTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("deploymentTemplate", "metadata", "labels"), template.DeploymentTemplate.Labels, "`selector` does not match template `labels`"))
+		}
+		allErrs = append(allErrs, validateDeployment(template.DeploymentTemplate, fldPath.Child("deploymentTemplate"))...)
+		template := template.DeploymentTemplate.Spec.Template
+		coreTemplate, err := convertPodTemplateSpec(&template)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+			return allErrs
+		}
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForReplicaSet(coreTemplate, selector, 0, fldPath.Child("deploymentTemplate", "spec", "template"))...)
 	}
 
 	return allErrs
@@ -269,11 +287,16 @@ func validateAdvancedStatefulSet(statefulSet *appsv1alpha1.AdvancedStatefulSetTe
 	if statefulSet.Spec.Replicas != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *statefulSet.Spec.Replicas, "replicas in advancedStatefulSetTemplate will not be used"))
 	}
-	if statefulSet.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
-		statefulSet.Spec.UpdateStrategy.RollingUpdate != nil &&
-		statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "updateStrategy", "rollingUpdate", "partition"), *statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition, "partition in advancedStatefulSetTemplate will not be used"))
+
+	return allErrs
+}
+
+func validateDeployment(deployment *appsv1alpha1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if deployment.Spec.Replicas != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *deployment.Spec.Replicas, "replicas in deploymentTemplate will not be used"))
 	}
+
 	return allErrs
 }
 
@@ -322,5 +345,15 @@ func validateAdvancedStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1
 	if statefulSet.Spec.Replicas != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
 	}
+	return allErrs
+}
+
+func validateDeploymentUpdate(deployment, oldDeployment *appsv1alpha1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if deployment.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*deployment.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	}
+
 	return allErrs
 }

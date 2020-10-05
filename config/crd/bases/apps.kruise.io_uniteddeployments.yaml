@@ -763,6 +763,18 @@ spec:
                   required:
                   - spec
                   type: object
+                deploymentTemplate:
+                  description: Deployment template
+                  properties:
+                    metadata:
+                      type: object
+                    spec:
+                      description: DeploymentSpec is the specification of the desired
+                        behavior of the Deployment.
+                      type: object
+                  required:
+                  - spec
+                  type: object
                 statefulSetTemplate:
                   description: StatefulSet template
                   properties:
