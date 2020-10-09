@@ -317,6 +317,6 @@ func (ssc *ReconcileStatefulSet) syncStatefulSet(set *appsv1alpha1.StatefulSet, 
 	if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil {
 		return err
 	}
-	klog.V(4).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
+	klog.V(4).Infof("Successfully synced StatefulSet %s/%s", set.Namespace, set.Name)
 	return nil
 }
