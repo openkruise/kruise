@@ -188,14 +188,19 @@ func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconc
 	nameToSubset, err := r.getNameToSubset(instance, control, expectedRevision)
 	if err != nil {
 		klog.Errorf("Fail to get Subsets of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
-		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
+		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
+			eventTypeFindSubsets), err.Error())
 		return reconcile.Result{}, nil
 	}
 
-	nextReplicas, effectiveSpecifiedReplicas, ineffectiveReason := GetAllocatedReplicas(nameToSubset, instance)
+	nextReplicas, err := GetAllocatedReplicas(nameToSubset, instance)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next replicas %v", instance.Namespace, instance.Name, nextReplicas)
-	if !effectiveSpecifiedReplicas {
-		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", ineffectiveReason)
+	if err != nil {
+		klog.Errorf("UnitedDeployment %s/%s Specified subset replicas is ineffective: %s",
+			instance.Namespace, instance.Name, err.Error())
+		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
+			eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", err.Error())
+		return reconcile.Result{}, nil
 	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
