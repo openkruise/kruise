@@ -82,7 +82,7 @@ func (c *realControl) getPatch(cs *appsv1alpha1.CloneSet, coreControl clonesetco
 		return nil, err
 	}
 	var raw map[string]interface{}
-	_ = json.Unmarshal([]byte(str), &raw)
+	_ = json.Unmarshal(str, &raw)
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
