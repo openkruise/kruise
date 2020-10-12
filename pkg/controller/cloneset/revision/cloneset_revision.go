@@ -96,7 +96,11 @@ func (c *realControl) getPatch(cs *appsv1alpha1.CloneSet, coreControl clonesetco
 
 func (c *realControl) ApplyRevision(cs *appsv1alpha1.CloneSet, revision *apps.ControllerRevision) (*appsv1alpha1.CloneSet, error) {
 	clone := cs.DeepCopy()
-	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(patchCodec, clone)), revision.Data.Raw, clone)
+	cloneBytes, err := runtime.Encode(patchCodec, clone)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(cloneBytes, revision.Data.Raw, clone)
 	if err != nil {
 		return nil, err
 	}
