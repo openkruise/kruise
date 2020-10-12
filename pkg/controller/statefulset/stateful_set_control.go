@@ -389,7 +389,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 	}
 
-	if unhealthy > 0 {
+	if unhealthy > 0 && firstUnhealthyPod != nil {
 		klog.V(4).Infof("StatefulSet %s/%s has %d unhealthy Pods starting with %s",
 			set.Namespace,
 			set.Name,
@@ -530,7 +530,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			continue
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod block
-		if !isRunningAndReady(condemned[target]) && monotonic && condemned[target] != firstUnhealthyPod {
+		if !isRunningAndReady(condemned[target]) && monotonic &&
+			condemned[target] != firstUnhealthyPod && firstUnhealthyPod != nil {
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready prior to scale down",
 				set.Namespace,
@@ -573,7 +574,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	maxUnavailable := 1
 	if set.Spec.UpdateStrategy.RollingUpdate != nil {
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(replicaCount), false)
+		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), replicaCount, false)
 		if err != nil {
 			return &status, err
 		}

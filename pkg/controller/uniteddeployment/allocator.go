@@ -104,7 +104,7 @@ func (s *replicasAllocator) validateReplicas(replicas int32, subsetReplicasLimit
 	return nil
 }
 
-func getSpecifiedSubsetReplicas(ud *appsv1alpha1.UnitedDeployment) *(map[string]int32) {
+func getSpecifiedSubsetReplicas(ud *appsv1alpha1.UnitedDeployment) *map[string]int32 {
 	replicaLimits := map[string]int32{}
 	if ud.Spec.Topology.Subsets == nil {
 		return &replicaLimits
