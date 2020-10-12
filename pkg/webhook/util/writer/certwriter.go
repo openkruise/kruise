@@ -119,7 +119,7 @@ func validCert(certs *generator.Artifacts, dnsName string) bool {
 	if !pool.AppendCertsFromPEM(certs.CACert) {
 		return false
 	}
-	block, _ := pem.Decode([]byte(certs.Cert))
+	block, _ := pem.Decode(certs.Cert)
 	if block == nil {
 		return false
 	}
