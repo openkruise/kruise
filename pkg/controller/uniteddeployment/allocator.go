@@ -85,7 +85,7 @@ func (s *replicasAllocator) validateReplicas(replicas int32, subsetReplicasLimit
 	}
 
 	if specifiedReplicas > replicas {
-		return fmt.Errorf("Specified subsets' replica (%d) is greater than UnitedDeployment replica (%d)",
+		return fmt.Errorf("specified subsets' replica (%d) is greater than UnitedDeployment replica (%d)",
 			specifiedReplicas, replicas)
 	} else if specifiedReplicas < replicas {
 		specifiedCount := 0
@@ -96,7 +96,7 @@ func (s *replicasAllocator) validateReplicas(replicas int32, subsetReplicasLimit
 		}
 
 		if specifiedCount == len(*s.subsets) {
-			return fmt.Errorf("Specified subsets' replica (%d) is less than UnitedDeployment replica (%d)",
+			return fmt.Errorf("specified subsets' replica (%d) is less than UnitedDeployment replica (%d)",
 				specifiedReplicas, replicas)
 		}
 	}
