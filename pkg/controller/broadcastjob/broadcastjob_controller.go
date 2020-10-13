@@ -397,7 +397,7 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 		errCh = make(chan error, diff)
 		wait := sync.WaitGroup{}
 		startIndex := int32(0)
-		for batchSize := int32(integer.Int32Min(diff, kubecontroller.SlowStartInitialBatchSize)); diff > 0; batchSize = integer.Int32Min(2*batchSize, diff) {
+		for batchSize := integer.Int32Min(diff, kubecontroller.SlowStartInitialBatchSize); diff > 0; batchSize = integer.Int32Min(2*batchSize, diff) {
 			// count of errors in current error channel
 			errorCount := len(errCh)
 			wait.Add(int(batchSize))

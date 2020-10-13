@@ -186,13 +186,13 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *appsv1alpha
 		case apierrors.IsNotFound(err):
 			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(&claim)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("Failed to create PVC %s: %s", claim.Name, err))
+				errs = append(errs, fmt.Errorf("failed to create PVC %s: %s", claim.Name, err))
 			}
 			if err == nil || !apierrors.IsAlreadyExists(err) {
 				spc.recordClaimEvent("create", set, pod, &claim, err)
 			}
 		case err != nil:
-			errs = append(errs, fmt.Errorf("Failed to retrieve PVC %s: %s", claim.Name, err))
+			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
 		case pvc.DeletionTimestamp != nil:
 			errs = append(errs, fmt.Errorf("pvc %s is to be deleted", claim.Name))

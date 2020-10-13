@@ -44,7 +44,7 @@ func ValidCACert(key, cert, caCert []byte, dnsName string, time time.Time) bool 
 	if !pool.AppendCertsFromPEM(caCert) {
 		return false
 	}
-	block, _ := pem.Decode([]byte(cert))
+	block, _ := pem.Decode(cert)
 	if block == nil {
 		return false
 	}

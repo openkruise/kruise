@@ -125,7 +125,7 @@ func (dsc *ReconcileDaemonSet) standardRollingUpdate(ds *appsv1alpha1.DaemonSet,
 
 	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeToDaemonPods)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("Couldn't get unavailable numbers: %v", err)
+		return reconcile.Result{}, fmt.Errorf("couldn't get unavailable numbers: %v", err)
 	}
 
 	// calculate the cluster scope numUnavailable.
@@ -260,7 +260,7 @@ func (dsc *ReconcileDaemonSet) getUnavailableNumbers(ds *appsv1alpha1.DaemonSet,
 	}
 	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, desiredNumberScheduled, true)
 	if err != nil {
-		return -1, -1, fmt.Errorf("Invalid value for MaxUnavailable: %v", err)
+		return -1, -1, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
 	klog.V(6).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
 	return maxUnavailable, numUnavailable, nil
@@ -583,7 +583,7 @@ func (dsc *ReconcileDaemonSet) getSurgeNumbers(ds *appsv1alpha1.DaemonSet, nodeT
 
 	maxSurge, err := intstrutil.GetValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.MaxSurge, desiredNumberScheduled, true)
 	if err != nil {
-		return -1, -1, fmt.Errorf("Invalid value for MaxSurge: %v", err)
+		return -1, -1, fmt.Errorf("invalid value for MaxSurge: %v", err)
 	}
 	return maxSurge, numSurge, nil
 }
@@ -662,12 +662,12 @@ func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 
 	maxSurge, numSurge, err := dsc.getSurgeNumbers(ds, nodeToDaemonPods, hash)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("Couldn't get surge numbers: %v", err)
+		return reconcile.Result{}, fmt.Errorf("couldn't get surge numbers: %v", err)
 	}
 
 	nodesWantToRun, nodesShouldContinueRunning, err := dsc.getNodesShouldRunDaemonPod(ds)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("Couldn't get nodes which want to run ds pod: %v", err)
+		return reconcile.Result{}, fmt.Errorf("couldn't get nodes which want to run ds pod: %v", err)
 	}
 
 	var nodesToSurge []string
