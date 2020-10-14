@@ -36,7 +36,7 @@ func NewResourceVersionExpectation() ResourceVersionExpectation {
 }
 
 type realResourceVersionExpectation struct {
-	sync.RWMutex
+	sync.Mutex
 	objectVersions map[types.UID]string
 }
 
@@ -57,8 +57,8 @@ func (r *realResourceVersionExpectation) Observe(obj metav1.Object) {
 }
 
 func (r *realResourceVersionExpectation) IsSatisfied(obj metav1.Object) bool {
-	r.RLock()
-	defer r.RUnlock()
+	r.Lock()
+	defer r.Unlock()
 	if isResourceVersionNewer(r.objectVersions[obj.GetUID()], obj.GetResourceVersion()) {
 		delete(r.objectVersions, obj.GetUID())
 	}

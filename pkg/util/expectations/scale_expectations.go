@@ -33,7 +33,7 @@ func NewScaleExpectations() ScaleExpectations {
 }
 
 type realScaleExpectations struct {
-	sync.RWMutex
+	sync.Mutex
 	// key: parent key, workload namespace/name
 	controllerCache map[string]*realControllerScaleExpectations
 }
