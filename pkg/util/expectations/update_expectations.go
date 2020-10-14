@@ -41,7 +41,7 @@ func NewUpdateExpectations(getRevision func(metav1.Object) string) UpdateExpecta
 }
 
 type realUpdateExpectations struct {
-	sync.RWMutex
+	sync.Mutex
 	// key: parent key, workload namespace/name
 	controllerCache map[string]*realControllerUpdateExpectations
 	// how to get pod revision
