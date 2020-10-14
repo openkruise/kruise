@@ -565,7 +565,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// TODO: separate out the below update only related logic
 
 	// If update expectations have not satisfied yet, skip updating pods
-	if updateSatisfied, updateDirtyPods := updateExpectations.SatisfiedExpectations(getStatefulSetKey(set), updateRevision.Name); !updateSatisfied {
+	if updateSatisfied, _, updateDirtyPods := updateExpectations.SatisfiedExpectations(getStatefulSetKey(set), updateRevision.Name); !updateSatisfied {
 		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", getStatefulSetKey(set), updateDirtyPods)
 		return &status, nil
 	}

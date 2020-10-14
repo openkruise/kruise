@@ -60,7 +60,7 @@ func TestResourceVersionExpectation(t *testing.T) {
 		c := NewResourceVersionExpectation()
 		c.Expect(testCase.expect)
 		c.Observe(testCase.observe)
-		got := c.IsSatisfied(testCase.isSatisfied)
+		got, _ := c.IsSatisfied(testCase.isSatisfied)
 		if got != testCase.result {
 			t.Fatalf("#%d expected %v, got %v", i, testCase.result, got)
 		}

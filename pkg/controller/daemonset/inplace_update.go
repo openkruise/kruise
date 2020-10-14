@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -89,9 +90,13 @@ func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 	}
 
 	// If update expectations have not satisfied yet, just skip this reconcile.
-	if updateSatisfied, updateDirtyPods := dsc.updateExp.SatisfiedExpectations(key, cur.Name); !updateSatisfied {
-		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", key, updateDirtyPods)
-		return reconcile.Result{}, nil
+	if updateSatisfied, unsatisfiedDuration, updateDirtyPods := dsc.updateExp.SatisfiedExpectations(key, cur.Name); !updateSatisfied {
+		if unsatisfiedDuration >= kruiseExpectations.ExpectationTimeout {
+			klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", key, updateDirtyPods, unsatisfiedDuration)
+			return reconcile.Result{}, nil
+		}
+		klog.V(4).Infof("Not satisfied scale for %v, updateDirtyPods=%v", key, updateDirtyPods)
+		return reconcile.Result{RequeueAfter: kruiseExpectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
 	return dsc.syncNodesWhenInplaceUpdate(ds, oldPodsToInplaceUpdate, hash, old[len(old)-1], cur)
