@@ -6,7 +6,7 @@ go:
 go_import_path: github.com/openkruise/kruise
 
 script:
-  - make all
+  - ./scripts/travis-test.sh
 
 after_success:
   - ./hack/docker_build_daily.sh
