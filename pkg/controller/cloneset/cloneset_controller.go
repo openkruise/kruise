@@ -29,6 +29,7 @@ import (
 	scalecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/scale"
 	updatecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/update"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
@@ -206,9 +207,13 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}
 
 	// If scaling expectations have not satisfied yet, just skip this reconcile.
-	if scaleSatisfied, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
+	if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
+		if unsatisfiedDuration >= expectations.ExpectationTimeout {
+			klog.Warningf("Expectation unsatisfied overtime for %v, scaleDirtyPods=%v, overtime=%v", request.String(), scaleDirtyPods, unsatisfiedDuration)
+			return reconcile.Result{}, nil
+		}
 		klog.V(4).Infof("Not satisfied scale for %v, scaleDirtyPods=%v", request.String(), scaleDirtyPods)
-		return reconcile.Result{}, nil
+		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
 	// list all active Pods and PVCs belongs to cs
@@ -235,15 +240,23 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		clonesetutils.UpdateExpectations.ObserveUpdated(request.String(), updateRevision.Name, pod)
 	}
 	// If update expectations have not satisfied yet, just skip this reconcile.
-	if updateSatisfied, updateDirtyPods := clonesetutils.UpdateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name); !updateSatisfied {
-		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
-		return reconcile.Result{}, nil
+	if updateSatisfied, unsatisfiedDuration, updateDirtyPods := clonesetutils.UpdateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name); !updateSatisfied {
+		if unsatisfiedDuration >= expectations.ExpectationTimeout {
+			klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", request.String(), updateDirtyPods, unsatisfiedDuration)
+			return reconcile.Result{}, nil
+		}
+		klog.V(4).Infof("Not satisfied scale for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
+		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
 	for _, pod := range filteredPods {
-		if !clonesetutils.ResourceVersionExpectations.IsSatisfied(pod) {
+		if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(pod); !isSatisfied {
+			if unsatisfiedDuration >= expectations.ExpectationTimeout {
+				klog.Warningf("Expectation unsatisfied overtime for %v, wait for pod %v updating, timeout=%v", request.String(), pod.Name, unsatisfiedDuration)
+				return reconcile.Result{}, nil
+			}
 			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for pod %v updating", request.String(), pod.Name)
-			return reconcile.Result{}, nil
+			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 		}
 	}
 

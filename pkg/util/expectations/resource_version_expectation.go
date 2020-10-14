@@ -19,6 +19,7 @@ package expectations
 import (
 	"strconv"
 	"sync"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,43 +28,72 @@ import (
 type ResourceVersionExpectation interface {
 	Expect(obj metav1.Object)
 	Observe(obj metav1.Object)
-	IsSatisfied(obj metav1.Object) bool
+	IsSatisfied(obj metav1.Object) (bool, time.Duration)
 	Delete(obj metav1.Object)
 }
 
 func NewResourceVersionExpectation() ResourceVersionExpectation {
-	return &realResourceVersionExpectation{objectVersions: make(map[types.UID]string, 100)}
+	return &realResourceVersionExpectation{objectVersions: make(map[types.UID]*objectCacheVersions, 100)}
 }
 
 type realResourceVersionExpectation struct {
 	sync.Mutex
-	objectVersions map[types.UID]string
+	objectVersions map[types.UID]*objectCacheVersions
+}
+
+type objectCacheVersions struct {
+	version                   string
+	firstUnsatisfiedTimestamp time.Time
 }
 
 func (r *realResourceVersionExpectation) Expect(obj metav1.Object) {
 	r.Lock()
 	defer r.Unlock()
-	if isResourceVersionNewer(r.objectVersions[obj.GetUID()], obj.GetResourceVersion()) {
-		r.objectVersions[obj.GetUID()] = obj.GetResourceVersion()
+
+	expectations := r.objectVersions[obj.GetUID()]
+	if expectations == nil {
+		r.objectVersions[obj.GetUID()] = &objectCacheVersions{}
+	}
+	if isResourceVersionNewer(r.objectVersions[obj.GetUID()].version, obj.GetResourceVersion()) {
+		r.objectVersions[obj.GetUID()].version = obj.GetResourceVersion()
 	}
 }
 
 func (r *realResourceVersionExpectation) Observe(obj metav1.Object) {
 	r.Lock()
 	defer r.Unlock()
-	if isResourceVersionNewer(r.objectVersions[obj.GetUID()], obj.GetResourceVersion()) {
+
+	expectations := r.objectVersions[obj.GetUID()]
+	if expectations == nil {
+		return
+	}
+	if isResourceVersionNewer(r.objectVersions[obj.GetUID()].version, obj.GetResourceVersion()) {
 		delete(r.objectVersions, obj.GetUID())
 	}
 }
 
-func (r *realResourceVersionExpectation) IsSatisfied(obj metav1.Object) bool {
+func (r *realResourceVersionExpectation) IsSatisfied(obj metav1.Object) (bool, time.Duration) {
 	r.Lock()
 	defer r.Unlock()
-	if isResourceVersionNewer(r.objectVersions[obj.GetUID()], obj.GetResourceVersion()) {
+
+	expectations := r.objectVersions[obj.GetUID()]
+	if expectations == nil {
+		return true, 0
+	}
+
+	if isResourceVersionNewer(r.objectVersions[obj.GetUID()].version, obj.GetResourceVersion()) {
 		delete(r.objectVersions, obj.GetUID())
 	}
 	_, existing := r.objectVersions[obj.GetUID()]
-	return !existing
+	if existing {
+		if r.objectVersions[obj.GetUID()].firstUnsatisfiedTimestamp.IsZero() {
+			r.objectVersions[obj.GetUID()].firstUnsatisfiedTimestamp = time.Now()
+		}
+
+		return false, time.Since(r.objectVersions[obj.GetUID()].firstUnsatisfiedTimestamp)
+	}
+
+	return !existing, 0
 }
 
 func (r *realResourceVersionExpectation) Delete(obj metav1.Object) {

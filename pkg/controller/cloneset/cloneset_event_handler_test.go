@@ -174,7 +174,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			for _, n := range testCase.alterExpectationCreationsAdds {
 				clonesetutils.ScaleExpectations.ExpectScale(testCase.alterExpectationCreationsKey, expectations.Create, n)
 			}
-			if ok, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
+			if ok, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
 				t.Fatalf("%s before execute, should not be satisfied", testCase.name)
 			}
 			modifySatisfied = true
@@ -185,7 +185,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
 		}
 		if modifySatisfied {
-			if ok, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
+			if ok, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
 				t.Fatalf("%s expected satisfied, but it is not", testCase.name)
 			}
 		}

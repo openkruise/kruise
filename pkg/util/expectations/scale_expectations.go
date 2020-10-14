@@ -2,6 +2,7 @@ package expectations
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -20,7 +21,7 @@ const (
 type ScaleExpectations interface {
 	ExpectScale(controllerKey string, action ScaleAction, name string)
 	ObserveScale(controllerKey string, action ScaleAction, name string)
-	SatisfiedExpectations(controllerKey string) (bool, map[ScaleAction][]string)
+	SatisfiedExpectations(controllerKey string) (bool, time.Duration, map[ScaleAction][]string)
 	DeleteExpectations(controllerKey string)
 	GetExpectations(controllerKey string) map[ScaleAction]sets.String
 }
@@ -40,7 +41,8 @@ type realScaleExpectations struct {
 
 type realControllerScaleExpectations struct {
 	// item: name for this object
-	objsCache map[ScaleAction]sets.String
+	objsCache                 map[ScaleAction]sets.String
+	firstUnsatisfiedTimestamp time.Time
 }
 
 func (r *realScaleExpectations) GetExpectations(controllerKey string) map[ScaleAction]sets.String {
@@ -102,22 +104,26 @@ func (r *realScaleExpectations) ObserveScale(controllerKey string, action ScaleA
 	delete(r.controllerCache, controllerKey)
 }
 
-func (r *realScaleExpectations) SatisfiedExpectations(controllerKey string) (bool, map[ScaleAction][]string) {
+func (r *realScaleExpectations) SatisfiedExpectations(controllerKey string) (bool, time.Duration, map[ScaleAction][]string) {
 	r.Lock()
 	defer r.Unlock()
 
 	expectations := r.controllerCache[controllerKey]
 	if expectations == nil {
-		return true, nil
+		return true, 0, nil
 	}
 
 	for a, s := range expectations.objsCache {
 		if s.Len() > 0 {
-			return false, map[ScaleAction][]string{a: s.List()}
+			if expectations.firstUnsatisfiedTimestamp.IsZero() {
+				expectations.firstUnsatisfiedTimestamp = time.Now()
+			}
+			return false, time.Since(expectations.firstUnsatisfiedTimestamp), map[ScaleAction][]string{a: s.List()}
 		}
 	}
+
 	delete(r.controllerCache, controllerKey)
-	return true, nil
+	return true, 0, nil
 }
 
 func (r *realScaleExpectations) DeleteExpectations(controllerKey string) {

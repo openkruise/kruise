@@ -18,6 +18,7 @@ package expectations
 
 import (
 	"sync"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,7 +29,7 @@ type UpdateExpectations interface {
 	ExpectUpdated(controllerKey, revision string, obj metav1.Object)
 	ObserveUpdated(controllerKey, revision string, obj metav1.Object)
 	DeleteObject(controllerKey string, obj metav1.Object)
-	SatisfiedExpectations(controllerKey, revision string) (bool, []string)
+	SatisfiedExpectations(controllerKey, revision string) (bool, time.Duration, []string)
 	DeleteExpectations(controllerKey string)
 }
 
@@ -52,7 +53,8 @@ type realControllerUpdateExpectations struct {
 	// latest revision
 	revision string
 	// item: pod name for this revision
-	objsUpdated sets.String
+	objsUpdated               sets.String
+	firstUnsatisfiedTimestamp time.Time
 }
 
 func (r *realUpdateExpectations) ExpectUpdated(controllerKey, revision string, obj metav1.Object) {
@@ -101,18 +103,27 @@ func (r *realUpdateExpectations) DeleteObject(controllerKey string, obj metav1.O
 	expectations.objsUpdated.Delete(getKey(obj))
 }
 
-func (r *realUpdateExpectations) SatisfiedExpectations(controllerKey, revision string) (bool, []string) {
+func (r *realUpdateExpectations) SatisfiedExpectations(controllerKey, revision string) (bool, time.Duration, []string) {
 	r.Lock()
 	defer r.Unlock()
 
 	oldExpectations := r.controllerCache[controllerKey]
 	if oldExpectations == nil {
-		return true, nil
+		return true, 0, nil
 	} else if oldExpectations.revision != revision {
-		return true, nil
+		oldExpectations.firstUnsatisfiedTimestamp = time.Time{}
+		return true, 0, nil
 	}
 
-	return oldExpectations.objsUpdated.Len() == 0, oldExpectations.objsUpdated.List()
+	if oldExpectations.objsUpdated.Len() > 0 {
+		if oldExpectations.firstUnsatisfiedTimestamp.IsZero() {
+			oldExpectations.firstUnsatisfiedTimestamp = time.Now()
+		}
+		return false, time.Since(oldExpectations.firstUnsatisfiedTimestamp), oldExpectations.objsUpdated.List()
+	}
+
+	oldExpectations.firstUnsatisfiedTimestamp = time.Time{}
+	return true, 0, oldExpectations.objsUpdated.List()
 }
 
 func (r *realUpdateExpectations) DeleteExpectations(controllerKey string) {
