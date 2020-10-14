@@ -335,7 +335,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconci
 			klog.V(4).Infof("DaemonSet has been deleted %s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name)
 			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, fmt.Errorf("Unable to retrieve DaemonSet %s/%s from store: %v", request.NamespacedName.Namespace, request.NamespacedName.Name, err)
+		return reconcile.Result{}, fmt.Errorf("unable to retrieve DaemonSet %s/%s from store: %v", request.NamespacedName.Namespace, request.NamespacedName.Name, err)
 	}
 
 	// Don't process a daemon set until all its creations and deletions have been processed.
@@ -645,7 +645,9 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 				}
 				if !ok || ds.Labels[IsFirstDeployedFlag] != "false" {
 					ds.Labels[IsFirstDeployedFlag] = "false"
-					dsc.client.Update(context.TODO(), ds)
+					if err := dsc.client.Update(context.TODO(), ds); err != nil {
+						return result, fmt.Errorf("failed to update %s: %v", ds.Name, err)
+					}
 				}
 			}
 		}

@@ -41,7 +41,7 @@ func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 
 	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeToDaemonPods)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("Couldn't get unavailable numbers: %v", err)
+		return reconcile.Result{}, fmt.Errorf("couldn't get unavailable numbers: %v", err)
 	}
 
 	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, hash, nodeToDaemonPods)
