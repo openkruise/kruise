@@ -172,38 +172,11 @@ func TestSpecifyValidReplicas(t *testing.T) {
 }
 
 func TestSpecifyInvalidReplicas(t *testing.T) {
-	// ignore specified replicas if invalid
 	infos := subsetInfos{}
 	infos = append(infos,
 		createSubset("t1", 10),
 		createSubset("t2", 4))
 	allocator := infos.SortToAllocator()
-	allocator.AllocateReplicas(17, &map[string]int32{
-		"t1": 6,
-		"t2": 6,
-	})
-	if " t2 -> 7; t1 -> 10;" != allocator.String() {
-		t.Fatalf("unexpected %s", allocator)
-	}
-
-	infos = subsetInfos{}
-	infos = append(infos,
-		createSubset("t1", 10),
-		createSubset("t2", 4))
-	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(17, &map[string]int32{
-		"t1": 10,
-		"t2": 11,
-	})
-	if " t2 -> 7; t1 -> 10;" != allocator.String() {
-		t.Fatalf("unexpected %s", allocator)
-	}
-
-	infos = subsetInfos{}
-	infos = append(infos,
-		createSubset("t1", 10),
-		createSubset("t2", 4))
-	allocator = infos.SortToAllocator()
 	allocator.AllocateReplicas(14, &map[string]int32{
 		"t1": 6,
 		"t2": 6,
@@ -222,57 +195,6 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		"t2": 11,
 	})
 	if " t2 -> 4; t1 -> 10;" != allocator.String() {
-		t.Fatalf("unexpected %s", allocator)
-	}
-
-	infos = subsetInfos{}
-	infos = append(infos,
-		createSubset("t1", 10),
-		createSubset("t2", 4))
-	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(10, &map[string]int32{
-		"t1": 6,
-		"t2": 6,
-	})
-	if " t2 -> 4; t1 -> 6;" != allocator.String() {
-		t.Fatalf("unexpected %s", allocator)
-	}
-
-	infos = subsetInfos{}
-	infos = append(infos,
-		createSubset("t1", 10),
-		createSubset("t2", 4))
-	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(10, &map[string]int32{
-		"t1": 10,
-		"t2": 11,
-	})
-	if " t2 -> 4; t1 -> 6;" != allocator.String() {
-		t.Fatalf("unexpected %s", allocator)
-	}
-
-	infos = subsetInfos{}
-	infos = append(infos,
-		createSubset("t1", 10),
-		createSubset("t2", 4))
-	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(4, &map[string]int32{
-		"t1": 6,
-		"t2": 6,
-	})
-	if " t1 -> 2; t2 -> 2;" != allocator.String() {
-		t.Fatalf("unexpected %s", allocator)
-	}
-
-	infos = subsetInfos{}
-	infos = append(infos,
-		createSubset("t1", 10),
-		createSubset("t2", 4))
-	allocator = infos.SortToAllocator()
-	allocator.AllocateReplicas(24, &map[string]int32{
-		"t1": 27,
-	})
-	if " t1 -> 12; t2 -> 12;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
 }
