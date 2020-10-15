@@ -118,7 +118,7 @@ func validateSidecarSetStratety(strategy *appsv1alpha1.SidecarSetUpdateStrategy,
 func getCoreVolumes(volumes []v1.Volume, fldPath *field.Path) ([]core.Volume, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
-	coreVolumes := []core.Volume{}
+	var coreVolumes []core.Volume
 	for _, volume := range volumes {
 		coreVolume := core.Volume{}
 		if err := corev1.Convert_v1_Volume_To_core_Volume(&volume, &coreVolume, nil); err != nil {
@@ -135,7 +135,7 @@ func validateContainersForSidecarSet(
 	initContainers, containers []appsv1alpha1.SidecarContainer, coreVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	coreInitContainers := []core.Container{}
+	var coreInitContainers []core.Container
 	for _, container := range initContainers {
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
@@ -144,7 +144,7 @@ func validateContainersForSidecarSet(
 		}
 		coreInitContainers = append(coreInitContainers, coreContainer)
 	}
-	coreContainers := []core.Container{}
+	var coreContainers []core.Container
 	for _, container := range containers {
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {

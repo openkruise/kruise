@@ -679,7 +679,9 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 		deleteDiff = burstReplicas
 	}
 
-	expectations.SetExpectations(dsKey, createDiff, deleteDiff)
+	if err := expectations.SetExpectations(dsKey, createDiff, deleteDiff); err != nil {
+		utilruntime.HandleError(err)
+	}
 	// error channel to communicate back failures.  make the buffer big enough to avoid any blocking
 	errCh := make(chan error, createDiff+deleteDiff)
 
@@ -786,7 +788,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 	deleteWait.Wait()
 
 	// collect errors if any for proper reporting/retry logic in the controller
-	errors := []error{}
+	var errors []error
 	close(errCh)
 	for err := range errCh {
 		errors = append(errors, err)
