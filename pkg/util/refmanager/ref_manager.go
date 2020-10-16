@@ -81,8 +81,8 @@ func (mgr *RefManager) ClaimOwnedObjects(objs []metav1.Object, filters ...func(m
 		return true
 	}
 
-	claimObjs := []metav1.Object{}
-	errlist := []error{}
+	var claimObjs []metav1.Object
+	var errlist []error
 	for _, obj := range objs {
 		ok, err := mgr.claimObject(obj, match)
 		if err != nil {

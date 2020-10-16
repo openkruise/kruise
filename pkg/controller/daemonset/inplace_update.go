@@ -143,7 +143,7 @@ func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.Daemo
 	updateWait.Wait()
 
 	// collect errors if any for proper reporting/retry logic in the controller
-	errors := []error{}
+	var errors []error
 	close(errCh)
 	for err := range errCh {
 		errors = append(errors, err)
