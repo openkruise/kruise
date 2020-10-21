@@ -93,12 +93,12 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 	set := m.adapter.NewResourceObject()
 	var updateError error
 	for i := 0; i < updateRetries; i++ {
-		getError := m.Client.Get(context.TODO(), m.objectKey(&subset.ObjectMeta), set)
+		getError := m.Client.Get(context.TODO(), m.objectKey(subset), set)
 		if getError != nil {
 			return getError
 		}
 
-		if err := m.adapter.ApplySubsetTemplate(ud, subset.Spec.SubsetName, revision, replicas, partition, set); err != nil {
+		if err := m.adapter.ApplySubsetTemplate(ud, subset.Name, revision, replicas, partition, set); err != nil {
 			return err
 		}
 
@@ -138,24 +138,9 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 	}
 
 	subset := &Subset{}
-	subset.ObjectMeta = metav1.ObjectMeta{
-		Name:                       set.GetName(),
-		GenerateName:               set.GetGenerateName(),
-		Namespace:                  set.GetNamespace(),
-		SelfLink:                   set.GetSelfLink(),
-		UID:                        set.GetUID(),
-		ResourceVersion:            set.GetResourceVersion(),
-		Generation:                 set.GetGeneration(),
-		CreationTimestamp:          set.GetCreationTimestamp(),
-		DeletionTimestamp:          set.GetDeletionTimestamp(),
-		DeletionGracePeriodSeconds: set.GetDeletionGracePeriodSeconds(),
-		Labels:                     set.GetLabels(),
-		Annotations:                set.GetAnnotations(),
-		OwnerReferences:            set.GetOwnerReferences(),
-		Finalizers:                 set.GetFinalizers(),
-		ClusterName:                set.GetClusterName(),
-	}
-	subset.Spec.SubsetName = subSetName
+	subset.Name = subSetName
+	subset.RefName = set.GetName()
+	subset.Namespace = set.GetNamespace()
 
 	specReplicas, specPartition, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas, err := m.adapter.GetReplicaDetails(set, updatedRevision)
 	if err != nil {
@@ -181,9 +166,9 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 	return subset, nil
 }
 
-func (m *SubsetControl) objectKey(objMeta *metav1.ObjectMeta) client.ObjectKey {
+func (m *SubsetControl) objectKey(subset *Subset) client.ObjectKey {
 	return types.NamespacedName{
-		Namespace: objMeta.Namespace,
-		Name:      objMeta.Name,
+		Namespace: subset.Namespace,
+		Name:      subset.RefName,
 	}
 }

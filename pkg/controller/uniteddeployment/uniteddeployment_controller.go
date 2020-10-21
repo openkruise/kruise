@@ -299,13 +299,7 @@ func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1alpha1.
 	mapping := map[string][]*Subset{}
 
 	for _, ss := range subsets {
-		subSetName, err := getSubsetNameFrom(ss)
-		if err != nil {
-			// filter out Subset without correct Subset name
-			continue
-		}
-
-		mapping[subSetName] = append(mapping[subSetName], ss)
+		mapping[ss.Name] = append(mapping[ss.Name], ss)
 	}
 	return mapping
 }

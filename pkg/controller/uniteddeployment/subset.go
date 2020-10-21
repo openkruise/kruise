@@ -24,15 +24,15 @@ import (
 
 // Subset stores the details of a subset resource owned by one UnitedDeployment.
 type Subset struct {
-	metav1.ObjectMeta
-
-	Spec   SubsetSpec
-	Status SubsetStatus
+	Name      string
+	RefName   string
+	Namespace string
+	Spec      SubsetSpec
+	Status    SubsetStatus
 }
 
 // SubsetSpec stores the spec details of the Subset
 type SubsetSpec struct {
-	SubsetName     string
 	Replicas       int32
 	UpdateStrategy SubsetUpdateStrategy
 	SubsetRef      ResourceRef
