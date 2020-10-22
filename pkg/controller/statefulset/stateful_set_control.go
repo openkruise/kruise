@@ -573,7 +573,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	maxUnavailable := 1
 	if set.Spec.UpdateStrategy.RollingUpdate != nil {
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(replicaCount), false)
+		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), replicaCount, false)
 		if err != nil {
 			return &status, err
 		}
