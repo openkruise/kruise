@@ -389,7 +389,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 	}
 
-	if unhealthy > 0 && firstUnhealthyPod != nil {
+	if unhealthy > 0 {
 		klog.V(4).Infof("StatefulSet %s/%s has %d unhealthy Pods starting with %s",
 			set.Namespace,
 			set.Name,
@@ -530,8 +530,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			continue
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod block
-		if !isRunningAndReady(condemned[target]) && monotonic &&
-			condemned[target] != firstUnhealthyPod && firstUnhealthyPod != nil {
+		if !isRunningAndReady(condemned[target]) && monotonic && condemned[target] != firstUnhealthyPod {
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready prior to scale down",
 				set.Namespace,
