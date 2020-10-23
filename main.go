@@ -22,6 +22,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 
+	"k8s.io/kubernetes/pkg/capabilities"
+
 	extclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/webhook"
@@ -57,11 +59,13 @@ func init() {
 func main() {
 	var metricsAddr, pprofAddr string
 	var healthProbeAddr string
-	var enableLeaderElection, enablePprof bool
+	var enableLeaderElection, enablePprof, allowPrivileged bool
 	var leaderElectionNamespace string
 	var namespace string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
+	flag.BoolVar(&allowPrivileged, "allow-privileged", false, "If true, allow privileged containers. It will only work if api-server is also"+
+		"started with --allow-privileged=true.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", true, "Whether you need to enable leader election.")
 	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "kruise-system",
 		"This determines the namespace in which the leader election configmap will be created, it will use in-cluster namespace if empty.")
@@ -79,6 +83,12 @@ func main() {
 				setupLog.Error(err, "unable to start pprof")
 			}
 		}()
+	}
+
+	if allowPrivileged {
+		capabilities.Initialize(capabilities.Capabilities{
+			AllowPrivileged: allowPrivileged,
+		})
 	}
 
 	//ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
