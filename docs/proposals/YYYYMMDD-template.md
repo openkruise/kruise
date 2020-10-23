@@ -62,14 +62,11 @@ any additional information provided beyond the standard proposal template.
         - [NFR1](#nfr1)
         - [NFR2](#nfr2)
     - [Implementation Details/Notes/Constraints](#implementation-detailsnotesconstraints)
-    - [Security Model](#security-model)
     - [Risks and Mitigations](#risks-and-mitigations)
   - [Alternatives](#alternatives)
   - [Upgrade Strategy](#upgrade-strategy)
   - [Additional Details](#additional-details)
     - [Test Plan [optional]](#test-plan-optional)
-    - [Graduation Criteria [optional]](#graduation-criteria-optional)
-    - [Version Skew Strategy [optional]](#version-skew-strategy-optional)
   - [Implementation History](#implementation-history)
 
 ## Glossary
@@ -128,11 +125,9 @@ place your `.plantuml` files under `images/` and run `make diagrams` from the do
 ### Requirements (Optional)
 
 Some authors may wish to use requirements in addition to user stories.
-Technical requirements should derived from user stories, and provide a trace from
+Technical requirements should be derived from user stories, and provide a trace from
 use case to design, implementation and test case. Requirements can be prioritised
 using the MoSCoW (MUST, SHOULD, COULD, WON'T) criteria.
-
-The FR and NFR notation is intended to be used as cross-references across a CAEP.
 
 The difference between goals and requirements is that between an executive summary
 and the body of a document. Each requirement should be in support of a goal,
@@ -162,17 +157,6 @@ considerations for performance, reliability and security.
 - Go in to as much detail as necessary here.
 - Talk about core concepts and how they releate.
 
-### Security Model
-
-Document the intended security model for the proposal, including implications
-on the Kubernetes RBAC model. Questions you may want to answer include:
-
-* Does this proposal implement security controls or require the need to do so?
-  * If so, consider describing the different roles and permissions with tables.
-* Are their adequate security warnings where appropriate (see https://adam.shostack.org/ReederEtAl_NEATatMicrosoft.pdf for guidance).
-* Are regex expressions going to be used, and are their appropriate defenses against DOS.
-* Is any sensitive data being stored in a secret, and only exists for as long as necessary?
-
 ### Risks and Mitigations
 
 - What are the risks of this proposal and how do we mitigate? Think broadly.
@@ -195,50 +179,6 @@ Consider the following in developing an upgrade strategy for this enhancement:
 ## Additional Details
 
 ### Test Plan [optional]
-
-**Note:** *Section not required until targeted at a release.*
-
-Consider the following in developing a test plan for this enhancement:
-- Will there be e2e and integration tests, in addition to unit tests?
-- How will it be tested in isolation vs with other components?
-
-No need to outline all of the test cases, just the general strategy.
-Anything that would count as tricky in the implementation and anything particularly challenging to test should be called out.
-
-All code is expected to have adequate tests (eventually with coverage expectations).
-Please adhere to the [Kubernetes testing guidelines][testing-guidelines] when drafting this test plan.
-
-[testing-guidelines]: https://git.k8s.io/community/contributors/devel/sig-testing/testing.md
-
-### Graduation Criteria [optional]
-
-**Note:** *Section not required until targeted at a release.*
-
-Define graduation milestones.
-
-These may be defined in terms of API maturity, or as something else. Initial proposal should keep
-this high-level with a focus on what signals will be looked at to determine graduation.
-
-Consider the following in developing the graduation criteria for this enhancement:
-- [Maturity levels (`alpha`, `beta`, `stable`)][maturity-levels]
-- [Deprecation policy][deprecation-policy]
-
-Clearly define what graduation means by either linking to the [API doc definition](https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-versioning),
-or by redefining what graduation means.
-
-In general, we try to use the same stages (alpha, beta, GA), regardless how the functionality is accessed.
-
-[maturity-levels]: https://git.k8s.io/community/contributors/devel/sig-architecture/api_changes.md#alpha-beta-and-stable-versions
-[deprecation-policy]: https://kubernetes.io/docs/reference/using-api/deprecation-policy/
-
-### Version Skew Strategy [optional]
-
-If applicable, how will the component handle version skew with other components? What are the guarantees? Make sure
-this is in the test plan.
-
-Consider the following in developing a version skew strategy for this enhancement:
-- Does this enhancement involve coordinating behavior in the control plane and in the kubelet? How does an n-2 kubelet without this feature available behave when this feature is used?
-- Will any other components on the node change? For example, changes to CSI, CRI or CNI may require updating that component before the kubelet.
 
 ## Implementation History
 
