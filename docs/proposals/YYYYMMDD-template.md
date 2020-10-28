@@ -17,6 +17,7 @@ superseded-by:
 ---
 
 # Title
+
 - Keep it simple and descriptive.
 - A good title can help communicate what the proposal is and should be considered as part of any review.
 
@@ -29,7 +30,7 @@ To get started with this template:
   Aim for single topic PRs to keep discussions focused.
   If you disagree with what is already in a document, open a new PR with suggested changes.
 
-The canonical place for the latest set of instructions (and the likely source of this file) is [here](/proposals/YYYYMMDD-template.md).
+The canonical place for the latest set of instructions (and the likely source of this file) is [here](./YYYYMMDD-template.md).
 
 The `Metadata` section above is intended to support the creation of tooling around the proposal process.
 This will be a YAML section that is fenced as a code block.
