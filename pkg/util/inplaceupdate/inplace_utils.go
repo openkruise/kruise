@@ -433,6 +433,9 @@ func CheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		containerImages[c.Name] = c.Image
+		if len(strings.Split(c.Image, ":")) <= 1 {
+			containerImages[c.Name] = fmt.Sprintf("%s:latest", c.Image)
+		}
 	}
 
 	_, isInGraceState := pod.Annotations[appsv1alpha1.InPlaceUpdateGraceKey]
