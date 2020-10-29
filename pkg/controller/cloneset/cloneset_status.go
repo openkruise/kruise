@@ -61,6 +61,7 @@ func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *a
 			return err
 		}
 		clone.Status = *newStatus
+		clone.Annotations = cs.Annotations
 		return r.Status().Update(context.TODO(), clone)
 	})
 }
