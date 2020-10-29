@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/uuid"
-
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -151,8 +151,8 @@ func TestValidate(t *testing.T) {
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      &val2,
 					MaxUnavailable: &maxUnavailable120Percent,
-					PriorityStrategy: &appsv1alpha1.UpdatePriorityStrategy{
-						WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+					PriorityStrategy: &appspub.UpdatePriorityStrategy{
+						WeightPriority: []appspub.UpdatePriorityWeightTerm{
 							{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "foo"}}},
 						},
 					},

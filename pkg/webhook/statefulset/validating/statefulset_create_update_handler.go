@@ -22,6 +22,8 @@ import (
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -42,11 +44,21 @@ var _ admission.Handler = &StatefulSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.StatefulSet{}
+	obj := &appsv1beta1.StatefulSet{}
 
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objv1alpha1 := &appsv1alpha1.StatefulSet{}
+		if err := h.Decoder.Decode(req, objv1alpha1); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if err := objv1alpha1.ConvertTo(obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err))
+		}
 	}
 
 	switch req.AdmissionRequest.Operation {
@@ -55,9 +67,21 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1beta1.Update:
-		oldObj := &appsv1alpha1.StatefulSet{}
-		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
+		oldObj := &appsv1beta1.StatefulSet{}
+
+		switch req.AdmissionRequest.Resource.Version {
+		case appsv1beta1.GroupVersion.Version:
+			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+		case appsv1alpha1.GroupVersion.Version:
+			objv1alpha1 := &appsv1alpha1.StatefulSet{}
+			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, objv1alpha1); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			if err := objv1alpha1.ConvertTo(oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err))
+			}
 		}
 
 		validationErrorList := validateStatefulSet(obj)
@@ -67,7 +91,7 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 		}
 
 		if obj.Spec.UpdateStrategy.RollingUpdate != nil &&
-			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1alpha1.InPlaceOnlyPodUpdateStrategyType {
+			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1beta1.InPlaceOnlyPodUpdateStrategyType {
 			if err := validateTemplateInPlaceOnly(&oldObj.Spec.Template, &obj.Spec.Template); err != nil {
 				return admission.Errored(http.StatusUnprocessableEntity,
 					fmt.Errorf("invalid template modified with InPlaceOnly strategy: %v, currently only image update is allowed for InPlaceOnly", err))

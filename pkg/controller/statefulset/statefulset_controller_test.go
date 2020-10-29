@@ -24,12 +24,12 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
-	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1beta1"
+	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -72,7 +72,7 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 	if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 		t.Error(err)
 	} else {
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
 		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
@@ -88,7 +88,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 	if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 		t.Error(err)
 	} else {
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
 		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
@@ -100,7 +100,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 	if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 		t.Error(err)
 	} else {
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	if set.Status.Replicas != 0 {
 		t.Errorf("set.Status.Replicas = %v; want 0", set.Status.Replicas)
@@ -116,7 +116,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 		t.Error(err)
 	} else {
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
 		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
@@ -151,7 +151,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 		t.Error(err)
 	} else {
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	if set.Status.Replicas != 0 {
 		t.Errorf("set.Status.Replicas = %v; want 0", set.Status.Replicas)
@@ -167,7 +167,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	if obj, _, err := spc.setsIndexer.Get(set); err != nil {
 		t.Error(err)
 	} else {
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
 		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
@@ -604,7 +604,7 @@ func splitObjects(initialObjects []runtime.Object) ([]runtime.Object, []runtime.
 	var kubeObjects []runtime.Object
 	var kruiseObjects []runtime.Object
 	for _, o := range initialObjects {
-		if _, ok := o.(*appsv1alpha1.StatefulSet); ok {
+		if _, ok := o.(*appsv1beta1.StatefulSet); ok {
 			kruiseObjects = append(kruiseObjects, o)
 		} else {
 			kubeObjects = append(kubeObjects, o)
@@ -619,11 +619,11 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	kruiseClient := kruisefake.NewSimpleClientset(kruiseObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	kruiseInformerFactory := kruiseinformers.NewSharedInformerFactory(kruiseClient, controller.NoResyncPeriodFunc())
-	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1alpha1().StatefulSets())
-	ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1alpha1().StatefulSets())
+	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1beta1().StatefulSets())
+	ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewStatefulSetController(
 		informerFactory.Core().V1().Pods(),
-		kruiseInformerFactory.Apps().V1alpha1().StatefulSets(),
+		kruiseInformerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		client,
@@ -654,7 +654,7 @@ func getPodAtOrdinal(pods []*v1.Pod, ordinal int) *v1.Pod {
 	return pods[ordinal]
 }
 
-func scaleUpStatefulSetController(set *appsv1alpha1.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+func scaleUpStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
 	spc.setsIndexer.Add(set)
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
@@ -697,12 +697,12 @@ func scaleUpStatefulSetController(set *appsv1alpha1.StatefulSet, ssc *StatefulSe
 		if err != nil {
 			return err
 		}
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	return assertMonotonicInvariants(set, spc)
 }
 
-func scaleDownStatefulSetController(set *appsv1alpha1.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+func scaleDownStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
@@ -749,7 +749,7 @@ func scaleDownStatefulSetController(set *appsv1alpha1.StatefulSet, ssc *Stateful
 		if err != nil {
 			return err
 		}
-		set = obj.(*appsv1alpha1.StatefulSet)
+		set = obj.(*appsv1beta1.StatefulSet)
 	}
 	return assertMonotonicInvariants(set, spc)
 }
@@ -821,8 +821,8 @@ func NewStatefulSetController(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: ssc.enqueueStatefulSet,
 			UpdateFunc: func(old, cur interface{}) {
-				oldPS := old.(*appsv1alpha1.StatefulSet)
-				curPS := cur.(*appsv1alpha1.StatefulSet)
+				oldPS := old.(*appsv1beta1.StatefulSet)
+				curPS := cur.(*appsv1beta1.StatefulSet)
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
 					klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
 				}
@@ -1018,7 +1018,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (ssc *StatefulSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1alpha1.StatefulSet {
+func (ssc *StatefulSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1beta1.StatefulSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
@@ -1038,7 +1038,7 @@ func (ssc *StatefulSetController) resolveControllerRef(namespace string, control
 
 // getStatefulSetsForPod returns a list of StatefulSets that potentially match
 // a given pod.
-func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*appsv1alpha1.StatefulSet {
+func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*appsv1beta1.StatefulSet {
 	sets, err := getPodStatefulSets(ssc.setLister, pod)
 	if err != nil {
 		return nil
@@ -1055,9 +1055,9 @@ func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*appsv1al
 	return sets
 }
 
-func getPodStatefulSets(s kruiseappslisters.StatefulSetLister, pod *v1.Pod) ([]*appsv1alpha1.StatefulSet, error) {
+func getPodStatefulSets(s kruiseappslisters.StatefulSetLister, pod *v1.Pod) ([]*appsv1beta1.StatefulSet, error) {
 	var selector labels.Selector
-	var ps *appsv1alpha1.StatefulSet
+	var ps *appsv1beta1.StatefulSet
 
 	if len(pod.Labels) == 0 {
 		return nil, fmt.Errorf("no StatefulSets found for pod %v because it has no labels", pod.Name)
@@ -1068,7 +1068,7 @@ func getPodStatefulSets(s kruiseappslisters.StatefulSetLister, pod *v1.Pod) ([]*
 		return nil, err
 	}
 
-	var psList []*appsv1alpha1.StatefulSet
+	var psList []*appsv1beta1.StatefulSet
 	for i := range list {
 		ps = list[i]
 		if ps.Namespace != pod.Namespace {

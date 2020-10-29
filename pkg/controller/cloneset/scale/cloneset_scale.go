@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -55,6 +56,7 @@ func (r *realControl) Manage(
 	if updateCS.Spec.Replicas == nil {
 		return false, fmt.Errorf("spec.Replicas is nil")
 	}
+	klog.Infof("DEBUG start scale for %v", util.DumpJSON(updateCS))
 
 	controllerKey := clonesetutils.GetControllerKey(updateCS)
 	coreControl := clonesetcore.New(updateCS)
@@ -134,7 +136,7 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 
 		klog.V(3).Infof("CloneSet %s patch pod %s lifecycle from PreparingDelete to Normal",
 			clonesetutils.GetControllerKey(cs), pod.Name)
-		if patched, err := lifecycle.PatchPodLifecycle(r, pod, appsv1alpha1.LifecycleStateNormal); err != nil {
+		if patched, err := lifecycle.PatchPodLifecycle(r, pod, appspub.LifecycleStateNormal); err != nil {
 			return modified, err
 		} else if patched {
 			modified = true
@@ -174,7 +176,7 @@ func (r *realControl) createPods(
 		if pod.Labels[apps.ControllerRevisionHashLabelKey] == currentRevision {
 			cs = currentCS
 		}
-		lifecycle.SetPodLifecycle(appsv1alpha1.LifecycleStateNormal)(pod)
+		lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(pod)
 
 		var createErr error
 		if createErr = r.createOnePod(cs, pod, existingPVCNames); createErr != nil {
@@ -227,7 +229,7 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 	var modified bool
 	for _, pod := range podsToDelete {
 		if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.PreDelete, pod) {
-			if patched, err := lifecycle.PatchPodLifecycle(r, pod, appsv1alpha1.LifecycleStatePreparingDelete); err != nil {
+			if patched, err := lifecycle.PatchPodLifecycle(r, pod, appspub.LifecycleStatePreparingDelete); err != nil {
 				return false, err
 			} else if patched {
 				klog.V(3).Infof("CloneSet %s scaling patch pod %s lifecycle to PreparingDelete",

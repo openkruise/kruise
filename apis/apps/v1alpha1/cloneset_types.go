@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -71,7 +74,7 @@ type CloneSetSpec struct {
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 
 	// Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
-	Lifecycle *Lifecycle `json:"lifecycle,omitempty"`
+	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
 }
 
 // CloneSetScaleStrategy defines strategies for pods scale.
@@ -106,14 +109,14 @@ type CloneSetUpdateStrategy struct {
 	Paused bool `json:"paused,omitempty"`
 	// Priorities are the rules for calculating the priority of updating pods.
 	// Each pod to be updated, will pass through these terms and get a sum of weights.
-	PriorityStrategy *UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
+	PriorityStrategy *appspub.UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
 	// ScatterStrategy defines the scatter rules to make pods been scattered when update.
 	// This will avoid pods with the same key-value to be updated in one batch.
 	// - Note that pods will be scattered after priority sort. So, although priority strategy and scatter strategy can be applied together, we suggest to use either one of them.
 	// - If scatterStrategy is used, we suggest to just use one term. Otherwise, the update order can be hard to understand.
 	ScatterStrategy CloneSetUpdateScatterStrategy `json:"scatterStrategy,omitempty"`
 	// InPlaceUpdateStrategy contains strategies for in-place update.
-	InPlaceUpdateStrategy *InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
+	InPlaceUpdateStrategy *appspub.InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
 }
 
 // CloneSetUpdateStrategyType defines strategies for pods in-place update.
@@ -146,6 +149,28 @@ type CloneSetUpdateScatterStrategy []CloneSetUpdateScatterTerm
 type CloneSetUpdateScatterTerm struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+// FieldsValidation checks invalid fields in CloneSetUpdateScatterStrategy.
+func (strategy CloneSetUpdateScatterStrategy) FieldsValidation() error {
+	if len(strategy) == 0 {
+		return nil
+	}
+
+	m := make(map[string]struct{}, len(strategy))
+	for _, term := range strategy {
+		if term.Key == "" {
+			return fmt.Errorf("key should not be empty")
+		}
+		id := term.Key + ":" + term.Value
+		if _, ok := m[id]; !ok {
+			m[id] = struct{}{}
+		} else {
+			return fmt.Errorf("duplicated key=%v value=%v", term.Key, term.Value)
+		}
+	}
+
+	return nil
 }
 
 // CloneSetStatus defines the observed state of CloneSet

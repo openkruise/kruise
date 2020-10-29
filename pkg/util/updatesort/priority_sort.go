@@ -20,17 +20,17 @@ import (
 	"sort"
 	"strconv"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type prioritySort struct {
-	strategy *appsv1alpha1.UpdatePriorityStrategy
+	strategy *appspub.UpdatePriorityStrategy
 }
 
-func NewPrioritySorter(s *appsv1alpha1.UpdatePriorityStrategy) Sorter {
+func NewPrioritySorter(s *appspub.UpdatePriorityStrategy) Sorter {
 	return &prioritySort{strategy: s}
 }
 

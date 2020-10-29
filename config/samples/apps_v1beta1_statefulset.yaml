@@ -1,0 +1,7 @@
+apiVersion: apps.kruise.io/v1beta1
+kind: StatefulSet
+metadata:
+  name: statefulset-sample
+spec:
+  # Add fields here
+  foo: bar

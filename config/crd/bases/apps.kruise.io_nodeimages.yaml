@@ -98,6 +98,7 @@ spec:
                             description: ObjectReference contains enough information
                               to let you inspect or modify the referred object.
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                           type: array
                         pullPolicy:
                           description: PullPolicy is an optional field to set parameters

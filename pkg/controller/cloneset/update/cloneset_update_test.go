@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/openkruise/kruise/apis"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/util"
@@ -81,20 +82,20 @@ func TestMange(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}},
-					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}}},
+					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
-						{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
 			},
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}},
-					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}}},
+					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
-						{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
 			},
@@ -106,7 +107,7 @@ func TestMange(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}},
-					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}}},
+					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
 					}},
@@ -115,10 +116,10 @@ func TestMange(t *testing.T) {
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}, ResourceVersion: "1"},
-					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}}},
+					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
-						{Type: appsv1alpha1.InPlaceUpdateReady, LastTransitionTime: now, Status: v1.ConditionTrue},
+						{Type: appspub.InPlaceUpdateReady, LastTransitionTime: now, Status: v1.ConditionTrue},
 					}},
 				},
 			},
@@ -136,10 +137,10 @@ func TestMange(t *testing.T) {
 						apps.ControllerRevisionHashLabelKey: "rev-old",
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
-					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}}},
+					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
-						{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
 			},
@@ -155,10 +156,10 @@ func TestMange(t *testing.T) {
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 						appsv1alpha1.SpecifiedDeleteKey:     "true",
 					}},
-					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}}},
+					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
-						{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
 			},
@@ -191,14 +192,14 @@ func TestMange(t *testing.T) {
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -217,14 +218,14 @@ func TestMange(t *testing.T) {
 						appsv1alpha1.SpecifiedDeleteKey:     "true",
 					}},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -259,14 +260,14 @@ func TestMange(t *testing.T) {
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -283,24 +284,24 @@ func TestMange(t *testing.T) {
 						Labels: map[string]string{
 							apps.ControllerRevisionHashLabelKey: "rev-new",
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
-							appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateUpdating),
+							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
 						},
-						Annotations: map[string]string{appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+						Annotations: map[string]string{appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 							Revision:              "rev-new",
 							UpdateTimestamp:       now,
-							LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 						})},
 						ResourceVersion: "2",
 					},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo2"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -316,7 +317,7 @@ func TestMange(t *testing.T) {
 			name: "inplace update with grace period",
 			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
@@ -335,14 +336,14 @@ func TestMange(t *testing.T) {
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionTrue},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -359,27 +360,27 @@ func TestMange(t *testing.T) {
 						Labels: map[string]string{
 							apps.ControllerRevisionHashLabelKey: "rev-new",
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
-							appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateUpdating),
+							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{
-							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:              "rev-new",
 								UpdateTimestamp:       now,
-								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 						ResourceVersion: "2",
 					},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -395,7 +396,7 @@ func TestMange(t *testing.T) {
 			name: "inplace update during grace period",
 			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
@@ -412,23 +413,23 @@ func TestMange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
-							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:              "rev-new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
-								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 					},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -447,23 +448,23 @@ func TestMange(t *testing.T) {
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
 						},
 						Annotations: map[string]string{
-							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:              "rev-new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
-								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 					},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -479,7 +480,7 @@ func TestMange(t *testing.T) {
 			name: "inplace update continuously after grace period",
 			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appsv1alpha1.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
@@ -496,23 +497,23 @@ func TestMange(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
-							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:              "rev-new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
-								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appsv1alpha1.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 					},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo1"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -531,23 +532,23 @@ func TestMange(t *testing.T) {
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
 						},
 						Annotations: map[string]string{
-							appsv1alpha1.InPlaceUpdateStateKey: util.DumpJSON(appsv1alpha1.InPlaceUpdateState{
+							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:              "rev-new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
-								LastContainerStatuses: map[string]appsv1alpha1.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
 						},
 						ResourceVersion: "1",
 					},
 					Spec: v1.PodSpec{
-						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 						Containers:     []v1.Container{{Name: "c1", Image: "foo2"}},
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: appsv1alpha1.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
+							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionFalse, Reason: "StartInPlaceUpdate", LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
 					},
@@ -589,11 +590,11 @@ func TestMange(t *testing.T) {
 				t.Fatalf("Failed to test %s, get pod %s error: %v", mc.name, p.Name, err)
 			}
 
-			if v, ok := gotPod.Annotations[appsv1alpha1.LifecycleTimestampKey]; ok {
+			if v, ok := gotPod.Annotations[appspub.LifecycleTimestampKey]; ok {
 				if p.Annotations == nil {
 					p.Annotations = map[string]string{}
 				}
-				p.Annotations[appsv1alpha1.LifecycleTimestampKey] = v
+				p.Annotations[appspub.LifecycleTimestampKey] = v
 			}
 
 			if !reflect.DeepEqual(gotPod, p) {

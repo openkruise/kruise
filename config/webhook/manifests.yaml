@@ -100,7 +100,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-statefulset
+      path: /mutate-apps-kruise-io-statefulset
   failurePolicy: Fail
   name: mstatefulset.kb.io
   rules:
@@ -108,6 +108,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -198,7 +199,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-statefulset
+      path: /validate-apps-kruise-io-statefulset
   failurePolicy: Fail
   name: vstatefulset.kb.io
   rules:
@@ -206,6 +207,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE

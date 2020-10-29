@@ -21,6 +21,7 @@ import (
 	"sort"
 	"time"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -97,7 +98,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 
 		if clonesetutils.GetPodRevision(pods[i]) != updateRevision.Name {
 			switch lifecycle.GetPodLifecycleState(pods[i]) {
-			case appsv1alpha1.LifecycleStatePreparingDelete, appsv1alpha1.LifecycleStateUpdated:
+			case appspub.LifecycleStatePreparingDelete, appspub.LifecycleStateUpdated:
 				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
 					cs.Namespace, cs.Name, pods[i].Name, lifecycle.GetPodLifecycleState(pods[i]))
 			default:
@@ -137,25 +138,25 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 		return false, 0, res.RefreshErr
 	}
 
-	var state appsv1alpha1.LifecycleStateType
+	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
-	case appsv1alpha1.LifecycleStateUpdating:
+	case appspub.LifecycleStateUpdating:
 		checkFunc := inplaceupdate.CheckInPlaceUpdateCompleted
 		if opts != nil && opts.CustomizeCheckUpdateCompleted != nil {
 			checkFunc = opts.CustomizeCheckUpdateCompleted
 		}
 		if checkFunc(pod) == nil {
 			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
-				state = appsv1alpha1.LifecycleStateUpdated
+				state = appspub.LifecycleStateUpdated
 			} else {
-				state = appsv1alpha1.LifecycleStateNormal
+				state = appspub.LifecycleStateNormal
 			}
 		}
-	case appsv1alpha1.LifecycleStateUpdated:
+	case appspub.LifecycleStateUpdated:
 		if cs.Spec.Lifecycle == nil ||
 			cs.Spec.Lifecycle.InPlaceUpdate == nil ||
 			lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
-			state = appsv1alpha1.LifecycleStateNormal
+			state = appspub.LifecycleStateNormal
 		}
 	}
 
@@ -186,8 +187,8 @@ func sortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.C
 
 	// PreparingUpdate first
 	sort.Slice(waitUpdateIndexes, func(i, j int) bool {
-		preparingUpdateI := lifecycle.GetPodLifecycleState(pods[waitUpdateIndexes[i]]) == appsv1alpha1.LifecycleStatePreparingUpdate
-		preparingUpdateJ := lifecycle.GetPodLifecycleState(pods[waitUpdateIndexes[j]]) == appsv1alpha1.LifecycleStatePreparingUpdate
+		preparingUpdateI := lifecycle.GetPodLifecycleState(pods[waitUpdateIndexes[i]]) == appspub.LifecycleStatePreparingUpdate
+		preparingUpdateJ := lifecycle.GetPodLifecycleState(pods[waitUpdateIndexes[j]]) == appspub.LifecycleStatePreparingUpdate
 		if preparingUpdateI != preparingUpdateJ {
 			return preparingUpdateI
 		}
@@ -238,7 +239,7 @@ func calculateUpdateCount(coreControl clonesetcore.Control, strategy appsv1alpha
 
 func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
 	state := lifecycle.GetPodLifecycleState(pod)
-	if state != "" && state != appsv1alpha1.LifecycleStateNormal {
+	if state != "" && state != appspub.LifecycleStateNormal {
 		return false
 	}
 	return coreControl.IsPodUpdateReady(pod, minReadySeconds)
@@ -261,7 +262,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 
 		if c.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, coreControl.GetUpdateOptions()) {
 			if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
-				if patched, err := lifecycle.PatchPodLifecycle(c, pod, appsv1alpha1.LifecycleStatePreparingUpdate); err != nil {
+				if patched, err := lifecycle.PatchPodLifecycle(c, pod, appspub.LifecycleStatePreparingUpdate); err != nil {
 					return 0, err
 				} else if patched {
 					clonesetutils.ResourceVersionExpectations.Expect(pod)
@@ -272,7 +273,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			}
 
 			opts := coreControl.GetUpdateOptions()
-			opts.AdditionalFuncs = append(opts.AdditionalFuncs, lifecycle.SetPodLifecycle(appsv1alpha1.LifecycleStateUpdating))
+			opts.AdditionalFuncs = append(opts.AdditionalFuncs, lifecycle.SetPodLifecycle(appspub.LifecycleStateUpdating))
 			res := c.inplaceControl.Update(pod, oldRevision, updateRevision, opts)
 			if res.InPlaceUpdate {
 				if res.UpdateErr == nil {

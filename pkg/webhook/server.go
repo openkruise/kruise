@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 var (
@@ -66,6 +67,9 @@ func SetupWithManager(mgr manager.Manager) error {
 		klog.V(3).Infof("Registered webhook handler %s", path)
 	}
 
+	// register conversion webhook
+	server.Register("/convert", &conversion.Webhook{})
+
 	// register health handler
 	server.Register("/healthz", &health.Handler{})
 
@@ -75,6 +79,7 @@ func SetupWithManager(mgr manager.Manager) error {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;update;patch
 
 func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 	cli := &client.DelegatingClient{
@@ -83,7 +88,7 @@ func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 		StatusClient: mgr.GetClient(),
 	}
 
-	c, err := webhookcontroller.New(cli, HandlerMap)
+	c, err := webhookcontroller.New(mgr.GetConfig(), cli, HandlerMap)
 	if err != nil {
 		return err
 	}
@@ -91,7 +96,7 @@ func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 		c.Start(stopCh)
 	}()
 
-	timer := time.NewTimer(time.Second * 5)
+	timer := time.NewTimer(time.Second * 20)
 	defer timer.Stop()
 	select {
 	case <-webhookcontroller.Inited():

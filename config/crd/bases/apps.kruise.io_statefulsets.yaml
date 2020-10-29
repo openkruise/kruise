@@ -150,6 +150,7 @@ spec:
                 out by the StatefulSet will fulfill this Template, but have a unique
                 identity from the rest of the StatefulSet.
               type: object
+              x-kubernetes-preserve-unknown-fields: true
             updateStrategy:
               description: updateStrategy indicates the StatefulSetUpdateStrategy
                 that will be employed to update Pods in the StatefulSet when a revision
@@ -331,6 +332,7 @@ spec:
                 description: PersistentVolumeClaim is a user's request for and claim
                   to a persistent volume
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               type: array
           required:
           - selector
@@ -358,6 +360,7 @@ spec:
                 description: StatefulSetCondition describes the state of a statefulset
                   at a certain point.
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               type: array
             currentReplicas:
               description: currentReplicas is the number of Pods created by the StatefulSet
@@ -408,6 +411,9 @@ spec:
   version: v1alpha1
   versions:
   - name: v1alpha1
+    served: true
+    storage: false
+  - name: v1beta1
     served: true
     storage: true
 status:

@@ -19,20 +19,20 @@ package updatesort
 import (
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCompare(t *testing.T) {
 	cases := []struct {
-		strategy *appsv1alpha1.UpdatePriorityStrategy
+		strategy *appspub.UpdatePriorityStrategy
 		podI     map[string]string
 		podJ     map[string]string
 		expected bool
 	}{
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{
 					{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "foo"}}},
 					{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "bar"}}},
 				},
@@ -42,8 +42,8 @@ func TestCompare(t *testing.T) {
 			expected: true,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{
 					{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "foo"}}},
 					{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "bar"}}},
 				},
@@ -53,8 +53,8 @@ func TestCompare(t *testing.T) {
 			expected: true,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{
 					{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "foo"}}},
 					{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "bar"}}},
 				},
@@ -64,8 +64,8 @@ func TestCompare(t *testing.T) {
 			expected: false,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{
 					{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "foo"}}},
 					{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "bar"}}},
 				},
@@ -75,8 +75,8 @@ func TestCompare(t *testing.T) {
 			expected: false,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{
 					{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "foo"}}},
 					{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key": "bar"}}},
 				},
@@ -86,8 +86,8 @@ func TestCompare(t *testing.T) {
 			expected: false,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{
 					{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key1": "foo"}}},
 					{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key2": "bar"}}},
 					{Weight: 15, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key3": "baz"}}},
@@ -98,8 +98,8 @@ func TestCompare(t *testing.T) {
 			expected: false,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{
 					{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key1": "foo"}}},
 					{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key2": "bar"}}},
 					{Weight: 5, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"key3": "baz"}}},
@@ -110,8 +110,8 @@ func TestCompare(t *testing.T) {
 			expected: false,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				OrderPriority: []appsv1alpha1.UpdatePriorityOrderTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				OrderPriority: []appspub.UpdatePriorityOrderTerm{
 					{OrderedKey: "key1"},
 					{OrderedKey: "key2"},
 				},
@@ -121,8 +121,8 @@ func TestCompare(t *testing.T) {
 			expected: true,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				OrderPriority: []appsv1alpha1.UpdatePriorityOrderTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				OrderPriority: []appspub.UpdatePriorityOrderTerm{
 					{OrderedKey: "key1"},
 					{OrderedKey: "key2"},
 				},
@@ -132,8 +132,8 @@ func TestCompare(t *testing.T) {
 			expected: true,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				OrderPriority: []appsv1alpha1.UpdatePriorityOrderTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				OrderPriority: []appspub.UpdatePriorityOrderTerm{
 					{OrderedKey: "key1"},
 					{OrderedKey: "key2"},
 				},
@@ -143,8 +143,8 @@ func TestCompare(t *testing.T) {
 			expected: true,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				OrderPriority: []appsv1alpha1.UpdatePriorityOrderTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				OrderPriority: []appspub.UpdatePriorityOrderTerm{
 					{OrderedKey: "key1"},
 					{OrderedKey: "key2"},
 				},
@@ -154,8 +154,8 @@ func TestCompare(t *testing.T) {
 			expected: false,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				OrderPriority: []appsv1alpha1.UpdatePriorityOrderTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				OrderPriority: []appspub.UpdatePriorityOrderTerm{
 					{OrderedKey: "key1"},
 					{OrderedKey: "key2"},
 				},
@@ -165,8 +165,8 @@ func TestCompare(t *testing.T) {
 			expected: false,
 		},
 		{
-			strategy: &appsv1alpha1.UpdatePriorityStrategy{
-				OrderPriority: []appsv1alpha1.UpdatePriorityOrderTerm{
+			strategy: &appspub.UpdatePriorityStrategy{
+				OrderPriority: []appspub.UpdatePriorityOrderTerm{
 					{OrderedKey: "key1"},
 					{OrderedKey: "key2"},
 				},
