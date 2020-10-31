@@ -44,14 +44,15 @@ type realStatusUpdater struct {
 
 func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
 	r.calculateStatus(cs, newStatus, pods)
-	isChanged := clonesetcore.New(cs).ExtraStatusCalculation(cs, pods)
-	if !r.inconsistentStatus(cs, newStatus) && !isChanged {
-		return nil
+	if r.inconsistentStatus(cs, newStatus) {
+		klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions update=%s",
+			cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.UpdateRevision)
+		if err := r.updateStatus(cs, newStatus); err != nil {
+			return err
+		}
 	}
 
-	klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions update=%s",
-		cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.UpdateRevision)
-	return r.updateStatus(cs, newStatus)
+	return clonesetcore.New(cs).ExtraStatusCalculation(cs, pods)
 }
 
 func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
