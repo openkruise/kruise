@@ -245,7 +245,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", request.String(), updateDirtyPods, unsatisfiedDuration)
 			return reconcile.Result{}, nil
 		}
-		klog.V(4).Infof("Not satisfied scale for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
+		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
