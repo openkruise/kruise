@@ -6,6 +6,8 @@ import (
 	"regexp"
 
 	"github.com/appscode/jsonpatch"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -18,15 +20,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
 
 // TODO (rz): break this giant function down further and use unit testing
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
-func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	switch spec.PodManagementPolicy {
@@ -60,7 +60,7 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 				apivalidation.ValidateNonnegativeField(
 					int64(*spec.UpdateStrategy.RollingUpdate.MinReadySeconds),
 					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"))...)
-			if *spec.UpdateStrategy.RollingUpdate.MinReadySeconds > appsv1alpha1.MaxMinReadySeconds {
+			if *spec.UpdateStrategy.RollingUpdate.MinReadySeconds > appsv1beta1.MaxMinReadySeconds {
 				allErrs = append(allErrs,
 					field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"),
 						*spec.UpdateStrategy.RollingUpdate.MinReadySeconds,
@@ -126,16 +126,16 @@ func validateStatefulSetSpec(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 	return allErrs
 }
 
-func validatePodUpdatePolicy(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+func validatePodUpdatePolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	switch spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy {
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"), ""))
-	case appsv1alpha1.RecreatePodUpdateStrategyType:
-	case appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType, appsv1alpha1.InPlaceOnlyPodUpdateStrategyType:
+	case appsv1beta1.RecreatePodUpdateStrategyType:
+	case appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, appsv1beta1.InPlaceOnlyPodUpdateStrategyType:
 		var containsReadinessGate bool
 		for _, r := range spec.Template.Spec.ReadinessGates {
-			if r.ConditionType == appsv1alpha1.InPlaceUpdateReady {
+			if r.ConditionType == appspub.InPlaceUpdateReady {
 				containsReadinessGate = true
 				break
 			}
@@ -145,7 +145,7 @@ func validatePodUpdatePolicy(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 				field.Invalid(fldPath.Child("template").Child("spec").Child("readinessGates"),
 					spec.Template.Spec.ReadinessGates,
 					fmt.Sprintf("must contains %v when podUpdatePolicy is %v",
-						appsv1alpha1.InPlaceUpdateReady,
+						appspub.InPlaceUpdateReady,
 						spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy)))
 		}
 	default:
@@ -153,14 +153,14 @@ func validatePodUpdatePolicy(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.
 			field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("podUpdatePolicy"),
 				spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy,
 				fmt.Sprintf("must be '%s', %s or '%s'",
-					appsv1alpha1.RecreatePodUpdateStrategyType,
-					appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
-					appsv1alpha1.InPlaceOnlyPodUpdateStrategyType)))
+					appsv1beta1.RecreatePodUpdateStrategyType,
+					appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
+					appsv1beta1.InPlaceOnlyPodUpdateStrategyType)))
 	}
 	return allErrs
 }
 
-func validateMaxUnavailableField(spec *appsv1alpha1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+func validateMaxUnavailableField(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
@@ -201,14 +201,14 @@ func validateMaxUnavailableField(spec *appsv1alpha1.StatefulSetSpec, fldPath *fi
 }
 
 // ValidateStatefulSet validates a StatefulSet.
-func validateStatefulSet(statefulSet *appsv1alpha1.StatefulSet) field.ErrorList {
+func validateStatefulSet(statefulSet *appsv1beta1.StatefulSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&statefulSet.ObjectMeta, true, appsvalidation.ValidateStatefulSetName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateStatefulSetUpdate tests if required fields in the StatefulSet are set.
-func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.StatefulSet) field.ErrorList {
+func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.StatefulSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 
 	restoreReplicas := statefulSet.Spec.Replicas

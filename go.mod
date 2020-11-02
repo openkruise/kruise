@@ -14,6 +14,7 @@ require (
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 	gomodules.xyz/jsonpatch/v2 v2.0.1
 	k8s.io/api v0.17.7
+	k8s.io/apiextensions-apiserver v0.17.7
 	k8s.io/apimachinery v0.17.7
 	k8s.io/apiserver v0.16.6
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible

@@ -18,7 +18,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_clonesets.yaml
 #- patches/webhook_in_broadcastjobs.yaml
 #- patches/webhook_in_sidecarsets.yaml
-#- patches/webhook_in_statefulsets.yaml
+- patches/webhook_in_statefulsets.yaml
 #- patches/webhook_in_uniteddeployments.yaml
 #- patches/webhook_in_daemonsets.yaml
 #- patches/webhook_in_nodeimages.yaml

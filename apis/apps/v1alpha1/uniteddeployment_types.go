@@ -94,17 +94,20 @@ type SubsetTemplate struct {
 
 // StatefulSetTemplateSpec defines the subset template of StatefulSet.
 type StatefulSetTemplateSpec struct {
+	// +kubebuilder:validation:XPreserveUnknownFields
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              appsv1.StatefulSetSpec `json:"spec"`
 }
 
 // AdvancedStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.
 type AdvancedStatefulSetTemplateSpec struct {
+	// +kubebuilder:validation:XPreserveUnknownFields
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              StatefulSetSpec `json:"spec"`
 }
 
 type CloneSetTemplateSpec struct {
+	// +kubebuilder:validation:XPreserveUnknownFields
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CloneSetSpec `json:"spec"`
 }
