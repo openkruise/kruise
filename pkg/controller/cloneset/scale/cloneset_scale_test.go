@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -67,7 +68,7 @@ func TestCreatePods(t *testing.T) {
 					appsv1alpha1.CloneSetInstanceID:     "id1",
 					apps.ControllerRevisionHashLabelKey: "revision-abc",
 					"foo":                               "bar",
-					appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateNormal),
+					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -82,7 +83,7 @@ func TestCreatePods(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Spec: v1.PodSpec{
-				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
@@ -123,7 +124,7 @@ func TestCreatePods(t *testing.T) {
 					appsv1alpha1.CloneSetInstanceID:     "id3",
 					apps.ControllerRevisionHashLabelKey: "revision-xyz",
 					"foo":                               "bar",
-					appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateNormal),
+					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -138,7 +139,7 @@ func TestCreatePods(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Spec: v1.PodSpec{
-				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
@@ -180,7 +181,7 @@ func TestCreatePods(t *testing.T) {
 					appsv1alpha1.CloneSetInstanceID:     "id4",
 					apps.ControllerRevisionHashLabelKey: "revision-xyz",
 					"foo":                               "bar",
-					appsv1alpha1.LifecycleStateKey:      string(appsv1alpha1.LifecycleStateNormal),
+					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -195,7 +196,7 @@ func TestCreatePods(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Spec: v1.PodSpec{
-				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appsv1alpha1.InPlaceUpdateReady}},
+				ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
@@ -237,11 +238,11 @@ func TestCreatePods(t *testing.T) {
 
 	for i := range expectedPods {
 		appsv1alpha1.SetDefaultPod(&expectedPods[i])
-		if v, ok := pods.Items[i].Annotations[appsv1alpha1.LifecycleTimestampKey]; ok {
+		if v, ok := pods.Items[i].Annotations[appspub.LifecycleTimestampKey]; ok {
 			if expectedPods[i].Annotations == nil {
 				expectedPods[i].Annotations = make(map[string]string)
 			}
-			expectedPods[i].Annotations[appsv1alpha1.LifecycleTimestampKey] = v
+			expectedPods[i].Annotations[appspub.LifecycleTimestampKey] = v
 		}
 	}
 

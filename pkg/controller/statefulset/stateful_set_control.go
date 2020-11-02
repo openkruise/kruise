@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -45,13 +45,13 @@ type ControlInterface interface {
 	// If an implementation returns a non-nil error, the invocation will be retried using a rate-limited strategy.
 	// Implementors should sink any errors that they do not wish to trigger a retry, and they may feel free to
 	// exit exceptionally at any point provided they wish the update to be re-run at a later point in time.
-	UpdateStatefulSet(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error
+	UpdateStatefulSet(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 	// ListRevisions returns a array of the ControllerRevisions that represent the revisions of set. If the returned
 	// error is nil, the returns slice of ControllerRevisions is valid.
-	ListRevisions(set *appsv1alpha1.StatefulSet) ([]*apps.ControllerRevision, error)
+	ListRevisions(set *appsv1beta1.StatefulSet) ([]*apps.ControllerRevision, error)
 	// AdoptOrphanRevisions adopts any orphaned ControllerRevisions that match set's Selector. If all adoptions are
 	// successful the returned error is nil.
-	AdoptOrphanRevisions(set *appsv1alpha1.StatefulSet, revisions []*apps.ControllerRevision) error
+	AdoptOrphanRevisions(set *appsv1beta1.StatefulSet, revisions []*apps.ControllerRevision) error
 }
 
 // NewDefaultStatefulSetControl returns a new instance of the default implementation ControlInterface that
@@ -91,7 +91,7 @@ type defaultStatefulSetControl struct {
 // strategy allows these constraints to be relaxed - pods will be created and deleted eagerly and
 // in no particular order. Clients using the burst strategy should be careful to ensure they
 // understand the consistency implications of having unpredictable numbers of pods available.
-func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
 
 	// list all revisions and sort them
 	revisions, err := ssc.ListRevisions(set)
@@ -141,7 +141,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *appsv1alpha1.Statef
 	return ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)
 }
 
-func (ssc *defaultStatefulSetControl) ListRevisions(set *appsv1alpha1.StatefulSet) ([]*apps.ControllerRevision, error) {
+func (ssc *defaultStatefulSetControl) ListRevisions(set *appsv1beta1.StatefulSet) ([]*apps.ControllerRevision, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func (ssc *defaultStatefulSetControl) ListRevisions(set *appsv1alpha1.StatefulSe
 }
 
 func (ssc *defaultStatefulSetControl) AdoptOrphanRevisions(
-	set *appsv1alpha1.StatefulSet,
+	set *appsv1beta1.StatefulSet,
 	revisions []*apps.ControllerRevision) error {
 	for i := range revisions {
 		adopted, err := ssc.controllerHistory.AdoptControllerRevision(set, controllerKind, revisions[i])
@@ -168,7 +168,7 @@ func (ssc *defaultStatefulSetControl) AdoptOrphanRevisions(
 // only RevisionHistoryLimit revisions remain. If the returned error is nil the operation was successful. This method
 // expects that revisions is sorted when supplied.
 func (ssc *defaultStatefulSetControl) truncateHistory(
-	set *appsv1alpha1.StatefulSet,
+	set *appsv1beta1.StatefulSet,
 	pods []*v1.Pod,
 	revisions []*apps.ControllerRevision,
 	current *apps.ControllerRevision,
@@ -207,7 +207,7 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 // a new revision, or modify the Revision of an existing revision if an update to set is detected.
 // This method expects that revisions is sorted when supplied.
 func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
-	set *appsv1alpha1.StatefulSet,
+	set *appsv1beta1.StatefulSet,
 	revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
 
@@ -280,12 +280,12 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 
 // TODO (RZ): Break the below spaghetti code into smaller chucks with unit tests
 func (ssc *defaultStatefulSetControl) updateStatefulSet(
-	set *appsv1alpha1.StatefulSet,
+	set *appsv1beta1.StatefulSet,
 	currentRevision *apps.ControllerRevision,
 	updateRevision *apps.ControllerRevision,
 	collisionCount int32,
 	pods []*v1.Pod,
-	revisions []*apps.ControllerRevision) (*appsv1alpha1.StatefulSetStatus, error) {
+	revisions []*apps.ControllerRevision) (*appsv1beta1.StatefulSetStatus, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return set.Status.DeepCopy(), err
@@ -302,7 +302,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// set the generation, and revisions in the returned status
-	status := appsv1alpha1.StatefulSetStatus{}
+	status := appsv1beta1.StatefulSetStatus{}
 	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
@@ -433,7 +433,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if !isCreated(replicas[i]) {
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
 				msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
-				condition := NewStatefulsetCondition(appsv1alpha1.FailedCreatePod, v1.ConditionTrue, "", msg)
+				condition := NewStatefulsetCondition(appsv1beta1.FailedCreatePod, v1.ConditionTrue, "", msg)
 				SetStatefulsetCondition(&status, condition)
 				return &status, err
 			}
@@ -504,7 +504,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		replica := replicas[i].DeepCopy()
 		if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
 			msg := fmt.Sprintf("StatefulPodControl failed to update Pod error: %s", err)
-			condition := NewStatefulsetCondition(appsv1alpha1.FailedUpdatePod, v1.ConditionTrue, "", msg)
+			condition := NewStatefulsetCondition(appsv1beta1.FailedUpdatePod, v1.ConditionTrue, "", msg)
 			SetStatefulsetCondition(&status, condition)
 			return &status, err
 		}
@@ -590,7 +590,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	var unavailablePods []string
 	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, replicas)
 	klog.V(5).Infof("Prepare to update pods indexes %v for StatefulSet %s", updateIndexes, getStatefulSetKey(set))
-	minWaitTime := appsv1alpha1.MaxMinReadySeconds * time.Second
+	minWaitTime := appsv1beta1.MaxMinReadySeconds * time.Second
 	// update pods in sequence
 	for _, target := range updateIndexes {
 
@@ -661,14 +661,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 }
 
 func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
-	set *appsv1alpha1.StatefulSet, pod *v1.Pod,
+	set *appsv1beta1.StatefulSet, pod *v1.Pod,
 	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 ) (bool, error) {
 	if set.Spec.UpdateStrategy.RollingUpdate == nil {
 		return false, nil
 	}
-	if set.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy != appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType &&
-		set.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy != appsv1alpha1.InPlaceOnlyPodUpdateStrategyType {
+	if set.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy != appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType &&
+		set.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy != appsv1beta1.InPlaceOnlyPodUpdateStrategyType {
 		return false, nil
 	}
 
@@ -703,8 +703,8 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 // mutated to indicate completion. If status is semantically equivalent to set's Status no update is performed. If the
 // returned error is nil, the update is successful.
 func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
-	set *appsv1alpha1.StatefulSet,
-	status *appsv1alpha1.StatefulSetStatus) error {
+	set *appsv1beta1.StatefulSet,
+	status *appsv1beta1.StatefulSetStatus) error {
 
 	// complete any in progress rolling update if necessary
 	completeRollingUpdate(set, status)

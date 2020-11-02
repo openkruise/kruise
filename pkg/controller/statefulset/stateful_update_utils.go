@@ -17,12 +17,12 @@ limitations under the License.
 package statefulset
 
 import (
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/updatesort"
 	v1 "k8s.io/api/core/v1"
 )
 
-func sortPodsToUpdate(rollingUpdateStrategy *appsv1alpha1.RollingUpdateStatefulSetStrategy, updateRevision string, replicas []*v1.Pod) []int {
+func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSetStrategy, updateRevision string, replicas []*v1.Pod) []int {
 	var updateMin int
 	if rollingUpdateStrategy != nil && rollingUpdateStrategy.Partition != nil {
 		updateMin = int(*rollingUpdateStrategy.Partition)

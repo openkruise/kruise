@@ -21,9 +21,9 @@ import (
 	"errors"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
@@ -32,7 +32,7 @@ import (
 
 func TestStatefulSetUpdaterUpdatesSetStatus(t *testing.T) {
 	set := newStatefulSet(3)
-	status := appsv1alpha1.StatefulSetStatus{ObservedGeneration: 1, Replicas: 2}
+	status := appsv1beta1.StatefulSetStatus{ObservedGeneration: 1, Replicas: 2}
 	fakeClient := &fake.Clientset{}
 	updater := NewRealStatefulSetStatusUpdater(fakeClient, nil)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
@@ -49,12 +49,12 @@ func TestStatefulSetUpdaterUpdatesSetStatus(t *testing.T) {
 
 func TestStatefulSetStatusUpdaterUpdatesObservedGeneration(t *testing.T) {
 	set := newStatefulSet(3)
-	status := appsv1alpha1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
+	status := appsv1beta1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
 	fakeClient := &fake.Clientset{}
 	updater := NewRealStatefulSetStatusUpdater(fakeClient, nil)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
-		sts := update.GetObject().(*appsv1alpha1.StatefulSet)
+		sts := update.GetObject().(*appsv1beta1.StatefulSet)
 		if sts.Status.ObservedGeneration != 3 {
 			t.Errorf("expected observedGeneration to be synced with generation for statefulset %q", sts.Name)
 		}
@@ -67,7 +67,7 @@ func TestStatefulSetStatusUpdaterUpdatesObservedGeneration(t *testing.T) {
 
 func TestStatefulSetStatusUpdaterUpdateReplicasFailure(t *testing.T) {
 	set := newStatefulSet(3)
-	status := appsv1alpha1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
+	status := appsv1beta1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
 	fakeClient := &fake.Clientset{}
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	indexer.Add(set)
@@ -83,7 +83,7 @@ func TestStatefulSetStatusUpdaterUpdateReplicasFailure(t *testing.T) {
 
 func TestStatefulSetStatusUpdaterUpdateReplicasConflict(t *testing.T) {
 	set := newStatefulSet(3)
-	status := appsv1alpha1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
+	status := appsv1beta1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
 	conflict := false
 	fakeClient := &fake.Clientset{}
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
@@ -108,7 +108,7 @@ func TestStatefulSetStatusUpdaterUpdateReplicasConflict(t *testing.T) {
 
 func TestStatefulSetStatusUpdaterUpdateReplicasConflictFailure(t *testing.T) {
 	set := newStatefulSet(3)
-	status := appsv1alpha1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
+	status := appsv1beta1.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
 	fakeClient := &fake.Clientset{}
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	indexer.Add(set)

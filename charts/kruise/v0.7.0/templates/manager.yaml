@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: kruise-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kruise-webhook-service
+  namespace: kruise-system
+spec:
+  ports:
+    - port: 443
+      targetPort: {{ .Values.manager.webhook.port }}
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kruise-webhook-certs
+  namespace: kruise-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: kruise-controller-manager
+  namespace: kruise-system
+spec:
+  replicas: {{ .Values.manager.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+        - args:
+            - --enable-leader-election
+            - --metrics-addr={{ .Values.manager.metrics.addr }}:{{ .Values.manager.metrics.port }}
+            - --health-probe-addr=:{{ .Values.manager.healthProbe.port }}
+            - --logtostderr=true
+            - --v={{ .Values.manager.log.level }}
+            {{- if .Values.manager.allowPrivileged }}
+            - --allow-privileged=true
+            {{- end }}
+          command:
+            - /manager
+          image: {{ .Values.manager.image.repository }}:{{.Values.manager.image.tag}}
+          imagePullPolicy: Always
+          name: manager
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: WEBHOOK_PORT
+              value: "{{ .Values.manager.webhook.port }}"
+            - name: CUSTOM_RESOURCE_ENABLE
+              value: {{ .Values.manager.custom_resource_enable }}
+            - name: WEBHOOK_CONFIGURATION_FAILURE_POLICY_PODS
+              value: {{ .Values.webhookConfiguration.failurePolicy.pods }}
+          ports:
+            - containerPort: {{ .Values.manager.webhook.port }}
+              name: webhook-server
+              protocol: TCP
+            - containerPort: {{ .Values.manager.metrics.port }}
+              name: metrics
+              protocol: TCP
+            - containerPort: {{ .Values.manager.healthProbe.port }}
+              name: health
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: readyz
+              port: {{ .Values.manager.healthProbe.port }}
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+      terminationGracePeriodSeconds: 10
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: control-plane
+                  operator: In
+                  values:
+                  - controller-manager
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+{{- with .Values.spec.nodeAffinity }}
+        nodeAffinity:
+{{ toYaml . | indent 10 }}
+{{- end }}
+
+{{- if .Values.spec.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.spec.nodeSelector | indent 8 }}
+{{- end }}
+
+{{- if .Values.spec.tolerations }}
+      tolerations:
+{{ toYaml .Values.spec.tolerations | indent 8 }}
+{{- end }}

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,7 @@ type RollingUpdateStatefulSetStrategy struct {
 	UnorderedUpdate *UnorderedUpdateStrategy `json:"unorderedUpdate,omitempty"`
 	// InPlaceUpdateStrategy contains strategies for in-place update.
 	// +optional
-	InPlaceUpdateStrategy *InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
+	InPlaceUpdateStrategy *appspub.InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
 	// MinReadySeconds indicates how long will the pod be considered ready after it's updated.
 	// MinReadySeconds works with both OrderedReady and Parallel podManagementPolicy.
 	// It affects the pod scale up speed when the podManagementPolicy is set to be OrderedReady.
@@ -87,7 +88,7 @@ type UnorderedUpdateStrategy struct {
 	// Priorities are the rules for calculating the priority of updating pods.
 	// Each pod to be updated, will pass through these terms and get a sum of weights.
 	// +optional
-	PriorityStrategy *UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
+	PriorityStrategy *appspub.UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
 }
 
 // PodUpdateStrategyType is a string enumeration type that enumerates

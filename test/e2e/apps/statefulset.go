@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -586,7 +587,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					PodUpdatePolicy: appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
 				},
 			}
-			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appsv1alpha1.InPlaceUpdateReady})
+			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
 			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)

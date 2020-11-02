@@ -20,7 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ import (
 
 func TestSortPodsToUpdate(t *testing.T) {
 	cases := []struct {
-		strategy       *appsv1alpha1.RollingUpdateStatefulSetStrategy
+		strategy       *appsv1beta1.RollingUpdateStatefulSetStrategy
 		updateRevision string
 		replicas       []*v1.Pod
 		expected       []int
@@ -44,9 +45,9 @@ func TestSortPodsToUpdate(t *testing.T) {
 			expected: []int{2, 1, 0},
 		},
 		{
-			strategy: &appsv1alpha1.RollingUpdateStatefulSetStrategy{
-				UnorderedUpdate: &appsv1alpha1.UnorderedUpdateStrategy{PriorityStrategy: &appsv1alpha1.UpdatePriorityStrategy{
-					WeightPriority: []appsv1alpha1.UpdatePriorityWeightTerm{
+			strategy: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+				UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{PriorityStrategy: &appspub.UpdatePriorityStrategy{
+					WeightPriority: []appspub.UpdatePriorityWeightTerm{
 						{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"k": "v1"}}},
 						{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"k": "v2"}}},
 					},

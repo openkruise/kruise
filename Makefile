@@ -1,8 +1,8 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= openkruise/kruise-manager:test
-# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true"
+# Produce CRDs that work for API servers that supports v1beta1 CRD and conversion, requires k8s 1.13 or later.
+CRD_OPTIONS ?= "crd"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -69,18 +69,18 @@ docker-push:
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
-ifeq (, $(shell which controller-gen-kruise))
+ifeq (, $(shell which controller-gen-kruise-2))
 	@{ \
 	set -e ;\
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	echo "replace sigs.k8s.io/controller-tools => github.com/openkruise/controller-tools v0.2.9-kruise" >> go.mod ;\
+	echo "replace sigs.k8s.io/controller-tools => github.com/openkruise/controller-tools v0.2.9-kruise.2" >> go.mod ;\
 	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.9 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	mv $(GOPATH)/bin/controller-gen $(GOPATH)/bin/controller-gen-kruise ;\
+	mv $(GOPATH)/bin/controller-gen $(GOPATH)/bin/controller-gen-kruise-2 ;\
 	}
-CONTROLLER_GEN=$(GOPATH)/bin/controller-gen-kruise
+CONTROLLER_GEN=$(GOPATH)/bin/controller-gen-kruise-2
 else
-CONTROLLER_GEN=$(shell which controller-gen-kruise)
+CONTROLLER_GEN=$(shell which controller-gen-kruise-2)
 endif

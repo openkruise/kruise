@@ -3,6 +3,7 @@ package scale
 import (
 	"sort"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
@@ -34,7 +35,7 @@ func getPlannedDeletedPods(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod
 		if isPodSpecifiedDelete(cs, pod) {
 			podsSpecifiedToDelete = append(podsSpecifiedToDelete, pod)
 		}
-		if lifecycle.GetPodLifecycleState(pod) == appsv1alpha1.LifecycleStatePreparingDelete {
+		if lifecycle.GetPodLifecycleState(pod) == appspub.LifecycleStatePreparingDelete {
 			podsInPreDelete = append(podsInPreDelete, pod)
 		}
 	}

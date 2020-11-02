@@ -22,20 +22,21 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"k8s.io/kubernetes/pkg/capabilities"
-
-	extclient "github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
-	"github.com/openkruise/kruise/pkg/webhook"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
+	"k8s.io/kubernetes/pkg/capabilities"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	extclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+	"github.com/openkruise/kruise/pkg/webhook"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -51,8 +52,10 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = appsv1alpha1.AddToScheme(clientgoscheme.Scheme)
+	_ = appsv1beta1.AddToScheme(clientgoscheme.Scheme)
 
 	_ = appsv1alpha1.AddToScheme(scheme)
+	_ = appsv1beta1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

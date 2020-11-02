@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
@@ -61,7 +61,7 @@ func init() {
 
 var (
 	// controllerKind contains the schema.GroupVersionKind for this controller type.
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 	concurrentReconciles = 3
 
 	updateExpectations = expectations.NewUpdateExpectations(func(o metav1.Object) string {
@@ -75,7 +75,7 @@ var (
 // Add creates a new StatefulSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !gate.ResourceEnabled(&appsv1alpha1.StatefulSet{}) {
+	if !gate.ResourceEnabled(&appsv1beta1.StatefulSet{}) {
 		return nil
 	}
 	r, err := newReconciler(mgr)
@@ -162,10 +162,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to StatefulSet
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.StatefulSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.StatefulSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldSS := e.ObjectOld.(*appsv1alpha1.StatefulSet)
-			newSS := e.ObjectNew.(*appsv1alpha1.StatefulSet)
+			oldSS := e.ObjectOld.(*appsv1beta1.StatefulSet)
+			newSS := e.ObjectNew.(*appsv1beta1.StatefulSet)
 			if oldSS.Status.Replicas != newSS.Status.Replicas {
 				klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", newSS.Name, oldSS.Status.Replicas, newSS.Status.Replicas)
 			}
@@ -179,7 +179,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to Pod created by StatefulSet
 	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.StatefulSet{},
+		OwnerType:    &appsv1beta1.StatefulSet{},
 	})
 	if err != nil {
 		return err
@@ -251,7 +251,7 @@ func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (res recon
 }
 
 // adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.
-func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1alpha1.StatefulSet) error {
+func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1beta1.StatefulSet) error {
 	revisions, err := ssc.control.ListRevisions(set)
 	if err != nil {
 		return err
@@ -263,7 +263,7 @@ func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1alpha1.Stateful
 		}
 	}
 	if len(orphanRevisions) > 0 {
-		fresh, err := ssc.kruiseClient.AppsV1alpha1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -280,7 +280,7 @@ func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1alpha1.Stateful
 //
 // NOTE: Returned Pods are pointers to objects from the cache.
 //       If you need to modify one, you need to copy it first.
-func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1alpha1.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
+func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1beta1.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
 	// List all pods to include the pods that don't match the selector anymore but
 	// has a ControllerRef pointing to this StatefulSet.
 	pods, err := ssc.podLister.Pods(set.Namespace).List(labels.Everything())
@@ -296,7 +296,7 @@ func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1alpha1.Statefu
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := ssc.kruiseClient.AppsV1alpha1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +311,7 @@ func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1alpha1.Statefu
 }
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
-func (ssc *ReconcileStatefulSet) syncStatefulSet(set *appsv1alpha1.StatefulSet, pods []*v1.Pod) error {
+func (ssc *ReconcileStatefulSet) syncStatefulSet(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
 	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
 	// TODO: investigate where we mutate the set during the update as it is not obvious.
 	if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil {

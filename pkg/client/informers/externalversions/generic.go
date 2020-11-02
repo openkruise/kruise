@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	v1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -68,6 +69,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().StatefulSets().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("uniteddeployments"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().UnitedDeployments().Informer()}, nil
+
+		// Group=apps.kruise.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
 
 	}
 

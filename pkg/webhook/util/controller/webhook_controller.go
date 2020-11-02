@@ -24,10 +24,15 @@ import (
 	extclient "github.com/openkruise/kruise/pkg/client"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/configuration"
+	"github.com/openkruise/kruise/pkg/webhook/util/crd"
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	"github.com/openkruise/kruise/pkg/webhook/util/writer"
 	"k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,8 +40,7 @@ import (
 	admissionregistrationinformers "k8s.io/client-go/informers/admissionregistration/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
-	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -64,16 +68,19 @@ type Controller struct {
 	runtimeClient client.Client
 	handlers      map[string]admission.Handler
 
-	informerFactory    informers.SharedInformerFactory
-	secretLister       corelisters.SecretNamespaceLister
-	mutatingWCLister   admissionregistrationlisters.MutatingWebhookConfigurationLister
-	validatingWCLister admissionregistrationlisters.ValidatingWebhookConfigurationLister
-	synced             []cache.InformerSynced
+	informerFactory informers.SharedInformerFactory
+	//secretLister       corelisters.SecretNamespaceLister
+	//mutatingWCLister   admissionregistrationlisters.MutatingWebhookConfigurationLister
+	//validatingWCLister admissionregistrationlisters.ValidatingWebhookConfigurationLister
+	crdClient   apiextensionsclientset.Interface
+	crdInformer cache.SharedIndexInformer
+	crdLister   apiextensionslisters.CustomResourceDefinitionLister
+	synced      []cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
 }
 
-func New(cli client.Client, handlers map[string]admission.Handler) (*Controller, error) {
+func New(cfg *rest.Config, cli client.Client, handlers map[string]admission.Handler) (*Controller, error) {
 	c := &Controller{
 		kubeClient:    extclient.GetGenericClient().KubeClient,
 		runtimeClient: cli,
@@ -85,17 +92,10 @@ func New(cli client.Client, handlers map[string]admission.Handler) (*Controller,
 	c.informerFactory = informers.NewSharedInformerFactory(c.kubeClient, 0)
 
 	secretInformer := coreinformers.New(c.informerFactory, namespace, nil).Secrets()
-	c.secretLister = secretInformer.Lister().Secrets(namespace)
-
 	admissionRegistrationInformer := admissionregistrationinformers.New(c.informerFactory, v1.NamespaceAll, nil)
-	c.mutatingWCLister = admissionRegistrationInformer.MutatingWebhookConfigurations().Lister()
-	c.validatingWCLister = admissionRegistrationInformer.ValidatingWebhookConfigurations().Lister()
-
-	c.synced = []cache.InformerSynced{
-		secretInformer.Informer().HasSynced,
-		admissionRegistrationInformer.MutatingWebhookConfigurations().Informer().HasSynced,
-		admissionRegistrationInformer.ValidatingWebhookConfigurations().Informer().HasSynced,
-	}
+	//c.secretLister = secretInformer.Lister().Secrets(namespace)
+	//c.mutatingWCLister = admissionRegistrationInformer.MutatingWebhookConfigurations().Lister()
+	//c.validatingWCLister = admissionRegistrationInformer.ValidatingWebhookConfigurations().Lister()
 
 	secretInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -148,6 +148,33 @@ func New(cli client.Client, handlers map[string]admission.Handler) (*Controller,
 		},
 	})
 
+	c.crdClient = apiextensionsclientset.NewForConfigOrDie(cfg)
+	c.crdInformer = apiextensionsinformers.NewCustomResourceDefinitionInformer(c.crdClient, 0, cache.Indexers{})
+	c.crdInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			crd := obj.(*apiextensionsv1beta1.CustomResourceDefinition)
+			if crd.Spec.Group == "apps.kruise.io" {
+				klog.Infof("CustomResourceDefinition %s added", crd.Name)
+				c.queue.Add("")
+			}
+		},
+		UpdateFunc: func(old, cur interface{}) {
+			crd := cur.(*apiextensionsv1beta1.CustomResourceDefinition)
+			if crd.Spec.Group == "apps.kruise.io" {
+				klog.Infof("CustomResourceDefinition %s updated", crd.Name)
+				c.queue.Add("")
+			}
+		},
+	})
+	c.crdLister = apiextensionslisters.NewCustomResourceDefinitionLister(c.crdInformer.GetIndexer())
+
+	c.synced = []cache.InformerSynced{
+		secretInformer.Informer().HasSynced,
+		admissionRegistrationInformer.MutatingWebhookConfigurations().Informer().HasSynced,
+		admissionRegistrationInformer.ValidatingWebhookConfigurations().Informer().HasSynced,
+		c.crdInformer.HasSynced,
+	}
+
 	return c, nil
 }
 
@@ -159,6 +186,9 @@ func (c *Controller) Start(stopCh <-chan struct{}) {
 	defer klog.Infof("Shutting down webhook-controller")
 
 	c.informerFactory.Start(stopCh)
+	go func() {
+		c.crdInformer.Run(stopCh)
+	}()
 	if !cache.WaitForNamedCacheSync("webhook-controller", stopCh, c.synced...) {
 		return
 	}
@@ -226,6 +256,10 @@ func (c *Controller) sync() error {
 
 	if err := configuration.Ensure(c.runtimeClient, c.handlers, certs.CACert); err != nil {
 		return fmt.Errorf("failed to ensure configuration: %v", err)
+	}
+
+	if err := crd.Ensure(c.crdClient, c.crdLister, certs.CACert); err != nil {
+		return fmt.Errorf("failed to ensure crd: %v", err)
 	}
 
 	onceInit.Do(func() {

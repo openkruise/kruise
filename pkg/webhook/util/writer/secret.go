@@ -132,7 +132,7 @@ func (s *secretCertWriter) read() (*generator.Artifacts, error) {
 		return nil, notFoundError{err}
 	}
 	certs := secretToCerts(secret)
-	if certs != nil {
+	if certs != nil && certs.CACert != nil && certs.CAKey != nil {
 		// Store the CA for next usage.
 		s.CertGenerator.SetCA(certs.CAKey, certs.CACert)
 	}
