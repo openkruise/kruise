@@ -33,6 +33,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
+	"github.com/openkruise/kruise/pkg/util/refmanager"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -218,6 +219,12 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// list all active Pods and PVCs belongs to cs
 	filteredPods, filteredPVCs, err := r.getOwnedResource(instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	//release Pods ownerRef
+	filteredPods, err = r.claimPods(instance, filteredPods)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -497,4 +504,28 @@ func (r *ReconcileCloneSet) truncateHistory(
 		}
 	}
 	return nil
+}
+
+func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) {
+	manager, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	selected := make([]metav1.Object, len(pods))
+	for i, pod := range pods {
+		selected[i] = pod
+	}
+
+	claimed, err := manager.ClaimOwnedObjects(selected)
+	if err != nil {
+		return nil, err
+	}
+
+	claimedPods := make([]*v1.Pod, len(claimed))
+	for i, pod := range claimed {
+		claimedPods[i] = pod.(*v1.Pod)
+	}
+
+	return claimedPods, nil
 }
