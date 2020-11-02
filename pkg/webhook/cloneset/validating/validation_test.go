@@ -160,10 +160,15 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
+			// test for all acceptable CloneSetSpec changes
 			spec: &appsv1alpha1.CloneSetSpec{
-				Replicas: &val1,
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
+				Replicas:             &val1,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate.Template,
+				RevisionHistoryLimit: &val1,
+				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+					PodsToDelete: []string{"p0"},
+				},
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      &val2,
@@ -171,11 +176,16 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			oldSpec: &appsv1alpha1.CloneSetSpec{
-				Replicas: &val1,
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate1.Template,
+				Replicas:             &val2,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate1.Template,
+				RevisionHistoryLimit: &val2,
+				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+					PodsToDelete: []string{"p1"},
+				},
+
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
 					Partition:      &val2,
 					MaxUnavailable: &intOrStr1,
 				},
@@ -323,30 +333,6 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		"invalid-cloneset-update-1": {
-			spec: &appsv1alpha1.CloneSetSpec{
-				Replicas:             &val1,
-				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-				RevisionHistoryLimit: &val2,
-				Template:             validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
-					MaxUnavailable: &intOrStr1,
-				},
-			},
-			oldSpec: &appsv1alpha1.CloneSetSpec{
-				Replicas:             &val1,
-				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
-				RevisionHistoryLimit: &val1,
-				Template:             validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
-					MaxUnavailable: &intOrStr1,
-				},
-			},
-		},
-		"invalid-cloneset-update-2": {
 			spec: &appsv1alpha1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
