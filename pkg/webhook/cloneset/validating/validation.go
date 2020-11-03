@@ -3,12 +3,12 @@ package validating
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -160,8 +160,9 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneS
 	clone.Spec.UpdateStrategy = oldCloneSet.Spec.UpdateStrategy
 	clone.Spec.MinReadySeconds = oldCloneSet.Spec.MinReadySeconds
 	clone.Spec.Lifecycle = oldCloneSet.Spec.Lifecycle
-	if !reflect.DeepEqual(clone.Spec, oldCloneSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'lifecycle', 'scaleStrategy', and 'updateStrategy' are forbidden"))
+	clone.Spec.RevisionHistoryLimit = oldCloneSet.Spec.RevisionHistoryLimit
+	if !apiequality.Semantic.DeepEqual(clone.Spec, oldCloneSet.Spec) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'lifecycle', 'scaleStrategy', 'updateStrategy', 'minReadySeconds' and 'revisionHistoryLimit' are forbidden"))
 	}
 
 	coreControl := clonesetcore.New(cloneSet)
