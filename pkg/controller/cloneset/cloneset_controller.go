@@ -20,6 +20,7 @@ package cloneset
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -40,10 +41,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -230,7 +233,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}
 
 	// list all revisions and sort them
-	revisions, err := r.controllerHistory.ListControllerRevisions(instance, selector)
+	revisions, err := r.getControllerRevisionsForCloneSet(instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -504,6 +507,47 @@ func (r *ReconcileCloneSet) truncateHistory(
 		}
 	}
 	return nil
+}
+
+// getReplicaSetsForDeployment uses ControllerRefManager to reconcile
+// ControllerRef by adopting and orphaning.
+// It returns the list of ControllerRevisions that this CloneSet should manage.
+func (r *ReconcileCloneSet) getControllerRevisionsForCloneSet(cs *appsv1alpha1.CloneSet) ([]*apps.ControllerRevision, error) {
+	// List all ControllerRevisions to find those we own but that no longer match our
+	// selector. They will be orphaned by ClaimControllerRevisions().
+	revisionList := apps.ControllerRevisionList{}
+	err := r.List(context.TODO(), &revisionList, &client.ListOptions{Namespace: cs.GetNamespace()})
+	if err != nil {
+		return nil, err
+	}
+	selector, err := metav1.LabelSelectorAsSelector(cs.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("cloneSet %s/%s has invalid label selector: %v", cs.Namespace, cs.Name, err)
+	}
+	// If any adoptions are attempted, we should first recheck for deletion with
+	// an uncached quorum read sometime after listing ControllerRevision
+	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh := &appsv1alpha1.CloneSet{}
+		err := r.Get(context.TODO(), types.NamespacedName{Name: cs.GetName(), Namespace: cs.GetNamespace()}, fresh)
+		if err != nil {
+			return nil, err
+		}
+		if fresh.UID != cs.UID {
+			return nil, fmt.Errorf("original CloneSet %v/%v is gone: got uid %v, wanted %v", cs.Namespace, cs.Name, fresh.UID, cs.UID)
+		}
+		return fresh, nil
+	})
+
+	var revisions []*apps.ControllerRevision
+	for _, revision := range revisionList.Items {
+		revisions = append(revisions, &revision)
+	}
+	// Use ControllerRefManager to adopt/orphan as needed.
+	cm := kubecontroller.NewControllerRevisionControllerRefManager(kubecontroller.RealControllerRevisionControl{
+		KubeClient: kruiseclient.GetGenericClient().KubeClient,
+	}, cs, selector, clonesetutils.ControllerKind, canAdoptFunc)
+
+	return cm.ClaimControllerRevisions(revisions)
 }
 
 func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) {
