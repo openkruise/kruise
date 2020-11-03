@@ -231,12 +231,16 @@ func (c *Controller) sync() error {
 	var certWriter writer.CertWriter
 	var err error
 
-	if dnsName = webhookutil.GetHost(); len(dnsName) > 0 {
+	if dnsName = webhookutil.GetHost(); len(dnsName) == 0 {
+		dnsName = generator.ServiceToCommonName(webhookutil.GetNamespace(), webhookutil.GetServiceName())
+	}
+
+	certWriterType := webhookutil.GetCertWriter()
+	if certWriterType == writer.FsCertWriter || (len(certWriterType) == 0 && len(webhookutil.GetHost()) != 0) {
 		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{
 			Path: webhookutil.GetCertDir(),
 		})
 	} else {
-		dnsName = generator.ServiceToCommonName(webhookutil.GetNamespace(), webhookutil.GetServiceName())
 		certWriter, err = writer.NewSecretCertWriter(writer.SecretCertWriterOptions{
 			Client: c.runtimeClient,
 			Secret: &types.NamespacedName{Namespace: webhookutil.GetNamespace(), Name: webhookutil.GetSecretName()},

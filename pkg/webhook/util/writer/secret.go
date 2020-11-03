@@ -29,6 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	SecretCertWriter = "secret"
+)
+
 // secretCertWriter provisions the certificate by reading and writing to the k8s secrets.
 type secretCertWriter struct {
 	*SecretCertWriterOptions
