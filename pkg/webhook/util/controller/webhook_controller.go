@@ -231,7 +231,7 @@ func (c *Controller) sync() error {
 	var certWriter writer.CertWriter
 	var err error
 
-	if dnsName = webhookutil.GetHost(); len(dnsName) > 0 {
+	if dnsName = webhookutil.GetHost(); len(dnsName) > 0 && len(webhookutil.GetSecretName()) == 0 {
 		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{
 			Path: webhookutil.GetCertDir(),
 		})
