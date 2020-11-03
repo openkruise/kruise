@@ -66,3 +66,7 @@ func GetCertDir() string {
 	}
 	return "/tmp/kruise-webhook-certs"
 }
+
+func GetCertWriter() string {
+	return os.Getenv("WEBHOOK_CERT_WRITER")
+}
