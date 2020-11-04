@@ -1,5 +1,5 @@
 ---
-title: BroadcastCronJob Crd and Controller
+title: AdvancedCronJob Crd and Controller
 authors:
   - "@rishi-anand"
 reviewers:
@@ -11,8 +11,8 @@ last-updated: 2020-10-25
 status: implementable
 ---
 
-# Implementing BroadcastCronJob Crd and Controller
-- Running BroadcastJob periodically at a given schedule. 
+# Implementing AdvancedCronJob Crd and Controller
+- Implementing AdvancedCronJob to support Job/BroadcastJob or any other future CRD and to run it periodically at a given schedule. 
 
 ## Table of Contents
 
@@ -33,35 +33,36 @@ any additional information provided beyond the standard proposal template.
 
 ## Summary
 
-This controller will help developers to run a job in specific schedule and on to all nodes in the cluster.
+This controller will be very generic and will have implementations to help developers to run a job or any CRD in specific schedule.
 
 ## Motivation
 
-- Developer may come across a use-case when some job needs to be executed on all the nodes and with some specific schedule.
+- Developer may come across a use-case when some job needs to be executed on at a specific schedule.
 - Found same use-case requirement in Issues #251 and I got motivated to implement it
 
 ### Goals
 
-- Implementing a custom controller for BroadcastCronJob which acts like CronJob but it schedules BroadcastJob
+- Implementing a custom controller for AdvancedCronJob which acts like CronJob but it schedules Job/BroadcastJob or other CRD
 
 ## Proposal
 
-- Adding a new CRD and controller for BroadcastCronJob
+- Adding a new CRD and controller for AdvancedCronJob
 
 ### User Stories
 
 - Implement a CRD which contains below fields and a controller which honors all the fields and reconciles accordingly.
 ```
 apiVersion: apps.kruise.io/v1alpha1
-kind: BroadcastCronJob
+kind: AdvancedCronJob
 metadata:
-  name: broadcastcronjob-sample
+  name: AdvancedCronJob-sample
 spec:
   schedule: "* * * * *"
   concurrencyPolicy: Replace
   paused: false
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
+  jobTemplate: #user can provide only one template at a time
   broadcastJobTemplate:
     spec:
       template:
@@ -72,7 +73,7 @@ spec:
               args:
                 - /bin/sh
                 - -c
-                - date; echo "Hello from the BroadcastCronJob - SpectroCloud"
+                - date; echo "Hello from the AdvancedCronJob - SpectroCloud"
           restartPolicy: Never
       completionPolicy:
         type: Always
@@ -87,6 +88,5 @@ Add unit and integration test cases
 
 ## Implementation History
 
-- [ ] 10/24/2020: Proposed idea in an issue <a href="https://github.com/openkruise/kruise/issues/215#issuecomment-715506813">#215</a>
-- [ ] 10/25/2020: Created PR for CRD and implementation of controller <a href="https://github.com/spectrocloud/kruise/pull/1">spectrocloud/kruise/pull/1</a>
-
+- [ ] 10/24/2020: Proposal discussion in an issue <a href="https://github.com/openkruise/kruise/issues/215#issuecomment-715506813">#215</a>
+- [ ] 11/04/2020: Proposal submission
