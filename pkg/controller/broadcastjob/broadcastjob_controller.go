@@ -21,7 +21,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -356,25 +355,15 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 
 	// max concurrent running pods
 	var parallelism int32
-	if job.Spec.Parallelism == nil {
-		// not specify,take the max int
-		parallelism = int32(1<<31 - 1)
-	} else {
-		parallelismIntStr := *job.Spec.Parallelism
-		if parallelismIntStr.Type == intstr.String {
-			absolute, err := percentageToAbsolute(parallelismIntStr.StrVal)
-			if err != nil {
-				return active, err
-			}
-			parallelism = int32(math.Ceil(float64(int32(absolute)*desired) / 100))
-		} else {
-			parallelism = parallelismIntStr.IntVal
-		}
+	var err error
+	parallelismInt, err := intstr.GetValueFromIntOrPercent(intstr.ValueOrDefault(job.Spec.Parallelism, intstr.FromInt(1<<31-1)), int(desired), true)
+	if err != nil {
+		return active, err
 	}
+	parallelism = int32(parallelismInt)
 
 	// The rest pods to run
 	rest := int32(len(restNodesToRunPod))
-	var err error
 	var errCh chan error
 	if active > parallelism {
 		// exceed parallelism limit
