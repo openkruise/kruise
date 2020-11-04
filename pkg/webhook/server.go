@@ -105,3 +105,23 @@ func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 		return fmt.Errorf("failed to start webhook controller for waiting more than 5s")
 	}
 }
+
+func WaitReady() error {
+	startTS := time.Now()
+	var err error
+	for {
+		duration := time.Since(startTS)
+		if err = Checker(nil); err == nil {
+			return nil
+		}
+
+		if duration > time.Second*5 {
+			klog.Warningf("Failed to wait webhook ready over %s: %v", duration, err)
+		}
+		if duration > time.Minute {
+			return err
+		}
+		time.Sleep(time.Second * 2)
+	}
+
+}

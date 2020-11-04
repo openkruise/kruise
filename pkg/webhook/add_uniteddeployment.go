@@ -17,16 +17,11 @@ limitations under the License.
 package webhook
 
 import (
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/webhook/uniteddeployment/mutating"
 	"github.com/openkruise/kruise/pkg/webhook/uniteddeployment/validating"
 )
 
 func init() {
-	if !gate.ResourceEnabled(&appsv1alpha1.UnitedDeployment{}) {
-		return
-	}
 	addHandlers(mutating.HandlerMap)
 	addHandlers(validating.HandlerMap)
 }

@@ -127,12 +127,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("setup controllers")
-	if err = controller.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup controllers")
-		os.Exit(1)
-	}
-
 	setupLog.Info("setup webhook")
 	if err = webhook.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to setup webhook")
@@ -152,6 +146,20 @@ func main() {
 		setupLog.Error(err, "unable to add readyz check")
 		os.Exit(1)
 	}
+
+	go func() {
+		setupLog.Info("wait webhook ready")
+		if err = webhook.WaitReady(); err != nil {
+			setupLog.Error(err, "unable to wait webhook ready")
+			os.Exit(1)
+		}
+
+		setupLog.Info("setup controllers")
+		if err = controller.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to setup controllers")
+			os.Exit(1)
+		}
+	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(stopCh); err != nil {
