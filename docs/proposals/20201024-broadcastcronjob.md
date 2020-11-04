@@ -46,7 +46,10 @@ This controller will be very generic and will have implementations to help devel
 
 ## Proposal
 
-- Adding a new CRD and controller for AdvancedCronJob
+- Adding a new CRD and controller for AdvancedCronJob.
+- AdvancedCronJob should be able to reconcile Job/BroadcastJob or any other future CRD if required.
+- Once AdvancedCronJob is created, spec cannot be modified.
+- Adding webhook for validation of AdvancedCronJob.
 
 ### User Stories
 
