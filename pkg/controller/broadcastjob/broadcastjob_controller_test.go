@@ -605,6 +605,9 @@ func createPod(job1 *appsv1alpha1.BroadcastJob, podName, nodeName string, phase 
 			Name:      podName,
 			Labels:    labelsAsMap(job1),
 			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(job1, appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")),
+			},
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodeName,
