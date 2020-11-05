@@ -53,6 +53,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=apps.kruise.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("advancedcronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().AdvancedCronJobs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("broadcastjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().BroadcastJobs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clonesets"):

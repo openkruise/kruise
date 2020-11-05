@@ -27,6 +27,10 @@ type FakeAppsV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAppsV1alpha1) AdvancedCronJobs(namespace string) v1alpha1.AdvancedCronJobInterface {
+	return &FakeAdvancedCronJobs{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) BroadcastJobs(namespace string) v1alpha1.BroadcastJobInterface {
 	return &FakeBroadcastJobs{c, namespace}
 }

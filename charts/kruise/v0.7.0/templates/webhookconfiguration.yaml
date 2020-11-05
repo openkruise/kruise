@@ -11,6 +11,24 @@ webhooks:
       service:
         name: kruise-webhook-service
         namespace: kruise-system
+        path: /mutate-apps-kruise-io-v1alpha1-advancedcronjob
+    failurePolicy: Fail
+    name: vadvancedcronjob.kb.io
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - advancedcronjobs
+  - clientConfig:
+      caBundle: Cg==
+      service:
+        name: kruise-webhook-service
+        namespace: kruise-system
         path: /mutate-apps-kruise-io-v1alpha1-sidecarset
     failurePolicy: Fail
     name: msidecarset.kb.io
@@ -30,7 +48,7 @@ webhooks:
         name: kruise-webhook-service
         namespace: kruise-system
         path: /mutate-pod
-    failurePolicy: {{ .Values.webhookConfiguration.failurePolicy.pods }}
+    failurePolicy: Ignore
     name: mpod.kb.io
     namespaceSelector:
       matchExpressions:
@@ -145,6 +163,24 @@ metadata:
   annotations:
     template: ""
 webhooks:
+  - clientConfig:
+      caBundle: Cg==
+      service:
+        name: kruise-webhook-service
+        namespace: kruise-system
+        path: /validate-apps-kruise-io-v1alpha1-advancedcronjob
+    failurePolicy: Fail
+    name: vadvancedcronjob.kb.io
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - advancedcronjobs
   - clientConfig:
       caBundle: Cg==
       service:

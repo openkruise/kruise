@@ -5,10 +5,12 @@ go 1.13
 require (
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
+	github.com/go-logr/logr v0.1.0
 	github.com/gorilla/mux v1.7.3
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.8.1
+	github.com/robfig/cron v1.2.0
 	github.com/stretchr/testify v1.4.0
 	github.com/xyproto/simpleredis v0.0.0-20200201215242-1ff0da2967b4
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
@@ -18,7 +20,6 @@ require (
 	k8s.io/apimachinery v0.17.7
 	k8s.io/apiserver v0.16.6
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
-	k8s.io/code-generator v0.16.6
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.16.6
 	k8s.io/utils v0.0.0-20200619165400-6e3d28b6ed19

@@ -22,5 +22,6 @@ bin
 *.swp
 *.swo
 *~
+.temp
 
 .DS_Store

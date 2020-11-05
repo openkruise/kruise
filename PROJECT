@@ -3,6 +3,9 @@ multigroup: true
 repo: github.com/openkruise/kruise
 resources:
 - group: apps
+  kind: AdvancedCronJob
+  version: v1alpha1
+- group: apps
   kind: CloneSet
   version: v1alpha1
 - group: apps

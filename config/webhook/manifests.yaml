@@ -46,6 +46,24 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kruise-io-v1alpha1-advancedcronjob
+  failurePolicy: Fail
+  name: mbroadcastjob.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - broadcastjobs
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kruise-io-v1alpha1-broadcastjob
   failurePolicy: Fail
   name: mbroadcastjob.kb.io
@@ -140,6 +158,24 @@ metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-advancedcronjob
+  failurePolicy: Fail
+  name: vadvancedcronjob.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - advancedcronjobs
 - clientConfig:
     caBundle: Cg==
     service:

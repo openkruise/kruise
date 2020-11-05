@@ -75,6 +75,26 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - advancedcronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - broadcastjobs
   verbs:
   - create
@@ -188,6 +208,26 @@ rules:
   - apps.kruise.io
   resources:
   - uniteddeployments/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - batch
+  resources:
+  - advancedcronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - advancedcronjobs/status
   verbs:
   - get
   - patch
