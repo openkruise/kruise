@@ -189,7 +189,11 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 	// convert pod list to a slice of pointers
 	var pods []*corev1.Pod
 	for i := range podList.Items {
-		pods = append(pods, &podList.Items[i])
+		pod := &podList.Items[i]
+		controllerRef := metav1.GetControllerOf(pod)
+		if controllerRef != nil && controllerRef.Kind == job.Kind && controllerRef.UID == job.UID {
+			pods = append(pods, pod)
+		}
 	}
 
 	// Get the map (nodeName -> Pod) for pods with node assigned
