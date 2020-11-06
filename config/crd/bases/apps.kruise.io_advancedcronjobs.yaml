@@ -58,82 +58,6 @@ spec:
         spec:
           description: AdvancedCronJobSpec defines the desired state of AdvancedCronJob
           properties:
-            broadcastJobTemplate:
-              description: Specifies the broadcastjob that will be created when executing
-                a BroadcastCronJob.
-              properties:
-                metadata:
-                  description: Standard object's metadata of the jobs created from
-                    this template.
-                  type: object
-                spec:
-                  description: Specification of the desired behavior of the broadcastjob.
-                  properties:
-                    completionPolicy:
-                      description: CompletionPolicy indicates the completion policy
-                        of the job. Default is Always CompletionPolicyType
-                      properties:
-                        activeDeadlineSeconds:
-                          description: ActiveDeadlineSeconds specifies the duration
-                            in seconds relative to the startTime that the job may
-                            be active before the system tries to terminate it; value
-                            must be positive integer. Only works for Always type.
-                          format: int64
-                          type: integer
-                        ttlSecondsAfterFinished:
-                          description: ttlSecondsAfterFinished limits the lifetime
-                            of a Job that has finished execution (either Complete
-                            or Failed). If this field is set, ttlSecondsAfterFinished
-                            after the Job finishes, it is eligible to be automatically
-                            deleted. When the Job is being deleted, its lifecycle
-                            guarantees (e.g. finalizers) will be honored. If this
-                            field is unset, the Job won't be automatically deleted.
-                            If this field is set to zero, the Job becomes eligible
-                            to be deleted immediately after it finishes. This field
-                            is alpha-level and is only honored by servers that enable
-                            the TTLAfterFinished feature. Only works for Always type
-                          format: int32
-                          type: integer
-                        type:
-                          description: Type indicates the type of the CompletionPolicy
-                            Default is Always
-                          type: string
-                      type: object
-                    failurePolicy:
-                      description: FailurePolicy indicates the behavior of the job,
-                        when failed pod is found.
-                      properties:
-                        restartLimit:
-                          description: RestartLimit specifies the number of retries
-                            before marking the pod failed.
-                          format: int32
-                          type: integer
-                        type:
-                          description: Type indicates the type of FailurePolicyType.
-                          type: string
-                      type: object
-                    parallelism:
-                      anyOf:
-                      - type: integer
-                      - type: string
-                      description: Parallelism specifies the maximum desired number
-                        of pods the job should run at any given time. The actual number
-                        of pods running in steady state will be less than this number
-                        when the work left to do is less than max parallelism. Not
-                        setting this value means no limit.
-                      x-kubernetes-int-or-string: true
-                    paused:
-                      description: Paused will pause the job.
-                      type: boolean
-                    template:
-                      description: Template describes the pod that will be created
-                        when executing a job.
-                      type: object
-                      x-kubernetes-preserve-unknown-fields: true
-                  required:
-                  - template
-                  type: object
-              type: object
             concurrencyPolicy:
               description: 'Specifies how to treat concurrent executions of a Job.
                 Valid values are: - "Allow" (default): allows CronJobs to run concurrently;
@@ -151,11 +75,6 @@ spec:
               format: int32
               minimum: 0
               type: integer
-            jobTemplate:
-              description: Specifies the job that will be created when executing a
-                CronJob.
-              type: object
-              x-kubernetes-preserve-unknown-fields: true
             paused:
               description: Paused will pause the cron job.
               type: boolean
@@ -173,8 +92,97 @@ spec:
               format: int32
               minimum: 0
               type: integer
+            template:
+              description: Specifies the job that will be created when executing a
+                CronJob.
+              properties:
+                broadcastJobTemplate:
+                  description: Specifies the broadcastjob that will be created when
+                    executing a BroadcastCronJob.
+                  properties:
+                    metadata:
+                      description: Standard object's metadata of the jobs created
+                        from this template.
+                      type: object
+                    spec:
+                      description: Specification of the desired behavior of the broadcastjob.
+                      properties:
+                        completionPolicy:
+                          description: CompletionPolicy indicates the completion policy
+                            of the job. Default is Always CompletionPolicyType
+                          properties:
+                            activeDeadlineSeconds:
+                              description: ActiveDeadlineSeconds specifies the duration
+                                in seconds relative to the startTime that the job
+                                may be active before the system tries to terminate
+                                it; value must be positive integer. Only works for
+                                Always type.
+                              format: int64
+                              type: integer
+                            ttlSecondsAfterFinished:
+                              description: ttlSecondsAfterFinished limits the lifetime
+                                of a Job that has finished execution (either Complete
+                                or Failed). If this field is set, ttlSecondsAfterFinished
+                                after the Job finishes, it is eligible to be automatically
+                                deleted. When the Job is being deleted, its lifecycle
+                                guarantees (e.g. finalizers) will be honored. If this
+                                field is unset, the Job won't be automatically deleted.
+                                If this field is set to zero, the Job becomes eligible
+                                to be deleted immediately after it finishes. This
+                                field is alpha-level and is only honored by servers
+                                that enable the TTLAfterFinished feature. Only works
+                                for Always type
+                              format: int32
+                              type: integer
+                            type:
+                              description: Type indicates the type of the CompletionPolicy
+                                Default is Always
+                              type: string
+                          type: object
+                        failurePolicy:
+                          description: FailurePolicy indicates the behavior of the
+                            job, when failed pod is found.
+                          properties:
+                            restartLimit:
+                              description: RestartLimit specifies the number of retries
+                                before marking the pod failed.
+                              format: int32
+                              type: integer
+                            type:
+                              description: Type indicates the type of FailurePolicyType.
+                              type: string
+                          type: object
+                        parallelism:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: Parallelism specifies the maximum desired number
+                            of pods the job should run at any given time. The actual
+                            number of pods running in steady state will be less than
+                            this number when the work left to do is less than max
+                            parallelism. Not setting this value means no limit.
+                          x-kubernetes-int-or-string: true
+                        paused:
+                          description: Paused will pause the job.
+                          type: boolean
+                        template:
+                          description: Template describes the pod that will be created
+                            when executing a job.
+                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
+                      required:
+                      - template
+                      type: object
+                  type: object
+                jobTemplate:
+                  description: Specifies the job that will be created when executing
+                    a CronJob.
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+              type: object
           required:
           - schedule
+          - template
           type: object
         status:
           description: AdvancedCronJobStatus defines the observed state of AdvancedCronJob

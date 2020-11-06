@@ -94,12 +94,12 @@ func setSidecarDefaultContainer(sidecarContainer *SidecarContainer) {
 
 // SetDefaults_AdvancedCronJob set default values for BroadcastJob.
 func SetDefaultsAdvancedCronJob(obj *AdvancedCronJob) {
-	if obj.Spec.JobTemplate != nil {
-		SetDefaultPodSpec(&obj.Spec.JobTemplate.Spec.Template.Spec)
+	if obj.Spec.Template.JobTemplate != nil {
+		SetDefaultPodSpec(&obj.Spec.Template.JobTemplate.Spec.Template.Spec)
 	}
 
-	if obj.Spec.BroadcastJobTemplate != nil {
-		SetDefaultPodSpec(&obj.Spec.BroadcastJobTemplate.Spec.Template.Spec)
+	if obj.Spec.Template.BroadcastJobTemplate != nil {
+		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
 	}
 
 	if obj.Spec.SuccessfulJobsHistoryLimit == nil {

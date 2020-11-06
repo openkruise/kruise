@@ -77,14 +77,14 @@ func validateAdvancedCronJobSpec(spec *appsv1alpha1.AdvancedCronJobSpec, fldPath
 	allErrs := field.ErrorList{}
 
 	templateCount := 0
-	if spec.JobTemplate != nil {
+	if spec.Template.JobTemplate != nil {
 		templateCount++
-		allErrs = append(allErrs, validateJobTemplateSpec(spec.JobTemplate, fldPath)...)
+		allErrs = append(allErrs, validateJobTemplateSpec(spec.Template.JobTemplate, fldPath)...)
 	}
 
-	if spec.BroadcastJobTemplate != nil {
+	if spec.Template.BroadcastJobTemplate != nil {
 		templateCount++
-		allErrs = append(allErrs, validateBroadcastJobTemplateSpec(spec.BroadcastJobTemplate, fldPath)...)
+		allErrs = append(allErrs, validateBroadcastJobTemplateSpec(spec.Template.BroadcastJobTemplate, fldPath)...)
 	}
 
 	if templateCount > 1 {

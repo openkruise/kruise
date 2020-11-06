@@ -60,12 +60,17 @@ type AdvancedCronJobSpec struct {
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty" protobuf:"varint,6,opt,name=failedJobsHistoryLimit"`
 
 	// Specifies the job that will be created when executing a CronJob.
+	Template AdvancedCronJobTemplate `json:"template" protobuf:"bytes,7,opt,name=jobTemplate"`
+}
+
+type AdvancedCronJobTemplate struct {
+	// Specifies the job that will be created when executing a CronJob.
 	// +optional
-	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate,omitempty" protobuf:"bytes,7,opt,name=jobTemplate"`
+	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,1,opt,name=jobTemplate"`
 
 	// Specifies the broadcastjob that will be created when executing a BroadcastCronJob.
 	// +optional
-	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate,omitempty" protobuf:"bytes,8,opt,name=broadcastJobTemplate"`
+	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate" protobuf:"bytes,2,opt,name=broadcastJobTemplate"`
 }
 
 type TemplateKind string

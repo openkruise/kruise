@@ -357,13 +357,13 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, lo
 				Name:        name,
 				Namespace:   brCronJob.Namespace,
 			},
-			Spec: *brCronJob.Spec.BroadcastJobTemplate.Spec.DeepCopy(),
+			Spec: *brCronJob.Spec.Template.BroadcastJobTemplate.Spec.DeepCopy(),
 		}
-		for k, v := range brCronJob.Spec.BroadcastJobTemplate.Annotations {
+		for k, v := range brCronJob.Spec.Template.BroadcastJobTemplate.Annotations {
 			job.Annotations[k] = v
 		}
 		job.Annotations[scheduledTimeAnnotation] = scheduledTime.Format(time.RFC3339)
-		for k, v := range brCronJob.Spec.BroadcastJobTemplate.Labels {
+		for k, v := range brCronJob.Spec.Template.BroadcastJobTemplate.Labels {
 			job.Labels[k] = v
 		}
 		if err := ctrl.SetControllerReference(brCronJob, job, r.scheme); err != nil {
