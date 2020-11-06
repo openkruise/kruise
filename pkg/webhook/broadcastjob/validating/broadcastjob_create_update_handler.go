@@ -23,6 +23,7 @@ import (
 	"regexp"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/broadcastjob"
 	v1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
@@ -94,14 +95,20 @@ func validateBroadcastJobSpec(spec *appsv1alpha1.BroadcastJobSpec, fldPath *fiel
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
 	}
-	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"))...)
 	if spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure &&
 		spec.Template.Spec.RestartPolicy != v1.RestartPolicyNever {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template").Child("spec").Child("restartPolicy"),
 			spec.Template.Spec.RestartPolicy,
 			"pod restartPolicy can only be Never or OnFailure"))
 	}
-	return allErrs
+	if spec.Template.Labels != nil {
+		if spec.Template.Labels[broadcastjob.JobNameLabelKey] != "" || spec.Template.Labels[broadcastjob.ControllerUIDLabelKey] != "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("template").Child("metadata").Child("labels"),
+				spec.Template.Labels,
+				fmt.Sprintf("\"%s\" and \"%s\" are not allowed to preset in pod labels", broadcastjob.JobNameLabelKey, broadcastjob.ControllerUIDLabelKey)))
+		}
+	}
+	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"))...)
 }
 
 func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
