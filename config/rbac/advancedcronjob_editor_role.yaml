@@ -1,0 +1,24 @@
+# permissions for end users to edit advancedcronjobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: advancedcronjob-editor-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs/status
+  verbs:
+  - get

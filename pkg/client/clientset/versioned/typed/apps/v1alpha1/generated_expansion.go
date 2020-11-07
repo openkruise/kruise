@@ -17,6 +17,8 @@ limitations under the License.
 
 package v1alpha1
 
+type AdvancedCronJobExpansion interface{}
+
 type BroadcastJobExpansion interface{}
 
 type CloneSetExpansion interface{}

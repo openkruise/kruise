@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
+	github.com/go-logr/logr v0.1.0
 	github.com/gorilla/mux v1.7.3
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1

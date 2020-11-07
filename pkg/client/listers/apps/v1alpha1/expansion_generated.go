@@ -17,6 +17,14 @@ limitations under the License.
 
 package v1alpha1
 
+// AdvancedCronJobListerExpansion allows custom methods to be added to
+// AdvancedCronJobLister.
+type AdvancedCronJobListerExpansion interface{}
+
+// AdvancedCronJobNamespaceListerExpansion allows custom methods to be added to
+// AdvancedCronJobNamespaceLister.
+type AdvancedCronJobNamespaceListerExpansion interface{}
+
 // BroadcastJobListerExpansion allows custom methods to be added to
 // BroadcastJobLister.
 type BroadcastJobListerExpansion interface{}
