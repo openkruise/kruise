@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 
-printf 'package hack\nimport "k8s.io/code-generator"\n' > ./hack/hold.go
 go mod vendor
 retVal=$?
-rm -f ./hack/hold.go
 if [ $retVal -ne 0 ]; then
     exit $retVal
 fi
