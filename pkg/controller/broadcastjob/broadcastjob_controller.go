@@ -53,6 +53,11 @@ func init() {
 	flag.IntVar(&concurrentReconciles, "broadcastjob-workers", concurrentReconciles, "Max concurrent workers for BroadCastJob controller.")
 }
 
+const (
+	JobNameLabelKey       = "broadcastjob-name"
+	ControllerUIDLabelKey = "broadcastjob-controller-uid"
+)
+
 var (
 	concurrentReconciles = 3
 	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
@@ -546,8 +551,8 @@ func (r *ReconcileBroadcastJob) getNodeToPodMap(pods []*corev1.Pod, job *appsv1a
 
 func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
 	return map[string]string{
-		"job-name":       job.Name,
-		"controller-uid": string(job.UID),
+		JobNameLabelKey:       job.Name,
+		ControllerUIDLabelKey: string(job.UID),
 	}
 }
 

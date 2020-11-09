@@ -95,7 +95,7 @@ func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 	// 1 new pod created, because parallelism is 2,
 	assert.Equal(t, 2, len(podList.Items))
 	// The new pod has the job-name label
-	assert.Equal(t, "job1", podList.Items[0].Labels["job-name"])
+	assert.Equal(t, "job1", podList.Items[0].Labels[JobNameLabelKey])
 	// 3 desired pods, one for each node
 	assert.Equal(t, int32(3), retrievedJob.Status.Desired)
 	assert.NotNil(t, retrievedJob.Status.StartTime)
@@ -155,7 +155,7 @@ func TestReconcileJobCreatePodPercentage(t *testing.T) {
 	// 1 new pod created, because parallelism is 2,
 	assert.Equal(t, 2, len(podList.Items))
 	// The new pod has the job-name label
-	assert.Equal(t, "job1", podList.Items[0].Labels["job-name"])
+	assert.Equal(t, "job1", podList.Items[0].Labels[JobNameLabelKey])
 	// 3 desired pods, one for each node
 	assert.Equal(t, int32(5), retrievedJob.Status.Desired)
 	assert.NotNil(t, retrievedJob.Status.StartTime)
