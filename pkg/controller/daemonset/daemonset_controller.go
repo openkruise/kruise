@@ -625,10 +625,10 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 					klog.Errorf("updateDaemonSetStatus failed in first deploy process")
 				}
 			}
-			unDelpoyedNum := ds.Status.DesiredNumberScheduled - ds.Status.CurrentNumberScheduled
+			unDeployedNum := ds.Status.DesiredNumberScheduled - ds.Status.CurrentNumberScheduled
 			// node count changes or daemonSet in first deploy.
 			isFirstDeployed, ok := ds.Labels[IsFirstDeployedFlag]
-			if unDelpoyedNum > 0 && (!ok || ok && isFirstDeployed != "false") {
+			if unDeployedNum > 0 && (!ok || ok && isFirstDeployed != "false") {
 				if int32(len(nodesNeedingDaemonPods)) >= partition {
 					sort.Strings(nodesNeedingDaemonPods)
 					nodesNeedingDaemonPods = append(nodesNeedingDaemonPods[:0], nodesNeedingDaemonPods[partition:]...)
@@ -937,7 +937,7 @@ func (dsc *ReconcileDaemonSet) getNodesToDaemonPods(ds *appsv1alpha1.DaemonSet) 
 	return nodeToDaemonPods, nil
 }
 
-// CanNodeBeDployed checks if the node is ready for new daemon Pod.
+// CanNodeBeDeployed checks if the node is ready for new daemon Pod.
 func CanNodeBeDeployed(node *corev1.Node, ds *appsv1alpha1.DaemonSet) bool {
 	isNodeScheduable := true
 	isNodeReady := true
