@@ -21,6 +21,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/gate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -280,10 +282,10 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 				klog.Errorf("failed to deleteJobPods for job %s,", job.Name)
 			}
 		}
-
+		activePods = r.filterActivePods(podsToDelete, activePods)
 		// DeletionTimestamp is not set and more nodes to run pod
 		if job.DeletionTimestamp == nil && len(restNodesToRunPod) > 0 {
-			active, err = r.reconcilePods(job, restNodesToRunPod, active, desired)
+			active, err = r.reconcilePods(job, restNodesToRunPod, desired, activePods)
 			if err != nil {
 				klog.Errorf("failed to reconcilePods for job %s,", job.Name)
 			}
@@ -307,6 +309,20 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	return reconcile.Result{RequeueAfter: requeueAfter}, err
+}
+
+func (r *ReconcileBroadcastJob) filterActivePods(podsToDelete, activePods []*corev1.Pod) []*corev1.Pod {
+	result := make([]*corev1.Pod, 0, len(activePods))
+Loop:
+	for i := range activePods {
+		for j := range podsToDelete {
+			if activePods[i].Name == podsToDelete[j].Name {
+				continue Loop
+			}
+		}
+		result = append(result, activePods[i])
+	}
+	return result
 }
 
 func (r *ReconcileBroadcastJob) updateJobStatus(request reconcile.Request, job *appsv1alpha1.BroadcastJob) error {
@@ -360,8 +376,9 @@ func addLabelToPodTemplate(job *appsv1alpha1.BroadcastJob) {
 }
 
 func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
-	restNodesToRunPod []*corev1.Node, active, desired int32) (int32, error) {
+	restNodesToRunPod []*corev1.Node, desired int32, activePods []*corev1.Pod) (int32, error) {
 
+	var active = int32(len(activePods))
 	// max concurrent running pods
 	var parallelism int32
 	var err error
@@ -374,10 +391,40 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 	// The rest pods to run
 	rest := int32(len(restNodesToRunPod))
 	var errCh chan error
+	var activeLock sync.Mutex
 	if active > parallelism {
 		// exceed parallelism limit
 		r.recorder.Eventf(job, corev1.EventTypeWarning, "TooManyActivePods", "Number of active pods exceed parallelism limit")
-		//TODO should we remove the extra pods ? it may just finish by its own.
+		diff := active - parallelism
+		errCh = make(chan error, diff)
+		klog.V(4).Infof("Too many pods running job %q, need %d, deleting %d", fmt.Sprintf("%s/%s", job.Name, job.Namespace), parallelism, diff)
+		// Sort the pods in the order such that not-ready < ready, unscheduled
+		// < scheduled, and pending < running. This ensures that we delete pods
+		// in the earlier stages whenever possible.
+		sort.Sort(kubecontroller.ActivePods(activePods))
+		wait := sync.WaitGroup{}
+		wait.Add(int(diff))
+		for i := int32(0); i < diff; i++ {
+			go func(ix int32) {
+				defer wait.Done()
+				if err := r.Delete(context.TODO(), activePods[ix]); err != nil {
+					if apierrors.IsNotFound(err) {
+						activeLock.Lock()
+						active--
+						activeLock.Unlock()
+					} else {
+						defer utilruntime.HandleError(err)
+						errCh <- err
+					}
+				} else {
+					// If succeed, decrease active counter
+					activeLock.Lock()
+					active--
+					activeLock.Unlock()
+				}
+			}(i)
+		}
+		wait.Wait()
 
 	} else if active < parallelism {
 		// diff is the current number of pods to run in this reconcile loop
@@ -391,7 +438,6 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
-		var activeLock sync.Mutex
 		errCh = make(chan error, diff)
 		wait := sync.WaitGroup{}
 		startIndex := int32(0)
