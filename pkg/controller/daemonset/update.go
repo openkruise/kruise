@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
@@ -102,9 +101,10 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur
 }
 
 // rollingUpdate would update DaemonSet according to its rollingUpdateType
-func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, hash string) (reconcile.Result, error) {
+func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, hash string) (delay time.Duration, err error) {
+
 	if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.StandardRollingUpdateType {
-		return dsc.standardRollingUpdate(ds, hash)
+		return delay, dsc.standardRollingUpdate(ds, hash)
 	} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.SurgingRollingUpdateType {
 		return dsc.surgingRollingUpdate(ds, hash)
 		//} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
@@ -112,20 +112,20 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, hash st
 	} else {
 		klog.Errorf("no matched RollingUpdate type")
 	}
-	return reconcile.Result{}, nil
+	return
 }
 
 // standardRollingUpdate deletes old daemon set pods making sure that no more than
 // ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable pods are unavailable
-func (dsc *ReconcileDaemonSet) standardRollingUpdate(ds *appsv1alpha1.DaemonSet, hash string) (reconcile.Result, error) {
+func (dsc *ReconcileDaemonSet) standardRollingUpdate(ds *appsv1alpha1.DaemonSet, hash string) error {
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
 
 	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeToDaemonPods)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("couldn't get unavailable numbers: %v", err)
+		return fmt.Errorf("couldn't get unavailable numbers: %v", err)
 	}
 
 	// calculate the cluster scope numUnavailable.
@@ -147,7 +147,7 @@ func (dsc *ReconcileDaemonSet) standardRollingUpdate(ds *appsv1alpha1.DaemonSet,
 
 	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, hash, nodeToDaemonPods)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
+		return fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
 	}
 
 	_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
@@ -649,25 +649,25 @@ func (dsc *ReconcileDaemonSet) pruneSurgingDaemonPods(ds *appsv1alpha1.DaemonSet
 // surgingRollingUpdate creates new daemon set pods to replace old ones making sure that no more
 // than ds.Spec.UpdateStrategy.SurgingRollingUpdate.MaxSurge extra pods are scheduled at any
 // given time.
-func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, hash string) (reconcile.Result, error) {
+func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, hash string) (delay time.Duration, err error) {
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+		return delay, fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
 
 	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, hash, nodeToDaemonPods)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
+		return delay, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
 	}
 
 	maxSurge, numSurge, err := dsc.getSurgeNumbers(ds, nodeToDaemonPods, hash)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("couldn't get surge numbers: %v", err)
+		return delay, fmt.Errorf("couldn't get surge numbers: %v", err)
 	}
 
 	nodesWantToRun, nodesShouldContinueRunning, err := dsc.getNodesShouldRunDaemonPod(ds)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("couldn't get nodes which want to run ds pod: %v", err)
+		return delay, fmt.Errorf("couldn't get nodes which want to run ds pod: %v", err)
 	}
 
 	var nodesToSurge []string
@@ -731,11 +731,11 @@ func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 							oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
 						}
 					} else {
-						return reconcile.Result{RequeueAfter: time.Duration(ds.Spec.MinReadySeconds) * time.Second}, nil
+						return time.Duration(ds.Spec.MinReadySeconds) * time.Second, nil
 					}
 				}
 			}
 		}
 	}
-	return dsc.syncNodes(ds, oldPodsToDelete, nodesToSurge, hash)
+	return delay, dsc.syncNodes(ds, oldPodsToDelete, nodesToSurge, hash)
 }
