@@ -923,10 +923,18 @@ func (dsc *ReconcileDaemonSet) getNodesToDaemonPods(ds *appsv1alpha1.DaemonSet) 
 		}
 		node := &corev1.Node{}
 		err = dsc.client.Get(context.TODO(), types.NamespacedName{Name: nodeName}, node)
-		if err == nil && CanNodeBeDeployed(node, ds) {
+		if err != nil {
+			klog.V(4).Infof("get node %s failed: %v", nodeName, err)
+			if errors.IsNotFound(err) {
+				// Unable to find the target node in the cluster, which means it has been drained from cluster,
+				// we still add this node to nodeToDaemonPods in order that the daemon pods that failed to be
+				// scheduled on it will be removed in later reconcile loop.
+				nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
+			}
+			continue
+		}
+		if CanNodeBeDeployed(node, ds) {
 			nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
-		} else {
-			klog.V(4).Infof("get node: %s failed", nodeName)
 		}
 	}
 
