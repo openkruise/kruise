@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +35,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	udctrl "github.com/openkruise/kruise/pkg/controller/uniteddeployment"
+	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
 // ValidateUnitedDeploymentSpec tests if required fields in the UnitedDeployment spec are set.
@@ -149,14 +149,6 @@ func ValidateUnitedDeploymentUpdate(unitedDeployment, oldUnitedDeployment *appsv
 	return allErrs
 }
 
-func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
-	coreTemplate := &core.PodTemplateSpec{}
-	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template.DeepCopy(), coreTemplate, nil); err != nil {
-		return nil, err
-	}
-	return coreTemplate, nil
-}
-
 func validateUnitedDeploymentSpecUpdate(spec, oldSpec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateSubsetTemplateUpdate(&spec.Template, &oldSpec.Template, fldPath.Child("template"))...)
@@ -235,7 +227,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 		}
 		allErrs = append(allErrs, validateStatefulSet(template.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
 		template := template.StatefulSetTemplate.Spec.Template
-		coreTemplate, err := convertPodTemplateSpec(&template)
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&template)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
@@ -248,7 +240,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 		}
 		allErrs = append(allErrs, validateAdvancedStatefulSet(template.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
 		template := template.AdvancedStatefulSetTemplate.Spec.Template
-		coreTemplate, err := convertPodTemplateSpec(&template)
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&template)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs

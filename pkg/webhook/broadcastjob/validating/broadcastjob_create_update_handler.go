@@ -24,12 +24,11 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/controller/broadcastjob"
+	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 	v1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/core"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -90,7 +89,7 @@ func validateBroadcastJobSpec(spec *appsv1alpha1.BroadcastJobSpec, fldPath *fiel
 		}
 	default:
 	}
-	coreTemplate, err := convertPodTemplateSpec(&spec.Template)
+	coreTemplate, err := convertor.ConvertPodTemplateSpec(&spec.Template)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
@@ -109,14 +108,6 @@ func validateBroadcastJobSpec(spec *appsv1alpha1.BroadcastJobSpec, fldPath *fiel
 		}
 	}
 	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"))...)
-}
-
-func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
-	coreTemplate := &core.PodTemplateSpec{}
-	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template.DeepCopy(), coreTemplate, nil); err != nil {
-		return nil, err
-	}
-	return coreTemplate, nil
 }
 
 func validateBroadcastJobName(name string, prefix bool) (allErrs []string) {
