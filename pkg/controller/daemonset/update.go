@@ -624,7 +624,7 @@ func (dsc *ReconcileDaemonSet) getNodesShouldRunDaemonPod(ds *appsv1alpha1.Daemo
 // generation. This method only applies when the update strategy is SurgingRollingUpdate.
 // This allows the daemon set controller to temporarily break its contract that only one daemon
 // pod can run per node by ignoring the pods that belong to previous generations, which are
-// cleaned up by the surgingRollineUpdate() method above.
+// cleaned up by the surgingRollingUpdate() method above.
 func (dsc *ReconcileDaemonSet) pruneSurgingDaemonPods(ds *appsv1alpha1.DaemonSet, pods []*corev1.Pod, hash string) []*corev1.Pod {
 	if len(pods) <= 1 || ds.Spec.UpdateStrategy.RollingUpdate.Type != appsv1alpha1.SurgingRollingUpdateType {
 		return pods
