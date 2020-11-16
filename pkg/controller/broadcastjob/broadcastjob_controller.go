@@ -408,7 +408,7 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 					// parallelize pod creation
 					klog.Infof("creating pod on node %s", nodeName)
 					err := r.createPodsOnNode(nodeName, job.Namespace, &job.Spec.Template, job, asOwner(job))
-					if err != nil && errors.IsTimeout(err) {
+					if err != nil && errors.IsTimeout(err) || errors.IsAlreadyExists(err) {
 						// Pod is created but its initialization has timed out.
 						// If the initialization is successful eventually, the
 						// controller will observe the creation via the informer.
@@ -653,6 +653,13 @@ func (r *ReconcileBroadcastJob) createPods(nodeName, namespace string, template 
 	if err != nil {
 		return err
 	}
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
+		return nil
+	}
+	// Specify the pod.Name to prevent the creation of two Pods in a Node
+	pod.Name = fmt.Sprintf("%s-%s", accessor.GetName(), nodeName)
 	pod.Namespace = namespace
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
@@ -670,11 +677,6 @@ func (r *ReconcileBroadcastJob) createPods(nodeName, namespace string, template 
 		return err
 	}
 
-	accessor, err := meta.Accessor(object)
-	if err != nil {
-		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
-		return nil
-	}
 	klog.Infof("Controller %v created pod %v", accessor.GetName(), pod.Name)
 	r.recorder.Eventf(object, corev1.EventTypeNormal, kubecontroller.SuccessfulCreatePodReason, "Created pod: %v", pod.Name)
 
