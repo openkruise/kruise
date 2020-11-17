@@ -3,9 +3,9 @@ approvers:
   - Fei-Guo
   - FillZpp
   - jian-he
-  - jzwlqx # for BroadcastJob
 reviewers:
   - Fei-Guo
   - FillZpp
   - jian-he
-  - jzwlqx # for BroadcastJob
+  - jetmuffin
+  - evertrain
