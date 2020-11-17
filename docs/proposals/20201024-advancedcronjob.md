@@ -12,7 +12,7 @@ status: implementable
 ---
 
 # Implementing AdvancedCronJob Crd and Controller
-- Implementing AdvancedCronJob to support Job/BroadcastJob or any other future CRD and to run it periodically at a given schedule. 
+- Implementing AdvancedCronJob to support Job/BroadcastJob or any other future CRD and to run it periodically at a given schedule.
 
 ## Table of Contents
 
@@ -64,7 +64,6 @@ type AdvancedCronJob struct {
 	Spec   AdvancedCronJobSpec   `json:"spec,omitempty"`
 	Status AdvancedCronJobStatus `json:"status,omitempty"`
 }
-
 
 type AdvancedCronJobSpec struct {
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
