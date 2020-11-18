@@ -5,16 +5,76 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	"github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 )
+
+type podEventHandler struct {
+	enqueueHandler handler.EnqueueRequestForOwner
+}
+
+func isBroadcastJobController(controllerRef *metav1.OwnerReference) bool {
+	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
+	if err != nil {
+		klog.Errorf("Could not parse OwnerReference %v APIVersion: %v", controllerRef, err)
+		return false
+	}
+	return controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group
+}
+
+func (p *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	pod := evt.Object.(*v1.Pod)
+	if pod.DeletionTimestamp != nil {
+		p.Delete(event.DeleteEvent{Meta: evt.Meta, Object: evt.Object}, q)
+		return
+	}
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
+		key := types.NamespacedName{Namespace: pod.Namespace, Name: controllerRef.Name}.String()
+		scaleExpectations.ObserveScale(key, expectations.Create, pod.Spec.NodeName)
+		p.enqueueHandler.Create(evt, q)
+	}
+}
+
+func (p *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	pod := evt.Object.(*v1.Pod)
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
+		key := types.NamespacedName{Namespace: pod.Namespace, Name: controllerRef.Name}.String()
+		scaleExpectations.ObserveScale(key, expectations.Delete, pod.Spec.NodeName)
+		p.enqueueHandler.Delete(evt, q)
+	}
+}
+
+func (p *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	p.enqueueHandler.Update(evt, q)
+}
+
+func (p *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
+
+var _ inject.Mapper = &podEventHandler{}
+
+func (p *podEventHandler) InjectScheme(s *runtime.Scheme) error {
+	return p.enqueueHandler.InjectScheme(s)
+}
+
+var _ inject.Mapper = &podEventHandler{}
+
+func (p *podEventHandler) InjectMapper(m meta.RESTMapper) error {
+	return p.enqueueHandler.InjectMapper(m)
+}
 
 type enqueueBroadcastJobForNode struct {
 	client client.Client
