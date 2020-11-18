@@ -11,8 +11,6 @@ rules:
   resources:
   - mutatingwebhookconfigurations
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
@@ -23,8 +21,6 @@ rules:
   resources:
   - validatingwebhookconfigurations
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
