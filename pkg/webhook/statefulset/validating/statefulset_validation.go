@@ -17,9 +17,9 @@ import (
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
-	"k8s.io/kubernetes/pkg/apis/core"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+
+	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
 var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
@@ -108,7 +108,7 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
-		coreTemplate, err := convertPodTemplateSpec(&spec.Template)
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&spec.Template)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
@@ -229,14 +229,6 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	return allErrs
-}
-
-func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
-	coreTemplate := &core.PodTemplateSpec{}
-	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template.DeepCopy(), coreTemplate, nil); err != nil {
-		return nil, err
-	}
-	return coreTemplate, nil
 }
 
 func validateTemplateInPlaceOnly(oldTemp, newTemp *v1.PodTemplateSpec) error {
