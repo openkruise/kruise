@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
@@ -353,7 +354,7 @@ func testUpdate(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 		cs.Spec.Template.Spec.Containers[0].Image = images[1]
 		cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
 			Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
-			Partition:      getInt32(1),
+			Partition:      util.GetIntOrStrPointer(intstr.FromInt(1)),
 			MaxUnavailable: &maxUnavailable,
 		}
 		return c.Update(context.TODO(), &cs)
@@ -377,7 +378,7 @@ func testUpdate(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 		cs.Spec.Template.Spec.Containers[0].Image = images[2]
 		cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
 			Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-			Partition:      getInt32(2),
+			Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 			MaxUnavailable: &maxUnavailable,
 		}
 		return c.Update(context.TODO(), &cs)

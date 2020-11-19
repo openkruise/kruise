@@ -3,12 +3,12 @@ package scale
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-	utilpointer "k8s.io/utils/pointer"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestGetOrGenAvailableIDs(t *testing.T) {
@@ -74,7 +74,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr0,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: &intOrStr0,
 					},
 				},
 			},
@@ -91,7 +91,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: &intOrStr0,
 					},
 				},
 			},
@@ -108,7 +108,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: &intOrStr0,
 					},
 				},
 			},
@@ -125,7 +125,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr0,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: &intOrStr0,
 					},
 				},
 			},
@@ -142,7 +142,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: &intOrStr0,
 					},
 				},
 			},
@@ -159,7 +159,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(1),
+						Partition: &intOrStr1,
 					},
 				},
 			},
@@ -176,7 +176,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: &intOrStr0,
 					},
 				},
 			},
@@ -193,7 +193,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(8),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(8)),
 					},
 				},
 			},
@@ -209,7 +209,7 @@ func TestCalculateDiffs(t *testing.T) {
 				Spec: appsv1alpha1.CloneSetSpec{
 					Replicas: utilpointer.Int32Ptr(9),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-						Partition: utilpointer.Int32Ptr(10),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(10)),
 					},
 				},
 			},
@@ -226,7 +226,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(9),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(10),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(10)),
 					},
 				},
 			},
@@ -243,7 +243,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(1),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr2,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(0)),
 					},
 				},
 			},
@@ -260,7 +260,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr0,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(0)),
 					},
 				},
 			},
@@ -277,7 +277,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(0)),
 					},
 				},
 			},
@@ -294,7 +294,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr0,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(0)),
 					},
 				},
 			},
@@ -311,7 +311,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(0)),
 					},
 				},
 			},
@@ -328,7 +328,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(0)),
 					},
 				},
 			},
@@ -345,7 +345,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(0),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(0)),
 					},
 				},
 			},
@@ -362,7 +362,7 @@ func TestCalculateDiffs(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(10),
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 						MaxSurge:  &intOrStr1,
-						Partition: utilpointer.Int32Ptr(6),
+						Partition: util.GetIntOrStrPointer(intstr.FromInt(6)),
 					},
 				},
 			},
