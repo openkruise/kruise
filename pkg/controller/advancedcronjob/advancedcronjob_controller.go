@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,7 +73,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:   mgr.GetClient(),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
-		Log:      ctrl.Log.WithName("controllers").WithName(appsv1alpha1.AdvancedCronJobKind),
 		Clock:    realClock{},
 	}
 }
@@ -127,7 +125,6 @@ var _ reconcile.Reconciler = &ReconcileAdvancedCronJob{}
 // ReconcileAdvancedCronJob reconciles a AdvancedCronJob object
 type ReconcileAdvancedCronJob struct {
 	client.Client
-	Log      logr.Logger
 	scheme   *runtime.Scheme
 	recorder record.EventRecorder
 	Clock
@@ -138,12 +135,11 @@ type ReconcileAdvancedCronJob struct {
 
 func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("advancedcronjob", req.NamespacedName)
 
 	var advancedCronJob appsv1alpha1.AdvancedCronJob
 
 	if err := r.Get(ctx, req.NamespacedName, &advancedCronJob); err != nil {
-		log.Error(err, "unable to fetch CronJob")
+		klog.Error(err, "unable to fetch CronJob")
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can get them
 		// on deleted requests.
@@ -160,8 +156,8 @@ func (r *ReconcileAdvancedCronJob) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(log logr.Logger, request reconcile.Request, advancedCronJob *appsv1alpha1.AdvancedCronJob) error {
-	log.V(1).Info(fmt.Sprintf("Updating job %s status %#v", advancedCronJob.Name, advancedCronJob.Status))
+func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(request reconcile.Request, advancedCronJob *appsv1alpha1.AdvancedCronJob) error {
+	klog.V(1).Info(fmt.Sprintf("Updating job %s status %#v", advancedCronJob.Name, advancedCronJob.Status))
 	advancedCronJobCopy := advancedCronJob.DeepCopy()
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		err := r.Status().Update(context.TODO(), advancedCronJobCopy)
