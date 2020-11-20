@@ -326,10 +326,6 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ds *appsv1alpha1.DaemonSet) ([]*cor
 
 func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconcile.Result, error) {
 	dsKey := request.NamespacedName.String()
-	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing daemon set %s/%s (%v)", request.NamespacedName.Namespace, request.NamespacedName.Name, time.Since(startTime))
-	}()
 	ds := &appsv1alpha1.DaemonSet{}
 	err := dsc.client.Get(context.TODO(), request.NamespacedName, ds)
 	if err != nil {
