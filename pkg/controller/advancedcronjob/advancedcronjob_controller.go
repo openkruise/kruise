@@ -73,7 +73,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:   mgr.GetClient(),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
-		Clock:    realClock{},
+		//Clock:    realClock{},
 	}
 }
 
@@ -98,17 +98,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	//err = hookJobIndexer(mgr, c)
 	//err = hookBroadcastJobIndexer(mgr, c)
 
-	if err != nil {
-		klog.Error(err)
-		return err
-	}
+	//if err != nil {
+	//	klog.Error(err)
+	//	return err
+	//}
 
 	return nil
 }
 
-type realClock struct{}
-
-func (_ realClock) Now() time.Time { return time.Now() }
+//type realClock struct{}
+//
+//func (_ realClock) Now() time.Time { return time.Now() }
 
 // clock knows how to get the current time.
 // It can be used to fake out timing for testing.
@@ -116,9 +116,9 @@ type Clock interface {
 	Now() time.Time
 }
 
-var (
-	scheduledTimeAnnotation = "apps.kruise.io/scheduled-at"
-)
+//var (
+//	scheduledTimeAnnotation = "apps.kruise.io/scheduled-at"
+//)
 
 var _ reconcile.Reconciler = &ReconcileAdvancedCronJob{}
 
