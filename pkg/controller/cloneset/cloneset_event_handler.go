@@ -54,7 +54,7 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
-		req := resoleControllerRef(pod.Namespace, controllerRef)
+		req := resolveControllerRef(pod.Namespace, controllerRef)
 		if req == nil {
 			return
 		}
@@ -111,14 +111,14 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		if req := resoleControllerRef(oldPod.Namespace, oldControllerRef); req != nil {
+		if req := resolveControllerRef(oldPod.Namespace, oldControllerRef); req != nil {
 			q.Add(*req)
 		}
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		req := resoleControllerRef(curPod.Namespace, curControllerRef)
+		req := resolveControllerRef(curPod.Namespace, curControllerRef)
 		if req == nil {
 			return
 		}
@@ -158,7 +158,7 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 		// No controller should care about orphans being deleted.
 		return
 	}
-	req := resoleControllerRef(pod.Namespace, controllerRef)
+	req := resolveControllerRef(pod.Namespace, controllerRef)
 	if req == nil {
 		return
 	}
@@ -173,7 +173,7 @@ func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimiti
 
 }
 
-func resoleControllerRef(namespace string, controllerRef *metav1.OwnerReference) *reconcile.Request {
+func resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *reconcile.Request {
 	// Parse the Group out of the OwnerReference to compare it to what was parsed out of the requested OwnerType
 	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
 	if err != nil {
@@ -242,7 +242,7 @@ func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	}
 
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
-		if req := resoleControllerRef(pvc.Namespace, controllerRef); req != nil {
+		if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil {
 			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pvc.Name)
 			q.Add(*req)
 		}
@@ -265,7 +265,7 @@ func (e *pvcEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	}
 
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
-		if req := resoleControllerRef(pvc.Namespace, controllerRef); req != nil {
+		if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil {
 			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pvc.Name)
 			q.Add(*req)
 		}
