@@ -113,13 +113,13 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *appsv1beta1.Statefu
 
 	// perform the main update function and get the status
 	status, getStatusErr := ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods, revisions)
-	updateStateusErr := ssc.updateStatefulSetStatus(set, status)
+	updateStatusErr := ssc.updateStatefulSetStatus(set, status)
 
 	if getStatusErr != nil {
 		return getStatusErr
 	}
-	if updateStateusErr != nil {
-		return updateStateusErr
+	if updateStatusErr != nil {
+		return updateStatusErr
 	}
 
 	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d available=%d current=%d updated=%d",

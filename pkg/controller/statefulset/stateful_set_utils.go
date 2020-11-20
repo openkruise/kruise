@@ -481,14 +481,14 @@ func SetStatefulsetCondition(status *appsv1beta1.StatefulSetStatus, condition ap
 }
 
 func filterOutCondition(conditions []apps.StatefulSetCondition, condType apps.StatefulSetConditionType) []apps.StatefulSetCondition {
-	var newCondtitions []apps.StatefulSetCondition
+	var newCondititions []apps.StatefulSetCondition
 	for _, c := range conditions {
 		if c.Type == condType {
 			continue
 		}
-		newCondtitions = append(newCondtitions, c)
+		newCondititions = append(newCondititions, c)
 	}
-	return newCondtitions
+	return newCondititions
 }
 
 func getStatefulSetKey(o metav1.Object) string {

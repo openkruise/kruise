@@ -223,7 +223,7 @@ func calculateUpdatedReplicas(podList []*corev1.Pod, updatedRevision string) (up
 	return
 }
 
-// deleteStucckPods tries to work around the blocking issue https://github.com/kubernetes/kubernetes/issues/67250
+// deleteStuckPods tries to work around the blocking issue https://github.com/kubernetes/kubernetes/issues/67250
 func (a *StatefulSetAdapter) deleteStuckPods(set *appsv1.StatefulSet, revision string, partition int32) error {
 	pods, err := a.getStatefulSetPods(set)
 	if err != nil {

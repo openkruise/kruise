@@ -93,7 +93,7 @@ func Test(t *testing.T) {
 	}
 
 	var ownerRefs []metav1.OwnerReference
-	updateOwnee = func(obj runtime.Object, c client.Client) (err error) {
+	updateOwner = func(obj runtime.Object, c client.Client) (err error) {
 		ownerRefs = obj.(*corev1.Pod).OwnerReferences
 		return nil
 	}
