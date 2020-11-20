@@ -52,10 +52,10 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind(appsv1alpha1.AdvancedCronJobKind)
-	jobOwnerKey          = ".metadata.controller"
-	apiGVStr             = appsv1alpha1.GroupVersion.String()
-	indexerArr           []IndexerFunc
+	//controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind(appsv1alpha1.AdvancedCronJobKind)
+	//jobOwnerKey          = ".metadata.controller"
+	//apiGVStr             = appsv1alpha1.GroupVersion.String()
+	indexerArr []IndexerFunc
 )
 
 // Add creates a new AdvancedCronJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
