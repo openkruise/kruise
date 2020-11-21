@@ -23,6 +23,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// AdvancedCronJobs returns a AdvancedCronJobInformer.
+	AdvancedCronJobs() AdvancedCronJobInformer
 	// BroadcastJobs returns a BroadcastJobInformer.
 	BroadcastJobs() BroadcastJobInformer
 	// CloneSets returns a CloneSetInformer.
@@ -50,6 +52,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// AdvancedCronJobs returns a AdvancedCronJobInformer.
+func (v *version) AdvancedCronJobs() AdvancedCronJobInformer {
+	return &advancedCronJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // BroadcastJobs returns a BroadcastJobInformer.

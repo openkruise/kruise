@@ -29,4 +29,7 @@ resources:
 - group: apps
   kind: StatefulSet
   version: v1beta1
+- group: apps
+  kind: AdvancedCronJob
+  version: v1alpha1
 version: "2"
