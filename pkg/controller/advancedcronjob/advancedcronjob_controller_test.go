@@ -14,14 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhook
-
-import (
-	"github.com/openkruise/kruise/pkg/webhook/sidecarset/mutating"
-	"github.com/openkruise/kruise/pkg/webhook/sidecarset/validating"
-)
-
-func init() {
-	addHandlers(mutating.HandlerMap)
-	addHandlers(validating.HandlerMap)
-}
+package advancedcronjob

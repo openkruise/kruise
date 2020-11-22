@@ -29,6 +29,10 @@ import (
 	"k8s.io/klog"
 )
 
+const (
+	FsCertWriter = "fs"
+)
+
 // fsCertWriter provisions the certificate by reading and writing to the filesystem.
 type fsCertWriter struct {
 	// dnsName is the DNS name that the certificate is for.

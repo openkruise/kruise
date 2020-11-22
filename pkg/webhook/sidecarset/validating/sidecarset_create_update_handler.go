@@ -97,7 +97,7 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 		}
 	}
 
-	allErrs = append(allErrs, validateSidecarSetStratety(&spec.Strategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, validateSidecarSetStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
 	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, spec.Containers, vols, fldPath.Child("containers"))...)
@@ -105,7 +105,7 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 	return allErrs
 }
 
-func validateSidecarSetStratety(strategy *appsv1alpha1.SidecarSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+func validateSidecarSetStrategy(strategy *appsv1alpha1.SidecarSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if strategy.RollingUpdate == nil {
 		allErrs = append(allErrs, validationfield.Required(fldPath.Child("rollingUpdate"), ""))

@@ -1,3 +1,5 @@
+// +build tools
+
 /*
 Copyright 2020 The Kruise Authors.
 
@@ -14,14 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhook
+// This package imports things required by build scripts, to force `go mod` to see them as dependencies
+package hack
 
-import (
-	"github.com/openkruise/kruise/pkg/webhook/sidecarset/mutating"
-	"github.com/openkruise/kruise/pkg/webhook/sidecarset/validating"
-)
-
-func init() {
-	addHandlers(mutating.HandlerMap)
-	addHandlers(validating.HandlerMap)
-}
+import _ "k8s.io/code-generator"

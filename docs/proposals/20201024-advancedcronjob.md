@@ -1,30 +1,70 @@
-/*
-Copyright 2020 The Kruise Authors.
+---
+title: AdvancedCronJob Crd and Controller
+authors:
+  - "@rishi-anand"
+reviewers:
+  - "@Fei-Guo"
+  - "@FillZpp"
+  - "@jzhoucliqr"
+creation-date: 2020-10-25
+last-updated: 2020-10-25
+status: implementable
+---
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+# Implementing AdvancedCronJob Crd and Controller
+- Implementing AdvancedCronJob to support Job/BroadcastJob or any other future CRD and to run it periodically at a given schedule.
 
-    http://www.apache.org/licenses/LICENSE-2.0
+## Table of Contents
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+A table of contents is helpful for quickly jumping to sections of a proposal and for highlighting
+any additional information provided beyond the standard proposal template.
+[Tools for generating](https://github.com/ekalinin/github-markdown-toc) a table of contents from markdown are available.
 
-package v1alpha1
+- [Title](#title)
+  - [Table of Contents](#table-of-contents)
+  - [Summary](#summary)
+  - [Motivation](#motivation)
+    - [Goals](#goals)
+  - [Proposal](#proposal)
+    - [User Stories](#user-stories)
+      - [Story 1](#story-1)
+      - [Story 2](#story-2)
+  - [Implementation History](#implementation-history)
 
-import (
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+## Summary
 
-const AdvancedCronJobKind = "AdvancedCronJob"
+This controller will be very generic and will have implementations to help developers to run a job or any CRD in specific schedule.
 
-// AdvancedCronJobSpec defines the desired state of AdvancedCronJob
+## Motivation
+
+- Developer may come across a use-case when some job needs to be executed on at a specific schedule.
+- Found same use-case requirement in Issues #251 and I got motivated to implement it
+
+### Goals
+
+- Implementing a custom controller for AdvancedCronJob which acts like CronJob but it schedules Job/BroadcastJob or other CRD
+
+## Proposal
+
+- Adding a new CRD and controller for AdvancedCronJob.
+- AdvancedCronJob should be able to reconcile Job/BroadcastJob or any other future CRD if required.
+- Once AdvancedCronJob is created, spec cannot be modified.
+- Adding webhook for validation of AdvancedCronJob.
+
+### User Stories
+
+- Implement a CRD which contains below fields and a controller which honors all the fields and reconciles accordingly.
+```
+
+// AdvancedCronJob is the Schema for the advancedcronjobs API
+type AdvancedCronJob struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   AdvancedCronJobSpec   `json:"spec,omitempty"`
+	Status AdvancedCronJobStatus `json:"status,omitempty"`
+}
+
 type AdvancedCronJobSpec struct {
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
@@ -66,11 +106,11 @@ type AdvancedCronJobSpec struct {
 type CronJobTemplate struct {
 	// Specifies the job that will be created when executing a CronJob.
 	// +optional
-	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,1,opt,name=jobTemplate"`
+	JobTemplate *batchv1beta1.JobTemplateSpec
 
 	// Specifies the broadcastjob that will be created when executing a BroadcastCronJob.
 	// +optional
-	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate" protobuf:"bytes,2,opt,name=broadcastJobTemplate"`
+	BroadcastJobTemplate *BroadcastJobTemplateSpec
 }
 
 type TemplateKind string
@@ -123,34 +163,15 @@ type AdvancedCronJobStatus struct {
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
 }
+```
 
-// +genclient
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=acj
-// +kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description="The schedule of advanced cron job."
-// +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".status.type",description="Type of cron job."
-// +kubebuilder:printcolumn:name="LastScheduleTime",type="date",JSONPath=".status.lastScheduleTime",description="The last time at which job was scheduled."
-// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp",description="CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC."
+#### Story 1
+Create a above CRD and implement the controller
 
-// AdvancedCronJob is the Schema for the advancedcronjobs API
-type AdvancedCronJob struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+#### Story 2
+Add unit and integration test cases
 
-	Spec   AdvancedCronJobSpec   `json:"spec,omitempty"`
-	Status AdvancedCronJobStatus `json:"status,omitempty"`
-}
+## Implementation History
 
-// +kubebuilder:object:root=true
-
-// AdvancedCronJobList contains a list of AdvancedCronJob
-type AdvancedCronJobList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AdvancedCronJob `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&AdvancedCronJob{}, &AdvancedCronJobList{})
-}
+- [ ] 10/24/2020: Proposal discussion in an issue <a href="https://github.com/openkruise/kruise/issues/215#issuecomment-715506813">#215</a>
+- [ ] 11/04/2020: Proposal submission

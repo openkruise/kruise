@@ -14,14 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhook
+package validating
 
 import (
-	"github.com/openkruise/kruise/pkg/webhook/sidecarset/mutating"
-	"github.com/openkruise/kruise/pkg/webhook/sidecarset/validating"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func init() {
-	addHandlers(mutating.HandlerMap)
-	addHandlers(validating.HandlerMap)
-}
+// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-daemonset,mutating=false,failurePolicy=fail,groups=apps.kruise.io,resources=daemonsets,verbs=create;update,versions=v1alpha1,name=vdaemonset.kb.io
+
+var (
+	// HandlerMap contains admission webhook handlers
+	HandlerMap = map[string]admission.Handler{
+		"validate-apps-kruise-io-v1alpha1-daemonset": &DaemonSetCreateUpdateHandler{},
+	}
+)

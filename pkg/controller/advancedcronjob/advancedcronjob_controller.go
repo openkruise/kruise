@@ -19,11 +19,9 @@ package advancedcronjob
 import (
 	"context"
 	"flag"
-	"fmt"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/util/retry"
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/client-go/tools/record"
 
@@ -137,13 +135,23 @@ type ReconcileAdvancedCronJob struct {
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=advancedcronjobs/status,verbs=get;update;patch
 
 func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	_ = context.Background()
+	_ = r.Log.WithValues("advancedcronjob", req.NamespacedName)
+
 	ctx := context.Background()
-	log := r.Log.WithValues("advancedcronjob", req.NamespacedName)
+	klog.Infof("Running BroadcastCronJob job %s", req.Name)
+
+	namespacedName := types.NamespacedName{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+	}
+
+	log := r.Log.WithValues("cronjob", namespacedName)
 
 	var advancedCronJob appsv1alpha1.AdvancedCronJob
 
-	if err := r.Get(ctx, req.NamespacedName, &advancedCronJob); err != nil {
-		log.Error(err, "unable to fetch CronJob")
+	if err := r.Get(ctx, namespacedName, &advancedCronJob); err != nil {
+		klog.Error(err, "unable to fetch CronJob")
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can get them
 		// on deleted requests.
@@ -156,7 +164,7 @@ func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, err
 	case appsv1alpha1.BroadcastJobTemplate:
 		return r.reconcileBroadcastJob(ctx, log, req, advancedCronJob)
 	default:
-		log.Info("No template found")
+		klog.Info("No template found")
 	}
 
 	return ctrl.Result{}, nil
@@ -166,25 +174,4 @@ func (r *ReconcileAdvancedCronJob) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.AdvancedCronJob{}).
 		Complete(r)
-}
-
-func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(log logr.Logger, request reconcile.Request, advancedCronJob *appsv1alpha1.AdvancedCronJob) error {
-	log.V(1).Info(fmt.Sprintf("Updating job %s status %#v", advancedCronJob.Name, advancedCronJob.Status))
-	advancedCronJobCopy := advancedCronJob.DeepCopy()
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		err := r.Status().Update(context.TODO(), advancedCronJobCopy)
-		if err == nil {
-			return nil
-		}
-
-		updated := &appsv1alpha1.AdvancedCronJob{}
-		err = r.Get(context.TODO(), request.NamespacedName, updated)
-		if err == nil {
-			advancedCronJobCopy = updated
-			advancedCronJobCopy.Status = advancedCronJob.Status
-		} else {
-			utilruntime.HandleError(fmt.Errorf("error getting updated advancedCronJob %s/%s from lister: %v", advancedCronJob.Namespace, advancedCronJob.Name, err))
-		}
-		return err
-	})
 }

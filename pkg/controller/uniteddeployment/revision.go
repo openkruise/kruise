@@ -78,32 +78,25 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDe
 
 func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsalphav1.UnitedDeployment) (*apps.ControllerRevision, *apps.ControllerRevision, *[]*apps.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
-	revisions, err := r.controlledHistories(ud)
-	if err != nil {
-		if ud.Status.CollisionCount == nil {
-			return currentRevision, updateRevision, nil, 0, err
-		}
-		return currentRevision, updateRevision, nil, *ud.Status.CollisionCount, err
-	}
-
-	history.SortControllerRevisions(revisions)
-	cleanedRevision, err := r.cleanExpiredRevision(ud, &revisions)
-	if err != nil {
-		if ud.Status.CollisionCount == nil {
-			return currentRevision, updateRevision, nil, 0, err
-		}
-		return currentRevision, updateRevision, nil, *ud.Status.CollisionCount, err
-	}
-	revisions = *cleanedRevision
-
-	// Use a local copy of set.Status.CollisionCount to avoid modifying set.Status directly.
-	// This copy is returned so the value gets carried over to set.Status in updateStatefulSet.
+	// Use a local copy of ud.Status.CollisionCount to avoid modifying ud.Status directly.
 	var collisionCount int32
 	if ud.Status.CollisionCount != nil {
 		collisionCount = *ud.Status.CollisionCount
 	}
 
-	// create a new revision from the current set
+	revisions, err := r.controlledHistories(ud)
+	if err != nil {
+		return currentRevision, updateRevision, nil, collisionCount, err
+	}
+
+	history.SortControllerRevisions(revisions)
+	cleanedRevision, err := r.cleanExpiredRevision(ud, &revisions)
+	if err != nil {
+		return currentRevision, updateRevision, nil, collisionCount, err
+	}
+	revisions = *cleanedRevision
+
+	// create a new revision from the current ud
 	updateRevision, err = r.newRevision(ud, nextRevision(revisions), &collisionCount)
 	if err != nil {
 		return nil, nil, nil, collisionCount, err

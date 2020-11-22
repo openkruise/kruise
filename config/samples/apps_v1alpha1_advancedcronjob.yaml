@@ -1,26 +1,7 @@
 apiVersion: apps.kruise.io/v1alpha1
 kind: AdvancedCronJob
 metadata:
-  name: advanced-sample-test220000demo
+  name: advancedcronjob-sample
 spec:
-  schedule: "* * * * *"
-  concurrencyPolicy: Replace
-  paused: false
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
-  jobTemplate: null
-  broadcastJobTemplate:
-    spec:
-      template:
-        spec:
-          containers:
-            - name: hello
-              image: busybox
-              args:
-                - /bin/sh
-                - -c
-                - date; echo "Hello from the AdvancedCronJob - SpectroCloud"
-          restartPolicy: Never
-      completionPolicy:
-        type: Always
-        activeDeadlineSeconds: 200
+  # Add fields here
+  foo: bar

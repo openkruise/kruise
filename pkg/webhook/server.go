@@ -77,8 +77,8 @@ func SetupWithManager(mgr manager.Manager) error {
 }
 
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;update;patch
 
 func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
@@ -104,4 +104,24 @@ func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 	case <-timer.C:
 		return fmt.Errorf("failed to start webhook controller for waiting more than 5s")
 	}
+}
+
+func WaitReady() error {
+	startTS := time.Now()
+	var err error
+	for {
+		duration := time.Since(startTS)
+		if err = Checker(nil); err == nil {
+			return nil
+		}
+
+		if duration > time.Second*5 {
+			klog.Warningf("Failed to wait webhook ready over %s: %v", duration, err)
+		}
+		if duration > time.Minute {
+			return err
+		}
+		time.Sleep(time.Second * 2)
+	}
+
 }
