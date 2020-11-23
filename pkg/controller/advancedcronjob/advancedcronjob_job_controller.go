@@ -14,38 +14,16 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 
-	"github.com/go-logr/logr"
 	"github.com/robfig/cron"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-func hookJobIndexer(mgr manager.Manager, c controller.Controller) error {
-	if err := mgr.GetFieldIndexer().IndexField(&batchv1.Job{}, jobOwnerKey, func(rawObj runtime.Object) []string {
-		// grab the job object, extract the owner...
-		job := rawObj.(*batchv1.Job)
-		owner := metav1.GetControllerOf(job)
-		if owner == nil {
-			return nil
-		}
-
-		// ...make sure it's a CronJob...
-		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
-			return nil
-		}
-
-		// ...and if so, return it
-		return []string{owner.Name}
-	}); err != nil {
-		return err
-	}
-
+func watchJob(c controller.Controller) error {
 	if err := c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.AdvancedCronJob{},
@@ -59,7 +37,7 @@ func hookJobIndexer(mgr manager.Manager, c controller.Controller) error {
 // +kubebuilder:rbac:groups=batch,resources=advancedcronjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=advancedcronjobs/status,verbs=get;update;patch
 
-func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, log logr.Logger, advancedCronJob appsv1alpha1.AdvancedCronJob) (ctrl.Result, error) {
+func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Request, advancedCronJob appsv1alpha1.AdvancedCronJob) (ctrl.Result, error) {
 	advancedCronJob.Status.Type = appsv1alpha1.JobTemplate
 
 	var childJobs batchv1.JobList
@@ -142,11 +120,10 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, log logr.Lo
 	}
 
 	klog.V(1).Info("job count", "active jobs", len(activeJobs), "successful jobs", len(successfulJobs), "failed jobs", len(failedJobs))
-
-	//if err := r.Client.Status().Update(ctx, &advancedCronJob); err != nil {
-	//	klog.Error(err, "unable to update AdvancedCronJob status")
-	//	return ctrl.Result{}, err
-	//}
+	if err := r.updateAdvancedJobStatus(req, &advancedCronJob); err != nil {
+		klog.Error(err, "unable to update AdvancedCronJob status")
+		return ctrl.Result{}, err
+	}
 
 	/*
 		Once we've updated our status, we can move on to ensuring that the status of
@@ -292,26 +269,23 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, log logr.Lo
 		out if we actually need to run.
 	*/
 	scheduledResult := ctrl.Result{RequeueAfter: nextRun.Sub(now)} // save this so we can re-use it elsewhere
-	log = log.WithValues("now", now, "next run", nextRun)
 
 	/*
 		### 6: Run a new job if it's on schedule, not past the deadline, and not blocked by our concurrency policy
 		If we've missed a run, and we're still within the deadline to start it, we'll need to run a job.
 	*/
 	if missedRun.IsZero() {
-		klog.V(1).Info("no upcoming scheduled times, sleeping until next")
+		klog.V(1).Info("no upcoming scheduled times, sleeping until next now ", now, " and next run ", nextRun)
 		return scheduledResult, nil
 	}
 
 	// make sure we're not too late to start the run
-	log = log.WithValues("current run", missedRun)
 	tooLate := false
 	if advancedCronJob.Spec.StartingDeadlineSeconds != nil {
 		tooLate = missedRun.Add(time.Duration(*advancedCronJob.Spec.StartingDeadlineSeconds) * time.Second).Before(now)
 	}
 	if tooLate {
-		klog.V(1).Info("missed starting deadline for last run, sleeping till next")
-		// TODO(directxman12): events
+		klog.V(1).Info("missed starting deadline for last run, sleeping till next", "current run", missedRun)
 		return scheduledResult, nil
 	}
 
@@ -332,7 +306,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, log logr.Lo
 		for _, activeJob := range activeJobs {
 			// we don't care if the job was already deleted
 			if err := r.Delete(ctx, activeJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-				log.Error(err, "unable to delete active job", "job", activeJob)
+				klog.Error(err, "unable to delete active job", "job", activeJob)
 				return ctrl.Result{}, err
 			}
 		}
@@ -340,10 +314,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, log logr.Lo
 
 	/*
 		Once we've figured out what to do with existing jobs, we'll actually create our desired job
-	*/
-
-	/*
-		We need to construct a job based on our CronJob's template.  We'll copy over the spec
+		We need to construct a job based on our AdvancedCronJob's template.  We'll copy over the spec
 		from the template and copy some basic object meta.
 		Then, we'll set the "scheduled time" annotation so that we can reconstitute our
 		`LastScheduleTime` field each reconcile.

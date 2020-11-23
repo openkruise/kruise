@@ -19,6 +19,9 @@ package fieldindex
 import (
 	"sync"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	batchv1 "k8s.io/api/batch/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,39 +32,29 @@ import (
 const (
 	IndexNameForPodNodeName = "spec.nodeName"
 	IndexNameForOwnerRefUID = "ownerRefUID"
+	IndexNameForController  = ".metadata.controller"
 )
 
-var registerOnce sync.Once
+var (
+	registerOnce sync.Once
+	apiGVStr     = appsv1alpha1.GroupVersion.String()
+)
+
+var ownerIndexFunc = func(obj runtime.Object) []string {
+	metaObj, ok := obj.(metav1.Object)
+	if !ok {
+		return []string{}
+	}
+	var owners []string
+	for _, ref := range metaObj.GetOwnerReferences() {
+		owners = append(owners, string(ref.UID))
+	}
+	return owners
+}
 
 func RegisterFieldIndexes(c cache.Cache) error {
 	var err error
 	registerOnce.Do(func() {
-		// pod nodeName
-		err = c.IndexField(&v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				return []string{}
-			}
-			if len(pod.Spec.NodeName) == 0 {
-				return []string{}
-			}
-			return []string{pod.Spec.NodeName}
-		})
-		if err != nil {
-			return
-		}
-
-		ownerIndexFunc := func(obj runtime.Object) []string {
-			metaObj, ok := obj.(metav1.Object)
-			if !ok {
-				return []string{}
-			}
-			var owners []string
-			for _, ref := range metaObj.GetOwnerReferences() {
-				owners = append(owners, string(ref.UID))
-			}
-			return owners
-		}
 
 		// pod ownerReference
 		if err = c.IndexField(&v1.Pod{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
@@ -71,6 +64,79 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		if err = c.IndexField(&v1.PersistentVolumeClaim{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
+		// pod name
+		if err = indexPodName(c); err != nil {
+			return
+		}
+		// job owner
+		if err = indexJob(c); err != nil {
+			return
+		}
+		// broadcastjob owner
+		if err = indexBroadcastCronJob(c); err != nil {
+			return
+		}
 	})
 	return err
+}
+
+func indexPodName(c cache.Cache) error {
+	if err := c.IndexField(&v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return []string{}
+		}
+		if len(pod.Spec.NodeName) == 0 {
+			return []string{}
+		}
+		return []string{pod.Spec.NodeName}
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func indexJob(c cache.Cache) error {
+	if err := c.IndexField(&batchv1.Job{}, IndexNameForController, func(rawObj runtime.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*batchv1.Job)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+
+		// ...make sure it's a AdvancedCronJob...
+		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func indexBroadcastCronJob(c cache.Cache) error {
+	if err := c.IndexField(&appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj runtime.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*appsv1alpha1.BroadcastJob)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+
+		// ...make sure it's a AdvancedCronJob...
+		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	}); err != nil {
+		return err
+	}
+	return nil
 }

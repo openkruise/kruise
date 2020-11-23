@@ -19,11 +19,15 @@ package advancedcronjob
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"k8s.io/klog"
@@ -33,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,8 +48,6 @@ type IndexerFunc func(manager.Manager) error
 
 func init() {
 	flag.IntVar(&concurrentReconciles, "AdvancedCronJob-workers", concurrentReconciles, "Max concurrent workers for AdvancedCronJob controller.")
-	indexerArr = make([]IndexerFunc, 0, 1)
-
 }
 
 var (
@@ -54,7 +55,6 @@ var (
 	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind(appsv1alpha1.AdvancedCronJobKind)
 	jobOwnerKey          = ".metadata.controller"
 	apiGVStr             = appsv1alpha1.GroupVersion.String()
-	indexerArr           []IndexerFunc
 )
 
 // Add creates a new AdvancedCronJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -72,7 +72,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:   mgr.GetClient(),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
-		Log:      ctrl.Log.WithName("controllers").WithName(appsv1alpha1.AdvancedCronJobKind),
 		Clock:    realClock{},
 	}
 }
@@ -88,21 +87,20 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to AdvancedCronJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.AdvancedCronJob{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
+	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.AdvancedCronJob{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		klog.Error(err)
 		return err
 	}
 
-	//Index
-	err = hookJobIndexer(mgr, c)
-	err = hookBroadcastJobIndexer(mgr, c)
-
-	if err != nil {
+	if err = watchJob(c); err != nil {
 		klog.Error(err)
 		return err
 	}
 
+	if err = watchBroadcastJob(c); err != nil {
+		klog.Error(err)
+		return err
+	}
 	return nil
 }
 
@@ -125,7 +123,6 @@ var _ reconcile.Reconciler = &ReconcileAdvancedCronJob{}
 // ReconcileAdvancedCronJob reconciles a AdvancedCronJob object
 type ReconcileAdvancedCronJob struct {
 	client.Client
-	Log      logr.Logger
 	scheme   *runtime.Scheme
 	recorder record.EventRecorder
 	Clock
@@ -135,9 +132,6 @@ type ReconcileAdvancedCronJob struct {
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=advancedcronjobs/status,verbs=get;update;patch
 
 func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("advancedcronjob", req.NamespacedName)
-
 	ctx := context.Background()
 	klog.Infof("Running BroadcastCronJob job %s", req.Name)
 
@@ -145,8 +139,6 @@ func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, err
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}
-
-	log := r.Log.WithValues("cronjob", namespacedName)
 
 	var advancedCronJob appsv1alpha1.AdvancedCronJob
 
@@ -160,9 +152,9 @@ func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, err
 
 	switch FindTemplateKind(advancedCronJob.Spec) {
 	case appsv1alpha1.JobTemplate:
-		return r.reconcileJob(ctx, log, advancedCronJob)
+		return r.reconcileJob(ctx, req, advancedCronJob)
 	case appsv1alpha1.BroadcastJobTemplate:
-		return r.reconcileBroadcastJob(ctx, log, req, advancedCronJob)
+		return r.reconcileBroadcastJob(ctx, req, advancedCronJob)
 	default:
 		klog.Info("No template found")
 	}
@@ -174,4 +166,25 @@ func (r *ReconcileAdvancedCronJob) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.AdvancedCronJob{}).
 		Complete(r)
+}
+
+func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(request reconcile.Request, advancedCronJob *appsv1alpha1.AdvancedCronJob) error {
+	klog.V(1).Info(fmt.Sprintf("Updating job %s status %#v", advancedCronJob.Name, advancedCronJob.Status))
+	advancedCronJobCopy := advancedCronJob.DeepCopy()
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		err := r.Status().Update(context.TODO(), advancedCronJobCopy)
+		if err == nil {
+			return nil
+		}
+
+		updated := &appsv1alpha1.AdvancedCronJob{}
+		err = r.Get(context.TODO(), request.NamespacedName, updated)
+		if err == nil {
+			advancedCronJobCopy = updated
+			advancedCronJobCopy.Status = advancedCronJob.Status
+		} else {
+			utilruntime.HandleError(fmt.Errorf("error getting updated advancedCronJob %s/%s from lister: %v", advancedCronJob.Namespace, advancedCronJob.Name, err))
+		}
+		return err
+	})
 }
