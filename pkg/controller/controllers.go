@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/openkruise/kruise/pkg/controller/advancedcronjob"
 	"github.com/openkruise/kruise/pkg/controller/broadcastjob"
 	"github.com/openkruise/kruise/pkg/controller/cloneset"
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
@@ -31,6 +32,7 @@ import (
 var controllerAddFuncs []func(manager.Manager) error
 
 func init() {
+	controllerAddFuncs = append(controllerAddFuncs, advancedcronjob.Add)
 	controllerAddFuncs = append(controllerAddFuncs, broadcastjob.Add)
 	controllerAddFuncs = append(controllerAddFuncs, cloneset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, daemonset.Add)

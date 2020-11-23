@@ -9,6 +9,7 @@ require (
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.8.1
+	github.com/robfig/cron v1.2.0
 	github.com/stretchr/testify v1.4.0
 	github.com/xyproto/simpleredis v0.0.0-20200201215242-1ff0da2967b4
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
