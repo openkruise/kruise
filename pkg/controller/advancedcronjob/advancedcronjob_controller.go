@@ -106,7 +106,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 type realClock struct{}
 
-func (_ realClock) Now() time.Time { return time.Now() }
+func (r realClock) Now() time.Time { return time.Now() }
 
 // clock knows how to get the current time.
 // It can be used to fake out timing for testing.
