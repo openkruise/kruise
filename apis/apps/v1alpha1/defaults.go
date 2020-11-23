@@ -92,35 +92,6 @@ func setSidecarDefaultContainer(sidecarContainer *SidecarContainer) {
 	}
 }
 
-// SetDefaults_AdvancedCronJob set default values for BroadcastJob.
-func SetDefaultsAdvancedCronJob(obj *AdvancedCronJob) {
-	if obj.Spec.Template.JobTemplate != nil {
-		SetDefaultPodSpec(&obj.Spec.Template.JobTemplate.Spec.Template.Spec)
-	}
-
-	if obj.Spec.Template.BroadcastJobTemplate != nil {
-		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
-	}
-
-	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
-		var successJobHistorylimit int32
-		successJobHistorylimit = 1
-		obj.Spec.SuccessfulJobsHistoryLimit = &successJobHistorylimit
-	}
-
-	if obj.Spec.FailedJobsHistoryLimit == nil {
-		var failedJobHistorylimit int32
-		failedJobHistorylimit = 1
-		obj.Spec.FailedJobsHistoryLimit = &failedJobHistorylimit
-	}
-
-	if obj.Spec.StartingDeadlineSeconds == nil {
-		var deadlineSeconds int64
-		deadlineSeconds = 3600
-		obj.Spec.StartingDeadlineSeconds = &deadlineSeconds
-	}
-}
-
 // SetDefaults_BroadcastJob set default values for BroadcastJob.
 func SetDefaultsBroadcastJob(obj *BroadcastJob) {
 	SetDefaultPodSpec(&obj.Spec.Template.Spec)
@@ -240,6 +211,7 @@ func SetDefaultsCloneSet(obj *CloneSet) {
 		obj.Spec.UpdateStrategy.Type = RecreateCloneSetUpdateStrategyType
 	case InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceOnlyCloneSetUpdateStrategyType:
 		if obj.Spec.UpdateStrategy.InPlaceUpdateStrategy == nil {
+			obj.Spec.UpdateStrategy.InPlaceUpdateStrategy = &InPlaceUpdateStrategy{}
 			obj.Spec.UpdateStrategy.InPlaceUpdateStrategy = &appspub.InPlaceUpdateStrategy{}
 		}
 	}
