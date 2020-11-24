@@ -7,6 +7,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -96,7 +97,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
@@ -111,7 +112,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 					MaxSurge:       &intOrStr1,
 				},
@@ -124,7 +125,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr0,
 					MaxSurge:       &intOrStr1,
 				},
@@ -137,7 +138,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &maxUnavailable120Percent,
 				},
 			},
@@ -149,7 +150,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &maxUnavailable120Percent,
 					PriorityStrategy: &appspub.UpdatePriorityStrategy{
 						WeightPriority: []appspub.UpdatePriorityWeightTerm{
@@ -171,7 +172,7 @@ func TestValidate(t *testing.T) {
 				},
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -186,7 +187,7 @@ func TestValidate(t *testing.T) {
 
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -224,7 +225,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -236,7 +237,7 @@ func TestValidate(t *testing.T) {
 				Template: invalidPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -248,7 +249,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -260,7 +261,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           "",
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -272,7 +273,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &minus1,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(-1)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -284,7 +285,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr0,
 				},
 			},
@@ -296,7 +297,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr0,
 					MaxSurge:       &intOrStr0,
 				},
@@ -309,7 +310,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
@@ -324,7 +325,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
@@ -339,7 +340,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
@@ -349,7 +350,7 @@ func TestValidate(t *testing.T) {
 				Template: validPodTemplate2.Template,
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
-					Partition:      &val2,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},

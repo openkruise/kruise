@@ -674,14 +674,14 @@ func TestCalculateUpdateCount(t *testing.T) {
 			expectedResult:    1,
 		},
 		{
-			strategy:          appsv1alpha1.CloneSetUpdateStrategy{Partition: getInt32Pointer(2), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(3))},
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{Partition: util.GetIntOrStrPointer(intstrutil.FromInt(2)), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(3))},
 			totalReplicas:     3,
 			waitUpdateIndexes: []int{0, 1},
 			pods:              []*v1.Pod{{}, readyPod(), readyPod()},
 			expectedResult:    0,
 		},
 		{
-			strategy:          appsv1alpha1.CloneSetUpdateStrategy{Partition: getInt32Pointer(2), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromString("50%"))},
+			strategy:          appsv1alpha1.CloneSetUpdateStrategy{Partition: util.GetIntOrStrPointer(intstrutil.FromInt(2)), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromString("50%"))},
 			totalReplicas:     8,
 			waitUpdateIndexes: []int{0, 1, 2, 3, 4, 5, 6},
 			pods:              []*v1.Pod{{}, readyPod(), {}, readyPod(), readyPod(), readyPod(), readyPod(), {}},

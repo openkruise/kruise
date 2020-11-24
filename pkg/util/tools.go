@@ -20,6 +20,7 @@ package util
 import (
 	"sync"
 
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/integer"
 )
 
@@ -74,4 +75,8 @@ func CheckDuplicate(list []string) []string {
 		}
 	}
 	return dupList
+}
+
+func GetIntOrStrPointer(i intstrutil.IntOrString) *intstrutil.IntOrString {
+	return &i
 }

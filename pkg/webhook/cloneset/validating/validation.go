@@ -101,7 +101,8 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 			appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType)))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*strategy.Partition), fldPath.Child("partition"))...)
+	partition, _ := intstrutil.GetValueFromIntOrPercent(strategy.Partition, replicas, true)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(partition), fldPath.Child("partition"))...)
 
 	if err := strategy.PriorityStrategy.FieldsValidation(); err != nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("priorityStrategy"), err.Error()))

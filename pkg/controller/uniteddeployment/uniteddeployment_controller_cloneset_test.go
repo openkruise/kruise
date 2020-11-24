@@ -1036,11 +1036,11 @@ func TestCsRollingUpdatePartition(t *testing.T) {
 
 	csA := getSubsetCsByName(csList, "subset-a")
 	g.Expect(csA).ShouldNot(gomega.BeNil())
-	g.Expect(*csA.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(4))
+	g.Expect(getPartitionCount(csA.Spec.UpdateStrategy.Partition, csA.Spec.Replicas)).Should(gomega.BeEquivalentTo(4))
 
 	csB := getSubsetCsByName(csList, "subset-b")
 	g.Expect(csB).ShouldNot(gomega.BeNil())
-	g.Expect(*csB.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(3))
+	g.Expect(getPartitionCount(csB.Spec.UpdateStrategy.Partition, csB.Spec.Replicas)).Should(gomega.BeEquivalentTo(3))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
@@ -1064,11 +1064,11 @@ func TestCsRollingUpdatePartition(t *testing.T) {
 
 	csA = getSubsetCsByName(csList, "subset-a")
 	g.Expect(csA).ShouldNot(gomega.BeNil())
-	g.Expect(*csA.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(0))
+	g.Expect(getPartitionCount(csA.Spec.UpdateStrategy.Partition, csA.Spec.Replicas)).Should(gomega.BeEquivalentTo(0))
 
 	csB = getSubsetCsByName(csList, "subset-b")
 	g.Expect(csB).ShouldNot(gomega.BeNil())
-	g.Expect(*csB.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(3))
+	g.Expect(getPartitionCount(csB.Spec.UpdateStrategy.Partition, csB.Spec.Replicas)).Should(gomega.BeEquivalentTo(3))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
@@ -1089,11 +1089,11 @@ func TestCsRollingUpdatePartition(t *testing.T) {
 
 	csA = getSubsetCsByName(csList, "subset-a")
 	g.Expect(csA).ShouldNot(gomega.BeNil())
-	g.Expect(*csA.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(0))
+	g.Expect(getPartitionCount(csA.Spec.UpdateStrategy.Partition, csA.Spec.Replicas)).Should(gomega.BeEquivalentTo(0))
 
 	csB = getSubsetCsByName(csList, "subset-b")
 	g.Expect(csB).ShouldNot(gomega.BeNil())
-	g.Expect(*csB.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(0))
+	g.Expect(getPartitionCount(csB.Spec.UpdateStrategy.Partition, csB.Spec.Replicas)).Should(gomega.BeEquivalentTo(0))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
 	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
@@ -1401,7 +1401,7 @@ func TestCsSubsetCount(t *testing.T) {
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(3))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:3.0"))
 	g.Expect(setsubA.Spec.UpdateStrategy.Partition).ShouldNot(gomega.BeNil())
-	g.Expect(*setsubA.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(1))
+	g.Expect(getPartitionCount(setsubA.Spec.UpdateStrategy.Partition, setsubA.Spec.Replicas)).Should(gomega.BeEquivalentTo(1))
 	setsubB = getSubsetCsByName(csList, "subset-b")
 	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(7))
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:3.0"))
@@ -1433,7 +1433,7 @@ func TestCsSubsetCount(t *testing.T) {
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(2))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:4.0"))
 	g.Expect(setsubA.Spec.UpdateStrategy.Partition).ShouldNot(gomega.BeNil())
-	g.Expect(*setsubA.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(2))
+	g.Expect(getPartitionCount(setsubA.Spec.UpdateStrategy.Partition, setsubA.Spec.Replicas)).Should(gomega.BeEquivalentTo(2))
 	setsubB = getSubsetCsByName(csList, "subset-b")
 	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:4.0"))
@@ -1457,7 +1457,7 @@ func TestCsSubsetCount(t *testing.T) {
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(1))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
 	g.Expect(setsubA.Spec.UpdateStrategy.Partition).ShouldNot(gomega.BeNil())
-	g.Expect(*setsubA.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(1))
+	g.Expect(getPartitionCount(setsubA.Spec.UpdateStrategy.Partition, setsubA.Spec.Replicas)).Should(gomega.BeEquivalentTo(1))
 	setsubB = getSubsetCsByName(csList, "subset-b")
 	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(9))
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
@@ -1474,7 +1474,7 @@ func TestCsSubsetCount(t *testing.T) {
 	g.Expect(*setsubA.Spec.Replicas).Should(gomega.BeEquivalentTo(4))
 	g.Expect(setsubA.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
 	g.Expect(setsubA.Spec.UpdateStrategy.Partition).ShouldNot(gomega.BeNil())
-	g.Expect(*setsubA.Spec.UpdateStrategy.Partition).Should(gomega.BeEquivalentTo(2))
+	g.Expect(getPartitionCount(setsubA.Spec.UpdateStrategy.Partition, setsubA.Spec.Replicas)).Should(gomega.BeEquivalentTo(2))
 	setsubB = getSubsetCsByName(csList, "subset-b")
 	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(6))
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
@@ -1508,4 +1508,9 @@ func getSubsetCsByName(csList *appsv1alpha1.CloneSetList, name string) *appsv1al
 		}
 	}
 	return nil
+}
+
+func getPartitionCount(partition *intstr.IntOrString, replicas *int32) int {
+	partitionCount, _ := intstr.GetValueFromIntOrPercent(partition, int(*replicas), true)
+	return partitionCount
 }

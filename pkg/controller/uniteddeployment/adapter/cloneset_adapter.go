@@ -5,11 +5,14 @@ import (
 	"fmt"
 
 	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -50,7 +53,8 @@ func (a *CloneSetAdapter) GetReplicaDetails(obj metav1.Object, updatedRevision s
 	specReplicas = set.Spec.Replicas
 
 	if set.Spec.UpdateStrategy.Partition != nil {
-		specPartition = set.Spec.UpdateStrategy.Partition
+		partition, _ := intstr.GetValueFromIntOrPercent(set.Spec.UpdateStrategy.Partition, int(*set.Spec.Replicas), true)
+		specPartition = utilpointer.Int32Ptr(int32(partition))
 	}
 
 	statusReplicas = set.Status.Replicas
@@ -116,7 +120,7 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 
 	set.Spec.UpdateStrategy = ud.Spec.Template.CloneSetTemplate.Spec.UpdateStrategy
 
-	set.Spec.UpdateStrategy.Partition = &partition
+	set.Spec.UpdateStrategy.Partition = util.GetIntOrStrPointer(intstr.FromInt(int(partition)))
 
 	set.Spec.Template = *ud.Spec.Template.CloneSetTemplate.Spec.Template.DeepCopy()
 

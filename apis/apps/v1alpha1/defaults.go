@@ -216,7 +216,8 @@ func SetDefaultsCloneSet(obj *CloneSet) {
 	}
 
 	if obj.Spec.UpdateStrategy.Partition == nil {
-		obj.Spec.UpdateStrategy.Partition = utilpointer.Int32Ptr(0)
+		partition := intstr.FromInt(0)
+		obj.Spec.UpdateStrategy.Partition = &partition
 	}
 	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
 		maxUnavailable := intstr.FromString(DefaultCloneSetMaxUnavailable)

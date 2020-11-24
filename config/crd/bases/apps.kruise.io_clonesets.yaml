@@ -218,12 +218,16 @@ spec:
                     Defaults to 20%.'
                   x-kubernetes-int-or-string: true
                 partition:
-                  description: Partition is the desired number of pods in old revisions.
-                    It means when partition is set during pods updating, (replicas
-                    - partition) number of pods will be updated. Default value is
-                    0.
-                  format: int32
-                  type: integer
+                  anyOf:
+                  - type: integer
+                  - type: string
+                  description: 'Partition is the desired number of pods in old revisions.
+                    Value can be an absolute number (ex: 5) or a percentage of desired
+                    pods (ex: 10%). Absolute number is calculated from percentage
+                    by rounding up by default. It means when partition is set during
+                    pods updating, (replicas - partition value) number of pods will
+                    be updated. Default value is 0.'
+                  x-kubernetes-int-or-string: true
                 paused:
                   description: Paused indicates that the CloneSet is paused. Default
                     value is false

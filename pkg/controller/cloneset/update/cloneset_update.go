@@ -200,7 +200,7 @@ func sortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.C
 func calculateUpdateCount(coreControl clonesetcore.Control, strategy appsv1alpha1.CloneSetUpdateStrategy, minReadySeconds int32, totalReplicas int, waitUpdateIndexes []int, pods []*v1.Pod) int {
 	partition := 0
 	if strategy.Partition != nil {
-		partition = int(*strategy.Partition)
+		partition, _ = intstrutil.GetValueFromIntOrPercent(strategy.Partition, totalReplicas, true)
 	}
 
 	if len(waitUpdateIndexes)-partition <= 0 {
