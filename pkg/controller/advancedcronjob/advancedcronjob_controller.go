@@ -131,7 +131,7 @@ type ReconcileAdvancedCronJob struct {
 
 func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	klog.Infof("Running BroadcastCronJob job %s", req.Name)
+	klog.Infof("Running AdvancedCronJob job %s", req.Name)
 
 	namespacedName := types.NamespacedName{
 		Namespace: req.Namespace,

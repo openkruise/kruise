@@ -19,9 +19,9 @@ package fieldindex
 import (
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "k8s.io/api/core/v1"
@@ -81,7 +81,7 @@ func RegisterFieldIndexes(c cache.Cache) error {
 }
 
 func indexPodName(c cache.Cache) error {
-	if err := c.IndexField(&v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
+	return c.IndexField(&v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
 			return []string{}
@@ -90,14 +90,11 @@ func indexPodName(c cache.Cache) error {
 			return []string{}
 		}
 		return []string{pod.Spec.NodeName}
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 func indexJob(c cache.Cache) error {
-	if err := c.IndexField(&batchv1.Job{}, IndexNameForController, func(rawObj runtime.Object) []string {
+	return c.IndexField(&batchv1.Job{}, IndexNameForController, func(rawObj runtime.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*batchv1.Job)
 		owner := metav1.GetControllerOf(job)
@@ -112,15 +109,11 @@ func indexJob(c cache.Cache) error {
 
 		// ...and if so, return it
 		return []string{owner.Name}
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 func indexBroadcastCronJob(c cache.Cache) error {
-	if err := c.IndexField(&appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj runtime.Object) []string {
+	return c.IndexField(&appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj runtime.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1alpha1.BroadcastJob)
 		owner := metav1.GetControllerOf(job)
@@ -135,8 +128,5 @@ func indexBroadcastCronJob(c cache.Cache) error {
 
 		// ...and if so, return it
 		return []string{owner.Name}
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
