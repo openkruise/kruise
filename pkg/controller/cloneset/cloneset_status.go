@@ -52,7 +52,7 @@ func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newS
 		}
 	}
 
-	return clonesetcore.New(cs).ExtraStatusCalculation(cs, pods)
+	return clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods)
 }
 
 func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {

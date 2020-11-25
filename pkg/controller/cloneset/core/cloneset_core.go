@@ -155,6 +155,6 @@ func (c *commonControl) ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneS
 	return nil
 }
 
-func (c *commonControl) ExtraStatusCalculation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) error {
+func (c *commonControl) ExtraStatusCalculation(status *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
 	return nil
 }
