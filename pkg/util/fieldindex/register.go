@@ -65,7 +65,7 @@ func RegisterFieldIndexes(c cache.Cache) error {
 			return
 		}
 		// pod name
-		if err = indexPodName(c); err != nil {
+		if err = indexPodNodeName(c); err != nil {
 			return
 		}
 		// job owner
@@ -80,7 +80,7 @@ func RegisterFieldIndexes(c cache.Cache) error {
 	return err
 }
 
-func indexPodName(c cache.Cache) error {
+func indexPodNodeName(c cache.Cache) error {
 	return c.IndexField(&v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
