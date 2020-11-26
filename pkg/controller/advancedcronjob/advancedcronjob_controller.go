@@ -23,9 +23,11 @@ import (
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/util/retry"
+
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"k8s.io/klog"
@@ -46,16 +48,11 @@ type IndexerFunc func(manager.Manager) error
 
 func init() {
 	flag.IntVar(&concurrentReconciles, "AdvancedCronJob-workers", concurrentReconciles, "Max concurrent workers for AdvancedCronJob controller.")
-	indexerArr = make([]IndexerFunc, 0, 1)
-
 }
 
 var (
 	concurrentReconciles = 3
-	//controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind(appsv1alpha1.AdvancedCronJobKind)
-	//jobOwnerKey          = ".metadata.controller"
-	//apiGVStr             = appsv1alpha1.GroupVersion.String()
-	indexerArr []IndexerFunc
+	jobOwnerKey          = ".metadata.controller"
 )
 
 // Add creates a new AdvancedCronJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -73,7 +70,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:   mgr.GetClient(),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
-		//Clock:    realClock{},
+		Clock:    realClock{},
 	}
 }
 
@@ -88,27 +85,26 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to AdvancedCronJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.AdvancedCronJob{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
+	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.AdvancedCronJob{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		klog.Error(err)
 		return err
 	}
 
-	//TODO add Indexer
-	//err = hookJobIndexer(mgr, c)
-	//err = hookBroadcastJobIndexer(mgr, c)
+	if err = watchJob(c); err != nil {
+		klog.Error(err)
+		return err
+	}
 
-	//if err != nil {
-	//	klog.Error(err)
-	//	return err
-	//}
-
+	if err = watchBroadcastJob(c); err != nil {
+		klog.Error(err)
+		return err
+	}
 	return nil
 }
 
-//type realClock struct{}
-//
-//func (_ realClock) Now() time.Time { return time.Now() }
+type realClock struct{}
+
+func (r realClock) Now() time.Time { return time.Now() }
 
 // clock knows how to get the current time.
 // It can be used to fake out timing for testing.
@@ -116,9 +112,9 @@ type Clock interface {
 	Now() time.Time
 }
 
-//var (
-//	scheduledTimeAnnotation = "apps.kruise.io/scheduled-at"
-//)
+var (
+	scheduledTimeAnnotation = "apps.kruise.io/scheduled-at"
+)
 
 var _ reconcile.Reconciler = &ReconcileAdvancedCronJob{}
 
@@ -135,10 +131,16 @@ type ReconcileAdvancedCronJob struct {
 
 func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
+	klog.Infof("Running AdvancedCronJob job %s", req.Name)
+
+	namespacedName := types.NamespacedName{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+	}
 
 	var advancedCronJob appsv1alpha1.AdvancedCronJob
 
-	if err := r.Get(ctx, req.NamespacedName, &advancedCronJob); err != nil {
+	if err := r.Get(ctx, namespacedName, &advancedCronJob); err != nil {
 		klog.Error(err, "unable to fetch CronJob")
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can get them
@@ -146,7 +148,15 @@ func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, err
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	//implement controller
+	switch FindTemplateKind(advancedCronJob.Spec) {
+	case appsv1alpha1.JobTemplate:
+		return r.reconcileJob(ctx, req, advancedCronJob)
+	case appsv1alpha1.BroadcastJobTemplate:
+		return r.reconcileBroadcastJob(ctx, req, advancedCronJob)
+	default:
+		klog.Info("No template found")
+	}
+
 	return ctrl.Result{}, nil
 }
 
