@@ -211,7 +211,7 @@ rules:
 - apiGroups:
   - batch
   resources:
-  - advancedcronjobs
+  - jobs
   verbs:
   - create
   - delete
@@ -223,7 +223,7 @@ rules:
 - apiGroups:
   - batch
   resources:
-  - advancedcronjobs/status
+  - jobs/status
   verbs:
   - get
   - patch

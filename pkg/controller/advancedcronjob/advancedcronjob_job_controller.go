@@ -48,8 +48,8 @@ func watchJob(c controller.Controller) error {
 	return nil
 }
 
-// +kubebuilder:rbac:groups=batch,resources=advancedcronjobs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=batch,resources=advancedcronjobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get;update;patch
 
 func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Request, advancedCronJob appsv1alpha1.AdvancedCronJob) (ctrl.Result, error) {
 	advancedCronJob.Status.Type = appsv1alpha1.JobTemplate

@@ -181,6 +181,7 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
               type: object
           required:
+          - concurrencyPolicy
           - schedule
           - template
           type: object

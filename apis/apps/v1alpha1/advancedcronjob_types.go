@@ -38,8 +38,7 @@ type AdvancedCronJobSpec struct {
 	// - "Allow" (default): allows CronJobs to run concurrently;
 	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
 	// - "Replace": cancels currently running job and replaces it with a new one
-	// +optional
-	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy"`
+	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy" protobuf:"bytes,3,opt,name=concurrencyPolicy"`
 
 	// Paused will pause the cron job.
 	// +optional
@@ -66,11 +65,11 @@ type AdvancedCronJobSpec struct {
 type CronJobTemplate struct {
 	// Specifies the job that will be created when executing a CronJob.
 	// +optional
-	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,1,opt,name=jobTemplate"`
+	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate,omitempty" protobuf:"bytes,1,opt,name=jobTemplate"`
 
 	// Specifies the broadcastjob that will be created when executing a BroadcastCronJob.
 	// +optional
-	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate" protobuf:"bytes,2,opt,name=broadcastJobTemplate"`
+	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate,omitempty" protobuf:"bytes,2,opt,name=broadcastJobTemplate"`
 }
 
 type TemplateKind string

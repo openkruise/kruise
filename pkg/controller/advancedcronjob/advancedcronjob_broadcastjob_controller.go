@@ -125,13 +125,13 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 	for _, activeJob := range activeJobs {
 		jobRef, err := ref.GetReference(r.scheme, activeJob)
 		if err != nil {
-			klog.Error(err, "unable to make reference to active broadcastjob", "job", activeJob)
+			klog.Error(err, "unable to make reference to active broadcastjob ", " job ", activeJob)
 			continue
 		}
 		advancedCronJob.Status.Active = append(advancedCronJob.Status.Active, *jobRef)
 	}
 
-	klog.V(1).Info("advancedCronJob count", "active advancedCronJob", len(activeJobs), "successful advancedCronJob", len(successfulJobs), "failed advancedCronJob", len(failedJobs))
+	klog.V(1).Info("advancedCronJob count ", " active advancedCronJob ", len(activeJobs), " successful advancedCronJob ", len(successfulJobs), " failed advancedCronJob ", len(failedJobs))
 	if err := r.updateAdvancedJobStatus(req, &advancedCronJob); err != nil {
 		klog.Error(err, "unable to update AdvancedCronJob status")
 		return ctrl.Result{}, err
