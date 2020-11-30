@@ -77,10 +77,8 @@ func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJob(obj *appsv1
 
 func validateAdvancedCronJobSpec(spec *appsv1alpha1.AdvancedCronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	allErrs = validateAdvancedCronJobSpecSchedule(spec, fldPath)
-	allErrs = validateAdvancedCronJobSpecTemplate(spec, fldPath)
-
+	allErrs = append(allErrs, validateAdvancedCronJobSpecSchedule(spec, fldPath)...)
+	allErrs = append(allErrs, validateAdvancedCronJobSpecTemplate(spec, fldPath)...)
 	return allErrs
 }
 
