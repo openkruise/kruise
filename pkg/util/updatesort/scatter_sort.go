@@ -105,6 +105,9 @@ func (ss *scatterSort) scatterPodsByRule(term appsv1alpha1.CloneSetUpdateScatter
 	}
 
 	for i := 0; i < len(pods); i++ {
+		if pods[i] == nil {
+			continue
+		}
 		if pods[i].Labels[term.Key] == term.Value {
 			totalMatched++
 		} else {

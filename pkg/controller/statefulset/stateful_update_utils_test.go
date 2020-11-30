@@ -31,12 +31,14 @@ func TestSortPodsToUpdate(t *testing.T) {
 	cases := []struct {
 		strategy       *appsv1beta1.RollingUpdateStatefulSetStrategy
 		updateRevision string
+		totalReplicas  int32
 		replicas       []*v1.Pod
 		expected       []int
 	}{
 		{
 			strategy:       nil,
 			updateRevision: "r1",
+			totalReplicas:  3,
 			replicas: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
 				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
@@ -55,6 +57,7 @@ func TestSortPodsToUpdate(t *testing.T) {
 				Partition: func() *int32 { var i int32 = 6; return &i }(),
 			},
 			updateRevision: "r1",
+			totalReplicas:  10,
 			replicas: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
 				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
@@ -72,6 +75,7 @@ func TestSortPodsToUpdate(t *testing.T) {
 		{
 			strategy:       nil,
 			updateRevision: "r1",
+			totalReplicas:  3,
 			replicas: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r1"}}},
@@ -79,10 +83,51 @@ func TestSortPodsToUpdate(t *testing.T) {
 			},
 			expected: []int{2, 1, 0},
 		},
+		{
+			strategy:       &appsv1beta1.RollingUpdateStatefulSetStrategy{Partition: func() *int32 { var i int32 = 2; return &i }()},
+			updateRevision: "r1",
+			totalReplicas:  3,
+			replicas: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				nil,
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				nil,
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+			},
+			expected: []int{4, 2},
+		},
+		{
+			strategy: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+				UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{PriorityStrategy: &appspub.UpdatePriorityStrategy{
+					WeightPriority: []appspub.UpdatePriorityWeightTerm{
+						{Weight: 20, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"k": "v1"}}},
+						{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"k": "v2"}}},
+					},
+				}},
+				Partition: func() *int32 { var i int32 = 6; return &i }(),
+			},
+			updateRevision: "r1",
+			totalReplicas:  10,
+			replicas: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				nil,
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+				nil,
+				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
+			},
+			expected: []int{8, 7, 11, 9},
+		},
 	}
 
 	for i, tc := range cases {
-		res := sortPodsToUpdate(tc.strategy, tc.updateRevision, tc.replicas)
+		res := sortPodsToUpdate(tc.strategy, tc.updateRevision, tc.totalReplicas, tc.replicas)
 		if !reflect.DeepEqual(res, tc.expected) {
 			t.Fatalf("case #%d failed, expected %v, got %v", i, tc.expected, res)
 		}

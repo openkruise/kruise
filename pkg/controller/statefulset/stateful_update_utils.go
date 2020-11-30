@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSetStrategy, updateRevision string, replicas []*v1.Pod) []int {
+func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSetStrategy, updateRevision string, totalReplicas int32, replicas []*v1.Pod) []int {
 	var updateMin int
 	if rollingUpdateStrategy != nil && rollingUpdateStrategy.Partition != nil {
 		updateMin = int(*rollingUpdateStrategy.Partition)
@@ -31,13 +31,16 @@ func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSe
 	if rollingUpdateStrategy == nil || rollingUpdateStrategy.UnorderedUpdate == nil {
 		var indexes []int
 		for target := len(replicas) - 1; target >= updateMin; target-- {
+			if replicas[target] == nil {
+				continue
+			}
 			indexes = append(indexes, target)
 		}
 		return indexes
 	}
 
 	priorityStrategy := rollingUpdateStrategy.UnorderedUpdate.PriorityStrategy
-	maxUpdate := len(replicas) - updateMin
+	maxUpdate := int(totalReplicas) - updateMin
 	if maxUpdate <= 0 {
 		return []int{}
 	}
@@ -45,6 +48,9 @@ func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSe
 	var updatedIdxs []int
 	var waitUpdateIdxs []int
 	for target := len(replicas) - 1; target >= 0; target-- {
+		if replicas[target] == nil {
+			continue
+		}
 		if isTerminating(replicas[target]) {
 			updatedIdxs = append(updatedIdxs, target)
 		} else if getPodRevision(replicas[target]) == updateRevision {
