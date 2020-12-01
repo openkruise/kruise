@@ -102,22 +102,20 @@ func SetDefaultsAdvancedCronJob(obj *AdvancedCronJob) {
 		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
 	}
 
+	if obj.Spec.ConcurrencyPolicy == "" {
+		obj.Spec.ConcurrencyPolicy = AllowConcurrent
+	}
+	if obj.Spec.Paused == nil {
+		obj.Spec.Paused = new(bool)
+	}
+
 	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
-		var successJobHistorylimit int32
-		successJobHistorylimit = 0
-		obj.Spec.SuccessfulJobsHistoryLimit = &successJobHistorylimit
+		obj.Spec.SuccessfulJobsHistoryLimit = new(int32)
+		*obj.Spec.SuccessfulJobsHistoryLimit = 3
 	}
-
 	if obj.Spec.FailedJobsHistoryLimit == nil {
-		var failedJobHistorylimit int32
-		failedJobHistorylimit = 0
-		obj.Spec.FailedJobsHistoryLimit = &failedJobHistorylimit
-	}
-
-	if obj.Spec.StartingDeadlineSeconds == nil {
-		var deadlineSeconds int64
-		deadlineSeconds = 3600
-		obj.Spec.StartingDeadlineSeconds = &deadlineSeconds
+		obj.Spec.FailedJobsHistoryLimit = new(int32)
+		*obj.Spec.FailedJobsHistoryLimit = 1
 	}
 }
 

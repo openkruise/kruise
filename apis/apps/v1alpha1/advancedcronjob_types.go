@@ -26,7 +26,12 @@ const AdvancedCronJobKind = "AdvancedCronJob"
 
 // AdvancedCronJobSpec defines the desired state of AdvancedCronJob
 type AdvancedCronJobSpec struct {
+	// +kubebuilder:validation:MinLength=0
+
+	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
+
+	// +kubebuilder:validation:Minimum=0
 
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
@@ -38,11 +43,12 @@ type AdvancedCronJobSpec struct {
 	// - "Allow" (default): allows CronJobs to run concurrently;
 	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
 	// - "Replace": cancels currently running job and replaces it with a new one
-	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy" protobuf:"bytes,3,opt,name=concurrencyPolicy"`
+	// +optional
+	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy"`
 
 	// Paused will pause the cron job.
 	// +optional
-	Paused bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
+	Paused *bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
 
 	// +kubebuilder:validation:Minimum=0
 
