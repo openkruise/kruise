@@ -38,6 +38,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller"
+	"github.com/openkruise/kruise/pkg/util/gate"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -100,7 +101,9 @@ func main() {
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	gate.Init(cfg)
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
 		HealthProbeBindAddress:  healthProbeAddr,
