@@ -102,7 +102,12 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
 					cs.Namespace, cs.Name, pods[i].Name, lifecycle.GetPodLifecycleState(pods[i]))
 			default:
-				waitUpdateIndexes = append(waitUpdateIndexes, i)
+				if gracePeriod := pods[i].Annotations[appspub.InPlaceUpdateGraceKey]; gracePeriod != "" {
+					klog.V(3).Infof("CloneSet %s/%s find pod %s still in grace period %s, so skip to update it",
+						cs.Namespace, cs.Name, pods[i].Name, gracePeriod)
+				} else {
+					waitUpdateIndexes = append(waitUpdateIndexes, i)
+				}
 			}
 		}
 	}
