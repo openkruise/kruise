@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-advancedcronjob,mutating=false,failurePolicy=fail,groups=apps.kruise.io,resources=advancedcronjobs,verbs=create;update,versions=v1alpha1,name=madvancedcronjob.kb.io
+// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-advancedcronjob,mutating=false,failurePolicy=fail,groups=apps.kruise.io,resources=advancedcronjobs,verbs=create;update,versions=v1alpha1,name=vadvancedcronjob.kb.io
 
 var (
 	// HandlerMap contains admission webhook handlers

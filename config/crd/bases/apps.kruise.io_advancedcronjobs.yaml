@@ -79,12 +79,15 @@ spec:
               description: Paused will pause the cron job.
               type: boolean
             schedule:
+              description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+              minLength: 0
               type: string
             startingDeadlineSeconds:
               description: Optional deadline in seconds for starting the job if it
                 misses scheduled time for any reason.  Missed jobs executions will
                 be counted as failed ones.
               format: int64
+              minimum: 0
               type: integer
             successfulJobsHistoryLimit:
               description: The number of successful finished jobs to retain. This
@@ -181,7 +184,6 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
               type: object
           required:
-          - concurrencyPolicy
           - schedule
           - template
           type: object
