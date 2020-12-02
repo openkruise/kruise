@@ -1,6 +1,8 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= openkruise/kruise-manager:test
+# Platforms to build the image for
+PLATFORMS ?= linux/amd64,linux/arm64,linux/arm
 # Produce CRDs that work for API servers that supports v1beta1 CRD and conversion, requires k8s 1.13 or later.
 CRD_OPTIONS ?= "crd"
 
@@ -65,6 +67,10 @@ docker-build: test
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+
+# Build and push the multiarchitecture docker images and manifest.
+docker-multiarch:
+	docker buildx build --pull --no-cache --platform=$(PLATFORMS) --push . -t $(IMG)
 
 # find or download controller-gen
 # download controller-gen if necessary
