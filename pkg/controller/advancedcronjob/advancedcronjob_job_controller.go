@@ -192,7 +192,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 	pause runs to investigate or putz with the cluster, without deleting the object.
 	*/
 
-	if advancedCronJob.Spec.Paused {
+	if advancedCronJob.Spec.Paused != nil && *advancedCronJob.Spec.Paused {
 		klog.V(1).Info("cronjob paused, skipping", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
