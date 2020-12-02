@@ -48,15 +48,14 @@ func watchJob(c controller.Controller) error {
 	return nil
 }
 
-// +kubebuilder:rbac:groups=batch,resources=advancedcronjobs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=batch,resources=advancedcronjobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get;update;patch
 
 func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Request, advancedCronJob appsv1alpha1.AdvancedCronJob) (ctrl.Result, error) {
 	advancedCronJob.Status.Type = appsv1alpha1.JobTemplate
-
 	var childJobs batchv1.JobList
 	if err := r.List(ctx, &childJobs, client.InNamespace(advancedCronJob.Namespace), client.MatchingFields{jobOwnerKey: advancedCronJob.Name}); err != nil {
-		klog.Error(err, "unable to list child Jobs")
+		klog.Error(err, "unable to list child Jobs", req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 
@@ -105,7 +104,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 		// the active jobs themselves.
 		scheduledTimeForJob, err := getScheduledTimeForJob(&job)
 		if err != nil {
-			klog.Error(err, "unable to parse schedule time for child job", "job", &job)
+			klog.Error(err, "unable to parse schedule time for child job", "job", &job, req.NamespacedName)
 			continue
 		}
 		if scheduledTimeForJob != nil {
@@ -127,15 +126,15 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 	for _, activeJob := range activeJobs {
 		jobRef, err := ref.GetReference(r.scheme, activeJob)
 		if err != nil {
-			klog.Error(err, "unable to make reference to active job", "job", activeJob)
+			klog.Error(err, "unable to make reference to active job", "job", activeJob, req.NamespacedName)
 			continue
 		}
 		advancedCronJob.Status.Active = append(advancedCronJob.Status.Active, *jobRef)
 	}
 
-	klog.V(1).Info("job count", "active jobs", len(activeJobs), "successful jobs", len(successfulJobs), "failed jobs", len(failedJobs))
+	klog.V(1).Info("job count ", " active jobs ", len(activeJobs), " successful jobs ", len(successfulJobs), " failed jobs ", len(failedJobs), req.NamespacedName)
 	if err := r.updateAdvancedJobStatus(req, &advancedCronJob); err != nil {
-		klog.Error(err, "unable to update AdvancedCronJob status")
+		klog.Error(err, "unable to update AdvancedCronJob status", req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 
@@ -161,9 +160,9 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 				break
 			}
 			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-				klog.Error(err, "unable to delete old failed job", "job", job)
+				klog.Error(err, "unable to delete old failed job ", job.Name, req.NamespacedName)
 			} else {
-				klog.V(0).Info("deleted old failed job", "job", job)
+				klog.V(0).Info("deleted old failed job ", job.Name, req.NamespacedName)
 			}
 		}
 	}
@@ -180,9 +179,9 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 				break
 			}
 			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); (err) != nil {
-				klog.Error(err, "unable to delete old successful job", "job", job)
+				klog.Error(err, "unable to delete old successful job ", job.Name, req.NamespacedName)
 			} else {
-				klog.V(0).Info("deleted old successful job", "job", job)
+				klog.V(0).Info("deleted old successful job ", job.Name, req.NamespacedName)
 			}
 		}
 	}
@@ -193,8 +192,8 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 	pause runs to investigate or putz with the cluster, without deleting the object.
 	*/
 
-	if advancedCronJob.Spec.Paused {
-		klog.V(1).Info("cronjob paused, skipping")
+	if advancedCronJob.Spec.Paused != nil && *advancedCronJob.Spec.Paused {
+		klog.V(1).Info("cronjob paused, skipping", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
@@ -272,7 +271,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 	now := realClock{}.Now()
 	missedRun, nextRun, err := getNextSchedule(&advancedCronJob, now)
 	if err != nil {
-		klog.Error(err, "unable to figure out CronJob schedule")
+		klog.Error(err, "unable to figure out CronJob schedule", req.NamespacedName)
 		// we don't really care about requeuing until we get an update that
 		// fixes the schedule, so don't return an error
 		return ctrl.Result{}, nil
@@ -289,7 +288,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 		If we've missed a run, and we're still within the deadline to start it, we'll need to run a job.
 	*/
 	if missedRun.IsZero() {
-		klog.V(1).Info("no upcoming scheduled times, sleeping until next now ", now, " and next run ", nextRun)
+		klog.V(1).Info("no upcoming scheduled times, sleeping until next now ", now, " and next run ", nextRun, req.NamespacedName)
 		return scheduledResult, nil
 	}
 
@@ -299,7 +298,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 		tooLate = missedRun.Add(time.Duration(*advancedCronJob.Spec.StartingDeadlineSeconds) * time.Second).Before(now)
 	}
 	if tooLate {
-		klog.V(1).Info("missed starting deadline for last run, sleeping till next", "current run", missedRun)
+		klog.V(1).Info("missed starting deadline for last run, sleeping till next", "current run", missedRun, req.NamespacedName)
 		return scheduledResult, nil
 	}
 
@@ -311,7 +310,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 	// figure out how to run this job -- concurrency policy might forbid us from running
 	// multiple at the same time...
 	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1alpha1.ForbidConcurrent && len(activeJobs) > 0 {
-		klog.V(1).Info("concurrency policy blocks concurrent runs, skipping", "num active", len(activeJobs))
+		klog.V(1).Info("concurrency policy blocks concurrent runs, skipping", "num active", len(activeJobs), req.NamespacedName)
 		return scheduledResult, nil
 	}
 
@@ -320,7 +319,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 		for _, activeJob := range activeJobs {
 			// we don't care if the job was already deleted
 			if err := r.Delete(ctx, activeJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-				klog.Error(err, "unable to delete active job", "job", activeJob)
+				klog.Error(err, "unable to delete active job", "job", activeJob, req.NamespacedName)
 				return ctrl.Result{}, err
 			}
 		}
@@ -367,18 +366,18 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 	// actually make the job...
 	job, err := constructJobForCronJob(&advancedCronJob, missedRun)
 	if err != nil {
-		klog.Error(err, "unable to construct job from template")
+		klog.Error(err, "unable to construct job from template", req.NamespacedName)
 		// don't bother requeuing until we get a change to the spec
 		return scheduledResult, nil
 	}
 
 	// ...and create it on the cluster
 	if err := r.Create(ctx, job); err != nil {
-		klog.Error(err, "unable to create Job for AdvancedCronJob", "job", job)
+		klog.Error(err, "unable to create Job for AdvancedCronJob", "job", job, req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 
-	klog.V(1).Info("created Job for AdvancedCronJob run", "job", job)
+	klog.V(1).Info("created Job for AdvancedCronJob run", "job", job, req.NamespacedName)
 
 	/*
 		### 7: Requeue when we either see a running job or it's time for the next scheduled run

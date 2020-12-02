@@ -26,7 +26,12 @@ const AdvancedCronJobKind = "AdvancedCronJob"
 
 // AdvancedCronJobSpec defines the desired state of AdvancedCronJob
 type AdvancedCronJobSpec struct {
+	// +kubebuilder:validation:MinLength=0
+
+	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
+
+	// +kubebuilder:validation:Minimum=0
 
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
@@ -43,7 +48,7 @@ type AdvancedCronJobSpec struct {
 
 	// Paused will pause the cron job.
 	// +optional
-	Paused bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
+	Paused *bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
 
 	// +kubebuilder:validation:Minimum=0
 
@@ -66,11 +71,11 @@ type AdvancedCronJobSpec struct {
 type CronJobTemplate struct {
 	// Specifies the job that will be created when executing a CronJob.
 	// +optional
-	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,1,opt,name=jobTemplate"`
+	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate,omitempty" protobuf:"bytes,1,opt,name=jobTemplate"`
 
 	// Specifies the broadcastjob that will be created when executing a BroadcastCronJob.
 	// +optional
-	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate" protobuf:"bytes,2,opt,name=broadcastJobTemplate"`
+	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate,omitempty" protobuf:"bytes,2,opt,name=broadcastJobTemplate"`
 }
 
 type TemplateKind string

@@ -131,7 +131,7 @@ type ReconcileAdvancedCronJob struct {
 
 func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	klog.Infof("Running AdvancedCronJob job %s", req.Name)
+	klog.Info("Running AdvancedCronJob job ", req.NamespacedName)
 
 	namespacedName := types.NamespacedName{
 		Namespace: req.Namespace,
@@ -141,7 +141,7 @@ func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, err
 	var advancedCronJob appsv1alpha1.AdvancedCronJob
 
 	if err := r.Get(ctx, namespacedName, &advancedCronJob); err != nil {
-		klog.Error(err, "unable to fetch CronJob")
+		klog.Error(err, "unable to fetch CronJob", req.NamespacedName)
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can get them
 		// on deleted requests.
@@ -154,7 +154,7 @@ func (r *ReconcileAdvancedCronJob) Reconcile(req ctrl.Request) (ctrl.Result, err
 	case appsv1alpha1.BroadcastJobTemplate:
 		return r.reconcileBroadcastJob(ctx, req, advancedCronJob)
 	default:
-		klog.Info("No template found")
+		klog.Info("No template found", req.NamespacedName)
 	}
 
 	return ctrl.Result{}, nil

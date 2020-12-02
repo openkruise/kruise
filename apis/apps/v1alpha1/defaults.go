@@ -21,7 +21,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/core/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -89,6 +89,33 @@ func setSidecarDefaultContainer(sidecarContainer *SidecarContainer) {
 				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PreStop.HTTPGet)
 			}
 		}
+	}
+}
+
+// SetDefaults_AdvancedCronJob set default values for BroadcastJob.
+func SetDefaultsAdvancedCronJob(obj *AdvancedCronJob) {
+	if obj.Spec.Template.JobTemplate != nil {
+		SetDefaultPodSpec(&obj.Spec.Template.JobTemplate.Spec.Template.Spec)
+	}
+
+	if obj.Spec.Template.BroadcastJobTemplate != nil {
+		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
+	}
+
+	if obj.Spec.ConcurrencyPolicy == "" {
+		obj.Spec.ConcurrencyPolicy = AllowConcurrent
+	}
+	if obj.Spec.Paused == nil {
+		obj.Spec.Paused = new(bool)
+	}
+
+	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
+		obj.Spec.SuccessfulJobsHistoryLimit = new(int32)
+		*obj.Spec.SuccessfulJobsHistoryLimit = 3
+	}
+	if obj.Spec.FailedJobsHistoryLimit == nil {
+		obj.Spec.FailedJobsHistoryLimit = new(int32)
+		*obj.Spec.FailedJobsHistoryLimit = 1
 	}
 }
 

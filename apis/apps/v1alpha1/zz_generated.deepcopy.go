@@ -97,6 +97,11 @@ func (in *AdvancedCronJobSpec) DeepCopyInto(out *AdvancedCronJobSpec) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.Paused != nil {
+		in, out := &in.Paused, &out.Paused
+		*out = new(bool)
+		**out = **in
+	}
 	if in.SuccessfulJobsHistoryLimit != nil {
 		in, out := &in.SuccessfulJobsHistoryLimit, &out.SuccessfulJobsHistoryLimit
 		*out = new(int32)
