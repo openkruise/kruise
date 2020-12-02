@@ -192,6 +192,38 @@ func TestValidate(t *testing.T) {
 				},
 			},
 		},
+		{
+			// test oldSpec not-exits spec exits case
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas:             &val1,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate.Template,
+				RevisionHistoryLimit: &val1,
+				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+					PodsToDelete: []string{"p0"},
+				},
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+			},
+			oldSpec: &appsv1alpha1.CloneSetSpec{
+				Replicas:             &val2,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate1.Template,
+				RevisionHistoryLimit: &val2,
+				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+					PodsToDelete: []string{},
+				},
+
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+			},
+		},
 	}
 
 	for i, successCase := range successCases {
@@ -202,7 +234,7 @@ func TestValidate(t *testing.T) {
 			}
 			h := CloneSetCreateUpdateHandler{Client: fake.NewFakeClient(&p0)}
 			if successCase.oldSpec == nil {
-				if errs := h.validateCloneSet(&obj); len(errs) != 0 {
+				if errs := h.validateCloneSet(&obj, nil); len(errs) != 0 {
 					t.Errorf("expected success: %v", errs)
 				}
 			} else {
@@ -333,6 +365,22 @@ func TestValidate(t *testing.T) {
 				},
 			},
 		},
+		// test pod-to-delete not-exits case
+		"invalid-podsToDelete-3": {
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+					PodsToDelete: []string{"p1"},
+				},
+			},
+		},
 		"invalid-cloneset-update-1": {
 			spec: &appsv1alpha1.CloneSetSpec{
 				Replicas: &val1,
@@ -365,7 +413,7 @@ func TestValidate(t *testing.T) {
 			}
 			h := CloneSetCreateUpdateHandler{Client: fake.NewFakeClient(&p0)}
 			if v.oldSpec == nil {
-				if errs := h.validateCloneSet(&obj); len(errs) == 0 {
+				if errs := h.validateCloneSet(&obj, nil); len(errs) == 0 {
 					t.Errorf("expected failure for %v", k)
 				}
 			} else {

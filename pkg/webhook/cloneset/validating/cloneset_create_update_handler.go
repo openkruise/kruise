@@ -48,7 +48,7 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1beta1.Create:
-		if allErrs := h.validateCloneSet(obj); len(allErrs) > 0 {
+		if allErrs := h.validateCloneSet(obj, nil); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1beta1.Update:
