@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -309,10 +310,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.CollisionCount = utilpointer.Int32Ptr(collisionCount)
 	status.LabelSelector = selector.String()
 
-	replicaCount := int(*set.Spec.Replicas)
-	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < set.Spec.Replicas
+	reserveOrdinals := sets.NewInt()
+	if len(set.Spec.ReserveOrdinals) > 0 {
+		reserveOrdinals.Insert(set.Spec.ReserveOrdinals...)
+	}
+	replicaCount := int(*set.Spec.Replicas) + reserveOrdinals.Len()
+	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < replicaCount and not in reserveOrdinals
 	replicas := make([]*v1.Pod, replicaCount)
-	// slice that will contain all Pods such that set.Spec.Replicas <= getOrdinal(pod)
+	// slice that will contain all Pods such that replicaCount <= getOrdinal(pod) or in reserveOrdinals
 	condemned := make([]*v1.Pod, 0, len(pods))
 	unhealthy := 0
 	firstUnhealthyOrdinal := math.MaxInt32
@@ -342,13 +347,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			}
 		}
 
-		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount {
-			// if the ordinal of the pod is within the range of the current number of replicas,
+		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount && !reserveOrdinals.Has(ord) {
+			// if the ordinal of the pod is within the range of the current number of replicas and not in reserveOrdinals,
 			// insert it at the indirection of its ordinal
 			replicas[ord] = pods[i]
 
-		} else if ord >= replicaCount {
-			// if the ordinal is greater than the number of replicas add it to the condemned list
+		} else if ord >= replicaCount || reserveOrdinals.Has(ord) {
+			// if the ordinal is greater than the number of replicas or in reserveOrdinals,
+			// add it to the condemned list
 			condemned = append(condemned, pods[i])
 		}
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
@@ -356,6 +362,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
 	for ord := 0; ord < replicaCount; ord++ {
+		if reserveOrdinals.Has(ord) {
+			continue
+		}
 		if replicas[ord] == nil {
 			replicas[ord] = newVersionedStatefulSetPod(
 				currentSet,
@@ -370,6 +379,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// find the first unhealthy Pod
 	for i := range replicas {
+		if replicas[i] == nil {
+			continue
+		}
 		if !isHealthy(replicas[i]) {
 			unhealthy++
 			if ord := getOrdinal(replicas[i]); ord < firstUnhealthyOrdinal {
@@ -405,6 +417,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
+		if replicas[i] == nil {
+			continue
+		}
 		// delete and recreate failed pods
 		if isFailed(replicas[i]) {
 			ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
@@ -573,7 +588,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	maxUnavailable := 1
 	if set.Spec.UpdateStrategy.RollingUpdate != nil {
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), replicaCount, false)
+		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(*set.Spec.Replicas), false)
 		if err != nil {
 			return &status, err
 		}
@@ -588,7 +603,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	var unavailablePods []string
-	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, replicas)
+	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, *set.Spec.Replicas, replicas)
 	klog.V(5).Infof("Prepare to update pods indexes %v for StatefulSet %s", updateIndexes, getStatefulSetKey(set))
 	minWaitTime := appsv1beta1.MaxMinReadySeconds * time.Second
 	// update pods in sequence

@@ -333,23 +333,35 @@ func TestSort(t *testing.T) {
 			scatterStrategy: appsv1alpha1.CloneSetUpdateScatterStrategy{{Key: "labelA", Value: "AAA"}},
 			expectedIndexes: []int{2, 0, 3, 4, 5, 6, 1},
 		},
+		{
+			desc:            "reserveOrdinals nil in slice",
+			podLabels:       []map[string]string{{}, {"labelA": "AAA"}, {"labelA": "AAA", "labelC": "CCC"}, {"labelB": "BBB", "labelC": "CCC"}, {"labelB": "BBB"}, nil, {}, {}, {"labelC": "CCC"}, {"labelC": "CCC"}, {"labelC": "CCC"}},
+			scatterStrategy: appsv1alpha1.CloneSetUpdateScatterStrategy{{Key: "labelA", Value: "AAA"}, {Key: "labelB", Value: "BBB"}, {Key: "labelC", Value: "CCC"}},
+			expectedIndexes: []int{3, 2, 0, 8, 9, 6, 7, 10, 1, 4},
+		},
 	}
 
 	for idx, tc := range testCases {
 		var pods []*v1.Pod
 		var indexes []int
-		for i := 0; i < len(tc.expectedIndexes); i++ {
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Labels:    tc.podLabels[i],
-					Name:      fmt.Sprintf("%d", i),
-				},
+		var j int
+		for i := 0; i < len(tc.expectedIndexes)+j; i++ {
+			var pod *v1.Pod
+			if tc.podLabels[i] != nil {
+				pod = &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Labels:    tc.podLabels[i],
+						Name:      fmt.Sprintf("%d", i),
+					},
+				}
+				indexes = append(indexes, i)
+			} else {
+				j++
 			}
 			pods = append(pods, pod)
-			indexes = append(indexes, i)
 		}
-		for i := len(indexes); i < len(tc.podLabels); i++ {
+		for i := len(indexes) + j; i < len(tc.podLabels); i++ {
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
@@ -365,7 +377,7 @@ func TestSort(t *testing.T) {
 
 		// compare
 		if !reflect.DeepEqual(gotIndexes, tc.expectedIndexes) {
-			t.Errorf("[%d] wrong order. desired: %v, got: %v", idx, tc.expectedIndexes, gotIndexes)
+			t.Errorf("[%d][%s] wrong order. desired: %v, got: %v", idx, tc.desc, tc.expectedIndexes, gotIndexes)
 		}
 	}
 }

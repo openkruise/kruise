@@ -15,6 +15,7 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -35,6 +36,19 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 	case apps.OrderedReadyPodManagement, apps.ParallelPodManagement:
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
+	}
+
+	if spec.ReserveOrdinals != nil {
+		orders := sets.NewInt()
+		for _, i := range spec.ReserveOrdinals {
+			if i < 0 || i >= int(*spec.Replicas) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("reserveOrdinals contains %d which must be 0<=order<replicas", i)))
+			}
+			if orders.Has(i) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("reserveOrdinals contains duplicated %d", i)))
+			}
+			orders.Insert(i)
+		}
 	}
 
 	switch spec.UpdateStrategy.Type {
@@ -220,12 +234,16 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 	restoreStrategy := statefulSet.Spec.UpdateStrategy
 	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
+	restoreReserveOrdinals := statefulSet.Spec.ReserveOrdinals
+	statefulSet.Spec.ReserveOrdinals = oldStatefulSet.Spec.ReserveOrdinals
+
 	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'reserveOrdinals', and 'updateStrategy' are forbidden"))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template = restoreTemplate
 	statefulSet.Spec.UpdateStrategy = restoreStrategy
+	statefulSet.Spec.ReserveOrdinals = restoreReserveOrdinals
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	return allErrs
