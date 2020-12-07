@@ -19,12 +19,11 @@ package fieldindex
 import (
 	"sync"
 
-	batchv1 "k8s.io/api/batch/v1"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"github.com/openkruise/kruise/pkg/util/gate"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 )
@@ -73,8 +72,10 @@ func RegisterFieldIndexes(c cache.Cache) error {
 			return
 		}
 		// broadcastjob owner
-		if err = indexBroadcastCronJob(c); err != nil {
-			return
+		if gate.ResourceEnabled(&appsv1alpha1.BroadcastJob{}) {
+			if err = indexBroadcastCronJob(c); err != nil {
+				return
+			}
 		}
 	})
 	return err
