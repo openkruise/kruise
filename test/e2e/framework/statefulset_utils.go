@@ -751,7 +751,7 @@ func DeleteAllStatefulSets(c clientset.Interface, kc kruiseclientset.Interface, 
 
 // NewStatefulSetPVC returns a PersistentVolumeClaim named name, for testing StatefulSets.
 func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
-	quantity, _ := resource.ParseQuantity("20Gi")
+	//quantity, _ := resource.ParseQuantity("20Gi")
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -762,7 +762,7 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceStorage: quantity, //*resource.NewQuantity(1, resource.BinarySI),
+					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},

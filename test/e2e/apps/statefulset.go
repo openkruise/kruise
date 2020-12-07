@@ -584,7 +584,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &appsv1alpha1.RollingUpdateStatefulSetStrategy{
-					PodUpdatePolicy: appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+					PodUpdatePolicy:       appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+					InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 10},
 				},
 			}
 			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})

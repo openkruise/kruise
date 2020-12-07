@@ -44,8 +44,11 @@ var (
 	isNotNotFound = func(err error) bool { return !errors.IsNotFound(err) }
 )
 
-func Init(cfg *rest.Config) {
+func init() {
 	_ = apis.AddToScheme(internalScheme)
+}
+
+func Init(cfg *rest.Config) {
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(cfg)
 }
 

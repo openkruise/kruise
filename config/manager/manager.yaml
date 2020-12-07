@@ -27,13 +27,30 @@ spec:
         - /manager
         args:
         - --enable-leader-election
+        - --logtostderr=true
+        - --v=5
         image: controller:latest
         name: manager
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        readinessProbe:
+          httpGet:
+            path: readyz
+            port: 8000
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 50Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 50Mi
       terminationGracePeriodSeconds: 10
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webhook-certs
+  namespace: system
