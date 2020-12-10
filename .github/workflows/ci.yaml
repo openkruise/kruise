@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - release-*
+  pull_request: {}
+  workflow_dispatch: {}
+
+env:
+  # Common versions
+  GO_VERSION: '1.14'
+  GOLANGCI_VERSION: 'v1.31'
+  DOCKER_BUILDX_VERSION: 'v0.4.2'
+  KIND_VERSION: 'v0.9.0'
+  KUSTOMIZE_VERSION: '3.1.0'
+
+  # Common users. We can't run a step 'if secrets.AWS_USR != ""' but we can run
+  # a step 'if env.AWS_USR' != ""', so we copy these to succinctly test whether
+  # credentials have been provided before trying to run steps that need them.
+  DOCKER_USR: ${{ secrets.DOCKER_USR }}
+  AWS_USR: ${{ secrets.AWS_USR }}
+
+jobs:
+
+  golangci-lint:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Go Dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+      - name: Lint golang code
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: ${{ env.GOLANGCI_VERSION }}
+          args: --skip-dirs=apis,pkg/client,vendor,test --disable-all  -E deadcode -E gofmt -E goimports -E golint -E ineffassign -E misspell -E vet --timeout=5m
+
+  markdownlint-misspell-shellcheck:
+    runs-on: ubuntu-18.04
+    # this image is build from Dockerfile
+    # https://github.com/pouchcontainer/pouchlinter/blob/master/Dockerfile
+    container: pouchcontainer/pouchlinter:v0.1.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Run misspell
+        run: find  ./* -name  "*"  | grep -v vendor | xargs misspell -error
+      - name: Run shellcheck
+        run: find ./ -name "*.sh" | grep -v vendor | xargs shellcheck
+      - name: Lint markdown files
+        run: find  ./ -name  "*.md" | grep -v vendor | grep -v commandline |  grep -v .github |  grep -v swagger |  grep -v api |  xargs mdl -r ~MD010,~MD013,~MD022,~MD024,~MD029,~MD031,~MD032,~MD033,~MD036
+      - name: Check markdown links
+        run: |
+          set +e
+          for name in $(find . -name \*.md | grep -v vendor | grep -v CHANGELOG); do
+            if [ -f $name ]; then
+              markdown-link-check -q $name -c .github/workflows/markdown-link-check.config.json;
+              if [ $? -ne 0 ]; then
+                code=1
+              fi
+            fi
+          done
+          bash -c "exit $code";
+
+  unit-tests:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Fetch History
+        run: git fetch --prune --unshallow
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: install Kubebuilder
+        uses: wonderflow/kubebuilder-action@v1.1
+      - name: Cache Go Dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+      - name: Run Unit Tests
+        run: make -j2 test
+      - name: Publish Unit Test Coverage
+        uses: codecov/codecov-action@v1
+        with:
+          flags: unittests
+          file: cover.out
+      - name: Check diff
+        run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make generate manifests\" and push again.\n"; exit 1)'
+
+  e2e-tests:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Setup Kind Cluster
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v1
+        with:
+          kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          set -ex
+          kubectl cluster-info
+          make deploy IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}
+          for ((i=1;i<10;i++));
+          do
+            set +e
+            PODS=$(kubectl get pod -n kruise-system | grep '1/1')
+            set -e
+            if [ ! -z "$PODS" ]; then
+              break
+            fi
+            sleep 3
+          done
+          set +e
+          PODS=$(kubectl get pod -n kruise-system | grep '1/1')
+          set -e
+          if [ -z "$PODS" ]; then
+            echo "Timeout to wait for kruise-manager ready"
+            kubectl get all -n kruise-system -o yaml
+            exit 1
+          fi
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          go test ./test/e2e/ -timeout 30m -v

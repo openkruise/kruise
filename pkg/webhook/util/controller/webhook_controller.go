@@ -48,10 +48,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-var (
+const (
 	mutatingWebhookConfigurationName   = "kruise-mutating-webhook-configuration"
 	validatingWebhookConfigurationName = "kruise-validating-webhook-configuration"
 
+	defaultResyncPeriod = time.Minute
+)
+
+var (
 	namespace  = webhookutil.GetNamespace()
 	secretName = webhookutil.GetSecretName()
 
@@ -211,6 +215,7 @@ func (c *Controller) processNextWorkItem() bool {
 
 	err := c.sync()
 	if err == nil {
+		c.queue.AddAfter(key, defaultResyncPeriod)
 		c.queue.Forget(key)
 		return true
 	}

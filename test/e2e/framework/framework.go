@@ -130,6 +130,7 @@ func (f *Framework) BeforeEach() {
 	if f.ClientSet == nil {
 		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		testDesc := ginkgo.CurrentGinkgoTestDescription()
 		if len(testDesc.ComponentTexts) > 0 {
 			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
@@ -139,7 +140,6 @@ func (f *Framework) BeforeEach() {
 				componentTexts)
 		}
 
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst
 		if f.Options.GroupVersion != nil {

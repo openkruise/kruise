@@ -19,7 +19,8 @@ English | [简体中文](./README-zh_CN.md)
 
 ## Introduction
 
-Kruise is the core of the OpenKruise (official site: [https://openkruise.io](https://openkruise.io)) project. It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload management.
+OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is now hosted by the [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) as a Sandbox Level Project.
+It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload management.
 
 As of now, Kruise offers these workload controllers:
 

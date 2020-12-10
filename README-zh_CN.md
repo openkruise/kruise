@@ -19,7 +19,8 @@
 
 ## 介绍
 
-Kruise 是 OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 中的核心项目之一，它提供一套在[Kubernetes核心控制器](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/)之外的扩展 workload 管理和实现。
+OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在 [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) 下的 Sandbox 项目。
+它提供一套在 [Kubernetes核心控制器](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) 之外的扩展 workload 管理和实现。
 
 目前，Kruise 提供了以下 workload 控制器：
 

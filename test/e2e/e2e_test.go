@@ -30,12 +30,17 @@ import (
 
 func init() {
 	// Register framework flags, then handle flags and Viper config.
-	framework.HandleFlags()
+	//framework.HandleFlags()
 
-	framework.AfterReadingAllFlags(&framework.TestContext)
+	//framework.AfterReadingAllFlags(&framework.TestContext)
 }
 
 func TestE2E(t *testing.T) {
+	// Register framework flags, then handle flags and Viper config.
+	framework.HandleFlags()
+
+	framework.AfterReadingAllFlags(&framework.TestContext)
+
 	err := kruiseapis.AddToScheme(scheme.Scheme)
 	if err != nil {
 		t.Fatal(err)

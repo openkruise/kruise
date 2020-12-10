@@ -2,21 +2,7 @@
 
 These tutorials walk through several examples to demonstrate how to use the Kruise Workloads to deploy and manage applications
 
-## Install Kruise
-
-Install Kruise with helm v3, which is a simple command-line tool and you can get it from [here](https://github.com/helm/helm/releases).
-
-```bash
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.5.0/kruise-chart.tgz
-```
-
-Verify Kruise-manager is running:
-
-```bash
-$ kubectl get pods -n kruise-system
-NAME                          READY   STATUS    RESTARTS   AGE
-kruise-controller-manager-0   1/1     Running   0          4m11s
-```
+[Install Kruise](../../README.md)
 
 ## Add AppHub as your helm repo
 
