@@ -42,8 +42,6 @@ rules:
   resources:
   - mutatingwebhookconfigurations
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
@@ -54,8 +52,6 @@ rules:
   resources:
   - validatingwebhookconfigurations
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
@@ -99,6 +95,26 @@ rules:
   - apps
   resources:
   - statefulsets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs/status
   verbs:
   - get
   - patch
@@ -219,6 +235,26 @@ rules:
   - apps.kruise.io
   resources:
   - uniteddeployments/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs/status
   verbs:
   - get
   - patch

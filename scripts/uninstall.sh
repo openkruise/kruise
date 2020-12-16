@@ -10,4 +10,5 @@ kubectl delete clusterrolebinding kruise-manager-rolebinding
 kubectl delete clusterrole kruise-manager-role
 
 # delete CRDs
+kubectl get crd -o name | grep "customresourcedefinition.apiextensions.k8s.io/[a-z.]*.kruise.io" | xargs kubectl patch -p '{"spec":{"conversion":null}}'
 kubectl get crd -o name | grep "customresourcedefinition.apiextensions.k8s.io/[a-z.]*.kruise.io" | xargs kubectl delete

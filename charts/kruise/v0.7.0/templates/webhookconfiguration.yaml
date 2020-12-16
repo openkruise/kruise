@@ -50,6 +50,24 @@ webhooks:
       service:
         name: kruise-webhook-service
         namespace: kruise-system
+        path: /mutate-apps-kruise-io-v1alpha1-advancedcronjob
+    failurePolicy: Fail
+    name: madvancedcronjob.kb.io
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - advancedcronjobs
+  - clientConfig:
+      caBundle: Cg==
+      service:
+        name: kruise-webhook-service
+        namespace: kruise-system
         path: /mutate-apps-kruise-io-v1alpha1-broadcastjob
     failurePolicy: Fail
     name: mbroadcastjob.kb.io
@@ -150,6 +168,24 @@ webhooks:
       service:
         name: kruise-webhook-service
         namespace: kruise-system
+        path: /validate-apps-kruise-io-v1alpha1-advancedcronjob
+    failurePolicy: Fail
+    name: vadvancedcronjob.kb.io
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - advancedcronjobs
+  - clientConfig:
+      caBundle: Cg==
+      service:
+        name: kruise-webhook-service
+        namespace: kruise-system
         path: /validate-apps-kruise-io-v1alpha1-broadcastjob
     failurePolicy: Fail
     name: vbroadcastjob.kb.io
@@ -181,6 +217,24 @@ webhooks:
           - UPDATE
         resources:
           - clonesets
+  - clientConfig:
+      caBundle: Cg==
+      service:
+        name: kruise-webhook-service
+        namespace: kruise-system
+        path: /validate-apps-kruise-io-v1alpha1-daemonset
+    failurePolicy: Fail
+    name: vdaemonset.kb.io
+    rules:
+      - apiGroups:
+          - apps.kruise.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - daemonsets
   - clientConfig:
       caBundle: Cg==
       service:

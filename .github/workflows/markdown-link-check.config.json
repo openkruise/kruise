@@ -2,6 +2,9 @@
   "ignorePatterns": [
     {
       "pattern": "^https://codecov.io"
+    },
+    {
+      "pattern": "^https://openkruise.io"
     }
   ]
 }
