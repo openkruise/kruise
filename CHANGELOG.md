@@ -1,5 +1,71 @@
 # Change Log
 
+## v0.7.0
+
+Since v0.7.0:
+
+1. OpenKruise requires Kubernetes 1.13+ because of CRD conversion.
+  Note that for Kubernetes 1.13 and 1.14, users must enable `CustomResourceWebhookConversion` feature-gate in kube-apiserver before install or upgrade Kruise.
+2. OpenKruise official image supports multi-arch, by default including linux/amd64, linux/arm64, and linux/arm platforms.
+
+### A NEW workload controller - AdvancedCronJob
+Thanks for @rishi-anand contributing!
+
+An enhanced version of CronJob, it supports multiple kind in a template:
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: AdvancedCronJob
+spec:
+  template:
+
+    # Option 1: use jobTemplate, which is equivalent to original CronJob
+    jobTemplate:
+      # ...
+
+    # Option 2: use broadcastJobTemplate, which will create a BroadcastJob object when cron schedule triggers
+    broadcastJobTemplate:
+      # ...
+
+    # Options 3(future): ...
+```
+
+### CloneSet
+
+- **Partition support intOrStr format**
+- Warning log for expectation timeout
+- Remove ownerRef when pod's labels not matched CloneSet's selector
+- Allow updating revisionHistoryLimit in validation
+- Fix resourceVersionExpectation race condition
+- Fix overwrite gracePeriod update
+- Fix webhook checking podsToDelete
+
+### StatefulSet
+
+- **Promote Advanced StatefulSet to v1beta1**
+  - A conversion webhook will help users to transfer existing and new `v1alpha1` advanced statefulsets to `v1beta1` automatically
+  - Even all advanced statefulsets have been converted to `v1beta1`, users can still get them through `v1alpha1` client and api
+- **Support reserveOrdinal for Advanced StatefulSet**
+
+### DaemonSet
+
+- Add validation webhook for DaemonSet
+- Fix pending pods created by controller
+
+### BroadcastJob
+
+- Optimize the way to calculate parallelism
+- Check ownerReference for filtered pods
+- Add pod label validation
+- Add ScaleExpectation for BroadcastJob
+
+### Others
+
+- Initializing capabilities if allowPrivileged is true
+- Support secret cert for webhook with vip
+- Add rate limiter config
+- Fix in-place rollback when spec image no latest tag
+
 ## v0.6.1
 
 ### CloneSet
@@ -209,9 +275,9 @@ It provides full features for more efficient, deterministic and controlled deplo
 ### Documents
 
 - Three blog posts are added in Kruise [website](http://openkruise.io/en-us/blog/index.html), titled:
-    1. Kruise Controller Classification Guidance.
-    2. Learning Concurrent Reconciling.
-    3. UnitedDeploymemt - Supporting Multi-domain Workload Management.
+  1. Kruise Controller Classification Guidance.
+  2. Learning Concurrent Reconciling.
+  3. UnitedDeploymemt - Supporting Multi-domain Workload Management.
 - New documents are added for UnitedDeployment, including a [tutorial](./docs/tutorial/uniteddeployment.md).
 - Revise main README.md.
 

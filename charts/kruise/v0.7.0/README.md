@@ -4,9 +4,8 @@
 
 Install with Helm 3:
 
-Note that Kruise v0.7+ will only support Kubernetes 1.13+ and 1.13/1.14 must enable `CustomResourceWebhookConversion` feature-gate.
-
-If your Kubernetes version is lower than 1.15, you'll need Helm v3.1.0+ that has the flag --disable-openapi-validation.
+OpenKruise only supports Kubernetes version >= `1.13+` because of CRD conversion.
+Note that for Kubernetes 1.13 and 1.14, users must enable `CustomResourceWebhookConversion` feature-gate in kube-apiserver before install or upgrade Kruise.
 
 ```bash
 # Kubernetes 1.13 and 1.14
@@ -43,7 +42,7 @@ The following table lists the configurable parameters of the kruise chart and th
 | `revisionHistoryLimit`                    | Limit of revision history                                    | `3`                           |
 | `manager.replicas`                        | Replicas of kruise-controller-manager deployment             | `2`                           |
 | `manager.image.repository`                | Repository for kruise-manager image                          | `openkruise/kruise-manager`   |
-| `manager.image.tag`                       | Tag for kruise-manager image                                 | `v0.6.1`                      |
+| `manager.image.tag`                       | Tag for kruise-manager image                                 | `v0.7.0`                      |
 | `manager.resources.limits.cpu`            | CPU resource limit of kruise-manager container               | `100m`                        |
 | `manager.resources.limits.memory`         | Memory resource limit of kruise-manager container            | `256Mi`                       |
 | `manager.resources.requests.cpu`          | CPU resource request of kruise-manager container             | `100m`                        |

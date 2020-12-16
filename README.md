@@ -12,10 +12,9 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
+|Dec 16th, 2020. Kruise v0.7.0 is **RELEASED**! It provides a new CRD named AdvancedCronJob, promotes AdvancedStatefulSet to v1beta1 and a few features in other controllers, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Oct 1st, 2020. Kruise v0.6.1 is **RELEASED**! It provides various features and bugfix, such as CloneSet lifecycle hook and UnitedDeployment supported CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Aug 19th, 2020. Kruise v0.6.0 is **RELEASED**! It updates Kubernetes dependency and switches to new controller runtime framework. It also supports a new controller called Advanced DaemonSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|May 19th, 2020. Kruise v0.5.0 is **RELEASED**! It supports `maxSurge` for CloneSet and fixes bugs for StatefulSet/SidecarSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|Mar 20th, 2020. Kruise v0.4.1 is **RELEASED**! It provides **graceful in-place update** for Advanced StatefulSet and CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 
 ## Introduction
 
@@ -36,6 +35,8 @@ As of now, Kruise offers these workload controllers:
 
 - [Advanced DaemonSet](https://openkruise.io/en-us/docs/advanced_daemonset.html): An enhanced version of default [DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) with extra upgrade strategies such as partition, node selector, pause and surging.
 
+- [AdvancedCronJob](https://openkruise.io/en-us/docs/advancedcronjob.html): An extended CronJob controller, currently its template supports Job and BroadcastJob.
+
 The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
 This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is a good introduction for new users.
 
@@ -55,14 +56,14 @@ This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evens
 
 ## Quick Start
 
-For a Kubernetes cluster with its version higher than v1.12, you can simply install Kruise with helm v3.1.0+:
+For a Kubernetes cluster with its version higher than v1.13, you can simply install Kruise with helm v3.1.0+:
 
 ```bash
-# Kubernetes 1.14 and older versions
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.1/kruise-chart.tgz --disable-openapi-validation
+# Kubernetes 1.13 and 1.14
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.7.0/kruise-chart.tgz --disable-openapi-validation
 
 # Kubernetes 1.15 and newer versions
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.6.1/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.7.0/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for the kruise-manager.
