@@ -175,7 +175,7 @@ func (a *StatefulSetAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj runtime
 // IsExpected checks the subset is the expected revision or not.
 // The revision label can tell the current subset revision.
 func (a *StatefulSetAdapter) IsExpected(obj metav1.Object, revision string) bool {
-	return obj.GetLabels()[appsv1.ControllerRevisionHashLabelKey] != revision
+	return obj.GetLabels()[alpha1.ControllerRevisionHashLabelKey] != revision
 }
 
 func (a *StatefulSetAdapter) getStatefulSetPods(set *appsv1.StatefulSet) ([]*corev1.Pod, error) {
