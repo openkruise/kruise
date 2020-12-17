@@ -582,6 +582,7 @@ func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
 //   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
 //   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
 //   - CheckNodeUnschedulablePredicate: check if the pod can tolerate node unschedulable
+//   - PodFitsResources: checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	_ = nodeInfo.SetNode(node)
@@ -605,6 +606,11 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	}
 
 	fit, reasons, err = predicates.CheckNodeUnschedulablePredicate(pod, nil, nodeInfo)
+	if err != nil || !fit {
+		logPredicateFailedReason(reasons, node)
+		return false, err
+	}
+	fit, reasons, err = predicates.PodFitsResources(pod, nil, nodeInfo)
 	if err != nil || !fit {
 		logPredicateFailedReason(reasons, node)
 		return false, err
