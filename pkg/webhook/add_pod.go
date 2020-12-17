@@ -18,13 +18,9 @@ package webhook
 
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
 )
 
 func init() {
-	if !gate.ResourceEnabled(&appsv1alpha1.SidecarSet{}) {
-		return
-	}
-	addHandlers(mutating.HandlerMap)
+	addHandlersWithGate(mutating.HandlerMap, &appsv1alpha1.SidecarSet{})
 }
