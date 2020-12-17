@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -578,6 +579,11 @@ func createNode(nodeName string) *v1.Node {
 	node3 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				"pods": resource.MustParse("10"),
+			},
 		},
 	}
 	return node3
