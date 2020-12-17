@@ -80,18 +80,19 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 }
 
 func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) {
+	coreControl := clonesetcore.New(cs)
 	for _, pod := range pods {
 		newStatus.Replicas++
-		if clonesetutils.IsRunningAndReady(pod) {
+		if coreControl.IsPodUpdateReady(pod, 0) {
 			newStatus.ReadyReplicas++
 		}
-		if clonesetutils.IsRunningAndAvailable(pod, cs.Spec.MinReadySeconds) {
+		if coreControl.IsPodUpdateReady(pod, cs.Spec.MinReadySeconds) {
 			newStatus.AvailableReplicas++
 		}
 		if clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision {
 			newStatus.UpdatedReplicas++
 		}
-		if clonesetutils.IsRunningAndReady(pod) && clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision {
+		if clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision && coreControl.IsPodUpdateReady(pod, 0) {
 			newStatus.UpdatedReadyReplicas++
 		}
 	}
