@@ -15,4 +15,5 @@ limitations under the License.
 */
 
 // +groupName=apps.kruise.io
+// +k8s:defaulter-gen=TypeMeta
 package v1beta1
