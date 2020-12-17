@@ -56,6 +56,21 @@ func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, e
 	}
 
 	// Ignore inactive pods
+	return filterActivePods(podList), nil
+}
+
+// GetActivePodsInCache returns all active pods in cache which match opts.
+func GetActivePodsInCache(cl client.Client, opts *client.ListOptions) ([]*v1.Pod, error) {
+	podList := &v1.PodList{}
+	if err := cl.List(context.TODO(), podList, opts); err != nil {
+		return nil, err
+	}
+
+	// Ignore inactive pods
+	return filterActivePods(podList), nil
+}
+
+func filterActivePods(podList *v1.PodList) []*v1.Pod {
 	var activePods []*v1.Pod
 	for i, pod := range podList.Items {
 		// Consider all rebuild pod as active pod, should not recreate
@@ -63,7 +78,7 @@ func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, e
 			activePods = append(activePods, &podList.Items[i])
 		}
 	}
-	return activePods, nil
+	return activePods
 }
 
 // GetPodRevision returns revision hash of this pod.

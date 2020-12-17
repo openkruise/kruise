@@ -17,14 +17,12 @@ limitations under the License.
 package cloneset
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/apps"
 
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -42,6 +40,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -162,18 +161,18 @@ func TestClaimPods(t *testing.T) {
 	type test struct {
 		name    string
 		pods    []*v1.Pod
-		claimed []*v1.Pod
+		released, adopted []string
 	}
 	var tests = []test{
 		{
-			name:    "Controller releases claimed pods when selector doesn't match",
-			pods:    []*v1.Pod{newPod("pod1", productionLabel, instance), newPod("pod2", nilLabel, instance)},
-			claimed: []*v1.Pod{newPod("pod1", productionLabel, instance)},
+			name:    "pods owned by cloneSet are released during claiming when selector doesn't match",
+			pods:    []*v1.Pod{newPod("pod1", productionLabel, instance, scheme), newPod("pod2", nilLabel, instance, scheme)},
+			released: []string{"pod2"},
 		},
 		{
-			name:    "Claim pods with correct label",
-			pods:    []*v1.Pod{newPod("pod3", productionLabel, nil), newPod("pod4", nilLabel, nil)},
-			claimed: []*v1.Pod{newPod("pod3", productionLabel, nil)},
+			name:    "pods without an owner are adopted during claiming when selector matches",
+			pods:    []*v1.Pod{newPod("pod3", productionLabel, nil, nil), newPod("pod4", nilLabel, nil, nil)},
+			adopted: []string{"pod3"},
 		},
 	}
 
@@ -189,15 +188,47 @@ func TestClaimPods(t *testing.T) {
 			scheme: scheme,
 		}
 
-		claimed, err := reconciler.claimPods(instance, test.pods)
-		g.Expect(err).NotTo(gomega.HaveOccurred())
-		if !reflect.DeepEqual(podToStringSlice(test.claimed), podToStringSlice(claimed)) {
-			t.Errorf("Test case `%s`, claimed wrong pods. Expected %v, got %v", test.name, podToStringSlice(test.claimed), podToStringSlice(claimed))
+		// before claiming, pods to be released are owned by cloneSet
+		for _, r := range test.released {
+			releasedPod := &v1.Pod{}
+			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: r}, releasedPod)
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+			g.Expect(releasedPod.GetOwnerReferences()).To(gomega.HaveLen(1))
+			g.Expect(releasedPod.GetOwnerReferences()[0].UID).To(gomega.Equal(instance.UID))
 		}
+
+		// before claiming, pods to be adopted have no owner
+		for _, r := range test.adopted {
+			adoptedPod := &v1.Pod{}
+			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: r}, adoptedPod)
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+			g.Expect(adoptedPod.GetOwnerReferences()).To(gomega.HaveLen(0))
+		}
+
+		_, err := reconciler.claimPods(instance, test.pods)
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// after claiming, released pods have no owner
+		for _, r := range test.released {
+			releasedPod := &v1.Pod{}
+			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: r}, releasedPod)
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+			g.Expect(releasedPod.GetOwnerReferences()).To(gomega.HaveLen(0))
+		}
+
+		// before claiming, adopted pods are owned by cloneSet
+		for _, r := range test.adopted {
+			adoptedPod := &v1.Pod{}
+			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: r}, adoptedPod)
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+			g.Expect(adoptedPod.GetOwnerReferences()).To(gomega.HaveLen(1))
+			g.Expect(adoptedPod.GetOwnerReferences()[0].UID).To(gomega.Equal(instance.UID))
+		}
+
 	}
 }
 
-func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Pod {
+func newPod(podName string, label map[string]string, owner metav1.Object, scheme *runtime.Scheme) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -214,17 +245,9 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 		},
 	}
 	if owner != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(owner, apps.SchemeGroupVersion.WithKind("Fake"))}
+		_ = controllerutil.SetControllerReference(owner, pod, scheme)
 	}
 	return pod
-}
-
-func podToStringSlice(pods []*v1.Pod) []string {
-	var names []string
-	for _, pod := range pods {
-		names = append(names, pod.Name)
-	}
-	return names
 }
 
 func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {

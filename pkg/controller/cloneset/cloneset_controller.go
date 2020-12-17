@@ -220,13 +220,16 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
-	// list all active Pods and PVCs belongs to cs
-	filteredPods, filteredPVCs, err := r.getOwnedResource(instance)
+	// list all active PVCs belongs to cs
+	filteredPVCs, err := r.getOwnedResource(instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	//release Pods ownerRef
+	// list all pods to include the pods that don't match the cs`s selector
+	// anymore but has the stale controller ref.
+	filteredPods, err := r.getAllActivePodsInNamespace(instance)
+
 	filteredPods, err = r.claimPods(instance, filteredPods)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -417,20 +420,15 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 	return currentRevision, updateRevision, collisionCount, nil
 }
 
-func (r *ReconcileCloneSet) getOwnedResource(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, []*v1.PersistentVolumeClaim, error) {
+func (r *ReconcileCloneSet) getOwnedResource(cs *appsv1alpha1.CloneSet) ([]*v1.PersistentVolumeClaim, error) {
 	opts := &client.ListOptions{
 		Namespace:     cs.Namespace,
 		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
 	}
 
-	filteredPods, err := clonesetutils.GetActivePods(r.Client, opts)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	pvcList := v1.PersistentVolumeClaimList{}
 	if err := r.List(context.TODO(), &pvcList, opts); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim
 	for i, pvc := range pvcList.Items {
@@ -439,7 +437,7 @@ func (r *ReconcileCloneSet) getOwnedResource(cs *appsv1alpha1.CloneSet) ([]*v1.P
 		}
 	}
 
-	return filteredPods, filteredPVCs, nil
+	return filteredPVCs, nil
 }
 
 // truncatePodsToDelete truncates any non-live pod names in spec.scaleStrategy.podsToDelete.
@@ -509,6 +507,11 @@ func (r *ReconcileCloneSet) truncateHistory(
 	return nil
 }
 
+// claimPods tries to take ownership of a list of Pods.
+//
+// It will reconcile the following:
+//   * Adopt orphans if the selector matches.
+//   * Release owned objects if the selector no longer matches.
 func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) {
 	manager, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
 	if err != nil {
@@ -531,4 +534,17 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 	}
 
 	return claimedPods, nil
+}
+
+func (r *ReconcileCloneSet) getAllActivePodsInNamespace(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, error) {
+	opts := &client.ListOptions{
+		Namespace:     cs.Namespace,
+	}
+
+	filteredPods, err := clonesetutils.GetActivePodsInCache(r.Client, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return filteredPods, nil
 }
