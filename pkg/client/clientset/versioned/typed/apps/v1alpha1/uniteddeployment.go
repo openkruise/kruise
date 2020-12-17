@@ -22,6 +22,7 @@ import (
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	scheme "github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -45,6 +46,9 @@ type UnitedDeploymentInterface interface {
 	List(opts v1.ListOptions) (*v1alpha1.UnitedDeploymentList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.UnitedDeployment, err error)
+	GetScale(unitedDeploymentName string, options v1.GetOptions) (*autoscalingv1.Scale, error)
+	UpdateScale(unitedDeploymentName string, scale *autoscalingv1.Scale) (*autoscalingv1.Scale, error)
+
 	UnitedDeploymentExpansion
 }
 
@@ -184,6 +188,34 @@ func (c *unitedDeployments) Patch(name string, pt types.PatchType, data []byte, 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the unitedDeployment, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
+func (c *unitedDeployments) GetScale(unitedDeploymentName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	result = &autoscalingv1.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("uniteddeployments").
+		Name(unitedDeploymentName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *unitedDeployments) UpdateScale(unitedDeploymentName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+	result = &autoscalingv1.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("uniteddeployments").
+		Name(unitedDeploymentName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return
