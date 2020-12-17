@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/gate"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
 	"github.com/openkruise/kruise/pkg/webhook/util/health"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -33,12 +36,17 @@ import (
 
 var (
 	// HandlerMap contains all admission webhook handlers.
-	HandlerMap = map[string]admission.Handler{}
+	HandlerMap   = map[string]admission.Handler{}
+	handlerGates = map[string]runtime.Object{}
 
 	Checker = health.Checker
 )
 
 func addHandlers(m map[string]admission.Handler) {
+	addHandlersWithGate(m, nil)
+}
+
+func addHandlersWithGate(m map[string]admission.Handler, gateObj runtime.Object) {
 	for path, handler := range m {
 		if len(path) == 0 {
 			klog.Warningf("Skip handler with empty path.")
@@ -52,6 +60,23 @@ func addHandlers(m map[string]admission.Handler) {
 			klog.V(1).Infof("conflicting webhook builder path %v in handler map", path)
 		}
 		HandlerMap[path] = handler
+		if gateObj != nil {
+			handlerGates[path] = gateObj
+		}
+	}
+}
+
+func filterActiveHandlers() {
+	disablePaths := sets.NewString()
+	for path := range HandlerMap {
+		if obj, ok := handlerGates[path]; ok {
+			if !gate.ResourceEnabled(obj) {
+				disablePaths.Insert(path)
+			}
+		}
+	}
+	for _, path := range disablePaths.List() {
+		delete(HandlerMap, path)
 	}
 }
 
@@ -62,6 +87,7 @@ func SetupWithManager(mgr manager.Manager) error {
 	server.CertDir = webhookutil.GetCertDir()
 
 	// register admission handlers
+	filterActiveHandlers()
 	for path, handler := range HandlerMap {
 		server.Register(path, &webhook.Admission{Handler: handler})
 		klog.V(3).Infof("Registered webhook handler %s", path)
@@ -88,6 +114,7 @@ func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 		StatusClient: mgr.GetClient(),
 	}
 
+	filterActiveHandlers()
 	c, err := webhookcontroller.New(mgr.GetConfig(), cli, HandlerMap)
 	if err != nil {
 		return err
