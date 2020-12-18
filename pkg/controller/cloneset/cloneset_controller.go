@@ -229,6 +229,9 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	// list all pods to include the pods that don't match the cs`s selector
 	// anymore but has the stale controller ref.
 	filteredPods, err := r.getAllActivePodsInNamespace(instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	filteredPods, err = r.claimPods(instance, filteredPods)
 	if err != nil {
