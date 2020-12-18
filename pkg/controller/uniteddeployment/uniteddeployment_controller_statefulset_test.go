@@ -1616,6 +1616,7 @@ func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, chan stru
 	return g, requests, stopMgr, mgrStopped
 }
 
+// clean can be shared amongst all subset workload tests (i.e. statefulsets, deployments, advancedStatefulsets, etc.).
 func clean(g *gomega.GomegaWithT, c client.Client) {
 	udList := &appsv1alpha1.UnitedDeploymentList{}
 	if err := c.List(context.TODO(), udList); err == nil {

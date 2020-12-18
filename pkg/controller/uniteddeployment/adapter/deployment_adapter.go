@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kruise Authors.
+Copyright 2020 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -149,7 +149,7 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, sub
 	return nil
 }
 
-// PostUpdate does some works after subset updated. StatefulSets will implement this method to clean stuck pods.
+// PostUpdate does some works after subset updated. Deployments typically don't have post update operations.
 func (a *DeploymentAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj runtime.Object, revision string, partition int32) error {
 	return nil
 }

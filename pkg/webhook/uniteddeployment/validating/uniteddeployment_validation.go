@@ -287,6 +287,11 @@ func validateAdvancedStatefulSet(statefulSet *appsv1alpha1.AdvancedStatefulSetTe
 	if statefulSet.Spec.Replicas != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *statefulSet.Spec.Replicas, "replicas in advancedStatefulSetTemplate will not be used"))
 	}
+	if statefulSet.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate != nil &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "updateStrategy", "rollingUpdate", "partition"), *statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition, "partition in advancedStatefulSetTemplate will not be used"))
+	}
 
 	return allErrs
 }
