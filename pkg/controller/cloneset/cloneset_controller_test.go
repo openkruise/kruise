@@ -143,8 +143,10 @@ func TestClaimPods(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	scheme := runtime.NewScheme()
-	appsv1alpha1.AddToScheme(scheme)
-	v1.AddToScheme(scheme)
+	err := appsv1alpha1.AddToScheme(scheme)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	err = v1.AddToScheme(scheme)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
 
 	instance := &appsv1alpha1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -159,14 +161,14 @@ func TestClaimPods(t *testing.T) {
 	appsv1alpha1.SetDefaultsCloneSet(instance)
 
 	type test struct {
-		name    string
-		pods    []*v1.Pod
+		name              string
+		pods              []*v1.Pod
 		released, adopted []string
 	}
 	var tests = []test{
 		{
-			name:    "pods owned by cloneSet are released during claiming when selector doesn't match",
-			pods:    []*v1.Pod{newPod("pod1", productionLabel, instance, scheme), newPod("pod2", nilLabel, instance, scheme)},
+			name:     "pods owned by cloneSet are released during claiming when selector doesn't match",
+			pods:     []*v1.Pod{newPod("pod1", productionLabel, instance, scheme), newPod("pod2", nilLabel, instance, scheme)},
 			released: []string{"pod2"},
 		},
 		{
@@ -216,7 +218,7 @@ func TestClaimPods(t *testing.T) {
 			g.Expect(releasedPod.GetOwnerReferences()).To(gomega.HaveLen(0))
 		}
 
-		// before claiming, adopted pods are owned by cloneSet
+		// after claiming, adopted pods are owned by cloneSet
 		for _, r := range test.adopted {
 			adoptedPod := &v1.Pod{}
 			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: r}, adoptedPod)

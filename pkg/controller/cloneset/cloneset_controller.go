@@ -538,7 +538,7 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 
 func (r *ReconcileCloneSet) getAllActivePodsInNamespace(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, error) {
 	opts := &client.ListOptions{
-		Namespace:     cs.Namespace,
+		Namespace: cs.Namespace,
 	}
 
 	filteredPods, err := clonesetutils.GetActivePodsInCache(r.Client, opts)
