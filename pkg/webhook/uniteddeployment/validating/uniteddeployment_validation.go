@@ -258,7 +258,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 		}
 		allErrs = append(allErrs, validateDeployment(template.DeploymentTemplate, fldPath.Child("deploymentTemplate"))...)
 		template := template.DeploymentTemplate.Spec.Template
-		coreTemplate, err := convertPodTemplateSpec(&template)
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&template)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
