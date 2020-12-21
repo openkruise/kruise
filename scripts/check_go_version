@@ -64,9 +64,9 @@ check_at_least_version() {
 
     # Compare versions
     VERS_LEAST="$PROG_NAME version '$CUR_VERS' should be at least '$MIN_VERS'"
-    test "$CUR_MAJ" -gt $(("$MIN_MAJ" - 1)) || die_upgrade "$VERS_LEAST"
+    test "$CUR_MAJ" -gt $(expr "$MIN_MAJ" - 1) || die_upgrade "$VERS_LEAST"
     test "$CUR_MAJ" -gt "$MIN_MAJ" || {
-        test "$CUR_MIN" -gt $(("$MIN_MIN" - 1)) || die_upgrade "$VERS_LEAST"
+        test "$CUR_MIN" -gt $(expr "$MIN_MIN" - 1) || die_upgrade "$VERS_LEAST"
         test "$CUR_MIN" -gt "$MIN_MIN" || {
             test "$CUR_FIX" -ge "$MIN_FIX" || die_upgrade "$VERS_LEAST"
         }
