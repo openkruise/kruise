@@ -68,6 +68,7 @@ const (
 	statefulSetSubSetType         subSetType = "StatefulSet"
 	advancedStatefulSetSubSetType subSetType = "AdvancedStatefulSet"
 	cloneSetSubSetType            subSetType = "CloneSet"
+	deploymentSubSetType          subSetType = "Deployment"
 )
 
 // Add creates a new UnitedDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -90,6 +91,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 			statefulSetSubSetType:         &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.StatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 			advancedStatefulSetSubSetType: &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.AdvancedStatefulSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 			cloneSetSubSetType:            &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.CloneSetAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
+			deploymentSubSetType:          &SubsetControl{Client: mgr.GetClient(), scheme: mgr.GetScheme(), adapter: &adapter.DeploymentAdapter{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}},
 		},
 	}
 }
@@ -134,6 +136,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &appsv1alpha1.UnitedDeployment{},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -154,6 +164,10 @@ type ReconcileUnitedDeployment struct {
 // +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps,resources=replicasets/status,verbs=get
 
 // Reconcile reads that state of the cluster for a UnitedDeployment object and makes changes based on the state read
 // and what is in the UnitedDeployment.Spec
@@ -292,6 +306,10 @@ func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.Uni
 
 	if instance.Spec.Template.CloneSetTemplate != nil {
 		return r.subSetControls[cloneSetSubSetType], cloneSetSubSetType
+	}
+
+	if instance.Spec.Template.DeploymentTemplate != nil {
+		return r.subSetControls[deploymentSubSetType], deploymentSubSetType
 	}
 
 	// unexpected

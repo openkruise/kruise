@@ -1616,6 +1616,7 @@ func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, chan stru
 	return g, requests, stopMgr, mgrStopped
 }
 
+// clean can be shared amongst all subset workload tests (i.e. statefulsets, deployments, advancedStatefulsets, etc.).
 func clean(g *gomega.GomegaWithT, c client.Client) {
 	udList := &appsv1alpha1.UnitedDeploymentList{}
 	if err := c.List(context.TODO(), udList); err == nil {
@@ -1629,7 +1630,7 @@ func clean(g *gomega.GomegaWithT, c client.Client) {
 		}
 
 		if len(udList.Items) != 0 {
-			return fmt.Errorf("expected %d sts, got %d", 0, len(udList.Items))
+			return fmt.Errorf("expected %d subset objects, got %d", 0, len(udList.Items))
 		}
 
 		return nil
@@ -1647,7 +1648,7 @@ func clean(g *gomega.GomegaWithT, c client.Client) {
 		}
 
 		if len(rList.Items) != 0 {
-			return fmt.Errorf("expected %d sts, got %d", 0, len(rList.Items))
+			return fmt.Errorf("expected %d subset objects, got %d", 0, len(rList.Items))
 		}
 
 		return nil
@@ -1689,6 +1690,24 @@ func clean(g *gomega.GomegaWithT, c client.Client) {
 		return nil
 	}, timeout, time.Second).Should(gomega.Succeed())
 
+	deploymentList := &appsv1.DeploymentList{}
+	if err := c.List(context.TODO(), deploymentList); err == nil {
+		for _, asts := range deploymentList.Items {
+			c.Delete(context.TODO(), &asts)
+		}
+	}
+	g.Eventually(func() error {
+		if err := c.List(context.TODO(), deploymentList); err != nil {
+			return err
+		}
+
+		if len(deploymentList.Items) != 0 {
+			return fmt.Errorf("expected %d deployments, got %d", 0, len(deploymentList.Items))
+		}
+
+		return nil
+	}, timeout, time.Second).Should(gomega.Succeed())
+
 	podList := &corev1.PodList{}
 	if err := c.List(context.TODO(), podList); err == nil {
 		for _, pod := range podList.Items {
@@ -1701,7 +1720,7 @@ func clean(g *gomega.GomegaWithT, c client.Client) {
 		}
 
 		if len(podList.Items) != 0 {
-			return fmt.Errorf("expected %d sts, got %d", 0, len(podList.Items))
+			return fmt.Errorf("expected %d pods, got %d", 0, len(podList.Items))
 		}
 
 		return nil
