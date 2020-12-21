@@ -255,7 +255,7 @@ func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.
 		job.Status.Phase = appsv1alpha1.PhasePaused
 		return reconcile.Result{RequeueAfter: requeueAfter}, r.updateJobStatus(request, job)
 	}
-	if job.Spec.Paused == false && job.Status.Phase == appsv1alpha1.PhasePaused {
+	if !job.Spec.Paused && job.Status.Phase == appsv1alpha1.PhasePaused {
 		job.Status.Phase = appsv1alpha1.PhaseRunning
 		r.recorder.Event(job, corev1.EventTypeNormal, "Continue", "continue to process job")
 	}

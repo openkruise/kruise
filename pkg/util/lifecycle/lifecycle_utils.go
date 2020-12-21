@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -56,7 +57,7 @@ func PatchPodLifecycle(c client.Client, pod *v1.Pod, state appspub.LifecycleStat
 		appspub.LifecycleTimestampKey,
 		time.Now().Format(time.RFC3339),
 	)
-	return true, c.Patch(nil, pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	return true, c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 }
 
 func IsPodHooked(hook *appspub.LifecycleHook, pod *v1.Pod) bool {

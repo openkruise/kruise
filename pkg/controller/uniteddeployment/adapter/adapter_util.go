@@ -72,9 +72,7 @@ func attachTolerations(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subse
 		podSpec.Tolerations = []corev1.Toleration{}
 	}
 
-	for _, toleration := range subsetConfig.Tolerations {
-		podSpec.Tolerations = append(podSpec.Tolerations, toleration)
-	}
+	podSpec.Tolerations = append(podSpec.Tolerations, subsetConfig.Tolerations...)
 }
 
 func getRevision(objMeta metav1.Object) string {

@@ -536,7 +536,7 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet,
 			if scheduled {
 				currentNumberScheduled++
 				// Sort the daemon pods by creation time, so that the oldest is first.
-				daemonPods, _ := nodeToDaemonPods[node.Name]
+				daemonPods := nodeToDaemonPods[node.Name]
 				sort.Sort(podByCreationTimestampAndPhase(daemonPods))
 				pod := daemonPods[0]
 				if podutil.IsPodReady(pod) {
