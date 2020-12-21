@@ -150,7 +150,7 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 		}
 		if strategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType && maxSurge > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
-				fmt.Sprintf("can not use maxSurge with strategy type InPlaceOnly")))
+				"can not use maxSurge with strategy type InPlaceOnly"))
 		}
 	}
 

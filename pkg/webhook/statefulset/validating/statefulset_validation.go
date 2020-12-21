@@ -78,7 +78,7 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 				allErrs = append(allErrs,
 					field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"),
 						*spec.UpdateStrategy.RollingUpdate.MinReadySeconds,
-						fmt.Sprintf("must be no more than 300 seconds")))
+						"must be no more than 300 seconds"))
 			}
 
 			// validate the `maxUnavailable` field

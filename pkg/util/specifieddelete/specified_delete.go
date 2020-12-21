@@ -17,6 +17,7 @@ limitations under the License.
 package specifieddelete
 
 import (
+	"context"
 	"fmt"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -41,5 +42,5 @@ func PatchPodSpecifiedDelete(c client.Client, pod *v1.Pod, value string) (bool, 
 		appsv1alpha1.SpecifiedDeleteKey,
 		value,
 	)
-	return true, c.Patch(nil, pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	return true, c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 }

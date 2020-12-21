@@ -254,7 +254,6 @@ func (e *pvcEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 	if pvc.DeletionTimestamp != nil {
 		e.Delete(event.DeleteEvent{Meta: evt.MetaNew, Object: evt.ObjectNew}, q)
 	}
-	return
 }
 
 func (e *pvcEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
