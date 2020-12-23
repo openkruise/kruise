@@ -403,6 +403,10 @@ spec:
                 - type
                 type: object
               type: array
+            currentRevision:
+              description: currentRevision, if not empty, indicates the current revision
+                version of the CloneSet.
+              type: string
             labelSelector:
               description: LabelSelector is label selectors for query over pods that
                 should match the replica count used by HPA.

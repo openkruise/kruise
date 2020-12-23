@@ -272,6 +272,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	newStatus := appsv1alpha1.CloneSetStatus{
 		ObservedGeneration: instance.Generation,
+		CurrentRevision:    currentRevision.Name,
 		UpdateRevision:     updateRevision.Name,
 		CollisionCount:     new(int32),
 		LabelSelector:      selector.String(),
@@ -400,12 +401,8 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 
 	// attempt to find the revision that corresponds to the current revision
 	for i := range revisions {
-		if revisions[i].Name == updateRevision.Name {
-			continue
-		}
-		if podsRevisions.Has(revisions[i].Name) {
+		if revisions[i].Name == cs.Status.CurrentRevision {
 			currentRevision = revisions[i]
-			break
 		}
 	}
 
