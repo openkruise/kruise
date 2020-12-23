@@ -201,6 +201,9 @@ type CloneSetStatus struct {
 	// UpdateRevision, if not empty, indicates the latest revision of the CloneSet.
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
+	// currentRevision, if not empty, indicates the current revision version of the CloneSet.
+	CurrentRevision string `json:"currentRevision,omitempty"`
+
 	// CollisionCount is the count of hash collisions for the CloneSet. The CloneSet controller
 	// uses this field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ControllerRevision.
