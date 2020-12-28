@@ -21,6 +21,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"sync"
 	"time"
 
@@ -54,6 +55,7 @@ import (
 )
 
 func init() {
+	flag.BoolVar(&scheduleBroadcastJobPods, "assign-bcj-pods-by-scheduler", true, "Use scheduler to assign broadcastJob pod to node.")
 	flag.IntVar(&concurrentReconciles, "broadcastjob-workers", concurrentReconciles, "Max concurrent workers for BroadCastJob controller.")
 }
 
@@ -64,6 +66,7 @@ const (
 
 var (
 	concurrentReconciles = 3
+	scheduleBroadcastJobPods bool
 	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
 	scaleExpectations    = expectations.NewScaleExpectations()
 )
@@ -683,8 +686,15 @@ func (r *ReconcileBroadcastJob) createPod(nodeName, namespace string, template *
 		return err
 	}
 	pod.Namespace = namespace
-	if len(nodeName) != 0 {
-		pod.Spec.NodeName = nodeName
+	if scheduleBroadcastJobPods {
+		// The pod's NodeAffinity will be updated to make sure the Pod is bound
+		// to the target node by default scheduler. It is safe to do so because there
+		// should be no conflicting node affinity with the target node.
+		pod.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(pod.Spec.Affinity, nodeName)
+	} else {
+		if len(nodeName) != 0 {
+			pod.Spec.NodeName = nodeName
+		}
 	}
 	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
