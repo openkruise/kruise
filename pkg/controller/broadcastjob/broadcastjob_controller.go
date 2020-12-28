@@ -21,7 +21,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"sync"
 	"time"
 
@@ -41,6 +40,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/utils/integer"
