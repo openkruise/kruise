@@ -286,7 +286,7 @@ func TestMange(t *testing.T) {
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
 							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
 						},
-						Annotations: map[string]string{appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+						Annotations: map[string]string{appspub.InPlaceUpdating: "true", appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 							Revision:              "rev-new",
 							UpdateTimestamp:       now,
 							LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
@@ -368,6 +368,7 @@ func TestMange(t *testing.T) {
 								UpdateTimestamp:       now,
 								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
+							appspub.InPlaceUpdating:       "true",
 							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 						ResourceVersion: "2",

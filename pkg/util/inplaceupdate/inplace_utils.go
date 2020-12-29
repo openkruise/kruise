@@ -42,7 +42,7 @@ var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/imag
 type (
 	CustomizeSpecCalculateFunc        func(oldRevision, newRevision *apps.ControllerRevision) *UpdateSpec
 	CustomizeSpecPatchFunc            func(pod *v1.Pod, spec *UpdateSpec) (*v1.Pod, error)
-	CustomizeCheckUpdateCompletedFunc func(pod *v1.Pod) error
+	CustomizeCheckUpdateCompletedFunc func(pod *v1.Pod) (int32, error)
 	GetRevisionFunc                   func(rev *apps.ControllerRevision) string
 )
 
@@ -62,9 +62,10 @@ type RefreshResult struct {
 }
 
 type UpdateResult struct {
-	InPlaceUpdate bool
-	UpdateErr     error
-	DelayDuration time.Duration
+	InPlaceUpdate   bool
+	InPlaceUpdating bool
+	UpdateErr       error
+	DelayDuration   time.Duration
 }
 
 // Interface for managing pods in-place update.
@@ -116,6 +117,10 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 		return RefreshResult{RefreshErr: err}
 	}
 
+	if err := c.refreshUpdatedCount(pod, opts); err != nil {
+		return RefreshResult{RefreshErr: err}
+	}
+
 	var delayDuration time.Duration
 	var err error
 	if pod.Annotations[appspub.InPlaceUpdateGraceKey] != "" {
@@ -125,6 +130,41 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 	}
 
 	return RefreshResult{DelayDuration: delayDuration}
+}
+
+func (c *realControl) refreshUpdatedCount(pod *v1.Pod, opts *UpdateOptions) error {
+	checkFunc := CheckInPlaceUpdateCompleted
+	if opts != nil && opts.CustomizeCheckUpdateCompleted != nil {
+		checkFunc = opts.CustomizeCheckUpdateCompleted
+	}
+	count, checkErr := checkFunc(pod)
+	if checkErr != nil {
+		return nil
+	}
+
+	return c.updateInplaceCount(pod, count)
+}
+
+func (c *realControl) updateInplaceCount(pod *v1.Pod, containerCount int32) error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		clone, err := c.adp.getPod(pod.Namespace, pod.Name)
+		if err != nil {
+			return err
+		}
+
+		if clone.Annotations[appspub.InPlaceUpdating] == "" {
+			return nil
+		}
+
+		delete(clone.Annotations, appspub.InPlaceUpdating)
+		//if annotation InPlaceUpdating not exist, or invalid number, use default 0
+		count, _ := strconv.ParseInt(pod.Annotations[appspub.InPlaceUpdateCount], 10, 32)
+		clone.Annotations[appspub.InPlaceUpdateCount] = fmt.Sprintf("%d", int32(count)+containerCount)
+
+		return c.adp.updatePod(clone)
+	})
+
+	return err
 }
 
 func (c *realControl) refreshCondition(pod *v1.Pod, opts *UpdateOptions) error {
@@ -138,7 +178,7 @@ func (c *realControl) refreshCondition(pod *v1.Pod, opts *UpdateOptions) error {
 	if opts != nil && opts.CustomizeCheckUpdateCompleted != nil {
 		checkFunc = opts.CustomizeCheckUpdateCompleted
 	}
-	if checkErr := checkFunc(pod); checkErr != nil {
+	if _, checkErr := checkFunc(pod); checkErr != nil {
 		klog.V(6).Infof("Check Pod %s/%s in-place update not completed yet: %v", pod.Namespace, pod.Name, checkErr)
 		return nil
 	}
@@ -232,6 +272,9 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 	}
 
 	// TODO(FillZpp): maybe we should check if the previous in-place update has completed
+	if isInplaceUpdateCompleted(pod) == false {
+		return UpdateResult{InPlaceUpdate: true, InPlaceUpdating: true}
+	}
 
 	// 2. update condition for pod with readiness-gate
 	if containsReadinessGate(pod) {
@@ -293,6 +336,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 		}
 		inPlaceUpdateStateJSON, _ := json.Marshal(inPlaceUpdateState)
 		clone.Annotations[appspub.InPlaceUpdateStateKey] = string(inPlaceUpdateStateJSON)
+		clone.Annotations[appspub.InPlaceUpdating] = "true"
 
 		if spec.GraceSeconds <= 0 {
 			if clone, err = patchUpdateSpecToPod(clone, spec, opts); err != nil {
@@ -415,17 +459,17 @@ func GetTemplateFromRevision(revision *apps.ControllerRevision) (*v1.PodTemplate
 // CheckInPlaceUpdateCompleted checks whether imageID in pod status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated
 // containers in Pod.
-func CheckInPlaceUpdateCompleted(pod *v1.Pod) error {
+func CheckInPlaceUpdateCompleted(pod *v1.Pod) (int32, error) {
 	inPlaceUpdateState := appspub.InPlaceUpdateState{}
 	if stateStr, ok := pod.Annotations[appspub.InPlaceUpdateStateKey]; !ok {
-		return nil
+		return 0, nil
 	} else if err := json.Unmarshal([]byte(stateStr), &inPlaceUpdateState); err != nil {
-		return err
+		return 0, err
 	}
 
 	// this should not happen, unless someone modified pod revision label
 	if inPlaceUpdateState.Revision != pod.Labels[apps.StatefulSetRevisionLabel] {
-		return fmt.Errorf("currently revision %s not equal to in-place update revision %s",
+		return 0, fmt.Errorf("currently revision %s not equal to in-place update revision %s",
 			pod.Labels[apps.StatefulSetRevisionLabel], inPlaceUpdateState.Revision)
 	}
 
@@ -438,24 +482,26 @@ func CheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 		}
 	}
 
+	var completedContainerCount int32
 	_, isInGraceState := pod.Annotations[appspub.InPlaceUpdateGraceKey]
 	for _, cs := range pod.Status.ContainerStatuses {
 		if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
 			// TODO: we assume that users should not update workload template with new image which actually has the same imageID as the old image
 			if oldStatus.ImageID == cs.ImageID {
 				if containerImages[cs.Name] != cs.Image || isInGraceState {
-					return fmt.Errorf("container %s imageID not changed", cs.Name)
+					return 0, fmt.Errorf("container %s imageID not changed", cs.Name)
 				}
 			}
 			delete(inPlaceUpdateState.LastContainerStatuses, cs.Name)
+			completedContainerCount++
 		}
 	}
 
 	if len(inPlaceUpdateState.LastContainerStatuses) > 0 {
-		return fmt.Errorf("not found statuses of containers %v", inPlaceUpdateState.LastContainerStatuses)
+		return completedContainerCount, fmt.Errorf("not found statuses of containers %v", inPlaceUpdateState.LastContainerStatuses)
 	}
 
-	return nil
+	return completedContainerCount, nil
 }
 
 // InjectReadinessGate injects InPlaceUpdateReady into pod.spec.readinessGates
@@ -548,4 +594,8 @@ func roundupSeconds(d time.Duration) time.Duration {
 		return d
 	}
 	return (d/time.Second + 1) * time.Second
+}
+
+func isInplaceUpdateCompleted(pod *v1.Pod) bool {
+	return pod.Annotations[appspub.InPlaceUpdating] == ""
 }

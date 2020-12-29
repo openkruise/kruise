@@ -35,6 +35,12 @@ const (
 	// InPlaceUpdateGraceKey records the spec that Pod should be updated when
 	// grace period ends.
 	InPlaceUpdateGraceKey string = "inplace-update-grace"
+
+	// InPlaceUpdating like a lock to mark InPlaceUpdating state.
+	InPlaceUpdating string = "inplace-updateing"
+
+	// InPlaceUpdateCount records the count of inplace-update.
+	InPlaceUpdateCount string = "inplace-update-count"
 )
 
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.

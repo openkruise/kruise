@@ -640,7 +640,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		if getPodRevision(replicas[target]) != updateRevision.Name || !isHealthy(replicas[target]) {
 			unavailablePods = append(unavailablePods, replicas[target].Name)
-		} else if completedErr := inplaceupdate.CheckInPlaceUpdateCompleted(
+		} else if _, completedErr := inplaceupdate.CheckInPlaceUpdateCompleted(
 			replicas[target]); completedErr != nil {
 			klog.V(4).Infof("StatefulSet %s/%s check Pod %s in-place update not-ready: %v",
 				set.Namespace,
