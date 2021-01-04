@@ -97,4 +97,8 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 			newStatus.UpdatedReadyReplicas++
 		}
 	}
+	if newStatus.UpdatedReplicas == newStatus.Replicas &&
+		newStatus.ReadyReplicas == newStatus.Replicas {
+		newStatus.CurrentRevision = newStatus.UpdateRevision
+	}
 }
