@@ -124,7 +124,7 @@ func main() {
 	}
 
 	setupLog.Info("new clientset registry")
-	err = extclient.NewRegistry(mgr)
+	err = extclient.NewRegistry(cfg)
 	if err != nil {
 		setupLog.Error(err, "unable to init kruise clientset and informer")
 		os.Exit(1)

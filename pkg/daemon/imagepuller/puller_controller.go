@@ -1,0 +1,283 @@
+/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package imagepuller
+
+import (
+	"fmt"
+	"math/rand"
+	"net/http"
+	"reflect"
+	"time"
+
+	kruiseapis "github.com/openkruise/kruise/apis"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/client"
+	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/runtime"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/reference"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
+)
+
+var (
+	scheme = runtime.NewScheme()
+)
+
+func init() {
+	_ = kruiseapis.AddToScheme(scheme)
+}
+
+type Controller struct {
+	queue                 workqueue.RateLimitingInterface
+	puller                puller
+	imagePullNodeInformer cache.SharedIndexInformer
+	imagePullNodeLister   listersalpha1.NodeImageLister
+	statusUpdater         *statusUpdater
+}
+
+// NewController returns the controller for image pulling
+func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonutil.SecretManager, healthz *daemonutil.Healthz) (*Controller, error) {
+	nodeName, _ := daemonutil.NodeName()
+	genericClient := client.GetGenericClient()
+	informer := newNodeImageInformer(genericClient.KruiseClient, nodeName)
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "imagepuller", Host: nodeName})
+
+	queue := workqueue.NewNamedRateLimitingQueue(
+		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 300*time.Second),
+		"imagepuller",
+	)
+
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			nodeImage, ok := obj.(*appsv1alpha1.NodeImage)
+			if ok {
+				enqueue(queue, nodeImage)
+			}
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			oldNodeImage, oldOK := oldObj.(*appsv1alpha1.NodeImage)
+			newNodeImage, newOK := newObj.(*appsv1alpha1.NodeImage)
+			if !oldOK || !newOK {
+				return
+			}
+			if reflect.DeepEqual(oldNodeImage.Spec, newNodeImage.Spec) {
+				klog.V(5).Infof("Find imagePullNode %s spec has not changed, skip enqueueing.", newNodeImage.Name)
+				return
+			}
+			logNewImages(oldNodeImage, newNodeImage)
+			enqueue(queue, newNodeImage)
+		},
+	})
+
+	puller, err := newRealPuller(runtimeFactory.GetImageRuntime(), secretManager, recorder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to new puller: %v", err)
+	}
+
+	healthz.RegisterFunc("nodeImageInformerSynced", func(_ *http.Request) error {
+		if !informer.HasSynced() {
+			return fmt.Errorf("not synced")
+		}
+		return nil
+	})
+
+	return &Controller{
+		queue:                 queue,
+		puller:                puller,
+		imagePullNodeInformer: informer,
+		imagePullNodeLister:   listersalpha1.NewNodeImageLister(informer.GetIndexer()),
+		statusUpdater:         newStatusUpdater(genericClient.KruiseClient.AppsV1alpha1().NodeImages()),
+	}, nil
+}
+
+func newNodeImageInformer(client kruiseclient.Interface, nodeName string) cache.SharedIndexInformer {
+	tweakListOptionsFunc := func(opt *metav1.ListOptions) {
+		opt.FieldSelector = "metadata.name=" + nodeName
+	}
+
+	return cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				tweakListOptionsFunc(&options)
+				return client.AppsV1alpha1().NodeImages().List(options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				tweakListOptionsFunc(&options)
+				return client.AppsV1alpha1().NodeImages().Watch(options)
+			},
+		},
+		&appsv1alpha1.NodeImage{},
+		time.Hour*12,
+		cache.Indexers{},
+	)
+}
+
+func enqueue(queue workqueue.Interface, obj *appsv1alpha1.NodeImage) {
+	if obj.DeletionTimestamp != nil {
+		return
+	}
+	key, _ := cache.MetaNamespaceKeyFunc(obj)
+	queue.Add(key)
+}
+
+func (c *Controller) Run(stop <-chan struct{}) {
+	defer utilruntime.HandleCrash()
+	defer c.queue.ShutDown()
+
+	klog.Info("Starting informer for NodeImage")
+	go c.imagePullNodeInformer.Run(stop)
+	if !cache.WaitForCacheSync(stop, c.imagePullNodeInformer.HasSynced) {
+		return
+	}
+
+	klog.Infof("Starting puller controller")
+	// Launch one workers to process resources, for there is only one NodeImage per Node
+	go wait.Until(func() {
+		for c.processNextWorkItem() {
+		}
+	}, time.Second, stop)
+
+	klog.Info("Started successfully")
+	<-stop
+}
+
+// processNextWorkItem will read a single work item off the workqueue and
+// attempt to process it, by calling the syncHandler.
+func (c *Controller) processNextWorkItem() bool {
+	// pull the next work item from queue.  It should be a key we use to lookup
+	// something in a cache
+	key, quit := c.queue.Get()
+	if quit {
+		return false
+	}
+	defer c.queue.Done(key)
+
+	err := c.sync(key.(string))
+
+	if err == nil {
+		// No error, tell the queue to stop tracking history
+		c.queue.Forget(key)
+	} else {
+		// requeue the item to work on later
+		c.queue.AddRateLimited(key)
+	}
+
+	return true
+}
+
+func (c *Controller) sync(key string) (retErr error) {
+	_, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		klog.Warningf("Invalid key: %s", key)
+		return nil
+	}
+
+	nodeImage, err := c.imagePullNodeLister.Get(name)
+	if errors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		klog.Errorf("Failed to get NodeImage %s: %v", name, err)
+		return err
+	}
+
+	klog.V(3).Infof("Start syncing for %s", name)
+	defer func() {
+		if retErr != nil {
+			klog.Errorf("Failed to sync for %s: %v", name, retErr)
+		} else {
+			klog.V(3).Infof("Finished syncing for %s", name)
+		}
+	}()
+
+	newStatus := appsv1alpha1.NodeImageStatus{
+		ImageStatuses: make(map[string]appsv1alpha1.ImageStatus),
+	}
+
+	ref, _ := reference.GetReference(scheme, nodeImage)
+	retErr = c.puller.Sync(&nodeImage.Spec, ref)
+	if retErr != nil {
+		return
+	}
+
+	for imageName, imageSpec := range nodeImage.Spec.Images {
+		newStatus.Desired += int32(len(imageSpec.Tags))
+
+		imageStatuses := c.puller.GetStatus(imageName)
+		if klog.V(9) {
+			klog.V(9).Infof("get image %v status %#v", imageName, imageStatuses)
+		}
+		if imageStatuses == nil {
+			continue
+		}
+		newStatus.ImageStatuses[imageName] = *imageStatuses
+		for _, tagStatus := range imageStatuses.Tags {
+			switch tagStatus.Phase {
+			case appsv1alpha1.ImagePhaseSucceeded:
+				newStatus.Succeeded++
+			case appsv1alpha1.ImagePhaseFailed:
+				newStatus.Failed++
+			case appsv1alpha1.ImagePhasePulling:
+				newStatus.Pulling++
+			}
+		}
+	}
+	if len(newStatus.ImageStatuses) == 0 {
+		newStatus.ImageStatuses = nil
+	}
+
+	retErr = retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		// try to get new data
+		nodeImage, err = c.imagePullNodeLister.Get(name)
+		if errors.IsNotFound(err) {
+			klog.Infof("node %v not found, skip", name)
+			return nil
+		} else if err != nil {
+			klog.Errorf("Failed to get %s imagePullNode: %v", name, err)
+			return err
+		}
+		err = c.statusUpdater.updateStatus(nodeImage, newStatus)
+		return err
+	})
+	if retErr != nil {
+		return retErr
+	}
+
+	if isImageInPulling(nodeImage.Spec, newStatus) {
+		// 1~2s
+		c.queue.AddAfter(key, time.Second+time.Millisecond*time.Duration(rand.Intn(1000)))
+	} else {
+		// about 10m
+		c.queue.AddAfter(key, 10*time.Minute+time.Millisecond*time.Duration(rand.Intn(10000)))
+	}
+	return nil
+}

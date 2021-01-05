@@ -1,0 +1,125 @@
+/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package imagepuller
+
+import (
+	"fmt"
+	"reflect"
+	"time"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	"golang.org/x/time/rate"
+	"k8s.io/klog"
+)
+
+func logNewImages(oldObj, newObj *appsv1alpha1.NodeImage) {
+	oldImages := make(map[string]struct{})
+	if oldObj != nil {
+		for image, imageSpec := range oldObj.Spec.Images {
+			for _, tagSpec := range imageSpec.Tags {
+				fullName := fmt.Sprintf("%v:%v", image, tagSpec.Tag)
+				oldImages[fullName] = struct{}{}
+			}
+		}
+	}
+
+	for image, imageSpec := range newObj.Spec.Images {
+		for _, tagSpec := range imageSpec.Tags {
+			fullName := fmt.Sprintf("%v:%v", image, tagSpec.Tag)
+			if _, ok := oldImages[fullName]; !ok {
+				klog.V(2).Infof("Received new image %v", fullName)
+			}
+		}
+	}
+}
+
+func isImageInPulling(spec appsv1alpha1.NodeImageSpec, status appsv1alpha1.NodeImageStatus) bool {
+	if status.Succeeded+status.Failed < status.Desired {
+		return true
+	}
+
+	tagSpecs := make(map[string]appsv1alpha1.ImageTagSpec)
+	for image, imageSpec := range spec.Images {
+		for _, tagSpec := range imageSpec.Tags {
+			fullName := fmt.Sprintf("%v:%v", image, tagSpec.Tag)
+			tagSpecs[fullName] = tagSpec
+		}
+	}
+	for image, imageStatus := range status.ImageStatuses {
+		for _, tagStatus := range imageStatus.Tags {
+			fullName := fmt.Sprintf("%v:%v", image, tagStatus.Tag)
+			if tagSpec, ok := tagSpecs[fullName]; ok && tagSpec.Version != tagStatus.Version {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+type statusUpdater struct {
+	imagePullNodeClient clientalpha1.NodeImageInterface
+
+	previousTimestamp time.Time
+	previousStatus    *appsv1alpha1.NodeImageStatus
+	rateLimiter       *rate.Limiter
+}
+
+const (
+	statusUpdateQPS   = 0.2
+	statusUpdateBurst = 5
+)
+
+func newStatusUpdater(imagePullNodeClient clientalpha1.NodeImageInterface) *statusUpdater {
+	return &statusUpdater{
+		imagePullNodeClient: imagePullNodeClient,
+		previousStatus:      &appsv1alpha1.NodeImageStatus{},
+		previousTimestamp:   time.Now().Add(-time.Hour * 24),
+		rateLimiter:         rate.NewLimiter(statusUpdateQPS, statusUpdateBurst),
+	}
+}
+
+func (su *statusUpdater) updateStatus(imagePullNode *appsv1alpha1.NodeImage, newStatus appsv1alpha1.NodeImageStatus) error {
+	// IMPORTANT!!! Make sure rate limiter is working!
+	if !su.statusChanaged(&newStatus) {
+		return nil
+	}
+
+	if !su.rateLimiter.Allow() {
+		msg := fmt.Sprintf("Updating status is limited qps=%v burst=%v", statusUpdateQPS, statusUpdateBurst)
+		klog.V(3).Infof(msg)
+		return fmt.Errorf(msg)
+	}
+
+	klog.V(5).Infof("Updating status: %v", util.DumpJSON(newStatus))
+	newNodeImage := imagePullNode.DeepCopy()
+	newNodeImage.Status = newStatus
+
+	_, err := su.imagePullNodeClient.UpdateStatus(newNodeImage)
+	if err == nil {
+		su.previousStatus = &newStatus
+	}
+	su.previousTimestamp = time.Now()
+	return err
+}
+
+func (su *statusUpdater) statusChanaged(newStatus *appsv1alpha1.NodeImageStatus) bool {
+	// Can not use imagePullNode.Status to compare because of time accuracy
+	return !reflect.DeepEqual(su.previousStatus, newStatus)
+}
