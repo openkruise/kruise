@@ -29,7 +29,7 @@ import (
 // SidecarSetHash returns a hash of the SidecarSet.
 // The Containers are taken into account.
 func SidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
-	encoded, err := encodeSidecarSet(sidecarSet, true)
+	encoded, err := encodeSidecarSet(sidecarSet)
 	if err != nil {
 		return "", err
 	}
@@ -44,19 +44,17 @@ func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, er
 	for i := range ss.Spec.Containers {
 		ss.Spec.Containers[i].Image = ""
 	}
-	encoded, err := encodeSidecarSet(ss, false)
+	encoded, err := encodeSidecarSet(ss)
 	if err != nil {
 		return "", err
 	}
 	return rand.SafeEncodeString(hash(encoded)), nil
 }
 
-func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet, includeInit bool) (string, error) {
+func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
 	m := map[string]interface{}{"containers": sidecarSet.Spec.Containers}
-	if includeInit {
-		m["initContainers"] = sidecarSet.Spec.InitContainers
-	}
+	m["initContainers"] = sidecarSet.Spec.InitContainers
 	data, err := json.Marshal(m)
 	if err != nil {
 		return "", err

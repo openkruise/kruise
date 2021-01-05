@@ -90,10 +90,10 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 		if coreControl.IsPodUpdateReady(pod, cs.Spec.MinReadySeconds) {
 			newStatus.AvailableReplicas++
 		}
-		if clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision {
+		if clonesetutils.GetPodRevision("", pod) == newStatus.UpdateRevision {
 			newStatus.UpdatedReplicas++
 		}
-		if clonesetutils.GetPodRevision(pod) == newStatus.UpdateRevision && coreControl.IsPodUpdateReady(pod, 0) {
+		if clonesetutils.GetPodRevision("", pod) == newStatus.UpdateRevision && coreControl.IsPodUpdateReady(pod, 0) {
 			newStatus.UpdatedReadyReplicas++
 		}
 	}

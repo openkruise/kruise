@@ -315,7 +315,7 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 }
 
 // GetPodRevision returns revision hash of this pod.
-func GetPodRevision(pod metav1.Object) string {
+func GetPodRevision(controllerKey string, pod metav1.Object) string {
 	return pod.GetLabels()[apps.ControllerRevisionHashLabelKey]
 }
 

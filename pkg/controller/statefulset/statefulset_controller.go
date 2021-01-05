@@ -65,7 +65,7 @@ var (
 	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 	concurrentReconciles = 3
 
-	updateExpectations = expectations.NewUpdateExpectations(func(o metav1.Object) string {
+	updateExpectations = expectations.NewUpdateExpectations(func(controllerKey string, o metav1.Object) string {
 		p := o.(*v1.Pod)
 		return getPodRevision(p)
 	})

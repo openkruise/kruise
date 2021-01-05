@@ -20,7 +20,9 @@ package util
 import (
 	"sync"
 
+	"github.com/docker/distribution/reference"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog"
 	"k8s.io/utils/integer"
 )
 
@@ -79,4 +81,57 @@ func CheckDuplicate(list []string) []string {
 
 func GetIntOrStrPointer(i intstrutil.IntOrString) *intstrutil.IntOrString {
 	return &i
+}
+
+// parse container images,
+// 1. docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
+// repo=docker.io/busybox, tag="", digest=sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
+// 2. docker.io/busybox:latest
+// repo=docker.io/busybox, tag=latest, digest=""
+func ParseImage(image string) (repo, tag, digest string, err error) {
+	refer, err := reference.Parse(image)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	if named, ok := refer.(reference.Named); ok {
+		repo = named.Name()
+	}
+	if tagged, ok := refer.(reference.Tagged); ok {
+		tag = tagged.Tag()
+	}
+	if digested, ok := refer.(reference.Digested); ok {
+		digest = digested.Digest().String()
+	}
+	return
+}
+
+//whether image is digest format,
+//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
+func IsImageDigest(image string) bool {
+	_, _, digest, _ := ParseImage(image)
+	return digest != ""
+}
+
+// 1. image1, image2 are digest image, compare repo+digest
+// 2. image1, image2 are normal image, compare repo+tag
+// 3. image1, image2 are digest+normal image, don't support compare it, return false
+func IsContainerImageEqual(image1, image2 string) bool {
+	repo1, tag1, digest1, err := ParseImage(image1)
+	if err != nil {
+		klog.Errorf("parse image %s failed: %s", image1, err.Error())
+		return false
+	}
+
+	repo2, tag2, digest2, err := ParseImage(image2)
+	if err != nil {
+		klog.Errorf("parse image %s failed: %s", image2, err.Error())
+		return false
+	}
+
+	if IsImageDigest(image1) && IsImageDigest(image2) {
+		return repo1 == repo2 && digest1 == digest2
+	}
+
+	return repo1 == repo2 && tag1 == tag2
 }

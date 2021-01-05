@@ -2,23 +2,23 @@ package sidecarset
 
 import (
 	"context"
-	"reflect"
+	"strings"
+	"time"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPod{}
@@ -50,7 +50,7 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 		return
 	}
 
-	sidecarSets, err := p.getPodSidecarSets(pod)
+	sidecarSets, err := p.getPodMatchedSidecarSets(pod)
 	if err != nil {
 		klog.Errorf("unable to get sidecarSets related with pod %s/%s, err: %v", pod.Namespace, pod.Name, err)
 		return
@@ -79,74 +79,112 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		return
 	}
 
-	podChanged := isPodChanged(oldPod, newPod)
-	labelChanged := false
-	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) {
-		labelChanged = true
-	}
-
-	if !podChanged && !labelChanged {
+	//labels changed, and reconcile union sidecarSets
+	/*if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) {
+		sidecarSets,err := p.getUnionSidecarSets(oldPod, newPod)
+		if err!=nil {
+			klog.Errorf("unable to get sidecarSets of pod %s/%s, err: %v", newPod.Namespace, newPod.Name, err)
+			return
+		}
+		for name := range sidecarSets {
+			q.Add(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: name,
+				},
+			})
+		}
 		return
-	}
+	}*/
 
-	sidecarSets, err := p.getPodSidecarSetMemberships(newPod)
+	matchedSidecarSets, err := p.getPodMatchedSidecarSets(newPod)
 	if err != nil {
 		klog.Errorf("unable to get sidecarSets of pod %s/%s, err: %v", newPod.Namespace, newPod.Name, err)
 		return
 	}
-
-	if labelChanged {
-		oldSidecarSets, err := p.getPodSidecarSetMemberships(oldPod)
-		if err != nil {
-			klog.Errorf("unable to get sidecarSets of pod %s/%s, err: %v", oldPod.Namespace, oldPod.Name, err)
-			return
+	for _, sidecarSet := range matchedSidecarSets {
+		var isChanged bool
+		var enqueueDelayTime time.Duration
+		//check whether pod status is changed
+		if isChanged = isPodStatusChanged(oldPod, newPod); !isChanged {
+			//check whether pod consistent is changed
+			isChanged, enqueueDelayTime = isPodConsistentChanged(oldPod, newPod, sidecarSet)
 		}
-		sidecarSets = sidecarSets.Difference(oldSidecarSets).Union(oldSidecarSets.Difference(sidecarSets))
+		if isChanged {
+			q.AddAfter(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: sidecarSet.Name,
+				},
+			}, enqueueDelayTime)
+		}
 	}
 
-	for name := range sidecarSets {
-		q.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: name,
-			},
-		})
+}
+
+/*func (p *enqueueRequestForPod) getUnionSidecarSets(oldPod, newPod *corev1.Pod) (sets.String, error) {
+	//if labels changed, then union older,new sidecarSets
+	sidecarSets, err := p.getPodSidecarSetMemberships(newPod)
+	if err != nil {
+		return nil, err
 	}
+	oldSidecarSets, err := p.getPodSidecarSetMemberships(oldPod)
+	if err != nil {
+		return nil, err
+	}
+	sidecarSets = sidecarSets.Difference(oldSidecarSets).Union(oldSidecarSets.Difference(sidecarSets))
+	return sidecarSets, nil
 }
 
 func (p *enqueueRequestForPod) getPodSidecarSetMemberships(pod *corev1.Pod) (sets.String, error) {
 	set := sets.String{}
-	sidecarSets, err := p.getPodSidecarSets(pod)
+	sidecarSets, err := p.getPodMatchedSidecarSets(pod)
 	if err != nil {
 		return set, err
 	}
-
 	for _, sidecarSet := range sidecarSets {
 		set.Insert(sidecarSet.Name)
 	}
 	return set, nil
-}
+}*/
 
-func (p *enqueueRequestForPod) getPodSidecarSets(pod *corev1.Pod) ([]appsv1alpha1.SidecarSet, error) {
+func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*appsv1alpha1.SidecarSet, error) {
+	sidecarSetNames, ok := pod.Annotations[sidecarcontrol.SidecarSetListAnnotation]
+
+	var matchedSidecarSets []*appsv1alpha1.SidecarSet
+	if ok && len(sidecarSetNames) > 0 {
+		for _, sidecarSetName := range strings.Split(sidecarSetNames, ",") {
+			sidecarSet := new(appsv1alpha1.SidecarSet)
+			if err := p.client.Get(context.TODO(), types.NamespacedName{
+				Name: sidecarSetName,
+			}, sidecarSet); err != nil {
+				if errors.IsNotFound(err) {
+					klog.Errorf("sidecarSet %v not fount", sidecarSetName)
+					continue
+				}
+				return nil, err
+			}
+			matchedSidecarSets = append(matchedSidecarSets, sidecarSet)
+		}
+		return matchedSidecarSets, nil
+	}
+
 	sidecarSets := appsv1alpha1.SidecarSetList{}
 	if err := p.client.List(context.TODO(), &sidecarSets); err != nil {
 		return nil, err
 	}
 
-	var matchedSidecarSets []appsv1alpha1.SidecarSet
 	for _, sidecarSet := range sidecarSets.Items {
-		matched, err := mutating.PodMatchSidecarSet(pod, sidecarSet)
+		matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet)
 		if err != nil {
 			return nil, err
 		}
 		if matched {
-			matchedSidecarSets = append(matchedSidecarSets, sidecarSet)
+			matchedSidecarSets = append(matchedSidecarSets, &sidecarSet)
 		}
 	}
-
 	return matchedSidecarSets, nil
 }
 
-func isPodChanged(oldPod, newPod *corev1.Pod) bool {
+func isPodStatusChanged(oldPod, newPod *corev1.Pod) bool {
 	// If the pod's deletion timestamp is set, remove endpoint from ready address.
 	if newPod.DeletionTimestamp != oldPod.DeletionTimestamp {
 		return true
@@ -160,9 +198,16 @@ func isPodChanged(oldPod, newPod *corev1.Pod) bool {
 		return true
 	}
 
-	if !isPodImageConsistent(oldPod) && isPodImageConsistent(newPod) {
-		return true
+	return false
+}
+
+func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, time.Duration) {
+	control := sidecarcontrol.New(sidecarSet)
+	var enqueueDelayTime time.Duration
+	if !control.IsPodUpdatedConsistent(oldPod, nil) && control.IsPodUpdatedConsistent(newPod, nil) {
+		enqueueDelayTime = 5 * time.Second
+		return true, enqueueDelayTime
 	}
 
-	return false
+	return false, enqueueDelayTime
 }

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidecarset
+  template:
+    metadata:
+      labels:
+        app: sidecarset
+    spec:
+      containers:
+        - image: busybox:latest
+          name: main
+          command:
+            - "/bin/sh"
+            - "-c"
+            - sleep 100000
