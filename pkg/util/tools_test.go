@@ -92,3 +92,65 @@ func TestSlowStartBatch(t *testing.T) {
 		}
 	}
 }
+
+func TestIsContainerImageEqual(t *testing.T) {
+	cases := []struct {
+		name       string
+		images     [2]string
+		equal      bool
+		exceptions map[string][3]string
+	}{
+		{
+			name:   "image tag and equal",
+			images: [2]string{"docker.io/busybox:v1", "docker.io/busybox:v1"},
+			equal:  true,
+			exceptions: map[string][3]string{
+				"docker.io/busybox:v1": {"docker.io/busybox", "v1", ""},
+			},
+		},
+		{
+			name:   "image tag and not equal",
+			images: [2]string{"docker.io/busybox:v1", "docker.io/busybox:v2"},
+			equal:  false,
+			exceptions: map[string][3]string{
+				"docker.io/busybox:v1": {"docker.io/busybox", "v1", ""},
+				"docker.io/busybox:v2": {"docker.io/busybox", "v2", ""},
+			},
+		},
+		{
+			name:   "image digest and equal",
+			images: [2]string{"docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d", "docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+			equal:  true,
+			exceptions: map[string][3]string{
+				"docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d": {"docker.io/busybox", "", "sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+			},
+		},
+		{
+			name:   "image digest and not equal",
+			images: [2]string{"docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d", "docker.io/busybox@sha256:a2d86defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+			equal:  false,
+			exceptions: map[string][3]string{
+				"docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d": {"docker.io/busybox", "", "sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+				"docker.io/busybox@sha256:a2d86defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d": {"docker.io/busybox", "", "sha256:a2d86defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			if cs.equal != IsContainerImageEqual(cs.images[0], cs.images[1]) {
+				t.Fatalf("except %t, but get %t", cs.equal, IsContainerImageEqual(cs.images[0], cs.images[1]))
+			}
+			for image, excepts := range cs.exceptions {
+				repo, tag, digest, err := ParseImage(image)
+				if err != nil {
+					t.Errorf("ParseImage %s failed: %s", image, err.Error())
+				}
+				if repo != excepts[0] || tag != excepts[1] || digest != excepts[2] {
+					t.Fatalf("except repo %s tag %s digest %s, but get %s, %s, %s",
+						excepts[0], excepts[1], excepts[2], repo, tag, digest)
+				}
+			}
+		})
+	}
+}

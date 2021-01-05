@@ -35,7 +35,7 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 	}
-	c := NewUpdateExpectations(func(p metav1.Object) string { return p.GetLabels()["revision"] })
+	c := NewUpdateExpectations(func(controllerKey string, p metav1.Object) string { return p.GetLabels()["revision"] })
 
 	// no pod in cache
 	if satisfied, _, _ := c.SatisfiedExpectations(controllerKey, revisions[0]); !satisfied {

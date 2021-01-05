@@ -1,0 +1,22 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: SidecarSet
+metadata:
+  name: test-sidecarset
+spec:
+  selector:
+    matchLabels:
+      app: sidecarset
+  initContainers:
+    - image: busybox:latest
+      name: init-sidecar
+      command: ["/bin/sh", "-c", "sleep 1"]
+  containers:
+    - image: nginx:latest
+      command: [ "tail", "-f", "/dev/null" ]
+      name: nginx-sidecar
+      podInjectPolicy: BeforeAppContainer
+      shareVolumePolicy: enabled
+    - image: busybox:latest
+      name: busybox-sidecar
+      command: [ "/bin/sh", "-c", "sleep 10000000" ]
+      podInjectPolicy: AfterAppContainer

@@ -34,18 +34,35 @@ func SetDefaultsSidecarSet(obj *SidecarSet) {
 	}
 
 	for i := range obj.Spec.Containers {
-		setSidecarDefaultContainer(&obj.Spec.Containers[i])
+		setDefaultSidecarContainer(&obj.Spec.Containers[i])
 	}
 }
 
-func setSidecarSetUpdateStratety(strategy *SidecarSetUpdateStrategy) {
-	if strategy.RollingUpdate == nil {
-		rollingUpdate := RollingUpdateSidecarSet{}
-		strategy.RollingUpdate = &rollingUpdate
+func setDefaultSidecarContainer(sidecarContainer *SidecarContainer) {
+	if sidecarContainer.PodInjectPolicy == "" {
+		sidecarContainer.PodInjectPolicy = BeforeAppContainerType
 	}
-	if strategy.RollingUpdate.MaxUnavailable == nil {
+	if sidecarContainer.UpgradeStrategy.UpgradeType == "" {
+		sidecarContainer.UpgradeStrategy.UpgradeType = SidecarContainerColdUpgrade
+	}
+	if sidecarContainer.ShareVolumePolicy.Type == "" {
+		sidecarContainer.ShareVolumePolicy.Type = ShareVolumePolicyDisabled
+	}
+
+	setSidecarDefaultContainer(sidecarContainer)
+}
+
+func setSidecarSetUpdateStratety(strategy *SidecarSetUpdateStrategy) {
+	if strategy.Type == "" {
+		strategy.Type = NotUpdateSidecarSetStrategyType
+	}
+	if strategy.MaxUnavailable == nil {
 		maxUnavailable := intstr.FromInt(1)
-		strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		strategy.MaxUnavailable = &maxUnavailable
+	}
+	if strategy.Partition == nil {
+		partition := intstr.FromInt(0)
+		strategy.Partition = &partition
 	}
 }
 

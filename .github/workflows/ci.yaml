@@ -145,4 +145,4 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          go test ./test/e2e/ -timeout 30m -v
+          go test ./test/e2e/ -timeout 90m -v

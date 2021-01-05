@@ -67,7 +67,7 @@ func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, e
 }
 
 // GetPodRevision returns revision hash of this pod.
-func GetPodRevision(pod metav1.Object) string {
+func GetPodRevision(controllerKey string, pod metav1.Object) string {
 	return pod.GetLabels()[apps.ControllerRevisionHashLabelKey]
 }
 
@@ -75,7 +75,7 @@ func GetPodRevision(pod metav1.Object) string {
 func GetPodsRevisions(pods []*v1.Pod) sets.String {
 	revisions := sets.NewString()
 	for _, p := range pods {
-		revisions.Insert(GetPodRevision(p))
+		revisions.Insert(GetPodRevision("", p))
 	}
 	return revisions
 }
@@ -104,7 +104,7 @@ func IsRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
 // SplitPodsByRevision returns Pods matched and unmatched the given revision
 func SplitPodsByRevision(pods []*v1.Pod, rev string) (matched, unmatched []*v1.Pod) {
 	for _, p := range pods {
-		if GetPodRevision(p) == rev {
+		if GetPodRevision("", p) == rev {
 			matched = append(matched, p)
 		} else {
 			unmatched = append(unmatched, p)

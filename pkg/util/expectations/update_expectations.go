@@ -34,7 +34,7 @@ type UpdateExpectations interface {
 }
 
 // NewUpdateExpectations returns a common UpdateExpectations.
-func NewUpdateExpectations(getRevision func(metav1.Object) string) UpdateExpectations {
+func NewUpdateExpectations(getRevision func(string, metav1.Object) string) UpdateExpectations {
 	return &realUpdateExpectations{
 		controllerCache: make(map[string]*realControllerUpdateExpectations),
 		getRevision:     getRevision,
@@ -46,7 +46,7 @@ type realUpdateExpectations struct {
 	// key: parent key, workload namespace/name
 	controllerCache map[string]*realControllerUpdateExpectations
 	// how to get pod revision
-	getRevision func(metav1.Object) string
+	getRevision func(string, metav1.Object) string
 }
 
 type realControllerUpdateExpectations struct {
@@ -82,7 +82,7 @@ func (r *realUpdateExpectations) ObserveUpdated(controllerKey, revision string, 
 		return
 	}
 
-	if expectations.revision == revision && expectations.objsUpdated.Has(getKey(obj)) && r.getRevision(obj) == revision {
+	if expectations.revision == revision && expectations.objsUpdated.Has(getKey(obj)) && r.getRevision(controllerKey, obj) == revision {
 		expectations.objsUpdated.Delete(getKey(obj))
 	}
 

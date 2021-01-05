@@ -25,10 +25,10 @@ import (
 )
 
 type scatterSort struct {
-	strategy appsv1alpha1.CloneSetUpdateScatterStrategy
+	strategy appsv1alpha1.UpdateScatterStrategy
 }
 
-func NewScatterSorter(s appsv1alpha1.CloneSetUpdateScatterStrategy) Sorter {
+func NewScatterSorter(s appsv1alpha1.UpdateScatterStrategy) Sorter {
 	return &scatterSort{strategy: s}
 }
 
@@ -46,22 +46,22 @@ func (ss *scatterSort) Sort(pods []*v1.Pod, indexes []int) []int {
 }
 
 // getScatterTerms returns all scatter terms in current sorting. It will sort all terms by sum of pods matched.
-func (ss *scatterSort) getScatterTerms(pods []*v1.Pod, indexes []int) []appsv1alpha1.CloneSetUpdateScatterTerm {
+func (ss *scatterSort) getScatterTerms(pods []*v1.Pod, indexes []int) []appsv1alpha1.UpdateScatterTerm {
 	if len(ss.strategy) == 1 {
 		return ss.strategy
 	}
 
-	var termSlice []appsv1alpha1.CloneSetUpdateScatterTerm
+	var termSlice []appsv1alpha1.UpdateScatterTerm
 	ruleCounter := map[string]int{}
 
-	termID := func(term appsv1alpha1.CloneSetUpdateScatterTerm) string {
+	termID := func(term appsv1alpha1.UpdateScatterTerm) string {
 		return term.Key + ":" + term.Value
 	}
 
 	for _, term := range ss.strategy {
 		for _, idx := range indexes {
 			if val, ok := pods[idx].Labels[term.Key]; ok && val == term.Value {
-				newTerm := appsv1alpha1.CloneSetUpdateScatterTerm{Key: term.Key, Value: val}
+				newTerm := appsv1alpha1.UpdateScatterTerm{Key: term.Key, Value: val}
 				id := termID(newTerm)
 				if count, ok := ruleCounter[id]; !ok {
 					termSlice = append(termSlice, newTerm)
@@ -86,7 +86,7 @@ func (ss *scatterSort) getScatterTerms(pods []*v1.Pod, indexes []int) []appsv1al
 }
 
 // scatterPodsByRule scatters pods by given rule term.
-func (ss *scatterSort) scatterPodsByRule(term appsv1alpha1.CloneSetUpdateScatterTerm, pods []*v1.Pod, indexes []int) (ret []int) {
+func (ss *scatterSort) scatterPodsByRule(term appsv1alpha1.UpdateScatterTerm, pods []*v1.Pod, indexes []int) (ret []int) {
 
 	// 1. counts the total number of matched and unmatched pods; find matched and unmatched pods in indexes waiting to update
 	var matchedIndexes, unmatchedIndexes []int

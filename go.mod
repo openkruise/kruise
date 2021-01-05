@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
+	github.com/docker/distribution v2.7.1+incompatible
 	github.com/gorilla/mux v1.7.3
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1
@@ -50,6 +51,7 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.16.6
 	k8s.io/metrics => k8s.io/metrics v0.16.6
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.16.6
+	github.com/docker/distribution => github.com/docker/distribution v2.7.2-0.20200708230840-70e0022e42fd+incompatible
 )
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.2

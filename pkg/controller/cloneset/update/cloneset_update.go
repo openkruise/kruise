@@ -96,7 +96,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 			continue
 		}
 
-		if clonesetutils.GetPodRevision(pods[i]) != updateRevision.Name {
+		if clonesetutils.GetPodRevision("", pods[i]) != updateRevision.Name {
 			switch lifecycle.GetPodLifecycleState(pods[i]) {
 			case appspub.LifecycleStatePreparingDelete, appspub.LifecycleStateUpdated:
 				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
@@ -259,7 +259,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 		cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
 		var oldRevision *apps.ControllerRevision
 		for _, r := range revisions {
-			if r.Name == clonesetutils.GetPodRevision(pod) {
+			if r.Name == clonesetutils.GetPodRevision("", pod) {
 				oldRevision = r
 				break
 			}

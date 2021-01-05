@@ -22,17 +22,12 @@ import (
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/api/admission/v1beta1"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-)
-
-const (
-	// SidecarSetHashAnnotation represents the key of a sidecarset hash
-	SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
-	// SidecarSetHashWithoutImageAnnotation represents the key of a sidecarset hash without images of sidecar
-	SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
 )
 
 // SidecarSetCreateHandler handles SidecarSet
@@ -56,13 +51,13 @@ func setHashSidecarSet(sidecarset *appsv1alpha1.SidecarSet) error {
 	if err != nil {
 		return err
 	}
-	sidecarset.Annotations[SidecarSetHashAnnotation] = hash
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = hash
 
 	hash, err = SidecarSetHashWithoutImage(sidecarset)
 	if err != nil {
 		return err
 	}
-	sidecarset.Annotations[SidecarSetHashWithoutImageAnnotation] = hash
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = hash
 
 	return nil
 }
