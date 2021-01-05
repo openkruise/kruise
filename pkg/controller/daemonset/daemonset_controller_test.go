@@ -282,7 +282,7 @@ func TestReconcile(t *testing.T) {
 	mgr, err := manager.New(cfg, manager.Options{})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
-	err = client.NewRegistry(mgr)
+	err = client.NewRegistry(mgr.GetConfig())
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
 	set := newDaemonSet("test")

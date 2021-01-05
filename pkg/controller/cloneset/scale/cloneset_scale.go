@@ -56,7 +56,6 @@ func (r *realControl) Manage(
 	if updateCS.Spec.Replicas == nil {
 		return false, fmt.Errorf("spec.Replicas is nil")
 	}
-	klog.Infof("DEBUG start scale for %v", util.DumpJSON(updateCS))
 
 	controllerKey := clonesetutils.GetControllerKey(updateCS)
 	coreControl := clonesetcore.New(updateCS)

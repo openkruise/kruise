@@ -1,7 +1,7 @@
 package client
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"k8s.io/client-go/rest"
 )
 
 var (
@@ -9,9 +9,9 @@ var (
 )
 
 // NewRegistry creates clientset by client-go
-func NewRegistry(mgr manager.Manager) error {
+func NewRegistry(cfg *rest.Config) error {
 	var err error
-	genericClient, err = newForConfig(mgr.GetConfig())
+	genericClient, err = newForConfig(cfg)
 	if err != nil {
 		return err
 	}

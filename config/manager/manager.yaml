@@ -30,6 +30,7 @@ spec:
         - --logtostderr=true
         - --v=5
         image: controller:latest
+        imagePullPolicy: Always
         name: manager
         env:
           - name: POD_NAMESPACE
@@ -54,3 +55,72 @@ kind: Secret
 metadata:
   name: webhook-certs
   namespace: system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: daemon
+  namespace: system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemon
+  namespace: system
+  labels:
+    control-plane: daemon
+spec:
+  selector:
+    matchLabels:
+      control-plane: daemon
+  template:
+    metadata:
+      labels:
+        control-plane: daemon
+    spec:
+      containers:
+      - command:
+        - /kruise-daemon
+        args:
+        - --logtostderr=true
+        - -v=4
+        image: controller:latest
+        imagePullPolicy: Always
+        name: daemon
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 10221
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: "0"
+            memory: "0"
+        volumeMounts:
+        - mountPath: /hostvarrun
+          name: runtime-socket
+          readOnly: true
+      tolerations:
+      - operator: Exists
+      hostNetwork: true
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: kruise-daemon
+      volumes:
+      - hostPath:
+          path: /var/run
+          type: ""
+        name: runtime-socket
