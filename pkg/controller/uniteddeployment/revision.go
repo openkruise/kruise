@@ -187,6 +187,7 @@ func (r *ReconcileUnitedDeployment) createControllerRevision(parent metav1.Objec
 		hash := history.HashControllerRevision(revision, collisionCount)
 		// Update the revisions name
 		clone.Name = history.ControllerRevisionName(parent.GetName(), hash)
+		clone.Labels[history.ControllerRevisionHashLabel] = hash
 		err = r.Client.Create(context.TODO(), clone)
 		if errors.IsAlreadyExists(err) {
 			exists := &apps.ControllerRevision{}

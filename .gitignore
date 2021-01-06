@@ -23,5 +23,6 @@ bin
 *.swp
 *.swo
 *~
+.vscode
 
 .DS_Store
