@@ -65,10 +65,10 @@ const (
 )
 
 var (
-	concurrentReconciles = 3
+	concurrentReconciles     = 3
 	scheduleBroadcastJobPods bool
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
-	scaleExpectations    = expectations.NewScaleExpectations()
+	controllerKind           = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
+	scaleExpectations        = expectations.NewScaleExpectations()
 )
 
 // Add creates a new BroadcastJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
