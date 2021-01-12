@@ -52,12 +52,7 @@ func NewSidecarSetProcessor(cli client.Client, expectations expectations.UpdateE
 }
 
 func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (reconcile.Result, error) {
-	// SidecarSet upgrade strategy type is NotUpdate
-	if !isSidecarSetNotUpdate(sidecarSet) {
-		return reconcile.Result{}, nil
-	}
 	control := sidecarcontrol.New(sidecarSet)
-
 	// 1. get matching pods with the sidecarSet
 	pods, err := p.getMatchingPods(sidecarSet)
 	if err != nil {
@@ -82,33 +77,25 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	// 4. sidecarset already updates all matched pods, then return
+	// 4. SidecarSet upgrade strategy type is NotUpdate
+	if !isSidecarSetNotUpdate(sidecarSet) {
+		return reconcile.Result{}, nil
+	}
+
+	// 5. sidecarset already updates all matched pods, then return
 	if isSidecarSetUpdateFinish(status) {
 		klog.V(3).Infof("sidecarSet update pod finished, name: %s", sidecarSet.Name)
 		return reconcile.Result{}, nil
 	}
 
-	// 5. Paused indicates that the SidecarSet is paused to update matched pods
+	// 6. Paused indicates that the SidecarSet is paused to update matched pods
 	if sidecarSet.Spec.Strategy.Paused {
 		klog.V(3).Infof("sidecarSet is paused, name: %s", sidecarSet.Name)
 		return reconcile.Result{}, nil
 	}
 
-	// 6. In kubernetes cluster, when inplace update pod, only fields such as image can be updated for the container.
-	// It is to determine whether there are other fields that have been modified for pod.
-	var canUpgradePods []*corev1.Pod
-	for index := range pods {
-		if control.IsSidecarSetCanUpgrade(pods[index]) {
-			canUpgradePods = append(canUpgradePods, pods[index])
-		}
-	}
-	if len(canUpgradePods) == 0 {
-		klog.V(3).Infof("sidecarSet(%s) will not upgrade pods", sidecarSet.Name)
-		return reconcile.Result{}, nil
-	}
-
 	// 7. upgrade pod sidecar
-	if err := p.updatePods(control, canUpgradePods); err != nil {
+	if err := p.updatePods(control, pods); err != nil {
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
@@ -304,7 +291,7 @@ func isPodInjectedSidecar(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) 
 }
 
 func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
-	if s.Spec.Strategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType || s.Spec.Strategy.Type == "" {
+	if s.Spec.Strategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
 		klog.V(3).Infof("sidecarSet spreading RollingUpdate config type, name: %s, type: %s", s.Name, s.Spec.Strategy.Type)
 		return false
 	}

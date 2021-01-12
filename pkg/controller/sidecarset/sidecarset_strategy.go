@@ -1,7 +1,6 @@
 package sidecarset
 
 import (
-	"math"
 	"sort"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -65,9 +64,11 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 	//1. select which pods can be upgraded, the following:
 	//	* pod must be not updated for the latest sidecarSet
 	//	* If selector is not nil, this upgrade will only update the selected pods.
+	//  * In kubernetes cluster, when inplace update pod, only fields such as image can be updated for the container.
+	//  * It is to determine whether there are other fields that have been modified for pod.
 	for index, pod := range pods {
 		isUpdated := sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod)
-		if !isUpdated && isSelected(pod) {
+		if !isUpdated && isSelected(pod) && control.IsSidecarSetCanUpgrade(pod) {
 			waitUpgradedIndexes = append(waitUpgradedIndexes, index)
 		}
 	}
@@ -118,8 +119,8 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 	}
 	waitUpdateIndexes = waitUpdateIndexes[:(len(waitUpdateIndexes) - partition)]
 
-	// max unavailable pods number
-	maxUnavailable := math.MaxInt32
+	// max unavailable pods number, default is 1
+	maxUnavailable := 1
 	if strategy.MaxUnavailable != nil {
 		maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(strategy.MaxUnavailable, totalReplicas, false)
 	}

@@ -108,7 +108,8 @@ type SidecarContainerUpgradeStrategy struct {
 type SidecarSetUpdateStrategy struct {
 	// Type is NotUpdate, the SidecarSet don't update the injected pods,
 	// it will only inject sidecar container into the newly created pods.
-	// Type is RollingUpdate, the SidecarSet will update the injected pods to the latest version on RollingUpdate Strategy
+	// Type is RollingUpdate, the SidecarSet will update the injected pods to the latest version on RollingUpdate Strategy.
+	// default is RollingUpdate
 	Type SidecarSetUpdateStrategyType `json:"type,omitempty"`
 
 	// Paused indicates that the SidecarSet is paused to update the injected pods,
