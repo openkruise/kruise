@@ -230,12 +230,12 @@ func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []appsv1alpha1.DaemonSet
 var _ handler.EventHandler = &nodeEventHandler{}
 
 type nodeEventHandler struct {
-	client client.Client
+	reader client.Reader
 }
 
 func (e *nodeEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	dsList := &appsv1alpha1.DaemonSetList{}
-	err := e.client.List(context.TODO(), dsList)
+	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(6).Infof("Error enqueueing daemon sets: %v", err)
 		return
@@ -244,7 +244,7 @@ func (e *nodeEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitin
 	node := evt.Object.(*v1.Node)
 	klog.V(6).Infof("add new node: %v", node.Name)
 	for index, ds := range dsList.Items {
-		_, shouldSchedule, _, err := NodeShouldRunDaemonPod(e.client, node, &dsList.Items[index])
+		_, shouldSchedule, _, err := NodeShouldRunDaemonPod(e.reader, node, &dsList.Items[index])
 		if err != nil {
 			continue
 		}
@@ -267,18 +267,18 @@ func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitin
 	}
 
 	dsList := &appsv1alpha1.DaemonSetList{}
-	err := e.client.List(context.TODO(), dsList)
+	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(6).Infof("Error enqueueing daemon sets: %v", err)
 		return
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
 	for index, ds := range dsList.Items {
-		_, oldShouldSchedule, oldShouldContinueRunning, err := NodeShouldRunDaemonPod(e.client, oldNode, &dsList.Items[index])
+		_, oldShouldSchedule, oldShouldContinueRunning, err := NodeShouldRunDaemonPod(e.reader, oldNode, &dsList.Items[index])
 		if err != nil {
 			continue
 		}
-		_, currentShouldSchedule, currentShouldContinueRunning, err := NodeShouldRunDaemonPod(e.client, curNode, &dsList.Items[index])
+		_, currentShouldSchedule, currentShouldContinueRunning, err := NodeShouldRunDaemonPod(e.reader, curNode, &dsList.Items[index])
 		if err != nil {
 			continue
 		}

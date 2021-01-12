@@ -660,7 +660,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 
 func newTestNodeEventHandler(client client.Client) *nodeEventHandler {
 	return &nodeEventHandler{
-		client: client,
+		reader: client,
 	}
 }
 

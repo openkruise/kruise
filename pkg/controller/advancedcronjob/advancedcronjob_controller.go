@@ -22,32 +22,28 @@ import (
 	"fmt"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/gate"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-
-	"github.com/openkruise/kruise/pkg/util/gate"
 	"k8s.io/klog"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 type IndexerFunc func(manager.Manager) error
 
 func init() {
-	flag.IntVar(&concurrentReconciles, "AdvancedCronJob-workers", concurrentReconciles, "Max concurrent workers for AdvancedCronJob controller.")
+	flag.IntVar(&concurrentReconciles, "advancedcronjob-workers", concurrentReconciles, "Max concurrent workers for AdvancedCronJob controller.")
 }
 
 var (
@@ -65,9 +61,9 @@ func Add(mgr manager.Manager) error {
 }
 
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	recorder := mgr.GetEventRecorderFor("broadcastjob-controller")
+	recorder := mgr.GetEventRecorderFor("advancedcronjob-controller")
 	return &ReconcileAdvancedCronJob{
-		Client:   mgr.GetClient(),
+		Client:   util.NewClientFromManager(mgr, "advancedcronjob-controller"),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
 		Clock:    realClock{},
@@ -78,7 +74,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	klog.Info("Starting AdvancedCronJob Controller")
-	c, err := controller.New("AdvancedCronJob-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
+	c, err := controller.New("advancedcronjob-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
 	if err != nil {
 		klog.Error(err)
 		return err

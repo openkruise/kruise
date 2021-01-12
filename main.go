@@ -100,7 +100,7 @@ func main() {
 
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
-
+	cfg.UserAgent = "kruise-manager"
 	gate.Init(cfg)
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{

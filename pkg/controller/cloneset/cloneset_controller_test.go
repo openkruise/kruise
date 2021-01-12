@@ -87,7 +87,7 @@ func TestReconcile(t *testing.T) {
 	// channel when it is finished.
 	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = mgr.GetClient()
+	c = util.NewClientFromManager(mgr, "test-cloneset-controller")
 
 	//recFn, requests := SetupTestReconcile(newReconciler(mgr))
 	g.Expect(add(mgr, newReconciler(mgr))).NotTo(gomega.HaveOccurred())

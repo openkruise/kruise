@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
@@ -64,10 +65,11 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	expectations := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
 	recorder := mgr.GetEventRecorderFor("sidecarset-controller")
+	cli := util.NewClientFromManager(mgr, "sidecarset-controller")
 	return &ReconcileSidecarSet{
-		Client:    mgr.GetClient(),
+		Client:    cli,
 		scheme:    mgr.GetScheme(),
-		processor: NewSidecarSetProcessor(mgr.GetClient(), expectations, recorder),
+		processor: NewSidecarSetProcessor(cli, expectations, recorder),
 	}
 }
 
@@ -88,7 +90,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{client: mgr.GetClient()}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetCache()}); err != nil {
 		return err
 	}
 

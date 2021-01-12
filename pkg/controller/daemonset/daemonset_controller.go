@@ -61,6 +61,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
+	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
@@ -131,7 +132,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
-	genericClient := client.GetGenericClient()
+	genericClient := client.GetGenericClientWithName("daemonset-controller")
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
@@ -158,8 +159,9 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	nodeLister := corelisters.NewNodeLister(nodeInformer.(cache.SharedIndexInformer).GetIndexer())
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 1*time.Minute)
 
+	cli := kruiseutil.NewClientFromManager(mgr, "daemonset-controller")
 	dsc := &ReconcileDaemonSet{
-		client:        mgr.GetClient(),
+		client:        cli,
 		eventRecorder: recorder,
 		podControl:    kubecontroller.RealPodControl{KubeClient: genericClient.KubeClient, Recorder: recorder},
 		crControl: kubecontroller.RealControllerRevisionControl{
@@ -170,7 +172,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		nodeLister:          nodeLister,
 		suspendedDaemonPods: map[string]sets.String{},
 		failedPodsBackoff:   failedPodsBackoff,
-		inplaceControl:      inplaceupdate.New(mgr.GetClient(), apps.ControllerRevisionHashLabelKey),
+		inplaceControl:      inplaceupdate.New(cli, apps.ControllerRevisionHashLabelKey),
 		updateExp:           updateExpectations,
 	}
 	dsc.podNodeIndex = podInformer.(cache.SharedIndexInformer).GetIndexer()
@@ -218,13 +220,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Node.
-	err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &nodeEventHandler{client: mgr.GetClient()})
+	err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &nodeEventHandler{reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod created by DaemonSet
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{Reader: mgr.GetClient()})
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}

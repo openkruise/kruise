@@ -77,7 +77,7 @@ func (p *podEventHandler) InjectMapper(m meta.RESTMapper) error {
 }
 
 type enqueueBroadcastJobForNode struct {
-	client client.Client
+	reader client.Reader
 }
 
 func (p *enqueueBroadcastJobForNode) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -101,7 +101,7 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 		return
 	}
 	jobList := &v1alpha1.BroadcastJobList{}
-	err := p.client.List(context.TODO(), jobList)
+	err := p.reader.List(context.TODO(), jobList)
 	if err != nil {
 		klog.Errorf("Error enqueueing broadcastjob on addNode %v", err)
 	}
@@ -132,7 +132,7 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterfac
 		return
 	}
 	jobList := &v1alpha1.BroadcastJobList{}
-	err := p.client.List(context.TODO(), jobList)
+	err := p.reader.List(context.TODO(), jobList)
 	if err != nil {
 		klog.Errorf("Error enqueueing broadcastjob on updateNode %v", err)
 	}

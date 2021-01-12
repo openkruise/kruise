@@ -12,7 +12,7 @@ type GenericClientset struct {
 	KruiseClient kruiseclientset.Interface
 }
 
-// NewForConfig creates a new Clientset for the given config.
+// newForConfig creates a new Clientset for the given config.
 func newForConfig(c *rest.Config) (*GenericClientset, error) {
 	kubeClient, err := kubeclientset.NewForConfig(c)
 	if err != nil {
@@ -26,4 +26,13 @@ func newForConfig(c *rest.Config) (*GenericClientset, error) {
 		KubeClient:   kubeClient,
 		KruiseClient: kruiseClient,
 	}, nil
+}
+
+// newForConfig creates a new Clientset for the given config.
+func newForConfigOrDie(c *rest.Config) *GenericClientset {
+	gc, err := newForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return gc
 }

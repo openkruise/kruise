@@ -86,7 +86,7 @@ type Controller struct {
 
 func New(cfg *rest.Config, cli client.Client, handlers map[string]admission.Handler) (*Controller, error) {
 	c := &Controller{
-		kubeClient:    extclient.GetGenericClient().KubeClient,
+		kubeClient:    extclient.GetGenericClientWithName("webhook-controller").KubeClient,
 		runtimeClient: cli,
 		handlers:      handlers,
 
