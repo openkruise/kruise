@@ -24,7 +24,7 @@ import (
 var _ handler.EventHandler = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct {
-	client client.Client
+	reader client.Reader
 }
 
 func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -153,7 +153,7 @@ func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*app
 	if ok && len(sidecarSetNames) > 0 {
 		for _, sidecarSetName := range strings.Split(sidecarSetNames, ",") {
 			sidecarSet := new(appsv1alpha1.SidecarSet)
-			if err := p.client.Get(context.TODO(), types.NamespacedName{
+			if err := p.reader.Get(context.TODO(), types.NamespacedName{
 				Name: sidecarSetName,
 			}, sidecarSet); err != nil {
 				if errors.IsNotFound(err) {
@@ -168,7 +168,7 @@ func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*app
 	}
 
 	sidecarSets := appsv1alpha1.SidecarSetList{}
-	if err := p.client.List(context.TODO(), &sidecarSets); err != nil {
+	if err := p.reader.List(context.TODO(), &sidecarSets); err != nil {
 		return nil, err
 	}
 

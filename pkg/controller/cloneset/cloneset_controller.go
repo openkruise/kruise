@@ -22,6 +22,8 @@ import (
 	"flag"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -77,22 +79,23 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
 	recorder := mgr.GetEventRecorderFor("cloneset-controller")
-	if cli := kruiseclient.GetGenericClient(); cli != nil {
+	if cli := kruiseclient.GetGenericClientWithName("cloneset-controller"); cli != nil {
 		eventBroadcaster := record.NewBroadcaster()
 		eventBroadcaster.StartLogging(klog.Infof)
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cli.KubeClient.CoreV1().Events("")})
 		recorder = eventBroadcaster.NewRecorder(mgr.GetScheme(), v1.EventSource{Component: "cloneset-controller"})
 	}
+	cli := util.NewClientFromManager(mgr, "cloneset-controller")
 	reconciler := &ReconcileCloneSet{
-		Client:            mgr.GetClient(),
+		Client:            cli,
 		scheme:            mgr.GetScheme(),
 		recorder:          recorder,
-		statusUpdater:     newStatusUpdater(mgr.GetClient()),
-		controllerHistory: historyutil.NewHistory(mgr.GetClient()),
+		statusUpdater:     newStatusUpdater(cli),
+		controllerHistory: historyutil.NewHistory(cli),
 		revisionControl:   revisioncontrol.NewRevisionControl(),
 	}
-	reconciler.scaleControl = scalecontrol.New(mgr.GetClient(), reconciler.recorder)
-	reconciler.updateControl = updatecontrol.New(mgr.GetClient(), reconciler.recorder)
+	reconciler.scaleControl = scalecontrol.New(cli, reconciler.recorder)
+	reconciler.updateControl = updatecontrol.New(cli, reconciler.recorder)
 	reconciler.reconcileFunc = reconciler.doReconcile
 	return reconciler
 }
@@ -124,7 +127,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &podEventHandler{Reader: mgr.GetClient()})
+	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &podEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}

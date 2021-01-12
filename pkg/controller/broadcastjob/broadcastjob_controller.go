@@ -25,6 +25,8 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +42,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/daemon/util"
+	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/utils/integer"
@@ -50,8 +52,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
 func init() {
@@ -84,7 +84,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	recorder := mgr.GetEventRecorderFor("broadcastjob-controller")
 	return &ReconcileBroadcastJob{
-		Client:   mgr.GetClient(),
+		Client:   util.NewClientFromManager(mgr, "broadcastjob-controller"),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
 	}
@@ -118,7 +118,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Node
-	if err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueBroadcastJobForNode{client: mgr.GetClient()}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueBroadcastJobForNode{reader: mgr.GetCache()}); err != nil {
 		return err
 	}
 	return nil
@@ -690,7 +690,7 @@ func (r *ReconcileBroadcastJob) createPod(nodeName, namespace string, template *
 		// The pod's NodeAffinity will be updated to make sure the Pod is bound
 		// to the target node by default scheduler. It is safe to do so because there
 		// should be no conflicting node affinity with the target node.
-		pod.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(pod.Spec.Affinity, nodeName)
+		pod.Spec.Affinity = daemonsetutil.ReplaceDaemonSetPodNodeNameNodeAffinity(pod.Spec.Affinity, nodeName)
 	} else {
 		if len(nodeName) != 0 {
 			pod.Spec.NodeName = nodeName

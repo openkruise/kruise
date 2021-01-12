@@ -34,7 +34,7 @@ import (
 
 func TestPodEventHandler(t *testing.T) {
 	fakeClient := fake.NewFakeClientWithScheme(scheme)
-	handler := enqueueRequestForPod{client: fakeClient}
+	handler := enqueueRequestForPod{reader: fakeClient}
 
 	err := fakeClient.Create(context.TODO(), sidecarSetDemo)
 	if nil != err {

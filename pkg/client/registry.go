@@ -1,24 +1,39 @@
 package client
 
 import (
+	"fmt"
+
 	"k8s.io/client-go/rest"
 )
 
 var (
-	genericClient *GenericClientset
+	cfg *rest.Config
+
+	defaultGenericClient *GenericClientset
 )
 
 // NewRegistry creates clientset by client-go
-func NewRegistry(cfg *rest.Config) error {
+func NewRegistry(c *rest.Config) error {
 	var err error
-	genericClient, err = newForConfig(cfg)
+	defaultGenericClient, err = newForConfig(c)
 	if err != nil {
 		return err
 	}
+	cfg = c
 	return nil
 }
 
-// GetGenericClient returns clientset
+// GetGenericClient returns default clientset
 func GetGenericClient() *GenericClientset {
-	return genericClient
+	return defaultGenericClient
+}
+
+// GetGenericClientWithName returns clientset with given name as user-agent
+func GetGenericClientWithName(name string) *GenericClientset {
+	if cfg == nil {
+		return nil
+	}
+	newCfg := *cfg
+	newCfg.UserAgent = fmt.Sprintf("%s/%s", cfg.UserAgent, name)
+	return newForConfigOrDie(&newCfg)
 }

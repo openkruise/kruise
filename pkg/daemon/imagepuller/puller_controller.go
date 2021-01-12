@@ -65,7 +65,7 @@ type Controller struct {
 // NewController returns the controller for image pulling
 func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonutil.SecretManager, healthz *daemonutil.Healthz) (*Controller, error) {
 	nodeName, _ := daemonutil.NodeName()
-	genericClient := client.GetGenericClient()
+	genericClient := client.GetGenericClientWithName("image-puller")
 	informer := newNodeImageInformer(genericClient.KruiseClient, nodeName)
 
 	eventBroadcaster := record.NewBroadcaster()

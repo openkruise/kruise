@@ -79,7 +79,7 @@ func nodeInSameCondition(old []corev1.NodeCondition, cur []corev1.NodeCondition)
 // * shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
-func NodeShouldRunDaemonPod(client client.Client, node *corev1.Node, ds *appsv1alpha1.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
+func NodeShouldRunDaemonPod(reader client.Reader, node *corev1.Node, ds *appsv1alpha1.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
 	newPod := NewPod(ds, node.Name)
 	// Because these bools require an && of all their required conditions, we start
 	// with all bools set to true and set a bool to false if a condition is not met.
@@ -91,7 +91,7 @@ func NodeShouldRunDaemonPod(client client.Client, node *corev1.Node, ds *appsv1a
 		return false, false, false, nil
 	}
 
-	reasons, nodeInfo, err := Simulate(client, newPod, node, ds)
+	reasons, nodeInfo, err := Simulate(reader, newPod, node, ds)
 	if err != nil {
 		klog.Warningf("DaemonSet Predicates failed on node %s for ds '%s/%s' due to unexpected error: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
 		return false, false, false, err
@@ -180,9 +180,9 @@ func newSchedulerNodeInfo(node *corev1.Node) *schedulernodeinfo.NodeInfo {
 	return nodeInfo
 }
 
-func Simulate(kubeclient client.Client, newPod *corev1.Pod, node *corev1.Node, ds *appsv1alpha1.DaemonSet) ([]predicates.PredicateFailureReason, *schedulernodeinfo.NodeInfo, error) {
+func Simulate(reader client.Reader, newPod *corev1.Pod, node *corev1.Node, ds *appsv1alpha1.DaemonSet) ([]predicates.PredicateFailureReason, *schedulernodeinfo.NodeInfo, error) {
 	podList := corev1.PodList{}
-	err := kubeclient.List(context.TODO(), &podList, client.MatchingFields{"spec.nodeName": node.Name})
+	err := reader.List(context.TODO(), &podList, client.MatchingFields{"spec.nodeName": node.Name})
 	if err != nil {
 		return nil, nil, err
 	}
