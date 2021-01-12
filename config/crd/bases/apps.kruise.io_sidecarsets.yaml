@@ -288,7 +288,7 @@ spec:
                     injected pods, it will only inject sidecar container into the
                     newly created pods. Type is RollingUpdate, the SidecarSet will
                     update the injected pods to the latest version on RollingUpdate
-                    Strategy
+                    Strategy. default is RollingUpdate
                   type: string
               type: object
             volumes:

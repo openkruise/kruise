@@ -24,9 +24,6 @@ type HandlePod func(pod []*corev1.Pod)
 var (
 	scheme *runtime.Scheme
 
-	partition      = intstr.FromInt(0)
-	maxUnavailable = intstr.FromInt(1)
-
 	sidecarSetDemo = &appsv1alpha1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Generation: 123,
@@ -49,9 +46,10 @@ var (
 				MatchLabels: map[string]string{"app": "nginx"},
 			},
 			Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
-				Type:           appsv1alpha1.RollingUpdateSidecarSetStrategyType,
-				Partition:      &partition,
-				MaxUnavailable: &maxUnavailable,
+				// default type=RollingUpdate, Partition=0, MaxUnavailable=1
+				//Type:           appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+				//Partition:      &partition,
+				//MaxUnavailable: &maxUnavailable,
 			},
 		},
 	}
@@ -177,8 +175,12 @@ func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1alp
 	}
 
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSetInput, podInput)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
 	reconciler := ReconcileSidecarSet{
-		Client: fakeClient, updateExpectations: expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)}
+		Client:             fakeClient,
+		updateExpectations: expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision),
+		processor:          NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10)),
+	}
 	if _, err := reconciler.Reconcile(request); err != nil {
 		t.Errorf("reconcile failed, err: %v", err)
 	}

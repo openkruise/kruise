@@ -27,6 +27,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -262,6 +263,11 @@ func TestScopeNamespacePods(t *testing.T) {
 
 func TestCanUpgradePods(t *testing.T) {
 	sidecarSet := factorySidecarSet()
+	sidecarSet.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = "without-bbb"
+	sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+		Type:   intstr.String,
+		StrVal: "50%",
+	}
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSet)
 	pods := factoryPodsCommon(100, 0, sidecarSet)
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
