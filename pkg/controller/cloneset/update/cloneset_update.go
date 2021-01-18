@@ -72,6 +72,14 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 		return requeueDuration.Get(), nil
 	}
 
+	var currentRevision *apps.ControllerRevision
+	for _, r := range revisions {
+		if r.Name == cs.Status.CurrentRevision {
+			currentRevision = r
+			break
+		}
+	}
+
 	// 1. refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
@@ -90,7 +98,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	}
 
 	// 2. find currently updated and not-ready count and all pods waiting to update
-	var waitUpdateIndexes []int
+	var waitUpdateIndexes, updatedIndexes []int
 	for i := range pods {
 		if coreControl.IsPodUpdatePaused(pods[i]) {
 			continue
@@ -109,22 +117,36 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 					waitUpdateIndexes = append(waitUpdateIndexes, i)
 				}
 			}
+		} else {
+			updatedIndexes = append(updatedIndexes, i)
 		}
 	}
 
 	// 3. sort all pods waiting to update
 	waitUpdateIndexes = sortUpdateIndexes(coreControl, cs.Spec.UpdateStrategy, pods, waitUpdateIndexes)
+	updatedIndexes = sortUpdateIndexes(coreControl, cs.Spec.UpdateStrategy, pods, updatedIndexes)
 
 	// 4. calculate max count of pods can update
-	needToUpdateCount := calculateUpdateCount(coreControl, cs.Spec.UpdateStrategy, cs.Spec.MinReadySeconds, int(*cs.Spec.Replicas), waitUpdateIndexes, pods)
-	if needToUpdateCount < len(waitUpdateIndexes) {
-		waitUpdateIndexes = waitUpdateIndexes[:needToUpdateCount]
-	}
+	needToUpdateCount, updateToUpdateRevision := calculateUpdateCount(coreControl, cs.Spec.UpdateStrategy, cs.Spec.MinReadySeconds, int(*cs.Spec.Replicas), waitUpdateIndexes, updatedIndexes, pods)
 
 	// 5. update pods
-	for _, idx := range waitUpdateIndexes {
+	if updateToUpdateRevision {
+		waitUpdateIndexes = waitUpdateIndexes[:needToUpdateCount]
+		for _, idx := range waitUpdateIndexes {
+			pod := pods[idx]
+			if duration, err := c.updatePod(cs, coreControl, currentRevision, updateRevision, revisions, pod, pvcs); err != nil {
+				return requeueDuration.Get(), err
+			} else if duration > 0 {
+				requeueDuration.Update(duration)
+			}
+		}
+		return requeueDuration.Get(), nil
+	}
+
+	updatedIndexes = updatedIndexes[:needToUpdateCount]
+	for _, idx := range updatedIndexes {
 		pod := pods[idx]
-		if duration, err := c.updatePod(cs, coreControl, updateRevision, revisions, pod, pvcs); err != nil {
+		if duration, err := c.updatePod(cs, coreControl, updateRevision, currentRevision, revisions, pod, pvcs); err != nil {
 			return requeueDuration.Get(), err
 		} else if duration > 0 {
 			requeueDuration.Update(duration)
@@ -202,16 +224,11 @@ func sortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.C
 	return waitUpdateIndexes
 }
 
-func calculateUpdateCount(coreControl clonesetcore.Control, strategy appsv1alpha1.CloneSetUpdateStrategy, minReadySeconds int32, totalReplicas int, waitUpdateIndexes []int, pods []*v1.Pod) int {
+func calculateUpdateCount(coreControl clonesetcore.Control, strategy appsv1alpha1.CloneSetUpdateStrategy, minReadySeconds int32, totalReplicas int, waitUpdateIndexes, updatedIndexes []int, pods []*v1.Pod) (int, bool) {
 	partition := 0
 	if strategy.Partition != nil {
 		partition, _ = intstrutil.GetValueFromIntOrPercent(strategy.Partition, totalReplicas, true)
 	}
-
-	if len(waitUpdateIndexes)-partition <= 0 {
-		return 0
-	}
-	waitUpdateIndexes = waitUpdateIndexes[:(len(waitUpdateIndexes) - partition)]
 
 	roundUp := true
 	if strategy.MaxSurge != nil {
@@ -222,24 +239,46 @@ func calculateUpdateCount(coreControl clonesetcore.Control, strategy appsv1alpha
 		intstrutil.ValueOrDefault(strategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), totalReplicas, roundUp)
 	usedSurge := len(pods) - totalReplicas
 
-	var notReadyCount, updateCount int
+	var notReadyCount, updateCount, updateToCurrentCount int
 	for _, p := range pods {
 		if !isPodReady(coreControl, p, minReadySeconds) {
 			notReadyCount++
 		}
 	}
-	for _, i := range waitUpdateIndexes {
-		if isPodReady(coreControl, pods[i], minReadySeconds) {
-			if notReadyCount >= (maxUnavailable + usedSurge) {
-				break
-			} else {
-				notReadyCount++
+
+	// update to updatedRevision
+	if partition < len(waitUpdateIndexes) {
+		waitUpdateIndexes = waitUpdateIndexes[:(len(waitUpdateIndexes) - partition)]
+		for _, i := range waitUpdateIndexes {
+			if isPodReady(coreControl, pods[i], minReadySeconds) {
+				if notReadyCount >= (maxUnavailable + usedSurge) {
+					break
+				} else {
+					notReadyCount++
+				}
 			}
+			updateCount++
 		}
-		updateCount++
+		return updateCount, true
 	}
 
-	return updateCount
+	// update to currentRevision
+	if totalReplicas-partition < len(updatedIndexes) {
+		updatedIndexes = updatedIndexes[:(len(updatedIndexes) - (totalReplicas - partition))]
+		for _, i := range updatedIndexes {
+			if isPodReady(coreControl, pods[i], minReadySeconds) {
+				if notReadyCount >= (maxUnavailable + usedSurge) {
+					break
+				} else {
+					notReadyCount++
+				}
+			}
+			updateToCurrentCount++
+		}
+		return updateToCurrentCount, false
+	}
+
+	return 0, true
 }
 
 func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
@@ -251,19 +290,12 @@ func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds i
 }
 
 func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control,
-	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
+	oldRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pod *v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (time.Duration, error) {
 
 	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType ||
 		cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-		var oldRevision *apps.ControllerRevision
-		for _, r := range revisions {
-			if r.Name == clonesetutils.GetPodRevision("", pod) {
-				oldRevision = r
-				break
-			}
-		}
 
 		if c.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, coreControl.GetUpdateOptions()) {
 			if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
