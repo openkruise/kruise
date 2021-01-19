@@ -18,9 +18,11 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -80,6 +82,7 @@ func main() {
 
 	klog.InitFlags(nil)
 	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
 
 	if enablePprof {
 		go func() {
@@ -103,6 +106,13 @@ func main() {
 	cfg.UserAgent = "kruise-manager"
 	gate.Init(cfg)
 
+	setupLog.Info("new clientset registry")
+	err := extclient.NewRegistry(cfg)
+	if err != nil {
+		setupLog.Error(err, "unable to init kruise clientset and informer")
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
@@ -120,13 +130,6 @@ func main() {
 	setupLog.Info("register field index")
 	if err := fieldindex.RegisterFieldIndexes(mgr.GetCache()); err != nil {
 		setupLog.Error(err, "failed to register field index")
-		os.Exit(1)
-	}
-
-	setupLog.Info("new clientset registry")
-	err = extclient.NewRegistry(cfg)
-	if err != nil {
-		setupLog.Error(err, "unable to init kruise clientset and informer")
 		os.Exit(1)
 	}
 

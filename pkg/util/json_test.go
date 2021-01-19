@@ -17,7 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"testing"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -66,4 +70,29 @@ func TestDumpJson(t *testing.T) {
 		t.Errorf("expect %v but got %v", except, DumpJSON(object))
 	}
 
+}
+
+type TimeTestCase struct {
+	TestTime *metav1.Time `json:"testTime"`
+}
+
+func TestIsJSONEqual(t *testing.T) {
+	now := metav1.Now()
+	t1 := TimeTestCase{TestTime: &metav1.Time{Time: now.Time}}
+	t2 := TimeTestCase{TestTime: &metav1.Time{Time: now.Add(-time.Millisecond * 2)}}
+	t3 := TimeTestCase{TestTime: &metav1.Time{Time: now.Add(-time.Second * 2)}}
+
+	if reflect.DeepEqual(t1, t2) {
+		t.Fatalf("expect t1 not equal to t2")
+	}
+	if reflect.DeepEqual(t1, t3) {
+		t.Fatalf("expect t1 not equal to t2")
+	}
+
+	if !IsJSONEqual(t1, t2) {
+		t.Fatalf("expect t1 json equal to t2: %v, %v", t1.TestTime.Time, t2.TestTime.Time)
+	}
+	if IsJSONEqual(t1, t3) {
+		t.Fatalf("expect t1 not json equal to t3")
+	}
 }

@@ -887,92 +887,95 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return nil
 			}, framework.StatefulPodTimeout, 2*time.Second).Should(gomega.BeNil())
 		})
-		/* Comment it for now until scale sub-resource is finalized in ref:pull/53679 for scale-sub resource specific comment.
-		It("should have a working scale subresource", func() {
-			By("Creating statefulset " + ssName + " in namespace " + ns)
+
+		/*
+			Release : v1.16
+			Testname: StatefulSet resource Replica scaling
+			Description: Create a StatefulSet resource.
+			Newly created StatefulSet resource MUST have a scale of one.
+			Bring the scale of the StatefulSet resource up to two. StatefulSet scale MUST be at two replicas.
+		*/
+		framework.ConformanceIt("should have a working scale subresource", func() {
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
-			sst := framework.NewStatefulSetTester(c)
+			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			framework.ExpectNoError(err)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 
-			By("getting scale subresource")
-			scale := framework.NewStatefulSetScale(ss)
-			scaleResult := &appsv1beta2.Scale{}
-
-			err = c.AppsV1beta2().RESTClient().Get().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
+			ginkgo.By("getting scale subresource")
+			scale, err := kc.AppsV1alpha1().StatefulSets(ns).GetScale(ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
-			Expect(scale.Spec.Replicas).To(Equal(int32(1)))
-			Expect(scale.Status.Replicas).To(Equal(int32(1)))
+			framework.ExpectEqual(scale.Spec.Replicas, int32(1))
+			framework.ExpectEqual(scale.Status.Replicas, int32(1))
 
-			By("updating a scale subresource")
-			scale.ResourceVersion = "" //unconditionally update to 2 replicas
+			ginkgo.By("updating a scale subresource")
+			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = 2
-			err = c.AppsV1beta2().RESTClient().Put().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
+			scaleResult, err := kc.AppsV1alpha1().StatefulSets(ns).UpdateScale(ssName, scale)
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
-			Expect(scaleResult.Spec.Replicas).To(Equal(int32(2)))
+			framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
 
-			By("verifying the statefulset Spec.Replicas was modified")
-			ss, err = c.AppsV1beta1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
+			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
+			ss, err = kc.AppsV1alpha1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
-			Expect(*(ss.Spec.Replicas)).To(Equal(int32(2)))
-		})
-		*/
-	})
-
-	framework.KruiseDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
-		var sst *framework.StatefulSetTester
-		var appTester *clusterAppTester
-
-		ginkgo.BeforeEach(func() {
-			sst = framework.NewStatefulSetTester(c, kc)
-			appTester = &clusterAppTester{tester: sst, ns: ns}
-		})
-
-		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
-			}
-			framework.Logf("Deleting all statefulset in ns %v", ns)
-			framework.DeleteAllStatefulSets(c, kc, ns)
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working zookeeper cluster", func() {
-			appTester.statefulPod = &zookeeperTester{tester: sst}
-			appTester.run()
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working redis cluster", func() {
-			appTester.statefulPod = &redisTester{tester: sst}
-			appTester.run()
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working mysql cluster", func() {
-			appTester.statefulPod = &mysqlGaleraTester{tester: sst}
-			appTester.run()
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working CockroachDB cluster", func() {
-			appTester.statefulPod = &cockroachDBTester{tester: sst}
-			appTester.run()
+			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
 		})
 	})
+
+	//framework.KruiseDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
+	//	var sst *framework.StatefulSetTester
+	//	var appTester *clusterAppTester
+	//
+	//	ginkgo.BeforeEach(func() {
+	//		sst = framework.NewStatefulSetTester(c, kc)
+	//		appTester = &clusterAppTester{tester: sst, ns: ns}
+	//	})
+	//
+	//	ginkgo.AfterEach(func() {
+	//		if ginkgo.CurrentGinkgoTestDescription().Failed {
+	//			framework.DumpDebugInfo(c, ns)
+	//		}
+	//		framework.Logf("Deleting all statefulset in ns %v", ns)
+	//		framework.DeleteAllStatefulSets(c, kc, ns)
+	//	})
+	//
+	//	// Do not mark this as Conformance.
+	//	// StatefulSet Conformance should not be dependent on specific applications.
+	//	ginkgo.It("should creating a working zookeeper cluster", func() {
+	//		appTester.statefulPod = &zookeeperTester{tester: sst}
+	//		appTester.run()
+	//	})
+	//
+	//	// Do not mark this as Conformance.
+	//	// StatefulSet Conformance should not be dependent on specific applications.
+	//	ginkgo.It("should creating a working redis cluster", func() {
+	//		appTester.statefulPod = &redisTester{tester: sst}
+	//		appTester.run()
+	//	})
+	//
+	//	// Do not mark this as Conformance.
+	//	// StatefulSet Conformance should not be dependent on specific applications.
+	//	ginkgo.It("should creating a working mysql cluster", func() {
+	//		appTester.statefulPod = &mysqlGaleraTester{tester: sst}
+	//		appTester.run()
+	//	})
+	//
+	//	// Do not mark this as Conformance.
+	//	// StatefulSet Conformance should not be dependent on specific applications.
+	//	ginkgo.It("should creating a working CockroachDB cluster", func() {
+	//		appTester.statefulPod = &cockroachDBTester{tester: sst}
+	//		appTester.run()
+	//	})
+	//})
 })
 
 func kubectlExecWithRetries(args ...string) (out string) {

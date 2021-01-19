@@ -101,7 +101,7 @@ func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag st
 	}
 
 	imageRef := fmt.Sprintf("%s:%s", imageName, tag)
-	namedRef, err := normalizeImageRef(imageRef)
+	namedRef, err := daemonutil.NormalizeImageRef(imageRef)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse image reference %q", imageRef)
 	}
@@ -391,27 +391,4 @@ func getRepoDigest(ref reference.Named, d digest.Digest, isSchema1 bool) string 
 		repoDigest = ref.Name() + "@" + d.String()
 	}
 	return repoDigest
-}
-
-// normalizeImageRef normalizes the image reference.
-func normalizeImageRef(ref string) (reference.Named, error) {
-	named, err := reference.ParseNormalizedNamed(ref)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := named.(reference.NamedTagged); ok {
-		if canonical, ok := named.(reference.Canonical); ok {
-			newNamed, err := reference.WithName(canonical.Name())
-			if err != nil {
-				return nil, err
-			}
-			newCanonical, err := reference.WithDigest(newNamed, canonical.Digest())
-			if err != nil {
-				return nil, err
-			}
-			return newCanonical, nil
-		}
-	}
-	return reference.TagNameOnly(named), nil
 }

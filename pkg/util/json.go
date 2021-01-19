@@ -16,10 +16,31 @@ limitations under the License.
 
 package util
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"reflect"
+)
 
 // DumpJSON returns the JSON encoding
 func DumpJSON(o interface{}) string {
 	j, _ := json.Marshal(o)
 	return string(j)
+}
+
+// IsJSONEqual checks if two objects are equal after encoding json
+func IsJSONEqual(o1, o2 interface{}) bool {
+	oj1, _ := json.Marshal(o1)
+	oj2, _ := json.Marshal(o2)
+	os1 := string(oj1)
+	os2 := string(oj2)
+	if os1 != os2 {
+
+	}
+
+	om1 := make(map[string]interface{})
+	om2 := make(map[string]interface{})
+	_ = json.Unmarshal(oj1, &om1)
+	_ = json.Unmarshal(oj2, &om2)
+
+	return reflect.DeepEqual(om1, om2)
 }

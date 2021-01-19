@@ -83,6 +83,42 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kruise-io-v1alpha1-imagepulljob
+  failurePolicy: Fail
+  name: mimagepulljob.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - imagepulljobs
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-apps-kruise-io-v1alpha1-nodeimage
+  failurePolicy: Fail
+  name: mnodeimage.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - nodeimages
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-pod
   failurePolicy: Fail
   name: mpod.kb.io
@@ -230,6 +266,42 @@ webhooks:
     - UPDATE
     resources:
     - daemonsets
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-imagepulljob
+  failurePolicy: Fail
+  name: vimagepulljob.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - imagepulljobs
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-nodeimage
+  failurePolicy: Fail
+  name: vnodeimage.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - nodeimages
 - clientConfig:
     caBundle: Cg==
     service:

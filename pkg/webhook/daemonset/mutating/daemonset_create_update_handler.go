@@ -51,7 +51,6 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 	}
 
 	appsv1alpha1.SetDefaultsDaemonSet(obj)
-	obj.Status = appsv1alpha1.DaemonSetStatus{}
 
 	marshalled, err := json.Marshal(obj)
 	if err != nil {

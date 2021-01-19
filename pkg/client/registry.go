@@ -19,7 +19,8 @@ func NewRegistry(c *rest.Config) error {
 	if err != nil {
 		return err
 	}
-	cfg = c
+	cfgCopy := *c
+	cfg = &cfgCopy
 	return nil
 }
 

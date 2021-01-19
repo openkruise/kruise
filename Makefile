@@ -58,6 +58,7 @@ vet:
 # Generate code
 generate: controller-gen
 	@scripts/generate_client.sh
+	@scripts/generate_bindata.sh
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 # Build the docker image
