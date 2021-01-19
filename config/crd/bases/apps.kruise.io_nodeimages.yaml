@@ -156,7 +156,8 @@ spec:
                 required:
                 - tags
                 type: object
-              description: Specifies images to be pulled on this node
+              description: Specifies images to be pulled on this node It can not be
+                more than 256 for each NodeImage
               type: object
           type: object
         status:

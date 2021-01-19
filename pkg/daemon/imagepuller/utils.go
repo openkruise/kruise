@@ -18,6 +18,7 @@ package imagepuller
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"time"
 
@@ -49,7 +50,7 @@ func logNewImages(oldObj, newObj *appsv1alpha1.NodeImage) {
 	}
 }
 
-func isImageInPulling(spec appsv1alpha1.NodeImageSpec, status appsv1alpha1.NodeImageStatus) bool {
+func isImageInPulling(spec *appsv1alpha1.NodeImageSpec, status *appsv1alpha1.NodeImageStatus) bool {
 	if status.Succeeded+status.Failed < status.Desired {
 		return true
 	}
@@ -82,7 +83,7 @@ type statusUpdater struct {
 }
 
 const (
-	statusUpdateQPS   = 0.2
+	statusUpdateQPS   = 0.5
 	statusUpdateBurst = 5
 )
 
@@ -95,12 +96,16 @@ func newStatusUpdater(imagePullNodeClient clientalpha1.NodeImageInterface) *stat
 	}
 }
 
-func (su *statusUpdater) updateStatus(imagePullNode *appsv1alpha1.NodeImage, newStatus appsv1alpha1.NodeImageStatus) error {
-	// IMPORTANT!!! Make sure rate limiter is working!
-	if !su.statusChanaged(&newStatus) {
-		return nil
+func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStatus *appsv1alpha1.NodeImageStatus) error {
+	if util.IsJSONEqual(newStatus, su.previousStatus) {
+		// 12h + 0~60min
+		randRefresh := time.Hour*12 + time.Second*time.Duration(rand.Int63n(3600))
+		if time.Since(su.previousTimestamp) < randRefresh {
+			return nil
+		}
 	}
 
+	// IMPORTANT!!! Make sure rate limiter is working!
 	if !su.rateLimiter.Allow() {
 		msg := fmt.Sprintf("Updating status is limited qps=%v burst=%v", statusUpdateQPS, statusUpdateBurst)
 		klog.V(3).Infof(msg)
@@ -108,18 +113,18 @@ func (su *statusUpdater) updateStatus(imagePullNode *appsv1alpha1.NodeImage, new
 	}
 
 	klog.V(5).Infof("Updating status: %v", util.DumpJSON(newStatus))
-	newNodeImage := imagePullNode.DeepCopy()
-	newNodeImage.Status = newStatus
+	newNodeImage := nodeImage.DeepCopy()
+	newNodeImage.Status = *newStatus
 
 	_, err := su.imagePullNodeClient.UpdateStatus(newNodeImage)
 	if err == nil {
-		su.previousStatus = &newStatus
+		su.previousStatus = newStatus
 	}
 	su.previousTimestamp = time.Now()
 	return err
 }
 
-func (su *statusUpdater) statusChanaged(newStatus *appsv1alpha1.NodeImageStatus) bool {
+func (su *statusUpdater) statusChanged(newStatus *appsv1alpha1.NodeImageStatus) bool {
 	// Can not use imagePullNode.Status to compare because of time accuracy
 	return !reflect.DeepEqual(su.previousStatus, newStatus)
 }

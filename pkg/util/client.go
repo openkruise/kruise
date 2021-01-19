@@ -25,7 +25,7 @@ import (
 
 func NewClientFromManager(mgr manager.Manager, name string) client.Client {
 	cfg := *mgr.GetConfig()
-	cfg.UserAgent = fmt.Sprintf("%s/%s", mgr.GetConfig().UserAgent, name)
+	cfg.UserAgent = fmt.Sprintf("kruise-manager/%s", name)
 
 	c, err := client.New(&cfg, client.Options{Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper()})
 	if err != nil {

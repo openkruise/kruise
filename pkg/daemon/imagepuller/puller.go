@@ -25,8 +25,10 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/runtime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 )
@@ -45,7 +47,7 @@ const (
 )
 
 type puller interface {
-	Sync(spec *appsv1alpha1.NodeImageSpec, ref *v1.ObjectReference) error
+	Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) error
 	GetStatus(imageName string) *appsv1alpha1.ImageStatus
 }
 
@@ -75,15 +77,15 @@ func newRealPuller(runtime daemonruntime.ImageRuntime, secretManager daemonutil.
 	return p, nil
 }
 
-// Sync remove specs not in the node spec
-func (p *realPuller) Sync(spec *appsv1alpha1.NodeImageSpec, ref *v1.ObjectReference) error {
-	klog.V(5).Infof("sync puller for spec %#v", spec)
+// Sync all images to pull
+func (p *realPuller) Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) error {
+	klog.V(5).Infof("sync puller for spec %v", util.DumpJSON(obj))
 
 	p.Lock()
 	defer p.Unlock()
 	// stop all workers not in the spec
 	for imageName := range p.workerPools {
-		if _, ok := spec.Images[imageName]; !ok {
+		if _, ok := obj.Spec.Images[imageName]; !ok {
 			klog.V(3).Infof("stop workerpool for %v", imageName)
 			pool := p.workerPools[imageName]
 			delete(p.workerPools, imageName)
@@ -91,16 +93,18 @@ func (p *realPuller) Sync(spec *appsv1alpha1.NodeImageSpec, ref *v1.ObjectRefere
 		}
 	}
 	var ret error
-	for imageName := range spec.Images {
-		// Definition of imageSpec explicitly because we cannot take the address of for loop variable
-		imageSpec := spec.Images[imageName]
+	for imageName, imageSpec := range obj.Spec.Images {
 		pool, ok := p.workerPools[imageName]
 		if !ok {
 			klog.V(3).Infof("starting new workerpool for %v", imageName)
 			pool = newRealWorkerPool(imageName, p.runtime, p.secretManager, p.eventRecorder)
 			p.workerPools[imageName] = pool
 		}
-		if err := pool.Sync(&imageSpec, ref); err != nil {
+		var imageStatus *appsv1alpha1.ImageStatus
+		if s, ok := obj.Status.ImageStatuses[imageName]; ok {
+			imageStatus = &s
+		}
+		if err := pool.Sync(&imageSpec, imageStatus, ref); err != nil {
 			ret = err
 		}
 	}
@@ -122,7 +126,7 @@ type imageStatusUpdater interface {
 }
 
 type workerPool interface {
-	Sync(spec *appsv1alpha1.ImageSpec, ref *v1.ObjectReference) error
+	Sync(spec *appsv1alpha1.ImageSpec, status *appsv1alpha1.ImageStatus, ref *v1.ObjectReference) error
 	GetStatus() *appsv1alpha1.ImageStatus
 	Stop()
 }
@@ -154,13 +158,13 @@ func newRealWorkerPool(name string, runtime daemonruntime.ImageRuntime, secretMa
 	return w
 }
 
-func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, ref *v1.ObjectReference) error {
+func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, status *appsv1alpha1.ImageStatus, ref *v1.ObjectReference) error {
 	if !w.active {
 		klog.Infof("workerPool %v has exited", w.name)
 		return nil
 	}
 
-	klog.V(5).Infof("sync workerpool for %v", w.name)
+	klog.V(5).Infof("sync worker pool for %v", w.name)
 
 	secrets, err := w.secretManager.GetSecrets(spec.PullSecrets)
 	if err != nil {
@@ -170,15 +174,30 @@ func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, ref *v1.ObjectRefere
 
 	w.Lock()
 	defer w.Unlock()
-	w.lastSyncSpec = spec
+	w.lastSyncSpec = spec.DeepCopy()
 
-	expectedTags := make(map[string]appsv1alpha1.ImageTagSpec)
+	allTags := sets.NewString()
+	activeTags := make(map[string]appsv1alpha1.ImageTagSpec)
 	for _, tagSpec := range spec.Tags {
-		expectedTags[tagSpec.Tag] = tagSpec
+		var tagStatus *appsv1alpha1.ImageTagStatus
+		if status != nil {
+			for i := range status.Tags {
+				if status.Tags[i].Tag == tagSpec.Tag && status.Tags[i].Version == tagSpec.Version {
+					tagStatus = &status.Tags[i]
+					break
+				}
+			}
+		}
+		if tagStatus == nil || tagStatus.CompletionTime == nil {
+			activeTags[tagSpec.Tag] = tagSpec
+		} else {
+			w.tagStatuses[tagStatus.Tag] = tagStatus
+		}
+		allTags.Insert(tagSpec.Tag)
 	}
-	// Stop workers not in spec or version has been updated
+	// Stop workers not active or version changed
 	for tag, worker := range w.pullWorkers {
-		tagSpec, ok := expectedTags[tag]
+		tagSpec, ok := activeTags[tag]
 		if !ok {
 			klog.V(4).Infof("stopping worker %v which is not in spec", worker.ImageRef())
 			delete(w.pullWorkers, tag)
@@ -191,12 +210,12 @@ func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, ref *v1.ObjectRefere
 	}
 	// Remove statuses not in spec
 	for tag := range w.tagStatuses {
-		if _, ok := expectedTags[tag]; !ok {
+		if !allTags.Has(tag) {
 			delete(w.tagStatuses, tag)
 		}
 	}
 	// Start new workers
-	for _, tagSpec := range spec.Tags {
+	for _, tagSpec := range activeTags {
 		_, ok := w.pullWorkers[tagSpec.Tag]
 
 		if !ok {
@@ -288,8 +307,8 @@ func (w *pullWorker) Stop() {
 	defer w.Unlock()
 	if w.active {
 		klog.Warningf("Worker to pull image %s:%s is stopped", w.name, w.tagSpec.Tag)
-		close(w.stopCh)
 		w.active = false
+		close(w.stopCh)
 	}
 }
 
@@ -298,10 +317,6 @@ func (w *pullWorker) IsActive() bool {
 }
 
 func (w *pullWorker) Run() {
-	if !w.active {
-		return
-	}
-
 	klog.V(3).Infof("starting worker %v version %v", w.ImageRef(), w.tagSpec.Version)
 
 	tag := w.tagSpec.Tag
@@ -319,7 +334,9 @@ func (w *pullWorker) Run() {
 		} else {
 			klog.Infof("Successfully pull image %s:%s, cost %vs", w.name, tag, cost)
 		}
-		w.statusUpdater.UpdateStatus(newStatus)
+		if w.IsActive() {
+			w.statusUpdater.UpdateStatus(newStatus)
+		}
 	}()
 
 	timeout := defaultImagePullingTimeout
@@ -330,6 +347,14 @@ func (w *pullWorker) Run() {
 	if w.tagSpec.PullPolicy != nil && w.tagSpec.PullPolicy.BackoffLimit != nil {
 		backoffLimit = int(*w.tagSpec.PullPolicy.BackoffLimit)
 	}
+	if backoffLimit < 0 {
+		backoffLimit = defaultImagePullingBackoffLimit
+	}
+	var deadline *time.Time
+	if w.tagSpec.PullPolicy != nil && w.tagSpec.PullPolicy.ActiveDeadlineSeconds != nil {
+		d := startTime.Time.Add(time.Duration(*w.tagSpec.PullPolicy.ActiveDeadlineSeconds) * time.Second)
+		deadline = &d
+	}
 
 	var (
 		step       = time.Second
@@ -337,8 +362,18 @@ func (w *pullWorker) Run() {
 	)
 
 	var lastError error
-	for i := 0; i < backoffLimit; i++ {
-		pullContext, cancel := context.WithTimeout(context.Background(), timeout)
+	for i := 0; i <= backoffLimit; i++ {
+		onceTimeout := timeout
+		if deadline != nil {
+			if deadlineLeft := time.Since(*deadline); deadlineLeft >= 0 {
+				lastError = fmt.Errorf("pulling exceeds the activeDeadlineSeconds")
+				break
+			} else if (-deadlineLeft) < onceTimeout {
+				onceTimeout = -deadlineLeft
+			}
+		}
+
+		pullContext, cancel := context.WithTimeout(context.Background(), onceTimeout)
 		lastError = w.doPullImage(pullContext, newStatus)
 		if lastError != nil {
 			cancel()
@@ -385,7 +420,7 @@ func (w *pullWorker) getImageInfo(ctx context.Context) (*daemonruntime.ImageInfo
 			return &info, nil
 		}
 	}
-	return nil, fmt.Errorf("Image %v:%v not found", w.name, w.tagSpec.Tag)
+	return nil, fmt.Errorf("image %v:%v not found", w.name, w.tagSpec.Tag)
 }
 
 // Pulling image and update process in status
@@ -434,7 +469,7 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 				if progressStatus.Err == nil {
 					return nil
 				}
-				return fmt.Errorf("Pulling image %s:%s error %v", w.name, tag, progressStatus.Err)
+				return fmt.Errorf("pulling image %s:%s error %v", w.name, tag, progressStatus.Err)
 			}
 			w.statusUpdater.UpdateStatus(newStatus)
 		}
@@ -446,8 +481,8 @@ func (w *pullWorker) finishPulling(newStatus *appsv1alpha1.ImageTagStatus, phase
 	now := metav1.Now()
 	newStatus.CompletionTime = &now
 	newStatus.Message = message
-	klog.V(5).Infof("pulling image %v finished, status=%#v", w.ImageRef(), newStatus)
-	w.statusUpdater.UpdateStatus(newStatus)
+	//klog.V(5).Infof("pulling image %v finished, status=%#v", w.ImageRef(), newStatus)
+	//w.statusUpdater.UpdateStatus(newStatus)
 }
 
 func minDuration(a, b time.Duration) time.Duration {

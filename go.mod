@@ -14,6 +14,7 @@ require (
 	github.com/docker/distribution v2.7.2-0.20200708230840-70e0022e42fd+incompatible
 	github.com/docker/docker v1.4.2-0.20180612054059-a9fbbdc8dd87
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
+	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/onsi/ginkgo v1.12.1
@@ -65,6 +66,8 @@ replace (
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.16.6
 	k8s.io/metrics => k8s.io/metrics v0.16.6
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.16.6
+
+	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 )
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.2

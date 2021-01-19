@@ -30,6 +30,7 @@ import (
 	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/runtime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
@@ -219,28 +219,28 @@ func (c *Controller) sync(key string) (retErr error) {
 		}
 	}()
 
-	newStatus := appsv1alpha1.NodeImageStatus{
-		ImageStatuses: make(map[string]appsv1alpha1.ImageStatus),
-	}
-
 	ref, _ := reference.GetReference(scheme, nodeImage)
-	retErr = c.puller.Sync(&nodeImage.Spec, ref)
+	retErr = c.puller.Sync(nodeImage.DeepCopy(), ref)
 	if retErr != nil {
 		return
 	}
 
+	newStatus := appsv1alpha1.NodeImageStatus{
+		ImageStatuses: make(map[string]appsv1alpha1.ImageStatus),
+	}
 	for imageName, imageSpec := range nodeImage.Spec.Images {
 		newStatus.Desired += int32(len(imageSpec.Tags))
 
-		imageStatuses := c.puller.GetStatus(imageName)
+		imageStatus := c.puller.GetStatus(imageName)
 		if klog.V(9) {
-			klog.V(9).Infof("get image %v status %#v", imageName, imageStatuses)
+			klog.V(9).Infof("get image %v status %#v", imageName, imageStatus)
 		}
-		if imageStatuses == nil {
+		if imageStatus == nil {
 			continue
 		}
-		newStatus.ImageStatuses[imageName] = *imageStatuses
-		for _, tagStatus := range imageStatuses.Tags {
+		nodeimagesutil.SortStatusImageTags(imageStatus)
+		newStatus.ImageStatuses[imageName] = *imageStatus
+		for _, tagStatus := range imageStatus.Tags {
 			switch tagStatus.Phase {
 			case appsv1alpha1.ImagePhaseSucceeded:
 				newStatus.Succeeded++
@@ -255,29 +255,17 @@ func (c *Controller) sync(key string) (retErr error) {
 		newStatus.ImageStatuses = nil
 	}
 
-	retErr = retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		// try to get new data
-		nodeImage, err = c.imagePullNodeLister.Get(name)
-		if errors.IsNotFound(err) {
-			klog.Infof("node %v not found, skip", name)
-			return nil
-		} else if err != nil {
-			klog.Errorf("Failed to get %s imagePullNode: %v", name, err)
-			return err
-		}
-		err = c.statusUpdater.updateStatus(nodeImage, newStatus)
-		return err
-	})
+	retErr = c.statusUpdater.updateStatus(nodeImage, &newStatus)
 	if retErr != nil {
 		return retErr
 	}
 
-	if isImageInPulling(nodeImage.Spec, newStatus) {
-		// 1~2s
-		c.queue.AddAfter(key, time.Second+time.Millisecond*time.Duration(rand.Intn(1000)))
+	if isImageInPulling(&nodeImage.Spec, &newStatus) {
+		// 3~5s
+		c.queue.AddAfter(key, 3*time.Second+time.Millisecond*time.Duration(rand.Intn(2000)))
 	} else {
-		// about 10m
-		c.queue.AddAfter(key, 10*time.Minute+time.Millisecond*time.Duration(rand.Intn(10000)))
+		// 3~5m
+		c.queue.AddAfter(key, 3*time.Minute+time.Millisecond*time.Duration(rand.Intn(120000)))
 	}
 	return nil
 }

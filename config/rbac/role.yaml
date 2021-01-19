@@ -185,6 +185,46 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - imagepulljobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - imagepulljobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - nodeimages
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - nodeimages/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - sidecarsets
   verbs:
   - create

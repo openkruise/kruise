@@ -189,7 +189,7 @@ func RunE2ETests(t *testing.T) {
 	var r []ginkgo.Reporter
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kruise e2e suite", r)
 }
 
 //// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it

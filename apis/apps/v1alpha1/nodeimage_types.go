@@ -24,6 +24,7 @@ import (
 // NodeImageSpec defines the desired state of NodeImage
 type NodeImageSpec struct {
 	// Specifies images to be pulled on this node
+	// It can not be more than 256 for each NodeImage
 	Images map[string]ImageSpec `json:"images,omitempty"`
 }
 
