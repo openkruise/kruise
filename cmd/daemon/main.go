@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	"math/rand"
+	"time"
 
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/daemon"
@@ -33,6 +35,7 @@ var (
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
 
 	cfg := config.GetConfigOrDie()
 	cfg.UserAgent = "kruise-daemon"

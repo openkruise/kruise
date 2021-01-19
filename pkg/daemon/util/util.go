@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/docker/distribution/reference"
 )
 
 // NodeName returns the node name of this daemon
@@ -58,4 +60,51 @@ func ParseRepositoryTag(repos string) (string, string) {
 		return repos[:n], tag
 	}
 	return repos, ""
+}
+
+// NormalizeImageRefToNameTag normalizes the image reference to name and tag.
+func NormalizeImageRefToNameTag(ref string) (string, string, error) {
+	namedRef, err := NormalizeImageRef(ref)
+	if err != nil {
+		return "", "", err
+	}
+	return reference.FamiliarName(namedRef), getAPITagFromNamedRef(namedRef), nil
+}
+
+// getAPITagFromNamedRef returns a tag from the specified reference.
+// This function is necessary as long as the docker "server" api expects
+// digests to be sent as tags and makes a distinction between the name
+// and tag/digest part of a reference.
+func getAPITagFromNamedRef(ref reference.Named) string {
+	if digested, ok := ref.(reference.Digested); ok {
+		return digested.Digest().String()
+	}
+	ref = reference.TagNameOnly(ref)
+	if tagged, ok := ref.(reference.Tagged); ok {
+		return tagged.Tag()
+	}
+	return ""
+}
+
+// NormalizeImageRef normalizes the image reference.
+func NormalizeImageRef(ref string) (reference.Named, error) {
+	named, err := reference.ParseNormalizedNamed(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := named.(reference.NamedTagged); ok {
+		if canonical, ok := named.(reference.Canonical); ok {
+			newNamed, err := reference.WithName(canonical.Name())
+			if err != nil {
+				return nil, err
+			}
+			newCanonical, err := reference.WithDigest(newNamed, canonical.Digest())
+			if err != nil {
+				return nil, err
+			}
+			return newCanonical, nil
+		}
+	}
+	return reference.TagNameOnly(named), nil
 }

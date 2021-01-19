@@ -99,13 +99,13 @@ func detectRuntime(varRunPath string) []runtimeConfig {
 		cfgs = append(cfgs, runtimeConfig{runtimeType: ContainerRuntimeDocker, runtimeURI: fmt.Sprintf("unix://%s/docker.sock", varRunPath)})
 	}
 	if _, err = os.Stat(fmt.Sprintf("%s/pouchcri.sock", varRunPath)); err == nil {
-		cfgs = append(cfgs, runtimeConfig{runtimeType: ContainerRuntimeContainerd, runtimeURI: fmt.Sprintf("unix://%s/pouchcri.sock", varRunPath)})
+		cfgs = append(cfgs, runtimeConfig{runtimeType: ContainerRuntimeContainerd, runtimeURI: fmt.Sprintf("%s/pouchcri.sock", varRunPath)})
 	}
 	if _, err = os.Stat(fmt.Sprintf("%s/containerd.sock", varRunPath)); err == nil {
-		cfgs = append(cfgs, runtimeConfig{runtimeType: ContainerRuntimeContainerd, runtimeURI: fmt.Sprintf("unix://%s/containerd.sock", varRunPath)})
+		cfgs = append(cfgs, runtimeConfig{runtimeType: ContainerRuntimeContainerd, runtimeURI: fmt.Sprintf("%s/containerd.sock", varRunPath)})
 	}
 	if _, err = os.Stat(fmt.Sprintf("%s/containerd/containerd.sock", varRunPath)); err == nil {
-		cfgs = append(cfgs, runtimeConfig{runtimeType: ContainerRuntimeContainerd, runtimeURI: fmt.Sprintf("unix://%s/containerd/containerd.sock", varRunPath)})
+		cfgs = append(cfgs, runtimeConfig{runtimeType: ContainerRuntimeContainerd, runtimeURI: fmt.Sprintf("%s/containerd/containerd.sock", varRunPath)})
 	}
 	return cfgs
 }

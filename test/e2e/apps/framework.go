@@ -21,5 +21,5 @@ import "github.com/onsi/ginkgo"
 
 // SIGDescribe describes SIG information
 func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-apps] "+text, body)
+	return ginkgo.Describe("[apps] "+text, body)
 }

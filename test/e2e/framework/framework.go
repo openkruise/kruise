@@ -82,6 +82,8 @@ type Framework struct {
 	// Place where various additional data is stored during test run to be printed to ReportDir,
 	// or stdout if ReportDir is not set once test ends.
 	TestSummaries []TestDataSummary
+
+	AfterEachActions []func()
 }
 
 // TestDataSummary defines a interface to test data summary
@@ -189,7 +191,7 @@ func (f *Framework) BeforeEach() {
 		f.Namespace = namespace
 
 		if TestContext.VerifyServiceAccount {
-			ginkgo.By("Waiting for a default service account to be provisioned in namespace")
+			ginkgo.By("Waiting for a default service account to be provisioned in namespace " + namespace.Name)
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		} else {
@@ -258,6 +260,10 @@ func (f *Framework) AfterEach() {
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		}
+	}
+
+	for _, f := range f.AfterEachActions {
+		f()
 	}
 
 	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)

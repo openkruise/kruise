@@ -24,6 +24,8 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o manager main.go \
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 #FROM gcr.io/distroless/static:nonroot
 FROM ubuntu:latest
+# This is required by daemon connnecting with cri
+RUN apt-get update -y && apt-get install ca-certificates -y && rm -rf /var/lib/apt/lists/*
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/daemon ./kruise-daemon

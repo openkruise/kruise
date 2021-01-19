@@ -17,6 +17,7 @@ limitations under the License.
 package requeueduration
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -53,6 +54,7 @@ func (dm *DurationStore) Pop(key string) time.Duration {
 type Duration struct {
 	sync.Mutex
 	duration time.Duration
+	message  string
 }
 
 func (rd *Duration) Update(newDuration time.Duration) {
@@ -65,8 +67,31 @@ func (rd *Duration) Update(newDuration time.Duration) {
 	}
 }
 
+func (rd *Duration) UpdateWithMsg(newDuration time.Duration, format string, args ...interface{}) {
+	rd.Lock()
+	defer rd.Unlock()
+	if newDuration > 0 {
+		if rd.duration <= 0 || newDuration < rd.duration {
+			rd.duration = newDuration
+			rd.message = fmt.Sprintf(format, args...)
+		}
+	}
+}
+
+func (rd *Duration) Merge(rd2 *Duration) {
+	rd2.Lock()
+	defer rd2.Unlock()
+	rd.UpdateWithMsg(rd2.duration, rd2.message)
+}
+
 func (rd *Duration) Get() time.Duration {
 	rd.Lock()
 	defer rd.Unlock()
 	return rd.duration
+}
+
+func (rd *Duration) GetWithMsg() (time.Duration, string) {
+	rd.Lock()
+	defer rd.Unlock()
+	return rd.duration, rd.message
 }

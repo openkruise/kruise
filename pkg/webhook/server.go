@@ -129,7 +129,7 @@ func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 	case <-webhookcontroller.Inited():
 		return nil
 	case <-timer.C:
-		return fmt.Errorf("failed to start webhook controller for waiting more than 5s")
+		return fmt.Errorf("failed to start webhook controller for waiting more than 20s")
 	}
 }
 
