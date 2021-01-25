@@ -64,24 +64,10 @@ func (r *realControl) Manage(
 		return false, nil
 	}
 
-	podsSpecifiedToDelete, podsInPreDelete := getPlannedDeletedPods(updateCS, pods)
-	podsToDelete := util.MergePods(podsSpecifiedToDelete, podsInPreDelete)
-	if len(podsToDelete) > 0 {
-		klog.V(3).Infof("CloneSet %s find pods %v specified to delete and pods %v in preDelete",
-			controllerKey, util.GetPodNames(podsSpecifiedToDelete).List(), util.GetPodNames(podsInPreDelete).List())
-
-		if modified, err := r.managePreparingDelete(updateCS, pods, podsInPreDelete, len(podsToDelete)); err != nil || modified {
-			return modified, err
-		}
-
-		if modified, err := r.deletePods(updateCS, podsToDelete, pvcs); err != nil || modified {
-			return modified, err
-		}
-	}
-
 	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
 	diff, currentRevDiff := calculateDiffs(updateCS, updateRevision == currentRevision, len(pods), len(notUpdatedPods))
 
+	// 1. scale out
 	if diff < 0 {
 		// total number of this creation
 		expectedCreations := diff * -1
@@ -104,8 +90,26 @@ func (r *realControl) Manage(
 
 		return r.createPods(expectedCreations, expectedCurrentCreations,
 			currentCS, updateCS, currentRevision, updateRevision, availableIDs.List(), existingPVCNames)
+	}
 
-	} else if diff > 0 {
+	// 2. specified scale in
+	podsSpecifiedToDelete, podsInPreDelete := getPlannedDeletedPods(updateCS, pods)
+	podsToDelete := util.MergePods(podsSpecifiedToDelete, podsInPreDelete)
+	if len(podsToDelete) > 0 {
+		klog.V(3).Infof("CloneSet %s find pods %v specified to delete and pods %v in preDelete",
+			controllerKey, util.GetPodNames(podsSpecifiedToDelete).List(), util.GetPodNames(podsInPreDelete).List())
+
+		if modified, err := r.managePreparingDelete(updateCS, pods, podsInPreDelete, len(podsToDelete)); err != nil || modified {
+			return modified, err
+		}
+
+		if modified, err := r.deletePods(updateCS, podsToDelete, pvcs); err != nil || modified {
+			return modified, err
+		}
+	}
+
+	// 3. scale in
+	if diff > 0 {
 		if len(podsToDelete) > 0 {
 			klog.V(3).Infof("CloneSet %s skip to scale in %d for existing pods to delete", controllerKey, diff)
 			return false, nil
