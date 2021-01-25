@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -115,8 +116,8 @@ func getSpecifiedSubsetReplicas(ud *appsv1alpha1.UnitedDeployment) *map[string]i
 			continue
 		}
 
-		if specifiedReplicas, err := ParseSubsetReplicas(*ud.Spec.Replicas, *subsetDef.Replicas); err == nil {
-			replicaLimits[subsetDef.Name] = specifiedReplicas
+		if specifiedReplicas, err := intstr.GetValueFromIntOrPercent(subsetDef.Replicas, int(*ud.Spec.Replicas), true); err == nil {
+			replicaLimits[subsetDef.Name] = int32(specifiedReplicas)
 		} else {
 			klog.Warningf("Fail to consider the replicas of subset %s when parsing replicaLimits during managing replicas of UnitedDeployment %s/%s: %s",
 				subsetDef.Name, ud.Namespace, ud.Name, err)

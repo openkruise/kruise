@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -34,7 +35,6 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	udctrl "github.com/openkruise/kruise/pkg/controller/uniteddeployment"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
@@ -105,11 +105,11 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 			continue
 		}
 
-		replicas, err := udctrl.ParseSubsetReplicas(expectedReplicas, *subset.Replicas)
+		replicas, err := intstr.GetValueFromIntOrPercent(subset.Replicas, int(expectedReplicas), true)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("replicas"), subset.Replicas, fmt.Sprintf("invalid replicas %s", subset.Replicas.String())))
 		} else {
-			sumReplicas += replicas
+			sumReplicas += int32(replicas)
 			count++
 		}
 	}

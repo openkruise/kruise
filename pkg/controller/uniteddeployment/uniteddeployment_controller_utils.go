@@ -19,49 +19,13 @@ package uniteddeployment
 
 import (
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const updateRetries = 5
-
-// ParseSubsetReplicas parses the subsetReplicas, and returns the replicas number depending on the sum replicas.
-func ParseSubsetReplicas(udReplicas int32, subsetReplicas intstr.IntOrString) (int32, error) {
-	if subsetReplicas.Type == intstr.Int {
-		if subsetReplicas.IntVal < 0 {
-			return 0, fmt.Errorf("subset replicas (%d) should not be less than 0", subsetReplicas.IntVal)
-		}
-		return subsetReplicas.IntVal, nil
-	}
-
-	strVal := subsetReplicas.StrVal
-	if !strings.HasSuffix(strVal, "%") {
-		return 0, fmt.Errorf("subset replicas (%s) only support integer value or percentage value with a suffix '%%'", strVal)
-	}
-
-	intPart := strVal[:len(strVal)-1]
-	percent64, err := strconv.ParseInt(intPart, 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("subset replicas (%s) should be correct percentage integer: %s", strVal, err)
-	}
-
-	if percent64 > int64(100) || percent64 < int64(0) {
-		return 0, fmt.Errorf("subset replicas (%s) should be in range [0, 100]", strVal)
-	}
-
-	return int32(round(float64(udReplicas) * float64(percent64) / 100)), nil
-}
-
-func round(x float64) int {
-	return int(math.Floor(x + 0.5))
-}
 
 func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
 	name, exist := metaObj.GetLabels()[appsv1alpha1.SubSetNameLabelKey]
