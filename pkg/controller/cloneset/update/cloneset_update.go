@@ -266,15 +266,23 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 		}
 
 		if c.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, coreControl.GetUpdateOptions()) {
-			if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
-				if patched, err := lifecycle.PatchPodLifecycle(c, pod, appspub.LifecycleStatePreparingUpdate); err != nil {
-					return 0, err
-				} else if patched {
+			switch state := lifecycle.GetPodLifecycleState(pod); state {
+			case "", appspub.LifecycleStateNormal:
+				var err error
+				var patched bool
+				if patched, err = lifecycle.PatchPodLifecycle(c, pod, appspub.LifecycleStatePreparingUpdate); err == nil && patched {
 					clonesetutils.ResourceVersionExpectations.Expect(pod)
 					klog.V(3).Infof("CloneSet %s patch pod %s lifecycle to PreparingUpdate",
 						clonesetutils.GetControllerKey(cs), pod.Name)
 				}
-				return 0, nil
+				return 0, err
+			case appspub.LifecycleStatePreparingUpdate:
+				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
+					return 0, nil
+				}
+			case appspub.LifecycleStateUpdating:
+			default:
+				return 0, fmt.Errorf("not allowed to in-place update pod %s in state %s", pod.Name, state)
 			}
 
 			opts := coreControl.GetUpdateOptions()
