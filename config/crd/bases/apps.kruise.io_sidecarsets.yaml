@@ -189,7 +189,7 @@ spec:
                     are ANDed.
                   type: object
               type: object
-            strategy:
+            updateStrategy:
               description: The sidecarset strategy to use to replace existing pods
                 with new ones.
               properties:

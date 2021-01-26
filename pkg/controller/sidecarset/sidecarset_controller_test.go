@@ -45,7 +45,7 @@ var (
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "nginx"},
 			},
-			Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+			UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 				// default type=RollingUpdate, Partition=0, MaxUnavailable=1
 				//Type:           appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 				//Partition:      &partition,
@@ -165,7 +165,7 @@ func TestUpdateWhenUseNotUpdateStrategy(t *testing.T) {
 }
 
 func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
-	sidecarSetInput.Spec.Strategy.Type = appsv1alpha1.NotUpdateSidecarSetStrategyType
+	sidecarSetInput.Spec.UpdateStrategy.Type = appsv1alpha1.NotUpdateSidecarSetStrategyType
 	podInput := podDemo.DeepCopy()
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -200,7 +200,7 @@ func TestUpdateWhenSidecarSetPaused(t *testing.T) {
 }
 
 func testUpdateWhenSidecarSetPaused(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
-	sidecarSetInput.Spec.Strategy.Paused = true
+	sidecarSetInput.Spec.UpdateStrategy.Paused = true
 	podInput := podDemo.DeepCopy()
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -271,7 +271,7 @@ func TestUpdateWhenPartitionFinished(t *testing.T) {
 
 func testUpdateWhenPartitionFinished(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
 	newPartition := intstr.FromInt(1)
-	sidecarSetInput.Spec.Strategy.Partition = &newPartition
+	sidecarSetInput.Spec.UpdateStrategy.Partition = &newPartition
 	podInput := podDemo.DeepCopy()
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{

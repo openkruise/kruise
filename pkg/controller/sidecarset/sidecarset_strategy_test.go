@@ -129,7 +129,7 @@ func factorySidecarSet() *appsv1alpha1.SidecarSet {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "sidecar"},
 			},
-			Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+			UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 				//Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			},
 		},
@@ -157,7 +157,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 10,
 				}
@@ -173,7 +173,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.String,
 					StrVal: "10%",
 				}
@@ -189,7 +189,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.String,
 					StrVal: "5%",
 				}
@@ -205,7 +205,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 100,
 				}
@@ -221,11 +221,11 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 100,
 				}
-				sidecarSet.Spec.Strategy.Partition = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.Partition = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 180,
 				}
@@ -241,11 +241,11 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 100,
 				}
-				sidecarSet.Spec.Strategy.Partition = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.Partition = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 100,
 				}
@@ -261,11 +261,11 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 100,
 				}
-				sidecarSet.Spec.Strategy.Partition = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.Partition = &intstr.IntOrString{
 					Type:   intstr.String,
 					StrVal: "18%",
 				}
@@ -281,11 +281,11 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 100,
 				}
-				sidecarSet.Spec.Strategy.Partition = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.Partition = &intstr.IntOrString{
 					Type:   intstr.String,
 					StrVal: "10%",
 				}
@@ -304,11 +304,11 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 100,
 				}
-				sidecarSet.Spec.Strategy.Selector = &metav1.LabelSelector{
+				sidecarSet.Spec.UpdateStrategy.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				}
 				return sidecarSet
@@ -488,7 +488,7 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 10,
 				}
@@ -506,7 +506,7 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 			},
 			getSidecarset: func() *appsv1alpha1.SidecarSet {
 				sidecarSet := factorySidecar()
-				sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 10,
 				}

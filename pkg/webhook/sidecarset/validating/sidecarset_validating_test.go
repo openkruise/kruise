@@ -17,7 +17,7 @@ func TestValidateSidecarSet(t *testing.T) {
 		"missing-selector": {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
 			Spec: appsv1alpha1.SidecarSetSpec{
-				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
 				},
 				Containers: []appsv1alpha1.SidecarContainer{
@@ -45,7 +45,7 @@ func TestValidateSidecarSet(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
-				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 					Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 					ScatterStrategy: appsv1alpha1.UpdateScatterStrategy{
 						{
@@ -83,7 +83,7 @@ func TestValidateSidecarSet(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
-				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
 				},
 				InitContainers: []appsv1alpha1.SidecarContainer{
@@ -103,7 +103,7 @@ func TestValidateSidecarSet(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
-				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
 				},
 			},
@@ -114,7 +114,7 @@ func TestValidateSidecarSet(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
-				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
 				},
 				Containers: []appsv1alpha1.SidecarContainer{
@@ -140,7 +140,7 @@ func TestValidateSidecarSet(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
-				Strategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
 				},
 				Containers: []appsv1alpha1.SidecarContainer{

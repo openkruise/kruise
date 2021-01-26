@@ -30,13 +30,13 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 	}
 	appsv1alpha1.SetDefaultsSidecarSet(sidecarSet)
 	_ = setHashSidecarSet(sidecarSet)
-	if sidecarSet.Spec.Strategy.Type != appsv1alpha1.NotUpdateSidecarSetStrategyType {
+	if sidecarSet.Spec.UpdateStrategy.Type != appsv1alpha1.NotUpdateSidecarSetStrategyType {
 		t.Fatalf("update strategy not initialized")
 	}
-	if *sidecarSet.Spec.Strategy.Partition != intstr.FromInt(0) {
+	if *sidecarSet.Spec.UpdateStrategy.Partition != intstr.FromInt(0) {
 		t.Fatalf("partition not initialized")
 	}
-	if *sidecarSet.Spec.Strategy.MaxUnavailable != intstr.FromInt(1) {
+	if *sidecarSet.Spec.UpdateStrategy.MaxUnavailable != intstr.FromInt(1) {
 		t.Fatalf("maxUnavailable not initialized")
 	}
 	for _, container := range sidecarSet.Spec.Containers {

@@ -264,7 +264,7 @@ func TestScopeNamespacePods(t *testing.T) {
 func TestCanUpgradePods(t *testing.T) {
 	sidecarSet := factorySidecarSet()
 	sidecarSet.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = "without-bbb"
-	sidecarSet.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+	sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 		Type:   intstr.String,
 		StrVal: "50%",
 	}
