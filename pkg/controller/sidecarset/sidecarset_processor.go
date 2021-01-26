@@ -89,7 +89,7 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 	}
 
 	// 6. Paused indicates that the SidecarSet is paused to update matched pods
-	if sidecarSet.Spec.Strategy.Paused {
+	if sidecarSet.Spec.UpdateStrategy.Paused {
 		klog.V(3).Infof("sidecarSet is paused, name: %s", sidecarSet.Name)
 		return reconcile.Result{}, nil
 	}
@@ -291,8 +291,8 @@ func isPodInjectedSidecar(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) 
 }
 
 func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
-	if s.Spec.Strategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
-		klog.V(3).Infof("sidecarSet spreading RollingUpdate config type, name: %s, type: %s", s.Name, s.Spec.Strategy.Type)
+	if s.Spec.UpdateStrategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
+		klog.V(3).Infof("sidecarSet spreading RollingUpdate config type, name: %s, type: %s", s.Name, s.Spec.UpdateStrategy.Type)
 		return false
 	}
 	return true
