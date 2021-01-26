@@ -27,7 +27,7 @@ import (
 
 // SetDefaults_SidecarSet set default values for SidecarSet.
 func SetDefaultsSidecarSet(obj *SidecarSet) {
-	setSidecarSetUpdateStratety(&obj.Spec.Strategy)
+	setSidecarSetUpdateStratety(&obj.Spec.UpdateStrategy)
 
 	for i := range obj.Spec.InitContainers {
 		setSidecarDefaultContainer(&obj.Spec.InitContainers[i])

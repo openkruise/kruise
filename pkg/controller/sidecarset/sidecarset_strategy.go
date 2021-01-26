@@ -39,7 +39,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 	sidecarset := control.GetSidecarset()
 	// wait to upgrade pod index
 	var waitUpgradedIndexes []int
-	strategy := sidecarset.Spec.Strategy
+	strategy := sidecarset.Spec.UpdateStrategy
 
 	// If selector is not nil, check whether the pods is selected to upgrade
 	isSelected := func(pod *corev1.Pod) bool {
@@ -106,7 +106,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdateIndexes []int, pods []*corev1.Pod) int {
 	totalReplicas := len(pods)
 	sidecarSet := coreControl.GetSidecarset()
-	strategy := sidecarSet.Spec.Strategy
+	strategy := sidecarSet.Spec.UpdateStrategy
 
 	// default partition = 0, indicates all pods will been upgraded
 	var partition int

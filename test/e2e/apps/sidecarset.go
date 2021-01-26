@@ -379,7 +379,7 @@ var _ = SIGDescribe("sidecarset", func() {
 		ginkgo.It("sidecarSet upgrade cold sidecar container image", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet()
-			sidecarSetIn.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 				MaxUnavailable: &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -420,7 +420,7 @@ var _ = SIGDescribe("sidecarset", func() {
 		ginkgo.It("sidecarSet upgrade cold sidecar container failed image, and only update one pod", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet()
-			sidecarSetIn.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
@@ -462,7 +462,7 @@ var _ = SIGDescribe("sidecarset", func() {
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and paused", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet()
-			sidecarSetIn.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
@@ -479,7 +479,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			tester.UpdateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second * 5)
 			// paused
-			sidecarSetIn.Spec.Strategy.Paused = true
+			sidecarSetIn.Spec.UpdateStrategy.Paused = true
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except := &appsv1alpha1.SidecarSetStatus{
 				MatchedPods:      2,
@@ -490,7 +490,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
 			// paused = false, continue update pods
-			sidecarSetIn.Spec.Strategy.Paused = false
+			sidecarSetIn.Spec.UpdateStrategy.Paused = false
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except = &appsv1alpha1.SidecarSetStatus{
 				MatchedPods:      2,
@@ -505,7 +505,7 @@ var _ = SIGDescribe("sidecarset", func() {
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and selector", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet()
-			sidecarSetIn.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
@@ -528,7 +528,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:latest"
 			// update sidecarSet selector
-			sidecarSetIn.Spec.Strategy.Selector = &metav1.LabelSelector{
+			sidecarSetIn.Spec.UpdateStrategy.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"canary.release": "true",
 				},
@@ -559,7 +559,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			}
 
 			// update sidecarSet selector == nil, and update all pods
-			sidecarSetIn.Spec.Strategy.Selector = nil
+			sidecarSetIn.Spec.UpdateStrategy.Selector = nil
 			tester.UpdateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second * 5)
 			tester.UpdateSidecarSet(sidecarSetIn)
@@ -577,7 +577,7 @@ var _ = SIGDescribe("sidecarset", func() {
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and partition", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet()
-			sidecarSetIn.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
@@ -593,7 +593,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:latest"
 			// update sidecarSet selector
-			sidecarSetIn.Spec.Strategy.Partition = &intstr.IntOrString{
+			sidecarSetIn.Spec.UpdateStrategy.Partition = &intstr.IntOrString{
 				Type:   intstr.String,
 				StrVal: "50%",
 			}
@@ -608,7 +608,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
 			// update sidecarSet partition, update all pods
-			sidecarSetIn.Spec.Strategy.Partition = nil
+			sidecarSetIn.Spec.UpdateStrategy.Partition = nil
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except = &appsv1alpha1.SidecarSetStatus{
 				MatchedPods:      2,
@@ -625,7 +625,7 @@ var _ = SIGDescribe("sidecarset", func() {
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and maxUnavailable", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet()
-			sidecarSetIn.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
@@ -641,7 +641,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:failed"
 			// update sidecarSet selector
-			sidecarSetIn.Spec.Strategy.MaxUnavailable = &intstr.IntOrString{
+			sidecarSetIn.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 				Type:   intstr.String,
 				StrVal: "50%",
 			}
@@ -672,7 +672,7 @@ var _ = SIGDescribe("sidecarset", func() {
 		ginkgo.It("sidecarSet update init sidecar container, and don't upgrade", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet()
-			sidecarSetIn.Spec.Strategy = appsv1alpha1.SidecarSetUpdateStrategy{
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]

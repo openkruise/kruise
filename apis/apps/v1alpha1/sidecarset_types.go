@@ -43,7 +43,7 @@ type SidecarSetSpec struct {
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// The sidecarset strategy to use to replace existing pods with new ones.
-	Strategy SidecarSetUpdateStrategy `json:"strategy,omitempty"`
+	UpdateStrategy SidecarSetUpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
 // SidecarContainer defines the container of Sidecar
