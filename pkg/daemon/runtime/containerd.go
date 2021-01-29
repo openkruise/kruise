@@ -44,6 +44,7 @@ import (
 	"golang.org/x/net/http/httpproxy"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 )
@@ -205,20 +206,24 @@ func (d *containerdImageClient) getResolver(ctx context.Context, ref reference.N
 	var lastErr error // last resolver error
 
 	// Stage 1: try to resolving reference by given secrets
-	for _, secret := range secrets {
-		authInfo, err := convertToRegistryAuthInfo(secret, registry)
-		if err != nil {
-			continue
+	if len(secrets) > 0 {
+		var authInfos []daemonutil.AuthInfo
+		authInfos, lastErr = convertToRegistryAuths(secrets, registry)
+		if lastErr == nil {
+			var pullErrs []error
+			for _, authInfo := range authInfos {
+				resolver := d.resolverGenerator(&authInfo)
+				_, desc, err := resolver.Resolve(ctx, ref.String())
+				if err == nil {
+					return resolver, desc.MediaType == images.MediaTypeDockerSchema1Manifest, nil
+				}
+				klog.Warningf("failed to resolve reference %s: %v", ref, err)
+				pullErrs = append(pullErrs, err)
+			}
+			if len(pullErrs) > 0 {
+				lastErr = utilerrors.NewAggregate(pullErrs)
+			}
 		}
-
-		resolver := d.resolverGenerator(authInfo)
-		_, desc, err := resolver.Resolve(ctx, ref.String())
-		if err != nil {
-			lastErr = err
-			klog.Warningf("failed to resolve reference %s: %v", ref, err)
-			continue
-		}
-		return resolver, desc.MediaType == images.MediaTypeDockerSchema1Manifest, nil
 	}
 
 	// Stage 2: try to resolving reference with default account info or
