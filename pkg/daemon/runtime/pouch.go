@@ -27,6 +27,7 @@ import (
 	pouchapi "github.com/alibaba/pouch/client"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	v1 "k8s.io/api/core/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 )
 
@@ -76,30 +77,36 @@ func (d *pouchImageRuntime) PullImage(ctx context.Context, imageName, tag string
 
 	registry := daemonutil.ParseRegistry(imageName)
 	var ioReader io.ReadCloser
-	var authInfo *daemonutil.AuthInfo
 
 	if len(pullSecrets) > 0 {
-		for _, secret := range pullSecrets {
-			authInfo, err = convertToRegistryAuthInfo(secret, registry)
-			if err == nil {
+		var authInfos []daemonutil.AuthInfo
+		authInfos, err = convertToRegistryAuths(pullSecrets, registry)
+		if err == nil {
+			var pullErrs []error
+			for _, authInfo := range authInfos {
+				var pullErr error
 				klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
-				ioReader, err = d.client.ImagePull(ctx, imageName, tag, authInfo.EncodeToString())
-				if err == nil {
+				ioReader, pullErr = d.client.ImagePull(ctx, imageName, tag, authInfo.EncodeToString())
+				if pullErr == nil {
 					return newImagePullStatusReader(ioReader), nil
 				}
-				d.handleRuntimeError(err)
-				klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, err)
+				d.handleRuntimeError(pullErr)
+				klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
+				pullErrs = append(pullErrs, pullErr)
+			}
+			if len(pullErrs) > 0 {
+				err = utilerrors.NewAggregate(pullErrs)
 			}
 		}
-
-		return nil, err
 	}
 
 	// Try the default secret
 	if d.accountManager != nil {
-		authInfo, err = d.accountManager.GetAccountInfo(registry)
-		if err != nil {
-			klog.Warningf("Failed to get account for registry %v, err %v", registry, err)
+		var authInfo *daemonutil.AuthInfo
+		var defaultErr error
+		authInfo, defaultErr = d.accountManager.GetAccountInfo(registry)
+		if defaultErr != nil {
+			klog.Warningf("Failed to get account for registry %v, err %v", registry, defaultErr)
 			// When the default account acquisition fails, try to pull anonymously
 		} else if authInfo != nil {
 			klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
@@ -112,18 +119,18 @@ func (d *pouchImageRuntime) PullImage(ctx context.Context, imageName, tag string
 		}
 	}
 
-	// Anonymous pull
-	if len(pullSecrets) == 0 {
-		klog.V(5).Infof("Pull image %v:%v anonymous", imageName, tag)
-		ioReader, err = d.client.ImagePull(ctx, imageName, tag, "")
-		if err != nil {
-			d.handleRuntimeError(err)
-			return nil, fmt.Errorf("anonymous pulling failed, err %v", err)
-		}
-		return newImagePullStatusReader(ioReader), nil
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, err
+	// Anonymous pull
+	klog.V(5).Infof("Pull image %v:%v anonymous", imageName, tag)
+	ioReader, err = d.client.ImagePull(ctx, imageName, tag, "")
+	if err != nil {
+		d.handleRuntimeError(err)
+		return nil, fmt.Errorf("anonymous pulling failed, err %v", err)
+	}
+	return newImagePullStatusReader(ioReader), nil
 }
 
 func (d *pouchImageRuntime) ListImages(ctx context.Context) ([]ImageInfo, error) {
