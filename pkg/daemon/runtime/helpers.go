@@ -31,53 +31,77 @@ import (
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 )
 
-// Auths struct contains an embedded RegistriesStruct of name auths
-type Auths struct {
-	Registries RegistriesStruct `json:"auths"`
+var (
+	keyring = credentialprovider.NewDockerKeyring()
+)
+
+func convertToRegistryAuths(pullSecrets []v1.Secret, repo string) (infos []daemonutil.AuthInfo, err error) {
+	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, keyring)
+	if err != nil {
+		return nil, err
+	}
+	creds, withCredentials := keyring.Lookup(repo)
+	if !withCredentials {
+		return nil, nil
+	}
+	for _, c := range creds {
+		infos = append(infos, daemonutil.AuthInfo{
+			Username: c.Username,
+			Password: c.Password,
+		})
+	}
+	return infos, nil
 }
 
-// RegistriesStruct is a map of registries
-type RegistriesStruct map[string]struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
-	Auth     string `json:"auth"`
-}
-
-func convertToRegistryAuthInfo(secret v1.Secret, registry string) (*daemonutil.AuthInfo, error) {
-	auths := Auths{}
-	if secret.Type == v1.SecretTypeOpaque {
-		return &daemonutil.AuthInfo{
-			Username: string(secret.Data["username"]),
-			Password: string(secret.Data["password"]),
-		}, nil
-	}
-
-	if secretData, ok := secret.Data[".dockerconfigjson"]; ok && secret.Type == v1.SecretTypeDockerConfigJson {
-		if err := json.Unmarshal(secretData, &auths); err != nil {
-			klog.Errorf("Error unmarshalling .dockerconfigjson from %s/%s: %v", secret.Namespace, secret.Name, err)
-			return nil, err
-		}
-
-	} else if dockerCfgData, ok := secret.Data[".dockercfg"]; ok && secret.Type == v1.SecretTypeDockercfg {
-		registries := RegistriesStruct{}
-		if err := json.Unmarshal(dockerCfgData, &registries); err != nil {
-			klog.Errorf("Error unmarshalling .dockercfg from %s/%s: %v", secret.Namespace, secret.Name, err)
-			return nil, err
-		}
-		auths.Registries = registries
-	}
-
-	if au, ok := auths.Registries[registry]; ok {
-		return &daemonutil.AuthInfo{
-			Username: au.Username,
-			Password: au.Password,
-		}, nil
-	}
-	return nil, fmt.Errorf("imagePullSecret %s/%s contains neither .dockercfg nor .dockerconfigjson", secret.Namespace, secret.Name)
-}
+//// Auths struct contains an embedded RegistriesStruct of name auths
+//type Auths struct {
+//	Registries RegistriesStruct `json:"auths"`
+//}
+//
+//// RegistriesStruct is a map of registries
+//type RegistriesStruct map[string]struct {
+//	Username string `json:"username"`
+//	Password string `json:"password"`
+//	Email    string `json:"email"`
+//	Auth     string `json:"auth"`
+//}
+//
+//func convertToRegistryAuthInfo(secret v1.Secret, registry string) (*daemonutil.AuthInfo, error) {
+//	auths := Auths{}
+//	if secret.Type == v1.SecretTypeOpaque {
+//		return &daemonutil.AuthInfo{
+//			Username: string(secret.Data["username"]),
+//			Password: string(secret.Data["password"]),
+//		}, nil
+//	}
+//
+//	if secretData, ok := secret.Data[".dockerconfigjson"]; ok && secret.Type == v1.SecretTypeDockerConfigJson {
+//		if err := json.Unmarshal(secretData, &auths); err != nil {
+//			klog.Errorf("Error unmarshalling .dockerconfigjson from %s/%s: %v", secret.Namespace, secret.Name, err)
+//			return nil, err
+//		}
+//
+//	} else if dockerCfgData, ok := secret.Data[".dockercfg"]; ok && secret.Type == v1.SecretTypeDockercfg {
+//		registries := RegistriesStruct{}
+//		if err := json.Unmarshal(dockerCfgData, &registries); err != nil {
+//			klog.Errorf("Error unmarshalling .dockercfg from %s/%s: %v", secret.Namespace, secret.Name, err)
+//			return nil, err
+//		}
+//		auths.Registries = registries
+//	}
+//
+//	if au, ok := auths.Registries[registry]; ok {
+//		return &daemonutil.AuthInfo{
+//			Username: au.Username,
+//			Password: au.Password,
+//		}, nil
+//	}
+//	return nil, fmt.Errorf("imagePullSecret %s/%s contains neither .dockercfg nor .dockerconfigjson", secret.Namespace, secret.Name)
+//}
 
 //func containsImage(c []ImageInfo, name string, tag string) bool {
 //	for _, info := range c {
