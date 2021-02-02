@@ -76,3 +76,20 @@ func IsPodHooked(hook *appspub.LifecycleHook, pod *v1.Pod) bool {
 	}
 	return false
 }
+
+func IsPodAllHooked(hook *appspub.LifecycleHook, pod *v1.Pod) bool {
+	if hook == nil || pod == nil {
+		return false
+	}
+	for _, f := range hook.FinalizersHandler {
+		if !controllerutil.ContainsFinalizer(pod, f) {
+			return false
+		}
+	}
+	for k, v := range hook.LabelsHandler {
+		if pod.Labels[k] != v {
+			return false
+		}
+	}
+	return true
+}
