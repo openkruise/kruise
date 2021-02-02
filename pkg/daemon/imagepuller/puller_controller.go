@@ -73,7 +73,9 @@ func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonuti
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "imagepuller", Host: nodeName})
 
 	queue := workqueue.NewNamedRateLimitingQueue(
-		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 300*time.Second),
+		// Backoff duration from 500ms to 50~55s
+		// For nodeimage controller will mark a image:tag task failed (not responded for a long time) if daemon does not report status in 60s.
+		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second+time.Millisecond*time.Duration(rand.Intn(5000))),
 		"imagepuller",
 	)
 
@@ -255,12 +257,13 @@ func (c *Controller) sync(key string) (retErr error) {
 		newStatus.ImageStatuses = nil
 	}
 
-	retErr = c.statusUpdater.updateStatus(nodeImage, &newStatus)
+	var limited bool
+	limited, retErr = c.statusUpdater.updateStatus(nodeImage, &newStatus)
 	if retErr != nil {
 		return retErr
 	}
 
-	if isImageInPulling(&nodeImage.Spec, &newStatus) {
+	if limited || isImageInPulling(&nodeImage.Spec, &newStatus) {
 		// 3~5s
 		c.queue.AddAfter(key, 3*time.Second+time.Millisecond*time.Duration(rand.Intn(2000)))
 	} else {

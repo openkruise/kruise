@@ -269,6 +269,13 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 			tagSpec := &imageSpec.Tags[i]
 			fullName := fmt.Sprintf("%s:%s", name, tagSpec.Tag)
 
+			// If createdAt field has not been injected by webhook, delete it
+			if tagSpec.CreatedAt == nil {
+				modified = true
+				messages = append(messages, fmt.Sprintf("image %s has no createAt field", fullName))
+				continue
+			}
+
 			// If tag has owners which have been deleted, delete this tag
 			var activeRefs []v1.ObjectReference
 			for _, ref := range tagSpec.OwnerReferences {
@@ -305,7 +312,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 			}
 
 			// If tag has TTL and status has completed, prepare to delete this tag
-			if tagSpec.CreatedAt != nil && tagSpec.PullPolicy != nil && tagSpec.PullPolicy.TTLSecondsAfterFinished != nil {
+			if tagSpec.PullPolicy != nil && tagSpec.PullPolicy.TTLSecondsAfterFinished != nil {
 
 				var completionTime *metav1.Time
 				if imageStatus, ok := nodeImage.Status.ImageStatuses[name]; ok {
