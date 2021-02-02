@@ -96,12 +96,12 @@ func newStatusUpdater(imagePullNodeClient clientalpha1.NodeImageInterface) *stat
 	}
 }
 
-func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStatus *appsv1alpha1.NodeImageStatus) error {
+func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStatus *appsv1alpha1.NodeImageStatus) (limited bool, err error) {
 	if util.IsJSONEqual(newStatus, su.previousStatus) {
 		// 12h + 0~60min
 		randRefresh := time.Hour*12 + time.Second*time.Duration(rand.Int63n(3600))
 		if time.Since(su.previousTimestamp) < randRefresh {
-			return nil
+			return false, nil
 		}
 	}
 
@@ -109,19 +109,19 @@ func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStat
 	if !su.rateLimiter.Allow() {
 		msg := fmt.Sprintf("Updating status is limited qps=%v burst=%v", statusUpdateQPS, statusUpdateBurst)
 		klog.V(3).Infof(msg)
-		return fmt.Errorf(msg)
+		return true, nil
 	}
 
 	klog.V(5).Infof("Updating status: %v", util.DumpJSON(newStatus))
 	newNodeImage := nodeImage.DeepCopy()
 	newNodeImage.Status = *newStatus
 
-	_, err := su.imagePullNodeClient.UpdateStatus(newNodeImage)
+	_, err = su.imagePullNodeClient.UpdateStatus(newNodeImage)
 	if err == nil {
 		su.previousStatus = newStatus
 	}
 	su.previousTimestamp = time.Now()
-	return err
+	return false, err
 }
 
 func (su *statusUpdater) statusChanged(newStatus *appsv1alpha1.NodeImageStatus) bool {
