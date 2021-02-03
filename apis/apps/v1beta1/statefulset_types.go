@@ -177,6 +177,9 @@ type StatefulSetSpec struct {
 	// - If you just want to delete Pod-1, you should set spec.reserveOrdinal to [1] and spec.replicas to 2.
 	//   Then controller will delete Pod-1 (existing Pods will be [0, 2])
 	ReserveOrdinals []int `json:"reserveOrdinals,omitempty"`
+
+	// Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
+	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
 }
 
 // StatefulSetStatus defines the observed state of StatefulSet

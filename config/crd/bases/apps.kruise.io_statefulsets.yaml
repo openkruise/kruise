@@ -440,6 +440,36 @@ spec:
           spec:
             description: StatefulSetSpec defines the desired state of StatefulSet
             properties:
+              lifecycle:
+                description: Lifecycle defines the lifecycle hooks for Pods pre-delete,
+                  in-place update.
+                properties:
+                  inPlaceUpdate:
+                    description: InPlaceUpdate is the hook before Pod to update and
+                      after Pod has been updated.
+                    properties:
+                      finalizersHandler:
+                        items:
+                          type: string
+                        type: array
+                      labelsHandler:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
+                  preDelete:
+                    description: PreDelete is the hook before Pod to be deleted.
+                    properties:
+                      finalizersHandler:
+                        items:
+                          type: string
+                        type: array
+                      labelsHandler:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
+                type: object
               podManagementPolicy:
                 description: podManagementPolicy controls how pods are created during
                   initial scale up, when replacing pods on nodes, or when scaling

@@ -28,6 +28,7 @@ import (
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -637,6 +638,7 @@ func TestMange(t *testing.T) {
 		fakeClient := fake.NewFakeClient(initialObjs...)
 		ctrl := &realControl{
 			fakeClient,
+			lifecycle.NewForTest(fakeClient),
 			inplaceupdate.NewForTest(fakeClient, apps.ControllerRevisionHashLabelKey, func() metav1.Time { return now }),
 			record.NewFakeRecorder(10),
 		}

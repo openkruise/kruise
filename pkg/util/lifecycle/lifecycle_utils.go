@@ -17,16 +17,44 @@ limitations under the License.
 package lifecycle
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/openkruise/kruise/pkg/util/podadapter"
 )
+
+// Interface for managing pods lifecycle.
+type Interface interface {
+	UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType) (bool, error)
+}
+
+type realControl struct {
+	adp podadapter.Adapter
+}
+
+func New(c client.Client) Interface {
+	return &realControl{adp: &podadapter.AdapterRuntimeClient{Client: c}}
+}
+
+func NewForTypedClient(c clientset.Interface) Interface {
+	return &realControl{adp: &podadapter.AdapterTypedClient{Client: c}}
+}
+
+func NewForInformer(informer coreinformers.PodInformer) Interface {
+	return &realControl{adp: &podadapter.AdapterInformer{PodInformer: informer}}
+}
+
+func NewForTest(c client.Client) Interface {
+	return &realControl{adp: &podadapter.AdapterRuntimeClient{Client: c}}
+}
 
 func GetPodLifecycleState(pod *v1.Pod) appspub.LifecycleStateType {
 	return appspub.LifecycleStateType(pod.Labels[appspub.LifecycleStateKey])
@@ -45,19 +73,27 @@ func SetPodLifecycle(state appspub.LifecycleStateType) func(*v1.Pod) {
 	}
 }
 
-func PatchPodLifecycle(c client.Client, pod *v1.Pod, state appspub.LifecycleStateType) (bool, error) {
+func (c *realControl) UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType) (bool, error) {
 	if GetPodLifecycleState(pod) == state {
 		return false, nil
 	}
 
-	body := fmt.Sprintf(
-		`{"metadata":{"labels":{"%s":"%s"},"annotations":{"%s":"%s"}}}`,
-		appspub.LifecycleStateKey,
-		string(state),
-		appspub.LifecycleTimestampKey,
-		time.Now().Format(time.RFC3339),
-	)
-	return true, c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	var err error
+	if adp, ok := c.adp.(podadapter.AdapterWithPatch); ok {
+		body := fmt.Sprintf(
+			`{"metadata":{"labels":{"%s":"%s"},"annotations":{"%s":"%s"}}}`,
+			appspub.LifecycleStateKey,
+			string(state),
+			appspub.LifecycleTimestampKey,
+			time.Now().Format(time.RFC3339),
+		)
+		err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	} else {
+		SetPodLifecycle(state)(pod)
+		err = c.adp.UpdatePod(pod)
+	}
+
+	return true, err
 }
 
 func IsPodHooked(hook *appspub.LifecycleHook, pod *v1.Pod) bool {

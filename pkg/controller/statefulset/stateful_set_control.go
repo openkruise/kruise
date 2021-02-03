@@ -34,8 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 )
 
 // ControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
@@ -63,6 +65,7 @@ type ControlInterface interface {
 func NewDefaultStatefulSetControl(
 	podControl StatefulPodControlInterface,
 	inplaceControl inplaceupdate.Interface,
+	lifecycleControl lifecycle.Interface,
 	statusUpdater StatusUpdaterInterface,
 	controllerHistory history.Interface,
 	recorder record.EventRecorder) ControlInterface {
@@ -72,6 +75,7 @@ func NewDefaultStatefulSetControl(
 		controllerHistory,
 		recorder,
 		inplaceControl,
+		lifecycleControl,
 	}
 }
 
@@ -84,6 +88,7 @@ type defaultStatefulSetControl struct {
 	controllerHistory history.Interface
 	recorder          record.EventRecorder
 	inplaceControl    inplaceupdate.Interface
+	lifecycleControl  lifecycle.Interface
 }
 
 // UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
@@ -446,6 +451,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// If we find a Pod that has not been created we create the Pod
 		if !isCreated(replicas[i]) {
+			lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(replicas[i])
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
 				msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
 				condition := NewStatefulsetCondition(appsv1beta1.FailedCreatePod, v1.ConditionTrue, "", msg)
@@ -558,7 +564,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			set.Name,
 			condemned[target].Name)
 
-		if err := ssc.podControl.DeleteStatefulPod(set, condemned[target]); err != nil {
+		modified, err := ssc.deletePod(set, condemned[target])
+		if err != nil || modified {
 			return &status, err
 		}
 		if getPodRevision(condemned[target]) == currentRevision.Name {
@@ -602,9 +609,26 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 	}
 
+	// refresh states for all pods
+	var modified bool
+	for _, pod := range pods {
+		refreshed, duration, err := ssc.refreshPodState(set, pod)
+		if err != nil {
+			return &status, err
+		} else if duration > 0 {
+			durationStore.Push(getStatefulSetKey(set), duration)
+		}
+		if refreshed {
+			modified = true
+		}
+	}
+	if modified {
+		return &status, nil
+	}
+
 	var unavailablePods []string
 	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, *set.Spec.Replicas, replicas)
-	klog.V(5).Infof("Prepare to update pods indexes %v for StatefulSet %s", updateIndexes, getStatefulSetKey(set))
+	klog.V(3).Infof("Prepare to update pods indexes %v for StatefulSet %s", updateIndexes, getStatefulSetKey(set))
 	minWaitTime := appsv1beta1.MaxMinReadySeconds * time.Second
 	// update pods in sequence
 	for _, target := range updateIndexes {
@@ -675,6 +699,74 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	return &status, nil
 }
 
+func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, pod *v1.Pod) (bool, error) {
+	if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.PreDelete, pod) {
+		if updated, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
+			return false, err
+		} else if updated {
+			klog.V(3).Infof("StatefulSet %s scaling update pod %s lifecycle to PreparingDelete",
+				getStatefulSetKey(set), pod.Name)
+			return true, nil
+		}
+		return false, nil
+	}
+	if err := ssc.podControl.DeleteStatefulPod(set, pod); err != nil {
+		ssc.recorder.Eventf(set, v1.EventTypeWarning, "FailedDelete", "failed to delete pod %s: %v", pod.Name, err)
+		return false, err
+	}
+	return true, nil
+}
+
+func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulSet, pod *v1.Pod) (bool, time.Duration, error) {
+	if set.Spec.UpdateStrategy.RollingUpdate == nil {
+		return false, 0, nil
+	}
+	opts := &inplaceupdate.UpdateOptions{}
+	if set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil {
+		opts.GracePeriodSeconds = set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.GracePeriodSeconds
+	}
+	res := ssc.inplaceControl.Refresh(pod, opts)
+	if res.RefreshErr != nil {
+		klog.Errorf("AdvancedStatefulSet %s failed to update pod %s condition for inplace: %v",
+			getStatefulSetKey(set), pod.Name, res.RefreshErr)
+		return false, 0, res.RefreshErr
+	}
+
+	var state appspub.LifecycleStateType
+	switch lifecycle.GetPodLifecycleState(pod) {
+	case appspub.LifecycleStateUpdating:
+		checkFunc := inplaceupdate.CheckInPlaceUpdateCompleted
+		if opts != nil && opts.CustomizeCheckUpdateCompleted != nil {
+			checkFunc = opts.CustomizeCheckUpdateCompleted
+		}
+		if checkFunc(pod) == nil {
+			if set.Spec.Lifecycle != nil && !lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
+				state = appspub.LifecycleStateUpdated
+			} else {
+				state = appspub.LifecycleStateNormal
+			}
+		}
+	case appspub.LifecycleStateUpdated:
+		if set.Spec.Lifecycle == nil ||
+			set.Spec.Lifecycle.InPlaceUpdate == nil ||
+			lifecycle.IsPodAllHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
+			state = appspub.LifecycleStateNormal
+		}
+	}
+
+	if state != "" {
+		if updated, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
+			return false, 0, err
+		} else if updated {
+			klog.V(3).Infof("AdvancedStatefulSet %s update pod %s lifecycle to %s",
+				getStatefulSetKey(set), pod.Name, state)
+			return true, res.DelayDuration, nil
+		}
+	}
+
+	return false, res.DelayDuration, nil
+}
+
 func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 	set *appsv1beta1.StatefulSet, pod *v1.Pod,
 	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
@@ -700,18 +792,42 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 		opts.GracePeriodSeconds = set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.GracePeriodSeconds
 	}
 
-	res := ssc.inplaceControl.Update(pod, oldRevision, updateRevision, opts)
-	if res.InPlaceUpdate && res.UpdateErr == nil {
-		ssc.recorder.Eventf(set, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
-		updateExpectations.ExpectUpdated(getStatefulSetKey(set), updateRevision.Name, pod)
-	} else if res.UpdateErr != nil {
-		ssc.recorder.Eventf(set, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place: %v", pod.Name, res.UpdateErr)
-	}
-	if res.DelayDuration > 0 {
-		durationStore.Push(getStatefulSetKey(set), res.DelayDuration)
-	}
+	if ssc.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, opts) {
+		switch state := lifecycle.GetPodLifecycleState(pod); state {
+		case "", appspub.LifecycleStateNormal:
+			var err error
+			var updated bool
+			if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
+				if updated, err = ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
+					klog.V(3).Infof("StatefulSet %s updated pod %s lifecycle to PreparingUpdate",
+						getStatefulSetKey(set), pod.Name)
+				}
+				return true, err
+			}
+		case appspub.LifecycleStatePreparingUpdate:
+			if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
+				return true, nil
+			}
+		case appspub.LifecycleStateUpdating:
+		default:
+			return true, fmt.Errorf("not allowed to in-place update pod %s in state %s", pod.Name, state)
+		}
 
-	return res.InPlaceUpdate, res.UpdateErr
+		if set.Spec.Lifecycle != nil {
+			opts.AdditionalFuncs = append(opts.AdditionalFuncs, lifecycle.SetPodLifecycle(appspub.LifecycleStateUpdating))
+		}
+		res := ssc.inplaceControl.Update(pod, oldRevision, updateRevision, opts)
+		if res.InPlaceUpdate {
+			if res.UpdateErr == nil {
+				ssc.recorder.Eventf(set, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place(revision %v)", pod.Name, updateRevision.Name)
+				return res.InPlaceUpdate, nil
+			}
+
+			ssc.recorder.Eventf(set, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place(revision %v): %v", pod.Name, updateRevision.Name, res.UpdateErr)
+			return res.InPlaceUpdate, res.UpdateErr
+		}
+	}
+	return true, nil
 }
 
 // updateStatefulSetStatus updates set's Status to be equal to status. If status indicates a complete update, it is

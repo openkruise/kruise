@@ -40,12 +40,13 @@ type Interface interface {
 
 // New returns a scale control.
 func New(c client.Client, recorder record.EventRecorder) Interface {
-	return &realControl{Client: c, recorder: recorder}
+	return &realControl{Client: c, lifecycleControl: lifecycle.New(c), recorder: recorder}
 }
 
 type realControl struct {
 	client.Client
-	recorder record.EventRecorder
+	lifecycleControl lifecycle.Interface
+	recorder         record.EventRecorder
 }
 
 func (r *realControl) Manage(
@@ -139,9 +140,9 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 
 		klog.V(3).Infof("CloneSet %s patch pod %s lifecycle from PreparingDelete to Normal",
 			clonesetutils.GetControllerKey(cs), pod.Name)
-		if patched, err := lifecycle.PatchPodLifecycle(r, pod, appspub.LifecycleStateNormal); err != nil {
+		if updated, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStateNormal); err != nil {
 			return modified, err
-		} else if patched {
+		} else if updated {
 			modified = true
 			clonesetutils.ResourceVersionExpectations.Expect(pod)
 		}
@@ -232,10 +233,10 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 	var modified bool
 	for _, pod := range podsToDelete {
 		if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.PreDelete, pod) {
-			if patched, err := lifecycle.PatchPodLifecycle(r, pod, appspub.LifecycleStatePreparingDelete); err != nil {
+			if updated, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
 				return false, err
-			} else if patched {
-				klog.V(3).Infof("CloneSet %s scaling patch pod %s lifecycle to PreparingDelete",
+			} else if updated {
+				klog.V(3).Infof("CloneSet %s scaling update pod %s lifecycle to PreparingDelete",
 					clonesetutils.GetControllerKey(cs), pod.Name)
 				modified = true
 				clonesetutils.ResourceVersionExpectations.Expect(pod)

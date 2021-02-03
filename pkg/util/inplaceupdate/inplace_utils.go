@@ -35,6 +35,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openkruise/kruise/pkg/util/podadapter"
 )
 
 var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
@@ -88,7 +90,7 @@ type UpdateSpec struct {
 }
 
 type realControl struct {
-	adp         adapter
+	adp         podadapter.Adapter
 	revisionKey string
 
 	// just for test
@@ -96,19 +98,19 @@ type realControl struct {
 }
 
 func New(c client.Client, revisionKey string) Interface {
-	return &realControl{adp: &adapterRuntimeClient{Client: c}, revisionKey: revisionKey, now: metav1.Now}
+	return &realControl{adp: &podadapter.AdapterRuntimeClient{Client: c}, revisionKey: revisionKey, now: metav1.Now}
 }
 
 func NewForTypedClient(c clientset.Interface, revisionKey string) Interface {
-	return &realControl{adp: &adapterTypedClient{client: c}, revisionKey: revisionKey, now: metav1.Now}
+	return &realControl{adp: &podadapter.AdapterTypedClient{Client: c}, revisionKey: revisionKey, now: metav1.Now}
 }
 
 func NewForInformer(informer coreinformers.PodInformer, revisionKey string) Interface {
-	return &realControl{adp: &adapterInformer{podInformer: informer}, revisionKey: revisionKey, now: metav1.Now}
+	return &realControl{adp: &podadapter.AdapterInformer{PodInformer: informer}, revisionKey: revisionKey, now: metav1.Now}
 }
 
 func NewForTest(c client.Client, revisionKey string, now func() metav1.Time) Interface {
-	return &realControl{adp: &adapterRuntimeClient{Client: c}, revisionKey: revisionKey, now: now}
+	return &realControl{adp: &podadapter.AdapterRuntimeClient{Client: c}, revisionKey: revisionKey, now: now}
 }
 
 func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
@@ -158,21 +160,21 @@ func (c *realControl) refreshCondition(pod *v1.Pod, opts *UpdateOptions) error {
 
 func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		clone, err := c.adp.getPod(pod.Namespace, pod.Name)
+		clone, err := c.adp.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
 		}
 
 		setPodCondition(clone, condition)
 		updatePodReadyCondition(clone)
-		return c.adp.updatePodStatus(clone)
+		return c.adp.UpdatePodStatus(clone)
 	})
 }
 
 func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.Duration, error) {
 	var delayDuration time.Duration
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		clone, err := c.adp.getPod(pod.Namespace, pod.Name)
+		clone, err := c.adp.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
 		}
@@ -211,7 +213,7 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 			delete(clone.Annotations, appspub.InPlaceUpdateGraceKey)
 		}
 
-		return c.adp.updatePod(clone)
+		return c.adp.UpdatePod(clone)
 	})
 
 	return delayDuration, err
@@ -260,7 +262,7 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 
 func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		clone, err := c.adp.getPod(pod.Namespace, pod.Name)
+		clone, err := c.adp.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
 		}
@@ -304,7 +306,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			clone.Annotations[appspub.InPlaceUpdateGraceKey] = string(inPlaceUpdateSpecJSON)
 		}
 
-		return c.adp.updatePod(clone)
+		return c.adp.UpdatePod(clone)
 	})
 }
 
