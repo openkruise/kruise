@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion)
@@ -228,6 +230,10 @@ func isTerminating(pod *v1.Pod) bool {
 
 // isHealthy returns true if pod is running and ready and has not been terminated
 func isHealthy(pod *v1.Pod) bool {
+	state := lifecycle.GetPodLifecycleState(pod)
+	if state != "" && state != appspub.LifecycleStateNormal {
+		return false
+	}
 	return isRunningAndReady(pod) && !isTerminating(pod)
 }
 
