@@ -55,6 +55,7 @@ import (
 	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1beta1"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 )
 
 type invariantFunc func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
@@ -66,7 +67,8 @@ func setupController(client clientset.Interface, kruiseClient kruiseclientset.In
 	ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 	recorder := record.NewFakeRecorder(10)
 	inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), apps.ControllerRevisionHashLabelKey)
-	ssc := NewDefaultStatefulSetControl(spc, inplaceControl, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
+	lifecycleControl := lifecycle.NewForInformer(informerFactory.Core().V1().Pods())
+	ssc := NewDefaultStatefulSetControl(spc, inplaceControl, lifecycleControl, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
 
 	stop := make(chan struct{})
 	informerFactory.Start(stop)
@@ -547,7 +549,8 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 		recorder := record.NewFakeRecorder(10)
 		inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), apps.ControllerRevisionHashLabelKey)
-		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder, inplaceControl}
+		lifecycleControl := lifecycle.NewForInformer(informerFactory.Core().V1().Pods())
+		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder, inplaceControl, lifecycleControl}
 
 		stop := make(chan struct{})
 		defer close(stop)
@@ -2068,6 +2071,145 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	condition = inplaceupdate.GetCondition(pods[1])
 	if condition == nil || condition.Status != v1.ConditionTrue {
 		t.Fatalf("Expected InPlaceUpdateReady condition True after in-place update completed, got %v", condition)
+	}
+}
+
+func TestStatefulSetControlLifecycleHook(t *testing.T) {
+	set := burst(newStatefulSet(3))
+	var partition int32 = 2
+	set.Spec.Lifecycle = &appspub.Lifecycle{
+		InPlaceUpdate: &appspub.LifecycleHook{
+			LabelsHandler: map[string]string{
+				"unready-block": "true",
+			},
+		},
+	}
+	set.Spec.Template.Labels["unready-block"] = "true"
+
+	set.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
+		Type: apps.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
+			return &appsv1beta1.RollingUpdateStatefulSetStrategy{
+				Partition:       &partition,
+				PodUpdatePolicy: appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
+			}
+		}(),
+	}
+	set.Spec.Template.Spec.ReadinessGates = append(set.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
+
+	client := fake.NewSimpleClientset()
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	spc, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+	if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+		t.Fatal(err)
+	}
+	set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ready to update
+	set.Spec.Template.Spec.Containers[0].Image = "foo"
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalPods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(originalPods))
+	// mock pod container statuses
+	for _, p := range originalPods {
+		p.Status.ContainerStatuses = append(p.Status.ContainerStatuses, v1.ContainerStatus{
+			Name:    "nginx",
+			ImageID: "imgID1",
+		})
+	}
+	oldRevision := originalPods[2].Labels[apps.StatefulSetRevisionLabel]
+
+	// prepare in-place update pod 2
+	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+
+	if lifecycle.GetPodLifecycleState(pods[2]) != appspub.LifecycleStatePreparingUpdate {
+		t.Fatalf("Expected pod2 in state %v, actually in state %v", appspub.LifecycleStatePreparingUpdate, lifecycle.GetPodLifecycleState(pods[2]))
+	}
+
+	// update pod2 label to be not hooked
+	pods[2].Labels["unready-block"] = "false"
+
+	// inplace update pod2
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if pods[2].Spec.Containers[0].Image != "foo" ||
+		pods[2].Labels[apps.StatefulSetRevisionLabel] == oldRevision {
+		t.Fatalf("Expected in-place update pod2, actually got %+v", pods[2])
+	}
+	condition := inplaceupdate.GetCondition(pods[2])
+	if condition == nil || condition.Status != v1.ConditionFalse {
+		t.Fatalf("Expected InPlaceUpdateReady condition False after in-place update, got %v", condition)
+	}
+	updateExpectations.ObserveUpdated(getStatefulSetKey(set), pods[2].Labels[apps.StatefulSetRevisionLabel], pods[2])
+
+	// update pod2 status, make pod2 state to be Updated
+	pods[2].Status.ContainerStatuses = []v1.ContainerStatus{{
+		Name:    "nginx",
+		ImageID: "imgID2",
+	}}
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+
+	if lifecycle.GetPodLifecycleState(pods[2]) != appspub.LifecycleStateUpdated {
+		t.Fatalf("Expected pod2 in state %v, actually in state %v", appspub.LifecycleStateUpdated, lifecycle.GetPodLifecycleState(pods[2]))
+	}
+
+	// update pod2 to be hooked, pod2 state to Normal
+	pods[2].Labels["unready-block"] = "true"
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+
+	if lifecycle.GetPodLifecycleState(pods[2]) != appspub.LifecycleStateNormal {
+		t.Fatalf("Expected pod2 in state %v, actually in state %v", appspub.LifecycleStateNormal, lifecycle.GetPodLifecycleState(pods[2]))
+	}
+
+	// should not prepare in-place update pod 1
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if lifecycle.GetPodLifecycleState(pods[1]) == appspub.LifecycleStatePreparingUpdate {
+		t.Fatalf("Expected pod1 in state %v, actually in state %v", appspub.LifecycleStatePreparingUpdate, lifecycle.GetPodLifecycleState(pods[1]))
 	}
 }
 

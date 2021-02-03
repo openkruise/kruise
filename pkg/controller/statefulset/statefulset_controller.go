@@ -30,6 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	apps "k8s.io/api/apps/v1"
@@ -127,6 +128,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 				pvcLister,
 				recorder),
 			inplaceupdate.New(util.NewClientFromManager(mgr, "statefulset-controller"), appsv1.ControllerRevisionHashLabelKey),
+			lifecycle.New(util.NewClientFromManager(mgr, "statefulset-controller")),
 			NewRealStatefulSetStatusUpdater(genericClient.KruiseClient, statefulSetLister),
 			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(revInformer.(toolscache.SharedIndexInformer).GetIndexer())),
 			recorder,

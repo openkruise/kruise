@@ -48,16 +48,18 @@ type Interface interface {
 
 func New(c client.Client, recorder record.EventRecorder) Interface {
 	return &realControl{
-		inplaceControl: inplaceupdate.New(c, apps.ControllerRevisionHashLabelKey),
-		Client:         c,
-		recorder:       recorder,
+		inplaceControl:   inplaceupdate.New(c, apps.ControllerRevisionHashLabelKey),
+		lifecycleControl: lifecycle.New(c),
+		Client:           c,
+		recorder:         recorder,
 	}
 }
 
 type realControl struct {
 	client.Client
-	inplaceControl inplaceupdate.Interface
-	recorder       record.EventRecorder
+	lifecycleControl lifecycle.Interface
+	inplaceControl   inplaceupdate.Interface
+	recorder         record.EventRecorder
 }
 
 func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
@@ -166,11 +168,11 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	}
 
 	if state != "" {
-		if patched, err := lifecycle.PatchPodLifecycle(c, pod, state); err != nil {
+		if updated, err := c.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
 			return false, 0, err
-		} else if patched {
+		} else if updated {
 			clonesetutils.ResourceVersionExpectations.Expect(pod)
-			klog.V(3).Infof("CloneSet %s patch pod %s lifecycle to %s",
+			klog.V(3).Infof("CloneSet %s update pod %s lifecycle to %s",
 				clonesetutils.GetControllerKey(cs), pod.Name, state)
 			return true, res.DelayDuration, nil
 		}
@@ -269,10 +271,10 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			switch state := lifecycle.GetPodLifecycleState(pod); state {
 			case "", appspub.LifecycleStateNormal:
 				var err error
-				var patched bool
-				if patched, err = lifecycle.PatchPodLifecycle(c, pod, appspub.LifecycleStatePreparingUpdate); err == nil && patched {
+				var updated bool
+				if updated, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
 					clonesetutils.ResourceVersionExpectations.Expect(pod)
-					klog.V(3).Infof("CloneSet %s patch pod %s lifecycle to PreparingUpdate",
+					klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
 						clonesetutils.GetControllerKey(cs), pod.Name)
 				}
 				return 0, err
