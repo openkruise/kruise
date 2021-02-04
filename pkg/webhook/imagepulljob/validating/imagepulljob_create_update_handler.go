@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"net/http"
 
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -43,6 +44,9 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImagePulling) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ImagePulling))
 	}
 
 	if err := validate(obj); err != nil {

@@ -24,7 +24,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/gate"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -49,12 +49,13 @@ func init() {
 var (
 	concurrentReconciles = 3
 	jobOwnerKey          = ".metadata.controller"
+	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("AdvancedCronJob")
 )
 
 // Add creates a new AdvancedCronJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !gate.ResourceEnabled(&appsv1alpha1.AdvancedCronJob{}) {
+	if !utildiscovery.DiscoverGVK(controllerKind) {
 		return nil
 	}
 	return add(mgr, newReconciler(mgr))
