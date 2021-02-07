@@ -66,7 +66,7 @@ func (r *realControl) Manage(
 	}
 
 	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
-	diff, currentRevDiff := calculateDiffs(updateCS, updateRevision == currentRevision, len(pods), len(notUpdatedPods))
+	diff, currentRevDiff := calculateDiffs(updateCS, len(pods), len(notUpdatedPods))
 
 	// 1. scale out
 	if diff < 0 {

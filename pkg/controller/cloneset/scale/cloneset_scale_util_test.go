@@ -61,7 +61,6 @@ func TestCalculateDiffs(t *testing.T) {
 	cases := []struct {
 		name                   string
 		cs                     *appsv1alpha1.CloneSet
-		revConsistent          bool
 		totalPods              int
 		notUpdatedPods         int
 		expectedTotalDiff      int
@@ -78,7 +77,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          true,
 			totalPods:              10,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      0,
@@ -95,7 +93,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          true,
 			totalPods:              10,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      0,
@@ -112,7 +109,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          true,
 			totalPods:              8,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      -2,
@@ -129,7 +125,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              8,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      -2,
@@ -146,7 +141,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              8,
 			notUpdatedPods:         1,
 			expectedTotalDiff:      -3,
@@ -163,7 +157,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              10,
 			notUpdatedPods:         1,
 			expectedTotalDiff:      0,
@@ -180,7 +173,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              11,
 			notUpdatedPods:         1,
 			expectedTotalDiff:      0,
@@ -197,7 +189,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              8,
 			notUpdatedPods:         6,
 			expectedTotalDiff:      -2,
@@ -213,7 +204,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              10,
 			notUpdatedPods:         10,
 			expectedTotalDiff:      1,
@@ -230,10 +220,9 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              10,
 			notUpdatedPods:         10,
-			expectedTotalDiff:      0,
+			expectedTotalDiff:      1,
 			expectedCurrentRevDiff: 1,
 		},
 		{
@@ -247,7 +236,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              1,
 			notUpdatedPods:         1,
 			expectedTotalDiff:      -1,
@@ -264,7 +252,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          true,
 			totalPods:              11,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      1,
@@ -281,7 +268,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          true,
 			totalPods:              11,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      1,
@@ -298,7 +284,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              11,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      1,
@@ -315,7 +300,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              11,
 			notUpdatedPods:         0,
 			expectedTotalDiff:      1,
@@ -332,7 +316,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              11,
 			notUpdatedPods:         1,
 			expectedTotalDiff:      0,
@@ -349,7 +332,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              12,
 			notUpdatedPods:         2,
 			expectedTotalDiff:      1,
@@ -366,7 +348,6 @@ func TestCalculateDiffs(t *testing.T) {
 					},
 				},
 			},
-			revConsistent:          false,
 			totalPods:              13,
 			notUpdatedPods:         7,
 			expectedTotalDiff:      2,
@@ -376,7 +357,7 @@ func TestCalculateDiffs(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(*testing.T) {
-			totalDiff, currentRevDiff := calculateDiffs(tc.cs, tc.revConsistent, tc.totalPods, tc.notUpdatedPods)
+			totalDiff, currentRevDiff := calculateDiffs(tc.cs, tc.totalPods, tc.notUpdatedPods)
 			if totalDiff != tc.expectedTotalDiff || currentRevDiff != tc.expectedCurrentRevDiff {
 				t.Fatalf("failed calculateDiffs, expected totalDiff %d, got %d, expected currentRevDiff %d, got %d",
 					tc.expectedTotalDiff, totalDiff, tc.expectedCurrentRevDiff, currentRevDiff)

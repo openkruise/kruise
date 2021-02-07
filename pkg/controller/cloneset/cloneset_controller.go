@@ -352,7 +352,8 @@ func (r *ReconcileCloneSet) syncCloneSet(
 			LastTransitionTime: metav1.Now(),
 			Message:            podsUpdateErr.Error(),
 		})
-		if err == nil {
+		// If these is a delay duration, need not to return error to outside
+		if err == nil && delayDuration <= 0 {
 			err = podsUpdateErr
 		}
 	}

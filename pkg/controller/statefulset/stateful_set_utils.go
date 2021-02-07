@@ -500,8 +500,3 @@ func filterOutCondition(conditions []apps.StatefulSetCondition, condType apps.St
 func getStatefulSetKey(o metav1.Object) string {
 	return o.GetNamespace() + "/" + o.GetName()
 }
-
-func isInPlaceOnly(set *appsv1beta1.StatefulSet) bool {
-	return set.Spec.UpdateStrategy.RollingUpdate != nil &&
-		set.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1beta1.InPlaceOnlyPodUpdateStrategyType
-}

@@ -104,7 +104,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
 					cs.Namespace, cs.Name, pods[i].Name, lifecycle.GetPodLifecycleState(pods[i]))
 			default:
-				if gracePeriod := pods[i].Annotations[appspub.InPlaceUpdateGraceKey]; gracePeriod != "" {
+				if gracePeriod, _ := appspub.GetInPlaceUpdateGrace(pods[i]); gracePeriod != "" {
 					klog.V(3).Infof("CloneSet %s/%s find pod %s still in grace period %s, so skip to update it",
 						cs.Namespace, cs.Name, pods[i].Name, gracePeriod)
 				} else {
@@ -126,10 +126,12 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	// 5. update pods
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
-		if duration, err := c.updatePod(cs, coreControl, updateRevision, revisions, pod, pvcs); err != nil {
-			return requeueDuration.Get(), err
-		} else if duration > 0 {
+		duration, err := c.updatePod(cs, coreControl, updateRevision, revisions, pod, pvcs)
+		if duration > 0 {
 			requeueDuration.Update(duration)
+		}
+		if err != nil {
+			return requeueDuration.Get(), err
 		}
 	}
 
@@ -138,6 +140,8 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 
 func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod) (bool, time.Duration, error) {
 	opts := coreControl.GetUpdateOptions()
+	opts = inplaceupdate.SetOptionsDefaults(opts)
+
 	res := c.inplaceControl.Refresh(pod, opts)
 	if res.RefreshErr != nil {
 		klog.Errorf("CloneSet %s/%s failed to update pod %s condition for inplace: %v",
@@ -148,11 +152,7 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
 	case appspub.LifecycleStateUpdating:
-		checkFunc := inplaceupdate.CheckInPlaceUpdateCompleted
-		if opts != nil && opts.CustomizeCheckUpdateCompleted != nil {
-			checkFunc = opts.CustomizeCheckUpdateCompleted
-		}
-		if checkFunc(pod) == nil {
+		if opts.CheckUpdateCompleted(pod) == nil {
 			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 				state = appspub.LifecycleStateUpdated
 			} else {
@@ -272,12 +272,14 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			case "", appspub.LifecycleStateNormal:
 				var err error
 				var updated bool
-				if updated, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
-					clonesetutils.ResourceVersionExpectations.Expect(pod)
-					klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
-						clonesetutils.GetControllerKey(cs), pod.Name)
+				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
+					if updated, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
+						clonesetutils.ResourceVersionExpectations.Expect(pod)
+						klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
+							clonesetutils.GetControllerKey(cs), pod.Name)
+					}
+					return 0, err
 				}
-				return 0, err
 			case appspub.LifecycleStatePreparingUpdate:
 				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 					return 0, nil
