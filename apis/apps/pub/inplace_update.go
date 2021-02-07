@@ -30,11 +30,15 @@ const (
 
 	// InPlaceUpdateStateKey records the state of inplace-update.
 	// The value of annotation is InPlaceUpdateState.
-	InPlaceUpdateStateKey string = "inplace-update-state"
+	InPlaceUpdateStateKey string = "apps.kruise.io/inplace-update-state"
+	// TODO: will be removed since v1.0.0
+	InPlaceUpdateStateKeyOld string = "inplace-update-state"
 
 	// InPlaceUpdateGraceKey records the spec that Pod should be updated when
 	// grace period ends.
-	InPlaceUpdateGraceKey string = "inplace-update-grace"
+	InPlaceUpdateGraceKey string = "apps.kruise.io/inplace-update-grace"
+	// TODO: will be removed since v1.0.0
+	InPlaceUpdateGraceKeyOld string = "inplace-update-grace"
 )
 
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
@@ -61,4 +65,25 @@ type InPlaceUpdateStrategy struct {
 	// GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
 	// when in-place update a Pod.
 	GracePeriodSeconds int32 `json:"gracePeriodSeconds,omitempty"`
+}
+
+func GetInPlaceUpdateState(obj metav1.Object) (string, bool) {
+	if v, ok := obj.GetAnnotations()[InPlaceUpdateStateKey]; ok {
+		return v, ok
+	}
+	v, ok := obj.GetAnnotations()[InPlaceUpdateStateKeyOld]
+	return v, ok
+}
+
+func GetInPlaceUpdateGrace(obj metav1.Object) (string, bool) {
+	if v, ok := obj.GetAnnotations()[InPlaceUpdateGraceKey]; ok {
+		return v, ok
+	}
+	v, ok := obj.GetAnnotations()[InPlaceUpdateGraceKeyOld]
+	return v, ok
+}
+
+func RemoveInPlaceUpdateGrace(obj metav1.Object) {
+	delete(obj.GetAnnotations(), InPlaceUpdateGraceKey)
+	delete(obj.GetAnnotations(), InPlaceUpdateGraceKeyOld)
 }
