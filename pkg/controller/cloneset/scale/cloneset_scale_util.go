@@ -85,25 +85,29 @@ func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
 	return id
 }
 
-func calculateDiffs(cs *appsv1alpha1.CloneSet, revConsistent bool, totalPods int, notUpdatedPods int) (totalDiff int, currentRevDiff int) {
+func calculateDiffs(cs *appsv1alpha1.CloneSet, totalPods int, notUpdatedPods int) (totalDiff int, currentRevDiff int) {
+	var partition int
+	if cs.Spec.UpdateStrategy.Partition != nil {
+		partition, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.Partition, int(*cs.Spec.Replicas), true)
+	}
+
+	if partition >= int(*cs.Spec.Replicas) {
+		totalDiff = totalPods - int(*cs.Spec.Replicas)
+		currentRevDiff = notUpdatedPods - int(*cs.Spec.Replicas)
+		return
+	}
+
 	var maxSurge int
-
-	if !revConsistent {
-		if cs.Spec.UpdateStrategy.Partition != nil {
-			partition, _ := intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.Partition, int(*cs.Spec.Replicas), true)
-			currentRevDiff = notUpdatedPods - integer.IntMin(partition, int(*cs.Spec.Replicas))
-		}
-
-		// Use maxSurge only if partition has not satisfied
-		if currentRevDiff > 0 {
-			if cs.Spec.UpdateStrategy.MaxSurge != nil {
-				maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, int(*cs.Spec.Replicas), true)
-				maxSurge = integer.IntMin(maxSurge, currentRevDiff)
-			}
+	currentRevDiff = notUpdatedPods - partition
+	// Use maxSurge only if partition has not satisfied
+	if currentRevDiff > 0 {
+		if cs.Spec.UpdateStrategy.MaxSurge != nil {
+			maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, int(*cs.Spec.Replicas), true)
+			maxSurge = integer.IntMin(maxSurge, currentRevDiff)
 		}
 	}
-	totalDiff = totalPods - int(*cs.Spec.Replicas) - maxSurge
 
+	totalDiff = totalPods - int(*cs.Spec.Replicas) - maxSurge
 	if totalDiff != 0 && maxSurge > 0 {
 		klog.V(3).Infof("CloneSet scale diff(%d),currentRevDiff(%d) with maxSurge %d", totalDiff, currentRevDiff, maxSurge)
 	}

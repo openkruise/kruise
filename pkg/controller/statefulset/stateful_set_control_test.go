@@ -1651,6 +1651,13 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
+		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
 		// validate the result
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
@@ -2004,6 +2011,9 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 		t.Fatalf("Expected InPlaceUpdateReady condition False after in-place update, got %v", condition)
 	}
 	updateExpectations.ObserveUpdated(getStatefulSetKey(set), pods[2].Labels[apps.StatefulSetRevisionLabel], pods[2])
+	if state := lifecycle.GetPodLifecycleState(pods[2]); state != appspub.LifecycleStateUpdating {
+		t.Fatalf("Expected lifecycle to be Updating during in-place update: %v", state)
+	}
 
 	// should not update pod 1, because of pod2 status not changed
 	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
@@ -2023,6 +2033,17 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 		Name:    "nginx",
 		ImageID: "imgID2",
 	}}
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if state := lifecycle.GetPodLifecycleState(pods[2]); state != appspub.LifecycleStateNormal {
+		t.Fatalf("Expected lifecycle to be Normal after in-place update: %v", state)
+	}
 	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Fatal(err)
 	}
@@ -2054,6 +2075,9 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 		Name:    "nginx",
 		ImageID: "imgID2",
 	}}
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
 	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Fatal(err)
 	}

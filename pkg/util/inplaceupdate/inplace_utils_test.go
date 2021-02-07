@@ -119,7 +119,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		res := calculateInPlaceUpdateSpec(tc.oldRevision, tc.newRevision, nil)
+		res := defaultCalculateInPlaceUpdateSpec(tc.oldRevision, tc.newRevision, nil)
 		if !reflect.DeepEqual(res, tc.expectedSpec) {
 			t.Fatalf("case #%d failed, expected %v, got %v", i, tc.expectedSpec, res)
 		}
@@ -211,12 +211,12 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 	}
 
 	for _, p := range succeedPods {
-		if err := CheckInPlaceUpdateCompleted(p); err != nil {
+		if err := defaultCheckInPlaceUpdateCompleted(p); err != nil {
 			t.Errorf("pod %s expected check success, got %v", p.Name, err)
 		}
 	}
 	for _, p := range failPods {
-		if err := CheckInPlaceUpdateCompleted(p); err == nil {
+		if err := defaultCheckInPlaceUpdateCompleted(p); err == nil {
 			t.Errorf("pod %s expected check failure, got no error", p.Name)
 		}
 	}
