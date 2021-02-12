@@ -152,7 +152,7 @@ func (w *Writer) Write(payload map[string]FileProjection) error {
 			klog.Error(err, "unable to determine whether payload should be written to disk")
 			return err
 		} else if !should && len(pathsToRemove) == 0 {
-			klog.V(1).Info("no update required for target directory", "directory", w.targetDir)
+			klog.V(6).Info("no update required for target directory", "directory", w.targetDir)
 			return nil
 		} else {
 			klog.V(1).Info("write required for target directory", "directory", w.targetDir)
@@ -327,7 +327,6 @@ func (w *Writer) pathsToRemove(payload map[string]FileProjection, oldTsDir strin
 	} else if err != nil {
 		return nil, err
 	}
-	klog.V(1).Info("current paths", "target directory", w.targetDir, "paths", paths.List())
 
 	newPaths := sets.NewString()
 	for file := range payload {
@@ -339,10 +338,11 @@ func (w *Writer) pathsToRemove(payload map[string]FileProjection, oldTsDir strin
 			subPath = strings.TrimSuffix(subPath, string(os.PathSeparator))
 		}
 	}
-	klog.V(1).Info("new paths", "target directory", w.targetDir, "paths", newPaths.List())
 
 	result := paths.Difference(newPaths)
-	klog.V(1).Info("paths to remove", "target directory", w.targetDir, "paths", result)
+	if len(result) > 0 {
+		klog.V(1).Info("paths to remove", "target directory", w.targetDir, "paths", result)
+	}
 
 	return result, nil
 }

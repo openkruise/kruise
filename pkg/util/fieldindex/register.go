@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/gate"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +72,7 @@ func RegisterFieldIndexes(c cache.Cache) error {
 			return
 		}
 		// broadcastjob owner
-		if gate.ResourceEnabled(&appsv1alpha1.BroadcastJob{}) {
+		if utildiscovery.DiscoverObject(&appsv1alpha1.BroadcastJob{}) {
 			if err = indexBroadcastCronJob(c); err != nil {
 				return
 			}

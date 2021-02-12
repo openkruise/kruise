@@ -24,6 +24,12 @@ import (
 	"os"
 	"time"
 
+	extclient "github.com/openkruise/kruise/pkg/client"
+	_ "github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+	"github.com/openkruise/kruise/pkg/webhook"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -33,14 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	extclient "github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
-	"github.com/openkruise/kruise/pkg/webhook"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller"
-	"github.com/openkruise/kruise/pkg/util/gate"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -70,7 +71,7 @@ func main() {
 	var namespace string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
-	flag.BoolVar(&allowPrivileged, "allow-privileged", false, "If true, allow privileged containers. It will only work if api-server is also"+
+	flag.BoolVar(&allowPrivileged, "allow-privileged", true, "If true, allow privileged containers. It will only work if api-server is also"+
 		"started with --allow-privileged=true.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", true, "Whether you need to enable leader election.")
 	flag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "kruise-system",
@@ -80,9 +81,12 @@ func main() {
 	flag.BoolVar(&enablePprof, "enable-pprof", false, "Enable pprof for controller manager.")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":8090", "The address the pprof binds to.")
 
+	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	klog.InitFlags(nil)
-	flag.Parse()
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 	rand.Seed(time.Now().UnixNano())
+	ctrl.SetLogger(klogr.New())
 
 	if enablePprof {
 		go func() {
@@ -98,13 +102,9 @@ func main() {
 		})
 	}
 
-	//ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-	ctrl.SetLogger(klogr.New())
-
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
 	cfg.UserAgent = "kruise-manager"
-	gate.Init(cfg)
 
 	setupLog.Info("new clientset registry")
 	err := extclient.NewRegistry(cfg)

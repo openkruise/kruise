@@ -20,11 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util/gate"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
 	"github.com/openkruise/kruise/pkg/webhook/util/health"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,10 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
+type GateFunc func() (enabled bool)
+
 var (
 	// HandlerMap contains all admission webhook handlers.
 	HandlerMap   = map[string]admission.Handler{}
-	handlerGates = map[string]runtime.Object{}
+	handlerGates = map[string]GateFunc{}
 
 	Checker = health.Checker
 )
@@ -46,7 +46,7 @@ func addHandlers(m map[string]admission.Handler) {
 	addHandlersWithGate(m, nil)
 }
 
-func addHandlersWithGate(m map[string]admission.Handler, gateObj runtime.Object) {
+func addHandlersWithGate(m map[string]admission.Handler, fn GateFunc) {
 	for path, handler := range m {
 		if len(path) == 0 {
 			klog.Warningf("Skip handler with empty path.")
@@ -60,8 +60,8 @@ func addHandlersWithGate(m map[string]admission.Handler, gateObj runtime.Object)
 			klog.V(1).Infof("conflicting webhook builder path %v in handler map", path)
 		}
 		HandlerMap[path] = handler
-		if gateObj != nil {
-			handlerGates[path] = gateObj
+		if fn != nil {
+			handlerGates[path] = fn
 		}
 	}
 }
@@ -69,8 +69,8 @@ func addHandlersWithGate(m map[string]admission.Handler, gateObj runtime.Object)
 func filterActiveHandlers() {
 	disablePaths := sets.NewString()
 	for path := range HandlerMap {
-		if obj, ok := handlerGates[path]; ok {
-			if !gate.ResourceEnabled(obj) {
+		if fn, ok := handlerGates[path]; ok {
+			if !fn() {
 				disablePaths.Insert(path)
 			}
 		}

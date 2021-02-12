@@ -63,7 +63,7 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 			return err
 		}
 		if _, ok := handlers[path]; !ok {
-			klog.Warningf("Find path %s not in handlers %v", path, handlers)
+			klog.Warningf("Ignore webhook for %s in configuration", path)
 			continue
 		}
 		if wh.ClientConfig.Service != nil {
@@ -86,7 +86,7 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 			return err
 		}
 		if _, ok := handlers[path]; !ok {
-			klog.Warningf("Find path %s not in handlers %v", path, handlers)
+			klog.Warningf("Ignore webhook for %s in configuration", path)
 			continue
 		}
 		if wh.ClientConfig.Service != nil {

@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,7 +64,6 @@ import (
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
-	"github.com/openkruise/kruise/pkg/util/gate"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
@@ -119,7 +119,7 @@ const (
 // Add creates a new DaemonSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !gate.ResourceEnabled(&appsv1alpha1.DaemonSet{}) {
+	if !utildiscovery.DiscoverGVK(controllerKind) {
 		return nil
 	}
 
