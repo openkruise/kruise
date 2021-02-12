@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -47,6 +48,9 @@ func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImagePulling) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ImagePulling))
 	}
 
 	if err := validate(obj); err != nil {

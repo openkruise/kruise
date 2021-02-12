@@ -24,8 +24,9 @@ import (
 	"regexp"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
-
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -335,6 +336,10 @@ func (h *SidecarSetCreateUpdateHandler) Handle(ctx context.Context, req admissio
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodWebhook) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.PodWebhook))
+	}
+
 	var oldSidecarSet *appsv1alpha1.SidecarSet
 	//when Operation is update, decode older object
 	if req.AdmissionRequest.Operation == admissionv1beta1.Update {

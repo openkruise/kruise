@@ -26,8 +26,10 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/gate"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	v1 "k8s.io/api/core/v1"
@@ -71,7 +73,7 @@ const (
 // Add creates a new NodeImage Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !gate.ResourceEnabled(&appsv1alpha1.NodeImage{}) {
+	if !utildiscovery.DiscoverGVK(controllerKind) || !utilfeature.DefaultFeatureGate.Enabled(features.ImagePulling) {
 		return nil
 	}
 	return add(mgr, newReconciler(mgr))
