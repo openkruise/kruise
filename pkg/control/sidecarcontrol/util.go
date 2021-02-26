@@ -54,8 +54,6 @@ var (
 	SidecarIgnoredNamespaces = []string{"kube-system", "kube-public"}
 	// SubPathExprEnvReg format: $(ODD_NAME)、$(POD_NAME)...
 	SubPathExprEnvReg, _ = regexp.Compile(`\$\(([-._a-zA-Z][-._a-zA-Z0-9]*)\)`)
-
-	RevisionAdapterImpl = &revisionAdapterImpl{}
 )
 
 type SidecarSetUpgradeSpec struct {
@@ -93,16 +91,6 @@ func IsActivePod(pod *corev1.Pod) bool {
 		return false
 	}
 	return true
-}
-
-type revisionAdapterImpl struct{}
-
-func (r *revisionAdapterImpl) EqualToRevisionHash(sidecarSetName string, obj metav1.Object, hash string) bool {
-	return GetPodSidecarSetRevision(sidecarSetName, obj) == hash
-}
-
-func (r *revisionAdapterImpl) WriteRevisionHash(obj metav1.Object, hash string) {
-	// No need to implement yet.
 }
 
 func GetSidecarSetRevision(sidecarSet *appsv1alpha1.SidecarSet) string {
@@ -222,7 +210,13 @@ func updatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
 	names := sets.NewString()
 	for _, sidecarContainer := range sidecarSet.Spec.Containers {
-		names.Insert(sidecarContainer.Name)
+		if IsHotUpgradeContainer(&sidecarContainer) {
+			name1, name2 := GetHotUpgradeContainerName(sidecarContainer.Name)
+			names.Insert(name2)
+			names.Insert(name1)
+		} else {
+			names.Insert(sidecarContainer.Name)
+		}
 	}
 	return names
 }
@@ -261,7 +255,7 @@ func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *ap
 		}
 
 		for _, volumeMount := range appContainer.VolumeMounts {
-			if !control.IsNeedInjectVolumeMount(volumeMount) {
+			if !control.NeedToInjectVolumeMount(volumeMount) {
 				continue
 			}
 			injectedMounts = append(injectedMounts, volumeMount)

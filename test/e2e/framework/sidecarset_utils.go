@@ -17,7 +17,6 @@ limitations under the License.
 package framework
 
 import (
-	utilpointer "k8s.io/utils/pointer"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -29,9 +28,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 type SidecarSetTester struct {
@@ -46,7 +47,7 @@ func NewSidecarSetTester(c clientset.Interface, kc kruiseclientset.Interface) *S
 	}
 }
 
-func (s *SidecarSetTester) NewBaseSidecarSet() *appsv1alpha1.SidecarSet {
+func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet {
 	return &appsv1alpha1.SidecarSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "SidecarSet",
@@ -89,6 +90,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet() *appsv1alpha1.SidecarSet {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "sidecarset"},
 			},
+			Namespace: ns,
 		},
 	}
 }
@@ -141,9 +143,11 @@ func (s *SidecarSetTester) CreateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet)
 
 func (s *SidecarSetTester) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) {
 	Logf("update sidecarSet(%s)", sidecarSet.Name)
-	sidecarSetClone := sidecarSet.DeepCopy()
+	sidecarSetClone, _ := s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		sidecarSetClone.Spec = sidecarSet.Spec
+		sidecarSetClone.Annotations = sidecarSet.Annotations
+		sidecarSetClone.Labels = sidecarSet.Labels
 		_, updateErr := s.kc.AppsV1alpha1().SidecarSets().Update(sidecarSetClone)
 		if updateErr == nil {
 			return nil
@@ -158,7 +162,8 @@ func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
 	Logf("update pod(%s.%s)", pod.Namespace, pod.Name)
 	podClone := pod.DeepCopy()
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		podClone.ObjectMeta = pod.ObjectMeta
+		podClone.Annotations = pod.Annotations
+		podClone.Labels = pod.Labels
 		podClone.Spec = pod.Spec
 		_, updateErr := s.c.CoreV1().Pods(podClone.Namespace).Update(podClone)
 		if updateErr == nil {
@@ -186,7 +191,8 @@ func (s *SidecarSetTester) WaitForSidecarSetUpgradeComplete(sidecarSet *appsv1al
 			return false, nil
 		})
 	if pollErr != nil {
-		Failf("Failed waiting for sidecarSet to upgrade complete: %v", pollErr)
+		inner, _ := s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
+		Failf("Failed waiting for sidecarSet to upgrade complete: %v status(%v)", pollErr, inner.Status)
 	}
 }
 
@@ -313,4 +319,79 @@ func (s *SidecarSetTester) GetSelectorPods(namespace string, selector *metav1.La
 		return nil, err
 	}
 	return podList.Items, nil
+}
+
+func (s *SidecarSetTester) NewBaseCloneSet(namespace string) *appsv1alpha1.CloneSet {
+	return &appsv1alpha1.CloneSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CloneSet",
+			APIVersion: appsv1alpha1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "busybox",
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: utilpointer.Int32Ptr(2),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "sidecarset",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "sidecarset",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "main",
+							Image:   "busybox:1.32",
+							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+						},
+					},
+				},
+			},
+			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+				Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+				MaxUnavailable: &intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "100%",
+				},
+				MaxSurge: &intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 0,
+				},
+			},
+		},
+	}
+}
+
+func (t *SidecarSetTester) CreateCloneSet(cloneset *appsv1alpha1.CloneSet) *appsv1alpha1.CloneSet {
+	Logf("create CloneSet(%s.%s)", cloneset.Namespace, cloneset.Name)
+	_, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Create(cloneset)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	t.WaitForCloneSetRunning(cloneset)
+	Logf("create cloneset(%s.%s) done", cloneset.Namespace, cloneset.Name)
+	cloneset, _ = t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(cloneset.Name, metav1.GetOptions{})
+	return cloneset
+}
+
+func (t *SidecarSetTester) WaitForCloneSetRunning(cloneset *appsv1alpha1.CloneSet) {
+	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
+		func() (bool, error) {
+			inner, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(cloneset.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if *inner.Spec.Replicas == inner.Status.ReadyReplicas {
+				return true, nil
+			}
+			return false, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for cloneset to enter running: %v", pollErr)
+	}
 }

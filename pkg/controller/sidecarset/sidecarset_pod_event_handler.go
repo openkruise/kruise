@@ -32,7 +32,6 @@ func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLim
 }
 
 func (p *enqueueRequestForPod) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	p.deletePod(q, evt.Object)
 }
 
 func (p *enqueueRequestForPod) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
@@ -57,18 +56,12 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	}
 
 	for _, sidecarSet := range sidecarSets {
+		klog.V(3).Infof("Create pod(%s.%s) and reconcile sidecarSet", pod.Namespace, pod.Name)
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name: sidecarSet.Name,
 			},
 		})
-	}
-}
-
-func (p *enqueueRequestForPod) deletePod(q workqueue.RateLimitingInterface, obj runtime.Object) {
-	if _, ok := obj.(*corev1.Pod); ok {
-		p.addPod(q, obj)
-		return
 	}
 }
 
@@ -186,15 +179,23 @@ func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*app
 
 func isPodStatusChanged(oldPod, newPod *corev1.Pod) bool {
 	// If the pod's deletion timestamp is set, remove endpoint from ready address.
-	if newPod.DeletionTimestamp != oldPod.DeletionTimestamp {
+	if oldPod.DeletionTimestamp.IsZero() && !newPod.DeletionTimestamp.IsZero() {
+		klog.V(3).Infof("pod(%s.%s) DeletionTimestamp changed, and reconcile sidecarSet", newPod.Namespace, newPod.Name)
 		return true
+		// oldPod Deletion is set, then no reconcile
+	} else if !oldPod.DeletionTimestamp.IsZero() {
+		return false
 	}
 
 	// If the pod's readiness has changed, the associated endpoint address
 	// will move from the unready endpoints set to the ready endpoints.
 	// So for the purposes of an endpoint, a readiness change on a pod
 	// means we have a changed pod.
-	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(newPod) {
+	oldReady := podutil.IsPodReady(oldPod)
+	newReady := podutil.IsPodReady(newPod)
+	if oldReady != newReady {
+		klog.V(3).Infof("pod(%s.%s) Ready changed(from %v to %v), and reconcile sidecarSet",
+			newPod.Namespace, newPod.Name, oldReady, newReady)
 		return true
 	}
 
@@ -204,7 +205,12 @@ func isPodStatusChanged(oldPod, newPod *corev1.Pod) bool {
 func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, time.Duration) {
 	control := sidecarcontrol.New(sidecarSet)
 	var enqueueDelayTime time.Duration
-	if !control.IsPodUpdatedConsistent(oldPod, nil) && control.IsPodUpdatedConsistent(newPod, nil) {
+	// contain sidecar empty container
+	oldConsistent := control.IsPodUpdatedConsistently(oldPod, nil)
+	newConsistent := control.IsPodUpdatedConsistently(newPod, nil)
+	if oldConsistent != newConsistent {
+		klog.V(3).Infof("pod(%s.%s) sidecarSet consistent(all sidecar containers) changed(from %v to %v), and reconcile sidecarSet",
+			newPod.Namespace, newPod.Name, oldConsistent, newConsistent)
 		enqueueDelayTime = 5 * time.Second
 		return true, enqueueDelayTime
 	}

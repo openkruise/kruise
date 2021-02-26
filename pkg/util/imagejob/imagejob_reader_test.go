@@ -167,12 +167,6 @@ func TestAll(t *testing.T) {
 	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
 	c = util.NewClientFromManager(mgr, "test-nodeimage-utils")
 
-	stopMgr, mgrStopped := StartTestManager(mgr, g)
-	defer func() {
-		close(stopMgr)
-		mgrStopped.Wait()
-	}()
-
 	for _, o := range initialNodeImages {
 		if err = c.Create(context.TODO(), o); err != nil {
 			g.Expect(err).NotTo(gomega.HaveOccurred())
@@ -200,6 +194,13 @@ func TestAll(t *testing.T) {
 			}
 		}
 	}
+
+	stopMgr, mgrStopped := StartTestManager(mgr, g)
+	defer func() {
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+	mgr.GetCache().WaitForCacheSync(stopMgr)
 
 	// Test GetNodeImagesForJob
 	testGetNodeImagesForJob(g)
