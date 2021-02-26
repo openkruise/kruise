@@ -210,7 +210,13 @@ func updatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
 	names := sets.NewString()
 	for _, sidecarContainer := range sidecarSet.Spec.Containers {
-		names.Insert(sidecarContainer.Name)
+		if IsHotUpgradeContainer(&sidecarContainer) {
+			name1, name2 := GetHotUpgradeContainerName(sidecarContainer.Name)
+			names.Insert(name2)
+			names.Insert(name1)
+		} else {
+			names.Insert(sidecarContainer.Name)
+		}
 	}
 	return names
 }

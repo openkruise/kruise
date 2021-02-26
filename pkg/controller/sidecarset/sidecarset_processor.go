@@ -77,6 +77,24 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
+	// 3. If sidecar container hot upgrade complete, then set the other one(empty sidecar container) image to HotUpgradeEmptyImage
+	if isSidecarSetHasHotUpgradeContainer(sidecarSet) {
+		var podsInHotUpgrading []*corev1.Pod
+		for _, pod := range pods {
+			// flip other hot sidecar container to empty, in the following:
+			// 1. the empty sidecar container image isn't equal HotUpgradeEmptyImage
+			// 2. all containers with exception of empty sidecar containers is updated and consistent
+			// 3. all containers with exception of empty sidecar containers is ready
+			if isPodSidecarInHotUpgrading(sidecarSet, pod) && control.IsPodUpdatedConsistent(pod, sidecarcontrol.GetSidecarSetEmptyContainers(sidecarSet, pod)) &&
+				isHotUpgradingReady(sidecarSet, pod) {
+				podsInHotUpgrading = append(podsInHotUpgrading, pod)
+			}
+		}
+		if err := p.flipHotUpgradingContainers(control, podsInHotUpgrading); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	// 4. SidecarSet upgrade strategy type is NotUpdate
 	if !isSidecarSetNotUpdate(sidecarSet) {
 		return reconcile.Result{}, nil
@@ -84,7 +102,7 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 
 	// 5. sidecarset already updates all matched pods, then return
 	if isSidecarSetUpdateFinish(status) {
-		klog.V(3).Infof("sidecarSet update pod finished, name: %s", sidecarSet.Name)
+		klog.V(3).Infof("sidecarSet(%s) matched pods(number=%d) are latest, and don't need update", sidecarSet.Name, len(pods))
 		return reconcile.Result{}, nil
 	}
 
@@ -109,8 +127,11 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 		klog.V(3).Infof("sidecarSet next update is nil, skip this round, name: %s", sidecarset.Name)
 		return nil
 	}
+	// mark upgrade pods list
+	podNames := make([]string, 0, len(upgradePods))
 	// upgrade pod sidecar
 	for _, pod := range upgradePods {
+		podNames = append(podNames, pod.Name)
 		if err := p.updatePodSidecarAndHash(control, pod); err != nil {
 			err := fmt.Errorf("updatePodSidecarAndHash error, s:%s, pod:%s, err:%v", sidecarset.Name, pod.Name, err)
 			return err
@@ -118,12 +139,7 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 		p.updateExpectations.ExpectUpdated(sidecarset.Name, sidecarcontrol.GetSidecarSetRevision(sidecarset), pod)
 	}
 
-	// mark upgrade pods list
-	podNames := make([]string, 0, len(upgradePods))
-	for _, pod := range upgradePods {
-		podNames = append(podNames, pod.Name)
-	}
-	klog.V(3).Infof("sidecarSet inject pod step, name: %s, pods: %v", sidecarset.Name, podNames)
+	klog.V(3).Infof("sidecarSet(%s) updated pods(%s)", sidecarset.Name, strings.Join(podNames, ","))
 	return nil
 }
 
@@ -203,7 +219,8 @@ func (p *Processor) updateSidecarSetStatus(sidecarSet *appsv1alpha1.SidecarSet, 
 		return err
 	}
 
-	klog.V(3).Infof("sidecarSet update status success, name: %s", sidecarSet.Name)
+	klog.V(3).Infof("sidecarSet(%s) update status(MatchedPods:%d, UpdatedPods:%d, ReadyPods:%d, UpdatedReadyPods:%d) success",
+		sidecarSet.Name, status.MatchedPods, status.UpdatedPods, status.ReadyPods, status.UpdatedReadyPods)
 	return nil
 }
 
@@ -264,6 +281,10 @@ func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) 
 	var matchedPods, updatedPods, readyPods, updatedAndReady int32
 	matchedPods = int32(len(pods))
 	for _, pod := range pods {
+		if !pod.DeletionTimestamp.IsZero() {
+			continue
+		}
+
 		updated := sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod)
 		if updated {
 			updatedPods++
@@ -349,7 +370,11 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 		sidecarContainer.Env = util.MergeEnvVar(sidecarContainer.Env, transferEnvs)
 
 		var changedContainer string
-		changedContainer = updateColdUpgradeContainerInPod(&sidecarContainer, control, pod)
+		if sidecarcontrol.IsHotUpgradeContainer(&sidecarContainer) {
+			changedContainer = updateHotUpgradeContainerInPod(&sidecarContainer, control, pod)
+		} else {
+			changedContainer = updateColdUpgradeContainerInPod(&sidecarContainer, control, pod)
+		}
 		if changedContainer != "" {
 			changedContainers = append(changedContainers, changedContainer)
 		}
@@ -365,4 +390,8 @@ func inconsistentStatus(sidecarSet *appsv1alpha1.SidecarSet, status *appsv1alpha
 		status.UpdatedPods != sidecarSet.Status.UpdatedPods ||
 		status.ReadyPods != sidecarSet.Status.ReadyPods ||
 		status.UpdatedReadyPods != sidecarSet.Status.UpdatedReadyPods
+}
+
+func isSidecarSetUpdateFinish(status *appsv1alpha1.SidecarSetStatus) bool {
+	return status.UpdatedPods >= status.MatchedPods
 }

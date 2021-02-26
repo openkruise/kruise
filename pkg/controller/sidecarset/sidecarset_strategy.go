@@ -73,6 +73,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 		}
 	}
 
+	klog.V(3).Infof("sidecarSet(%s) matchedPods(%d) waitUpdated(%d)", sidecarset.Name, len(pods), len(waitUpgradedIndexes))
 	//2. Sort Pods with default sequence
 	//	- Unassigned < assigned
 	//	- PodPending < PodUnknown < PodRunning

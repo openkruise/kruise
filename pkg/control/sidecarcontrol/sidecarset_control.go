@@ -157,6 +157,10 @@ func (c *commonControl) IsSidecarSetCanUpgrade(pod *v1.Pod) bool {
 	return GetPodSidecarSetWithoutImageRevision(sidecarSet.Name, pod) == GetSidecarSetWithoutImageRevision(sidecarSet)
 }
 
+func (c *commonControl) IsPodAvailableChanged(pod, oldPod *v1.Pod) bool {
+	return false
+}
+
 // isContainerInplaceUpdateCompleted checks whether imageID in container status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated containers in Pod.
 func isSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSetName string, containers sets.String) error {

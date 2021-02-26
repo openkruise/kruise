@@ -60,7 +60,7 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 			t.Fatalf("container %v terminationMessagePolicy initialized incorrectly", container.Name)
 		}
 	}
-	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation] != "9w829wfc74c22465fv2z2dwf54x7c5wv6424f98dv7bcwx8444768wf6wfv4bdfc" {
+	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation] != "6wbd76bd7984x24fb4f44fv9222cw9v9bcf85x766744wddd4zwx927zzz2zb684" {
 		t.Fatalf("sidecarset %v hash initialized incorrectly, got %v", sidecarSet.Name, sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation])
 	}
 }

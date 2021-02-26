@@ -34,6 +34,8 @@ type SidecarControl interface {
 	// when update pod, judge whether inject sidecar container into pod
 	NeedInjectOnUpdatedPod(pod, oldPod *v1.Pod, sidecarContainer *appsv1alpha1.SidecarContainer, injectedEnvs []v1.EnvVar,
 		injectedMounts []v1.VolumeMount) (needInject bool, existSidecars []*appsv1alpha1.SidecarContainer, existVolumes []v1.Volume)
+	//IsPodAvailableChanged check whether pod changed on updating trigger re-inject sidecar container
+	IsPodAvailableChanged(pod, oldPod *v1.Pod) bool
 
 	// update
 	// pod whether consistent and ready
