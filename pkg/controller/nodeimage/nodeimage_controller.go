@@ -284,7 +284,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 				gvk := ref.GroupVersionKind()
 				if gvk.Group != controllerKind.Group || gvk.Kind != "ImagePullJob" {
 					activeRefs = append(activeRefs, ref)
-					break
+					continue
 				}
 				job := appsv1alpha1.ImagePullJob{}
 				err := r.Get(context.TODO(), types.NamespacedName{Namespace: ref.Namespace, Name: ref.Name}, &job)
@@ -294,14 +294,13 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 					}
 					klog.Errorf("Failed to check owners for %s in NodeImage %s, get job %v error: %v", fullName, name, util.DumpJSON(ref), err)
 					activeRefs = append(activeRefs, ref)
-					break
+					continue
 				}
 				if job.UID != ref.UID {
 					klog.Warningf("When check owners for %s in NodeImage %s, get job %v find UID %v not equal", fullName, name, util.DumpJSON(ref), job.UID)
 					continue
 				}
 				activeRefs = append(activeRefs, ref)
-				break
 			}
 			if len(activeRefs) != len(tagSpec.OwnerReferences) {
 				modified = true
