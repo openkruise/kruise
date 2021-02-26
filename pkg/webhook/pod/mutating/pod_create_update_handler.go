@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -40,6 +39,12 @@ type PodCreateHandler struct {
 	Decoder *admission.Decoder
 }
 
+func (h *PodCreateHandler) mutatingPodFn(ctx context.Context, req admission.Request, obj *corev1.Pod) error {
+	return h.sidecarsetMutatingPod(ctx, req, obj)
+}
+
+var _ admission.Handler = &PodCreateHandler{}
+
 // Handle handles admission requests.
 func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	obj := &corev1.Pod{}
@@ -52,20 +57,10 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if obj.Namespace == "" {
 		obj.Namespace = req.Namespace
 	}
-	var oldPod *corev1.Pod
-	//when Operation is update, decode older object
-	if req.AdmissionRequest.Operation == admissionv1beta1.Update {
-		oldPod = new(corev1.Pod)
-		if err := h.Decoder.Decode(
-			admission.Request{AdmissionRequest: admissionv1beta1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
-			oldPod); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
-		}
-	}
 
 	injectPodReadinessGate(req, obj)
 
-	err = h.sidecarsetMutatingPod(ctx, obj, oldPod)
+	err = h.mutatingPodFn(ctx, req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}

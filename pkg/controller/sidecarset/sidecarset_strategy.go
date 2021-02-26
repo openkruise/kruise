@@ -68,11 +68,12 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 	//  * It is to determine whether there are other fields that have been modified for pod.
 	for index, pod := range pods {
 		isUpdated := sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod)
-		if !isUpdated && isSelected(pod) && control.IsSidecarSetCanUpgrade(pod) {
+		if !isUpdated && isSelected(pod) && control.IsSidecarSetUpgradable(pod) {
 			waitUpgradedIndexes = append(waitUpgradedIndexes, index)
 		}
 	}
 
+	klog.V(3).Infof("sidecarSet(%s) matchedPods(%d) waitUpdated(%d)", sidecarset.Name, len(pods), len(waitUpgradedIndexes))
 	//2. sort Pods with default sequence and scatter
 	waitUpgradedIndexes = SortUpdateIndexes(strategy, pods, waitUpgradedIndexes)
 
@@ -135,14 +136,17 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 
 	var upgradeAndNotReadyCount int
 	for _, pod := range pods {
-		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) && !coreControl.IsPodConsistentAndReady(pod) {
+		// 1. sidecar containers have been updated to the latest sidecarSet version, for pod.spec.containers
+		// 2. whether pod.spec and pod.status is inconsistent after updating the sidecar containers
+		// 3. whether pod is not ready
+		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) && (!coreControl.IsPodUpdatedConsistently(pod, nil) || !coreControl.IsPodReady(pod)) {
 			upgradeAndNotReadyCount++
 		}
 	}
 	var needUpgradeCount int
 	for _, i := range waitUpdateIndexes {
 		// If pod is not ready, then not included in the calculation of maxUnavailable
-		if !coreControl.IsPodConsistentAndReady(pods[i]) {
+		if !coreControl.IsPodReady(pods[i]) {
 			needUpgradeCount++
 			continue
 		}

@@ -19,6 +19,7 @@ package sidecarset
 import (
 	"context"
 	"flag"
+	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
@@ -26,14 +27,17 @@ import (
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -84,7 +88,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to SidecarSet
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.SidecarSet{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.SidecarSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old := e.ObjectOld.(*appsv1alpha1.SidecarSet)
+			new := e.ObjectNew.(*appsv1alpha1.SidecarSet)
+			if !reflect.DeepEqual(old.Spec, new.Spec) {
+				klog.V(3).Infof("Observed updated Spec for SidecarSet: %s/%s", new.Namespace, new.Name)
+				return true
+			}
+			return false
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -126,6 +140,6 @@ func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	klog.V(3).Infof("begin to process sidecarset %v", sidecarSet.Name)
+	klog.V(3).Infof("begin to process sidecarset %v for reconcile", sidecarSet.Name)
 	return r.processor.UpdateSidecarSet(sidecarSet)
 }

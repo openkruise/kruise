@@ -42,7 +42,7 @@ type SidecarSetSpec struct {
 	// List of volumes that can be mounted by sidecar containers
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// The sidecarset strategy to use to replace existing pods with new ones.
+	// The sidecarset updateStrategy to use to replace existing pods with new ones.
 	UpdateStrategy SidecarSetUpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
@@ -96,10 +96,20 @@ type SidecarContainerUpgradeType string
 
 const (
 	SidecarContainerColdUpgrade SidecarContainerUpgradeType = "ColdUpgrade"
+	SidecarContainerHotUpgrade  SidecarContainerUpgradeType = "HotUpgrade"
 )
 
 type SidecarContainerUpgradeStrategy struct {
+	// when sidecar container is stateless, use ColdUpgrade
+	// otherwise HotUpgrade are more HotUpgrade.
+	// examples for istio envoy container is suitable for HotUpgrade
+	// default is ColdUpgrade
 	UpgradeType SidecarContainerUpgradeType `json:"upgradeType,omitempty"`
+
+	// when HotUpgrade, HotUpgradeEmptyImage is used to complete the hot upgrading process
+	// HotUpgradeEmptyImage is consistent of sidecar container in Command, Args, Liveness probe, etc.
+	// but it does no actual work.
+	HotUpgradeEmptyImage string `json:"hotUpgradeEmptyImage,omitempty"`
 }
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet

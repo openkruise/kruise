@@ -86,7 +86,7 @@ func TestPodEventHandler(t *testing.T) {
 		Object: podDemo,
 	}
 	handler.Delete(deleteEvt, deleteQ)
-	if deleteQ.Len() != 1 {
+	if deleteQ.Len() != 0 {
 		t.Errorf("unexpected delete event handle queue size, expected 1 actual %d", deleteQ.Len())
 	}
 }
