@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.14 as builder
+FROM golang:1.15 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -21,11 +21,11 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o manager main.go \
   && CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o daemon ./cmd/daemon/main.go
 
 # Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-#FROM gcr.io/distroless/static:nonroot
 FROM ubuntu:latest
 # This is required by daemon connnecting with cri
-RUN apt-get update -y && apt-get install ca-certificates -y && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/bin/* /usr/sbin/ && apt-get update -y \
+  && apt-get install --no-install-recommends -y ca-certificates \
+  && apt-get clean && rm -rf /var/log/*log /var/lib/apt/lists/* /var/log/apt/* /var/lib/dpkg/*-old /var/cache/debconf/*-old
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/daemon ./kruise-daemon

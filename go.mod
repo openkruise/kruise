@@ -15,6 +15,7 @@ require (
 	github.com/docker/docker v1.4.2-0.20180612054059-a9fbbdc8dd87
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
+	github.com/go-openapi/spec v0.19.2
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/onsi/ginkgo v1.12.1
@@ -40,6 +41,7 @@ require (
 	k8s.io/component-base v0.16.6
 	k8s.io/cri-api v0.16.6
 	k8s.io/klog v1.0.0
+	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
 	k8s.io/kubernetes v1.16.6
 	k8s.io/utils v0.0.0-20200619165400-6e3d28b6ed19
 	sigs.k8s.io/controller-runtime v0.5.7

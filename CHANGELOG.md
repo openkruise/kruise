@@ -1,6 +1,94 @@
 # Change Log
 
+## v0.8.0
+
+### Breaking changes
+
+1. The flags for kruise-manager must start with `--` instead of `-`. If you install Kruise with helm chart, ignore this.
+2. SidecarSet has been refactored. Make sure there is no SidecarSet being upgrading when you upgrade Kruise,
+   and read [the latest doc for SidecarSet](https://openkruise.io/en-us/docs/sidecarset.html).
+3. A new component named `kruise-daemon` comes in. It is deployed in kruise-system using DaemonSet, defaults on every Node.
+
+Now Kruise includes two components:
+
+- **kruise-controller-manager**: contains multiple controllers and webhooks, deployed using Deployment.
+- **kruise-daemon**: contains bypass features like image pre-download and container restart in the future, deployed using DaemonSet.
+
+### New CRDs: NodeImage and ImagePullJob
+
+[Official doc](https://openkruise.io/en-us/docs/imagepulljob.html)
+
+Kruise will create a NodeImage for each Node, and its `spec` contains the images that should be downloaded on this Node.
+
+Also, users can create an ImagePullJob CR to declare an image should be downloaded on which nodes.
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: ImagePullJob
+metadata:
+  name: test-imagepulljob
+spec:
+  image: nginx:latest
+  completionPolicy:
+    type: Always
+  parallelism: 10
+  pullPolicy:
+    backoffLimit: 3
+    timeoutSeconds: 300
+  selector:
+    matchLabels:
+      node-label: xxx
+```
+
+### SidecarSet
+
+[Official doc](https://openkruise.io/en-us/docs/sidecarset.html)
+
+- Refactor the controller and webhook for SidecarSet:
+  - For `spec`:
+    - Add `namespace`: indicates this SidecarSet will only inject for Pods in this namespace.
+    - For `spec.containers`:
+      - Add `podInjectPolicy`: indicates this sidecar container should be injected in the front or end of `containers` list.
+      - Add `upgradeStrategy`: indicates the upgrade strategy of this sidecar container (currently it only supports `ColdUpgrade`)
+      - Add `shareVolumePolicy`: indicates whether to share other containers' VolumeMounts in the Pod.
+      - Add `transferEnv`: can transfer the names of env shared from other containers.
+    - For `spec.updateStrategy`:
+      - Add `type`: contains `NotUpdate` or `RollingUpdate`.
+      - Add `selector`: indicates only update Pods that matched this selector.
+      - Add `partition`: indicates the desired number of Pods in old revisions.
+      - Add `scatterStrategy`: defines the scatter rules to make pods been scattered during updating.
+
+### CloneSet
+
+- Add `currentRevision` field in status.
+- Optimize CloneSet scale sequence.
+- Fix condition for pod lifecycle state from Updated to Normal.
+- Change annotations `inplace-update-state` => `apps.kruise.io/inplace-update-state`, `inplace-update-grace` => `apps.kruise.io/inplace-update-grace`.
+- Fix `maxSurge` calculation when partition > replicas.
+
+### UnitedDeployment
+
+- Support Deployment as template in UnitedDeployment.
+
+### Advanced StatefulSet
+
+- Support lifecycle hook for in-place update and pre-delete.
+
+### BroadcastJob
+
+- Add PodFitsResources predicates.
+- Add `--assign-bcj-pods-by-scheduler` flag to control whether to use scheduler to assign BroadcastJob's Pods.
+
+### Others
+
+- Add feature-gate to replace the CUSTOM_RESOURCE_ENABLE env.
+- Add GetScale/UpdateScale into clientsets for scalable resources.
+- Support multi-platform build in Makefile.
+- Set different user-agent for controllers.
+
 ## v0.7.0
+
+### Breaking changes
 
 Since v0.7.0:
 

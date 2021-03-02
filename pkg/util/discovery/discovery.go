@@ -17,12 +17,14 @@ limitations under the License.
 package discovery
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/pkg/client"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -30,7 +32,14 @@ import (
 
 var (
 	internalScheme = runtime.NewScheme()
-	isNotNotFound  = func(err error) bool { return !errors.IsNotFound(err) }
+
+	errKindNotFound = fmt.Errorf("kind not found in group version resources")
+	backOff         = wait.Backoff{
+		Steps:    4,
+		Duration: 500 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	}
 )
 
 func init() {
@@ -44,31 +53,31 @@ func DiscoverGVK(gvk schema.GroupVersionKind) bool {
 	}
 	discoveryClient := genericClient.DiscoveryClient
 
-	var resourceList *metav1.APIResourceList
-	err := retry.OnError(retry.DefaultBackoff, isNotNotFound, func() error {
-		var err error
-		resourceList, err = discoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
-		if err != nil && !errors.IsNotFound(err) {
-			klog.Infof("Failed to get groupVersionKind %v: %v", gvk, err)
+	startTime := time.Now()
+	err := retry.OnError(backOff, func(err error) bool { return true }, func() error {
+		resourceList, err := discoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
+		if err != nil {
+			return err
 		}
-		return err
+		for _, r := range resourceList.APIResources {
+			if r.Kind == gvk.Kind {
+				return nil
+			}
+		}
+		return errKindNotFound
 	})
+
 	if err != nil {
-		if errors.IsNotFound(err) {
-			klog.Infof("Not found groupVersionKind %v: %v", gvk, err)
+		if err == errKindNotFound {
+			klog.Warningf("Not found kind %s in group version %s, waiting time %s", gvk.Kind, gvk.GroupVersion().String(), time.Since(startTime))
 			return false
 		}
+
 		// This might be caused by abnormal apiserver or etcd, ignore it
-		return true
+		klog.Errorf("Failed to find resources in group version %s: %v, waiting time %s", gvk.GroupVersion().String(), err, time.Since(startTime))
 	}
 
-	for _, r := range resourceList.APIResources {
-		if r.Kind == gvk.Kind {
-			return true
-		}
-	}
-
-	return false
+	return true
 }
 
 func DiscoverObject(obj runtime.Object) bool {

@@ -135,6 +135,8 @@ func (s *secretCertWriter) read() (*generator.Artifacts, error) {
 	err := s.Client.Get(context.TODO(), *s.Secret, secret)
 	if apierrors.IsNotFound(err) {
 		return nil, notFoundError{err}
+	} else if err != nil {
+		return nil, err
 	}
 	certs := secretToCerts(secret)
 	if certs != nil && certs.CACert != nil && certs.CAKey != nil {
