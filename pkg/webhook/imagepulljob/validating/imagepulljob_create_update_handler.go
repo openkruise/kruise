@@ -45,8 +45,8 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImagePulling) {
-		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ImagePulling))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.KruiseDaemon))
 	}
 
 	if err := validate(obj); err != nil {

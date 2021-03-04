@@ -55,7 +55,7 @@ func setDefaultSidecarContainer(sidecarContainer *SidecarContainer) {
 
 func setSidecarSetUpdateStratety(strategy *SidecarSetUpdateStrategy) {
 	if strategy.Type == "" {
-		strategy.Type = NotUpdateSidecarSetStrategyType
+		strategy.Type = RollingUpdateSidecarSetStrategyType
 	}
 	if strategy.MaxUnavailable == nil {
 		maxUnavailable := intstr.FromInt(1)
@@ -495,7 +495,7 @@ func SetDefaultsImageTagPullPolicy(obj *ImageTagPullPolicy) {
 		obj.TimeoutSeconds = utilpointer.Int32Ptr(600)
 	}
 	if obj.BackoffLimit == nil {
-		obj.TimeoutSeconds = utilpointer.Int32Ptr(3)
+		obj.BackoffLimit = utilpointer.Int32Ptr(3)
 	}
 }
 

@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	// ImagePulling enables controllers for NodeImage and ImagePullJob.
-	ImagePulling featuregate.Feature = "ImagePulling"
+	// KruiseDaemon enables the features relied on kruise-daemon, such as image pulling and container restarting.
+	KruiseDaemon featuregate.Feature = "KruiseDaemon"
 
 	// PodWebhook enables webhook for Pods creations. This is also related to SidecarSet.
 	PodWebhook featuregate.Feature = "PodWebhook"
@@ -36,7 +36,7 @@ const (
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PodWebhook:   {Default: true, PreRelease: featuregate.Beta},
-	ImagePulling: {Default: true, PreRelease: featuregate.Beta},
+	KruiseDaemon: {Default: true, PreRelease: featuregate.Beta},
 }
 
 func init() {
