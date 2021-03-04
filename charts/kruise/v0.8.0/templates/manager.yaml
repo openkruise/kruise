@@ -183,7 +183,7 @@ spec:
       serviceAccountName: kruise-daemon
       volumes:
       - hostPath:
-          path: /var/run
+          path: {{ .Values.daemon.socketLocation }}
           type: ""
         name: runtime-socket
 {{- end }}
