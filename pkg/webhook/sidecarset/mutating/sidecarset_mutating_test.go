@@ -30,7 +30,7 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 	}
 	appsv1alpha1.SetDefaultsSidecarSet(sidecarSet)
 	_ = setHashSidecarSet(sidecarSet)
-	if sidecarSet.Spec.UpdateStrategy.Type != appsv1alpha1.NotUpdateSidecarSetStrategyType {
+	if sidecarSet.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateSidecarSetStrategyType {
 		t.Fatalf("update strategy not initialized")
 	}
 	if *sidecarSet.Spec.UpdateStrategy.Partition != intstr.FromInt(0) {

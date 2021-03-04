@@ -115,6 +115,7 @@ type ImagePullJobStatus struct {
 }
 
 // +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="TOTAL",type="integer",JSONPath=".status.desired",description="Number of all nodes matched by this job"

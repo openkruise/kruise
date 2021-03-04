@@ -12,16 +12,16 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
+|Feb 4th, 2021. Kruise v0.8.0 is **RELEASED**! It provides refactoring SidecarSet, Deployment hosted by UnitedDeployment, and a new kruise-daemon component which supports image pre-download, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Dec 16th, 2020. Kruise v0.7.0 is **RELEASED**! It provides a new CRD named AdvancedCronJob, promotes AdvancedStatefulSet to v1beta1 and a few features in other controllers, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Oct 1st, 2020. Kruise v0.6.1 is **RELEASED**! It provides various features and bugfix, such as CloneSet lifecycle hook and UnitedDeployment supported CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|Aug 19th, 2020. Kruise v0.6.0 is **RELEASED**! It updates Kubernetes dependency and switches to new controller runtime framework. It also supports a new controller called Advanced DaemonSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 
 ## Introduction
 
 OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is now hosted by the [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) as a Sandbox Level Project.
-It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload management.
+It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload and application management.
 
-As of now, Kruise offers these workload controllers:
+As of now, Kruise mainly offers these controllers:
 
 - [CloneSet](https://openkruise.io/en-us/docs/cloneset.html): CloneSet is a workload that mainly focuses on managing stateless applications. It provides a rich set of features for more efficient, deterministic and controlled management, such as in-place update, specified Pod deletion, configurable priority/scatter based update, preUpdate/postUpdate hooks, etc. This [post](https://thenewstack.io/introducing-cloneset-production-grade-kubernetes-deployment-crd/) provides more details about why CloneSet is useful.
 
@@ -29,16 +29,15 @@ As of now, Kruise offers these workload controllers:
 
 - [SidecarSet](https://openkruise.io/en-us/docs/sidecarset.html): A controller that injects sidecar containers into the Pod spec based on the Pod selectors. The controller is also responsible for upgrading the sidecar containers.
 
+- [Advanced DaemonSet](https://openkruise.io/en-us/docs/advanced_daemonset.html): An enhanced version of default [DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) with extra upgrade strategies such as partition, node selector, pause and surging.
+
 - [UnitedDeployment](https://openkruise.io/en-us/docs/uniteddeployment.html): This controller manages application Pods spread in multiple fault domains by using multiple workloads.
 
 - [BroadcastJob](https://openkruise.io/en-us/docs/broadcastjob.html): A job that runs Pods to completion across all the nodes in the cluster.
 
-- [Advanced DaemonSet](https://openkruise.io/en-us/docs/advanced_daemonset.html): An enhanced version of default [DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) with extra upgrade strategies such as partition, node selector, pause and surging.
-
 - [AdvancedCronJob](https://openkruise.io/en-us/docs/advancedcronjob.html): An extended CronJob controller, currently its template supports Job and BroadcastJob.
 
-The project **roadmap** is actively updated in [here](https://github.com/openkruise/kruise/projects).
-This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evenson](https://github.com/lachie83) is a good introduction for new users.
+- [ImagePullJob](https://openkruise.io/en-us/docs/imagepulljob.html): Help users download images on any nodes they want.
 
 ## Key Features
 
@@ -54,22 +53,28 @@ This [video](https://www.youtube.com/watch?v=elB7reZ6eAQ) demo by [Lachlan Evens
 
     A global workload can be defined over multiple fault domains, and the Kruise controller will spread a sub workload in each domain. You can manage the domain replicas, sub workload template and update strategies uniformly using the global workload.
 
+- **Image pre-download**
+
+  Help users download images on any nodes they want.
+
+- **...**
+
 ## Quick Start
 
 For a Kubernetes cluster with its version higher than v1.13, you can simply install Kruise with helm v3.1.0+:
 
 ```bash
 # Kubernetes 1.13 and 1.14
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.7.0/kruise-chart.tgz --disable-openapi-validation
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.0/kruise-chart.tgz --disable-openapi-validation
 
 # Kubernetes 1.15 and newer versions
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.7.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.0/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for the kruise-manager.
-You may have to set your specific configurations when it is deployed into a production cluster or you want to enable/disable specific controllers.
+You may have to set your specific configurations when it is deployed into a production cluster or you want to configure feature-gates.
 
-For more details, see [quick-start](https://openkruise.io/en-us/docs/quick_start.html).
+For more details, see [installation doc](https://openkruise.io/en-us/docs/installation.html).
 
 ## Documentation
 
