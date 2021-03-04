@@ -59,6 +59,7 @@ The following table lists the configurable parameters of the kruise chart and th
 | `daemon.resources.requests.cpu`           | CPU resource request of kruise-daemon container              | `0`                           |
 | `daemon.resources.requests.memory`        | Memory resource request of kruise-daemon container           | `0`                           |
 | `daemon.affinity`                         | Affinity policy for kruise-daemon pod                        | `{}`                          |
+| `daemon.socketLocation`                   | Location of the container manager control socket             | `/var/run`                    |
 | `webhookConfiguration.failurePolicy.pods` | The failurePolicy for pods in mutating webhook configuration | `Ignore`                      |
 | `webhookConfiguration.timeoutSeconds`     | The timeoutSeconds for all webhook configuration             | `30`                          |
 | `crds.managed`                            | Kruise will not install CRDs with chart if this is false     | `true`                        |
