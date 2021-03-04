@@ -47,6 +47,8 @@ daemon:
 
   port: 10221
 
+  socketLocation: "/var/run"
+
   resources:
     limits:
       cpu: 50m
