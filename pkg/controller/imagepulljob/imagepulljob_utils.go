@@ -84,5 +84,8 @@ func formatStatusMessage(status *appsv1alpha1.ImagePullJobStatus) (ret string) {
 	if status.CompletionTime != nil {
 		return "job has completed"
 	}
+	if status.Desired == 0 {
+		return "job is running, no progress"
+	}
 	return fmt.Sprintf("job is running, progress %.1f%%", 100.0*float64(status.Succeeded+status.Failed)/float64(status.Desired))
 }

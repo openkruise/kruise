@@ -21,10 +21,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -59,8 +62,27 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 
 func validate(obj *appsv1alpha1.ImagePullJob) error {
 	if obj.Spec.Selector != nil {
-		if obj.Spec.Selector.Names != nil && (obj.Spec.Selector.MatchLabels != nil || obj.Spec.Selector.MatchExpressions != nil) {
-			return fmt.Errorf("can not set both names and labelSelector in this spec.selector")
+		if obj.Spec.Selector.MatchLabels != nil || obj.Spec.Selector.MatchExpressions != nil {
+			if obj.Spec.Selector.Names != nil {
+				return fmt.Errorf("can not set both names and labelSelector in this spec.selector")
+			}
+			if _, err := metav1.LabelSelectorAsSelector(&obj.Spec.Selector.LabelSelector); err != nil {
+				return fmt.Errorf("invalid selector: %v", err)
+			}
+		}
+		if obj.Spec.Selector.Names != nil {
+			names := sets.NewString(obj.Spec.Selector.Names...)
+			if names.Len() != len(obj.Spec.Selector.Names) {
+				return fmt.Errorf("duplicated name in selector names")
+			}
+		}
+	}
+	if obj.Spec.PodSelector != nil {
+		if obj.Spec.Selector != nil {
+			return fmt.Errorf("can not set both selector and podSelector")
+		}
+		if _, err := metav1.LabelSelectorAsSelector(&obj.Spec.PodSelector.LabelSelector); err != nil {
+			return fmt.Errorf("invalid podSelector: %v", err)
 		}
 	}
 

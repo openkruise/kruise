@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
@@ -65,7 +66,7 @@ func (e *nodeImageEventHandler) Generic(evt event.GenericEvent, q workqueue.Rate
 
 func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q workqueue.RateLimitingInterface) {
 	// Get jobs related to this NodeImage
-	jobs, err := nodeimagesutil.GetJobsForNodeImage(e.Reader, nodeImage)
+	jobs, _, err := nodeimagesutil.GetActiveJobsForNodeImage(e.Reader, nodeImage, nil)
 	if err != nil {
 		klog.Errorf("Failed to get jobs for NodeImage %s: %v", nodeImage.Name, err)
 	}
@@ -76,44 +77,136 @@ func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q work
 
 func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1alpha1.NodeImage, q workqueue.RateLimitingInterface) {
 	changedImages := sets.NewString()
-	oldNodeImage = oldNodeImage.DeepCopy()
+	tmpOldNodeImage := oldNodeImage.DeepCopy()
 	for name, imageSpec := range nodeImage.Spec.Images {
-		oldImageSpec := oldNodeImage.Spec.Images[name]
-		delete(oldNodeImage.Spec.Images, name)
+		oldImageSpec := tmpOldNodeImage.Spec.Images[name]
+		delete(tmpOldNodeImage.Spec.Images, name)
 		if !reflect.DeepEqual(imageSpec, oldImageSpec) {
 			changedImages.Insert(name)
 		}
 	}
-	for name := range oldNodeImage.Spec.Images {
+	for name := range tmpOldNodeImage.Spec.Images {
 		changedImages.Insert(name)
 	}
 	for name, imageStatus := range nodeImage.Status.ImageStatuses {
-		oldImageStatus := oldNodeImage.Status.ImageStatuses[name]
-		delete(oldNodeImage.Status.ImageStatuses, name)
+		oldImageStatus := tmpOldNodeImage.Status.ImageStatuses[name]
+		delete(tmpOldNodeImage.Status.ImageStatuses, name)
 		if !reflect.DeepEqual(imageStatus, oldImageStatus) {
 			changedImages.Insert(name)
 		}
 	}
-	for name := range oldNodeImage.Status.ImageStatuses {
+	for name := range tmpOldNodeImage.Status.ImageStatuses {
 		changedImages.Insert(name)
 	}
 	klog.V(5).Infof("Find NodeImage %s updated and only affect images: %v", nodeImage.Name, changedImages.List())
 
 	// Get jobs related to this NodeImage
-	jobs, err := nodeimagesutil.GetJobsForNodeImage(e.Reader, nodeImage)
+	newJobs, oldJobs, err := nodeimagesutil.GetActiveJobsForNodeImage(e.Reader, nodeImage, oldNodeImage)
 	if err != nil {
 		klog.Errorf("Failed to get jobs for NodeImage %s: %v", nodeImage.Name, err)
 	}
-	for _, j := range jobs {
-		var match bool
+	diffSet := diffJobs(newJobs, oldJobs)
+	for _, j := range newJobs {
 		for _, cImage := range changedImages.List() {
 			if j.Spec.Image == cImage || strings.HasPrefix(j.Spec.Image, cImage+":") {
-				match = true
+				diffSet[types.NamespacedName{Namespace: j.Namespace, Name: j.Name}] = struct{}{}
 				break
 			}
 		}
-		if match {
-			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: j.Namespace, Name: j.Name}})
-		}
+	}
+	for name := range diffSet {
+		q.Add(reconcile.Request{NamespacedName: name})
 	}
 }
+
+type podEventHandler struct {
+	client.Reader
+}
+
+var _ handler.EventHandler = &podEventHandler{}
+
+func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	obj := evt.Object.(*v1.Pod)
+	e.handle(obj, q)
+}
+
+func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	obj := evt.ObjectNew.(*v1.Pod)
+	oldObj := evt.ObjectOld.(*v1.Pod)
+	if obj.DeletionTimestamp != nil {
+		e.handle(obj, q)
+	} else {
+		e.handleUpdate(obj, oldObj, q)
+	}
+}
+
+func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	obj := evt.Object.(*v1.Pod)
+	e.handle(obj, q)
+}
+
+func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
+
+func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.RateLimitingInterface) {
+	if pod.Spec.NodeName == "" {
+		return
+	}
+	// Get jobs related to this Pod
+	jobs, _, err := nodeimagesutil.GetActiveJobsForPod(e.Reader, pod, nil)
+	if err != nil {
+		klog.Errorf("Failed to get jobs for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
+	}
+	for _, j := range jobs {
+		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: j.Namespace, Name: j.Name}})
+	}
+}
+
+func (e *podEventHandler) handleUpdate(pod, oldPod *v1.Pod, q workqueue.RateLimitingInterface) {
+	if pod.Spec.NodeName == "" {
+		return
+	}
+	if pod.Spec.NodeName == oldPod.Spec.NodeName && reflect.DeepEqual(pod.Labels, oldPod.Labels) {
+		return
+	}
+	// Get jobs related to this NodeImage
+	newJobs, oldJobs, err := nodeimagesutil.GetActiveJobsForPod(e.Reader, pod, oldPod)
+	if err != nil {
+		klog.Errorf("Failed to get jobs for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
+	}
+	if oldPod.Spec.NodeName == "" {
+		for _, j := range newJobs {
+			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: j.Namespace, Name: j.Name}})
+		}
+		return
+	}
+	diffSet := diffJobs(newJobs, oldJobs)
+	for name := range diffSet {
+		q.Add(reconcile.Request{NamespacedName: name})
+	}
+}
+
+func diffJobs(newJobs, oldJobs []*appsv1alpha1.ImagePullJob) set {
+	setNew := make(set, len(newJobs))
+	setOld := make(set, len(oldJobs))
+	for _, j := range newJobs {
+		setNew[types.NamespacedName{Namespace: j.Namespace, Name: j.Name}] = struct{}{}
+	}
+	for _, j := range oldJobs {
+		setOld[types.NamespacedName{Namespace: j.Namespace, Name: j.Name}] = struct{}{}
+	}
+	ret := make(set)
+	for name, v := range setNew {
+		if _, ok := setOld[name]; !ok {
+			ret[name] = v
+		}
+	}
+	for name, v := range setOld {
+		if _, ok := setNew[name]; !ok {
+			ret[name] = v
+		}
+	}
+	return ret
+}
+
+type set map[types.NamespacedName]struct{}

@@ -23,10 +23,15 @@ import (
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -63,6 +68,38 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 		}
 	}()
 
+	if job.Spec.PodSelector != nil {
+		selector, err := util.GetFastLabelSelector(&job.Spec.PodSelector.LabelSelector)
+		if err != nil {
+			return nil, fmt.Errorf("parse podSelector error: %v", err)
+		}
+
+		podList := &v1.PodList{}
+		if err := reader.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+			return nil, err
+		}
+
+		nodeImageNames := sets.NewString()
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			if !kubecontroller.IsPodActive(pod) || pod.Spec.NodeName == "" || nodeImageNames.Has(pod.Spec.NodeName) {
+				continue
+			}
+			nodeImageNames.Insert(pod.Spec.NodeName)
+			nodeImage := &appsv1alpha1.NodeImage{}
+			if err := reader.Get(context.TODO(), types.NamespacedName{Name: pod.Spec.NodeName}, nodeImage); err != nil {
+				if errors.IsNotFound(err) {
+					klog.Warningf("Get NodeImages for ImagePullJob %s/%s, find Pod %s on Node %s but NodeImage not found",
+						job.Namespace, job.Name, pod.Name, pod.Spec.NodeName)
+					continue
+				}
+				return nil, err
+			}
+			nodeImages = append(nodeImages, nodeImage)
+		}
+		return nodeImages, nil
+	}
+
 	nodeImageList := &appsv1alpha1.NodeImageList{}
 	if job.Spec.Selector == nil {
 		if err := reader.List(context.TODO(), nodeImageList); err != nil {
@@ -85,7 +122,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 		return nodeImages, nil
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(&job.Spec.Selector.LabelSelector)
+	selector, err := util.GetFastLabelSelector(&job.Spec.Selector.LabelSelector)
 	if err != nil {
 		return nil, fmt.Errorf("parse selector error: %v", err)
 	}
@@ -103,30 +140,102 @@ func convertNodeImages(nodeImageList *appsv1alpha1.NodeImageList) []*appsv1alpha
 	return nodeImages
 }
 
-func GetJobsForNodeImage(reader client.Reader, nodeImage *appsv1alpha1.NodeImage) (jobs []*appsv1alpha1.ImagePullJob, err error) {
+func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *appsv1alpha1.NodeImage) (newJobs, oldJobs []*appsv1alpha1.ImagePullJob, err error) {
+	var podsOnNode []*v1.Pod
 	jobList := appsv1alpha1.ImagePullJobList{}
-	if err = reader.List(context.TODO(), &jobList); err != nil {
-		return nil, err
+	if err = reader.List(context.TODO(), &jobList, client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}); err != nil {
+		return nil, nil, err
 	}
 	for i := range jobList.Items {
 		job := &jobList.Items[i]
-		if job.Spec.Selector == nil {
-			jobs = append(jobs, job)
+		var matched bool
+		var oldMatched bool
+
+		if job.Spec.PodSelector != nil {
+			selector, err := util.GetFastLabelSelector(&job.Spec.PodSelector.LabelSelector)
+			if err != nil {
+				return nil, nil, fmt.Errorf("parse podSelector for %s/%s error: %v", job.Namespace, job.Name, err)
+			}
+			if podsOnNode == nil {
+				if podsOnNode, err = getPodsOnNode(reader, nodeImage.Name); err != nil {
+					return nil, nil, fmt.Errorf("get pods on node error: %v", err)
+				}
+			}
+			for _, pod := range podsOnNode {
+				if selector.Matches(labels.Set(pod.Labels)) {
+					matched = true
+					oldMatched = true
+					break
+				}
+			}
+		} else if job.Spec.Selector == nil {
+			matched = true
+			oldMatched = true
 		} else if job.Spec.Selector.Names != nil {
 			if slice.ContainsString(job.Spec.Selector.Names, nodeImage.Name, nil) {
-				jobs = append(jobs, job)
+				matched = true
+				oldMatched = true
 			}
 		} else {
-			selector, err := metav1.LabelSelectorAsSelector(&job.Spec.Selector.LabelSelector)
+			selector, err := util.GetFastLabelSelector(&job.Spec.Selector.LabelSelector)
 			if err != nil {
-				return nil, fmt.Errorf("parse selector error: %v", err)
+				return nil, nil, fmt.Errorf("parse selector for %s/%s error: %v", job.Namespace, job.Name, err)
 			}
-			if !selector.Empty() && selector.Matches(labels.Set(nodeImage.Labels)) {
-				jobs = append(jobs, job)
+			if !selector.Empty() {
+				if selector.Matches(labels.Set(nodeImage.Labels)) {
+					matched = true
+				}
+				if oldNodeImage != nil {
+					if selector.Matches(labels.Set(oldNodeImage.Labels)) {
+						oldMatched = true
+					}
+				}
+			}
+		}
+		if matched {
+			newJobs = append(newJobs, job)
+		}
+		if oldNodeImage != nil && oldMatched {
+			oldJobs = append(oldJobs, job)
+		}
+	}
+	return
+}
+
+func getPodsOnNode(reader client.Reader, nodeName string) (pods []*v1.Pod, err error) {
+	podList := v1.PodList{}
+	if err = reader.List(context.TODO(), &podList, client.MatchingFields{fieldindex.IndexNameForPodNodeName: nodeName}); err != nil {
+		return nil, err
+	}
+	pods = make([]*v1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pods = append(pods, &podList.Items[i])
+	}
+	return
+}
+
+func GetActiveJobsForPod(reader client.Reader, pod, oldPod *v1.Pod) (newJobs, oldJobs []*appsv1alpha1.ImagePullJob, err error) {
+	jobList := appsv1alpha1.ImagePullJobList{}
+	if err = reader.List(context.TODO(), &jobList, client.InNamespace(pod.Namespace), client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}); err != nil {
+		return nil, nil, err
+	}
+	for i := range jobList.Items {
+		job := &jobList.Items[i]
+
+		if job.Spec.PodSelector != nil {
+			selector, err := util.GetFastLabelSelector(&job.Spec.PodSelector.LabelSelector)
+			if err != nil {
+				return nil, nil, fmt.Errorf("parse podSelector for %s/%s error: %v", job.Namespace, job.Name, err)
+			}
+			if selector.Matches(labels.Set(pod.Labels)) {
+				newJobs = append(newJobs, job)
+			}
+			if oldPod != nil && selector.Matches(labels.Set(oldPod.Labels)) {
+				oldJobs = append(oldJobs, job)
 			}
 		}
 	}
-	return jobs, nil
+	return
 }
 
 func SortSpecImageTags(imageSpec *appsv1alpha1.ImageSpec) {

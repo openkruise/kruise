@@ -462,7 +462,7 @@ func Predicates(pod *corev1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []
 // checkNodeFitness runs a set of predicates that select candidate nodes for the DaemonSet;
 // the predicates include:
 //   - PodFitsHost: checks pod's NodeName against node
-//   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
+//   - PodMatchNodeSelector: checks pod's ImagePullJobNodeSelector and NodeAffinity against node
 //   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
 func checkNodeFitness(pod *corev1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	var predicateFails []predicates.PredicateFailureReason

@@ -32,6 +32,7 @@ const (
 	IndexNameForPodNodeName = "spec.nodeName"
 	IndexNameForOwnerRefUID = "ownerRefUID"
 	IndexNameForController  = ".metadata.controller"
+	IndexNameForIsActive    = "isActive"
 )
 
 var (
@@ -74,6 +75,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		// broadcastjob owner
 		if utildiscovery.DiscoverObject(&appsv1alpha1.BroadcastJob{}) {
 			if err = indexBroadcastCronJob(c); err != nil {
+				return
+			}
+		}
+		// imagepulljob active
+		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
+			if err = indexImagePullJobActive(c); err != nil {
 				return
 			}
 		}
@@ -129,5 +136,16 @@ func indexBroadcastCronJob(c cache.Cache) error {
 
 		// ...and if so, return it
 		return []string{owner.Name}
+	})
+}
+
+func indexImagePullJobActive(c cache.Cache) error {
+	return c.IndexField(&appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj runtime.Object) []string {
+		obj := rawObj.(*appsv1alpha1.ImagePullJob)
+		isActive := "false"
+		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
+			isActive = "true"
+		}
+		return []string{isActive}
 	})
 }

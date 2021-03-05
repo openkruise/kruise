@@ -93,7 +93,7 @@ var _ = SIGDescribe("PullImage", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
 				Image: "nginx:1.9.1",
-				Selector: &appsv1alpha1.NodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+				Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 					{Key: framework.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
 				}}},
 				PullPolicy: &appsv1alpha1.PullPolicy{
@@ -141,7 +141,7 @@ var _ = SIGDescribe("PullImage", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
 				Image:    "nginx:1.9.2",
-				Selector: &appsv1alpha1.NodeSelector{Names: []string{nodes[0].Name}},
+				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
 				PullPolicy: &appsv1alpha1.PullPolicy{
 					TimeoutSeconds: utilpointer.Int32Ptr(50),
 					BackoffLimit:   utilpointer.Int32Ptr(2),
