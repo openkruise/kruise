@@ -35,7 +35,12 @@ type ImagePullJobSpec struct {
 	// Selector is a query over nodes that should match the job.
 	// nil to match all nodes.
 	// +optional
-	Selector *NodeSelector `json:"selector,omitempty"`
+	Selector *ImagePullJobNodeSelector `json:"selector,omitempty"`
+
+	// PodSelector is a query over pods that should pull image on nodes of these pods.
+	// Mutually exclusive with Selector.
+	// +optional
+	PodSelector *ImagePullJobPodSelector `json:"podSelector,omitempty"`
 
 	// Parallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified,
 	// it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.
@@ -52,8 +57,15 @@ type ImagePullJobSpec struct {
 	CompletionPolicy CompletionPolicy `json:"completionPolicy"`
 }
 
-// NodeSelector is a selector over nodes
-type NodeSelector struct {
+// ImagePullJobPodSelector is a selector over pods
+type ImagePullJobPodSelector struct {
+	// LabelSelector is a label query over pods that should match the job.
+	// +optional
+	metav1.LabelSelector `json:",inline"`
+}
+
+// ImagePullJobNodeSelector is a selector over nodes
+type ImagePullJobNodeSelector struct {
 	// Names specify a set of nodes to execute the job.
 	// +optional
 	Names []string `json:"names,omitempty"`

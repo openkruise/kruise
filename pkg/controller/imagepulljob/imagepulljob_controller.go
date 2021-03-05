@@ -101,6 +101,12 @@ func add(mgr manager.Manager, r *ReconcileImagePullJob) error {
 		return err
 	}
 
+	// Watch for pod for jobs that have pod selector
+	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &podEventHandler{Reader: mgr.GetCache()})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
