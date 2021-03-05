@@ -582,7 +582,7 @@ func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
 // checkNodeFitness runs a set of predicates that select candidate nodes for the job pod;
 // the predicates include:
 //   - PodFitsHost: checks pod's NodeName against node
-//   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
+//   - PodMatchNodeSelector: checks pod's ImagePullJobNodeSelector and NodeAffinity against node
 //   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
 //   - CheckNodeUnschedulablePredicate: check if the pod can tolerate node unschedulable
 //   - PodFitsResources: checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
