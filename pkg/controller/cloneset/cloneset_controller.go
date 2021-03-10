@@ -249,10 +249,10 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// Refresh update expectations
 	for _, pod := range filteredPods {
-		clonesetutils.UpdateExpectations.ObserveUpdated(request.String(), updateRevision.Name, pod)
+		clonesetutils.UpdateExpectations.ObserveUpdated(request.String(), clonesetutils.GetRevisionLabel(updateRevision), pod)
 	}
 	// If update expectations have not satisfied yet, just skip this reconcile.
-	if updateSatisfied, unsatisfiedDuration, updateDirtyPods := clonesetutils.UpdateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name); !updateSatisfied {
+	if updateSatisfied, unsatisfiedDuration, updateDirtyPods := clonesetutils.UpdateExpectations.SatisfiedExpectations(request.String(), clonesetutils.GetRevisionLabel(updateRevision)); !updateSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
 			klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", request.String(), updateDirtyPods, unsatisfiedDuration)
 			return reconcile.Result{}, nil
@@ -285,7 +285,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	delayDuration, syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 
 	// update new status
-	if err = r.statusUpdater.UpdateCloneSetStatus(instance, &newStatus, filteredPods); err != nil {
+	if err = r.statusUpdater.UpdateCloneSetStatus(instance, &newStatus, updateRevision, filteredPods); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -330,7 +330,9 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	var podsScaleErr error
 	var podsUpdateErr error
 
-	scaling, podsScaleErr = r.scaleControl.Manage(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
+	scaling, podsScaleErr = r.scaleControl.Manage(currentSet, updateSet,
+		clonesetutils.GetRevisionLabel(currentRevision), clonesetutils.GetRevisionLabel(updateRevision),
+		filteredPods, filteredPVCs)
 	if podsScaleErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedScale,

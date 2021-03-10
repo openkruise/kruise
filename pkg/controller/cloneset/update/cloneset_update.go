@@ -98,7 +98,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 			continue
 		}
 
-		if clonesetutils.GetPodRevision("", pods[i]) != updateRevision.Name {
+		if clonesetutils.GetPodRevision("", pods[i]) != clonesetutils.GetRevisionLabel(updateRevision) {
 			switch lifecycle.GetPodLifecycleState(pods[i]) {
 			case appspub.LifecycleStatePreparingDelete, appspub.LifecycleStateUpdated:
 				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
@@ -261,7 +261,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 		cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
 		var oldRevision *apps.ControllerRevision
 		for _, r := range revisions {
-			if r.Name == clonesetutils.GetPodRevision("", pod) {
+			if clonesetutils.GetRevisionLabel(r) == clonesetutils.GetPodRevision("", pod) {
 				oldRevision = r
 				break
 			}
@@ -291,11 +291,12 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 
 			opts := coreControl.GetUpdateOptions()
 			opts.AdditionalFuncs = append(opts.AdditionalFuncs, lifecycle.SetPodLifecycle(appspub.LifecycleStateUpdating))
+			opts.GetRevision = clonesetutils.GetRevisionLabel
 			res := c.inplaceControl.Update(pod, oldRevision, updateRevision, opts)
 			if res.InPlaceUpdate {
 				if res.UpdateErr == nil {
 					c.recorder.Eventf(cs, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place(revision %v)", pod.Name, updateRevision.Name)
-					clonesetutils.UpdateExpectations.ExpectUpdated(clonesetutils.GetControllerKey(cs), updateRevision.Name, pod)
+					clonesetutils.UpdateExpectations.ExpectUpdated(clonesetutils.GetControllerKey(cs), clonesetutils.GetRevisionLabel(updateRevision), pod)
 					return res.DelayDuration, nil
 				}
 

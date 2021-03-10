@@ -22,7 +22,9 @@ import (
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -78,6 +81,15 @@ func GetPodsRevisions(pods []*v1.Pod) sets.String {
 		revisions.Insert(GetPodRevision("", p))
 	}
 	return revisions
+}
+
+// GetRevisionLabel return revision hash label value from revision to create pods.
+// https://github.com/openkruise/kruise/issues/531
+func GetRevisionLabel(revision *apps.ControllerRevision) string {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CloneSetHashOnlyRevisionName) {
+		return revision.Labels[history.ControllerRevisionHashLabel]
+	}
+	return revision.Name
 }
 
 // NextRevision finds the next valid revision number based on revisions. If the length of revisions
