@@ -167,7 +167,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 			expectedStatus: []int32{2, 2, 2, 2},
 		},
 	}
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			pods := cs.getPods()
@@ -248,7 +248,7 @@ func TestScopeNamespacePods(t *testing.T) {
 		}
 		fakeClient.Create(context.TODO(), pod)
 	}
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
 	pods, err := processor.getMatchingPods(sidecarSet)
 	if err != nil {
@@ -270,7 +270,7 @@ func TestCanUpgradePods(t *testing.T) {
 	}
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSet)
 	pods := factoryPodsCommon(100, 0, sidecarSet)
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	for i := range pods {
 		if i < 50 {
 			pods[i].Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = `{"test-sidecarset":{"hash":"without-aaa"}}`

@@ -23,6 +23,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type fakeRevisionAdapterImpl struct{}
+
+func (r *fakeRevisionAdapterImpl) EqualToRevisionHash(_ string, obj metav1.Object, hash string) bool {
+	return obj.GetLabels()["revision"] == hash
+}
+
+func (r *fakeRevisionAdapterImpl) WriteRevisionHash(obj metav1.Object, hash string) {
+	if obj.GetLabels() == nil {
+		obj.SetLabels(make(map[string]string, 1))
+	}
+	obj.GetLabels()["revision"] = hash
+}
+
 func TestUpdate(t *testing.T) {
 	controllerKey := "default/controller-test"
 	revisions := []string{"rev-0", "rev-1"}
@@ -35,7 +48,7 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 	}
-	c := NewUpdateExpectations(func(controllerKey string, p metav1.Object) string { return p.GetLabels()["revision"] })
+	c := NewUpdateExpectations(&fakeRevisionAdapterImpl{})
 
 	// no pod in cache
 	if satisfied, _, _ := c.SatisfiedExpectations(controllerKey, revisions[0]); !satisfied {

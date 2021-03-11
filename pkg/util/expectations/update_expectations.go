@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -34,10 +35,10 @@ type UpdateExpectations interface {
 }
 
 // NewUpdateExpectations returns a common UpdateExpectations.
-func NewUpdateExpectations(getRevision func(string, metav1.Object) string) UpdateExpectations {
+func NewUpdateExpectations(revisionAdapter revisionadapter.Interface) UpdateExpectations {
 	return &realUpdateExpectations{
 		controllerCache: make(map[string]*realControllerUpdateExpectations),
-		getRevision:     getRevision,
+		revisionAdapter: revisionAdapter,
 	}
 }
 
@@ -45,8 +46,8 @@ type realUpdateExpectations struct {
 	sync.Mutex
 	// key: parent key, workload namespace/name
 	controllerCache map[string]*realControllerUpdateExpectations
-	// how to get pod revision
-	getRevision func(string, metav1.Object) string
+	// the impl of interface
+	revisionAdapter revisionadapter.Interface
 }
 
 type realControllerUpdateExpectations struct {
@@ -82,7 +83,7 @@ func (r *realUpdateExpectations) ObserveUpdated(controllerKey, revision string, 
 		return
 	}
 
-	if expectations.revision == revision && expectations.objsUpdated.Has(getKey(obj)) && r.getRevision(controllerKey, obj) == revision {
+	if expectations.revision == revision && expectations.objsUpdated.Has(getKey(obj)) && r.revisionAdapter.EqualToRevisionHash(controllerKey, obj, revision) {
 		expectations.objsUpdated.Delete(getKey(obj))
 	}
 
