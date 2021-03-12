@@ -33,6 +33,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -67,10 +68,7 @@ var (
 	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 	concurrentReconciles = 3
 
-	updateExpectations = expectations.NewUpdateExpectations(func(controllerKey string, o metav1.Object) string {
-		p := o.(*v1.Pod)
-		return getPodRevision(p)
-	})
+	updateExpectations = expectations.NewUpdateExpectations(revisionadapter.NewDefaultImpl())
 	// this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
 	durationStore = requeueduration.DurationStore{}
 )
@@ -127,7 +125,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 				podLister,
 				pvcLister,
 				recorder),
-			inplaceupdate.New(util.NewClientFromManager(mgr, "statefulset-controller"), appsv1.ControllerRevisionHashLabelKey),
+			inplaceupdate.New(util.NewClientFromManager(mgr, "statefulset-controller"), revisionadapter.NewDefaultImpl()),
 			lifecycle.New(util.NewClientFromManager(mgr, "statefulset-controller")),
 			NewRealStatefulSetStatusUpdater(genericClient.KruiseClient, statefulSetLister),
 			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(revInformer.(toolscache.SharedIndexInformer).GetIndexer())),

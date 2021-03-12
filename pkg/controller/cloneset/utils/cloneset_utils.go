@@ -19,6 +19,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -29,22 +30,51 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
 	// ControllerKind is GroupVersionKind for CloneSet.
-	ControllerKind = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	ControllerKind      = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	RevisionAdapterImpl = &revisionAdapterImpl{}
+	EqualToRevisionHash = RevisionAdapterImpl.EqualToRevisionHash
+	WriteRevisionHash   = RevisionAdapterImpl.WriteRevisionHash
 
 	ScaleExpectations           = expectations.NewScaleExpectations()
-	UpdateExpectations          = expectations.NewUpdateExpectations(GetPodRevision)
+	UpdateExpectations          = expectations.NewUpdateExpectations(RevisionAdapterImpl)
 	ResourceVersionExpectations = expectations.NewResourceVersionExpectation()
 )
+
+type revisionAdapterImpl struct {
+}
+
+func (r *revisionAdapterImpl) EqualToRevisionHash(_ string, obj metav1.Object, hash string) bool {
+	objHash := obj.GetLabels()[apps.ControllerRevisionHashLabelKey]
+	if objHash == hash {
+		return true
+	}
+	return r.getShortHash(hash) == r.getShortHash(objHash)
+}
+
+func (r *revisionAdapterImpl) WriteRevisionHash(obj metav1.Object, hash string) {
+	if obj.GetLabels() == nil {
+		obj.SetLabels(make(map[string]string, 1))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CloneSetShortHash) {
+		hash = r.getShortHash(hash)
+	}
+	obj.GetLabels()[apps.ControllerRevisionHashLabelKey] = hash
+}
+
+func (r *revisionAdapterImpl) getShortHash(hash string) string {
+	// This makes sure the real hash must be the last '-' substring of revision name
+	// vendor/k8s.io/kubernetes/pkg/controller/history/controller_history.go#82
+	list := strings.Split(hash, "-")
+	return list[len(list)-1]
+}
 
 // GetControllerKey return key of CloneSet.
 func GetControllerKey(cs *appsv1alpha1.CloneSet) string {
@@ -67,29 +97,6 @@ func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, e
 		}
 	}
 	return activePods, nil
-}
-
-// GetPodRevision returns revision hash of this pod.
-func GetPodRevision(controllerKey string, pod metav1.Object) string {
-	return pod.GetLabels()[apps.ControllerRevisionHashLabelKey]
-}
-
-// GetPodsRevisions return revision hash set of these pods.
-func GetPodsRevisions(pods []*v1.Pod) sets.String {
-	revisions := sets.NewString()
-	for _, p := range pods {
-		revisions.Insert(GetPodRevision("", p))
-	}
-	return revisions
-}
-
-// GetRevisionLabel return revision hash label value from revision to create pods.
-// https://github.com/openkruise/kruise/issues/531
-func GetRevisionLabel(revision *apps.ControllerRevision) string {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CloneSetHashOnlyRevisionName) {
-		return revision.Labels[history.ControllerRevisionHashLabel]
-	}
-	return revision.Name
 }
 
 // NextRevision finds the next valid revision number based on revisions. If the length of revisions
@@ -116,7 +123,7 @@ func IsRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
 // SplitPodsByRevision returns Pods matched and unmatched the given revision
 func SplitPodsByRevision(pods []*v1.Pod, rev string) (matched, unmatched []*v1.Pod) {
 	for _, p := range pods {
-		if GetPodRevision("", p) == rev {
+		if EqualToRevisionHash("", p, rev) {
 			matched = append(matched, p)
 		} else {
 			unmatched = append(unmatched, p)

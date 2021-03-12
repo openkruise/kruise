@@ -175,10 +175,10 @@ func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1alp
 	}
 
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSetInput, podInput)
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
-		updateExpectations: expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision),
+		updateExpectations: expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl),
 		processor:          NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10)),
 	}
 	if _, err := reconciler.Reconcile(request); err != nil {
@@ -210,7 +210,7 @@ func testUpdateWhenSidecarSetPaused(t *testing.T, sidecarSetInput *appsv1alpha1.
 	}
 
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSetInput, podInput)
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,
@@ -245,7 +245,7 @@ func testUpdateWhenMaxUnavailableNotZero(t *testing.T, sidecarSetInput *appsv1al
 	}
 
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSetInput, podInput)
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,
@@ -281,7 +281,7 @@ func testUpdateWhenPartitionFinished(t *testing.T, sidecarSetInput *appsv1alpha1
 	}
 
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSetInput, podInput)
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,
@@ -317,7 +317,7 @@ func testRemoveSidecarSet(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet
 	}
 
 	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSetInput, podInput)
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.GetPodSidecarSetRevision)
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,

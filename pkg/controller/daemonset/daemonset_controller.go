@@ -26,6 +26,7 @@ import (
 	"time"
 
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,7 +86,7 @@ var (
 
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations       = kubecontroller.NewControllerExpectations()
-	updateExpectations = kruiseExpectations.NewUpdateExpectations(GetPodRevision)
+	updateExpectations = kruiseExpectations.NewUpdateExpectations(revisionadapter.NewDefaultImpl())
 )
 
 const (
@@ -172,7 +173,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		nodeLister:          nodeLister,
 		suspendedDaemonPods: map[string]sets.String{},
 		failedPodsBackoff:   failedPodsBackoff,
-		inplaceControl:      inplaceupdate.New(cli, apps.ControllerRevisionHashLabelKey),
+		inplaceControl:      inplaceupdate.New(cli, revisionadapter.NewDefaultImpl()),
 		updateExp:           updateExpectations,
 	}
 	dsc.podNodeIndex = podInformer.(cache.SharedIndexInformer).GetIndexer()

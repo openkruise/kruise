@@ -26,6 +26,7 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
@@ -79,10 +80,10 @@ func TestMange(t *testing.T) {
 		{
 			name:           "do nothing",
 			cs:             &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
-			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev-new"}},
+			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new"}},
 					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
@@ -92,7 +93,7 @@ func TestMange(t *testing.T) {
 			},
 			expectedPods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new"}},
 					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
@@ -104,10 +105,10 @@ func TestMange(t *testing.T) {
 		{
 			name:           "normal update condition",
 			cs:             &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
-			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev-new"}},
+			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new"}},
 					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
@@ -116,7 +117,7 @@ func TestMange(t *testing.T) {
 			},
 			expectedPods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new"}, ResourceVersion: "1"},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new"}, ResourceVersion: "1"},
 					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
@@ -131,11 +132,11 @@ func TestMange(t *testing.T) {
 				Replicas:       getInt32Pointer(1),
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType},
 			}},
-			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev-new"}},
+			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev-old",
+						apps.ControllerRevisionHashLabelKey: "rev_old",
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
@@ -153,7 +154,7 @@ func TestMange(t *testing.T) {
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", ResourceVersion: "1", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev-old",
+						apps.ControllerRevisionHashLabelKey: "rev_old",
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 						appsv1alpha1.SpecifiedDeleteKey:     "true",
 					}},
@@ -177,19 +178,19 @@ func TestMange(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
 			}},
 			updateRevision: &apps.ControllerRevision{
-				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2","env":["name":"k", "value":"v"]}]}}}}`)},
 			},
 			revisions: []*apps.ControllerRevision{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					ObjectMeta: metav1.ObjectMeta{Name: "rev_old"},
 					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
 				},
 			},
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev-old",
+						apps.ControllerRevisionHashLabelKey: "rev_old",
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
 					Spec: v1.PodSpec{
@@ -214,7 +215,7 @@ func TestMange(t *testing.T) {
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", ResourceVersion: "1", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev-old",
+						apps.ControllerRevisionHashLabelKey: "rev_old",
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 						appsv1alpha1.SpecifiedDeleteKey:     "true",
 					}},
@@ -245,19 +246,19 @@ func TestMange(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
 			}},
 			updateRevision: &apps.ControllerRevision{
-				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			revisions: []*apps.ControllerRevision{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					ObjectMeta: metav1.ObjectMeta{Name: "rev_old"},
 					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
 				},
 			},
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev-old",
+						apps.ControllerRevisionHashLabelKey: "rev_old",
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
 					Spec: v1.PodSpec{
@@ -283,12 +284,12 @@ func TestMange(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev-new",
+							apps.ControllerRevisionHashLabelKey: "rev_new",
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
 							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-							Revision:              "rev-new",
+							Revision:              "rev_new",
 							UpdateTimestamp:       now,
 							LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 						})},
@@ -321,19 +322,19 @@ func TestMange(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
-				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			revisions: []*apps.ControllerRevision{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					ObjectMeta: metav1.ObjectMeta{Name: "rev_old"},
 					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
 				},
 			},
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev-old",
+						apps.ControllerRevisionHashLabelKey: "rev_old",
 						appsv1alpha1.CloneSetInstanceID:     "id-0",
 					}},
 					Spec: v1.PodSpec{
@@ -359,17 +360,17 @@ func TestMange(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev-new",
+							apps.ControllerRevisionHashLabelKey: "rev_new",
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
 							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev-new",
+								Revision:              "rev_new",
 								UpdateTimestamp:       now,
 								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 						ResourceVersion: "2",
 					},
@@ -400,26 +401,26 @@ func TestMange(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
-				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			revisions: []*apps.ControllerRevision{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					ObjectMeta: metav1.ObjectMeta{Name: "rev_old"},
 					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
 				},
 			},
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
-						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1alpha1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev-new",
+								Revision:              "rev_new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
 								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 					},
 					Spec: v1.PodSpec{
@@ -445,16 +446,16 @@ func TestMange(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev-new",
+							apps.ControllerRevisionHashLabelKey: "rev_new",
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev-new",
+								Revision:              "rev_new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
 								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 					},
 					Spec: v1.PodSpec{
@@ -484,26 +485,26 @@ func TestMange(t *testing.T) {
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
-				ObjectMeta: metav1.ObjectMeta{Name: "rev-new"},
+				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
 				Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
 			},
 			revisions: []*apps.ControllerRevision{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "rev-old"},
+					ObjectMeta: metav1.ObjectMeta{Name: "rev_old"},
 					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo1"}]}}}}`)},
 				},
 			},
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
-						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev-new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1alpha1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev-new",
+								Revision:              "rev_new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
 								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
-							appspub.InPlaceUpdateGraceKey: `{"revision":"rev-new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
+							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
 					},
 					Spec: v1.PodSpec{
@@ -529,12 +530,12 @@ func TestMange(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev-new",
+							apps.ControllerRevisionHashLabelKey: "rev_new",
 							appsv1alpha1.CloneSetInstanceID:     "id-0",
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev-new",
+								Revision:              "rev_new",
 								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
 								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							}),
@@ -569,7 +570,7 @@ func TestMange(t *testing.T) {
 		ctrl := &realControl{
 			fakeClient,
 			lifecycle.NewForTest(fakeClient),
-			inplaceupdate.NewForTest(fakeClient, apps.ControllerRevisionHashLabelKey, func() metav1.Time { return now }),
+			inplaceupdate.NewForTest(fakeClient, clonesetutils.RevisionAdapterImpl, func() metav1.Time { return now }),
 			record.NewFakeRecorder(10),
 		}
 		if _, err := ctrl.Manage(mc.cs, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {

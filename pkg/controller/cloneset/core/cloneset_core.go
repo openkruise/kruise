@@ -25,7 +25,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -90,7 +89,7 @@ func (c *commonControl) newVersionedPods(cs *appsv1alpha1.CloneSet, revision str
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[apps.ControllerRevisionHashLabelKey] = revision
+		clonesetutils.WriteRevisionHash(pod, revision)
 
 		pod.Name = fmt.Sprintf("%s-%s", cs.Name, id)
 		pod.Namespace = cs.Namespace
