@@ -52,6 +52,8 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 		return
 	}
 
+	clonesetutils.ScaleExpectations.ObserveScale(pod.Namespace, expectations.Create, pod.Name)
+
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
 		req := resolveControllerRef(pod.Namespace, controllerRef)
@@ -59,7 +61,6 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 			return
 		}
 		klog.V(4).Infof("Pod %s/%s created, owner: %s", pod.Namespace, pod.Name, req.Name)
-		clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pod.Name)
 		q.Add(*req)
 		return
 	}
@@ -153,6 +154,8 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	}
 	clonesetutils.ResourceVersionExpectations.Delete(pod)
 
+	clonesetutils.ScaleExpectations.ObserveScale(pod.Namespace, expectations.Delete, pod.Name)
+
 	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
@@ -164,7 +167,6 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	}
 
 	klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, req.Name)
-	clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pod.Name)
 	clonesetutils.UpdateExpectations.DeleteObject(req.String(), pod)
 	q.Add(*req)
 }
@@ -243,7 +245,7 @@ func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
 		if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil {
-			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pvc.Name)
+			clonesetutils.ScaleExpectations.ObserveScale(pvc.Namespace, expectations.Create, pvc.Name)
 			q.Add(*req)
 		}
 	}
@@ -265,7 +267,7 @@ func (e *pvcEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
 		if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil {
-			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pvc.Name)
+			clonesetutils.ScaleExpectations.ObserveScale(pvc.Namespace, expectations.Delete, pvc.Name)
 			q.Add(*req)
 		}
 	}

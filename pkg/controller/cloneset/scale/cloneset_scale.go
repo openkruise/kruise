@@ -167,7 +167,7 @@ func (r *realControl) createPods(
 
 	podsCreationChan := make(chan *v1.Pod, len(newPods))
 	for _, p := range newPods {
-		clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(updateCS), expectations.Create, p.Name)
+		clonesetutils.ScaleExpectations.ExpectScale(p.Namespace, expectations.Create, p.Name)
 		podsCreationChan <- p
 	}
 
@@ -196,7 +196,7 @@ func (r *realControl) createPods(
 	// rollback to ignore failure pods because the informer won't observe these pods
 	for _, pod := range newPods {
 		if _, ok := successPodNames.Load(pod.Name); !ok {
-			clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(updateCS), expectations.Create, pod.Name)
+			clonesetutils.ScaleExpectations.ObserveScale(pod.Namespace, expectations.Create, pod.Name)
 		}
 	}
 
@@ -212,9 +212,9 @@ func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, exist
 		if existingPVCNames.Has(c.Name) {
 			continue
 		}
-		clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
+		clonesetutils.ScaleExpectations.ExpectScale(c.Namespace, expectations.Create, c.Name)
 		if err := r.Create(context.TODO(), &c); err != nil {
-			clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Create, c.Name)
+			clonesetutils.ScaleExpectations.ObserveScale(c.Namespace, expectations.Create, c.Name)
 			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedCreate", "failed to create pvc: %v, pvc: %v", err, util.DumpJSON(c))
 			return err
 		}
@@ -244,9 +244,9 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 			continue
 		}
 
-		clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pod.Name)
+		clonesetutils.ScaleExpectations.ExpectScale(pod.Namespace, expectations.Delete, pod.Name)
 		if err := r.Delete(context.TODO(), pod); err != nil {
-			clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pod.Name)
+			clonesetutils.ScaleExpectations.ObserveScale(pod.Namespace, expectations.Delete, pod.Name)
 			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to delete pod %s: %v", pod.Name, err)
 			return modified, err
 		}
@@ -259,9 +259,9 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 				continue
 			}
 
-			clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
+			clonesetutils.ScaleExpectations.ExpectScale(pvc.Namespace, expectations.Delete, pvc.Name)
 			if err := r.Delete(context.TODO(), pvc); err != nil {
-				clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
+				clonesetutils.ScaleExpectations.ObserveScale(pvc.Namespace, expectations.Delete, pvc.Name)
 				r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to delete pvc %s: %v", pvc.Name, err)
 				return modified, err
 			}

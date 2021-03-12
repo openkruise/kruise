@@ -192,7 +192,6 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			klog.V(3).Infof("CloneSet %s has been deleted.", request)
-			clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
 			clonesetutils.UpdateExpectations.DeleteExpectations(request.String())
 			return reconcile.Result{}, nil
 		}
@@ -213,7 +212,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}
 
 	// If scaling expectations have not satisfied yet, just skip this reconcile.
-	if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
+	if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.Namespace); !scaleSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
 			klog.Warningf("Expectation unsatisfied overtime for %v, scaleDirtyPods=%v, overtime=%v", request.String(), scaleDirtyPods, unsatisfiedDuration)
 			return reconcile.Result{}, nil

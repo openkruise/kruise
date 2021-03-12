@@ -155,7 +155,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 					},
 				},
 			},
-			alterExpectationCreationsKey:  "default/cs02",
+			alterExpectationCreationsKey:  "default",
 			alterExpectationCreationsAdds: []string{"pod-xyz"},
 			expectedQueueLen:              1,
 		},
@@ -660,7 +660,162 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 }
 
 func TestEnqueueRequestForPodDelete(t *testing.T) {
-	// Nothing to do, DeleteEvent already tested in other testing cases before
+	lTrue := true
+	cases := []struct {
+		name                       string
+		css                        []*appsv1alpha1.CloneSet
+		e                          event.DeleteEvent
+		alterExpectationDeleteKey  string
+		alterExpectationDeleteAdds []string
+		expectedQueueLen           int
+	}{
+		{
+			name:             "no cs",
+			e:                event.DeleteEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}}},
+			expectedQueueLen: 0,
+		},
+		{
+			name: "correct owner reference",
+			css: []*appsv1alpha1.CloneSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.CloneSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.CloneSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e: event.DeleteEvent{
+				Object: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "pod-xyz",
+						Labels:    map[string]string{"key": "v1"},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "CloneSet",
+								Name:       "cs02",
+								UID:        "002",
+								Controller: &lTrue,
+							},
+						},
+					},
+				},
+			},
+			alterExpectationDeleteKey:  "default",
+			alterExpectationDeleteAdds: []string{"pod-xyz"},
+			expectedQueueLen:           1,
+		},
+		{
+			name: "no owner reference",
+			css: []*appsv1alpha1.CloneSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.CloneSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.CloneSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+			},
+			e: event.DeleteEvent{
+				Object: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "pod-xyz",
+						Labels:    map[string]string{"key": "v1"},
+					},
+				},
+			},
+			alterExpectationDeleteKey:  "default",
+			alterExpectationDeleteAdds: []string{"pod-xyz"},
+			expectedQueueLen:           0,
+		},
+	}
+
+	for _, testCase := range cases {
+		fakeClient := fake.NewFakeClient()
+		for _, cs := range testCase.css {
+			fakeClient.Create(context.TODO(), cs)
+		}
+
+		enqueueHandler := newTestPodEventHandler(fakeClient)
+		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+		modifySatisfied := false
+		if testCase.alterExpectationDeleteKey != "" && len(testCase.alterExpectationDeleteAdds) > 0 {
+			for _, n := range testCase.alterExpectationDeleteAdds {
+				clonesetutils.ScaleExpectations.ExpectScale(testCase.alterExpectationDeleteKey, expectations.Delete, n)
+			}
+			if ok, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationDeleteKey); ok {
+				t.Fatalf("%s before execute, should not be satisfied", testCase.name)
+			}
+			modifySatisfied = true
+		}
+
+		enqueueHandler.Delete(testCase.e, q)
+		if q.Len() != testCase.expectedQueueLen {
+			t.Fatalf("%s failed, expected queue len %d, got queue len %d", testCase.name, testCase.expectedQueueLen, q.Len())
+		}
+		if modifySatisfied {
+			if ok, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(testCase.alterExpectationDeleteKey); !ok {
+				t.Fatalf("%s expected satisfied, but it is not", testCase.name)
+			}
+		}
+	}
 }
 
 func TestGetPodCloneSets(t *testing.T) {

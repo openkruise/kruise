@@ -320,7 +320,7 @@ func TestCreatePods(t *testing.T) {
 		t.Fatalf("expected pvcs \n%s\ngot pvcs\n%s", util.DumpJSON(expectedPVCs), util.DumpJSON(pvcs.Items))
 	}
 
-	exp := clonesetutils.ScaleExpectations.GetExpectations("default/foo")
+	exp := clonesetutils.ScaleExpectations.GetExpectations("default")
 	expectedExp := map[expectations.ScaleAction]sets.String{
 		expectations.Create: sets.NewString("foo-id1", "foo-id3", "foo-id4", "datadir-foo-id1", "datadir-foo-id4"),
 	}
