@@ -12,7 +12,7 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
-|Feb 4th, 2021. Kruise v0.8.0 is **RELEASED**! It provides refactoring SidecarSet, Deployment hosted by UnitedDeployment, and a new kruise-daemon component which supports image pre-download, please check the [CHANGELOG](CHANGELOG.md) for details.|
+|Mar 4th, 2021. Kruise v0.8.0 is **RELEASED**! It provides refactoring SidecarSet, Deployment hosted by UnitedDeployment, and a new kruise-daemon component which supports image pre-download, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Dec 16th, 2020. Kruise v0.7.0 is **RELEASED**! It provides a new CRD named AdvancedCronJob, promotes AdvancedStatefulSet to v1beta1 and a few features in other controllers, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Oct 1st, 2020. Kruise v0.6.1 is **RELEASED**! It provides various features and bugfix, such as CloneSet lifecycle hook and UnitedDeployment supported CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 
