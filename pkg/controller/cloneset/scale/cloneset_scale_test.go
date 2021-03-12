@@ -34,8 +34,8 @@ func TestCreatePods(t *testing.T) {
 	currentCS := clonesettest.NewCloneSet(3)
 	updateCS := currentCS.DeepCopy()
 	updateCS.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "e-key", Value: "e-value"}}
-	currentRevision := "revision-abc"
-	updateRevision := "revision-xyz"
+	currentRevision := "revision_abc"
+	updateRevision := "revision_xyz"
 
 	ctrl := newFakeControl()
 	created, err := ctrl.createPods(
@@ -66,7 +66,7 @@ func TestCreatePods(t *testing.T) {
 				GenerateName: "foo-",
 				Labels: map[string]string{
 					appsv1alpha1.CloneSetInstanceID:     "id1",
-					apps.ControllerRevisionHashLabelKey: "revision-abc",
+					apps.ControllerRevisionHashLabelKey: "revision_abc",
 					"foo":                               "bar",
 					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
 				},
@@ -122,7 +122,7 @@ func TestCreatePods(t *testing.T) {
 				GenerateName: "foo-",
 				Labels: map[string]string{
 					appsv1alpha1.CloneSetInstanceID:     "id3",
-					apps.ControllerRevisionHashLabelKey: "revision-xyz",
+					apps.ControllerRevisionHashLabelKey: "revision_xyz",
 					"foo":                               "bar",
 					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
 				},
@@ -179,7 +179,7 @@ func TestCreatePods(t *testing.T) {
 				GenerateName: "foo-",
 				Labels: map[string]string{
 					appsv1alpha1.CloneSetInstanceID:     "id4",
-					apps.ControllerRevisionHashLabelKey: "revision-xyz",
+					apps.ControllerRevisionHashLabelKey: "revision_xyz",
 					"foo":                               "bar",
 					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
 				},

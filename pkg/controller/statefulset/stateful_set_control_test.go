@@ -56,6 +56,7 @@ import (
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
 type invariantFunc func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
@@ -66,7 +67,7 @@ func setupController(client clientset.Interface, kruiseClient kruiseclientset.In
 	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 	ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 	recorder := record.NewFakeRecorder(10)
-	inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), apps.ControllerRevisionHashLabelKey)
+	inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), revisionadapter.NewDefaultImpl())
 	lifecycleControl := lifecycle.NewForInformer(informerFactory.Core().V1().Pods())
 	ssc := NewDefaultStatefulSetControl(spc, inplaceControl, lifecycleControl, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
 
@@ -548,7 +549,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 		ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 		recorder := record.NewFakeRecorder(10)
-		inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), apps.ControllerRevisionHashLabelKey)
+		inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), revisionadapter.NewDefaultImpl())
 		lifecycleControl := lifecycle.NewForInformer(informerFactory.Core().V1().Pods())
 		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder, inplaceControl, lifecycleControl}
 

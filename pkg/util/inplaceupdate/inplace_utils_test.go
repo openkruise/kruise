@@ -25,6 +25,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -433,7 +434,7 @@ func TestRefresh(t *testing.T) {
 		testCase.expectedPod.Kind = "Pod"
 
 		cli := fake.NewFakeClient(testCase.pod)
-		ctrl := NewForTest(cli, apps.ControllerRevisionHashLabelKey, func() metav1.Time { return aHourAgo })
+		ctrl := NewForTest(cli, revisionadapter.NewDefaultImpl(), func() metav1.Time { return aHourAgo })
 		if res := ctrl.Refresh(testCase.pod, nil); res.RefreshErr != nil {
 			t.Fatalf("failed to update condition: %v", res.RefreshErr)
 		}

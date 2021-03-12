@@ -22,7 +22,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -32,7 +31,7 @@ import (
 
 // StatusUpdater is interface for updating CloneSet status.
 type StatusUpdater interface {
-	UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, updateRevision *apps.ControllerRevision, pods []*v1.Pod) error
+	UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error
 }
 
 func newStatusUpdater(c client.Client) StatusUpdater {
@@ -43,8 +42,8 @@ type realStatusUpdater struct {
 	client.Client
 }
 
-func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, updateRevision *apps.ControllerRevision, pods []*v1.Pod) error {
-	r.calculateStatus(cs, newStatus, updateRevision, pods)
+func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
+	r.calculateStatus(cs, newStatus, pods)
 	if r.inconsistentStatus(cs, newStatus) {
 		klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions current=%s update=%s",
 			cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.CurrentRevision, newStatus.UpdateRevision)
@@ -81,7 +80,7 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.LabelSelector != oldStatus.LabelSelector
 }
 
-func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, updateRevision *apps.ControllerRevision, pods []*v1.Pod) {
+func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) {
 	coreControl := clonesetcore.New(cs)
 	for _, pod := range pods {
 		newStatus.Replicas++
@@ -91,10 +90,10 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 		if coreControl.IsPodUpdateReady(pod, cs.Spec.MinReadySeconds) {
 			newStatus.AvailableReplicas++
 		}
-		if clonesetutils.GetPodRevision("", pod) == clonesetutils.GetRevisionLabel(updateRevision) {
+		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) {
 			newStatus.UpdatedReplicas++
 		}
-		if clonesetutils.GetPodRevision("", pod) == clonesetutils.GetRevisionLabel(updateRevision) && coreControl.IsPodUpdateReady(pod, 0) {
+		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && coreControl.IsPodUpdateReady(pod, 0) {
 			newStatus.UpdatedReadyReplicas++
 		}
 	}

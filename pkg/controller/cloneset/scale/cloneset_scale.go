@@ -13,7 +13,6 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
-	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -177,7 +176,7 @@ func (r *realControl) createPods(
 		pod := <-podsCreationChan
 
 		cs := updateCS
-		if pod.Labels[apps.ControllerRevisionHashLabelKey] == currentRevision {
+		if clonesetutils.EqualToRevisionHash("", pod, currentRevision) {
 			cs = currentCS
 		}
 		lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(pod)

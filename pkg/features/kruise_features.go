@@ -33,14 +33,14 @@ const (
 	// PodWebhook enables webhook for Pods creations. This is also related to SidecarSet.
 	PodWebhook featuregate.Feature = "PodWebhook"
 
-	// CloneSetHashOnlyRevisionName enables CloneSet controller only set revision hash name to pod.
-	CloneSetHashOnlyRevisionName featuregate.Feature = "CloneSetHashOnlyRevisionName"
+	// CloneSetShortHash enables CloneSet controller only set revision hash name to pod label.
+	CloneSetShortHash featuregate.Feature = "CloneSetShortHash"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	PodWebhook:                   {Default: true, PreRelease: featuregate.Beta},
-	KruiseDaemon:                 {Default: true, PreRelease: featuregate.Beta},
-	CloneSetHashOnlyRevisionName: {Default: false, PreRelease: featuregate.Beta},
+	PodWebhook:        {Default: true, PreRelease: featuregate.Beta},
+	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
+	CloneSetShortHash: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
