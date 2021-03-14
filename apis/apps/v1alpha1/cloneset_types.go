@@ -75,11 +75,30 @@ type CloneSetSpec struct {
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
 }
 
+// CloneSetDeletePriority defines the relationship among these conditions are ANDed
+type CloneSetDeletePriority struct {
+	// PodNames is the assemble of the pods’ names
+	PodNames []string `json:"podNames,omitempty"`
+	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+	// map is equivalent to an element of matchExpressions, whose key field is "key", the
+	// operator is "In", and the values array contains only "value". The requirements are ANDed.
+	// +optional
+	MatchLabels map[string]string `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
+	// NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
+	// requirements.
+	// +optional
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
+}
+
 // CloneSetScaleStrategy defines strategies for pods scale.
 type CloneSetScaleStrategy struct {
 	// PodsToDelete is the names of Pod should be deleted.
 	// Note that this list will be truncated for non-existing pod names.
 	PodsToDelete []string `json:"podsToDelete,omitempty"`
+	// DeletePriority is the queue composed of priority conditions
+	// According to the order of the queue, the pod that meets the conditions first is deleted first
+	DeletePriority []CloneSetDeletePriority `json:"deletePriority,omitempty"`
 }
 
 // CloneSetUpdateStrategy defines strategies for pods update.

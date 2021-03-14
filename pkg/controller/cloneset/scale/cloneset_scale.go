@@ -114,7 +114,7 @@ func (r *realControl) Manage(
 		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev)",
 			controllerKey, diff, currentRevDiff)
 
-		podsToDelete := choosePodsToDelete(diff, currentRevDiff, notUpdatedPods, updatedPods)
+		podsToDelete := choosePodsToDelete(updateCS, diff, currentRevDiff, notUpdatedPods, updatedPods)
 
 		return r.deletePods(updateCS, podsToDelete, pvcs)
 	}
