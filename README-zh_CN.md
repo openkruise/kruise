@@ -12,7 +12,7 @@
 
 |![notification](docs/img/bell-outline-badge.svg) 最新进展：|
 |------------------|
-|Feb 4th, 2021. Kruise v0.8.0 发布! 提供了重构版本的 SidecarSet、UnitedDeployment 支持管理 Deployment，以及一个新的 kruise-daemon 组件目前支持镜像预热，详情参见 [CHANGELOG](CHANGELOG.md).|
+|Mar 4th, 2021. Kruise v0.8.0 发布! 提供了重构版本的 SidecarSet、UnitedDeployment 支持管理 Deployment，以及一个新的 kruise-daemon 组件目前支持镜像预热，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Dec 16th, 2020. Kruise v0.7.0 发布! 提供一个新的 AdvancedCronJob CRD、将 Advanced StatefulSet 升级 v1beta1 版本、以及其他控制器一些新增能力，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Oct 1st, 2020. Kruise v0.6.1 发布! 提供一系列增强 feature 和 bugfix 比如 CloneSet lifecycle hook 、UnitedDeployment 支持 CloneSet 等，详情参见 [CHANGELOG](CHANGELOG.md).|
 
