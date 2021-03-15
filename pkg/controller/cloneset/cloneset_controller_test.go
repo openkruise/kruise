@@ -319,7 +319,7 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 		gomega.Not(gomega.Equal(pods[4].Labels[appsv1alpha1.CloneSetInstanceID])),
 	))
 
-	// Delete instance 'xub0a'
+	// Specified delete instance 'xub0a'
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cs := appsv1alpha1.CloneSet{}
 		if err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs); err != nil {
@@ -331,6 +331,14 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 	})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
+	// Should not delete yet because of maxUnavailable
+	pods, _ = checkInstances(g, instance, 5, 5)
+
+	// Update 4 Pods to ready
+	err = updatePodsStatus(pods[:4], v1.PodStatus{Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}, Phase: v1.PodRunning})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// Then 'xub0a' should be deleted
 	pods, pvcs = checkInstances(g, instance, 4, 4)
 	g.Expect([]string{
 		pods[0].Labels[appsv1alpha1.CloneSetInstanceID],
@@ -396,6 +404,26 @@ func testUpdate(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 	samePVCNames = getPVCNames(pvcs1).Intersection(getPVCNames(pvcs2))
 	g.Expect(samePodNames.Len()).Should(gomega.Equal(4))
 	g.Expect(samePVCNames.Len()).Should(gomega.Equal(4))
+}
+
+func updatePodsStatus(pods []*v1.Pod, status v1.PodStatus) error {
+	for _, pod := range pods {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			clone := &v1.Pod{}
+			if err := c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, clone); err != nil {
+				return err
+			}
+			clone.Status = status
+			return c.Status().Update(context.TODO(), clone)
+		})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func getInt32(i int32) *int32 {

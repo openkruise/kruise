@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kruise Authors.
+Copyright 2021 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package update
+package sync
 
 import (
 	"context"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,7 +74,7 @@ func getInt32Pointer(i int32) *int32 {
 	return &i
 }
 
-func TestMange(t *testing.T) {
+func TestUpdate(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	now := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
 	cases := []manageCase{
@@ -573,7 +574,7 @@ func TestMange(t *testing.T) {
 			inplaceupdate.NewForTest(fakeClient, clonesetutils.RevisionAdapterImpl, func() metav1.Time { return now }),
 			record.NewFakeRecorder(10),
 		}
-		if _, err := ctrl.Manage(mc.cs, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
+		if _, err := ctrl.Update(mc.cs, nil, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
 			t.Fatalf("Failed to test %s, manage error: %v", mc.name, err)
 		}
 		podList := v1.PodList{}
@@ -702,22 +703,34 @@ func TestCalculateUpdateCount(t *testing.T) {
 			expectedResult:    1,
 		},
 		{
-			// maxUnavailable = 1 and maxSurge = 2, usedSurge = 2
+			// maxUnavailable = 0 and maxSurge = 2, usedSurge = 2
 			strategy: appsv1alpha1.CloneSetUpdateStrategy{
-				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(1)),
+				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(0)),
 				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 			},
 			totalReplicas:     4,
-			waitUpdateIndexes: []int{0, 1, 2},
+			waitUpdateIndexes: []int{0, 1, 2, 3},
 			pods:              []*v1.Pod{readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), readyPod()},
-			expectedResult:    3,
+			expectedResult:    2,
 		},
 	}
 
 	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
 	for i, tc := range cases {
-		res := calculateUpdateCount(coreControl, tc.strategy, 0, tc.totalReplicas, tc.waitUpdateIndexes, tc.pods)
-		if res != tc.expectedResult {
+		updateRevision := "updated"
+		indexes := sets.NewInt(tc.waitUpdateIndexes...)
+		for i, pod := range tc.pods {
+			if !indexes.Has(i) {
+				pod.Labels = map[string]string{apps.ControllerRevisionHashLabelKey: updateRevision}
+			}
+		}
+
+		replicas := int32(tc.totalReplicas)
+		cs := &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: &replicas, UpdateStrategy: tc.strategy}}
+		diffRes := calculateDiffsWithExpectation(cs, tc.pods, updateRevision)
+
+		res := limitUpdateIndexes(coreControl, 0, diffRes, tc.waitUpdateIndexes, tc.pods)
+		if len(res) != tc.expectedResult {
 			t.Fatalf("case #%d failed, expected %d, got %d", i, tc.expectedResult, res)
 		}
 	}

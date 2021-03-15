@@ -53,6 +53,21 @@ func MergePods(pods1, pods2 []*v1.Pod) []*v1.Pod {
 	return ret
 }
 
+// DiffPods returns pods in pods1 but not in pods2
+func DiffPods(pods1, pods2 []*v1.Pod) (ret []*v1.Pod) {
+	names2 := sets.NewString()
+	for _, pod := range pods2 {
+		names2.Insert(pod.Name)
+	}
+	for _, pod := range pods1 {
+		if names2.Has(pod.Name) {
+			continue
+		}
+		ret = append(ret, pod)
+	}
+	return
+}
+
 func MergeVolumeMounts(original, additional []v1.VolumeMount) []v1.VolumeMount {
 	mountpoints := sets.NewString()
 	for _, mount := range original {
