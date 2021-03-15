@@ -201,21 +201,21 @@ spec:
                   - type: integer
                   - type: string
                   description: 'The maximum number of pods that can be scheduled above
-                    the desired replicas during the update. Value can be an absolute
-                    number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute
-                    number is calculated from percentage by rounding up. Defaults
-                    to 0.'
+                    the desired replicas during update or specified delete. Value
+                    can be an absolute number (ex: 5) or a percentage of desired pods
+                    (ex: 10%). Absolute number is calculated from percentage by rounding
+                    up. Defaults to 0.'
                   x-kubernetes-int-or-string: true
                 maxUnavailable:
                   anyOf:
                   - type: integer
                   - type: string
                   description: 'The maximum number of pods that can be unavailable
-                    during the update. Value can be an absolute number (ex: 5) or
-                    a percentage of desired pods (ex: 10%). Absolute number is calculated
-                    from percentage by rounding up by default. When maxSurge > 0,
-                    absolute number is calculated from percentage by rounding down.
-                    Defaults to 20%.'
+                    during update or scale. Value can be an absolute number (ex: 5)
+                    or a percentage of desired pods (ex: 10%). Absolute number is
+                    calculated from percentage by rounding up by default. When maxSurge
+                    > 0, absolute number is calculated from percentage by rounding
+                    down. Defaults to 20%.'
                   x-kubernetes-int-or-string: true
                 partition:
                   anyOf:

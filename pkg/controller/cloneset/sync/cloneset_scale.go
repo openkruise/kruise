@@ -1,8 +1,25 @@
-package scale
+/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package sync
 
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -14,10 +31,10 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -28,27 +45,7 @@ const (
 	initialBatchSize = 1
 )
 
-// Interface for managing replicas including create and delete pod/pvc.
-type Interface interface {
-	Manage(
-		currentCS, updateCS *appsv1alpha1.CloneSet,
-		currentRevision, updateRevision string,
-		pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
-	) (bool, error)
-}
-
-// New returns a scale control.
-func New(c client.Client, recorder record.EventRecorder) Interface {
-	return &realControl{Client: c, lifecycleControl: lifecycle.New(c), recorder: recorder}
-}
-
-type realControl struct {
-	client.Client
-	lifecycleControl lifecycle.Interface
-	recorder         record.EventRecorder
-}
-
-func (r *realControl) Manage(
+func (r *realControl) Scale(
 	currentCS, updateCS *appsv1alpha1.CloneSet,
 	currentRevision, updateRevision string,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
@@ -64,17 +61,24 @@ func (r *realControl) Manage(
 		return false, nil
 	}
 
-	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
-	diff, currentRevDiff := calculateDiffs(updateCS, len(pods), len(notUpdatedPods))
+	// 1. manage pods to delete and in preDelete
+	podsSpecifiedToDelete, podsInPreDelete, numToDelete := getPlannedDeletedPods(updateCS, pods)
+	if modified, err := r.managePreparingDelete(updateCS, pods, util.DiffPods(podsInPreDelete, podsSpecifiedToDelete), numToDelete); err != nil || modified {
+		return modified, err
+	}
 
-	// 1. scale out
-	if diff < 0 {
+	// 2. calculate scale numbers
+	diffRes := calculateDiffsWithExpectation(updateCS, pods, updateRevision)
+	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
+
+	// 3. scale out
+	if diffRes.scaleNum > 0 {
 		// total number of this creation
-		expectedCreations := diff * -1
+		expectedCreations := diffRes.scaleNum
 		// lack number of current version
 		expectedCurrentCreations := 0
-		if currentRevDiff < 0 {
-			expectedCurrentCreations = currentRevDiff * -1
+		if diffRes.scaleNumOldRevision > 0 {
+			expectedCurrentCreations = diffRes.scaleNumOldRevision
 		}
 
 		klog.V(3).Infof("CloneSet %s begin to scale out %d pods including %d (current rev)",
@@ -92,15 +96,36 @@ func (r *realControl) Manage(
 			currentCS, updateCS, currentRevision, updateRevision, availableIDs.List(), existingPVCNames)
 	}
 
-	// 2. specified scale in
-	podsSpecifiedToDelete, podsInPreDelete := getPlannedDeletedPods(updateCS, pods)
-	podsToDelete := util.MergePods(podsSpecifiedToDelete, podsInPreDelete)
-	if len(podsToDelete) > 0 {
-		klog.V(3).Infof("CloneSet %s find pods %v specified to delete and pods %v in preDelete",
-			controllerKey, util.GetPodNames(podsSpecifiedToDelete).List(), util.GetPodNames(podsInPreDelete).List())
-
-		if modified, err := r.managePreparingDelete(updateCS, pods, podsInPreDelete, len(podsToDelete)); err != nil || modified {
+	// 4. try to delete pods already in pre-delete
+	if len(podsInPreDelete) > 0 {
+		klog.V(3).Infof("CloneSet %s try to delete pods in preDelete: %v", controllerKey, util.GetPodNames(podsInPreDelete).List())
+		if modified, err := r.deletePods(updateCS, podsInPreDelete, pvcs); err != nil || modified {
 			return modified, err
+		}
+	}
+
+	// 5. specified delete
+	if podsToDelete := util.DiffPods(podsSpecifiedToDelete, podsInPreDelete); len(podsToDelete) > 0 {
+		newPodsToDelete, oldPodsToDelete := clonesetutils.SplitPodsByRevision(podsToDelete, updateRevision)
+		klog.V(3).Infof("CloneSet %s try to delete pods specified. Delete ready limit: %d. Pods: %v, %v.",
+			controllerKey, diffRes.deleteReadyLimit, util.GetPodNames(newPodsToDelete).List(), util.GetPodNames(oldPodsToDelete).List())
+
+		podsToDelete = make([]*v1.Pod, 0, len(podsToDelete))
+		for _, pod := range newPodsToDelete {
+			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
+				podsToDelete = append(podsToDelete, pod)
+			} else if diffRes.deleteReadyLimit > 0 {
+				podsToDelete = append(podsToDelete, pod)
+				diffRes.deleteReadyLimit--
+			}
+		}
+		for _, pod := range oldPodsToDelete {
+			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
+				podsToDelete = append(podsToDelete, pod)
+			} else if diffRes.deleteReadyLimit > 0 {
+				podsToDelete = append(podsToDelete, pod)
+				diffRes.deleteReadyLimit--
+			}
 		}
 
 		if modified, err := r.deletePods(updateCS, podsToDelete, pvcs); err != nil || modified {
@@ -108,17 +133,27 @@ func (r *realControl) Manage(
 		}
 	}
 
-	// 3. scale in
-	if diff > 0 {
-		if len(podsToDelete) > 0 {
-			klog.V(3).Infof("CloneSet %s skip to scale in %d for existing pods to delete", controllerKey, diff)
+	// 6. scale in
+	if diffRes.scaleNum < 0 {
+		if numToDelete > 0 {
+			klog.V(3).Infof("CloneSet %s skip to scale in %d for %d to delete, including %d specified and %d preDelete",
+				controllerKey, diffRes.scaleNum, numToDelete, len(podsSpecifiedToDelete), len(podsInPreDelete))
 			return false, nil
 		}
 
-		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev)",
-			controllerKey, diff, currentRevDiff)
+		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev), delete ready limit: %d",
+			controllerKey, -diffRes.scaleNum, -diffRes.scaleNumOldRevision, diffRes.deleteReadyLimit)
 
-		podsToDelete := choosePodsToDelete(diff, currentRevDiff, notUpdatedPods, updatedPods)
+		podsPreparingToDelete := choosePodsToDelete(-diffRes.scaleNum, -diffRes.scaleNumOldRevision, notUpdatedPods, updatedPods)
+		podsToDelete := make([]*v1.Pod, 0, len(podsPreparingToDelete))
+		for _, pod := range podsPreparingToDelete {
+			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
+				podsToDelete = append(podsToDelete, pod)
+			} else if diffRes.deleteReadyLimit > 0 {
+				podsToDelete = append(podsToDelete, pod)
+				diffRes.deleteReadyLimit--
+			}
+		}
 
 		return r.deletePods(updateCS, podsToDelete, pvcs)
 	}
@@ -133,7 +168,7 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 		if diff <= 0 {
 			return modified, nil
 		}
-		if isPodSpecifiedDelete(cs, pod) {
+		if isSpecifiedDelete(cs, pod) {
 			continue
 		}
 
@@ -268,4 +303,92 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 	}
 
 	return modified, nil
+}
+
+func getPlannedDeletedPods(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, int) {
+	var podsSpecifiedToDelete []*v1.Pod
+	var podsInPreDelete []*v1.Pod
+	names := sets.NewString()
+	for _, pod := range pods {
+		if isSpecifiedDelete(cs, pod) {
+			names.Insert(pod.Name)
+			podsSpecifiedToDelete = append(podsSpecifiedToDelete, pod)
+		}
+		if lifecycle.GetPodLifecycleState(pod) == appspub.LifecycleStatePreparingDelete {
+			names.Insert(pod.Name)
+			podsInPreDelete = append(podsInPreDelete, pod)
+		}
+	}
+	return podsSpecifiedToDelete, podsInPreDelete, names.Len()
+}
+
+// Get available IDs, if the a PVC exists but the corresponding pod does not exist, then reusing the ID, i.e., reuse the pvc.
+// If there is not enough existing available IDs, then generate ID using rand utility.
+// More details: if template changes more than container image, controller will delete pod during update, and
+// it will keep the pvc to reuse.
+func getOrGenAvailableIDs(num int, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) sets.String {
+	existingIDs := sets.NewString()
+	availableIDs := sets.NewString()
+	for _, pvc := range pvcs {
+		if id := pvc.Labels[appsv1alpha1.CloneSetInstanceID]; len(id) > 0 {
+			existingIDs.Insert(id)
+			availableIDs.Insert(id)
+		}
+	}
+
+	for _, pod := range pods {
+		if id := pod.Labels[appsv1alpha1.CloneSetInstanceID]; len(id) > 0 {
+			existingIDs.Insert(id)
+			availableIDs.Delete(id)
+		}
+	}
+
+	retIDs := sets.NewString()
+	for i := 0; i < num; i++ {
+		id := getOrGenInstanceID(existingIDs, availableIDs)
+		retIDs.Insert(id)
+	}
+
+	return retIDs
+}
+
+func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
+	id, _ := availableIDs.PopAny()
+	if len(id) == 0 {
+		for {
+			id = rand.String(LengthOfInstanceID)
+			if !existingIDs.Has(id) {
+				break
+			}
+		}
+	}
+	return id
+}
+
+func choosePodsToDelete(totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
+	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
+		// No need to sort pods if we are about to delete all of them.
+		if diff < len(pods) {
+			// Sort the pods in the order such that not-ready < ready, unscheduled
+			// < scheduled, and pending < running. This ensures that we delete pods
+			// in the earlier stages whenever possible.
+			sort.Sort(kubecontroller.ActivePods(pods))
+		} else if diff > len(pods) {
+			klog.Warningf("Diff > len(pods) in choosePodsToDelete func which is not expected.")
+			return pods
+		}
+		return pods[:diff]
+	}
+
+	var podsToDelete []*v1.Pod
+	if currentRevDiff >= totalDiff {
+		podsToDelete = choose(notUpdatedPods, totalDiff)
+	} else if currentRevDiff > 0 {
+		podsToDelete = choose(notUpdatedPods, currentRevDiff)
+		podsToDelete = append(podsToDelete, choose(updatedPods, totalDiff-currentRevDiff)...)
+	} else {
+		podsToDelete = choose(updatedPods, totalDiff)
+	}
+
+	return podsToDelete
 }

@@ -1,4 +1,20 @@
-package scale
+/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package sync
 
 import (
 	"context"
@@ -468,5 +484,47 @@ func TestDeletePods(t *testing.T) {
 	}
 	if len(gotPVCs.Items) != 1 || reflect.DeepEqual(gotPVCs.Items[0], pvcs[1]) {
 		t.Fatalf("unexpected pvcs: %v", util.DumpJSON(gotPVCs.Items))
+	}
+}
+
+func TestGetOrGenAvailableIDs(t *testing.T) {
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "a"},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "b"},
+			},
+		},
+	}
+
+	pvcs := []*v1.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "b"},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "c"},
+			},
+		},
+	}
+
+	gotIDs := getOrGenAvailableIDs(2, pods, pvcs)
+	if gotIDs.Len() != 2 {
+		t.Fatalf("expected got 2")
+	}
+
+	if !gotIDs.Has("c") {
+		t.Fatalf("expected got c")
+	}
+
+	gotIDs.Delete("c")
+	if id, _ := gotIDs.PopAny(); len(id) != 5 {
+		t.Fatalf("expected got random id, but actually %v", id)
 	}
 }

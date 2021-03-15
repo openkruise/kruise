@@ -157,10 +157,10 @@ func defaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	}
 
 	// this should not happen, unless someone modified pod revision label
-	if inPlaceUpdateState.Revision != pod.Labels[apps.StatefulSetRevisionLabel] {
-		return fmt.Errorf("currently revision %s not equal to in-place update revision %s",
-			pod.Labels[apps.StatefulSetRevisionLabel], inPlaceUpdateState.Revision)
-	}
+	//if inPlaceUpdateState.Revision != pod.Labels[apps.StatefulSetRevisionLabel] {
+	//	return fmt.Errorf("currently revision %s not equal to in-place update revision %s",
+	//		pod.Labels[apps.StatefulSetRevisionLabel], inPlaceUpdateState.Revision)
+	//}
 
 	containerImages := make(map[string]string, len(pod.Spec.Containers))
 	for i := range pod.Spec.Containers {

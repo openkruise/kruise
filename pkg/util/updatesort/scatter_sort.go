@@ -73,7 +73,7 @@ func (ss *scatterSort) getScatterTerms(pods []*v1.Pod, indexes []int) []appsv1al
 		}
 	}
 
-	sort.Slice(termSlice, func(i, j int) bool {
+	sort.SliceStable(termSlice, func(i, j int) bool {
 		cI := ruleCounter[termID(termSlice[i])]
 		cJ := ruleCounter[termID(termSlice[j])]
 		if cI != cJ {

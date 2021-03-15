@@ -158,25 +158,25 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 		},
 	}
 	failPods := []*v1.Pod{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "f1",
-				Labels: map[string]string{
-					apps.StatefulSetRevisionLabel: "new-revision",
-				},
-				Annotations: map[string]string{
-					appspub.InPlaceUpdateStateKey: `{"revision":"old-revision","lastContainerStatuses":{"c1":{"imageID":"img01"}}}`,
-				},
-			},
-			Status: v1.PodStatus{
-				ContainerStatuses: []v1.ContainerStatus{
-					{
-						Name:    "c1",
-						ImageID: "img02",
-					},
-				},
-			},
-		},
+		//{
+		//	ObjectMeta: metav1.ObjectMeta{
+		//		Name: "f1",
+		//		Labels: map[string]string{
+		//			apps.StatefulSetRevisionLabel: "new-revision",
+		//		},
+		//		Annotations: map[string]string{
+		//			appspub.InPlaceUpdateStateKey: `{"revision":"old-revision","lastContainerStatuses":{"c1":{"imageID":"img01"}}}`,
+		//		},
+		//	},
+		//	Status: v1.PodStatus{
+		//		ContainerStatuses: []v1.ContainerStatus{
+		//			{
+		//				Name:    "c1",
+		//				ImageID: "img02",
+		//			},
+		//		},
+		//	},
+		//},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "f2",
