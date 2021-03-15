@@ -1,8 +1,6 @@
 package scale
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sort"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -10,10 +8,12 @@ import (
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/integer"
 )
