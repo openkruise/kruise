@@ -90,7 +90,7 @@ You are warmly welcome to hack on Kruise. We have prepared a detailed guide [CON
 
 Active communication channels:
 
-- Slack: [channel address](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWJlZGJiZjUwNGU5Y2U2ODI3N2JiODI4N2M1OWFlOTgzMDgyOWVkZGRjNzdmZTBjYzgxZmM5MjAyNjhhZTdmMjQ)
+- Slack: [Channel in Kubernetes Slack](https://kubernetes.slack.com/channels/openkruise)
 - Mailing List: todo
 - Dingtalk Group(钉钉讨论群)
 
