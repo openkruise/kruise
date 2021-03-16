@@ -90,7 +90,7 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.
 
 活跃的社区途径：
 
-- Slack: [channel address](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWJlZGJiZjUwNGU5Y2U2ODI3N2JiODI4N2M1OWFlOTgzMDgyOWVkZGRjNzdmZTBjYzgxZmM5MjAyNjhhZTdmMjQ)
+- Slack: [Channel in Kubernetes Slack](https://kubernetes.slack.com/channels/openkruise)
 - 钉钉讨论群
 
 <div>
