@@ -32,4 +32,7 @@ resources:
 - group: apps
   kind: AdvancedCronJob
   version: v1alpha1
+- group: apps
+  kind: ContainerRecreateRequest
+  version: v1alpha1
 version: "2"
