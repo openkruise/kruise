@@ -19,7 +19,10 @@ package util
 import (
 	"strings"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
@@ -217,4 +220,22 @@ func MergeVolumeMountsInContainer(origin *v1.Container, other v1.Container) {
 
 		origin.VolumeMounts = append(origin.VolumeMounts, volume)
 	}
+}
+
+func IsPodOwnedByKruise(pod *v1.Pod) bool {
+	ownerRef := metav1.GetControllerOf(pod)
+	if ownerRef == nil {
+		return false
+	}
+	gv, _ := schema.ParseGroupVersion(ownerRef.APIVersion)
+	return gv.Group == appsv1alpha1.GroupVersion.Group
+}
+
+func InjectReadinessGateToPod(pod *v1.Pod, conditionType v1.PodConditionType) {
+	for _, g := range pod.Spec.ReadinessGates {
+		if g.ConditionType == conditionType {
+			return
+		}
+	}
+	pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: conditionType})
 }
