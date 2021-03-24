@@ -23,6 +23,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
 	"github.com/openkruise/kruise/pkg/controller/imagepulljob"
 	"github.com/openkruise/kruise/pkg/controller/nodeimage"
+	"github.com/openkruise/kruise/pkg/controller/podreadiness"
 	"github.com/openkruise/kruise/pkg/controller/sidecarset"
 	"github.com/openkruise/kruise/pkg/controller/statefulset"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment"
@@ -40,6 +41,7 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, daemonset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, nodeimage.Add)
 	controllerAddFuncs = append(controllerAddFuncs, imagepulljob.Add)
+	controllerAddFuncs = append(controllerAddFuncs, podreadiness.Add)
 	controllerAddFuncs = append(controllerAddFuncs, sidecarset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, statefulset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, uniteddeployment.Add)
