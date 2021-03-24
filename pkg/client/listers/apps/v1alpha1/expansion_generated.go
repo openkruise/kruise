@@ -41,6 +41,14 @@ type CloneSetListerExpansion interface{}
 // CloneSetNamespaceLister.
 type CloneSetNamespaceListerExpansion interface{}
 
+// ContainerRecreateRequestListerExpansion allows custom methods to be added to
+// ContainerRecreateRequestLister.
+type ContainerRecreateRequestListerExpansion interface{}
+
+// ContainerRecreateRequestNamespaceListerExpansion allows custom methods to be added to
+// ContainerRecreateRequestNamespaceLister.
+type ContainerRecreateRequestNamespaceListerExpansion interface{}
+
 // DaemonSetListerExpansion allows custom methods to be added to
 // DaemonSetLister.
 type DaemonSetListerExpansion interface{}
