@@ -130,6 +130,15 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, up
 	// calculate the number of surge to use
 	if maxSurge > 0 {
 
+		// Use surge for maxUnavailable not satisfied before scaling
+		var scaleSurge, scaleOldRevisionSurge int
+		if toDeleteCount := toDeleteNewRevisionCount + toDeleteOldRevisionCount; toDeleteCount > 0 {
+			scaleSurge = integer.IntMin(integer.IntMax((notReadyNewRevisionCount+notReadyOldRevisionCount+toDeleteCount+preDeletingCount)-maxUnavailable, 0), toDeleteCount)
+			if scaleSurge > toDeleteNewRevisionCount {
+				scaleOldRevisionSurge = scaleSurge - toDeleteNewRevisionCount
+			}
+		}
+
 		// Use surge for old and new revision updating
 		var updateSurge, updateOldRevisionSurge int
 		if util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
@@ -146,8 +155,14 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, up
 			}
 		}
 
-		res.useSurge = integer.IntMin(maxSurge, updateSurge)
-		res.useSurgeOldRevision = integer.IntMin(res.useSurge, updateOldRevisionSurge)
+		// It is because the controller is designed not to do scale and update in once reconcile
+		if scaleSurge >= updateSurge {
+			res.useSurge = integer.IntMin(maxSurge, scaleSurge)
+			res.useSurgeOldRevision = integer.IntMin(res.useSurge, scaleOldRevisionSurge)
+		} else {
+			res.useSurge = integer.IntMin(maxSurge, updateSurge)
+			res.useSurgeOldRevision = integer.IntMin(res.useSurge, updateOldRevisionSurge)
+		}
 	}
 
 	res.scaleNum = replicas + res.useSurge - len(pods)
