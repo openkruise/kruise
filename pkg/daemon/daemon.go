@@ -24,8 +24,8 @@ import (
 	"sync"
 
 	"github.com/openkruise/kruise/pkg/client"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/runtime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/rest"

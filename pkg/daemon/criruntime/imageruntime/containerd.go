@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package imageruntime
 
 import (
 	"context"
@@ -54,11 +54,11 @@ const (
 	defaultContainerdNamespace = "k8s.io"
 )
 
-// NewContainerdImageRuntime returns containerd-type ImageRuntime
-func NewContainerdImageRuntime(
+// NewContainerdImageService returns containerd-type ImageService
+func NewContainerdImageService(
 	address string, // containerd will be servicing basic API and CRI-API
 	accountManager daemonutil.ImagePullAccountManager,
-) (ImageRuntime, error) {
+) (ImageService, error) {
 	conn, err := getContainerdConn(address)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ type containerdImageClient struct {
 	httpProxy      string
 }
 
-// PullImage implements ImageRuntime.PullImage.
+// PullImage implements ImageService.PullImage.
 func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (ImagePullStatusReader, error) {
 	ctx = namespaces.WithNamespace(ctx, d.namespace)
 
@@ -114,7 +114,7 @@ func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag st
 	return d.doPullImage(ctx, namedRef, isSchema1, resolver), nil
 }
 
-// ListImages implements ImageRuntime.ListImages.
+// ListImages implements ImageService.ListImages.
 func (d *containerdImageClient) ListImages(ctx context.Context) ([]ImageInfo, error) {
 	resp, err := d.criImageClient.ListImages(ctx, &runtimeapi.ListImagesRequest{})
 	if err != nil {
