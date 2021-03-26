@@ -177,6 +177,19 @@ func GetContainer(name string, pod *v1.Pod) *v1.Container {
 	return nil
 }
 
+func GetContainerStatus(name string, pod *v1.Pod) *v1.ContainerStatus {
+	if pod == nil {
+		return nil
+	}
+	for i := range pod.Status.ContainerStatuses {
+		v := &pod.Status.ContainerStatuses[i]
+		if v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
+
 func GetPodVolume(pod *v1.Pod, volumeName string) *v1.Volume {
 	for idx, v := range pod.Spec.Volumes {
 		if v.Name == volumeName {
