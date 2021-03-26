@@ -28,7 +28,7 @@ import (
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/runtime"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
 	v1 "k8s.io/api/core/v1"
@@ -65,12 +65,12 @@ type Controller struct {
 // NewController returns the controller for image pulling
 func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonutil.SecretManager, healthz *daemonutil.Healthz) (*Controller, error) {
 	nodeName, _ := daemonutil.NodeName()
-	genericClient := client.GetGenericClientWithName("image-puller")
+	genericClient := client.GetGenericClientWithName("kruise-daemon-imagepuller")
 	informer := newNodeImageInformer(genericClient.KruiseClient, nodeName)
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "imagepuller", Host: nodeName})
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kruise-daemon-imagepuller", Host: nodeName})
 
 	queue := workqueue.NewNamedRateLimitingQueue(
 		// Backoff duration from 500ms to 50~55s
@@ -101,7 +101,7 @@ func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonuti
 		},
 	})
 
-	puller, err := newRealPuller(runtimeFactory.GetImageRuntime(), secretManager, recorder)
+	puller, err := newRealPuller(runtimeFactory.GetImageService(), secretManager, recorder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new puller: %v", err)
 	}
@@ -169,7 +169,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 		}
 	}, time.Second, stop)
 
-	klog.Info("Started successfully")
+	klog.Info("Started puller controller successfully")
 	<-stop
 }
 
