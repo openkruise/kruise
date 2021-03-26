@@ -65,6 +65,24 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kruise-io-v1alpha1-containerrecreaterequest
+  failurePolicy: Fail
+  name: mcontainerrecreaterequest.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - containerrecreaterequests
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kruise-io-v1alpha1-daemonset
   failurePolicy: Fail
   name: mdaemonset.kb.io
