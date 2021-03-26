@@ -14,45 +14,47 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package imageruntime
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
-	dockertypes "github.com/docker/docker/api/types"
-	dockerapi "github.com/docker/docker/client"
+	pouchfilters "github.com/alibaba/pouch/apis/filters"
+	pouchtypes "github.com/alibaba/pouch/apis/types"
+	pouchapi "github.com/alibaba/pouch/client"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 )
 
-// NewDockerImageRuntime create a docker runtime
-func NewDockerImageRuntime(runtimeURI string, accountManager daemonutil.ImagePullAccountManager) (ImageRuntime, error) {
-	r := &dockerImageRuntime{runtimeURI: runtimeURI, accountManager: accountManager}
+// NewPouchImageService create a pouch runtime client
+func NewPouchImageService(runtimeURI string, accountManager daemonutil.ImagePullAccountManager) (ImageService, error) {
+	r := &pouchImageService{runtimeURI: runtimeURI, accountManager: accountManager}
 	if err := r.createRuntimeClientIfNecessary(); err != nil {
 		return nil, err
 	}
 	return r, nil
 }
 
-type dockerImageRuntime struct {
+type pouchImageService struct {
 	sync.Mutex
 	runtimeURI     string
 	accountManager daemonutil.ImagePullAccountManager
 
-	client *dockerapi.Client
+	client pouchapi.ImageAPIClient
 }
 
-func (d *dockerImageRuntime) createRuntimeClientIfNecessary() error {
+func (d *pouchImageService) createRuntimeClientIfNecessary() error {
 	d.Lock()
 	defer d.Unlock()
 	if d.client != nil {
 		return nil
 	}
-	c, err := dockerapi.NewClient(d.runtimeURI, "1.23", nil, nil)
+	c, err := pouchapi.NewAPIClient(d.runtimeURI, pouchapi.TLSConfig{})
 	if err != nil {
 		return err
 	}
@@ -60,7 +62,7 @@ func (d *dockerImageRuntime) createRuntimeClientIfNecessary() error {
 	return nil
 }
 
-func (d *dockerImageRuntime) handleRuntimeError(err error) {
+func (d *pouchImageService) handleRuntimeError(err error) {
 	if filterCloseErr(err) {
 		d.Lock()
 		defer d.Unlock()
@@ -68,13 +70,12 @@ func (d *dockerImageRuntime) handleRuntimeError(err error) {
 	}
 }
 
-func (d *dockerImageRuntime) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (reader ImagePullStatusReader, err error) {
+func (d *pouchImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (reader ImagePullStatusReader, err error) {
 	if err = d.createRuntimeClientIfNecessary(); err != nil {
 		return nil, err
 	}
 
 	registry := daemonutil.ParseRegistry(imageName)
-	fullName := imageName + ":" + tag
 	var ioReader io.ReadCloser
 
 	if len(pullSecrets) > 0 {
@@ -85,7 +86,7 @@ func (d *dockerImageRuntime) PullImage(ctx context.Context, imageName, tag strin
 			for _, authInfo := range authInfos {
 				var pullErr error
 				klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
-				ioReader, pullErr = d.client.ImagePull(ctx, fullName, dockertypes.ImagePullOptions{RegistryAuth: authInfo.EncodeToString()})
+				ioReader, pullErr = d.client.ImagePull(ctx, imageName, tag, authInfo.EncodeToString())
 				if pullErr == nil {
 					return newImagePullStatusReader(ioReader), nil
 				}
@@ -109,12 +110,12 @@ func (d *dockerImageRuntime) PullImage(ctx context.Context, imageName, tag strin
 			// When the default account acquisition fails, try to pull anonymously
 		} else if authInfo != nil {
 			klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
-			ioReader, err = d.client.ImagePull(ctx, fullName, dockertypes.ImagePullOptions{RegistryAuth: authInfo.EncodeToString()})
+			ioReader, err = d.client.ImagePull(ctx, imageName, tag, authInfo.EncodeToString())
 			if err == nil {
 				return newImagePullStatusReader(ioReader), nil
 			}
 			d.handleRuntimeError(err)
-			klog.Warningf("Failed to pull image %v:%v, err %v", imageName, tag, err)
+			klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, err)
 		}
 	}
 
@@ -124,27 +125,28 @@ func (d *dockerImageRuntime) PullImage(ctx context.Context, imageName, tag strin
 
 	// Anonymous pull
 	klog.V(5).Infof("Pull image %v:%v anonymous", imageName, tag)
-	ioReader, err = d.client.ImagePull(ctx, fullName, dockertypes.ImagePullOptions{})
+	ioReader, err = d.client.ImagePull(ctx, imageName, tag, "")
 	if err != nil {
 		d.handleRuntimeError(err)
-		return nil, err
+		return nil, fmt.Errorf("anonymous pulling failed, err %v", err)
 	}
 	return newImagePullStatusReader(ioReader), nil
 }
 
-func (d *dockerImageRuntime) ListImages(ctx context.Context) ([]ImageInfo, error) {
+func (d *pouchImageService) ListImages(ctx context.Context) ([]ImageInfo, error) {
 	if err := d.createRuntimeClientIfNecessary(); err != nil {
 		return nil, err
 	}
-	infos, err := d.client.ImageList(ctx, dockertypes.ImageListOptions{All: true})
+
+	infos, err := d.client.ImageList(ctx, pouchfilters.NewArgs())
 	if err != nil {
 		d.handleRuntimeError(err)
 		return nil, err
 	}
-	return newImageCollectionDocker(infos), nil
+	return newImageCollectionPouch(infos), nil
 }
 
-func newImageCollectionDocker(infos []dockertypes.ImageSummary) []ImageInfo {
+func newImageCollectionPouch(infos []pouchtypes.ImageInfo) []ImageInfo {
 	collection := make([]ImageInfo, 0, len(infos))
 	for _, info := range infos {
 		collection = append(collection, ImageInfo{

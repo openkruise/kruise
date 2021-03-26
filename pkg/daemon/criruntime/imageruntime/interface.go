@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package imageruntime
 
 import (
 	"context"
@@ -45,7 +45,7 @@ type ImagePullStatusReader interface {
 	Close()
 }
 
-type ImageRuntime interface {
+type ImageService interface {
 	PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (ImagePullStatusReader, error)
 	ListImages(ctx context.Context) ([]ImageInfo, error)
 }

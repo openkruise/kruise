@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/runtime"
+	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -53,7 +53,7 @@ type puller interface {
 
 type realPuller struct {
 	sync.Mutex
-	runtime       daemonruntime.ImageRuntime
+	runtime       runtimeimage.ImageService
 	secretManager daemonutil.SecretManager
 	eventRecorder record.EventRecorder
 
@@ -62,12 +62,7 @@ type realPuller struct {
 
 var _ puller = &realPuller{}
 
-func newRealPuller(runtime daemonruntime.ImageRuntime, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder) (*realPuller, error) {
-	collection, err := runtime.ListImages(context.TODO())
-	if err != nil {
-		return nil, fmt.Errorf("failed to list images: %v", err)
-	}
-	klog.V(2).Infof("Initial list images number %v", len(collection))
+func newRealPuller(runtime runtimeimage.ImageService, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder) (*realPuller, error) {
 	p := &realPuller{
 		runtime:       runtime,
 		secretManager: secretManager,
@@ -135,7 +130,7 @@ type realWorkerPool struct {
 	sync.Mutex
 
 	name          string
-	runtime       daemonruntime.ImageRuntime
+	runtime       runtimeimage.ImageService
 	secretManager daemonutil.SecretManager
 	eventRecorder record.EventRecorder
 	pullWorkers   map[string]*pullWorker
@@ -145,7 +140,7 @@ type realWorkerPool struct {
 	lastSyncSpec *appsv1alpha1.ImageSpec
 }
 
-func newRealWorkerPool(name string, runtime daemonruntime.ImageRuntime, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder) *realWorkerPool {
+func newRealWorkerPool(name string, runtime runtimeimage.ImageService, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder) *realWorkerPool {
 	w := &realWorkerPool{
 		name:          name,
 		runtime:       runtime,
@@ -267,7 +262,7 @@ func (w *realWorkerPool) UpdateStatus(status *appsv1alpha1.ImageTagStatus) {
 	w.tagStatuses[status.Tag] = status
 }
 
-func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, secrets []v1.Secret, runtime daemonruntime.ImageRuntime, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
+func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
 	o := &pullWorker{
 		name:          name,
 		tagSpec:       tagSpec,
@@ -289,7 +284,7 @@ type pullWorker struct {
 	name          string
 	tagSpec       appsv1alpha1.ImageTagSpec
 	secrets       []v1.Secret
-	runtime       daemonruntime.ImageRuntime
+	runtime       runtimeimage.ImageService
 	statusUpdater imageStatusUpdater
 	ref           *v1.ObjectReference
 	eventRecorder record.EventRecorder
@@ -409,7 +404,7 @@ func (w *pullWorker) Run() {
 	}
 }
 
-func (w *pullWorker) getImageInfo(ctx context.Context) (*daemonruntime.ImageInfo, error) {
+func (w *pullWorker) getImageInfo(ctx context.Context) (*runtimeimage.ImageInfo, error) {
 	imageInfos, err := w.runtime.ListImages(ctx)
 	if err != nil {
 		klog.V(5).Infof("List images failed, err %v", err)
