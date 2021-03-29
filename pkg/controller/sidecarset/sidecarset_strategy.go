@@ -73,34 +73,42 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 		}
 	}
 
-	//2. Sort Pods with default sequence
+	//2. sort Pods with default sequence and scatter
+	waitUpgradedIndexes = SortUpdateIndexes(strategy, pods, waitUpgradedIndexes)
+
+	//3. calculate to be upgraded pods number for the time
+	needToUpgradeCount := calculateUpgradeCount(control, waitUpgradedIndexes, pods)
+	if needToUpgradeCount < len(waitUpgradedIndexes) {
+		waitUpgradedIndexes = waitUpgradedIndexes[:needToUpgradeCount]
+	}
+
+	//4. injectPods will be upgraded in the following process
+	for _, idx := range waitUpgradedIndexes {
+		upgradePods = append(upgradePods, pods[idx])
+	}
+	return
+}
+
+// SortUpdateIndexes sorts the given waitUpdateIndexes of Pods to update according to the SidecarSet update strategy.
+func SortUpdateIndexes(strategy appsv1alpha1.SidecarSetUpdateStrategy, pods []*corev1.Pod, waitUpdateIndexes []int) []int {
+	//Sort Pods with default sequence
 	//	- Unassigned < assigned
 	//	- PodPending < PodUnknown < PodRunning
 	//	- Not ready < ready
 	//	- Been ready for empty time < less time < more time
 	//	- Pods with containers with higher restart counts < lower restart counts
 	//	- Empty creation time pods < newer pods < older pods
-	sort.Slice(waitUpgradedIndexes, sidecarcontrol.GetPodsSortFunc(pods, waitUpgradedIndexes))
+	sort.Slice(waitUpdateIndexes, sidecarcontrol.GetPodsSortFunc(pods, waitUpdateIndexes))
 
-	//3. sort waitUpdateIndexes based on the scatter rules
+	//sort waitUpdateIndexes based on the scatter rules
 	if strategy.ScatterStrategy != nil {
 		// convert regular terms to scatter terms
 		// for examples: labelA=* -> labelA=value1, labelA=value2...(labels in pod definition)
 		scatter := parseUpdateScatterTerms(strategy.ScatterStrategy, pods)
-		waitUpgradedIndexes = updatesort.NewScatterSorter(scatter).Sort(pods, waitUpgradedIndexes)
+		waitUpdateIndexes = updatesort.NewScatterSorter(scatter).Sort(pods, waitUpdateIndexes)
 	}
 
-	//4. calculate to be upgraded pods number for the time
-	needToUpgradeCount := calculateUpgradeCount(control, waitUpgradedIndexes, pods)
-	if needToUpgradeCount < len(waitUpgradedIndexes) {
-		waitUpgradedIndexes = waitUpgradedIndexes[:needToUpgradeCount]
-	}
-
-	//5. injectPods will be upgraded in the following process
-	for _, idx := range waitUpgradedIndexes {
-		upgradePods = append(upgradePods, pods[idx])
-	}
-	return
+	return waitUpdateIndexes
 }
 
 func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdateIndexes []int, pods []*corev1.Pod) int {

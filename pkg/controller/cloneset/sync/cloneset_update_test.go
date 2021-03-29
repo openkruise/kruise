@@ -631,7 +631,7 @@ func TestSortUpdateIndexes(t *testing.T) {
 
 	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
 	for i, tc := range cases {
-		got := sortUpdateIndexes(coreControl, tc.strategy, tc.pods, tc.waitUpdateIndexes)
+		got := SortUpdateIndexes(coreControl, tc.strategy, tc.pods, tc.waitUpdateIndexes)
 		if !reflect.DeepEqual(got, tc.expectedIndexes) {
 			t.Fatalf("case #%d failed, expected %v, got %v", i, tc.expectedIndexes, got)
 		}
