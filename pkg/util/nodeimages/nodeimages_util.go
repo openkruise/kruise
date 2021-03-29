@@ -23,10 +23,12 @@ import (
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	sortingcontrol "github.com/openkruise/kruise/pkg/control/sorting"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -79,10 +81,28 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 			return nil, err
 		}
 
-		nodeImageNames := sets.NewString()
+		pods := make([]*v1.Pod, 0, len(podList.Items))
 		for i := range podList.Items {
 			pod := &podList.Items[i]
-			if !kubecontroller.IsPodActive(pod) || pod.Spec.NodeName == "" || nodeImageNames.Has(pod.Spec.NodeName) {
+			if !kubecontroller.IsPodActive(pod) || pod.Spec.NodeName == "" {
+				continue
+			}
+			pods = append(pods, pod)
+		}
+
+		owner := metav1.GetControllerOf(job)
+		if owner != nil {
+			newPods, err := sortingcontrol.SortPods(reader, job.Namespace, *owner, pods)
+			if err != nil {
+				klog.Errorf("ImagePullJob %s/%s failed to sort Pods: %v", job.Namespace, job.Name, err)
+			} else {
+				pods = newPods
+			}
+		}
+
+		nodeImageNames := sets.NewString()
+		for _, pod := range pods {
+			if nodeImageNames.Has(pod.Spec.NodeName) {
 				continue
 			}
 			nodeImageNames.Insert(pod.Spec.NodeName)
