@@ -21,7 +21,7 @@ import (
 	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -105,7 +105,7 @@ func (e *imagePullJobHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 
 func (e *imagePullJobHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	job := evt.Object.(*appsv1alpha1.ImagePullJob)
-	nodeImageNames := nodeimagesutil.PopCachedNodeImagesForJob(job)
+	nodeImageNames := utilimagejob.PopCachedNodeImagesForJob(job)
 	for _, name := range nodeImageNames {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: name}})
 	}

@@ -41,13 +41,18 @@ const (
 	// all Pods during creation.
 	// Otherwise, it will only be injected to Pods created by Kruise workloads.
 	KruisePodReadinessGate featuregate.Feature = "KruisePodReadinessGate"
+
+	// PreDownloadImageForInPlaceUpdate enables cloneset-controller to create ImagePullJobs to
+	// pre-download images for in-place update.
+	PreDownloadImageForInPlaceUpdate featuregate.Feature = "PreDownloadImageForInPlaceUpdate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	PodWebhook:             {Default: true, PreRelease: featuregate.Beta},
-	KruiseDaemon:           {Default: true, PreRelease: featuregate.Beta},
-	CloneSetShortHash:      {Default: false, PreRelease: featuregate.Alpha},
-	KruisePodReadinessGate: {Default: false, PreRelease: featuregate.Alpha},
+	PodWebhook:                       {Default: true, PreRelease: featuregate.Beta},
+	KruiseDaemon:                     {Default: true, PreRelease: featuregate.Beta},
+	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
+	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

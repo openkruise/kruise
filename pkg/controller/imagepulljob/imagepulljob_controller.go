@@ -31,7 +31,7 @@ import (
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -172,7 +172,7 @@ func (r *ReconcileImagePullJob) Reconcile(request reconcile.Request) (res reconc
 	}
 
 	// Get all NodeImage related to this ImagePullJob
-	nodeImages, err := nodeimagesutil.GetNodeImagesForJob(r.Client, job)
+	nodeImages, err := utilimagejob.GetNodeImagesForJob(r.Client, job)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to get NodeImages: %v", err)
 	}
@@ -320,7 +320,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 					OwnerReferences: []v1.ObjectReference{*ownerRef},
 				})
 			}
-			nodeimagesutil.SortSpecImageTags(&imageSpec)
+			utilimagejob.SortSpecImageTags(&imageSpec)
 			nodeImage.Spec.Images[imageName] = imageSpec
 
 			oldResourceVersion := nodeImage.ResourceVersion

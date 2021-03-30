@@ -9,4 +9,10 @@ const (
 
 	// SpecifiedDeleteKey indicates this object should be deleted, and the value could be the deletion option.
 	SpecifiedDeleteKey = "apps.kruise.io/specified-delete"
+
+	// ImagePreDownloadCreatedKey indicates the images of this revision have been pre-downloaded
+	ImagePreDownloadCreatedKey = "apps.kruise.io/pre-predownload-created"
+
+	// ImagePreDownloadIgnoredKey indicates the images of this revision have been ignored to pre-download
+	ImagePreDownloadIgnoredKey = "apps.kruise.io/image-predownload-ignored"
 )

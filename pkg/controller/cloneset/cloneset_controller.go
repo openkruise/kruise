@@ -20,7 +20,10 @@ package cloneset
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
+
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
@@ -28,11 +31,15 @@ import (
 	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
 	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 	apps "k8s.io/api/apps/v1"
@@ -41,6 +48,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -62,6 +70,9 @@ func init() {
 
 var (
 	concurrentReconciles = 3
+
+	isPreDownloadDisabled             bool
+	minimumReplicasToPreDownloadImage int32 = 3
 )
 
 // Add creates a new CloneSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -69,6 +80,11 @@ var (
 func Add(mgr manager.Manager) error {
 	if !utildiscovery.DiscoverGVK(clonesetutils.ControllerKind) {
 		return nil
+	}
+	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
+		isPreDownloadDisabled = true
 	}
 	return add(mgr, newReconciler(mgr))
 }
@@ -257,8 +273,19 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
+
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
+	clonesetutils.ResourceVersionExpectations.Observe(updateRevision)
+	if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(updateRevision); !isSatisfied {
+		if unsatisfiedDuration < expectations.ExpectationTimeout {
+			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for updateRevision %v updating", request.String(), updateRevision.Name)
+			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
+		}
+		klog.Warningf("Expectation unsatisfied overtime for %v, wait for updateRevision %v updating, timeout=%v", request.String(), updateRevision.Name, unsatisfiedDuration)
+		clonesetutils.ResourceVersionExpectations.Delete(updateRevision)
+	}
 	for _, pod := range filteredPods {
+		clonesetutils.ResourceVersionExpectations.Observe(pod)
 		if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(pod); !isSatisfied {
 			if unsatisfiedDuration >= expectations.ExpectationTimeout {
 				klog.Warningf("Expectation unsatisfied overtime for %v, wait for pod %v updating, timeout=%v", request.String(), pod.Name, unsatisfiedDuration)
@@ -277,6 +304,20 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		LabelSelector:      selector.String(),
 	}
 	*newStatus.CollisionCount = collisionCount
+
+	if !isPreDownloadDisabled {
+		if currentRevision.Name != updateRevision.Name {
+			// pre-download images for new revision
+			if err := r.createImagePullJobsForInPlaceUpdate(instance, currentRevision, updateRevision); err != nil {
+				klog.Errorf("Failed to create ImagePullJobs for %s: %v", request, err)
+			}
+		} else {
+			// delete ImagePullJobs if revisions have been consistent
+			if err := utilimagejob.DeleteJobsForWorkload(r.Client, instance); err != nil {
+				klog.Errorf("Failed to delete imagepulljobs for %s: %v", request, err)
+			}
+		}
+	}
 
 	// scale and update pods
 	delayDuration, syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
@@ -514,7 +555,7 @@ func (r *ReconcileCloneSet) truncateHistory(
 }
 
 func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) {
-	manager, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
+	mgr, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -524,7 +565,7 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 		selected[i] = pod
 	}
 
-	claimed, err := manager.ClaimOwnedObjects(selected)
+	claimed, err := mgr.ClaimOwnedObjects(selected)
 	if err != nil {
 		return nil, err
 	}
@@ -535,4 +576,101 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 	}
 
 	return claimedPods, nil
+}
+
+func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1.CloneSet, currentRevision, updateRevision *apps.ControllerRevision) error {
+	if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadCreatedKey]; ok {
+		return nil
+	} else if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadIgnoredKey]; ok {
+		return nil
+	}
+
+	// ignore if update type is ReCreate
+	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.RecreateCloneSetUpdateStrategyType {
+		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for update type is %s",
+			cs.Namespace, cs.Name, cs.Spec.UpdateStrategy.Type)
+		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+	}
+
+	// ignore if replicas <= minimumReplicasToPreDownloadImage
+	if *cs.Spec.Replicas <= minimumReplicasToPreDownloadImage {
+		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for replicas %d <= %d",
+			cs.Namespace, cs.Name, *cs.Spec.Replicas, minimumReplicasToPreDownloadImage)
+		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+	}
+
+	// ignore if all Pods update in one batch
+	var partition, maxUnavailable int
+	if cs.Spec.UpdateStrategy.Partition != nil {
+		partition, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.Partition, int(*cs.Spec.Replicas), true)
+	}
+	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)
+	if partition == 0 && maxUnavailable >= int(*cs.Spec.Replicas) {
+		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for all Pods update in one batch, replicas=%d, partition=%d, maxUnavailable=%d",
+			cs.Namespace, cs.Name, *cs.Spec.Replicas, partition, maxUnavailable)
+		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+	}
+
+	// ignore if this revision can not update in-place
+	opts := &inplaceupdate.UpdateOptions{}
+	inplaceupdate.SetOptionsDefaults(opts)
+	spec := opts.CalculateSpec(currentRevision, updateRevision, opts)
+	if spec == nil {
+		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for %s -> %s can not update in-place",
+			cs.Namespace, cs.Name, currentRevision.Name, updateRevision.Name)
+		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+	}
+
+	// start to create jobs
+
+	var pullSecrets []string
+	for _, s := range cs.Spec.Template.Spec.ImagePullSecrets {
+		pullSecrets = append(pullSecrets, s.Name)
+	}
+
+	selector := cs.Spec.Selector.DeepCopy()
+	selector.MatchExpressions = append(selector.MatchExpressions, metav1.LabelSelectorRequirement{
+		Key:      apps.ControllerRevisionHashLabelKey,
+		Operator: metav1.LabelSelectorOpNotIn,
+		Values:   []string{updateRevision.Name, updateRevision.Labels[history.ControllerRevisionHashLabel]},
+	})
+
+	// As cloneset is the job's owner, we have the convention that all resources owned by cloneset
+	// have to match the selector of cloneset, such as pod, pvc and controllerrevision.
+	// So we had better put the labels into jobs.
+	labelMap := make(map[string]string)
+	for k, v := range cs.Spec.Template.Labels {
+		labelMap[k] = v
+	}
+	labelMap[history.ControllerRevisionHashLabel] = updateRevision.Labels[history.ControllerRevisionHashLabel]
+
+	for name, image := range spec.ContainerImages {
+		// job name is revision name + container name, it can not be more than 255 characters
+		jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
+		err := utilimagejob.CreateJobForWorkload(r.Client, cs, jobName, image, labelMap, *selector, pullSecrets)
+		if err != nil {
+			if !errors.IsAlreadyExists(err) {
+				klog.Errorf("CloneSet %s/%s failed to create ImagePullJob %s: %v", cs.Namespace, cs.Name, jobName, err)
+				r.recorder.Eventf(cs, v1.EventTypeNormal, "FailedCreateImagePullJob", "failed to create ImagePullJob %s: %v", jobName, err)
+			}
+			continue
+		}
+		klog.V(3).Infof("CloneSet %s/%s created ImagePullJob %s for image: %s", cs.Namespace, cs.Name, jobName, image)
+		r.recorder.Eventf(cs, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)
+	}
+
+	return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadCreatedKey, "true")
+}
+
+func (r *ReconcileCloneSet) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error {
+	oldRevision := revision.ResourceVersion
+	body := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value)
+	if err := r.Patch(context.TODO(), revision, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
+		return err
+	}
+	if oldRevision != revision.ResourceVersion {
+		clonesetutils.ResourceVersionExpectations.Expect(revision)
+	}
+	return nil
 }

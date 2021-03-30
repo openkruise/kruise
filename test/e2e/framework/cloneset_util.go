@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 )
 
 type CloneSetTester struct {
@@ -38,15 +39,16 @@ func NewCloneSetTester(c clientset.Interface, kc kruiseclientset.Interface, ns s
 	}
 }
 
-func (t *CloneSetTester) NewCloneSet(name string, replicas int32) *appsv1alpha1.CloneSet {
+func (t *CloneSetTester) NewCloneSet(name string, replicas int32, updateStrategy appsv1alpha1.CloneSetUpdateStrategy) *appsv1alpha1.CloneSet {
 	return &appsv1alpha1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.ns,
 			Name:      name,
 		},
 		Spec: appsv1alpha1.CloneSetSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"owner": name}},
+			Replicas:       &replicas,
+			Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"owner": name}},
+			UpdateStrategy: updateStrategy,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"owner": name},
@@ -73,4 +75,31 @@ func (t *CloneSetTester) CreateCloneSet(cs *appsv1alpha1.CloneSet) (*appsv1alpha
 
 func (t *CloneSetTester) GetCloneSet(name string) (*appsv1alpha1.CloneSet, error) {
 	return t.kc.AppsV1alpha1().CloneSets(t.ns).Get(name, metav1.GetOptions{})
+}
+
+func (t *CloneSetTester) UpdateCloneSet(name string, fn func(cs *appsv1alpha1.CloneSet)) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		cs, err := t.GetCloneSet(name)
+		if err != nil {
+			return err
+		}
+
+		fn(cs)
+		_, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Update(cs)
+		return err
+	})
+}
+
+func (t *CloneSetTester) ListImagePullJobsForCloneSet(name string) (jobs []*appsv1alpha1.ImagePullJob, err error) {
+	jobList, err := t.kc.AppsV1alpha1().ImagePullJobs(t.ns).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for i := range jobList.Items {
+		job := &jobList.Items[i]
+		if owner := metav1.GetControllerOf(job); owner != nil && owner.Name == name {
+			jobs = append(jobs, job)
+		}
+	}
+	return jobs, nil
 }
