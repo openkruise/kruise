@@ -89,7 +89,6 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	clonesetutils.ResourceVersionExpectations.Observe(curPod)
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if curPod.DeletionTimestamp != nil {

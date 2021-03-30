@@ -25,6 +25,7 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -34,19 +35,21 @@ var _ = SIGDescribe("CloneSet", func() {
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
 	var tester *framework.CloneSetTester
+	var randStr string
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
 		tester = framework.NewCloneSetTester(c, kc, ns)
+		randStr = rand.String(10)
 	})
 
 	framework.KruiseDescribe("CloneSet Scaling", func() {
 		var err error
 
 		ginkgo.It("scales in normal cases", func() {
-			cs := tester.NewCloneSet("clone", 3)
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -66,6 +69,50 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+		})
+	})
+
+	framework.KruiseDescribe("CloneSet pre-download images", func() {
+		var err error
+
+		ginkgo.It("pre-download for new image", func() {
+			cs := tester.NewCloneSet("clone-"+randStr, 5, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.MaxUnavailable).To(gomega.Equal(func() *intstr.IntOrString { i := intstr.FromString("20%"); return &i }()))
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(5)))
+
+			ginkgo.By("Update image to nginx:1.9.2")
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				if cs.Annotations == nil {
+					cs.Annotations = map[string]string{}
+				}
+				cs.Annotations[appsv1alpha1.ImagePreDownloadParallelismKey] = "2"
+				cs.Spec.Template.Spec.Containers[0].Image = "nginx:1.9.2"
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Should get the ImagePullJob")
+			var job *appsv1alpha1.ImagePullJob
+			gomega.Eventually(func() int {
+				jobs, err := tester.ListImagePullJobsForCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				if len(jobs) > 0 {
+					job = jobs[0]
+				}
+				return len(jobs)
+			}, 3*time.Second, time.Second).Should(gomega.Equal(1))
+
+			ginkgo.By("Check the ImagePullJob spec and status")
+			gomega.Expect(job.Spec.Image).To(gomega.Equal("nginx:1.9.2"))
+			gomega.Expect(job.Spec.Parallelism.IntValue()).To(gomega.Equal(2))
 		})
 	})
 })

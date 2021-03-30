@@ -30,7 +30,7 @@ import (
 	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -240,7 +240,7 @@ func (c *Controller) sync(key string) (retErr error) {
 		if imageStatus == nil {
 			continue
 		}
-		nodeimagesutil.SortStatusImageTags(imageStatus)
+		utilimagejob.SortStatusImageTags(imageStatus)
 		newStatus.ImageStatuses[imageName] = *imageStatus
 		for _, tagStatus := range imageStatus.Tags {
 			switch tagStatus.Phase {

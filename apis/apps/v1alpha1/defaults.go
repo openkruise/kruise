@@ -507,10 +507,10 @@ func SetDefaultsImagePullJob(obj *ImagePullJob) {
 	if obj.Spec.PullPolicy == nil {
 		obj.Spec.PullPolicy = &PullPolicy{}
 	}
-	if obj.Spec.PullPolicy.TimeoutSeconds != nil {
+	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
 		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
 	}
-	if obj.Spec.PullPolicy.BackoffLimit != nil {
+	if obj.Spec.PullPolicy.BackoffLimit == nil {
 		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
 	}
 }

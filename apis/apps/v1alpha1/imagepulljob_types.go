@@ -21,6 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	ImagePreDownloadParallelismKey    = "apps.kruise.io/image-predownload-parallelism"
+	ImagePreDownloadTimeoutSecondsKey = "apps.kruise.io/image-predownload-timeout-seconds"
+)
+
 // ImagePullJobSpec defines the desired state of ImagePullJob
 type ImagePullJobSpec struct {
 	// Image is the image to be pulled by the job

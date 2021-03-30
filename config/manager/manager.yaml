@@ -29,6 +29,7 @@ spec:
         - --enable-leader-election
         - --logtostderr=true
         - --v=5
+        - --feature-gates=AllAlpha=true
         image: controller:latest
         imagePullPolicy: Always
         name: manager

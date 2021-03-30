@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -66,7 +66,7 @@ func (e *nodeImageEventHandler) Generic(evt event.GenericEvent, q workqueue.Rate
 
 func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q workqueue.RateLimitingInterface) {
 	// Get jobs related to this NodeImage
-	jobs, _, err := nodeimagesutil.GetActiveJobsForNodeImage(e.Reader, nodeImage, nil)
+	jobs, _, err := utilimagejob.GetActiveJobsForNodeImage(e.Reader, nodeImage, nil)
 	if err != nil {
 		klog.Errorf("Failed to get jobs for NodeImage %s: %v", nodeImage.Name, err)
 	}
@@ -101,7 +101,7 @@ func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1alph
 	klog.V(5).Infof("Find NodeImage %s updated and only affect images: %v", nodeImage.Name, changedImages.List())
 
 	// Get jobs related to this NodeImage
-	newJobs, oldJobs, err := nodeimagesutil.GetActiveJobsForNodeImage(e.Reader, nodeImage, oldNodeImage)
+	newJobs, oldJobs, err := utilimagejob.GetActiveJobsForNodeImage(e.Reader, nodeImage, oldNodeImage)
 	if err != nil {
 		klog.Errorf("Failed to get jobs for NodeImage %s: %v", nodeImage.Name, err)
 	}
@@ -153,7 +153,7 @@ func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.RateLimitingInterface)
 		return
 	}
 	// Get jobs related to this Pod
-	jobs, _, err := nodeimagesutil.GetActiveJobsForPod(e.Reader, pod, nil)
+	jobs, _, err := utilimagejob.GetActiveJobsForPod(e.Reader, pod, nil)
 	if err != nil {
 		klog.Errorf("Failed to get jobs for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
@@ -170,7 +170,7 @@ func (e *podEventHandler) handleUpdate(pod, oldPod *v1.Pod, q workqueue.RateLimi
 		return
 	}
 	// Get jobs related to this NodeImage
-	newJobs, oldJobs, err := nodeimagesutil.GetActiveJobsForPod(e.Reader, pod, oldPod)
+	newJobs, oldJobs, err := utilimagejob.GetActiveJobsForPod(e.Reader, pod, oldPod)
 	if err != nil {
 		klog.Errorf("Failed to get jobs for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
