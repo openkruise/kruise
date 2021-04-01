@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
@@ -45,6 +46,7 @@ type Daemon interface {
 type daemon struct {
 	runtimeFactory   daemonruntime.Factory
 	pullerController *imagepuller.Controller
+	crrController    *containerrecreate.Controller
 
 	listener  net.Listener
 	healthz   *daemonutil.Healthz
@@ -87,9 +89,15 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 		return nil, fmt.Errorf("failed to new image puller controller: %v", err)
 	}
 
+	crrController, err := containerrecreate.NewController(cfg, runtimeFactory, healthz)
+	if err != nil {
+		return nil, fmt.Errorf("failed to new crr daemon controller: %v", err)
+	}
+
 	return &daemon{
 		runtimeFactory:   runtimeFactory,
 		pullerController: puller,
+		crrController:    crrController,
 
 		listener:  listener,
 		healthz:   healthz,
@@ -100,6 +108,7 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 func (d *daemon) Run(stop <-chan struct{}) error {
 	go d.serve(stop)
 	go d.pullerController.Run(stop)
+	go d.crrController.Run(stop)
 
 	select {
 	case <-stop:

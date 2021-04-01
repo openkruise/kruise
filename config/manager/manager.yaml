@@ -84,7 +84,7 @@ spec:
         - /kruise-daemon
         args:
         - --logtostderr=true
-        - -v=4
+        - -v=5
         image: controller:latest
         imagePullPolicy: Always
         name: daemon

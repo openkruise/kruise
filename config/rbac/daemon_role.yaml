@@ -28,3 +28,21 @@ rules:
   - events
   verbs:
   - create
+  - update
+  - patch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests/status
+  verbs:
+  - get
+  - patch
+  - update

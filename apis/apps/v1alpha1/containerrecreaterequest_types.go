@@ -159,6 +159,8 @@ type ContainerRecreateRequestSyncContainerStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=crr
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="Phase of this ContainerRecreateRequest."
+// +kubebuilder:printcolumn:name="POD",type="string",JSONPath=".spec.podName",description="Pod name of this ContainerRecreateRequest."
+// +kubebuilder:printcolumn:name="NODE",type="string",JSONPath=".metadata.labels.crr\\.apps\\.kruise\\.io/node-name",description="Pod name of this ContainerRecreateRequest."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp",description="CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC."
 
 // ContainerRecreateRequest is the Schema for the containerrecreaterequests API

@@ -39,10 +39,6 @@ type PodCreateHandler struct {
 	Decoder *admission.Decoder
 }
 
-func (h *PodCreateHandler) mutatingPodFn(ctx context.Context, req admission.Request, obj *corev1.Pod) error {
-	return h.sidecarsetMutatingPod(ctx, req, obj)
-}
-
 var _ admission.Handler = &PodCreateHandler{}
 
 // Handle handles admission requests.
@@ -60,7 +56,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 
 	injectPodReadinessGate(req, obj)
 
-	err = h.mutatingPodFn(ctx, req, obj)
+	err = h.sidecarsetMutatingPod(ctx, req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
