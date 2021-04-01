@@ -30,7 +30,7 @@ func TestValidate(t *testing.T) {
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyAlways,
 				DNSPolicy:     v1.DNSClusterFirst,
-				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 			},
 		},
 	}
@@ -42,7 +42,7 @@ func TestValidate(t *testing.T) {
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyAlways,
 				DNSPolicy:     v1.DNSClusterFirst,
-				Containers:    []v1.Container{{Name: "abc", Image: "image1", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []v1.Container{{Name: "abc", Image: "image1", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 			},
 		},
 	}
@@ -54,7 +54,7 @@ func TestValidate(t *testing.T) {
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyAlways,
 				DNSPolicy:     v1.DNSClusterFirst,
-				Containers:    []v1.Container{{Name: "abc", Image: "image2", ImagePullPolicy: "Always"}},
+				Containers:    []v1.Container{{Name: "abc", Image: "image2", ImagePullPolicy: "Always", TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 			},
 		},
 	}
