@@ -65,7 +65,7 @@ func (h *Healthz) Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	_, _ = w.Write([]byte("ok"))
 	if h.healthzCount%10 == 0 {
-		klog.V(5).Infof("/healthz ok %v", h.info)
+		klog.V(6).Infof("/healthz ok %v", h.info)
 	}
 }
 

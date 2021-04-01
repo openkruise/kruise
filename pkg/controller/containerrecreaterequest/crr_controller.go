@@ -221,12 +221,15 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(request reconcile.Request)
 }
 
 func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
-	var syncContainerStatuses []appsv1alpha1.ContainerRecreateRequestSyncContainerStatus
+	syncContainerStatuses := make([]appsv1alpha1.ContainerRecreateRequestSyncContainerStatus, 0, len(crr.Spec.Containers))
 	for i := range crr.Spec.Containers {
 		c := &crr.Spec.Containers[i]
 		containerStatus := util.GetContainerStatus(c.Name, pod)
 		if containerStatus == nil {
 			klog.Warningf("Not found %s container in Pod Status for CRR %s/%s", c.Name, crr.Namespace, crr.Name)
+			continue
+		} else if containerStatus.State.Running == nil || containerStatus.State.Running.StartedAt.Before(&crr.CreationTimestamp) {
+			// ignore non-running and history status
 			continue
 		}
 		syncContainerStatuses = append(syncContainerStatuses, appsv1alpha1.ContainerRecreateRequestSyncContainerStatus{

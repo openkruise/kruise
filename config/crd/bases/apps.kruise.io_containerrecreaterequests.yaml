@@ -13,6 +13,14 @@ spec:
     description: Phase of this ContainerRecreateRequest.
     name: PHASE
     type: string
+  - JSONPath: .spec.podName
+    description: Pod name of this ContainerRecreateRequest.
+    name: POD
+    type: string
+  - JSONPath: .metadata.labels.crr\.apps\.kruise\.io/node-name
+    description: Pod name of this ContainerRecreateRequest.
+    name: NODE
+    type: string
   - JSONPath: .metadata.creationTimestamp
     description: CreationTimestamp is a timestamp representing the server time when
       this object was created. It is not guaranteed to be set in happens-before order
