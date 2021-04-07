@@ -114,7 +114,6 @@ func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
 		StatusClient: mgr.GetClient(),
 	}
 
-	filterActiveHandlers()
 	c, err := webhookcontroller.New(mgr.GetConfig(), cli, HandlerMap)
 	if err != nil {
 		return err
