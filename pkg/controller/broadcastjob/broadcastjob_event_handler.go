@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -43,7 +44,7 @@ func (p *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	}
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: pod.Namespace, Name: controllerRef.Name}.String()
-		scaleExpectations.ObserveScale(key, expectations.Create, pod.Spec.NodeName)
+		scaleExpectations.ObserveScale(key, expectations.Create, getAssignedNode(pod))
 		p.enqueueHandler.Create(evt, q)
 	}
 }
@@ -52,7 +53,7 @@ func (p *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	pod := evt.Object.(*v1.Pod)
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: pod.Namespace, Name: controllerRef.Name}.String()
-		scaleExpectations.ObserveScale(key, expectations.Delete, pod.Spec.NodeName)
+		scaleExpectations.ObserveScale(key, expectations.Delete, getAssignedNode(pod))
 		p.enqueueHandler.Delete(evt, q)
 	}
 }
@@ -200,4 +201,24 @@ func shouldIgnoreNodeUpdate(oldNode, curNode v1.Node) bool {
 	oldNode.ResourceVersion = curNode.ResourceVersion
 	oldNode.Status.Conditions = curNode.Status.Conditions
 	return apiequality.Semantic.DeepEqual(oldNode, curNode)
+}
+
+func getAssignedNode(pod *v1.Pod) string {
+	if pod.Spec.NodeName != "" {
+		return pod.Spec.NodeName
+	}
+	if pod.Spec.Affinity != nil &&
+		pod.Spec.Affinity.NodeAffinity != nil &&
+		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		terms := pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+		for _, t := range terms {
+			for _, req := range t.MatchFields {
+				if req.Key == schedulerapi.NodeFieldSelectorKeyNodeName && req.Operator == v1.NodeSelectorOpIn && len(req.Values) == 1 {
+					return req.Values[0]
+				}
+			}
+		}
+	}
+	klog.Warningf("Not found assigned node in Pod %s/%s", pod.Namespace, pod.Name)
+	return ""
 }
