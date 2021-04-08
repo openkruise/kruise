@@ -120,7 +120,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				job, err = tester.GetBroadcastJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Succeeded
-			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			}, 30*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
 		})
 	})
 })
