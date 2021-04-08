@@ -1,5 +1,15 @@
 # Change Log
 
+## v0.8.1
+
+### Kruise-daemon
+
+- Optimize cri-runtime for kruise-daemon
+
+### BroadcastJob
+
+- Fix broadcastjob expectation observed when node assigned by scheduler
+
 ## v0.8.0
 
 ### Breaking changes
