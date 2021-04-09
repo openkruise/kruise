@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -107,7 +106,7 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 		klog.Errorf("Error enqueueing broadcastjob on addNode %v", err)
 	}
 	for _, bcj := range jobList.Items {
-		mockPod := NewPod(&bcj, node.Name)
+		mockPod := NewMockPod(&bcj, node.Name)
 		canFit, err := checkNodeFitness(mockPod, node)
 		if err != nil {
 			klog.Errorf("failed to checkNodeFitness for job %s/%s, on node %s, %v", bcj.Namespace, bcj.Name, node.Name, err)
@@ -138,7 +137,7 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterfac
 		klog.Errorf("Error enqueueing broadcastjob on updateNode %v", err)
 	}
 	for _, bcj := range jobList.Items {
-		mockPod := NewPod(&bcj, oldNode.Name)
+		mockPod := NewMockPod(&bcj, oldNode.Name)
 		canOldNodeFit, err := checkNodeFitness(mockPod, oldNode)
 		if err != nil {
 			klog.Errorf("failed to checkNodeFitness for job %s/%s, on old node %s, %v", bcj.Namespace, bcj.Name, oldNode.Name, err)
@@ -201,24 +200,4 @@ func shouldIgnoreNodeUpdate(oldNode, curNode v1.Node) bool {
 	oldNode.ResourceVersion = curNode.ResourceVersion
 	oldNode.Status.Conditions = curNode.Status.Conditions
 	return apiequality.Semantic.DeepEqual(oldNode, curNode)
-}
-
-func getAssignedNode(pod *v1.Pod) string {
-	if pod.Spec.NodeName != "" {
-		return pod.Spec.NodeName
-	}
-	if pod.Spec.Affinity != nil &&
-		pod.Spec.Affinity.NodeAffinity != nil &&
-		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		terms := pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
-		for _, t := range terms {
-			for _, req := range t.MatchFields {
-				if req.Key == schedulerapi.NodeFieldSelectorKeyNodeName && req.Operator == v1.NodeSelectorOpIn && len(req.Values) == 1 {
-					return req.Values[0]
-				}
-			}
-		}
-	}
-	klog.Warningf("Not found assigned node in Pod %s/%s", pod.Namespace, pod.Name)
-	return ""
 }

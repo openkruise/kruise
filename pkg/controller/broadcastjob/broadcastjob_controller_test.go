@@ -19,9 +19,8 @@ package broadcastjob
 import (
 	"flag"
 	"fmt"
+	"reflect"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/labels"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -29,12 +28,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -45,6 +46,42 @@ func init() {
 	klog.InitFlags(nil)
 	_ = flag.Set("logtostderr", "true")
 	_ = flag.Set("v", "10")
+}
+
+func TestGetNodeToPodMap(t *testing.T) {
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "p01"},
+			Spec:       v1.PodSpec{NodeName: "n01"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "p02"},
+			Spec: v1.PodSpec{Affinity: &v1.Affinity{NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+					MatchFields: []v1.NodeSelectorRequirement{{Key: schedulerapi.NodeFieldSelectorKeyNodeName, Operator: v1.NodeSelectorOpIn, Values: []string{"n02"}}},
+				}}},
+			}}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "p03"},
+			Spec:       v1.PodSpec{NodeName: "n03"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "p04"},
+			Spec: v1.PodSpec{Affinity: &v1.Affinity{NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
+					MatchFields: []v1.NodeSelectorRequirement{{Key: schedulerapi.NodeFieldSelectorKeyNodeName, Operator: v1.NodeSelectorOpIn, Values: []string{"n04"}}},
+				}}},
+			}}},
+		},
+	}
+
+	r := &ReconcileBroadcastJob{recorder: record.NewFakeRecorder(10)}
+	nodeToPodMap := r.getNodeToPodMap(pods, &appsv1alpha1.BroadcastJob{})
+	expectedNodeToPodMap := map[string]*v1.Pod{"n01": pods[0], "n02": pods[1], "n03": pods[2], "n04": pods[3]}
+	if !reflect.DeepEqual(nodeToPodMap, expectedNodeToPodMap) {
+		t.Fatalf("Unexpected nodeToPodMap: %#v", nodeToPodMap)
+	}
 }
 
 // Test scenario:
