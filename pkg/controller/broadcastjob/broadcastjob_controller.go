@@ -538,7 +538,7 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 		} else {
 			// no pod exists, mock a pod to check if the pod can fit on the node,
 			// considering nodeName, label affinity and taints
-			mockPod := NewPod(job, node.Name)
+			mockPod := NewMockPod(job, node.Name)
 			canFit, err = checkNodeFitness(mockPod, &node)
 			if err != nil {
 				klog.Errorf("failed to checkNodeFitness for node %s, %v", node.Name, err)
@@ -560,7 +560,7 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 func (r *ReconcileBroadcastJob) getNodeToPodMap(pods []*corev1.Pod, job *appsv1alpha1.BroadcastJob) map[string]*corev1.Pod {
 	nodeToPodMap := make(map[string]*corev1.Pod)
 	for i, pod := range pods {
-		nodeName := pod.Spec.NodeName
+		nodeName := getAssignedNode(pod)
 		if _, ok := nodeToPodMap[nodeName]; ok {
 			// should not happen
 			klog.Warningf("Duplicated pod %s run on the same node %s. this should not happen.", pod.Name, nodeName)
@@ -630,8 +630,8 @@ func logPredicateFailedReason(reasons []predicates.PredicateFailureReason, node 
 	}
 }
 
-// NewPod creates a new pod
-func NewPod(job *appsv1alpha1.BroadcastJob, nodeName string) *corev1.Pod {
+// NewMockPod creates a new mock pod
+func NewMockPod(job *appsv1alpha1.BroadcastJob, nodeName string) *corev1.Pod {
 	newPod := &corev1.Pod{Spec: job.Spec.Template.Spec, ObjectMeta: job.Spec.Template.ObjectMeta}
 	newPod.Namespace = job.Namespace
 	newPod.Spec.NodeName = nodeName
@@ -649,9 +649,9 @@ func (r *ReconcileBroadcastJob) deleteJobPods(job *appsv1alpha1.BroadcastJob, po
 		go func(ix int32) {
 			defer wait.Done()
 			key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}.String()
-			scaleExpectations.ExpectScale(key, expectations.Delete, pods[ix].Spec.NodeName)
+			scaleExpectations.ExpectScale(key, expectations.Delete, getAssignedNode(pods[ix]))
 			if err := r.Delete(context.TODO(), pods[ix]); err != nil {
-				scaleExpectations.ObserveScale(key, expectations.Delete, pods[ix].Spec.NodeName)
+				scaleExpectations.ObserveScale(key, expectations.Delete, getAssignedNode(pods[ix]))
 				defer utilruntime.HandleError(err)
 				klog.Infof("Failed to delete %v, job %q/%q", pods[ix].Name, job.Namespace, job.Name)
 				errCh <- err
