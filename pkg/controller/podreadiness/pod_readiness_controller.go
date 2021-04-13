@@ -120,12 +120,6 @@ func (r *ReconcilePodReadiness) Reconcile(request reconcile.Request) (res reconc
 		if pod.DeletionTimestamp != nil {
 			return nil
 		}
-		if !utilpodreadiness.ContainsReadinessGate(pod) {
-			return nil
-		}
-		if utilpodreadiness.GetReadinessCondition(pod) != nil {
-			return nil
-		}
 
 		pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
 			Type:               appspub.KruisePodReadyConditionType,
