@@ -37,6 +37,11 @@ func SetDefaultsSidecarSet(obj *SidecarSet) {
 	for i := range obj.Spec.Containers {
 		setDefaultSidecarContainer(&obj.Spec.Containers[i])
 	}
+
+	for i := range obj.Spec.Volumes {
+		v := &obj.Spec.Volumes[i]
+		SetDefaultsVolume(v)
+	}
 }
 
 func setDefaultSidecarContainer(sidecarContainer *SidecarContainer) {
@@ -328,59 +333,63 @@ func SetDefaultPod(in *corev1.Pod) {
 	}
 }
 
+func SetDefaultsVolume(v *corev1.Volume) {
+	v1.SetDefaults_Volume(v)
+	if v.VolumeSource.HostPath != nil {
+		v1.SetDefaults_HostPathVolumeSource(v.VolumeSource.HostPath)
+	}
+	if v.VolumeSource.Secret != nil {
+		v1.SetDefaults_SecretVolumeSource(v.VolumeSource.Secret)
+	}
+	if v.VolumeSource.ISCSI != nil {
+		v1.SetDefaults_ISCSIVolumeSource(v.VolumeSource.ISCSI)
+	}
+	if v.VolumeSource.RBD != nil {
+		v1.SetDefaults_RBDVolumeSource(v.VolumeSource.RBD)
+	}
+	if v.VolumeSource.DownwardAPI != nil {
+		v1.SetDefaults_DownwardAPIVolumeSource(v.VolumeSource.DownwardAPI)
+		for j := range v.VolumeSource.DownwardAPI.Items {
+			b := &v.VolumeSource.DownwardAPI.Items[j]
+			if b.FieldRef != nil {
+				v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+			}
+		}
+	}
+	if v.VolumeSource.ConfigMap != nil {
+		v1.SetDefaults_ConfigMapVolumeSource(v.VolumeSource.ConfigMap)
+	}
+	if v.VolumeSource.AzureDisk != nil {
+		v1.SetDefaults_AzureDiskVolumeSource(v.VolumeSource.AzureDisk)
+	}
+	if v.VolumeSource.Projected != nil {
+		v1.SetDefaults_ProjectedVolumeSource(v.VolumeSource.Projected)
+		for j := range v.VolumeSource.Projected.Sources {
+			b := &v.VolumeSource.Projected.Sources[j]
+			if b.DownwardAPI != nil {
+				for k := range b.DownwardAPI.Items {
+					c := &b.DownwardAPI.Items[k]
+					if c.FieldRef != nil {
+						v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+					}
+				}
+			}
+			if b.ServiceAccountToken != nil {
+				v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+			}
+		}
+	}
+	if v.VolumeSource.ScaleIO != nil {
+		v1.SetDefaults_ScaleIOVolumeSource(v.VolumeSource.ScaleIO)
+	}
+}
+
 // SetDefaultPodSpec sets default pod spec
 func SetDefaultPodSpec(in *corev1.PodSpec) {
 	v1.SetDefaults_PodSpec(in)
 	for i := range in.Volumes {
 		a := &in.Volumes[i]
-		v1.SetDefaults_Volume(a)
-		if a.VolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
-		}
-		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
-		}
-		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
-		}
-		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
-		}
-		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
-			for j := range a.VolumeSource.DownwardAPI.Items {
-				b := &a.VolumeSource.DownwardAPI.Items[j]
-				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
-				}
-			}
-		}
-		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
-		}
-		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
-		}
-		if a.VolumeSource.Projected != nil {
-			v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
-			for j := range a.VolumeSource.Projected.Sources {
-				b := &a.VolumeSource.Projected.Sources[j]
-				if b.DownwardAPI != nil {
-					for k := range b.DownwardAPI.Items {
-						c := &b.DownwardAPI.Items[k]
-						if c.FieldRef != nil {
-							v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
-						}
-					}
-				}
-				if b.ServiceAccountToken != nil {
-					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
-				}
-			}
-		}
-		if a.VolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
-		}
+		SetDefaultsVolume(a)
 	}
 	for i := range in.InitContainers {
 		a := &in.InitContainers[i]

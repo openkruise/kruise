@@ -26,6 +26,14 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 					},
 				},
 			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "sidecarset-volume",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
 		},
 	}
 	appsv1alpha1.SetDefaultsSidecarSet(sidecarSet)
@@ -33,6 +41,11 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 	if sidecarSet.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateSidecarSetStrategyType {
 		t.Fatalf("update strategy not initialized")
 	}
+
+	if len(sidecarSet.Spec.Volumes) == 0 {
+		t.Fatalf("volumes not initialized")
+	}
+
 	if *sidecarSet.Spec.UpdateStrategy.Partition != intstr.FromInt(0) {
 		t.Fatalf("partition not initialized")
 	}
