@@ -266,6 +266,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 		pullPolicy.ActiveDeadlineSeconds = job.Spec.CompletionPolicy.ActiveDeadlineSeconds
 	}
 
+	now := metav1.NewTime(r.clock.Now())
 	imageName, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(job.Spec.Image)
 	for i := 0; i < parallelism; i++ {
 		var skip bool
@@ -299,6 +300,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 				tagSpec.Version++
 				// merge owner reference
 				tagSpec.OwnerReferences = append(tagSpec.OwnerReferences, *ownerRef)
+				tagSpec.CreatedAt = &now
 				found = true
 				break
 			}
@@ -318,6 +320,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 					Version:         foundVersion + 1,
 					PullPolicy:      &pullPolicy,
 					OwnerReferences: []v1.ObjectReference{*ownerRef},
+					CreatedAt:       &now,
 				})
 			}
 			utilimagejob.SortSpecImageTags(&imageSpec)
