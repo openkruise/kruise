@@ -574,7 +574,11 @@ func TestUpdate(t *testing.T) {
 			inplaceupdate.NewForTest(fakeClient, clonesetutils.RevisionAdapterImpl, func() metav1.Time { return now }),
 			record.NewFakeRecorder(10),
 		}
-		if _, err := ctrl.Update(mc.cs, nil, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
+		currentRevision := mc.updateRevision
+		if len(mc.revisions) > 0 {
+			currentRevision = mc.revisions[0]
+		}
+		if _, err := ctrl.Update(mc.cs, currentRevision, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
 			t.Fatalf("Failed to test %s, manage error: %v", mc.name, err)
 		}
 		podList := v1.PodList{}
@@ -717,6 +721,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 
 	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
 	for i, tc := range cases {
+		currentRevision := "current"
 		updateRevision := "updated"
 		indexes := sets.NewInt(tc.waitUpdateIndexes...)
 		for i, pod := range tc.pods {
@@ -727,7 +732,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 
 		replicas := int32(tc.totalReplicas)
 		cs := &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: &replicas, UpdateStrategy: tc.strategy}}
-		diffRes := calculateDiffsWithExpectation(cs, tc.pods, updateRevision)
+		diffRes := calculateDiffsWithExpectation(cs, tc.pods, currentRevision, updateRevision)
 
 		res := limitUpdateIndexes(coreControl, 0, diffRes, tc.waitUpdateIndexes, tc.pods)
 		if len(res) != tc.expectedResult {

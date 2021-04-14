@@ -59,7 +59,7 @@ type expectationDiffs struct {
 
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, updateRevision string) (res expectationDiffs) {
+func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable int
@@ -126,6 +126,11 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, up
 
 	updateOldDiff := oldRevisionActiveCount - partition
 	updateNewDiff := newRevisionActiveCount - (replicas - partition)
+	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
+	if updateRevision == currentRevision {
+		updateOldDiff = integer.IntMax(updateOldDiff, 0)
+		updateNewDiff = integer.IntMin(updateNewDiff, 0)
+	}
 
 	// calculate the number of surge to use
 	if maxSurge > 0 {
