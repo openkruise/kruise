@@ -333,7 +333,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 2, updateMaxUnavailable: 1},
 		},
 		{
 			name: "update in-place partition=3 with maxSurge (step 2/4)",
@@ -384,7 +384,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 2, updateMaxUnavailable: 1},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 2/7)",
@@ -422,7 +422,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 			},
-			expectResult: expectationDiffs{useSurge: 1, scaleNum: 1},
+			expectResult: expectationDiffs{useSurge: 1, scaleNum: 1, updateNum: 1, updateMaxUnavailable: 1},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 5/7)",
@@ -513,6 +513,32 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			},
 			revisionConsistent: true,
 			expectResult:       expectationDiffs{updateNum: 2, updateMaxUnavailable: 1},
+		},
+		{
+			name: "allow to update when fail to scale out normally",
+			set:  createTestCloneSet(5, intstr.FromInt(1), intstr.FromInt(2), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			revisionConsistent: true,
+			expectResult:       expectationDiffs{scaleNum: 1, updateNum: 1, updateMaxUnavailable: 1},
+		},
+		{
+			name: "allow to update when fail to scale in normally",
+			set:  createTestCloneSet(5, intstr.FromInt(1), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			revisionConsistent: true,
+			expectResult:       expectationDiffs{scaleNum: -1, scaleNumOldRevision: -2, deleteReadyLimit: 2, updateNum: 1, updateMaxUnavailable: 2},
 		},
 	}
 

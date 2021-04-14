@@ -181,16 +181,14 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		res.deleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-preDeletingCount-notReadyNewRevisionCount-notReadyOldRevisionCount, 0)
 	}
 
-	// Do update only if the scaling has satisfied
-	if newRevisionActiveCount+oldRevisionActiveCount == replicas+res.useSurge {
-		if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
-			res.updateNum = updateOldDiff
-		} else {
-			res.updateNum = 0 - updateNewDiff
-		}
+	// The consistency between scale and update will be guaranteed by syncCloneSet and expectations
+	if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
+		res.updateNum = updateOldDiff
+	} else {
+		res.updateNum = 0 - updateNewDiff
 	}
 	if res.updateNum != 0 {
-		res.updateMaxUnavailable = maxUnavailable + res.useSurge
+		res.updateMaxUnavailable = maxUnavailable + len(pods) - replicas
 	}
 
 	return
