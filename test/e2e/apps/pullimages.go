@@ -216,6 +216,68 @@ var _ = SIGDescribe("PullImage", func() {
 			gomega.Expect(job.Status.Succeeded).To(gomega.Equal(int32(len(nodes))))
 			gomega.Expect(job.Status.CompletionTime == nil).To(gomega.Equal(true))
 		})
+
+		ginkgo.It("create two jobs to pull a same image", func() {
+			ginkgo.By("Create job1")
+			job1 := baseJob.DeepCopy()
+			job1.Name = baseJob.Name + "-1"
+			job1.Spec = appsv1alpha1.ImagePullJobSpec{
+				Image:    "nginx:1.9.4",
+				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+				PullPolicy: &appsv1alpha1.PullPolicy{
+					TimeoutSeconds: utilpointer.Int32Ptr(50),
+					BackoffLimit:   utilpointer.Int32Ptr(2),
+				},
+				Parallelism: &intorstr4,
+				CompletionPolicy: appsv1alpha1.CompletionPolicy{
+					Type: appsv1alpha1.Never,
+				},
+			}
+			err := testerForImagePullJob.CreateJob(job1)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Desired should be equal to 1")
+			gomega.Eventually(func() int32 {
+				job1, err = testerForImagePullJob.GetJob(job1)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job1.Status.Desired
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Wait job1 completed in 60s")
+			gomega.Eventually(func() int32 {
+				job1, err = testerForImagePullJob.GetJob(job1)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job1.Status.Succeeded
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Wait until job1 has created over 70s (> response timeout)")
+			time.Until(job1.CreationTimestamp.Add(70 * time.Second))
+
+			ginkgo.By("Create job2")
+			job2 := baseJob.DeepCopy()
+			job2.Name = baseJob.Name + "-2"
+			job2.Spec = appsv1alpha1.ImagePullJobSpec{
+				Image:    "nginx:1.9.4",
+				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+				PullPolicy: &appsv1alpha1.PullPolicy{
+					TimeoutSeconds: utilpointer.Int32Ptr(50),
+					BackoffLimit:   utilpointer.Int32Ptr(2),
+				},
+				Parallelism: &intorstr4,
+				CompletionPolicy: appsv1alpha1.CompletionPolicy{
+					Type: appsv1alpha1.Never,
+				},
+			}
+			err = testerForImagePullJob.CreateJob(job2)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait job2 completed in 10s")
+			gomega.Eventually(func() int32 {
+				job2, err = testerForImagePullJob.GetJob(job2)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job2.Status.Succeeded
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+		})
 	})
 
 })
