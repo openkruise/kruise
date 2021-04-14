@@ -68,7 +68,7 @@ func (r *realControl) Scale(
 	}
 
 	// 2. calculate scale numbers
-	diffRes := calculateDiffsWithExpectation(updateCS, pods, updateRevision)
+	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision)
 	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
 
 	// 3. scale out

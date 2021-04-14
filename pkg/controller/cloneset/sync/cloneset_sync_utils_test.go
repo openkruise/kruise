@@ -33,10 +33,11 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 	newRevision := "new_rev"
 
 	cases := []struct {
-		name         string
-		set          *appsv1alpha1.CloneSet
-		pods         []*v1.Pod
-		expectResult expectationDiffs
+		name               string
+		set                *appsv1alpha1.CloneSet
+		pods               []*v1.Pod
+		revisionConsistent bool
+		expectResult       expectationDiffs
 	}{
 		{
 			name:         "an empty cloneset",
@@ -461,11 +462,67 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			},
 			expectResult: expectationDiffs{},
 		},
+		{
+			name: "revision consistent 1",
+			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			revisionConsistent: true,
+			expectResult:       expectationDiffs{},
+		},
+		{
+			name: "revision consistent 2",
+			set:  createTestCloneSet(5, intstr.FromInt(3), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			revisionConsistent: true,
+			expectResult:       expectationDiffs{},
+		},
+		{
+			name: "revision consistent 3",
+			set:  createTestCloneSet(5, intstr.FromInt(3), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			revisionConsistent: true,
+			expectResult:       expectationDiffs{},
+		},
+		{
+			name: "revision consistent 4",
+			set:  createTestCloneSet(5, intstr.FromInt(1), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			revisionConsistent: true,
+			expectResult:       expectationDiffs{updateNum: 2, updateMaxUnavailable: 1},
+		},
 	}
 
 	for i := range cases {
 		t.Run(cases[i].name, func(t *testing.T) {
-			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, newRevision)
+			current := oldRevision
+			if cases[i].revisionConsistent {
+				current = newRevision
+			}
+			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision)
 			if !reflect.DeepEqual(res, cases[i].expectResult) {
 				t.Errorf("got %#v, expect %#v", res, cases[i].expectResult)
 			}
