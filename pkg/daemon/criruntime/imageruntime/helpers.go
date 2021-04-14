@@ -144,7 +144,7 @@ func (pp *pullingProgress) getProgressPercent() int32 {
 	if total == int64(0) {
 		return 0
 	}
-	return int32(int64(current) * 100 / total)
+	return int32(current * 100 / total)
 }
 
 type imagePullStatusReader struct {
