@@ -82,6 +82,42 @@ var _ = SIGDescribe("sidecarset", func() {
 			ginkgo.By(fmt.Sprintf("test no matched sidecarSet done"))
 		})
 
+		ginkgo.It("sidecarset with volumes.downwardAPI", func() {
+			// create sidecarSet
+			sidecarSet := tester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.Volumes = []corev1.Volume{
+				{
+					Name: "podinfo",
+					VolumeSource: corev1.VolumeSource{
+						DownwardAPI: &corev1.DownwardAPIVolumeSource{
+							Items: []corev1.DownwardAPIVolumeFile{
+								{
+									Path: "labels",
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: "metadata.labels",
+									},
+								},
+								{
+									Path: "annotations",
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: "metadata.annotations",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			sidecarSet.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc/podinfo",
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s with volumes.downwardAPI", sidecarSet.Name))
+			tester.CreateSidecarSet(sidecarSet)
+		})
+
 		ginkgo.It("sidecarSet inject pod sidecar container", func() {
 			// create sidecarSet
 			sidecarSet := tester.NewBaseSidecarSet(ns)
