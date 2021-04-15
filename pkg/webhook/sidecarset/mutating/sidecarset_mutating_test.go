@@ -28,6 +28,38 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 			},
 		},
 	}
+
+	sidecarSet.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "podinfo",
+			VolumeSource: corev1.VolumeSource{
+				DownwardAPI: &corev1.DownwardAPIVolumeSource{
+					Items: []corev1.DownwardAPIVolumeFile{
+						{
+							Path: "labels",
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels",
+							},
+						},
+						{
+							Path: "annotations",
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.annotations",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	sidecarSet.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      "podinfo",
+			MountPath: "/etc/podinfo",
+		},
+	}
+
 	appsv1alpha1.SetDefaultsSidecarSet(sidecarSet)
 	_ = setHashSidecarSet(sidecarSet)
 	if sidecarSet.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateSidecarSetStrategyType {
@@ -39,6 +71,11 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 	if *sidecarSet.Spec.UpdateStrategy.MaxUnavailable != intstr.FromInt(1) {
 		t.Fatalf("maxUnavailable not initialized")
 	}
+
+	if len(sidecarSet.Spec.Volumes) == 0 {
+		t.Fatalf("volumes not initialized")
+	}
+
 	for _, container := range sidecarSet.Spec.Containers {
 		if container.PodInjectPolicy != appsv1alpha1.BeforeAppContainerType {
 			t.Fatalf("container %v podInjectPolicy initialized incorrectly", container.Name)
@@ -60,7 +97,7 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 			t.Fatalf("container %v terminationMessagePolicy initialized incorrectly", container.Name)
 		}
 	}
-	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation] != "6wbd76bd7984x24fb4f44fv9222cw9v9bcf85x766744wddd4zwx927zzz2zb684" {
+	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation] != "7b64cw4d5xv2wvx6229fbxzf4x55wvzwxc47fvd6bbx97d44xcz6xf8844594xbz" {
 		t.Fatalf("sidecarset %v hash initialized incorrectly, got %v", sidecarSet.Name, sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation])
 	}
 }
