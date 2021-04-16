@@ -30,7 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -339,7 +339,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 		}
 		if len(newTags) > 0 {
 			imageSpec.Tags = newTags
-			nodeimagesutil.SortSpecImageTags(&imageSpec)
+			utilimagejob.SortSpecImageTags(&imageSpec)
 			newImageMap[name] = imageSpec
 		} else {
 			modified = true
@@ -433,7 +433,7 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 			if newStatus.ImageStatuses == nil {
 				newStatus.ImageStatuses = make(map[string]appsv1alpha1.ImageStatus)
 			}
-			nodeimagesutil.SortStatusImageTags(&imageStatus)
+			utilimagejob.SortStatusImageTags(&imageStatus)
 			newStatus.ImageStatuses[name] = imageStatus
 		}
 	}

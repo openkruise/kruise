@@ -165,6 +165,26 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - containerrecreaterequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - daemonsets
   verbs:
   - create

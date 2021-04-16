@@ -27,39 +27,82 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // mutate pod based on SidecarSet Object
-func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev1.Pod, oldPod *corev1.Pod) error {
+func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
+	if len(req.AdmissionRequest.SubResource) > 0 ||
+		(req.AdmissionRequest.Operation != admissionv1beta1.Create && req.AdmissionRequest.Operation != admissionv1beta1.Update) ||
+		req.AdmissionRequest.Resource.Resource != "pods" {
+		return nil
+	}
+	// filter out pods that don't require inject, include the following:
+	// 1. Deletion pod
+	// 2. ignore namespace: "kube-system", "kube-public"
 	if !sidecarcontrol.IsActivePod(pod) {
 		return nil
 	}
 
-	klog.V(3).Infof("[sidecar inject] begin to process %s/%s", pod.Namespace, pod.Name)
-	// DisableDeepCopy:true, indicates must be deep copy before update sidecarSet objection
-	listOpts := &client.ListOptions{}
-	sidecarsetList := &appsv1alpha1.SidecarSetList{}
-	if err := h.Client.List(ctx, sidecarsetList, listOpts); err != nil {
-		return err
-	}
-	isUpdated := false
-	//when oldPod is not empty, indicates it is update event
-	if oldPod != nil {
+	var oldPod *corev1.Pod
+	var isUpdated bool
+	//when Operation is update, decode older object
+	if req.AdmissionRequest.Operation == admissionv1beta1.Update {
 		isUpdated = true
-	} else {
-		oldPod = &corev1.Pod{}
+		oldPod = new(corev1.Pod)
+		if err := h.Decoder.Decode(
+			admission.Request{AdmissionRequest: admissionv1beta1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
+			oldPod); err != nil {
+			return err
+		}
 	}
 
+	// DisableDeepCopy:true, indicates must be deep copy before update sidecarSet objection
+	sidecarsetList := &appsv1alpha1.SidecarSetList{}
+	if err := h.Client.List(ctx, sidecarsetList, &client.ListOptions{}); err != nil {
+		return err
+	}
+
+	matchedSidecarSets := make([]sidecarcontrol.SidecarControl, 0)
+	for _, sidecarSet := range sidecarsetList.Items {
+		if matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); err != nil {
+			return err
+		} else if !matched {
+			continue
+		}
+		// check whether sidecarSet is active
+		// when sidecarSet is not active, it will not perform injections and upgrades process.
+		control := sidecarcontrol.New(sidecarSet.DeepCopy())
+		if !control.IsActiveSidecarSet() {
+			continue
+		}
+		matchedSidecarSets = append(matchedSidecarSets, control)
+	}
+	if len(matchedSidecarSets) == 0 {
+		return nil
+	}
+
+	// check pod
+	if isUpdated {
+		if !matchedSidecarSets[0].IsPodAvailabilityChanged(pod, oldPod) {
+			klog.V(3).Infof("pod(%s.%s) availability unchanged for sidecarSet, and ignore", pod.Namespace, pod.Name)
+			return nil
+		}
+	}
+
+	klog.V(3).Infof("[sidecar inject] begin to operation(%s) pod(%s/%s) resources(%s) subResources(%s)",
+		req.Operation, req.Namespace, req.Name, req.Resource, req.SubResource)
 	//build sidecar containers, sidecar initContainers, sidecar volumes, annotations to inject into pod object
-	sidecarContainers, sidecarInitContainers, volumesInSidecar, injectedAnnotations,
-		err := buildSidecars(isUpdated, pod, oldPod, sidecarsetList)
+	sidecarContainers, sidecarInitContainers, volumesInSidecar, injectedAnnotations, err := buildSidecars(isUpdated, pod, oldPod, matchedSidecarSets)
 	if err != nil {
 		return err
 	} else if len(sidecarContainers) == 0 && len(sidecarInitContainers) == 0 {
+		klog.V(3).Infof("[sidecar inject] pod(%s.%s) don't have injected containers", pod.Namespace, pod.Name)
 		return nil
 	}
 
@@ -87,7 +130,6 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, pod *corev
 		pod.Annotations[k] = v
 	}
 	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
-
 	return nil
 }
 
@@ -121,7 +163,7 @@ func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1alpha1
 	return origins
 }
 
-func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, sidecarsetList *appsv1alpha1.SidecarSetList) (
+func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedSidecarSets []sidecarcontrol.SidecarControl) (
 	sidecarContainers, sidecarInitContainers []*appsv1alpha1.SidecarContainer,
 	volumesInSidecars []corev1.Volume, injectedAnnotations map[string]string, err error) {
 
@@ -134,30 +176,43 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, sidecars
 	// parse sidecar hash in pod annotations
 	if oldHashStr := pod.Annotations[sidecarcontrol.SidecarSetHashAnnotation]; len(oldHashStr) > 0 {
 		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHash); err != nil {
-			return nil, nil, nil, nil,
-				fmt.Errorf("invalid %s value %v, unmarshal failed: %v", sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
+			// to be compatible with older sidecarSet hash struct, map[string]string
+			olderSidecarSetHash := make(map[string]string)
+			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
+				return nil, nil, nil, nil,
+					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
+			}
+			for k, v := range olderSidecarSetHash {
+				sidecarSetHash[k] = sidecarcontrol.SidecarSetUpgradeSpec{
+					SidecarSetHash: v,
+					SidecarSetName: k,
+				}
+			}
 		}
 	}
 	if oldHashStr := pod.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation]; len(oldHashStr) > 0 {
 		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHashWithoutImage); err != nil {
-			return nil, nil, nil, nil,
-				fmt.Errorf("invalid %s value %v, unmarshal failed: %v", sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
+			// to be compatible with older sidecarSet hash struct, map[string]string
+			olderSidecarSetHash := make(map[string]string)
+			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
+				return nil, nil, nil, nil,
+					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
+			}
+			for k, v := range olderSidecarSetHash {
+				sidecarSetHashWithoutImage[k] = sidecarcontrol.SidecarSetUpgradeSpec{
+					SidecarSetHash: v,
+					SidecarSetName: k,
+				}
+			}
 		}
 	}
 
 	//matched SidecarSet.Name list
 	sidecarSetNames := make([]string, 0)
-	for _, innerSidecarSet := range sidecarsetList.Items {
-		if matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, innerSidecarSet); err != nil {
-			return nil, nil, nil, nil, err
-			// sidecarset don't select this pod, then continue
-		} else if !matched {
-			continue
-		}
-
-		sidecarSet := innerSidecarSet.DeepCopy()
-		control := sidecarcontrol.New(sidecarSet)
-		//process sidecarset inject pods container
+	for _, control := range matchedSidecarSets {
+		sidecarSet := control.GetSidecarset()
+		klog.V(3).Infof("build pod(%s.%s) sidecar containers for sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
+		// sidecarSet List
 		sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
 		// pre-process volumes only in sidecar
 		volumesMap := getVolumesMapInSidecarSet(sidecarSet)
@@ -199,18 +254,18 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, sidecars
 			//when update pod object
 			if isUpdated {
 				// judge whether inject sidecar container into pod
-				needInject, existSidecars, existVolumes := control.NeedInjectOnUpdatedPod(pod, oldPod, sidecarContainer, transferEnvs, injectedMounts)
+				needInject, existSidecars, existVolumes := control.NeedToInjectInUpdatedPod(pod, oldPod, sidecarContainer, transferEnvs, injectedMounts)
 				if !needInject {
 					sidecarContainers = append(sidecarContainers, existSidecars...)
 					volumesInSidecars = append(volumesInSidecars, existVolumes...)
 					continue
 				}
 
-				klog.Infof("upgrade or insert sidecar container %v during upgrade in pod %v/%v",
+				klog.V(3).Infof("upgrade or insert sidecar container %v during upgrade in pod %v/%v",
 					sidecarContainer.Name, pod.Namespace, pod.Name)
 				//when created pod object, need inject sidecar container into pod
 			} else {
-				klog.Infof("inject new sidecar container %v during creation in pod %v/%v",
+				klog.V(3).Infof("inject new sidecar container %v during creation in pod %v/%v",
 					sidecarContainer.Name, pod.Namespace, pod.Name)
 			}
 
@@ -224,7 +279,17 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, sidecars
 			sidecarContainer.Env = append(sidecarContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
 			// merged Env from sidecar.Env and transfer envs
 			sidecarContainer.Env = util.MergeEnvVar(sidecarContainer.Env, transferEnvs)
-			sidecarContainers = append(sidecarContainers, sidecarContainer)
+
+			// when sidecar container UpgradeStrategy is HotUpgrade
+			if sidecarcontrol.IsHotUpgradeContainer(sidecarContainer) {
+				hotContainers, annotations := injectHotUpgradeContainers(pod, sidecarContainer)
+				sidecarContainers = append(sidecarContainers, hotContainers...)
+				for k, v := range annotations {
+					injectedAnnotations[k] = v
+				}
+			} else {
+				sidecarContainers = append(sidecarContainers, sidecarContainer)
+			}
 		}
 	}
 
@@ -233,8 +298,9 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, sidecars
 	injectedAnnotations[sidecarcontrol.SidecarSetHashAnnotation] = string(by)
 	by, _ = json.Marshal(sidecarSetHashWithoutImage)
 	injectedAnnotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = string(by)
+	sidecarSetNameList := strings.Join(sidecarSetNames, ",")
 	// store matched sidecarset list in pod annotations
-	injectedAnnotations[sidecarcontrol.SidecarSetListAnnotation] = strings.Join(sidecarSetNames, ",")
+	injectedAnnotations[sidecarcontrol.SidecarSetListAnnotation] = sidecarSetNameList
 	return sidecarContainers, sidecarInitContainers, volumesInSidecars, injectedAnnotations, nil
 }
 

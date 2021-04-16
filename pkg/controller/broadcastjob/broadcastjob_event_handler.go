@@ -43,7 +43,7 @@ func (p *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	}
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: pod.Namespace, Name: controllerRef.Name}.String()
-		scaleExpectations.ObserveScale(key, expectations.Create, pod.Spec.NodeName)
+		scaleExpectations.ObserveScale(key, expectations.Create, getAssignedNode(pod))
 		p.enqueueHandler.Create(evt, q)
 	}
 }
@@ -52,7 +52,7 @@ func (p *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	pod := evt.Object.(*v1.Pod)
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: pod.Namespace, Name: controllerRef.Name}.String()
-		scaleExpectations.ObserveScale(key, expectations.Delete, pod.Spec.NodeName)
+		scaleExpectations.ObserveScale(key, expectations.Delete, getAssignedNode(pod))
 		p.enqueueHandler.Delete(evt, q)
 	}
 }
@@ -106,7 +106,7 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 		klog.Errorf("Error enqueueing broadcastjob on addNode %v", err)
 	}
 	for _, bcj := range jobList.Items {
-		mockPod := NewPod(&bcj, node.Name)
+		mockPod := NewMockPod(&bcj, node.Name)
 		canFit, err := checkNodeFitness(mockPod, node)
 		if err != nil {
 			klog.Errorf("failed to checkNodeFitness for job %s/%s, on node %s, %v", bcj.Namespace, bcj.Name, node.Name, err)
@@ -137,7 +137,7 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterfac
 		klog.Errorf("Error enqueueing broadcastjob on updateNode %v", err)
 	}
 	for _, bcj := range jobList.Items {
-		mockPod := NewPod(&bcj, oldNode.Name)
+		mockPod := NewMockPod(&bcj, oldNode.Name)
 		canOldNodeFit, err := checkNodeFitness(mockPod, oldNode)
 		if err != nil {
 			klog.Errorf("failed to checkNodeFitness for job %s/%s, on old node %s, %v", bcj.Namespace, bcj.Name, oldNode.Name, err)

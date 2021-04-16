@@ -1,0 +1,210 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.9
+  creationTimestamp: null
+  name: containerrecreaterequests.apps.kruise.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: Phase of this ContainerRecreateRequest.
+    name: PHASE
+    type: string
+  - JSONPath: .spec.podName
+    description: Pod name of this ContainerRecreateRequest.
+    name: POD
+    type: string
+  - JSONPath: .metadata.labels.crr\.apps\.kruise\.io/node-name
+    description: Pod name of this ContainerRecreateRequest.
+    name: NODE
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    description: CreationTimestamp is a timestamp representing the server time when
+      this object was created. It is not guaranteed to be set in happens-before order
+      across separate operations. Clients may not set this value. It is represented
+      in RFC3339 form and is in UTC.
+    name: AGE
+    type: date
+  group: apps.kruise.io
+  names:
+    kind: ContainerRecreateRequest
+    listKind: ContainerRecreateRequestList
+    plural: containerrecreaterequests
+    shortNames:
+    - crr
+    singular: containerrecreaterequest
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ContainerRecreateRequest is the Schema for the containerrecreaterequests
+        API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ContainerRecreateRequestSpec defines the desired state of ContainerRecreateRequest
+          properties:
+            activeDeadlineSeconds:
+              description: ActiveDeadlineSeconds is the deadline duration of this
+                ContainerRecreateRequest.
+              format: int64
+              type: integer
+            containers:
+              description: Containers contains the containers that need to recreate
+                in the Pod.
+              items:
+                description: ContainerRecreateRequestContainer defines the container
+                  that need to recreate.
+                properties:
+                  name:
+                    description: Name of the container that need to recreate. It must
+                      be existing in the real pod.Spec.Containers.
+                    type: string
+                  ports:
+                    description: Ports is synced from the real container in Pod spec
+                      during this ContainerRecreateRequest creating. Populated by
+                      the system. Read-only.
+                    items:
+                      description: ContainerPort represents a network port in a single
+                        container.
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    type: array
+                  preStop:
+                    description: PreStop is synced from the real container in Pod
+                      spec during this ContainerRecreateRequest creating. Populated
+                      by the system. Read-only.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  statusContext:
+                    description: StatusContext is synced from the real Pod status
+                      during this ContainerRecreateRequest creating. Populated by
+                      the system. Read-only.
+                    properties:
+                      containerID:
+                        description: Container's ID in the format 'docker://<container_id>'.
+                        type: string
+                      restartCount:
+                        description: The number of times the container has been restarted,
+                          currently based on the number of dead containers that have
+                          not yet been removed. Note that this is calculated from
+                          dead containers. But those containers are subject to garbage
+                          collection. This value will get capped at 5 by GC.
+                        format: int32
+                        type: integer
+                    required:
+                    - containerID
+                    - restartCount
+                    type: object
+                required:
+                - name
+                type: object
+              type: array
+            podName:
+              description: PodName is name of the Pod that owns the recreated containers.
+              type: string
+            strategy:
+              description: Strategy defines strategies for containers recreation.
+              properties:
+                failurePolicy:
+                  description: FailurePolicy decides whether to continue if one container
+                    fails to recreate
+                  type: string
+                orderedRecreate:
+                  description: OrderedRecreate indicates whether to recreate the next
+                    container only if the previous one has recreated completely.
+                  type: boolean
+                terminationGracePeriodSeconds:
+                  description: TerminationGracePeriodSeconds is the optional duration
+                    in seconds to wait the container terminating gracefully. Value
+                    must be non-negative integer. The value zero indicates delete
+                    immediately. If this value is nil, we will use pod.Spec.TerminationGracePeriodSeconds
+                    as default value.
+                  format: int64
+                  type: integer
+                unreadyGracePeriodSeconds:
+                  description: UnreadyGracePeriodSeconds is the optional duration
+                    in seconds to mark Pod as not ready over this duration before
+                    executing preStop hook and stopping the container.
+                  format: int64
+                  type: integer
+              type: object
+            ttlSecondsAfterFinished:
+              description: TTLSecondsAfterFinished is the TTL duration after this
+                ContainerRecreateRequest has completed.
+              format: int32
+              type: integer
+          required:
+          - containers
+          - podName
+          type: object
+        status:
+          description: ContainerRecreateRequestStatus defines the observed state of
+            ContainerRecreateRequest
+          properties:
+            completionTime:
+              description: Represents time when the ContainerRecreateRequest was completed.
+                It is not guaranteed to be set in happens-before order across separate
+                operations. It is represented in RFC3339 form and is in UTC.
+              format: date-time
+              type: string
+            containerRecreateStates:
+              description: ContainerRecreateStates contains the recreation states
+                of the containers.
+              items:
+                description: ContainerRecreateRequestContainerRecreateState contains
+                  the recreation state of the container.
+                properties:
+                  message:
+                    description: A human readable message indicating details about
+                      this state.
+                    type: string
+                  name:
+                    description: Name of the container.
+                    type: string
+                  phase:
+                    description: Phase indicates the recreation phase of the container.
+                    type: string
+                required:
+                - name
+                - phase
+                type: object
+              type: array
+            message:
+              description: A human readable message indicating details about this
+                ContainerRecreateRequest.
+              type: string
+            phase:
+              description: Phase of this ContainerRecreateRequest, e.g. Pending, Recreating,
+                Completed
+              type: string
+          required:
+          - phase
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

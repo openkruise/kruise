@@ -26,14 +26,16 @@ import (
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
-	scalecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/scale"
-	updatecontrol "github.com/openkruise/kruise/pkg/controller/cloneset/update"
+	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 	apps "k8s.io/api/apps/v1"
@@ -63,6 +65,9 @@ func init() {
 
 var (
 	concurrentReconciles = 3
+
+	isPreDownloadDisabled             bool
+	minimumReplicasToPreDownloadImage int32 = 3
 )
 
 // Add creates a new CloneSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -70,6 +75,11 @@ var (
 func Add(mgr manager.Manager) error {
 	if !utildiscovery.DiscoverGVK(clonesetutils.ControllerKind) {
 		return nil
+	}
+	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
+		isPreDownloadDisabled = true
 	}
 	return add(mgr, newReconciler(mgr))
 }
@@ -93,8 +103,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		controllerHistory: historyutil.NewHistory(cli),
 		revisionControl:   revisioncontrol.NewRevisionControl(),
 	}
-	reconciler.scaleControl = scalecontrol.New(cli, reconciler.recorder)
-	reconciler.updateControl = updatecontrol.New(cli, reconciler.recorder)
+	reconciler.syncControl = synccontrol.New(cli, reconciler.recorder)
 	reconciler.reconcileFunc = reconciler.doReconcile
 	return reconciler
 }
@@ -152,8 +161,7 @@ type ReconcileCloneSet struct {
 	controllerHistory history.Interface
 	statusUpdater     StatusUpdater
 	revisionControl   revisioncontrol.Interface
-	scaleControl      scalecontrol.Interface
-	updateControl     updatecontrol.Interface
+	syncControl       synccontrol.Interface
 }
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
@@ -260,8 +268,19 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
+
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
+	clonesetutils.ResourceVersionExpectations.Observe(updateRevision)
+	if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(updateRevision); !isSatisfied {
+		if unsatisfiedDuration < expectations.ExpectationTimeout {
+			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for updateRevision %v updating", request.String(), updateRevision.Name)
+			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
+		}
+		klog.Warningf("Expectation unsatisfied overtime for %v, wait for updateRevision %v updating, timeout=%v", request.String(), updateRevision.Name, unsatisfiedDuration)
+		clonesetutils.ResourceVersionExpectations.Delete(updateRevision)
+	}
 	for _, pod := range filteredPods {
+		clonesetutils.ResourceVersionExpectations.Observe(pod)
 		if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(pod); !isSatisfied {
 			if unsatisfiedDuration >= expectations.ExpectationTimeout {
 				klog.Warningf("Expectation unsatisfied overtime for %v, wait for pod %v updating, timeout=%v", request.String(), pod.Name, unsatisfiedDuration)
@@ -280,6 +299,20 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		LabelSelector:      selector.String(),
 	}
 	*newStatus.CollisionCount = collisionCount
+
+	if !isPreDownloadDisabled {
+		if currentRevision.Name != updateRevision.Name {
+			// pre-download images for new revision
+			if err := r.createImagePullJobsForInPlaceUpdate(instance, currentRevision, updateRevision); err != nil {
+				klog.Errorf("Failed to create ImagePullJobs for %s: %v", request, err)
+			}
+		} else {
+			// delete ImagePullJobs if revisions have been consistent
+			if err := utilimagejob.DeleteJobsForWorkload(r.Client, instance); err != nil {
+				klog.Errorf("Failed to delete imagepulljobs for %s: %v", request, err)
+			}
+		}
+	}
 
 	// scale and update pods
 	delayDuration, syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
@@ -330,7 +363,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	var podsScaleErr error
 	var podsUpdateErr error
 
-	scaling, podsScaleErr = r.scaleControl.Manage(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
+	scaling, podsScaleErr = r.syncControl.Scale(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
 	if podsScaleErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedScale,
@@ -344,7 +377,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 		return delayDuration, podsScaleErr
 	}
 
-	delayDuration, podsUpdateErr = r.updateControl.Manage(updateSet, updateRevision, revisions, filteredPods, filteredPVCs)
+	delayDuration, podsUpdateErr = r.syncControl.Update(updateSet, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 	if podsUpdateErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedUpdate,
@@ -517,7 +550,7 @@ func (r *ReconcileCloneSet) truncateHistory(
 }
 
 func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) {
-	manager, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
+	mgr, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -527,7 +560,7 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 		selected[i] = pod
 	}
 
-	claimed, err := manager.ClaimOwnedObjects(selected)
+	claimed, err := mgr.ClaimOwnedObjects(selected)
 	if err != nil {
 		return nil, err
 	}

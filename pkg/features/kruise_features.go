@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -35,12 +36,23 @@ const (
 
 	// CloneSetShortHash enables CloneSet controller only set revision hash name to pod label.
 	CloneSetShortHash featuregate.Feature = "CloneSetShortHash"
+
+	// KruisePodReadinessGate enables Kruise webhook to inject 'KruisePodReady' readiness-gate to
+	// all Pods during creation.
+	// Otherwise, it will only be injected to Pods created by Kruise workloads.
+	KruisePodReadinessGate featuregate.Feature = "KruisePodReadinessGate"
+
+	// PreDownloadImageForInPlaceUpdate enables cloneset-controller to create ImagePullJobs to
+	// pre-download images for in-place update.
+	PreDownloadImageForInPlaceUpdate featuregate.Feature = "PreDownloadImageForInPlaceUpdate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	PodWebhook:        {Default: true, PreRelease: featuregate.Beta},
-	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
-	CloneSetShortHash: {Default: false, PreRelease: featuregate.Alpha},
+	PodWebhook:                       {Default: true, PreRelease: featuregate.Beta},
+	KruiseDaemon:                     {Default: true, PreRelease: featuregate.Beta},
+	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
+	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -58,4 +70,11 @@ func compatibleEnv() {
 	if !limits.Has("SidecarSet") {
 		defaultFeatureGates[PodWebhook] = featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}
 	}
+}
+
+func ValidateFeatureGates() error {
+	if utilfeature.DefaultFeatureGate.Enabled(KruisePodReadinessGate) && !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
+		return fmt.Errorf("can not enable feature-gate %s because of %s disabled", KruisePodReadinessGate, PodWebhook)
+	}
+	return nil
 }

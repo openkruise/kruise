@@ -54,7 +54,7 @@ func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, er
 func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
 	m := map[string]interface{}{"containers": sidecarSet.Spec.Containers}
-	m["initContainers"] = sidecarSet.Spec.InitContainers
+	//m["initContainers"] = sidecarSet.Spec.InitContainers
 	data, err := json.Marshal(m)
 	if err != nil {
 		return "", err

@@ -18,6 +18,7 @@ package mutating
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,8 +28,10 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -371,7 +374,8 @@ func testPodHasNoMatchedSidecarSet(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewFakeClient(sidecarSetIn)
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	_ = podHandler.sidecarsetMutatingPod(context.Background(), podOut, nil)
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 
 	if len(podOut.Spec.Containers) != len(podIn.Spec.Containers) {
 		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers), len(podOut.Spec.Containers))
@@ -389,7 +393,8 @@ func testSidecarSetPodInjectPolicy(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 	client := fake.NewFakeClient(sidecarSetIn)
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	err := podHandler.sidecarsetMutatingPod(context.Background(), podOut, nil)
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -465,7 +470,8 @@ func testSidecarVolumesAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSe
 	client := fake.NewFakeClient(sidecarSetIn)
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	err := podHandler.sidecarsetMutatingPod(context.Background(), podOut, nil)
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -489,6 +495,32 @@ func testSidecarVolumesAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSe
 			if volume.Name != "volume-1" {
 				t.Fatalf("expect volume-1 but got %v", volume.Name)
 			}
+		}
+	}
+}
+
+func TestPodSidecarSetHashCompatibility(t *testing.T) {
+	podIn := pod1.DeepCopy()
+	podIn.Annotations = map[string]string{}
+	podIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = `{"sidecarset-test":"bv6d2fbw97wz8xx5x4v4wddwbd5z744wcf7c786dd4dvxvd5w6w424df7vx47989"}`
+	podIn.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = `{"sidecarset-test":"54x5977vf9zz4248w7v44456zf655b8bcffv7x74w88f6dwb994fw48b8f9b8959"}`
+	_, _, _, annotations, err := buildSidecars(false, podIn, nil, nil)
+	if err != nil {
+		t.Fatalf("compatible pod sidecarSet Hash failed: %s", err.Error())
+	}
+	// format: sidecarset.name -> sidecarset hash
+	sidecarSetHash := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+	// format: sidecarset.name -> sidecarset hash(without image)
+	sidecarSetHashWithoutImage := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+	// parse sidecar hash in pod annotations
+	if oldHashStr := annotations[sidecarcontrol.SidecarSetHashAnnotation]; len(oldHashStr) > 0 {
+		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHash); err != nil {
+			t.Fatalf("compatible pod sidecarSet Hash failed: %s", err.Error())
+		}
+	}
+	if oldHashStr := annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation]; len(oldHashStr) > 0 {
+		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHashWithoutImage); err != nil {
+			t.Fatalf("compatible pod sidecarSet Hash failed: %s", err.Error())
 		}
 	}
 }
@@ -586,7 +618,8 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 			client := fake.NewFakeClient(cs.getSidecarSets())
 			podOut := podIn.DeepCopy()
 			podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-			err := podHandler.sidecarsetMutatingPod(context.Background(), podOut, nil)
+			req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+			err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 			if err != nil {
 				t.Fatalf("inject sidecar into pod failed, err: %v", err)
 			}
@@ -617,7 +650,8 @@ func testSidecarSetTransferEnv(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	client := fake.NewFakeClient(sidecarSetIn)
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	err := podHandler.sidecarsetMutatingPod(context.Background(), podOut, nil)
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -645,7 +679,8 @@ func testSidecarSetHashInject(t *testing.T, sidecarSetIn1 *appsv1alpha1.SidecarS
 	client := fake.NewFakeClient(sidecarSetIn1, sidecarSetIn2, sidecarSetIn3)
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	err := podHandler.sidecarsetMutatingPod(context.Background(), podOut, nil)
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -675,7 +710,8 @@ func testSidecarSetNameInject(t *testing.T, sidecarSetIn1, sidecarSetIn3 *appsv1
 	client := fake.NewFakeClient(sidecarSetIn1, sidecarSetIn3)
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	err := podHandler.sidecarsetMutatingPod(context.Background(), podOut, nil)
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -798,5 +834,21 @@ func TestMergeSidecarContainers(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func newAdmission(op admissionv1beta1.Operation, object, oldObject runtime.RawExtension, subResource string) admission.Request {
+	return admission.Request{
+		AdmissionRequest: newAdmissionRequest(op, object, oldObject, subResource),
+	}
+}
+
+func newAdmissionRequest(op admissionv1beta1.Operation, object, oldObject runtime.RawExtension, subResource string) admissionv1beta1.AdmissionRequest {
+	return admissionv1beta1.AdmissionRequest{
+		Resource:    metav1.GroupVersionResource{Group: corev1.SchemeGroupVersion.Group, Version: corev1.SchemeGroupVersion.Version, Resource: "pods"},
+		Operation:   op,
+		Object:      object,
+		OldObject:   oldObject,
+		SubResource: subResource,
 	}
 }

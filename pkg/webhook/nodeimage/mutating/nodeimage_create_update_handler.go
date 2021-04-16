@@ -23,7 +23,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
-	nodeimagesutil "github.com/openkruise/kruise/pkg/util/nodeimages"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -49,11 +49,11 @@ func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission
 
 	// Sort image tags
 	for name, imageSpec := range obj.Spec.Images {
-		nodeimagesutil.SortSpecImageTags(&imageSpec)
+		utilimagejob.SortSpecImageTags(&imageSpec)
 		obj.Spec.Images[name] = imageSpec
 	}
 	for name, imageStatus := range obj.Status.ImageStatuses {
-		nodeimagesutil.SortStatusImageTags(&imageStatus)
+		utilimagejob.SortStatusImageTags(&imageStatus)
 		obj.Status.ImageStatuses[name] = imageStatus
 	}
 

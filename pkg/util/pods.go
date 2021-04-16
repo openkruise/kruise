@@ -19,7 +19,10 @@ package util
 import (
 	"strings"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
@@ -51,6 +54,21 @@ func MergePods(pods1, pods2 []*v1.Pod) []*v1.Pod {
 		}
 	}
 	return ret
+}
+
+// DiffPods returns pods in pods1 but not in pods2
+func DiffPods(pods1, pods2 []*v1.Pod) (ret []*v1.Pod) {
+	names2 := sets.NewString()
+	for _, pod := range pods2 {
+		names2.Insert(pod.Name)
+	}
+	for _, pod := range pods1 {
+		if names2.Has(pod.Name) {
+			continue
+		}
+		ret = append(ret, pod)
+	}
+	return
 }
 
 func MergeVolumeMounts(original, additional []v1.VolumeMount) []v1.VolumeMount {
@@ -159,6 +177,19 @@ func GetContainer(name string, pod *v1.Pod) *v1.Container {
 	return nil
 }
 
+func GetContainerStatus(name string, pod *v1.Pod) *v1.ContainerStatus {
+	if pod == nil {
+		return nil
+	}
+	for i := range pod.Status.ContainerStatuses {
+		v := &pod.Status.ContainerStatuses[i]
+		if v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
+
 func GetPodVolume(pod *v1.Pod, volumeName string) *v1.Volume {
 	for idx, v := range pod.Spec.Volumes {
 		if v.Name == volumeName {
@@ -217,4 +248,22 @@ func MergeVolumeMountsInContainer(origin *v1.Container, other v1.Container) {
 
 		origin.VolumeMounts = append(origin.VolumeMounts, volume)
 	}
+}
+
+func IsPodOwnedByKruise(pod *v1.Pod) bool {
+	ownerRef := metav1.GetControllerOf(pod)
+	if ownerRef == nil {
+		return false
+	}
+	gv, _ := schema.ParseGroupVersion(ownerRef.APIVersion)
+	return gv.Group == appsv1alpha1.GroupVersion.Group
+}
+
+func InjectReadinessGateToPod(pod *v1.Pod, conditionType v1.PodConditionType) {
+	for _, g := range pod.Spec.ReadinessGates {
+		if g.ConditionType == conditionType {
+			return
+		}
+	}
+	pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: conditionType})
 }

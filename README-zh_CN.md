@@ -66,10 +66,10 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 ```bash
 # Kubernetes 版本 1.13 或 1.14
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.0/kruise-chart.tgz --disable-openapi-validation
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz --disable-openapi-validation
 
 # Kubernetes 版本大于等于 1.15
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz
 ```
 
 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者配置 feature-gates。
@@ -82,6 +82,17 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.
 
 我们也提供了 [**tutorials**](./docs/tutorial/README.md) 来示范如何使用 Kruise 控制器。
 
+## 用户
+
+登记: [如果贵司正在使用 Kruise 请留言](https://github.com/openkruise/kruise/issues/289)
+
+- 阿里巴巴集团, 蚂蚁集团, 斗鱼TV, 申通, Boss直聘
+- 杭银消费, 万翼科技, 多点, Bringg, 佐疆科技
+- Lyft, 携程, 享住智慧, VIPKID, 掌门1对1
+- 小红书, 比心, 永辉科技中心, 跟谁学, 哈啰出行
+- Spectro Cloud, 艾佳生活, Arkane Systems, 滴普科技, 火花思维
+- OPPO, 苏宁
+
 ## 贡献
 
 我们非常欢迎每一位社区同学共同参与 Kruise 的建设，你可以从 [CONTRIBUTING.md](CONTRIBUTING.md) 手册开始。
@@ -90,7 +101,7 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.
 
 活跃的社区途径：
 
-- Slack: [channel address](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWJlZGJiZjUwNGU5Y2U2ODI3N2JiODI4N2M1OWFlOTgzMDgyOWVkZGRjNzdmZTBjYzgxZmM5MjAyNjhhZTdmMjQ)
+- Slack: [Channel in Kubernetes Slack](https://kubernetes.slack.com/channels/openkruise)
 - 钉钉讨论群
 
 <div>

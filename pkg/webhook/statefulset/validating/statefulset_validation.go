@@ -44,9 +44,8 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals, "reserveOrdinals contains duplicated items"))
 		}
 		for _, i := range spec.ReserveOrdinals {
-			if i < 0 || i >= int(*spec.Replicas)+orders.Len() {
-				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals, fmt.Sprintf("reserveOrdinals contains %d which must be 0 <= order < (%d+%d)",
-					i, *spec.Replicas, orders.Len())))
+			if i < 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals, fmt.Sprintf("reserveOrdinals contains %d which must be order >= 0", i)))
 			}
 		}
 	}

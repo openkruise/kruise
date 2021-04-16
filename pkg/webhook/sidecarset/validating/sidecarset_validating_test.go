@@ -77,6 +77,38 @@ func TestValidateSidecarSet(t *testing.T) {
 				},
 			},
 		},
+		"wrong-selector": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "app-name",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"app-group", "app-risk-"},
+						},
+					},
+				},
+				Containers: []appsv1alpha1.SidecarContainer{
+					{
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+							Type: appsv1alpha1.ShareVolumePolicyEnabled,
+						},
+						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+						},
+						Container: corev1.Container{
+							Name:                     "test-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
 		"wrong-initContainer": {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
 			Spec: appsv1alpha1.SidecarSetSpec{

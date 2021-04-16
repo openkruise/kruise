@@ -133,6 +133,10 @@ func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field
 	if len(selector.MatchLabels)+len(selector.MatchExpressions) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, selector, "empty selector is not valid for sidecarset."))
 	}
+	_, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), selector, ""))
+	}
 	return allErrs
 }
 

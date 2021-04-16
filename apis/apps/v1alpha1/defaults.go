@@ -37,6 +37,9 @@ func SetDefaultsSidecarSet(obj *SidecarSet) {
 	for i := range obj.Spec.Containers {
 		setDefaultSidecarContainer(&obj.Spec.Containers[i])
 	}
+
+	//default setting volumes
+	setDefaultPodVolumes(obj.Spec.Volumes)
 }
 
 func setDefaultSidecarContainer(sidecarContainer *SidecarContainer) {
@@ -331,8 +334,161 @@ func SetDefaultPod(in *corev1.Pod) {
 // SetDefaultPodSpec sets default pod spec
 func SetDefaultPodSpec(in *corev1.PodSpec) {
 	v1.SetDefaults_PodSpec(in)
-	for i := range in.Volumes {
-		a := &in.Volumes[i]
+	//default pod volumes
+	setDefaultPodVolumes(in.Volumes)
+	for i := range in.InitContainers {
+		a := &in.InitContainers[i]
+		v1.SetDefaults_Container(a)
+		for j := range a.Ports {
+			b := &a.Ports[j]
+			v1.SetDefaults_ContainerPort(b)
+		}
+		for j := range a.Env {
+			b := &a.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		if a.LivenessProbe != nil {
+			v1.SetDefaults_Probe(a.LivenessProbe)
+			if a.LivenessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.ReadinessProbe != nil {
+			v1.SetDefaults_Probe(a.ReadinessProbe)
+			if a.ReadinessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.StartupProbe != nil {
+			v1.SetDefaults_Probe(a.StartupProbe)
+			if a.StartupProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
+			}
+		}
+		if a.Lifecycle != nil {
+			if a.Lifecycle.PostStart != nil {
+				if a.Lifecycle.PostStart.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
+	for i := range in.Containers {
+		a := &in.Containers[i]
+		// For in-place update, we set default imagePullPolicy to Always
+		if a.ImagePullPolicy == "" {
+			a.ImagePullPolicy = corev1.PullAlways
+		}
+		v1.SetDefaults_Container(a)
+		for j := range a.Ports {
+			b := &a.Ports[j]
+			v1.SetDefaults_ContainerPort(b)
+		}
+		for j := range a.Env {
+			b := &a.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		if a.LivenessProbe != nil {
+			v1.SetDefaults_Probe(a.LivenessProbe)
+			if a.LivenessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.ReadinessProbe != nil {
+			v1.SetDefaults_Probe(a.ReadinessProbe)
+			if a.ReadinessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.StartupProbe != nil {
+			v1.SetDefaults_Probe(a.StartupProbe)
+			if a.StartupProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.StartupProbe.Handler.HTTPGet)
+			}
+		}
+		if a.Lifecycle != nil {
+			if a.Lifecycle.PostStart != nil {
+				if a.Lifecycle.PostStart.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
+	for i := range in.EphemeralContainers {
+		a := &in.EphemeralContainers[i]
+		for j := range a.EphemeralContainerCommon.Ports {
+			b := &a.EphemeralContainerCommon.Ports[j]
+			v1.SetDefaults_ContainerPort(b)
+		}
+		for j := range a.EphemeralContainerCommon.Env {
+			b := &a.EphemeralContainerCommon.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
+		if a.EphemeralContainerCommon.LivenessProbe != nil {
+			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
+			if a.EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.EphemeralContainerCommon.ReadinessProbe != nil {
+			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
+			if a.EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.EphemeralContainerCommon.StartupProbe != nil {
+			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
+			if a.EphemeralContainerCommon.StartupProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.Handler.HTTPGet)
+			}
+		}
+		if a.EphemeralContainerCommon.Lifecycle != nil {
+			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
+				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
+				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
+	v1.SetDefaults_ResourceList(&in.Overhead)
+}
+
+func setDefaultPodVolumes(volumes []corev1.Volume) {
+	for i := range volumes {
+		a := &volumes[i]
 		v1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
 			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
@@ -382,93 +538,48 @@ func SetDefaultPodSpec(in *corev1.PodSpec) {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
-	for i := range in.InitContainers {
-		a := &in.InitContainers[i]
-		v1.SetDefaults_Container(a)
-		for j := range a.Ports {
-			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
-		}
-		for j := range a.Env {
-			b := &a.Env[j]
-			if b.ValueFrom != nil {
-				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
-				}
+}
+
+// SetDefaults_NodeImage set default values for NodeImage.
+func SetDefaultsNodeImage(obj *NodeImage) {
+	now := metav1.Now()
+	for name, imageSpec := range obj.Spec.Images {
+		for i := range imageSpec.Tags {
+			tagSpec := &imageSpec.Tags[i]
+			if tagSpec.CreatedAt == nil {
+				tagSpec.CreatedAt = &now
 			}
-		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
-		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			if tagSpec.PullPolicy == nil {
+				tagSpec.PullPolicy = &ImageTagPullPolicy{}
 			}
+			SetDefaultsImageTagPullPolicy(tagSpec.PullPolicy)
 		}
-		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.Lifecycle != nil {
-			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
-				}
-			}
-			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
-				}
-			}
-		}
+		obj.Spec.Images[name] = imageSpec
 	}
-	for i := range in.Containers {
-		a := &in.Containers[i]
-		// For in-place update, we set default imagePullPolicy to Always
-		if a.ImagePullPolicy == "" {
-			a.ImagePullPolicy = corev1.PullAlways
-		}
-		v1.SetDefaults_Container(a)
-		for j := range a.Ports {
-			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
-		}
-		for j := range a.Env {
-			b := &a.Env[j]
-			if b.ValueFrom != nil {
-				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
-				}
-			}
-		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
-		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.Lifecycle != nil {
-			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
-				}
-			}
-			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
-				}
-			}
-		}
+}
+
+func SetDefaultsImageTagPullPolicy(obj *ImageTagPullPolicy) {
+	if obj.TimeoutSeconds == nil {
+		obj.TimeoutSeconds = utilpointer.Int32Ptr(600)
+	}
+	if obj.BackoffLimit == nil {
+		obj.BackoffLimit = utilpointer.Int32Ptr(3)
+	}
+}
+
+// SetDefaults_ImagePullJob set default values for ImagePullJob.
+func SetDefaultsImagePullJob(obj *ImagePullJob) {
+	if obj.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.CompletionPolicy.Type = Always
+	}
+	if obj.Spec.PullPolicy == nil {
+		obj.Spec.PullPolicy = &PullPolicy{}
+	}
+	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
+		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
+	}
+	if obj.Spec.PullPolicy.BackoffLimit == nil {
+		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
 	}
 }
 

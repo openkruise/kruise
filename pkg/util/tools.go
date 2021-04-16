@@ -18,6 +18,7 @@ limitations under the License.
 package util
 
 import (
+	"math"
 	"sync"
 
 	"github.com/docker/distribution/reference"
@@ -81,6 +82,15 @@ func CheckDuplicate(list []string) []string {
 
 func GetIntOrStrPointer(i intstrutil.IntOrString) *intstrutil.IntOrString {
 	return &i
+}
+
+// IntAbs returns the abs number of the given int number
+func IntAbs(i int) int {
+	return int(math.Abs(float64(i)))
+}
+
+func IsIntPlusAndMinus(i, j int) bool {
+	return (i < 0 && j > 0) || (i > 0 && j < 0)
 }
 
 // parse container images,

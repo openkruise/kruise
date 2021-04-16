@@ -68,39 +68,48 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 	//  * It is to determine whether there are other fields that have been modified for pod.
 	for index, pod := range pods {
 		isUpdated := sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod)
-		if !isUpdated && isSelected(pod) && control.IsSidecarSetCanUpgrade(pod) {
+		if !isUpdated && isSelected(pod) && control.IsSidecarSetUpgradable(pod) {
 			waitUpgradedIndexes = append(waitUpgradedIndexes, index)
 		}
 	}
 
-	//2. Sort Pods with default sequence
+	klog.V(3).Infof("sidecarSet(%s) matchedPods(%d) waitUpdated(%d)", sidecarset.Name, len(pods), len(waitUpgradedIndexes))
+	//2. sort Pods with default sequence and scatter
+	waitUpgradedIndexes = SortUpdateIndexes(strategy, pods, waitUpgradedIndexes)
+
+	//3. calculate to be upgraded pods number for the time
+	needToUpgradeCount := calculateUpgradeCount(control, waitUpgradedIndexes, pods)
+	if needToUpgradeCount < len(waitUpgradedIndexes) {
+		waitUpgradedIndexes = waitUpgradedIndexes[:needToUpgradeCount]
+	}
+
+	//4. injectPods will be upgraded in the following process
+	for _, idx := range waitUpgradedIndexes {
+		upgradePods = append(upgradePods, pods[idx])
+	}
+	return
+}
+
+// SortUpdateIndexes sorts the given waitUpdateIndexes of Pods to update according to the SidecarSet update strategy.
+func SortUpdateIndexes(strategy appsv1alpha1.SidecarSetUpdateStrategy, pods []*corev1.Pod, waitUpdateIndexes []int) []int {
+	//Sort Pods with default sequence
 	//	- Unassigned < assigned
 	//	- PodPending < PodUnknown < PodRunning
 	//	- Not ready < ready
 	//	- Been ready for empty time < less time < more time
 	//	- Pods with containers with higher restart counts < lower restart counts
 	//	- Empty creation time pods < newer pods < older pods
-	sort.Slice(waitUpgradedIndexes, sidecarcontrol.GetPodsSortFunc(pods, waitUpgradedIndexes))
+	sort.Slice(waitUpdateIndexes, sidecarcontrol.GetPodsSortFunc(pods, waitUpdateIndexes))
 
-	//3. sort waitUpdateIndexes based on the scatter rules
+	//sort waitUpdateIndexes based on the scatter rules
 	if strategy.ScatterStrategy != nil {
 		// convert regular terms to scatter terms
 		// for examples: labelA=* -> labelA=value1, labelA=value2...(labels in pod definition)
 		scatter := parseUpdateScatterTerms(strategy.ScatterStrategy, pods)
-		waitUpgradedIndexes = updatesort.NewScatterSorter(scatter).Sort(pods, waitUpgradedIndexes)
+		waitUpdateIndexes = updatesort.NewScatterSorter(scatter).Sort(pods, waitUpdateIndexes)
 	}
 
-	//4. calculate to be upgraded pods number for the time
-	needToUpgradeCount := calculateUpgradeCount(control, waitUpgradedIndexes, pods)
-	if needToUpgradeCount < len(waitUpgradedIndexes) {
-		waitUpgradedIndexes = waitUpgradedIndexes[:needToUpgradeCount]
-	}
-
-	//5. injectPods will be upgraded in the following process
-	for _, idx := range waitUpgradedIndexes {
-		upgradePods = append(upgradePods, pods[idx])
-	}
-	return
+	return waitUpdateIndexes
 }
 
 func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdateIndexes []int, pods []*corev1.Pod) int {
@@ -127,14 +136,17 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 
 	var upgradeAndNotReadyCount int
 	for _, pod := range pods {
-		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) && !coreControl.IsPodConsistentAndReady(pod) {
+		// 1. sidecar containers have been updated to the latest sidecarSet version, for pod.spec.containers
+		// 2. whether pod.spec and pod.status is inconsistent after updating the sidecar containers
+		// 3. whether pod is not ready
+		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) && (!coreControl.IsPodUpdatedConsistently(pod, nil) || !coreControl.IsPodReady(pod)) {
 			upgradeAndNotReadyCount++
 		}
 	}
 	var needUpgradeCount int
 	for _, i := range waitUpdateIndexes {
 		// If pod is not ready, then not included in the calculation of maxUnavailable
-		if !coreControl.IsPodConsistentAndReady(pods[i]) {
+		if !coreControl.IsPodReady(pods[i]) {
 			needUpgradeCount++
 			continue
 		}

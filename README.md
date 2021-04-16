@@ -65,10 +65,10 @@ For a Kubernetes cluster with its version higher than v1.13, you can simply inst
 
 ```bash
 # Kubernetes 1.13 and 1.14
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.0/kruise-chart.tgz --disable-openapi-validation
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz --disable-openapi-validation
 
 # Kubernetes 1.15 and newer versions
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for the kruise-manager.
@@ -82,6 +82,17 @@ You can view the full documentation from the [OpenKruise website](https://openkr
 
 We also provide [**tutorials**](./docs/tutorial/README.md) for **ALL** Kruise controllers to demonstrate how to use them.
 
+## Users
+
+Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/289)
+
+- Alibaba Group, Ant Group, DouyuTV, Sto, Boss直聘
+- hangyinxiaofei, vanyitech, Dmall, Bringg, 佐疆科技
+- Lyft, Ctrip, 享住智慧, VIPKID, zhangmen
+- xiaohongshu, bixin, 永辉科技中心, 跟谁学, 哈啰出行
+- Spectro Cloud, ihomefnt, Arkane Systems, Deepexi, 火花思维
+- OPPO, Suning.cn
+
 ## Contributing
 
 You are warmly welcome to hack on Kruise. We have prepared a detailed guide [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -90,7 +101,7 @@ You are warmly welcome to hack on Kruise. We have prepared a detailed guide [CON
 
 Active communication channels:
 
-- Slack: [channel address](https://join.slack.com/t/kruise-workspace/shared_invite/enQtNjU5NzQ0ODcyNjYzLWJlZGJiZjUwNGU5Y2U2ODI3N2JiODI4N2M1OWFlOTgzMDgyOWVkZGRjNzdmZTBjYzgxZmM5MjAyNjhhZTdmMjQ)
+- Slack: [Channel in Kubernetes Slack](https://kubernetes.slack.com/channels/openkruise)
 - Mailing List: todo
 - Dingtalk Group(钉钉讨论群)
 

@@ -62,7 +62,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("pods don't have matched sidecarSet", func() {
 			// create sidecarSet
-			sidecarSet := tester.NewBaseSidecarSet()
+			sidecarSet := tester.NewBaseSidecarSet(ns)
 			// sidecarSet no matched pods
 			sidecarSet.Spec.Selector.MatchLabels["app"] = "nomatched"
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
@@ -82,9 +82,45 @@ var _ = SIGDescribe("sidecarset", func() {
 			ginkgo.By(fmt.Sprintf("test no matched sidecarSet done"))
 		})
 
+		ginkgo.It("sidecarset with volumes.downwardAPI", func() {
+			// create sidecarSet
+			sidecarSet := tester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.Volumes = []corev1.Volume{
+				{
+					Name: "podinfo",
+					VolumeSource: corev1.VolumeSource{
+						DownwardAPI: &corev1.DownwardAPIVolumeSource{
+							Items: []corev1.DownwardAPIVolumeFile{
+								{
+									Path: "labels",
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: "metadata.labels",
+									},
+								},
+								{
+									Path: "annotations",
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: "metadata.annotations",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			sidecarSet.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc/podinfo",
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s with volumes.downwardAPI", sidecarSet.Name))
+			tester.CreateSidecarSet(sidecarSet)
+		})
+
 		ginkgo.It("sidecarSet inject pod sidecar container", func() {
 			// create sidecarSet
-			sidecarSet := tester.NewBaseSidecarSet()
+			sidecarSet := tester.NewBaseSidecarSet(ns)
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
 			tester.CreateSidecarSet(sidecarSet)
 
@@ -108,7 +144,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet inject pod sidecar container volumeMounts", func() {
 			// create sidecarSet
-			sidecarSet := tester.NewBaseSidecarSet()
+			sidecarSet := tester.NewBaseSidecarSet(ns)
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
 
@@ -197,7 +233,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet inject pod sidecar container volumeMounts, SubPathExpr with expanded subpath", func() {
 			// create sidecarSet
-			sidecarSet := tester.NewBaseSidecarSet()
+			sidecarSet := tester.NewBaseSidecarSet(ns)
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
 
@@ -298,7 +334,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet inject pod sidecar container transfer Envs", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
 			sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
 				{
@@ -378,7 +414,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet upgrade cold sidecar container image", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 				MaxUnavailable: &intstr.IntOrString{
@@ -419,7 +455,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet upgrade cold sidecar container failed image, and only update one pod", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
@@ -461,7 +497,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and paused", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
@@ -504,7 +540,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and selector", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
@@ -576,7 +612,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and partition", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
@@ -624,7 +660,7 @@ var _ = SIGDescribe("sidecarset", func() {
 
 		ginkgo.It("sidecarSet upgrade cold sidecar container image, and maxUnavailable", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
@@ -639,6 +675,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			tester.CreateDeployment(deploymentIn)
 
 			// update sidecarSet sidecar container
+			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) failed image", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:failed"
 			// update sidecarSet selector
 			sidecarSetIn.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
@@ -652,10 +689,11 @@ var _ = SIGDescribe("sidecarset", func() {
 				UpdatedReadyPods: 0,
 				ReadyPods:        2,
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(time.Second * 30)
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
 			// update sidecarSet sidecar container
+			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) success image", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:latest"
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except = &appsv1alpha1.SidecarSetStatus{
@@ -664,14 +702,14 @@ var _ = SIGDescribe("sidecarset", func() {
 				UpdatedReadyPods: 4,
 				ReadyPods:        4,
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(time.Second * 30)
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image, and maxUnavailable done"))
 		})
 
 		ginkgo.It("sidecarSet update init sidecar container, and don't upgrade", func() {
 			// create sidecarSet
-			sidecarSetIn := tester.NewBaseSidecarSet()
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
@@ -690,8 +728,8 @@ var _ = SIGDescribe("sidecarset", func() {
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except := &appsv1alpha1.SidecarSetStatus{
 				MatchedPods:      1,
-				UpdatedPods:      0,
-				UpdatedReadyPods: 0,
+				UpdatedPods:      1,
+				UpdatedReadyPods: 1,
 				ReadyPods:        1,
 			}
 			time.Sleep(time.Minute)
