@@ -192,8 +192,6 @@ func updatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 			}
 			newWithoutImageHash, _ := json.Marshal(withoutImageHash)
 			pod.Annotations[SidecarSetHashWithoutImageAnnotation] = string(newWithoutImageHash)
-		} else {
-
 		}
 		// compatible done
 	}
