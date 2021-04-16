@@ -19,8 +19,6 @@ package sync
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/labels"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -33,9 +31,11 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 )
 
