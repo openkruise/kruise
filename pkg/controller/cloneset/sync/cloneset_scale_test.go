@@ -528,3 +528,93 @@ func TestGetOrGenAvailableIDs(t *testing.T) {
 		t.Fatalf("expected got random id, but actually %v", id)
 	}
 }
+
+func TestSortByDeletePriority(t *testing.T) {
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "a", "key1": "value1"},
+				Name:   "a",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "b", "key2": "value2"},
+				Name:   "b",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "a", "key3": "value3"},
+				Name:   "c",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "b", "key1": "value1"},
+				Name:   "d",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "a", "key3": "value3"},
+				Name:   "e",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "b"},
+				Name:   "f",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "a"},
+				Name:   "j",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "c"},
+				Name:   "h",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"key": "c"},
+				Name:   "i",
+			},
+			Spec: v1.PodSpec{
+				NodeName: "virtual-kubelet",
+			},
+		},
+	}
+
+	priority := []appsv1alpha1.CloneSetDeletePriority{
+		{
+			NodeName: "virtual-kubelet",
+		},
+		{
+			MatchLabels: map[string]string{"key3": "value3"},
+			PodNames:    []string{"e"},
+		},
+		{
+			MatchLabels: map[string]string{"key1": "value1"},
+		}, {
+			MatchLabels: map[string]string{"key": "a"},
+		}, {
+			PodNames: []string{"h"},
+		},
+	}
+	expected := []string{"i", "e", "a", "d", "c", "j", "h", "b", "f"}
+	pods = sortByDeletePriority(priority, pods)
+
+	if len(expected) != len(pods) {
+		t.Fatalf("len not equals")
+	}
+	for i := range expected {
+		if expected[i] != pods[i].Name {
+			t.Fatalf("incorrect order")
+		}
+	}
+}
