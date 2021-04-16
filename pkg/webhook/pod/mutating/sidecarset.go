@@ -176,14 +176,34 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 	// parse sidecar hash in pod annotations
 	if oldHashStr := pod.Annotations[sidecarcontrol.SidecarSetHashAnnotation]; len(oldHashStr) > 0 {
 		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHash); err != nil {
-			return nil, nil, nil, nil,
-				fmt.Errorf("invalid %s value %v, unmarshal failed: %v", sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
+			// to be compatible with older sidecarSet hash struct, map[string]string
+			olderSidecarSetHash := make(map[string]string)
+			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
+				return nil, nil, nil, nil,
+					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
+			}
+			for k, v := range olderSidecarSetHash {
+				sidecarSetHash[k] = sidecarcontrol.SidecarSetUpgradeSpec{
+					SidecarSetHash: v,
+					SidecarSetName: k,
+				}
+			}
 		}
 	}
 	if oldHashStr := pod.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation]; len(oldHashStr) > 0 {
 		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHashWithoutImage); err != nil {
-			return nil, nil, nil, nil,
-				fmt.Errorf("invalid %s value %v, unmarshal failed: %v", sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
+			// to be compatible with older sidecarSet hash struct, map[string]string
+			olderSidecarSetHash := make(map[string]string)
+			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
+				return nil, nil, nil, nil,
+					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
+			}
+			for k, v := range olderSidecarSetHash {
+				sidecarSetHashWithoutImage[k] = sidecarcontrol.SidecarSetUpgradeSpec{
+					SidecarSetHash: v,
+					SidecarSetName: k,
+				}
+			}
 		}
 	}
 

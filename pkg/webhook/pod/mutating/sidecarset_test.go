@@ -18,6 +18,7 @@ package mutating
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -494,6 +495,32 @@ func testSidecarVolumesAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSe
 			if volume.Name != "volume-1" {
 				t.Fatalf("expect volume-1 but got %v", volume.Name)
 			}
+		}
+	}
+}
+
+func TestPodSidecarSetHashCompatibility(t *testing.T) {
+	podIn := pod1.DeepCopy()
+	podIn.Annotations = map[string]string{}
+	podIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = `{"sidecarset-test":"bv6d2fbw97wz8xx5x4v4wddwbd5z744wcf7c786dd4dvxvd5w6w424df7vx47989"}`
+	podIn.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = `{"sidecarset-test":"54x5977vf9zz4248w7v44456zf655b8bcffv7x74w88f6dwb994fw48b8f9b8959"}`
+	_, _, _, annotations, err := buildSidecars(false, podIn, nil, nil)
+	if err != nil {
+		t.Fatalf("compatible pod sidecarSet Hash failed: %s", err.Error())
+	}
+	// format: sidecarset.name -> sidecarset hash
+	sidecarSetHash := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+	// format: sidecarset.name -> sidecarset hash(without image)
+	sidecarSetHashWithoutImage := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+	// parse sidecar hash in pod annotations
+	if oldHashStr := annotations[sidecarcontrol.SidecarSetHashAnnotation]; len(oldHashStr) > 0 {
+		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHash); err != nil {
+			t.Fatalf("compatible pod sidecarSet Hash failed: %s", err.Error())
+		}
+	}
+	if oldHashStr := annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation]; len(oldHashStr) > 0 {
+		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHashWithoutImage); err != nil {
+			t.Fatalf("compatible pod sidecarSet Hash failed: %s", err.Error())
 		}
 	}
 }
