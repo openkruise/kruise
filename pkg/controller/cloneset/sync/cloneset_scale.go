@@ -31,9 +31,11 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 )
 
@@ -144,7 +146,7 @@ func (r *realControl) Scale(
 		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev), delete ready limit: %d",
 			controllerKey, -diffRes.scaleNum, -diffRes.scaleNumOldRevision, diffRes.deleteReadyLimit)
 
-		podsPreparingToDelete := choosePodsToDelete(-diffRes.scaleNum, -diffRes.scaleNumOldRevision, notUpdatedPods, updatedPods)
+		podsPreparingToDelete := choosePodsToDelete(updateCS, -diffRes.scaleNum, -diffRes.scaleNumOldRevision, notUpdatedPods, updatedPods)
 		podsToDelete := make([]*v1.Pod, 0, len(podsPreparingToDelete))
 		for _, pod := range podsPreparingToDelete {
 			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
@@ -365,7 +367,53 @@ func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
 	return id
 }
 
-func choosePodsToDelete(totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
+// Group the pods according to the number of priority conditions,
+// group the remaining pods into a group, and return after merging
+// This method is a stable sort
+func sortByDeletePriority(priority []appsv1alpha1.CloneSetDeletePriority, pods []*v1.Pod) []*v1.Pod {
+
+	labelSelectors := make([]labels.Selector, len(priority)+1)
+	podNameSelectors := make([]sets.String, len(priority)+1)
+	nodeNameSelectors := make([]string, len(priority)+1)
+	podGroups := make([][]*v1.Pod, len(priority)+1)
+	result := make([]*v1.Pod, 0)
+
+	for i, item := range priority {
+		if item.MatchLabels != nil {
+			selector := labels.SelectorFromValidatedSet(item.MatchLabels)
+			labelSelectors[i] = selector
+		}
+		if item.PodNames != nil {
+			podNameSelectors[i] = sets.NewString(item.PodNames...)
+		}
+		if item.NodeName != "" {
+			nodeNameSelectors[i] = item.NodeName
+		}
+	}
+
+	for _, pod := range pods {
+		for i := 0; i <= len(priority); i++ {
+			if labelSelectors[i] != nil && !labelSelectors[i].Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+			if podNameSelectors[i] != nil && !podNameSelectors[i].Has(pod.Name) {
+				continue
+			}
+			if nodeNameSelectors[i] != "" && nodeNameSelectors[i] != pod.Spec.NodeName {
+				continue
+			}
+			podGroups[i] = append(podGroups[i], pod)
+			break
+		}
+	}
+
+	for _, podGroup := range podGroups {
+		result = append(result, podGroup...)
+	}
+	return result
+}
+
+func choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
 		// No need to sort pods if we are about to delete all of them.
 		if diff < len(pods) {
@@ -373,6 +421,22 @@ func choosePodsToDelete(totalDiff int, currentRevDiff int, notUpdatedPods, updat
 			// < scheduled, and pending < running. This ensures that we delete pods
 			// in the earlier stages whenever possible.
 			sort.Sort(kubecontroller.ActivePods(pods))
+			// Divide the sorted pods into two groups according to whether they accept the request,
+			// then sort one group based on the priority strategy and return the pods that are planned to be deleted
+			if len(cs.Spec.ScaleStrategy.DeletePriority) > 0 {
+				index := len(pods)
+				for i, pod := range pods {
+					if podutil.IsPodReady(pod) && pod.Status.Phase == v1.PodRunning {
+						index = i
+					}
+				}
+				if diff < index {
+					return sortByDeletePriority(cs.Spec.ScaleStrategy.DeletePriority, pods[:index])[:diff]
+				}
+				if diff > index {
+					return append(pods[:index], sortByDeletePriority(cs.Spec.ScaleStrategy.DeletePriority, pods[index:])[diff-index])
+				}
+			}
 		} else if diff > len(pods) {
 			klog.Warningf("Diff > len(pods) in choosePodsToDelete func which is not expected.")
 			return pods

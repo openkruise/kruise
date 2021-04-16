@@ -507,6 +507,39 @@ spec:
                           description: ScaleStrategy indicates the ScaleStrategy that
                             will be employed to create and delete Pods in the CloneSet.
                           properties:
+                            deletePriority:
+                              description: DeletePriority is the queue composed of
+                                priority conditions According to the order of the
+                                queue, the pod that meets the conditions first is
+                                deleted first
+                              items:
+                                description: CloneSetDeletePriority defines the relationship
+                                  among these conditions are ANDed
+                                properties:
+                                  matchLabels:
+                                    additionalProperties:
+                                      type: string
+                                    description: matchLabels is a map of {key,value}
+                                      pairs. A single {key,value} in the matchLabels
+                                      map is equivalent to an element of matchExpressions,
+                                      whose key field is "key", the operator is "In",
+                                      and the values array contains only "value".
+                                      The requirements are ANDed.
+                                    type: object
+                                  nodeName:
+                                    description: NodeName is a request to schedule
+                                      this pod onto a specific node. If it is non-empty,
+                                      the scheduler simply schedules this pod onto
+                                      that node, assuming that it fits resource requirements.
+                                    type: string
+                                  podNames:
+                                    description: PodNames is the assemble of the pods’
+                                      names
+                                    items:
+                                      type: string
+                                    type: array
+                                type: object
+                              type: array
                             podsToDelete:
                               description: PodsToDelete is the names of Pod should
                                 be deleted. Note that this list will be truncated
