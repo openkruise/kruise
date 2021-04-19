@@ -509,35 +509,71 @@ spec:
                           properties:
                             deletePriority:
                               description: DeletePriority is the queue composed of
-                                priority conditions According to the order of the
-                                queue, the pod that meets the conditions first is
-                                deleted first
+                                priority conditions According to the weight, the pod
+                                that meets the conditions first is deleted first
                               items:
-                                description: CloneSetDeletePriority defines the relationship
-                                  among these conditions are ANDed
+                                description: CloneSetDeletePriorityWeightTerm defines
+                                  weight and conditions
                                 properties:
-                                  matchLabels:
-                                    additionalProperties:
-                                      type: string
-                                    description: matchLabels is a map of {key,value}
-                                      pairs. A single {key,value} in the matchLabels
-                                      map is equivalent to an element of matchExpressions,
-                                      whose key field is "key", the operator is "In",
-                                      and the values array contains only "value".
-                                      The requirements are ANDed.
+                                  matchSelector:
+                                    description: A label selector term, associated
+                                      with the corresponding weight.
+                                    properties:
+                                      matchExpressions:
+                                        description: matchExpressions is a list of
+                                          label selector requirements. The requirements
+                                          are ANDed.
+                                        items:
+                                          description: A label selector requirement
+                                            is a selector that contains values, a
+                                            key, and an operator that relates the
+                                            key and values.
+                                          properties:
+                                            key:
+                                              description: key is the label key that
+                                                the selector applies to.
+                                              type: string
+                                            operator:
+                                              description: operator represents a key's
+                                                relationship to a set of values. Valid
+                                                operators are In, NotIn, Exists and
+                                                DoesNotExist.
+                                              type: string
+                                            values:
+                                              description: values is an array of string
+                                                values. If the operator is In or NotIn,
+                                                the values array must be non-empty.
+                                                If the operator is Exists or DoesNotExist,
+                                                the values array must be empty. This
+                                                array is replaced during a strategic
+                                                merge patch.
+                                              items:
+                                                type: string
+                                              type: array
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
+                                      matchLabels:
+                                        additionalProperties:
+                                          type: string
+                                        description: matchLabels is a map of {key,value}
+                                          pairs. A single {key,value} in the matchLabels
+                                          map is equivalent to an element of matchExpressions,
+                                          whose key field is "key", the operator is
+                                          "In", and the values array contains only
+                                          "value". The requirements are ANDed.
+                                        type: object
                                     type: object
-                                  nodeName:
-                                    description: NodeName is a request to schedule
-                                      this pod onto a specific node. If it is non-empty,
-                                      the scheduler simply schedules this pod onto
-                                      that node, assuming that it fits resource requirements.
-                                    type: string
-                                  podNames:
-                                    description: PodNames is the assemble of the pods’
-                                      names
-                                    items:
-                                      type: string
-                                    type: array
+                                  weight:
+                                    description: Weight associated with matching the
+                                      corresponding MatchSelector, in the range 1-100.
+                                    format: int32
+                                    type: integer
+                                required:
+                                - matchSelector
+                                - weight
                                 type: object
                               type: array
                             podsToDelete:

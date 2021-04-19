@@ -19,6 +19,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -370,36 +371,28 @@ func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
 // Group the pods according to the number of priority conditions,
 // group the remaining pods into a group, and return after merging
 // This method is a stable sort
-func sortByDeletePriority(priority []appsv1alpha1.CloneSetDeletePriority, pods []*v1.Pod) []*v1.Pod {
+func sortByDeletePriority(priority []appsv1alpha1.CloneSetDeletePriorityWeightTerm, pods []*v1.Pod) []*v1.Pod {
 
 	labelSelectors := make([]labels.Selector, len(priority)+1)
-	podNameSelectors := make([]sets.String, len(priority)+1)
-	nodeNameSelectors := make([]string, len(priority)+1)
 	podGroups := make([][]*v1.Pod, len(priority)+1)
-	result := make([]*v1.Pod, 0)
+	result := make([]*v1.Pod, 0, len(pods))
+
+	sort.SliceStable(priority, func(i, j int) bool {
+		return priority[i].Weight > priority[j].Weight
+	})
 
 	for i, item := range priority {
-		if item.MatchLabels != nil {
-			selector := labels.SelectorFromValidatedSet(item.MatchLabels)
-			labelSelectors[i] = selector
+		selector, err := metav1.LabelSelectorAsSelector(item.MatchSelector)
+		if err != nil {
+			klog.Errorf("Error DeletePriority.CloneSetDeletePriorityWeightTerm.MatchSelector %s selector: %v", item.MatchSelector, err)
+			return pods
 		}
-		if item.PodNames != nil {
-			podNameSelectors[i] = sets.NewString(item.PodNames...)
-		}
-		if item.NodeName != "" {
-			nodeNameSelectors[i] = item.NodeName
-		}
+		labelSelectors[i] = selector
 	}
 
 	for _, pod := range pods {
 		for i := 0; i <= len(priority); i++ {
 			if labelSelectors[i] != nil && !labelSelectors[i].Matches(labels.Set(pod.Labels)) {
-				continue
-			}
-			if podNameSelectors[i] != nil && !podNameSelectors[i].Has(pod.Name) {
-				continue
-			}
-			if nodeNameSelectors[i] != "" && nodeNameSelectors[i] != pod.Spec.NodeName {
 				continue
 			}
 			podGroups[i] = append(podGroups[i], pod)

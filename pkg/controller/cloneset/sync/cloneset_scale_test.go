@@ -581,7 +581,7 @@ func TestSortByDeletePriority(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{"key": "c"},
+				Labels: map[string]string{"key": "d"},
 				Name:   "i",
 			},
 			Spec: v1.PodSpec{
@@ -590,23 +590,42 @@ func TestSortByDeletePriority(t *testing.T) {
 		},
 	}
 
-	priority := []appsv1alpha1.CloneSetDeletePriority{
+	priority := []appsv1alpha1.CloneSetDeletePriorityWeightTerm{
 		{
-			NodeName: "virtual-kubelet",
+			Weight: 1,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key3": "value3"},
+			},
 		},
 		{
-			MatchLabels: map[string]string{"key3": "value3"},
-			PodNames:    []string{"e"},
+			Weight: 20,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key1": "value1"},
+			},
 		},
 		{
-			MatchLabels: map[string]string{"key1": "value1"},
+			Weight: 10,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key2": "value2"},
+			},
 		}, {
-			MatchLabels: map[string]string{"key": "a"},
+			Weight: 50,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "c"},
+			},
 		}, {
-			PodNames: []string{"h"},
+			Weight: 99,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "a"},
+			},
+		}, {
+			Weight: 50,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "d"},
+			},
 		},
 	}
-	expected := []string{"i", "e", "a", "d", "c", "j", "h", "b", "f"}
+	expected := []string{"a", "c", "e", "j", "h", "i", "d", "b", "f"}
 	pods = sortByDeletePriority(priority, pods)
 
 	if len(expected) != len(pods) {

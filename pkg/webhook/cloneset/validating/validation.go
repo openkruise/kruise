@@ -118,7 +118,23 @@ func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy, oldStrateg
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podsToDelete"), podName, fmt.Sprintf("find pod %s owner is not this CloneSet", podName)))
 		}
 	}
+	if len(strategy.DeletePriority) > 0 {
+		allErrs = append(allErrs, ValidateCloneSetDeletePriorityWeightTerms(strategy.DeletePriority, fldPath.Child("deletePriority"))...)
+	}
+	return allErrs
+}
 
+// ValidatePreferredSchedulingTerms tests that the specified SoftNodeAffinity fields has valid data
+func ValidateCloneSetDeletePriorityWeightTerms(deletePriority []appsv1alpha1.CloneSetDeletePriorityWeightTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, term := range deletePriority {
+		if term.Weight <= 0 || term.Weight > 100 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("weight"), term.Weight, "must be in the range 1-100"))
+		}
+
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(term.MatchSelector, fldPath.Index(i).Child("matchSelector"))...)
+	}
 	return allErrs
 }
 
