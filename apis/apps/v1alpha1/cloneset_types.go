@@ -88,7 +88,7 @@ type CloneSetScaleStrategy struct {
 	// PodsToDelete is the names of Pod should be deleted.
 	// Note that this list will be truncated for non-existing pod names.
 	PodsToDelete []string `json:"podsToDelete,omitempty"`
-	// DeletePriority is the queue composed of priority conditions
+	// DeletePriority is the slice composed of priority conditions
 	// According to the weight, the pod that meets the conditions first is deleted first
 	DeletePriority []CloneSetDeletePriorityWeightTerm `json:"deletePriority,omitempty"`
 }
