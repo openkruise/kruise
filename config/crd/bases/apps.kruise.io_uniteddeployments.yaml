@@ -508,7 +508,7 @@ spec:
                             will be employed to create and delete Pods in the CloneSet.
                           properties:
                             deletePriority:
-                              description: DeletePriority is the queue composed of
+                              description: DeletePriority is the slice composed of
                                 priority conditions According to the weight, the pod
                                 that meets the conditions first is deleted first
                               items:
