@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kruise Authors.
+Copyright 2021 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,17 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validating
+package webhook
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	"github.com/openkruise/kruise/pkg/webhook/customresourcedefinition/validating"
 )
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-cloneset,mutating=false,failurePolicy=fail,groups=apps.kruise.io,resources=clonesets,verbs=create;update;delete,versions=v1alpha1,name=vcloneset.kb.io
-
-var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-apps-kruise-io-v1alpha1-cloneset": &CloneSetCreateUpdateHandler{},
-	}
-)
+func init() {
+	addHandlers(validating.HandlerMap)
+}

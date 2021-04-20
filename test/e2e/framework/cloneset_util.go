@@ -103,3 +103,7 @@ func (t *CloneSetTester) ListImagePullJobsForCloneSet(name string) (jobs []*apps
 	}
 	return jobs, nil
 }
+
+func (t *CloneSetTester) DeleteCloneSet(name string) error {
+	return t.kc.AppsV1alpha1().CloneSets(t.ns).Delete(name, &metav1.DeleteOptions{})
+}

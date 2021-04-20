@@ -21,7 +21,9 @@ import (
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -40,25 +42,39 @@ var _ admission.Handler = &CloneSetCreateUpdateHandler{}
 // Handle handles admission requests.
 func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	obj := &appsv1alpha1.CloneSet{}
-
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
+	oldObj := &appsv1alpha1.CloneSet{}
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1beta1.Create:
+		err := h.Decoder.Decode(req, obj)
+		if err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
 		if allErrs := h.validateCloneSet(obj, nil); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1beta1.Update:
-		oldObj := &appsv1alpha1.CloneSet{}
+		err := h.Decoder.Decode(req, obj)
+		if err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
 		if allErrs := h.validateCloneSetUpdate(obj, oldObj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+		}
+	case admissionv1beta1.Delete:
+		if len(req.OldObject.Raw) == 0 {
+			klog.Warningf("Skip to validate CloneSet %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Namespace, req.Name)
+			return admission.ValidationResponse(true, "")
+		}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if err := deletionprotection.ValidateWorkloadDeletion(oldObj, oldObj.Spec.Replicas); err != nil {
+			return admission.Errored(http.StatusForbidden, err)
 		}
 	}
 

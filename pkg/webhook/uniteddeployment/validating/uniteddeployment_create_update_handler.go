@@ -21,7 +21,9 @@ import (
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -42,19 +44,20 @@ var _ admission.Handler = &UnitedDeploymentCreateUpdateHandler{}
 // Handle handles admission requests.
 func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	obj := &appsv1alpha1.UnitedDeployment{}
-
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
+	oldObj := &appsv1alpha1.UnitedDeployment{}
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1beta1.Create:
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
 		if allErrs := validateUnitedDeployment(obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1beta1.Update:
-		oldObj := &appsv1alpha1.UnitedDeployment{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
@@ -63,6 +66,17 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 		updateErrorList := ValidateUnitedDeploymentUpdate(obj, oldObj)
 		if allErrs := append(validationErrorList, updateErrorList...); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+		}
+	case admissionv1beta1.Delete:
+		if len(req.OldObject.Raw) == 0 {
+			klog.Warningf("Skip to validate UnitedDeployment %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Namespace, req.Name)
+			return admission.ValidationResponse(true, "")
+		}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if err := deletionprotection.ValidateWorkloadDeletion(oldObj, oldObj.Spec.Replicas); err != nil {
+			return admission.Errored(http.StatusForbidden, err)
 		}
 	}
 

@@ -24,11 +24,6 @@ import (
 	"os"
 	"time"
 
-	extclient "github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
-	"github.com/openkruise/kruise/pkg/webhook"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -39,8 +34,15 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	extclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+	"github.com/openkruise/kruise/pkg/webhook"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -60,6 +62,7 @@ func init() {
 
 	_ = appsv1alpha1.AddToScheme(scheme)
 	_ = appsv1beta1.AddToScheme(scheme)
+	_ = policyv1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

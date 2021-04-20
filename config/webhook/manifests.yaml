@@ -253,6 +253,57 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-apps-deployment
+  failurePolicy: Fail
+  name: vbuiltindeployment.kb.io
+  rules:
+  - apiGroups:
+    - apps
+    apiVersions:
+    - v1
+    operations:
+    - DELETE
+    resources:
+    - deployments
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-replicaset
+  failurePolicy: Fail
+  name: vbuiltinreplicaset.kb.io
+  rules:
+  - apiGroups:
+    - apps
+    apiVersions:
+    - v1
+    operations:
+    - DELETE
+    resources:
+    - replicasets
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-statefulset
+  failurePolicy: Fail
+  name: vbuiltinstatefulset.kb.io
+  rules:
+  - apiGroups:
+    - apps
+    apiVersions:
+    - v1
+    operations:
+    - DELETE
+    resources:
+    - statefulsets
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-apps-kruise-io-v1alpha1-cloneset
   failurePolicy: Fail
   name: vcloneset.kb.io
@@ -264,8 +315,27 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - clonesets
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-customresourcedefinition
+  failurePolicy: Fail
+  name: vcustomresourcedefinition.kb.io
+  rules:
+  - apiGroups:
+    - apiextensions.k8s.io
+    apiVersions:
+    - v1
+    - v1beta1
+    operations:
+    - DELETE
+    resources:
+    - customresourcedefinitions
 - clientConfig:
     caBundle: Cg==
     service:
@@ -302,6 +372,23 @@ webhooks:
     - UPDATE
     resources:
     - imagepulljobs
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-namespace
+  failurePolicy: Fail
+  name: vnamespace.kb.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - DELETE
+    resources:
+    - namespaces
 - clientConfig:
     caBundle: Cg==
     service:
@@ -355,6 +442,7 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - statefulsets
 - clientConfig:
@@ -373,5 +461,6 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
     - uniteddeployments
