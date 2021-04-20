@@ -1,5 +1,6 @@
 /*
 Copyright 2019 The Kruise Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,17 +15,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validating
+package policy
 
-import (
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-)
+import "github.com/onsi/ginkgo"
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-uniteddeployment,mutating=false,failurePolicy=fail,groups=apps.kruise.io,resources=uniteddeployments,verbs=create;update;delete,versions=v1alpha1,name=vuniteddeployment.kb.io
-
-var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-apps-kruise-io-v1alpha1-uniteddeployment": &UnitedDeploymentCreateUpdateHandler{},
-	}
-)
+// SIGDescribe describes SIG information
+func SIGDescribe(text string, body func()) bool {
+	return ginkgo.Describe("[policy] "+text, body)
+}

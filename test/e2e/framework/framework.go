@@ -25,6 +25,7 @@ import (
 
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
@@ -60,6 +61,8 @@ type Framework struct {
 
 	KruiseClientSet kruiseclientset.Interface
 	ClientSet       clientset.Interface
+
+	ApiExtensionsClientSet apiextensionsclientset.Interface
 
 	DynamicClient dynamic.Interface
 
@@ -153,6 +156,8 @@ func (f *Framework) BeforeEach() {
 		f.KruiseClientSet, err = kruiseclientset.NewForConfig(config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		f.ClientSet, err = clientset.NewForConfig(config)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		f.ApiExtensionsClientSet, err = apiextensionsclientset.NewForConfig(config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		f.DynamicClient, err = dynamic.NewForConfig(config)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())

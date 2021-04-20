@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kruise Authors.
+Copyright 2021 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,15 +16,15 @@ limitations under the License.
 
 package validating
 
-import (
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-)
+import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-uniteddeployment,mutating=false,failurePolicy=fail,groups=apps.kruise.io,resources=uniteddeployments,verbs=create;update;delete,versions=v1alpha1,name=vuniteddeployment.kb.io
+// +kubebuilder:webhook:path=/validate-customresourcedefinition,mutating=false,failurePolicy=fail,groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=delete,versions=v1;v1beta1,name=vcustomresourcedefinition.kb.io
+
+// +kubebuilder:rbac:groups="*",resources="*",verbs=list
 
 var (
 	// HandlerMap contains admission webhook handlers
 	HandlerMap = map[string]admission.Handler{
-		"validate-apps-kruise-io-v1alpha1-uniteddeployment": &UnitedDeploymentCreateUpdateHandler{},
+		"validate-customresourcedefinition": &CRDHandler{},
 	}
 )

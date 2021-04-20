@@ -39,6 +39,7 @@ import (
 
 	// test sources
 	_ "github.com/openkruise/kruise/test/e2e/apps"
+	_ "github.com/openkruise/kruise/test/e2e/policy"
 )
 
 // handleFlags sets up all flags and parses the command line.

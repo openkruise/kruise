@@ -1,0 +1,105 @@
+/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package validating
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+)
+
+type CRDHandler struct {
+	Client client.Client
+
+	// Decoder decodes objects
+	Decoder *admission.Decoder
+}
+
+var _ admission.Handler = &CRDHandler{}
+
+// Handle handles admission requests.
+func (h *CRDHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+	if req.AdmissionRequest.Operation != admissionv1beta1.Delete || req.AdmissionRequest.SubResource != "" {
+		return admission.ValidationResponse(true, "")
+	}
+	if len(req.OldObject.Raw) == 0 {
+		klog.Warningf("Skip to validate CRD %s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Name)
+		return admission.ValidationResponse(true, "")
+	}
+
+	var metaObj metav1.Object
+	var gvk schema.GroupVersionKind
+	switch req.Kind.Version {
+	case "v1beta1":
+		crd := &apiextensionsv1beta1.CustomResourceDefinition{}
+		if err := h.Decoder.DecodeRaw(req.OldObject, crd); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		metaObj = crd
+		for _, v := range crd.Spec.Versions {
+			if v.Storage {
+				gvk = schema.GroupVersionKind{Group: crd.Spec.Group, Kind: crd.Spec.Names.ListKind, Version: v.Name}
+				break
+			}
+		}
+	case "v1":
+		crd := &apiextensionsv1.CustomResourceDefinition{}
+		if err := h.Decoder.DecodeRaw(req.OldObject, crd); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		metaObj = crd
+		for _, v := range crd.Spec.Versions {
+			if v.Storage {
+				gvk = schema.GroupVersionKind{Group: crd.Spec.Group, Kind: crd.Spec.Names.ListKind, Version: v.Name}
+				break
+			}
+		}
+	default:
+		klog.Warningf("Skip to validate CRD %s deletion for unrecognized version %s", req.Name, req.Kind.Version)
+		return admission.ValidationResponse(true, "")
+	}
+
+	if err := deletionprotection.ValidateCRDDeletion(h.Client, metaObj, gvk); err != nil {
+		return admission.Errored(http.StatusForbidden, err)
+	}
+	return admission.ValidationResponse(true, "")
+}
+
+var _ inject.Client = &CRDHandler{}
+
+func (h *CRDHandler) InjectClient(c client.Client) error {
+	h.Client = c
+	return nil
+}
+
+var _ admission.DecoderInjector = &CRDHandler{}
+
+func (h *CRDHandler) InjectDecoder(d *admission.Decoder) error {
+	h.Decoder = d
+	return nil
+}

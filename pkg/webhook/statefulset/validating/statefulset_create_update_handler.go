@@ -23,7 +23,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -44,43 +46,22 @@ var _ admission.Handler = &StatefulSetCreateUpdateHandler{}
 // Handle handles admission requests.
 func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	obj := &appsv1beta1.StatefulSet{}
-
-	switch req.AdmissionRequest.Resource.Version {
-	case appsv1beta1.GroupVersion.Version:
-		if err := h.Decoder.Decode(req, obj); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
-		}
-	case appsv1alpha1.GroupVersion.Version:
-		objv1alpha1 := &appsv1alpha1.StatefulSet{}
-		if err := h.Decoder.Decode(req, objv1alpha1); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
-		}
-		if err := objv1alpha1.ConvertTo(obj); err != nil {
-			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err))
-		}
-	}
+	oldObj := &appsv1beta1.StatefulSet{}
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1beta1.Create:
+		if err := h.decodeObject(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
 		if allErrs := validateStatefulSet(obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1beta1.Update:
-		oldObj := &appsv1beta1.StatefulSet{}
-
-		switch req.AdmissionRequest.Resource.Version {
-		case appsv1beta1.GroupVersion.Version:
-			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
-			}
-		case appsv1alpha1.GroupVersion.Version:
-			objv1alpha1 := &appsv1alpha1.StatefulSet{}
-			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, objv1alpha1); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
-			}
-			if err := objv1alpha1.ConvertTo(oldObj); err != nil {
-				return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err))
-			}
+		if err := h.decodeObject(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if err := h.decodeOldObject(req, oldObj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
 		}
 
 		validationErrorList := validateStatefulSet(obj)
@@ -96,9 +77,56 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 					fmt.Errorf("invalid template modified with InPlaceOnly strategy: %v, currently only image update is allowed for InPlaceOnly", err))
 			}
 		}
+	case admissionv1beta1.Delete:
+		if len(req.OldObject.Raw) == 0 {
+			klog.Warningf("Skip to validate StatefulSet %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Namespace, req.Name)
+			return admission.ValidationResponse(true, "")
+		}
+		if err := h.decodeOldObject(req, oldObj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if err := deletionprotection.ValidateWorkloadDeletion(oldObj, oldObj.Spec.Replicas); err != nil {
+			return admission.Errored(http.StatusForbidden, err)
+		}
 	}
 
 	return admission.ValidationResponse(true, "")
+}
+
+func (h *StatefulSetCreateUpdateHandler) decodeObject(req admission.Request, obj *appsv1beta1.StatefulSet) error {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return err
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objv1alpha1 := &appsv1alpha1.StatefulSet{}
+		if err := h.Decoder.Decode(req, objv1alpha1); err != nil {
+			return err
+		}
+		if err := objv1alpha1.ConvertTo(obj); err != nil {
+			return fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+	}
+	return nil
+}
+
+func (h *StatefulSetCreateUpdateHandler) decodeOldObject(req admission.Request, oldObj *appsv1beta1.StatefulSet) error {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+			return err
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objv1alpha1 := &appsv1alpha1.StatefulSet{}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, objv1alpha1); err != nil {
+			return err
+		}
+		if err := objv1alpha1.ConvertTo(oldObj); err != nil {
+			return fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+	}
+	return nil
 }
 
 //var _ inject.Client = &StatefulSetCreateUpdateHandler{}
