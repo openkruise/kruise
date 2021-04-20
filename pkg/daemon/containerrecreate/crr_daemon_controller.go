@@ -169,7 +169,11 @@ func enqueue(queue workqueue.Interface, obj *appsv1alpha1.ContainerRecreateReque
 	if obj.DeletionTimestamp != nil || obj.Status.CompletionTime != nil {
 		return
 	}
-	queue.Add(obj.Namespace + "/" + obj.Spec.PodName)
+	queue.Add(objectKey(obj))
+}
+
+func objectKey(obj *appsv1alpha1.ContainerRecreateRequest) string {
+	return obj.Namespace + "/" + obj.Spec.PodName
 }
 
 func (c *Controller) Run(stop <-chan struct{}) {
@@ -381,6 +385,9 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 		return c.completeCRRStatus(crr, "")
 	}
 
+	if crr.Spec.Strategy != nil && crr.Spec.Strategy.MinStartedSeconds > 0 {
+		c.queue.AddAfter(objectKey(crr), time.Duration(crr.Spec.Strategy.MinStartedSeconds)*time.Second)
+	}
 	return nil
 }
 

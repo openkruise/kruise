@@ -18,6 +18,7 @@ package containerrecreate
 
 import (
 	"encoding/json"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -55,6 +56,11 @@ func getCurrentCRRContainersRecreateStates(
 	crr *appsv1alpha1.ContainerRecreateRequest,
 	podStatus *kubeletcontainer.PodStatus,
 ) []appsv1alpha1.ContainerRecreateRequestContainerRecreateState {
+
+	var minStartedDuration time.Duration
+	if crr.Spec.Strategy != nil {
+		minStartedDuration = time.Duration(crr.Spec.Strategy.MinStartedSeconds) * time.Second
+	}
 
 	syncContainerStatuses := getCRRSyncContainerStatuses(crr)
 	var statuses []appsv1alpha1.ContainerRecreateRequestContainerRecreateState
@@ -96,7 +102,10 @@ func getCurrentCRRContainersRecreateStates(
 				Name:  c.Name,
 				Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
 			}
-			if syncContainerStatus != nil && syncContainerStatus.ContainerID == kubeContainerStatus.ID.String() && syncContainerStatus.Ready {
+			if syncContainerStatus != nil &&
+				syncContainerStatus.ContainerID == kubeContainerStatus.ID.String() &&
+				time.Since(kubeContainerStatus.StartedAt) > minStartedDuration &&
+				syncContainerStatus.Ready {
 				currentState.Phase = appsv1alpha1.ContainerRecreateRequestSucceeded
 			}
 
