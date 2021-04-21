@@ -20,7 +20,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"reflect"
 	"sort"
 	"time"
 
@@ -151,6 +150,17 @@ func (r *ReconcileImagePullJob) Reconcile(request reconcile.Request) (res reconc
 		return reconcile.Result{}, err
 	}
 
+	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
+	resourceVersionExpectations.Observe(job)
+	if isSatisfied, unsatisfiedDuration := resourceVersionExpectations.IsSatisfied(job); !isSatisfied {
+		if unsatisfiedDuration >= expectations.ExpectationTimeout {
+			klog.Warningf("Expectation unsatisfied overtime for %v, timeout=%v", request.String(), unsatisfiedDuration)
+			return reconcile.Result{}, nil
+		}
+		klog.V(4).Infof("Not satisfied resourceVersion for %v", request.String())
+		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
+	}
+
 	if job.DeletionTimestamp != nil {
 		return reconcile.Result{}, nil
 	}
@@ -179,6 +189,7 @@ func (r *ReconcileImagePullJob) Reconcile(request reconcile.Request) (res reconc
 
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
 	for _, nodeImage := range nodeImages {
+		resourceVersionExpectations.Observe(nodeImage)
 		if isSatisfied, unsatisfiedDuration := resourceVersionExpectations.IsSatisfied(nodeImage); !isSatisfied {
 			if unsatisfiedDuration >= expectations.ExpectationTimeout {
 				klog.Warningf("Expectation unsatisfied overtime for %v, wait for NodeImage %v updating, timeout=%v", request.String(), nodeImage.Name, unsatisfiedDuration)
@@ -200,11 +211,12 @@ func (r *ReconcileImagePullJob) Reconcile(request reconcile.Request) (res reconc
 		return reconcile.Result{}, fmt.Errorf("failed to sync NodeImages: %v", err)
 	}
 
-	if !reflect.DeepEqual(job.Status, newStatus) {
+	if !util.IsJSONObjectEqual(&job.Status, newStatus) {
 		job.Status = *newStatus
 		if err = r.Status().Update(context.TODO(), job); err != nil {
 			return reconcile.Result{}, fmt.Errorf("update ImagePullJob status error: %v", err)
 		}
+		resourceVersionExpectations.Expect(job)
 		return reconcile.Result{}, nil
 	}
 

@@ -47,7 +47,6 @@ func (e *nodeImageEventHandler) Create(evt event.CreateEvent, q workqueue.RateLi
 func (e *nodeImageEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	obj := evt.ObjectNew.(*appsv1alpha1.NodeImage)
 	oldObj := evt.ObjectOld.(*appsv1alpha1.NodeImage)
-	resourceVersionExpectations.Observe(obj)
 	if obj.DeletionTimestamp != nil {
 		e.handle(obj, q)
 	} else {

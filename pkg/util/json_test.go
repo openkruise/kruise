@@ -89,10 +89,10 @@ func TestIsJSONEqual(t *testing.T) {
 		t.Fatalf("expect t1 not equal to t2")
 	}
 
-	if !IsJSONEqual(t1, t2) {
+	if !IsJSONObjectEqual(t1, t2) {
 		t.Fatalf("expect t1 json equal to t2: %v, %v", t1.TestTime.Time, t2.TestTime.Time)
 	}
-	if IsJSONEqual(t1, t3) {
+	if IsJSONObjectEqual(t1, t3) {
 		t.Fatalf("expect t1 not json equal to t3")
 	}
 }

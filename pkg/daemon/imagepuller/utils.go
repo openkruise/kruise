@@ -97,7 +97,7 @@ func newStatusUpdater(imagePullNodeClient clientalpha1.NodeImageInterface) *stat
 }
 
 func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStatus *appsv1alpha1.NodeImageStatus) (limited bool, err error) {
-	if util.IsJSONEqual(newStatus, su.previousStatus) {
+	if util.IsJSONObjectEqual(newStatus, su.previousStatus) {
 		// 12h + 0~60min
 		randRefresh := time.Hour*12 + time.Second*time.Duration(rand.Int63n(3600))
 		if time.Since(su.previousTimestamp) < randRefresh {

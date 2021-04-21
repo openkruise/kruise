@@ -27,14 +27,18 @@ func DumpJSON(o interface{}) string {
 	return string(j)
 }
 
-// IsJSONEqual checks if two objects are equal after encoding json
-func IsJSONEqual(o1, o2 interface{}) bool {
+// IsJSONObjectEqual checks if two objects are equal after encoding json
+func IsJSONObjectEqual(o1, o2 interface{}) bool {
+	if reflect.DeepEqual(o1, o2) {
+		return true
+	}
+
 	oj1, _ := json.Marshal(o1)
 	oj2, _ := json.Marshal(o2)
 	os1 := string(oj1)
 	os2 := string(oj2)
-	if os1 != os2 {
-
+	if os1 == os2 {
+		return true
 	}
 
 	om1 := make(map[string]interface{})
