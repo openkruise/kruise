@@ -438,7 +438,7 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 		}
 	}
 
-	if util.IsJSONEqual(newStatus.ImageStatuses, nodeImage.Status.ImageStatuses) {
+	if util.IsJSONObjectEqual(newStatus.ImageStatuses, nodeImage.Status.ImageStatuses) {
 		return nil
 	}
 
