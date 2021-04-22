@@ -25,8 +25,11 @@ import (
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/integer"
 )
 
@@ -212,4 +215,100 @@ func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds i
 		return false
 	}
 	return coreControl.IsPodUpdateReady(pod, minReadySeconds)
+}
+
+// ActivePodsWithPriority type allows custom sorting of pods so a controller can pick the best ones to delete.
+type ActivePodsWithPriority struct {
+	Pods           []*v1.Pod
+	labelSelectors []labels.Selector
+}
+
+func (s ActivePodsWithPriority) Len() int      { return len(s.Pods) }
+func (s ActivePodsWithPriority) Swap(i, j int) { s.Pods[i], s.Pods[j] = s.Pods[j], s.Pods[i] }
+
+func (s ActivePodsWithPriority) Less(i, j int) bool {
+	// 1. Unassigned < assigned
+	// If only one of the pods is unassigned, the unassigned one is smaller
+	if s.Pods[i].Spec.NodeName != s.Pods[j].Spec.NodeName && (len(s.Pods[i].Spec.NodeName) == 0 || len(s.Pods[j].Spec.NodeName) == 0) {
+		return len(s.Pods[i].Spec.NodeName) == 0
+	}
+	// 2.Score according to the rules:
+	// PodPending: 0, PodUnknown: 10, PodRunning: 20 ， Not ready: 0, ready: 1
+	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 10, v1.PodRunning: 20}
+
+	iScore := m[s.Pods[i].Status.Phase] + btoi(podutil.IsPodReady(s.Pods[i]))
+	jScore := m[s.Pods[j].Status.Phase] + btoi(podutil.IsPodReady(s.Pods[j]))
+
+	// 3. not receives traffic < receives traffic  (a score of 21 means receiving traffic)
+	// If a pod receives traffic but one is not, the not receives traffic one is smaller
+	if iScore != jScore && (iScore == 21 || jScore == 21) {
+		return iScore < jScore
+	}
+	// 4. Sort the PODS according to the order of labelSelectors，the top one is smaller
+	if priorityScore(s.labelSelectors, s.Pods[i]) != priorityScore(s.labelSelectors, s.Pods[j]) {
+		return priorityScore(s.labelSelectors, s.Pods[i]) < priorityScore(s.labelSelectors, s.Pods[j])
+	}
+	// 5. Compare scores
+	if iScore != jScore {
+		return iScore < jScore
+	}
+	// 6. Been ready for empty time < less time < more time
+	// If both pods are ready, the latest ready one is smaller
+	if podutil.IsPodReady(s.Pods[i]) && podutil.IsPodReady(s.Pods[j]) && !podReadyTime(s.Pods[i]).Equal(podReadyTime(s.Pods[j])) {
+		return afterOrZero(podReadyTime(s.Pods[i]), podReadyTime(s.Pods[j]))
+	}
+	// 7. Pods with containers with higher restart counts < lower restart counts
+	if maxContainerRestarts(s.Pods[i]) != maxContainerRestarts(s.Pods[j]) {
+		return maxContainerRestarts(s.Pods[i]) > maxContainerRestarts(s.Pods[j])
+	}
+	// 8. Empty creation time pods < newer pods < older pods
+	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
+		return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
+	}
+	return false
+}
+
+func priorityScore(labelSelectors []labels.Selector, pod *v1.Pod) int {
+	for i, selector := range labelSelectors {
+		if selector.Matches(labels.Set(pod.Labels)) {
+			return i
+		}
+	}
+	return len(labelSelectors)
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// afterOrZero checks if time t1 is after time t2; if one of them
+// is zero, the zero time is seen as after non-zero time.
+func afterOrZero(t1, t2 *metav1.Time) bool {
+	if t1.Time.IsZero() || t2.Time.IsZero() {
+		return t1.Time.IsZero()
+	}
+	return t1.After(t2.Time)
+}
+
+func podReadyTime(pod *v1.Pod) *metav1.Time {
+	if podutil.IsPodReady(pod) {
+		for _, c := range pod.Status.Conditions {
+			// we only care about pod ready conditions
+			if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+				return &c.LastTransitionTime
+			}
+		}
+	}
+	return &metav1.Time{}
+}
+
+func maxContainerRestarts(pod *v1.Pod) int {
+	maxRestarts := 0
+	for _, c := range pod.Status.ContainerStatuses {
+		maxRestarts = integer.IntMax(maxRestarts, int(c.RestartCount))
+	}
+	return maxRestarts
 }

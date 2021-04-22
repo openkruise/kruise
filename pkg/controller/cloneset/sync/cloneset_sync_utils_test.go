@@ -17,7 +17,11 @@ limitations under the License.
 package sync
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"reflect"
+	"sort"
 	"testing"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -581,4 +585,208 @@ func createTestPod(revisionHash string, lifecycleState appspub.LifecycleStateTyp
 		pod.Labels[appsv1alpha1.SpecifiedDeleteKey] = "true"
 	}
 	return pod
+}
+
+// create count pods with the given phase for the given rc (same selectors and namespace), and add them to the store.
+func newPodList(count int, status v1.PodPhase) *v1.PodList {
+	var pods []v1.Pod
+	for i := 0; i < count; i++ {
+		newPod := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("pod%d", i),
+				Labels:    map[string]string{"foo": "bar"},
+				Namespace: metav1.NamespaceDefault,
+			},
+			Status: v1.PodStatus{Phase: status},
+		}
+
+		pods = append(pods, newPod)
+	}
+	return &v1.PodList{
+		Items: pods,
+	}
+}
+
+func TestSortingActiveAndPriorityPodsLabelMiss(t *testing.T) {
+	numPods := 9
+	podList := newPodList(numPods, v1.PodRunning)
+
+	pods := make([]*v1.Pod, len(podList.Items))
+	for i := range podList.Items {
+		pods[i] = &podList.Items[i]
+	}
+	// pods[0] is not scheduled yet.
+	pods[0].Spec.NodeName = ""
+	pods[0].Status.Phase = v1.PodPending
+	// pods[1] is scheduled but pending.
+	pods[1].Spec.NodeName = "bar"
+	pods[1].Status.Phase = v1.PodPending
+	// pods[2] is unknown.
+	pods[2].Spec.NodeName = "foo"
+	pods[2].Status.Phase = v1.PodUnknown
+	// pods[3] is running but not ready.
+	pods[3].Spec.NodeName = "foo"
+	pods[3].Status.Phase = v1.PodRunning
+	// pods[4] is running and ready but without LastTransitionTime.
+	now := metav1.Now()
+	pods[4].Spec.NodeName = "foo"
+	pods[4].Status.Phase = v1.PodRunning
+	pods[4].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	pods[4].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[5] is running and ready and with LastTransitionTime.
+	pods[5].Spec.NodeName = "foo"
+	pods[5].Status.Phase = v1.PodRunning
+	pods[5].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: now}}
+	pods[5].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[6] is running ready for a longer time than pods[5].
+	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	pods[6].Spec.NodeName = "foo"
+	pods[6].Status.Phase = v1.PodRunning
+	pods[6].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[6].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[7] has lower container restart count than pods[6].
+	pods[7].Spec.NodeName = "foo"
+	pods[7].Status.Phase = v1.PodRunning
+	pods[7].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[7].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[7].CreationTimestamp = now
+	// pods[8] is older than pods[7].
+	pods[8].Spec.NodeName = "foo"
+	pods[8].Status.Phase = v1.PodRunning
+	pods[8].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[8].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[8].CreationTimestamp = then
+
+	priority := []appsv1alpha1.CloneSetDeletePriorityWeightTerm{
+		{
+			Weight: 1,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "value"},
+			},
+		},
+	}
+
+	getOrder := func(pods []*v1.Pod) []string {
+		names := make([]string, len(pods))
+		for i := range pods {
+			names[i] = pods[i].Name
+		}
+		return names
+	}
+
+	expected := getOrder(pods)
+
+	for i := 0; i < 20; i++ {
+		idx := rand.Perm(numPods)
+		randomizedPods := make([]*v1.Pod, numPods)
+		for j := 0; j < numPods; j++ {
+			randomizedPods[j] = pods[idx[j]]
+		}
+		sort.Sort(ActivePodsWithPriority{randomizedPods, deletePrioritySelector(priority)})
+		actual := getOrder(randomizedPods)
+
+		assert.EqualValues(t, expected, actual, "expected %v, got %v", expected, actual)
+	}
+}
+
+func TestSortingActiveAndPriorityPods(t *testing.T) {
+	numPods := 10
+	podList := newPodList(numPods, v1.PodRunning)
+
+	pods := make([]*v1.Pod, len(podList.Items))
+	for i := range podList.Items {
+		pods[i] = &podList.Items[i]
+	}
+	// pods[0] is not scheduled yet.
+	pods[0].Spec.NodeName = ""
+	pods[0].Status.Phase = v1.PodPending
+	// pods[1] by label.
+	pods[1].Spec.NodeName = "foo"
+	pods[1].ObjectMeta.Labels = map[string]string{"key": "a", "key1": "value1"}
+	pods[1].Status.Phase = v1.PodRunning
+	// pods[2] by label.
+	pods[2].Spec.NodeName = "bar"
+	pods[2].ObjectMeta.Labels = map[string]string{"key": "c"}
+	pods[2].Status.Phase = v1.PodPending
+	// pods[3] by label.
+	pods[3].Spec.NodeName = "foo"
+	pods[3].ObjectMeta.Labels = map[string]string{"key": "c"}
+	pods[3].Status.Phase = v1.PodUnknown
+	// pods[4] by label.
+	pods[4].Spec.NodeName = "foo"
+	pods[4].ObjectMeta.Labels = map[string]string{"key": "d"}
+	pods[4].Status.Phase = v1.PodUnknown
+	// pods[5] label miss.
+	pods[5].Spec.NodeName = "foo"
+	pods[5].Status.Phase = v1.PodPending
+	// pods[6] CreationTimestamp late and label first in order.
+	now := metav1.Now()
+	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	pods[6].Spec.NodeName = "foo"
+	pods[6].Status.Phase = v1.PodRunning
+	pods[6].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[6].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	pods[6].CreationTimestamp = now
+	pods[6].ObjectMeta.Labels = map[string]string{"key": "a", "key1": "value1"}
+	// pods[7] is older than pods[6].
+	pods[7].Spec.NodeName = "foo"
+	pods[7].Status.Phase = v1.PodRunning
+	pods[7].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[7].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[7].CreationTimestamp = then
+	pods[7].ObjectMeta.Labels = map[string]string{"key": "a", "key1": "value1"}
+	// pods[8] by label.
+	pods[8].Spec.NodeName = "foo"
+	pods[8].Status.Phase = v1.PodRunning
+	pods[8].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[8].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[8].CreationTimestamp = now
+	pods[8].ObjectMeta.Labels = map[string]string{"key": "c", "key1": "value1"}
+	// pods[8] label miss.
+	pods[9].Spec.NodeName = "foo"
+	pods[9].Status.Phase = v1.PodRunning
+	pods[9].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[9].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[9].CreationTimestamp = now
+
+	priority := []appsv1alpha1.CloneSetDeletePriorityWeightTerm{
+		{
+			Weight: 50,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "c"},
+			},
+		}, {
+			Weight: 99,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "a"},
+			},
+		}, {
+			Weight: 50,
+			MatchSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"key": "d"},
+			},
+		},
+	}
+
+	getOrder := func(pods []*v1.Pod) []string {
+		names := make([]string, len(pods))
+		for i := range pods {
+			names[i] = pods[i].Name
+		}
+		return names
+	}
+
+	expected := getOrder(pods)
+
+	for i := 0; i < 20; i++ {
+		idx := rand.Perm(numPods)
+		randomizedPods := make([]*v1.Pod, numPods)
+		for j := 0; j < numPods; j++ {
+			randomizedPods[j] = pods[idx[j]]
+		}
+		sort.Sort(ActivePodsWithPriority{randomizedPods, deletePrioritySelector(priority)})
+		actual := getOrder(randomizedPods)
+
+		assert.EqualValues(t, expected, actual, "expected %v, got %v", expected, actual)
+	}
 }

@@ -134,6 +134,11 @@ func ValidateCloneSetDeletePriorityWeightTerms(deletePriority []appsv1alpha1.Clo
 		}
 
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(term.MatchSelector, fldPath.Index(i).Child("matchSelector"))...)
+
+		_, err := metav1.LabelSelectorAsSelector(term.MatchSelector)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, "matchSelector", err.Error()))
+		}
 	}
 	return allErrs
 }

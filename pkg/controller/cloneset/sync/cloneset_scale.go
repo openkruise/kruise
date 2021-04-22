@@ -31,12 +31,10 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 )
 
@@ -368,67 +366,23 @@ func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
 	return id
 }
 
-// Group the pods according to the number of priority conditions,
-// group the remaining pods into a group, and return after merging
-// This method is a stable sort
-func sortByDeletePriority(priority []appsv1alpha1.CloneSetDeletePriorityWeightTerm, pods []*v1.Pod) []*v1.Pod {
-
-	labelSelectors := make([]labels.Selector, len(priority)+1)
-	podGroups := make([][]*v1.Pod, len(priority)+1)
-	result := make([]*v1.Pod, 0, len(pods))
-
-	sort.SliceStable(priority, func(i, j int) bool {
-		return priority[i].Weight > priority[j].Weight
-	})
-
-	for i, item := range priority {
-		selector, err := metav1.LabelSelectorAsSelector(item.MatchSelector)
-		if err != nil {
-			klog.Errorf("Error DeletePriority.CloneSetDeletePriorityWeightTerm.MatchSelector %s selector: %v", item.MatchSelector, err)
-			return pods
-		}
-		labelSelectors[i] = selector
-	}
-
-	for _, pod := range pods {
-		for i := 0; i <= len(priority); i++ {
-			if labelSelectors[i] != nil && !labelSelectors[i].Matches(labels.Set(pod.Labels)) {
-				continue
-			}
-			podGroups[i] = append(podGroups[i], pod)
-			break
-		}
-	}
-
-	for _, podGroup := range podGroups {
-		result = append(result, podGroup...)
-	}
-	return result
-}
-
 func choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
 		// No need to sort pods if we are about to delete all of them.
 		if diff < len(pods) {
-			// Sort the pods in the order such that not-ready < ready, unscheduled
-			// < scheduled, and pending < running. This ensures that we delete pods
-			// in the earlier stages whenever possible.
-			sort.Sort(kubecontroller.ActivePods(pods))
-			// Divide the sorted pods into two groups according to whether they accept the request,
-			// then sort one group based on the priority strategy and return the pods that are planned to be deleted
 			if len(cs.Spec.ScaleStrategy.DeletePriority) > 0 {
-				index := len(pods)
-				for i, pod := range pods {
-					if podutil.IsPodReady(pod) && pod.Status.Phase == v1.PodRunning {
-						index = i
-					}
-				}
-				if diff < index {
-					return sortByDeletePriority(cs.Spec.ScaleStrategy.DeletePriority, pods[:index])[:diff]
-				}
-				if diff > index {
-					return append(pods[:index], sortByDeletePriority(cs.Spec.ScaleStrategy.DeletePriority, pods[index:])[diff-index])
-				}
+				// Pods are classified according to whether they receive traffic.
+				// If pods are in the same category, they are sorted in the order of cs.Spec.ScaleStrategy.DeletePriority.
+				// Otherwise, the pods are sorted according to controller.ActivePods
+				sort.Sort(ActivePodsWithPriority{
+					Pods:           pods,
+					labelSelectors: deletePrioritySelector(cs.Spec.ScaleStrategy.DeletePriority),
+				})
+			} else {
+				// Sort the pods in the order such that not-ready < ready, unscheduled
+				// < scheduled, and pending < running. This ensures that we delete pods
+				// in the earlier stages whenever possible.
+				sort.Sort(kubecontroller.ActivePods(pods))
 			}
 		} else if diff > len(pods) {
 			klog.Warningf("Diff > len(pods) in choosePodsToDelete func which is not expected.")
@@ -448,4 +402,17 @@ func choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff int, currentRevDiff
 	}
 
 	return podsToDelete
+}
+
+func deletePrioritySelector(deletePriority []appsv1alpha1.CloneSetDeletePriorityWeightTerm) []labels.Selector {
+	labelSelectors := make([]labels.Selector, len(deletePriority))
+	sort.SliceStable(deletePriority, func(i, j int) bool {
+		return deletePriority[i].Weight > deletePriority[j].Weight
+	})
+	for i, item := range deletePriority {
+		// Has been pre-checked
+		selector, _ := util.GetFastLabelSelector(item.MatchSelector)
+		labelSelectors[i] = selector
+	}
+	return labelSelectors
 }
