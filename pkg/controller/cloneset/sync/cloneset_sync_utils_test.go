@@ -17,11 +17,14 @@ limitations under the License.
 package sync
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +40,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		set                *appsv1alpha1.CloneSet
 		pods               []*v1.Pod
 		revisionConsistent bool
+		disableFeatureGate bool
 		expectResult       expectationDiffs
 	}{
 		{
@@ -540,10 +544,28 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			revisionConsistent: true,
 			expectResult:       expectationDiffs{scaleNum: -1, scaleNumOldRevision: -2, deleteReadyLimit: 2, updateNum: 1, updateMaxUnavailable: 2},
 		},
+		{
+			name: "disable rollback feature-gate",
+			set:  createTestCloneSet(5, intstr.FromInt(4), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			disableFeatureGate: true,
+			expectResult:       expectationDiffs{},
+		},
 	}
 
 	for i := range cases {
 		t.Run(cases[i].name, func(t *testing.T) {
+			if cases[i].disableFeatureGate {
+				_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", features.CloneSetPartitionRollback))
+			} else {
+				_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", features.CloneSetPartitionRollback))
+			}
 			current := oldRevision
 			if cases[i].revisionConsistent {
 				current = newRevision
