@@ -31,11 +31,9 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -370,20 +368,13 @@ func choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff int, currentRevDiff
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
 		// No need to sort pods if we are about to delete all of them.
 		if diff < len(pods) {
-			if len(cs.Spec.ScaleStrategy.DeletePriority) > 0 {
-				// Pods are classified according to whether they receive traffic.
-				// If pods are in the same category, they are sorted in the order of cs.Spec.ScaleStrategy.DeletePriority.
-				// Otherwise, the pods are sorted according to controller.ActivePods
-				sort.Sort(ActivePodsWithPriority{
-					Pods:           pods,
-					labelSelectors: deletePrioritySelector(cs.Spec.ScaleStrategy.DeletePriority),
-				})
-			} else {
-				// Sort the pods in the order such that not-ready < ready, unscheduled
-				// < scheduled, and pending < running. This ensures that we delete pods
-				// in the earlier stages whenever possible.
-				sort.Sort(kubecontroller.ActivePods(pods))
-			}
+			// Pods are classified according to whether they receive traffic.
+			// If pods are in the same category, they are sorted in the order of cs.Spec.ScaleStrategy.DeletePriority.
+			// Otherwise, the pods are sorted according to controller.ActivePods
+			sort.Sort(ActivePodsWithPriority{
+				Pods:              pods,
+				PrioritySelectors: prioritySelector(cs.Spec.ScaleStrategy.DeletePriority),
+			})
 		} else if diff > len(pods) {
 			klog.Warningf("Diff > len(pods) in choosePodsToDelete func which is not expected.")
 			return pods
@@ -404,15 +395,15 @@ func choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff int, currentRevDiff
 	return podsToDelete
 }
 
-func deletePrioritySelector(deletePriority []appsv1alpha1.CloneSetDeletePriorityWeightTerm) []labels.Selector {
-	labelSelectors := make([]labels.Selector, len(deletePriority))
-	sort.SliceStable(deletePriority, func(i, j int) bool {
-		return deletePriority[i].Weight > deletePriority[j].Weight
-	})
+func prioritySelector(deletePriority []appsv1alpha1.CloneSetDeletePriorityWeightTerm) []DeletePriorityWeightTerm {
+	prioritySelectors := make([]DeletePriorityWeightTerm, len(deletePriority))
 	for i, item := range deletePriority {
 		// Has been pre-checked
 		selector, _ := util.GetFastLabelSelector(item.MatchSelector)
-		labelSelectors[i] = selector
+		prioritySelectors[i] = DeletePriorityWeightTerm{
+			Weight:        item.Weight,
+			LabelSelector: selector,
+		}
 	}
-	return labelSelectors
+	return prioritySelectors
 }

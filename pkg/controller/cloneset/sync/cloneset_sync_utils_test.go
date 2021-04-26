@@ -682,7 +682,7 @@ func TestSortingActiveAndPriorityPodsLabelMiss(t *testing.T) {
 		for j := 0; j < numPods; j++ {
 			randomizedPods[j] = pods[idx[j]]
 		}
-		sort.Sort(ActivePodsWithPriority{randomizedPods, deletePrioritySelector(priority)})
+		sort.Sort(ActivePodsWithPriority{randomizedPods, prioritySelector(priority)})
 		actual := getOrder(randomizedPods)
 
 		assert.EqualValues(t, expected, actual, "expected %v, got %v", expected, actual)
@@ -715,7 +715,7 @@ func TestSortingActiveAndPriorityPods(t *testing.T) {
 	// pods[4] by label.
 	pods[4].Spec.NodeName = "foo"
 	pods[4].ObjectMeta.Labels = map[string]string{"key": "d"}
-	pods[4].Status.Phase = v1.PodUnknown
+	pods[4].Status.Phase = v1.PodRunning
 	// pods[5] label miss.
 	pods[5].Spec.NodeName = "foo"
 	pods[5].Status.Phase = v1.PodPending
@@ -784,7 +784,7 @@ func TestSortingActiveAndPriorityPods(t *testing.T) {
 		for j := 0; j < numPods; j++ {
 			randomizedPods[j] = pods[idx[j]]
 		}
-		sort.Sort(ActivePodsWithPriority{randomizedPods, deletePrioritySelector(priority)})
+		sort.Sort(ActivePodsWithPriority{randomizedPods, prioritySelector(priority)})
 		actual := getOrder(randomizedPods)
 
 		assert.EqualValues(t, expected, actual, "expected %v, got %v", expected, actual)

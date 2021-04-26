@@ -219,9 +219,19 @@ func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds i
 
 // ActivePodsWithPriority type allows custom sorting of pods so a controller can pick the best ones to delete.
 type ActivePodsWithPriority struct {
-	Pods           []*v1.Pod
-	labelSelectors []labels.Selector
+	Pods              []*v1.Pod
+	PrioritySelectors []DeletePriorityWeightTerm
 }
+
+type DeletePriorityWeightTerm struct {
+	Weight        int32
+	LabelSelector labels.Selector
+}
+
+const (
+	// PodRunning and ready
+	ReceiveTraffic = 21
+)
 
 func (s ActivePodsWithPriority) Len() int      { return len(s.Pods) }
 func (s ActivePodsWithPriority) Swap(i, j int) { s.Pods[i], s.Pods[j] = s.Pods[j], s.Pods[i] }
@@ -241,12 +251,12 @@ func (s ActivePodsWithPriority) Less(i, j int) bool {
 
 	// 3. not receives traffic < receives traffic  (a score of 21 means receiving traffic)
 	// If a pod receives traffic but one is not, the not receives traffic one is smaller
-	if iScore != jScore && (iScore == 21 || jScore == 21) {
+	if iScore != jScore && (iScore == ReceiveTraffic || jScore == ReceiveTraffic) {
 		return iScore < jScore
 	}
-	// 4. Sort the PODS according to the order of labelSelectors，the top one is smaller
-	if priorityScore(s.labelSelectors, s.Pods[i]) != priorityScore(s.labelSelectors, s.Pods[j]) {
-		return priorityScore(s.labelSelectors, s.Pods[i]) < priorityScore(s.labelSelectors, s.Pods[j])
+	// 4. Pods with more weight are smaller
+	if priorityScore(s.PrioritySelectors, s.Pods[i]) != priorityScore(s.PrioritySelectors, s.Pods[j]) {
+		return priorityScore(s.PrioritySelectors, s.Pods[i]) > priorityScore(s.PrioritySelectors, s.Pods[j])
 	}
 	// 5. Compare scores
 	if iScore != jScore {
@@ -268,13 +278,13 @@ func (s ActivePodsWithPriority) Less(i, j int) bool {
 	return false
 }
 
-func priorityScore(labelSelectors []labels.Selector, pod *v1.Pod) int {
-	for i, selector := range labelSelectors {
-		if selector.Matches(labels.Set(pod.Labels)) {
-			return i
+func priorityScore(prioritySelectors []DeletePriorityWeightTerm, pod *v1.Pod) int32 {
+	for _, selector := range prioritySelectors {
+		if selector.LabelSelector.Matches(labels.Set(pod.Labels)) {
+			return selector.Weight
 		}
 	}
-	return len(labelSelectors)
+	return 0
 }
 
 func btoi(b bool) int {
