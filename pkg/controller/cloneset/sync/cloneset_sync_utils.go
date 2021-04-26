@@ -21,7 +21,9 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 	v1 "k8s.io/api/core/v1"
@@ -127,7 +129,8 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	updateOldDiff := oldRevisionActiveCount - partition
 	updateNewDiff := newRevisionActiveCount - (replicas - partition)
 	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
-	if updateRevision == currentRevision {
+	// If the CloneSetPartitionRollback is not enabled, Pods can only update to the new revision
+	if updateRevision == currentRevision || !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPartitionRollback) {
 		updateOldDiff = integer.IntMax(updateOldDiff, 0)
 		updateNewDiff = integer.IntMin(updateNewDiff, 0)
 	}

@@ -45,6 +45,10 @@ const (
 	// PreDownloadImageForInPlaceUpdate enables cloneset-controller to create ImagePullJobs to
 	// pre-download images for in-place update.
 	PreDownloadImageForInPlaceUpdate featuregate.Feature = "PreDownloadImageForInPlaceUpdate"
+
+	// CloneSetPartitionRollback enables CloneSet controller to rollback Pods to currentRevision
+	// when number of updateRevision pods is bigger than (replicas - partition).
+	CloneSetPartitionRollback featuregate.Feature = "CloneSetPartitionRollback"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -53,6 +57,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
 	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
 	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetPartitionRollback:        {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
