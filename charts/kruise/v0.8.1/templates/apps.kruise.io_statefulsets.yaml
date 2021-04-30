@@ -48,8 +48,8 @@ spec:
     webhookClientConfig:
       caBundle: Cg==
       service:
-        namespace: system
-        name: webhook-service
+        name: kruise-webhook-service
+        namespace: kruise-system
         path: /convert
   preserveUnknownFields: false
   subresources:
