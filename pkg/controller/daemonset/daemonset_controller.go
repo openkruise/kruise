@@ -93,8 +93,6 @@ const (
 	// StatusUpdateRetries limits the number of retries if sending a status update to API server fails.
 	StatusUpdateRetries = 1
 
-	IsFirstDeployedFlag = "daemonset.kruise.io/is-first-deployed"
-
 	IsIgnoreNotReady     = "daemonset.kruise.io/ignore-not-ready"
 	IsIgnoreUnscheduable = "daemonset.kruise.io/ignore-unscheduable"
 
@@ -597,12 +595,13 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 	}
 
 	var nodesNeedingDaemonPods, podsToDelete []string
+	nodesDesireScheduled := 0
 
 	for _, node := range nodeList {
 		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
-		delay, nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(node, nodeToDaemonPods, ds, hash)
+		delay, nodeShouldSchedulePod, nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(node, nodeToDaemonPods, ds, hash)
 		if err != nil {
 			continue
 		}
@@ -610,9 +609,14 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 			return delay, nil
 		}
 
+		if nodeShouldSchedulePod {
+			nodesDesireScheduled++
+		}
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)
 		podsToDelete = append(podsToDelete, podsToDeleteOnNode...)
 	}
+
+	newPods, _ := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
 
 	// This is the first deploy process.
 	if ds.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateDaemonSetStrategyType &&
@@ -625,33 +629,21 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 					klog.Errorf("updateDaemonSetStatus failed in first deploy process")
 				}
 			}
-			unDeployedNum := ds.Status.DesiredNumberScheduled - ds.Status.CurrentNumberScheduled
-			// node count changes or daemonSet in first deploy.
-			isFirstDeployed, ok := ds.Labels[IsFirstDeployedFlag]
-			if unDeployedNum > 0 && (!ok || ok && isFirstDeployed != "false") {
-				if int32(len(nodesNeedingDaemonPods)) >= partition {
-					sort.Strings(nodesNeedingDaemonPods)
-					nodesNeedingDaemonPods = append(nodesNeedingDaemonPods[:0], nodesNeedingDaemonPods[partition:]...)
-				} else {
-					nodesNeedingDaemonPods = []string{}
-				}
-				_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
-				for _, pod := range oldPods {
-					podsToDelete = append(podsToDelete, pod.Name)
-				}
+
+			maxUpdate := nodesDesireScheduled - int(partition) - len(newPods)
+			if maxUpdate > len(nodesNeedingDaemonPods) {
+				maxUpdate = len(nodesNeedingDaemonPods)
+			}
+
+			if maxUpdate > 0 {
+				sort.Strings(nodesNeedingDaemonPods)
+				nodesNeedingDaemonPods = nodesNeedingDaemonPods[:maxUpdate]
 			} else {
-				if ds.Labels == nil {
-					ds.Labels = make(map[string]string)
-				}
-				if !ok || ds.Labels[IsFirstDeployedFlag] != "false" {
-					ds.Labels[IsFirstDeployedFlag] = "false"
-					if err := dsc.client.Update(context.TODO(), ds); err != nil {
-						return delay, fmt.Errorf("failed to update %s: %v", ds.Name, err)
-					}
-				}
+				nodesNeedingDaemonPods = []string{}
 			}
 		}
 	}
+
 	// Label new pods using the hash label value of the current history when creating them
 	return delay, dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash)
 }
@@ -792,6 +784,8 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 }
 
 // podsShouldBeOnNode figures out the DaemonSet pods to be created and deleted on the given node:
+//   - delay: backoff time when failed to run DaemonSet pods on the node
+//   - shouldRunDaemonPod: whether to run DaemonSet pod on the node
 //   - nodesNeedingDaemonPods: the pods need to start on the node
 //   - podsToDelete: the Pods need to be deleted on the node
 //   - err: unexpected error
@@ -800,13 +794,14 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 	nodeToDaemonPods map[string][]*corev1.Pod,
 	ds *appsv1alpha1.DaemonSet,
 	hash string,
-) (delay time.Duration, nodesNeedingDaemonPods, podsToDelete []string, err error) {
+) (delay time.Duration, shouldRunDaemonPod bool, nodesNeedingDaemonPods, podsToDelete []string, err error) {
 
 	wantToRun, shouldSchedule, shouldContinueRunning, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
 	if err != nil {
 		return
 	}
 
+	shouldRunDaemonPod = shouldSchedule
 	daemonPods, exists := nodeToDaemonPods[node.Name]
 	dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
 
