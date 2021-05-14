@@ -3,6 +3,10 @@
 crds:
   managed: true
 
+# namespace for kruise installation
+installation:
+  namespace: kruise-system
+
 featureGates: ""
 
 manager:

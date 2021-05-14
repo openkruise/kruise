@@ -10,7 +10,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-advancedcronjob
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -29,7 +29,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-broadcastjob
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -48,7 +48,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-cloneset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -67,7 +67,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-daemonset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -86,7 +86,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-imagepulljob
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -105,7 +105,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-nodeimage
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -124,7 +124,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-pod
   failurePolicy: {{ .Values.webhookConfiguration.failurePolicy.pods }}
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -146,7 +146,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-sidecarset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -165,7 +165,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-statefulset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -185,7 +185,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /mutate-apps-kruise-io-v1alpha1-uniteddeployment
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -214,7 +214,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-advancedcronjob
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -233,7 +233,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-broadcastjob
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -252,7 +252,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-cloneset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -271,7 +271,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-daemonset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -290,7 +290,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-imagepulljob
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -309,7 +309,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-nodeimage
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -328,7 +328,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-sidecarset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -347,7 +347,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-statefulset
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
@@ -367,7 +367,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: kruise-webhook-service
-      namespace: kruise-system
+      namespace: {{ .Values.installation.namespace }}
       path: /validate-apps-kruise-io-v1alpha1-uniteddeployment
   failurePolicy: Fail
   timeoutSeconds: {{ .Values.webhookConfiguration.timeoutSeconds }}
