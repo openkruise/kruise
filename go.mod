@@ -17,6 +17,8 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
 	github.com/go-openapi/spec v0.19.2
 	github.com/gogo/googleapis v1.4.0 // indirect
+	github.com/gogo/protobuf v1.3.1
+	github.com/google/gofuzz v1.0.0
 	github.com/gorilla/mux v1.7.3
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1
