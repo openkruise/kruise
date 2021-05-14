@@ -49,7 +49,7 @@ spec:
       caBundle: Cg==
       service:
         name: kruise-webhook-service
-        namespace: kruise-system
+        namespace: {{ .Values.installation.namespace }}
         path: /convert
   preserveUnknownFields: false
   subresources:

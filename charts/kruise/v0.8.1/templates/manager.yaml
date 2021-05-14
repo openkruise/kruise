@@ -3,13 +3,13 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-  name: kruise-system
+  name: {{ .Values.installation.namespace }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: kruise-webhook-service
-  namespace: kruise-system
+  namespace: {{ .Values.installation.namespace }}
 spec:
   ports:
     - port: 443
@@ -21,7 +21,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: kruise-webhook-certs
-  namespace: kruise-system
+  namespace: {{ .Values.installation.namespace }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,7 +29,7 @@ metadata:
   labels:
     control-plane: controller-manager
   name: kruise-controller-manager
-  namespace: kruise-system
+  namespace: {{ .Values.installation.namespace }}
 spec:
   replicas: {{ .Values.manager.replicas }}
   selector:
@@ -52,11 +52,12 @@ spec:
             - --metrics-addr={{ .Values.manager.metrics.addr }}:{{ .Values.manager.metrics.port }}
             - --health-probe-addr=:{{ .Values.manager.healthProbe.port }}
             - --logtostderr=true
+            - --leader-election-namespace={{ .Values.installation.namespace }}
             - --v={{ .Values.manager.log.level }}
             - --feature-gates={{ .Values.featureGates }}
           command:
             - /manager
-          image: {{ .Values.manager.image.repository }}:{{.Values.manager.image.tag}}
+          image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
           imagePullPolicy: Always
           name: manager
           env:
@@ -116,14 +117,14 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kruise-daemon
-  namespace: kruise-system
+  namespace: {{ .Values.installation.namespace }}
 {{ if contains "KruiseDaemon=false" .Values.featureGates }}{{ else }}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kruise-daemon
-  namespace: kruise-system
+  namespace: {{ .Values.installation.namespace }}
   labels:
     control-plane: daemon
 spec:
@@ -151,7 +152,7 @@ spec:
         - --logtostderr=true
         - --v=4
         - --addr=:{{ .Values.daemon.port }}
-        image: {{ .Values.manager.image.repository }}:{{.Values.manager.image.tag}}
+        image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
         imagePullPolicy: Always
         name: daemon
         env:
