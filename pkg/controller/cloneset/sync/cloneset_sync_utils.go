@@ -226,8 +226,6 @@ func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds i
 type ActivePodsWithDeletionCost []*v1.Pod
 
 const (
-	// PodRunning and ready
-	ReceiveTraffic = 21
 	// PodDeletionCost can be used to set to an int32 that represent the cost of deleting
 	// a pod compared to other pods belonging to the same ReplicaSet. Pods with lower
 	// deletion cost are preferred to be deleted before pods with higher deletion cost.
@@ -248,49 +246,44 @@ func (s ActivePodsWithDeletionCost) Less(i, j int) bool {
 	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
 		return len(s[i].Spec.NodeName) == 0
 	}
-	// 2.Score according to the rules:
-	// PodPending: 0, PodUnknown: 10, PodRunning: 20 ， Not ready: 0, ready: 1
-	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 10, v1.PodRunning: 20}
-
-	iScore := m[s[i].Status.Phase] + btoi(podutil.IsPodReady(s[i]))
-	jScore := m[s[j].Status.Phase] + btoi(podutil.IsPodReady(s[j]))
-
-	// 3. not receives traffic < receives traffic  (a score of 21 means receiving traffic)
-	// If a pod receives traffic but one is not, the not receives traffic one is smaller
-	if iScore != jScore && (iScore == ReceiveTraffic || jScore == ReceiveTraffic) {
-		return iScore < jScore
+	// 2. PodPending < PodUnknown < PodRunning
+	podPhaseToOrdinal := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
+	if podPhaseToOrdinal[s[i].Status.Phase] != podPhaseToOrdinal[s[j].Status.Phase] {
+		return podPhaseToOrdinal[s[i].Status.Phase] < podPhaseToOrdinal[s[j].Status.Phase]
 	}
+	// 3. Not ready < ready
+	// If only one of the pods is not ready, the not ready one is smaller
+	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
+		return !podutil.IsPodReady(s[i])
+	}
+
 	// 4. higher pod-deletion-cost < lower pod-deletion cost
 	pi, _ := getDeletionCostFromPodAnnotations(s[i].Annotations)
 	pj, _ := getDeletionCostFromPodAnnotations(s[j].Annotations)
 	if pi != pj {
 		return pi < pj
 	}
-	// 5. Compare scores
-	if iScore != jScore {
-		return iScore < jScore
-	}
-	// 6. Been ready for empty time < less time < more time
+
+	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
+	//       see https://github.com/kubernetes/kubernetes/issues/22065
+	// 5. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
-	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
-		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
+	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) {
+		readyTime1 := podReadyTime(s[i])
+		readyTime2 := podReadyTime(s[j])
+		if !readyTime1.Equal(readyTime2) {
+			return afterOrZero(readyTime1, readyTime2)
+		}
 	}
-	// 7. Pods with containers with higher restart counts < lower restart counts
+	// 6. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
 		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
 	}
-	// 8. Empty creation time pods < newer pods < older pods
+	// 7. Empty creation time pods < newer pods < older pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
 		return afterOrZero(&s[i].CreationTimestamp, &s[j].CreationTimestamp)
 	}
 	return false
-}
-
-func btoi(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 // afterOrZero checks if time t1 is after time t2; if one of them
