@@ -39,6 +39,7 @@ The following table lists the configurable parameters of the kruise chart and th
 | Parameter                                 | Description                                                  | Default                       |
 | ----------------------------------------- | ------------------------------------------------------------ | ----------------------------- |
 | `featureGates`                            | Feature gates for Kruise, empty string means all enabled     | ``                            |
+| `installation.namespace`                  | namespace for kruise installation                            | `kruise-system`               |
 | `manager.log.level`                       | Log level that kruise-manager printed                        | `4`                           |
 | `manager.replicas`                        | Replicas of kruise-controller-manager deployment             | `2`                           |
 | `manager.image.repository`                | Repository for kruise-manager image                          | `openkruise/kruise-manager`   |
