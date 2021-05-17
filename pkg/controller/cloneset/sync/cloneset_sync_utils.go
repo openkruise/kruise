@@ -18,6 +18,7 @@ package sync
 
 import (
 	"fmt"
+
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -28,13 +29,14 @@ import (
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 
+	"strconv"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/integer"
-	"strconv"
 )
 
 type expectationDiffs struct {
@@ -229,11 +231,6 @@ const (
 	// PodDeletionCost can be used to set to an int32 that represent the cost of deleting
 	// a pod compared to other pods belonging to the same ReplicaSet. Pods with lower
 	// deletion cost are preferred to be deleted before pods with higher deletion cost.
-	// Note that this is honored on a best-effort basis, and so it does not offer guarantees on
-	// pod deletion order.
-	// The implicit deletion cost for pods that don't set the annotation is 0, negative values are permitted.
-	//
-	// This annotation is beta-level and is only honored when PodDeletionCost feature is enabled.
 	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
 )
 
