@@ -224,6 +224,63 @@ jobs:
           ./scripts/generate_bindata.sh
           ginkgo -timeout 60m -v --focus='\[apps\] (PullImage|ContainerRecreateRequest)' test/e2e
 
+  e2e-tests-for-advanced-daemonset:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v1
+        with:
+          kustomize-version: ${{ env.KUSTOMIZE_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          set -ex
+          kubectl cluster-info
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
+          for ((i=1;i<10;i++));
+          do
+            set +e
+            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+            set -e
+            if [ "$PODS" -eq 2 ]; then
+              break
+            fi
+            sleep 3
+          done
+          set +e
+          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get all -n kruise-system -o yaml
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
+          set -e
+          if [ "$PODS" -eq 2 ]; then
+            echo "Wait for kruise-manager and kruise-daemon ready successfully"
+          else
+            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
+            exit 1
+          fi
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          go install github.com/onsi/ginkgo/ginkgo
+          ./scripts/generate_bindata.sh
+          ginkgo -timeout 60m -v --focus='\[apps\] DaemonSet' test/e2e
+
   e2e-tests-for-other:
     runs-on: ubuntu-18.04
     steps:
@@ -280,7 +337,7 @@ jobs:
           go install github.com/onsi/ginkgo/ginkgo
           ./scripts/generate_bindata.sh
           set +e
-          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest)' test/e2e
+          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet)' test/e2e
 #          retVal=$?
 #          if [ $retVal -ne 0 ]; then
 #            kubectl get pod -n kruise-system -o wide
