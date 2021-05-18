@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -369,10 +368,10 @@ func choosePodsToDelete(totalDiff int, currentRevDiff int, notUpdatedPods, updat
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
 		// No need to sort pods if we are about to delete all of them.
 		if diff < len(pods) {
-			// Sort the pods in the order such that not-ready < ready, unscheduled
-			// < scheduled, and pending < running. This ensures that we delete pods
-			// in the earlier stages whenever possible.
-			sort.Sort(kubecontroller.ActivePods(pods))
+			// Pods are classified according to whether they receive traffic.
+			// If pods are in the same category, they are sorted in the order of pod-deletion-cost.
+			// Otherwise, the pods are sorted according to controller.ActivePods
+			sort.Sort(ActivePodsWithDeletionCost(pods))
 		} else if diff > len(pods) {
 			klog.Warningf("Diff > len(pods) in choosePodsToDelete func which is not expected.")
 			return pods
