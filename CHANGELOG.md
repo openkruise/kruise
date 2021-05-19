@@ -1,5 +1,36 @@
 # Change Log
 
+## v0.9.0
+
+### New feature: ContainerRecreateRequest
+
+[[doc](https://openkruise.io/en-us/docs/containerrecreaterequest.html)]
+
+ContainerRecreateRequest provides a way to let users **restart/recreate** one or more containers in an existing Pod.
+
+### New feature: Deletion Protection
+
+[[doc](https://openkruise.io/en-us/docs/deletion_protection.html)]
+
+This feature provides a safety policy which could help users protect Kubernetes resources and
+applications' availability from the cascading deletion mechanism.
+
+### CloneSet
+
+- Support `pod-deletion-cost` to let users set the priority of pods deletion. [[doc](https://openkruise.io/en-us/docs/cloneset.html#pod-deletion-cost)]
+- Support image pre-download for in-place update, which can accelerate the progress of applications upgrade. [[doc](https://openkruise.io/en-us/docs/cloneset.html#pre-download-image-for-in-place-update)]
+- Add `CloneSetShortHash` feature-gate, which solves the length limit of CloneSet name. [[doc](https://openkruise.io/en-us/docs/cloneset.html#short-hash-label)]
+- Make `maxUnavailable` and `maxSurge` effective for specified deletion. [[doc](https://openkruise.io/en-us/docs/cloneset.html#maxunavailable)]
+- Support efficient update and rollback using `partition`. [[doc](https://openkruise.io/en-us/docs/cloneset.html#rollback-by-partition)]
+
+### SidecarSet
+
+- Support sidecar container **hot upgrade**. [[doc](https://openkruise.io/en-us/docs/sidecarset.html#Hot-Upgrade-Sidecar)]
+
+### ImagePullJob
+
+- Add `podSelector` to pull image on nodes of the specific pods.
+
 ## v0.8.1
 
 ### Kruise-daemon

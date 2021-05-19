@@ -1,0 +1,190 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: {{ .Values.installation.namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kruise-webhook-service
+  namespace: {{ .Values.installation.namespace }}
+spec:
+  ports:
+    - port: 443
+      targetPort: {{ .Values.manager.webhook.port }}
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kruise-webhook-certs
+  namespace: {{ .Values.installation.namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: kruise-controller-manager
+  namespace: {{ .Values.installation.namespace }}
+spec:
+  replicas: {{ .Values.manager.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  minReadySeconds: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 100%
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+        - args:
+            - --enable-leader-election
+            - --metrics-addr={{ .Values.manager.metrics.addr }}:{{ .Values.manager.metrics.port }}
+            - --health-probe-addr=:{{ .Values.manager.healthProbe.port }}
+            - --logtostderr=true
+            - --leader-election-namespace={{ .Values.installation.namespace }}
+            - --v={{ .Values.manager.log.level }}
+            - --feature-gates={{ .Values.featureGates }}
+          command:
+            - /manager
+          image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
+          imagePullPolicy: Always
+          name: manager
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: WEBHOOK_PORT
+              value: "{{ .Values.manager.webhook.port }}"
+            - name: WEBHOOK_CONFIGURATION_FAILURE_POLICY_PODS
+              value: {{ .Values.webhookConfiguration.failurePolicy.pods }}
+          ports:
+            - containerPort: {{ .Values.manager.webhook.port }}
+              name: webhook-server
+              protocol: TCP
+            - containerPort: {{ .Values.manager.metrics.port }}
+              name: metrics
+              protocol: TCP
+            - containerPort: {{ .Values.manager.healthProbe.port }}
+              name: health
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: readyz
+              port: {{ .Values.manager.healthProbe.port }}
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+      terminationGracePeriodSeconds: 10
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: control-plane
+                  operator: In
+                  values:
+                  - controller-manager
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+{{- with .Values.manager.nodeAffinity }}
+        nodeAffinity:
+{{ toYaml . | indent 10 }}
+{{- end }}
+
+{{- if .Values.manager.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.manager.nodeSelector | indent 8 }}
+{{- end }}
+
+{{- if .Values.manager.tolerations }}
+      tolerations:
+{{ toYaml .Values.manager.tolerations | indent 8 }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kruise-daemon
+  namespace: {{ .Values.installation.namespace }}
+{{ if contains "KruiseDaemon=false" .Values.featureGates }}{{ else }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kruise-daemon
+  namespace: {{ .Values.installation.namespace }}
+  labels:
+    control-plane: daemon
+spec:
+  selector:
+    matchLabels:
+      control-plane: daemon
+  minReadySeconds: 3
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      labels:
+        control-plane: daemon
+    spec:
+{{- if .Values.daemon.affinity }}
+      affinity:
+{{ toYaml .Values.daemon.affinity | indent 8 }}
+{{- end }}
+      containers:
+      - command:
+        - /kruise-daemon
+        args:
+        - --logtostderr=true
+        - --v=4
+        - --addr=:{{ .Values.daemon.port }}
+        image: {{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}
+        imagePullPolicy: Always
+        name: daemon
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: {{ .Values.daemon.port }}
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          {{- toYaml .Values.daemon.resources | nindent 12 }}
+        volumeMounts:
+        - mountPath: /hostvarrun
+          name: runtime-socket
+          readOnly: true
+      tolerations:
+      - operator: Exists
+      hostNetwork: true
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: kruise-daemon
+      volumes:
+      - hostPath:
+          path: {{ .Values.daemon.socketLocation }}
+          type: ""
+        name: runtime-socket
+{{- end }}

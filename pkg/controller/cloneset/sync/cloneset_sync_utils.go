@@ -18,6 +18,8 @@ package sync
 
 import (
 	"fmt"
+	"reflect"
+	"strconv"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -28,9 +30,6 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
-
-	"strconv"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
@@ -66,6 +65,10 @@ type expectationDiffs struct {
 	updateMaxUnavailable int
 }
 
+func (e expectationDiffs) isEmpty() bool {
+	return reflect.DeepEqual(e, expectationDiffs{})
+}
+
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
 func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string) (res expectationDiffs) {
@@ -86,6 +89,9 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	var notReadyNewRevisionCount, notReadyOldRevisionCount int
 	var toDeleteNewRevisionCount, toDeleteOldRevisionCount, preDeletingCount int
 	defer func() {
+		if res.isEmpty() {
+			return
+		}
 		klog.V(1).Infof("Calculate diffs for CloneSet %s/%s, replicas=%d, partition=%d, maxSurge=%d, maxUnavailable=%d,"+
 			" allPods=%d, newRevisionPods=%d, newRevisionActivePods=%d, oldRevisionPods=%d, oldRevisionActivePods=%d,"+
 			" notReadyNewRevisionCount=%d, notReadyOldRevisionCount=%d,"+
