@@ -12,9 +12,9 @@
 
 |![notification](docs/img/bell-outline-badge.svg) 最新进展：|
 |------------------|
+|May 20th, 2021. Kruise v0.9.0 发布! 新增了多种重大功能如 容器重建/重启、删除安全防护等，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Mar 4th, 2021. Kruise v0.8.0 发布! 提供了重构版本的 SidecarSet、UnitedDeployment 支持管理 Deployment，以及一个新的 kruise-daemon 组件目前支持镜像预热，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Dec 16th, 2020. Kruise v0.7.0 发布! 提供一个新的 AdvancedCronJob CRD、将 Advanced StatefulSet 升级 v1beta1 版本、以及其他控制器一些新增能力，详情参见 [CHANGELOG](CHANGELOG.md).|
-|Oct 1st, 2020. Kruise v0.6.1 发布! 提供一系列增强 feature 和 bugfix 比如 CloneSet lifecycle hook 、UnitedDeployment 支持 CloneSet 等，详情参见 [CHANGELOG](CHANGELOG.md).|
 
 ## 介绍
 
@@ -39,6 +39,10 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 - [ImagePullJob](https://openkruise.io/zh-cn/docs/imagepulljob.html): 支持用户指定在任意范围的节点上预热镜像。
 
+- [ContainerRecreateRequest](https://openkruise.io/zh-cn/docs/containerrecreaterequest.html):  为用户提供了重建/重启存量 Pod 中一个或多个容器的能力。
+
+- [Deletion Protection](https://openkruise.io/zh-cn/docs/deletion_protection.html): 该功能提供了删除安全策略，用来在 Kubernetes 级联删除的机制下保护用户的资源和应用可用性。
+
 ## 核心功能
 
 - **原地升级**
@@ -57,6 +61,10 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
     支持用户指定在任意范围的节点上下载镜像。
 
+- **容器重建/重启**
+
+    支持用户重建/重启存量 Pod 中一个或多个容器。
+
 - **...**
 
 ## 快速开始
@@ -66,10 +74,10 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 ```bash
 # Kubernetes 版本 1.13 或 1.14
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz --disable-openapi-validation
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz --disable-openapi-validation
 
 # Kubernetes 版本大于等于 1.15
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz
 ```
 
 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者配置 feature-gates。
