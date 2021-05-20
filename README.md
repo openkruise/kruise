@@ -12,9 +12,9 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
+|May 20th, 2021. Kruise v0.9.0 is **RELEASED**! It provides great features such as ContainerRecreate and DeletionProtection, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Mar 4th, 2021. Kruise v0.8.0 is **RELEASED**! It provides refactoring SidecarSet, Deployment hosted by UnitedDeployment, and a new kruise-daemon component which supports image pre-download, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Dec 16th, 2020. Kruise v0.7.0 is **RELEASED**! It provides a new CRD named AdvancedCronJob, promotes AdvancedStatefulSet to v1beta1 and a few features in other controllers, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|Oct 1st, 2020. Kruise v0.6.1 is **RELEASED**! It provides various features and bugfix, such as CloneSet lifecycle hook and UnitedDeployment supported CloneSet, please check the [CHANGELOG](CHANGELOG.md) for details.|
 
 ## Introduction
 
@@ -39,6 +39,10 @@ As of now, Kruise mainly offers these controllers:
 
 - [ImagePullJob](https://openkruise.io/en-us/docs/imagepulljob.html): Help users download images on any nodes they want.
 
+- [ContainerRecreateRequest](https://openkruise.io/en-us/docs/containerrecreaterequest.html):  Provides a way to let users restart/recreate one or more containers in an existing Pod.
+
+- [Deletion Protection](https://openkruise.io/en-us/docs/deletion_protection.html): Provides a safety policy which could help users protect Kubernetes resources and applications' availability from the cascading deletion mechanism.
+
 ## Key Features
 
 - **In-place update**
@@ -57,6 +61,10 @@ As of now, Kruise mainly offers these controllers:
 
   Help users download images on any nodes they want.
 
+- **Container recreate/restart**
+
+  Help users restart/recreate one or more containers in an existing Pod.
+
 - **...**
 
 ## Quick Start
@@ -65,10 +73,10 @@ For a Kubernetes cluster with its version higher than v1.13, you can simply inst
 
 ```bash
 # Kubernetes 1.13 and 1.14
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz --disable-openapi-validation
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz --disable-openapi-validation
 
 # Kubernetes 1.15 and newer versions
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.8.1/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz
 ```
 
 Note that installing this chart directly means it will use the default template values for the kruise-manager.
