@@ -49,12 +49,10 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -800,7 +798,7 @@ func NewStatefulSetController(
 				history.NewHistory(kubeClient, revInformer.Lister()),
 				recorder,
 			),
-			podControl: kubecontroller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+			podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 			podLister:  podInformer.Lister(),
 			setLister:  setInformer.Lister(),
 		},
@@ -847,7 +845,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting stateful set controller")
 	defer klog.Infof("Shutting down statefulset controller")
 
-	if !toolscache.WaitForNamedCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
+	if !cache.WaitForNamedCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 
