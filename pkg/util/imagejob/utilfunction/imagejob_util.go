@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package imagejob
+package utilfunction
 
 import (
 	"context"
@@ -22,13 +22,13 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func CreateJobForWorkload(c client.Client, owner metav1.Object, name, image string, labels map[string]string, podSelector metav1.LabelSelector, pullSecrets []string) error {
+func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.GroupVersionKind, name, image string, labels map[string]string, podSelector metav1.LabelSelector, pullSecrets []string) error {
 	var pullTimeoutSeconds int32 = 300
 	if str, ok := owner.GetAnnotations()[appsv1alpha1.ImagePreDownloadTimeoutSecondsKey]; ok {
 		if i, err := strconv.Atoi(str); err == nil {
@@ -47,7 +47,7 @@ func CreateJobForWorkload(c client.Client, owner metav1.Object, name, image stri
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       owner.GetNamespace(),
 			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(owner, owner.(runtime.Object).GetObjectKind().GroupVersionKind())},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(owner, gvk)},
 			Labels:          labels,
 		},
 		Spec: appsv1alpha1.ImagePullJobSpec{

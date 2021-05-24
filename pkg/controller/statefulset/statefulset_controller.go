@@ -22,19 +22,21 @@ import (
 	"fmt"
 	"time"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
-	apps "k8s.io/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,6 +52,7 @@ import (
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	sigsclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -71,6 +74,15 @@ var (
 	updateExpectations = expectations.NewUpdateExpectations(revisionadapter.NewDefaultImpl())
 	// this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
 	durationStore = requeueduration.DurationStore{}
+
+	// predownload image field
+	minimumReplicasToPreDownloadImage int32 = 3
+
+	// global client
+	sigsruntimeClient sigsclient.Client
+
+	// determined during controller initializing
+	isPreDownloadDisabled bool
 )
 
 // Add creates a new StatefulSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -78,6 +90,12 @@ var (
 func Add(mgr manager.Manager) error {
 	if !utildiscovery.DiscoverGVK(controllerKind) {
 		return nil
+	}
+	// check for whether imagepulljob is disabled
+	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
+		isPreDownloadDisabled = true
 	}
 	r, err := newReconciler(mgr)
 	if err != nil {
@@ -115,6 +133,9 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
+
+	// new a client
+	sigsruntimeClient = util.NewClientFromManager(mgr, "statefulset-controller")
 
 	return &ReconcileStatefulSet{
 		kruiseClient: genericClient.KruiseClient,
@@ -259,7 +280,7 @@ func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1beta1.StatefulS
 	if err != nil {
 		return err
 	}
-	orphanRevisions := make([]*apps.ControllerRevision, 0)
+	orphanRevisions := make([]*appsv1.ControllerRevision, 0)
 	for i := range revisions {
 		if metav1.GetControllerOf(revisions[i]) == nil {
 			orphanRevisions = append(orphanRevisions, revisions[i])

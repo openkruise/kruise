@@ -35,7 +35,7 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
-	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 	apps "k8s.io/api/apps/v1"
@@ -308,7 +308,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			}
 		} else {
 			// delete ImagePullJobs if revisions have been consistent
-			if err := utilimagejob.DeleteJobsForWorkload(r.Client, instance); err != nil {
+			if err := imagejobutilfunc.DeleteJobsForWorkload(r.Client, instance); err != nil {
 				klog.Errorf("Failed to delete imagepulljobs for %s: %v", request, err)
 			}
 		}

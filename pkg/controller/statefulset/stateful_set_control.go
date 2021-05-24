@@ -35,6 +35,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 )
@@ -304,6 +305,20 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	updateSet, err := ApplyRevision(set, updateRevision)
 	if err != nil {
 		return set.Status.DeepCopy(), err
+	}
+
+	if !isPreDownloadDisabled && sigsruntimeClient != nil {
+		if currentRevision.Name != updateRevision.Name {
+			// pre-download images for new revision
+			if err := ssc.createImagePullJobsForInPlaceUpdate(set, currentRevision, updateRevision); err != nil {
+				klog.Errorf("Failed to create ImagePullJobs for %v: %v", set, err)
+			}
+		} else {
+			// delete ImagePullJobs if revisions have been consistent
+			if err := imagejobutilfunc.DeleteJobsForWorkload(sigsruntimeClient, set); err != nil {
+				klog.Errorf("Failed to delete imagepulljobs for %v: %v", set, err)
+			}
+		}
 	}
 
 	// set the generation, and revisions in the returned status
