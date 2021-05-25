@@ -203,6 +203,7 @@ func (r *ReconcileNodeImage) Reconcile(request reconcile.Request) (res reconcile
 			return reconcile.Result{}, fmt.Errorf("failed to create nodeimage %v, err: %v", nodeImage.Name, err)
 		}
 		klog.Infof("Successfully create nodeimage %s", nodeImage.Name)
+		return reconcile.Result{}, nil
 	}
 
 	if nodeImage.DeletionTimestamp != nil {
