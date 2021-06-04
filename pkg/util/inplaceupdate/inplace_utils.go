@@ -38,6 +38,8 @@ import (
 
 var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
 
+const MessageImageIDNotChanged = "imageID not changed"
+
 type RefreshResult struct {
 	RefreshErr    error
 	DelayDuration time.Duration
@@ -117,9 +119,18 @@ func (c *realControl) refreshCondition(pod *v1.Pod, opts *UpdateOptions) error {
 		return nil
 	}
 
+	newCondition := v1.PodCondition{
+		Type:               appspub.InPlaceUpdateReady,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: c.now(),
+	}
+
 	// in-place updating has not completed yet
-	if checkErr := opts.CheckUpdateCompleted(pod); checkErr != nil {
+	checkErr := opts.CheckUpdateCompleted(pod)
+	if checkErr != nil && strings.Contains(checkErr.Error(), MessageImageIDNotChanged) {
 		klog.V(6).Infof("Check Pod %s/%s in-place update not completed yet: %v", pod.Namespace, pod.Name, checkErr)
+		goto end
+	} else if checkErr != nil {
 		return nil
 	}
 
@@ -128,11 +139,7 @@ func (c *realControl) refreshCondition(pod *v1.Pod, opts *UpdateOptions) error {
 		return nil
 	}
 
-	newCondition := v1.PodCondition{
-		Type:               appspub.InPlaceUpdateReady,
-		Status:             v1.ConditionTrue,
-		LastTransitionTime: c.now(),
-	}
+end:
 	return c.updateCondition(pod, newCondition)
 }
 

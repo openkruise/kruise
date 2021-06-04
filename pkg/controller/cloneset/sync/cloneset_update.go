@@ -19,6 +19,7 @@ package sync
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -142,12 +143,15 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
 	case appspub.LifecycleStateUpdating:
-		if opts.CheckUpdateCompleted(pod) == nil {
+		checkErr := opts.CheckUpdateCompleted(pod)
+		if checkErr == nil {
 			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 				state = appspub.LifecycleStateUpdated
 			} else {
 				state = appspub.LifecycleStateNormal
 			}
+		} else if strings.Contains(checkErr.Error(), inplaceupdate.MessageImageIDNotChanged) {
+			state = appspub.LifecycleStateNormal
 		}
 	case appspub.LifecycleStateUpdated:
 		if cs.Spec.Lifecycle == nil ||
