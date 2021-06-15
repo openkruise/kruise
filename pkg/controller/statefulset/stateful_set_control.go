@@ -316,7 +316,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		} else {
 			// delete ImagePullJobs if revisions have been consistent
 			if err := imagejobutilfunc.DeleteJobsForWorkload(sigsruntimeClient, set); err != nil {
-				klog.Errorf("Failed to delete imagepulljobs for %v: %v", set, err)
+				klog.Errorf("Failed to delete ImagePullJobs for %v: %v", set, err)
 			}
 		}
 	}
@@ -346,6 +346,18 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	var firstUnhealthyPod *v1.Pod
 	monotonic := !allowsBurst(set)
 	minReadySeconds := getMinReadySeconds(set)
+	var scaleMaxUnavailable *int
+	if set.Spec.ScaleStrategy != nil && set.Spec.ScaleStrategy.MaxUnavailable != nil {
+		maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(set.Spec.ScaleStrategy.MaxUnavailable, int(*set.Spec.Replicas), false)
+		if err != nil {
+			return &status, err
+		}
+		// maxUnavailable should not be less than 1
+		if maxUnavailable < 1 {
+			maxUnavailable = 1
+		}
+		scaleMaxUnavailable = &maxUnavailable
+	}
 
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
@@ -484,7 +496,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			}
 
 			// if the set does not allow bursting, return immediately
-			if monotonic {
+			if monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
 				return &status, nil
 			}
 			// pod created, no more work possible for this round
@@ -492,7 +504,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
 		// completes before we continue to make progress.
-		if isTerminating(replicas[i]) && monotonic {
+		if isTerminating(replicas[i]) && (monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable)) {
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to Terminate",
 				set.Namespace,
@@ -511,8 +523,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If we have a Pod that has been created but is not running and available we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Available.
-		if monotonic {
-			if isAvailable, waitTime := isRunningAndAvailable(replicas[i], minReadySeconds); !isAvailable {
+		if monotonic || scaleMaxUnavailable != nil {
+			isAvailable, waitTime := isRunningAndAvailable(replicas[i], minReadySeconds)
+			if !isAvailable && (monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable)) {
 				if waitTime > 0 {
 					// make sure we check later
 					durationStore.Push(getStatefulSetKey(set), waitTime)

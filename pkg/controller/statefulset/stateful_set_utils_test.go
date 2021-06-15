@@ -449,7 +449,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 	return &appsv1beta1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
-			APIVersion: "apps/v1",
+			APIVersion: "apps.kruise.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

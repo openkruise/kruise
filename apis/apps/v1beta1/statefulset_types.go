@@ -180,6 +180,19 @@ type StatefulSetSpec struct {
 
 	// Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
+
+	// scaleStrategy indicates the StatefulSetScaleStrategy that will be
+	// employed to scale Pods in the StatefulSet.
+	ScaleStrategy *StatefulSetScaleStrategy `json:"scaleStrategy,omitempty"`
+}
+
+// StatefulSetScaleStrategy defines strategies for pods scale.
+type StatefulSetScaleStrategy struct {
+	// The maximum number of pods that can be unavailable during scaling.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding down.
+	// It can just be allowed to work with Parallel podManagementPolicy.
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }
 
 // StatefulSetStatus defines the observed state of StatefulSet
