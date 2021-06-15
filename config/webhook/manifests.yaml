@@ -412,6 +412,24 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-policy-kruise-io-podunavailablebudget
+  failurePolicy: Fail
+  name: vpodunavailablebudget.kb.io
+  rules:
+  - apiGroups:
+    - policy.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - podunavailablebudgets
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-apps-kruise-io-v1alpha1-sidecarset
   failurePolicy: Fail
   name: vsidecarset.kb.io

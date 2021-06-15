@@ -124,3 +124,97 @@ func GetFastLabelSelector(ps *metav1.LabelSelector) (labels.Selector, error) {
 
 	return metav1.LabelSelectorAsSelector(ps)
 }
+
+// whether selectors overlap (indicates that selector1, selector2 have same key, and there is an certain intersection）
+// 1. when selector1、selector2 don't have same key, it is considered non-overlap, e.g. selector1(a=b) and selector2(c=d)
+// 2. when selector1、selector2 have same key, and matchLabels & matchExps are intersection, it is considered overlap.
+// For examples:
+//    a In [b,c]    And a Exist
+//                      a In [b,...] [c,...] [Include any b,c,...]
+//                      a NotIn [a,...] [b,....] [c,....] [All other cases are allowed except for the inclusion of both b,c...] [b,c,e]
+//    a Exist       And a Exist
+//                      a In [x,y,Any,...]
+//                      a NotIn [a,b,Any...]
+//    a NotIn [b,c] And a Exist
+//                      a NotExist
+//                      a NotIn [a,b,Any...]
+//                      a In [a,b] [a,c] [e,f] [Any,...] other than [b],[c],[b,c]
+//    a NotExist    And a NotExist
+//                      a NotIn [Any,...]
+//    When selector1 and selector2 contain the same key, except for the above case, they are considered non-overlap
+//
+func IsSelectorLooseOverlap(selector1, selector2 *metav1.LabelSelector) bool {
+	matchExp1 := convertSelectorToMatchExpressions(selector1)
+	matchExp2 := convertSelectorToMatchExpressions(selector2)
+
+	for k, exp1 := range matchExp1 {
+		exp2, ok := matchExp2[k]
+		if !ok {
+			return false
+		}
+
+		if !isMatchExpOverlap(exp1, exp2) {
+			return false
+		}
+	}
+
+	for k, exp2 := range matchExp2 {
+		exp1, ok := matchExp1[k]
+		if !ok {
+			return false
+		}
+
+		if !isMatchExpOverlap(exp2, exp1) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isMatchExpOverlap(matchExp1, matchExp2 metav1.LabelSelectorRequirement) bool {
+	switch matchExp1.Operator {
+	case metav1.LabelSelectorOpIn:
+		if matchExp2.Operator == metav1.LabelSelectorOpExists {
+			return true
+		} else if matchExp2.Operator == metav1.LabelSelectorOpIn && sliceOverlaps(matchExp2.Values, matchExp1.Values) {
+			return true
+		} else if matchExp2.Operator == metav1.LabelSelectorOpNotIn && !sliceContains(matchExp2.Values, matchExp1.Values) {
+			return true
+		}
+	case metav1.LabelSelectorOpExists:
+		if matchExp2.Operator == metav1.LabelSelectorOpIn || matchExp2.Operator == metav1.LabelSelectorOpNotIn ||
+			matchExp2.Operator == metav1.LabelSelectorOpExists {
+			return true
+		}
+	case metav1.LabelSelectorOpNotIn:
+		if matchExp2.Operator == metav1.LabelSelectorOpExists || matchExp2.Operator == metav1.LabelSelectorOpDoesNotExist ||
+			matchExp2.Operator == metav1.LabelSelectorOpNotIn {
+			return true
+		} else if matchExp2.Operator == metav1.LabelSelectorOpIn && !sliceContains(matchExp1.Values, matchExp2.Values) {
+			return true
+		}
+	case metav1.LabelSelectorOpDoesNotExist:
+		if matchExp2.Operator == metav1.LabelSelectorOpDoesNotExist || matchExp2.Operator == metav1.LabelSelectorOpNotIn {
+			return true
+		}
+	}
+
+	return false
+}
+
+func convertSelectorToMatchExpressions(selector *metav1.LabelSelector) map[string]metav1.LabelSelectorRequirement {
+	matchExps := map[string]metav1.LabelSelectorRequirement{}
+	for _, exp := range selector.MatchExpressions {
+		matchExps[exp.Key] = exp
+	}
+
+	for k, v := range selector.MatchLabels {
+		matchExps[k] = metav1.LabelSelectorRequirement{
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   []string{v},
+		}
+	}
+
+	return matchExps
+}

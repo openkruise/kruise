@@ -25,6 +25,7 @@ import (
 	versioned "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	apps "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps"
 	internalinterfaces "github.com/openkruise/kruise/pkg/client/informers/externalversions/internalinterfaces"
+	policy "github.com/openkruise/kruise/pkg/client/informers/externalversions/policy"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -172,8 +173,13 @@ type SharedInformerFactory interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	Apps() apps.Interface
+	Policy() policy.Interface
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
 	return apps.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Policy() policy.Interface {
+	return policy.New(f, f.namespace, f.tweakListOptions)
 }
