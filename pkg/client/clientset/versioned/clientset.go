@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1beta1"
+	policyv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/policy/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -31,14 +32,16 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AppsV1alpha1() appsv1alpha1.AppsV1alpha1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
+	PolicyV1alpha1() policyv1alpha1.PolicyV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	appsV1alpha1 *appsv1alpha1.AppsV1alpha1Client
-	appsV1beta1  *appsv1beta1.AppsV1beta1Client
+	appsV1alpha1   *appsv1alpha1.AppsV1alpha1Client
+	appsV1beta1    *appsv1beta1.AppsV1beta1Client
+	policyV1alpha1 *policyv1alpha1.PolicyV1alpha1Client
 }
 
 // AppsV1alpha1 retrieves the AppsV1alpha1Client
@@ -49,6 +52,11 @@ func (c *Clientset) AppsV1alpha1() appsv1alpha1.AppsV1alpha1Interface {
 // AppsV1beta1 retrieves the AppsV1beta1Client
 func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return c.appsV1beta1
+}
+
+// PolicyV1alpha1 retrieves the PolicyV1alpha1Client
+func (c *Clientset) PolicyV1alpha1() policyv1alpha1.PolicyV1alpha1Interface {
+	return c.policyV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -80,6 +88,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.policyV1alpha1, err = policyv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -94,6 +106,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.appsV1alpha1 = appsv1alpha1.NewForConfigOrDie(c)
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
+	cs.policyV1alpha1 = policyv1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -104,6 +117,7 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.appsV1alpha1 = appsv1alpha1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
+	cs.policyV1alpha1 = policyv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

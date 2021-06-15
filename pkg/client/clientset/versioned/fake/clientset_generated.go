@@ -23,6 +23,8 @@ import (
 	fakeappsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1/fake"
 	appsv1beta1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1beta1"
 	fakeappsv1beta1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1beta1/fake"
+	policyv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/policy/v1alpha1"
+	fakepolicyv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/policy/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -85,4 +87,9 @@ func (c *Clientset) AppsV1alpha1() appsv1alpha1.AppsV1alpha1Interface {
 // AppsV1beta1 retrieves the AppsV1beta1Client
 func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
+}
+
+// PolicyV1alpha1 retrieves the PolicyV1alpha1Client
+func (c *Clientset) PolicyV1alpha1() policyv1alpha1.PolicyV1alpha1Interface {
+	return &fakepolicyv1alpha1.FakePolicyV1alpha1{Fake: &c.Fake}
 }
