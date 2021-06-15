@@ -3178,3 +3178,67 @@ func newRevisionOrDie(set *appsv1beta1.StatefulSet, revision int64) *apps.Contro
 	}
 	return rev
 }
+
+func TestScaleUpWithMaxUnavailable(t *testing.T) {
+	set := newStatefulSet(5)
+	set.Spec.PodManagementPolicy = apps.ParallelPodManagement
+	set.Spec.ScaleStrategy = &appsv1beta1.StatefulSetScaleStrategy{
+		MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt(2); return &i }(),
+	}
+
+	client := fake.NewSimpleClientset()
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	spc, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+
+	selector, _ := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	var err error
+	var pods []*v1.Pod
+	reconcileTwice := func() {
+		for i := 0; i < 2; i++ {
+			set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("Error getting updated StatefulSet: %v", err)
+			}
+
+			pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Fatalf("Failed to list pods: %v", err)
+			}
+			sort.Sort(ascendingOrdinal(pods))
+
+			// ensure all pods are valid (have a phase)
+			for ord, pod := range pods {
+				if pod.Status.Phase == "" {
+					if pods, err = spc.setPodPending(set, ord); err != nil {
+						t.Fatalf("Failed to set phase for pod: %v", err)
+					}
+				}
+			}
+
+			if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+				t.Fatalf("Failed to reconcile update statefulset: %v", err)
+			}
+		}
+	}
+
+	reconcileTwice()
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.Replicas != 2 {
+		t.Fatalf("Expect status replicas=2, got %v", set.Status.Replicas)
+	}
+
+	spc.setPodRunning(set, 1)
+	spc.setPodReady(set, 1)
+	reconcileTwice()
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.Replicas != 3 {
+		t.Fatalf("Expect status replicas=3, got %v", set.Status.Replicas)
+	}
+}

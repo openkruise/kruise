@@ -50,6 +50,12 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 		}
 	}
 
+	if spec.ScaleStrategy != nil {
+		if spec.ScaleStrategy.MaxUnavailable != nil {
+			allErrs = append(allErrs, validateMaxUnavailableField(spec.ScaleStrategy.MaxUnavailable, spec, fldPath.Child("scaleStrategy").Child("maxUnavailable"))...)
+		}
+	}
+
 	switch spec.UpdateStrategy.Type {
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
@@ -81,7 +87,11 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 			}
 
 			// validate the `maxUnavailable` field
-			allErrs = append(allErrs, validateMaxUnavailableField(spec, fldPath)...)
+			if maxUnavailable := spec.UpdateStrategy.RollingUpdate.MaxUnavailable; maxUnavailable == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"), ""))
+			} else {
+				allErrs = append(allErrs, validateMaxUnavailableField(maxUnavailable, spec, fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"))...)
+			}
 
 			// validate the `PodUpdatePolicy` related fields
 			allErrs = append(allErrs, validatePodUpdatePolicy(spec, fldPath)...)
@@ -173,42 +183,16 @@ func validatePodUpdatePolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 	return allErrs
 }
 
-func validateMaxUnavailableField(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
-			Child("rollingUpdate").Child("maxUnavailable"), ""))
-	} else {
-		allErrs = append(allErrs,
-			appsvalidation.ValidatePositiveIntOrPercent(
-				*spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"))...)
-		if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(
-			intstrutil.ValueOrDefault(spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)),
-			1,
-			true,
-		); err != nil {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
-				spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-				fmt.Sprintf("failed getValueFromIntOrPercent for maxUnavailable: %v", err),
-			))
-		} else if maxUnavailable < 1 {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
-				spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-				"getValueFromIntOrPercent for maxUnavailable should not be less than 1",
-			))
-		}
-		if apps.ParallelPodManagement != spec.PodManagementPolicy &&
-			(spec.UpdateStrategy.RollingUpdate.MaxUnavailable.Type != intstr.Int ||
-				spec.UpdateStrategy.RollingUpdate.MaxUnavailable.IntVal != 1) {
-			allErrs = append(allErrs, field.Invalid(
-				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"),
-				spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-				"maxUnavailable can just work with Parallel PodManagementPolicyType",
-			))
-		}
+func validateMaxUnavailableField(maxUnavailable *intstr.IntOrString, spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := appsvalidation.ValidatePositiveIntOrPercent(*maxUnavailable, fldPath)
+	if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(maxUnavailable, intstrutil.FromInt(1)), 1, true); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, maxUnavailable, fmt.Sprintf("getValueFromIntOrPercent error: %v", err)))
+	} else if maxUnavailable < 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath, maxUnavailable, "should not be less than 1"))
+	}
+	if apps.ParallelPodManagement != spec.PodManagementPolicy &&
+		(maxUnavailable.Type != intstr.Int || maxUnavailable.IntVal != 1) {
+		allErrs = append(allErrs, field.Invalid(fldPath, maxUnavailable, "can only work with Parallel PodManagementPolicyType"))
 	}
 	return allErrs
 }
@@ -233,6 +217,9 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 	restoreStrategy := statefulSet.Spec.UpdateStrategy
 	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
+	restoreScaleStrategy := statefulSet.Spec.ScaleStrategy
+	statefulSet.Spec.ScaleStrategy = oldStatefulSet.Spec.ScaleStrategy
+
 	restoreReserveOrdinals := statefulSet.Spec.ReserveOrdinals
 	statefulSet.Spec.ReserveOrdinals = oldStatefulSet.Spec.ReserveOrdinals
 	statefulSet.Spec.Lifecycle = oldStatefulSet.Spec.Lifecycle
@@ -243,6 +230,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template = restoreTemplate
 	statefulSet.Spec.UpdateStrategy = restoreStrategy
+	statefulSet.Spec.ScaleStrategy = restoreScaleStrategy
 	statefulSet.Spec.ReserveOrdinals = restoreReserveOrdinals
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)

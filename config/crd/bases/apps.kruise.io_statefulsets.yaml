@@ -510,6 +510,21 @@ spec:
                   10.
                 format: int32
                 type: integer
+              scaleStrategy:
+                description: scaleStrategy indicates the StatefulSetScaleStrategy
+                  that will be employed to scale Pods in the StatefulSet.
+                properties:
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: 'The maximum number of pods that can be unavailable
+                      during scaling. Value can be an absolute number (ex: 5) or a
+                      percentage of desired pods (ex: 10%). Absolute number is calculated
+                      from percentage by rounding down. It can just be allowed to
+                      work with Parallel podManagementPolicy.'
+                    x-kubernetes-int-or-string: true
+                type: object
               selector:
                 description: 'selector is a label query over pods that should match
                   the replica count. It must match the pod template''s labels. More
