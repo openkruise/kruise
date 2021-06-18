@@ -20,7 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
+	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -62,6 +64,7 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err))
 		}
 	}
+	var copy runtime.Object = obj.DeepCopy()
 
 	appsv1beta1.SetDefaultsStatefulSet(obj)
 	obj.Status = appsv1beta1.StatefulSetStatus{}
@@ -82,7 +85,9 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 	}
-
+	if reflect.DeepEqual(obj, copy) {
+		return admission.Allowed("")
+	}
 	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
 	if len(resp.Patches) > 0 {
 		klog.V(5).Infof("Admit StatefulSet %s/%s patches: %v", obj.Namespace, obj.Name, util.DumpJSON(resp.Patches))

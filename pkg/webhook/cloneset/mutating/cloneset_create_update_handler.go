@@ -20,6 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"reflect"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -50,8 +53,11 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
+	var copy runtime.Object = obj.DeepCopy()
 	appsv1alpha1.SetDefaultsCloneSet(obj)
-
+	if reflect.DeepEqual(obj, copy) {
+		return admission.Allowed("")
+	}
 	marshalled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)

@@ -23,6 +23,8 @@ import (
 	"net/http"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -59,6 +61,7 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
+	var copy runtime.Object = obj.DeepCopy()
 
 	if req.AdmissionRequest.Operation == admissionv1beta1.Update {
 		oldObj := &appsv1alpha1.ContainerRecreateRequest{}
@@ -136,6 +139,9 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
+	if reflect.DeepEqual(obj, copy) {
+		return admission.Allowed("")
+	}
 	marshalled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
