@@ -53,7 +53,7 @@ func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 	}
 
 	if opts.CheckUpdateCompleted == nil {
-		opts.CheckUpdateCompleted = defaultCheckInPlaceUpdateCompleted
+		opts.CheckUpdateCompleted = DefaultCheckInPlaceUpdateCompleted
 	}
 
 	return opts
@@ -145,10 +145,10 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 	return updateSpec
 }
 
-// defaultCheckInPlaceUpdateCompleted checks whether imageID in pod status has been changed since in-place update.
+// DefaultCheckInPlaceUpdateCompleted checks whether imageID in pod status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated
 // containers in Pod.
-func defaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
+func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	inPlaceUpdateState := appspub.InPlaceUpdateState{}
 	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); !ok {
 		return nil
