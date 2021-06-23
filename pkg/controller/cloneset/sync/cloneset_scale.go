@@ -62,7 +62,7 @@ func (r *realControl) Scale(
 
 	// 1. manage pods to delete and in preDelete
 	podsSpecifiedToDelete, podsInPreDelete, numToDelete := getPlannedDeletedPods(updateCS, pods)
-	if modified, err := r.managePreparingDelete(updateCS, pods, util.DiffPods(podsInPreDelete, podsSpecifiedToDelete), numToDelete); err != nil || modified {
+	if modified, err := r.managePreparingDelete(updateCS, pods, podsInPreDelete, numToDelete); err != nil || modified {
 		return modified, err
 	}
 
