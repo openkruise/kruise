@@ -103,6 +103,14 @@ func (c *commonControl) newVersionedPods(cs *appsv1alpha1.CloneSet, revision str
 	return newPods
 }
 
+func (c *commonControl) GetPodSpreadConstraint() []clonesetutils.PodSpreadConstraint {
+	var constraints []clonesetutils.PodSpreadConstraint
+	for _, c := range c.Spec.Template.Spec.TopologySpreadConstraints {
+		constraints = append(constraints, clonesetutils.PodSpreadConstraint{TopologyKey: c.TopologyKey})
+	}
+	return constraints
+}
+
 func (c *commonControl) IsPodUpdatePaused(pod *v1.Pod) bool {
 	return false
 }
