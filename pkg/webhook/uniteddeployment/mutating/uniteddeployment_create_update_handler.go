@@ -19,7 +19,9 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
+	"reflect"
 
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/klog"
@@ -50,10 +52,12 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-
+	var copy runtime.Object = obj.DeepCopy()
 	appsv1alpha1.SetDefaultsUnitedDeployment(obj)
 	obj.Status = appsv1alpha1.UnitedDeploymentStatus{}
-
+	if reflect.DeepEqual(obj, copy) {
+		return admission.Allowed("")
+	}
 	marshalled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)

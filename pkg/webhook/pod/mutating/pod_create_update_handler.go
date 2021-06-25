@@ -19,7 +19,9 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +51,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
+	var copy runtime.Object = obj.DeepCopy()
 	// when pod.namespace is empty, using req.namespace
 	if obj.Namespace == "" {
 		obj.Namespace = req.Namespace
@@ -60,7 +63,9 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-
+	if reflect.DeepEqual(obj, copy) {
+		return admission.Allowed("")
+	}
 	marshalled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
