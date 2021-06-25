@@ -190,6 +190,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 
 			//change pods container image
 			ds.Spec.Template.Spec.Containers[0].Image = framework.NewImage
+			kc.AppsV1alpha1().DaemonSets(ds.Namespace).Update(ds)
 
 			ginkgo.By("Get all Old Deamonset Pods")
 			newPodList, err := tester.ListDaemonPods(label)
