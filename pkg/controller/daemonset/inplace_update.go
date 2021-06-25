@@ -50,7 +50,7 @@ func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 		return reconcile.Result{}, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
 	}
 
-	_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
+	newPods, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
 
 	oldAvailablePods, oldUnavailablePods := util.SplitByAvailablePods(ds.Spec.MinReadySeconds, oldPods)
 
@@ -85,7 +85,7 @@ func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 	// Refresh update expectations
 	key, _ := kubecontroller.KeyFunc(ds)
 	// Refresh update expectations
-	for _, pod := range oldPodsToInplaceUpdate {
+	for _, pod := range newPods {
 		dsc.updateExp.ObserveUpdated(key, cur.Name, pod)
 	}
 

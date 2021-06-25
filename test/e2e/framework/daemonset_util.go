@@ -205,6 +205,40 @@ func (t *DaemonSetTester) SetDaemonSetNodeLabels(nodeName string, labels map[str
 	return newNode, nil
 }
 
+func (t *DaemonSetTester) CheckImageChangeToNew(ds *appsv1alpha1.DaemonSet,podList *v1.PodList) func()(bool,error){
+	return func()(bool,error){
+		for _, pod := range podList.Items{
+			for _, status := range pod.Status.ContainerStatuses{
+				if status.Image != ds.Spec.Template.Spec.Containers[0].Image{
+					return false,fmt.Errorf("pod container image is not new")
+				}
+			}
+		}
+		return true,nil
+	}
+}
+
+func (t *DaemonSetTester) CheckPodStayInNode(oldNodeList *v1.NodeList,newNodeList *v1.NodeList) func()(bool,error){
+	return func()(bool,error){
+		if len(oldNodeList.Items) != len(newNodeList.Items){
+			return false,fmt.Errorf("newPods not match old Pods")
+		}
+
+		mp := make(map[string]struct{})
+		for i,_ := range oldNodeList.Items{
+			mp[oldNodeList.Items[i].Name] = struct{}{}
+		}
+		for i,_ := range newNodeList.Items{
+			if _,ok := mp[newNodeList.Items[i].Name];ok{
+				delete(mp,newNodeList.Items[i].Name)
+			}else{
+				return false,fmt.Errorf("oldNode not match newNode")
+			}
+		}
+		return true,nil
+	}
+}
+
 func (t *DaemonSetTester) CheckRunningOnAllNodes(ds *appsv1alpha1.DaemonSet) func() (bool, error) {
 	return func() (bool, error) {
 		nodeNames := t.SchedulableNodes(ds)
