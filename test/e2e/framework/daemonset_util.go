@@ -210,7 +210,7 @@ func (t *DaemonSetTester) CheckImageChangeToNew(podList *v1.PodList,newImage str
 		for _, pod := range podList.Items{
 			for _, status := range pod.Status.ContainerStatuses{
 				if status.Image != newImage{
-					return false,fmt.Errorf("pod container image is not new")
+					return false,nil
 				}
 			}
 		}
