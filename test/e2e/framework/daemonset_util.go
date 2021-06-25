@@ -210,6 +210,7 @@ func (t *DaemonSetTester) CheckImageChangeToNew(podList *v1.PodList,newImage str
 		for _, pod := range podList.Items{
 			for _, status := range pod.Status.ContainerStatuses{
 				if status.Image != newImage{
+					Logf("newPod container image is %s,should be %s",status.Image,newImage)
 					return false,nil
 				}
 			}
@@ -221,7 +222,8 @@ func (t *DaemonSetTester) CheckImageChangeToNew(podList *v1.PodList,newImage str
 func (t *DaemonSetTester) CheckPodStayInNode(oldNodeList *v1.NodeList,newNodeList *v1.NodeList) func()(bool,error){
 	return func()(bool,error){
 		if len(oldNodeList.Items) != len(newNodeList.Items){
-			return false,fmt.Errorf("newPods not match old Pods")
+			Logf("newPods not match old Pods")
+			return false,nil
 		}
 
 		mp := make(map[string]struct{})
@@ -232,7 +234,8 @@ func (t *DaemonSetTester) CheckPodStayInNode(oldNodeList *v1.NodeList,newNodeLis
 			if _,ok := mp[newNodeList.Items[i].Name];ok{
 				delete(mp,newNodeList.Items[i].Name)
 			}else{
-				return false,fmt.Errorf("oldNode not match newNode")
+				Logf("mp not contain %s key and mp is %v",newNodeList.Items[i].Name,mp)
+				return false,nil
 			}
 		}
 		return true,nil
