@@ -24,6 +24,9 @@ import (
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
@@ -36,7 +39,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+var (
+	inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+	UpdateExpectations     = expectations.NewUpdateExpectations(&revisionAdapterImpl{})
+)
 
 type RefreshResult struct {
 	RefreshErr    error
@@ -75,6 +81,34 @@ type realControl struct {
 
 	// just for test
 	now func() metav1.Time
+}
+
+type revisionAdapterImpl struct {
+}
+
+func (r *revisionAdapterImpl) EqualToRevisionHash(_ string, obj metav1.Object, hash string) bool {
+	objHash := obj.GetLabels()[apps.ControllerRevisionHashLabelKey]
+	if objHash == hash {
+		return true
+	}
+	return r.getShortHash(hash) == r.getShortHash(objHash)
+}
+
+func (r *revisionAdapterImpl) WriteRevisionHash(obj metav1.Object, hash string) {
+	if obj.GetLabels() == nil {
+		obj.SetLabels(make(map[string]string, 1))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CloneSetShortHash) {
+		hash = r.getShortHash(hash)
+	}
+	obj.GetLabels()[apps.ControllerRevisionHashLabelKey] = hash
+}
+
+func (r *revisionAdapterImpl) getShortHash(hash string) string {
+	// This makes sure the real hash must be the last '-' substring of revision name
+	// vendor/k8s.io/kubernetes/pkg/controller/history/controller_history.go#82
+	list := strings.Split(hash, "-")
+	return list[len(list)-1]
 }
 
 func New(c client.Client, revisionAdapter revisionadapter.Interface) Interface {

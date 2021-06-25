@@ -156,5 +156,53 @@ var _ = SIGDescribe("DaemonSet", func() {
 			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.WaitFailedDaemonPodDeleted(&pod))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for the failed daemon pod to be completely deleted")
 		})
+
+		/*
+		  Testname: DaemonSet-InplaceUpdate
+		  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod InplaceUpdate. In this case only image change,Others
+		  remain Unchanged.
+		*/
+		framework.ConformanceIt("should only inplace image", func() {
+			label := map[string]string{framework.DaemonSetNameLabel: dsName}
+
+			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, framework.OldImage, appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+					Type: appsv1alpha1.InplaceRollingUpdateType,
+				},
+			}))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckRunningOnAllNodes(ds))
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+			err = tester.CheckDaemonStatus(dsName)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Get all Old Deamonset Node")
+			oldNodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+			gomega.Expect(len(oldNodeList.Items)).To(gomega.BeNumerically(">", 0))
+
+			//change pods container image
+
+			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1alpha1.DaemonSet) {
+				ds.Spec.Template.Spec.Containers[0].Image = framework.NewImage
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
+
+			ginkgo.By("Compare container info")
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.GetNewPodsToCheckImage(label, framework.NewImage))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for pod image")
+
+			ginkgo.By("Get all New Deamonset Node")
+			newNodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+			gomega.Expect(len(newNodeList.Items)).To(gomega.BeNumerically(">", 0))
+
+			ginkgo.By("Compare Node info")
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckPodStayInNode(oldNodeList, newNodeList))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for node info")
+		})
 	})
 })

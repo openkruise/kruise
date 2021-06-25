@@ -107,7 +107,7 @@ func validateDaemonSetUpdateStrategy(strategy *appsv1alpha1.DaemonSetUpdateStrat
 					fldPath.Child("rollingUpdate").Child("partition"))...)
 		}
 		switch strategy.RollingUpdate.Type {
-		case appsv1alpha1.StandardRollingUpdateType, appsv1alpha1.SurgingRollingUpdateType:
+		case appsv1alpha1.StandardRollingUpdateType, appsv1alpha1.SurgingRollingUpdateType, appsv1alpha1.InplaceRollingUpdateType:
 		default:
 			validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.SurgingRollingUpdateType)}
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("rollingUpdateType"), strategy, validValues))
