@@ -205,11 +205,11 @@ func (t *DaemonSetTester) SetDaemonSetNodeLabels(nodeName string, labels map[str
 	return newNode, nil
 }
 
-func (t *DaemonSetTester) CheckImageChangeToNew(ds *appsv1alpha1.DaemonSet,podList *v1.PodList) func()(bool,error){
+func (t *DaemonSetTester) CheckImageChangeToNew(podList *v1.PodList,newImage string) func()(bool,error){
 	return func()(bool,error){
 		for _, pod := range podList.Items{
 			for _, status := range pod.Status.ContainerStatuses{
-				if status.Image != ds.Spec.Template.Spec.Containers[0].Image{
+				if status.Image != newImage{
 					return false,fmt.Errorf("pod container image is not new")
 				}
 			}

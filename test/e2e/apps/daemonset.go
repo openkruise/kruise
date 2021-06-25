@@ -192,7 +192,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			ds.Spec.Template.Spec.Containers[0].Image = framework.NewImage
 
 			ginkgo.By("Compare container info")
-			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckImageChangeToNew(ds,oldPodList))
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckImageChangeToNew(oldPodList,framework.NewImage))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for pod image")
 
 			ginkgo.By("Get all New Deamonset Node")
