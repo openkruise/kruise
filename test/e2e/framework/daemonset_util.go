@@ -205,19 +205,28 @@ func (t *DaemonSetTester) SetDaemonSetNodeLabels(nodeName string, labels map[str
 	return newNode, nil
 }
 
-func (t *DaemonSetTester) CheckImageChangeToNew(podList *v1.PodList,newImage string) func()(bool,error){
+func (t *DaemonSetTester) GetNewPodsToCheckImage(label map[string]string,newImage string) func()(bool,error){
 	return func()(bool,error){
-		for _, pod := range podList.Items{
+		newPods,err := t.ListDaemonPods(label)
+		if err != nil{
+			Logf("get newPods error!")
+			return false,nil
+		}
+		for _, pod := range newPods.Items{
 			for _, status := range pod.Status.ContainerStatuses{
-				if status.Image != newImage{
+				substr := strings.Split(status.Image,"/")
+				if substr[len(substr)-1] != newImage{
 					Logf("newPod container image is %s,should be %s",status.Image,newImage)
 					return false,nil
+				}else{
+					Logf("Pod has new image %s",substr[len(substr)-1])
 				}
 			}
 		}
 		return true,nil
 	}
 }
+
 
 func (t *DaemonSetTester) CheckPodStayInNode(oldNodeList *v1.NodeList,newNodeList *v1.NodeList) func()(bool,error){
 	return func()(bool,error){
