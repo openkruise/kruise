@@ -169,7 +169,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
 					Type: appsv1alpha1.InplaceRollingUpdateType,
 				},
-				}))
+			}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
@@ -179,27 +179,27 @@ var _ = SIGDescribe("DaemonSet", func() {
 			err = tester.CheckDaemonStatus(dsName)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-
 			ginkgo.By("Get all Old Deamonset Node")
 			oldNodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 			gomega.Expect(len(oldNodeList.Items)).To(gomega.BeNumerically(">", 0))
 
 			//change pods container image
-			ds.Spec.Template.Spec.Containers[0].Image = framework.NewImage
-			kc.AppsV1alpha1().DaemonSets(ds.Namespace).UpdateStatus(ds)
 
+			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1alpha1.DaemonSet) {
+				ds.Spec.Template.Spec.Containers[0].Image = framework.NewImage
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
 
 			ginkgo.By("Compare container info")
-			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.GetNewPodsToCheckImage(label,framework.NewImage))
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.GetNewPodsToCheckImage(label, framework.NewImage))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for pod image")
 
 			ginkgo.By("Get all New Deamonset Node")
 			newNodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 			gomega.Expect(len(newNodeList.Items)).To(gomega.BeNumerically(">", 0))
 
-
 			ginkgo.By("Compare Node info")
-			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckPodStayInNode(oldNodeList,newNodeList))
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckPodStayInNode(oldNodeList, newNodeList))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for node info")
 		})
 	})
