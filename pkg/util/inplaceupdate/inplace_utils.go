@@ -19,12 +19,13 @@ package inplaceupdate
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
@@ -41,7 +42,7 @@ import (
 
 var (
 	inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
-	UpdateExpectations          = expectations.NewUpdateExpectations(&revisionAdapterImpl{})
+	UpdateExpectations     = expectations.NewUpdateExpectations(&revisionAdapterImpl{})
 )
 
 type RefreshResult struct {
