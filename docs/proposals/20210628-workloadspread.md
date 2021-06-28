@@ -2,14 +2,12 @@
 title: WorkloadSpread
 authors:
   - "@BoltsLei"
-
 reviewers:
   - "@Fei-Guo"
   - "@furykerry"
   - "@FillZpp"
-
-creation-date: 2021-06-28 
-last-updated: 2021-06-28 
+creation-date: 2021-06-28
+last-updated: 2021-06-28
 status: implementable
 ---
 
@@ -20,7 +18,6 @@ status: implementable
 A table of contents is helpful for quickly jumping to sections of a proposal and for highlighting
 any additional information provided beyond the standard proposal template.
 [Tools for generating](https://github.com/ekalinin/github-markdown-toc) a table of contents from markdown are available.
-
 
 ## Motivation
 
@@ -107,8 +104,8 @@ status:
   - `preferredNodeSelectorTerms`: the additional node selector of this subset, it will be injected into each term of `pod.spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution`
   - `tolerations`: the additional tolerations of this subset, it will be injected into `pod.spec.tolerations`
   - `patch`: the specified strategic patch body of this subset, it will be patched to Pods that belong to this subset
-  - `maxReplicas`: the maximum number of Pods in this subset, it can be an absolute number or a percentage string. maxReplicas 
-     can be null that represents there is no replicas limits in this subset.
+  - `maxReplicas`: the maximum number of Pods in this subset, it can be an absolute number or percentage string. maxReplicas 
+    can be null represents that there is no replicas limits in this subset.
 - `scheduleStrategy`: strategies for schedule
   - `type`: can be `Fixed` or `Adaptive`
     - `Fixed` means always choose the former subset for Pods unless the subset's maxReplicas has been satisfied
@@ -154,15 +151,13 @@ So if the `PodWebhook` feature-gate is set to `false`, WorkloadSpread will also 
 
 ### Implementation Details/Notes/Constraints
 
-WorkloadSpread have both webhook and controller. Controller should collaborate with webhook to maintain WorkloadSpread 
-status together. The controller is responsible for calculating the real status, and the webhook mainly counts missingReplicas 
-and records the creation or deletion entry of Pod into map.
+WorkloadSpread have both webhook and controller. Controller should collaborate with webhook to maintain WorkloadSpread status together. \
+The controller is responsible for calculating the real status, and the webhook mainly counts missingReplicas and records the creation or deletion entry of Pod into map.
 
 #### Replicas control
 
 ##### Pod creation 
-When a Pod is creating and its workload has a related WorkloadSpread,
-webhook will check the subsetStatuses in the WorkloadSpread one by one:
+When a Pod is creating and its workload has a related WorkloadSpread, webhook will check the subsetStatuses in the WorkloadSpread one by one:
 
 1. if `missingReplicas` > 0 or `missingReplicas` = -1 and this subset is not unschedulable, choose this subset temporarily \
    (1). update `missingReplicas` -= 1 and put this pod into `creatingPods` map and try to update subsetStatus. \
@@ -175,30 +170,28 @@ webhook will check the subsetStatuses in the WorkloadSpread one by one:
 Also, when a Pod that belongs to a subset is deleting or evicting, webhook will put it into the `deletingPods` map in subsetStatus and update `missingReplicas` += 1.
 
 ##### Update Pod Status
-When a Pod that belongs to a subset changes status phase to 'succeed' or 'failed', which means Pod has been terminated lifecycle, 
+When a Pod that belongs to a subset changes status phase to 'succeed' or 'failed', which means Pod has been terminated lifecycle, \
 webhook will clean it from `creatingPods` map and update `missingReplicas` -= 1.
 
 #### Reschedule strategy
-rescheduleSubset will delete some unscheduled Pods that still in pending status. Some subsets have no
-sufficient resource can lead to some Pods scheduled failed.
+rescheduleSubset will delete some unscheduled Pods that still in pending status. Some subsets have no sufficient resource can lead to some Pods scheduled failed.
 
-WorkloadSpread has multiple subset, so some Pods scheduled failed should be rescheduled to other subsets.
-controller will mark the subset contains Pods scheduled failed to unscheduable status and Webhook cannot inject
-Pod into this subset by check subset's status. Controller cleans up Pods scheduled failed to trigger workload create new replicas, 
+WorkloadSpread has multiple subset, so some Pods scheduled failed should be rescheduled to other subsets. \
+controller will mark the subset contains Pods scheduled failed to unscheduable status and Webhook cannot inject \
+Pod into this subset by check subset's status. Controller cleans up Pods scheduled failed to trigger workload create new replicas, \
 webhook will skip unscheduable subset and chose suitable subset to inject. 
 
 The unscheduled subset can be kept for 10 minutes and then should be recovered schedulable status to schedule Pod again by controller.
 
-
 #### Deletion priority
 
 We have three types for subset's Pod deletion-cost
-1. the number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods
+1. the number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods \
    in this subset is more higher than other Pods in workload.
-2. subset's maxReplicas is nil, deletion-cost = 0. indicating the priority of Pods in this subset is more lower than
+2. subset's maxReplicas is nil, deletion-cost = 0. indicating the priority of Pods in this subset is lower than \
    other subsets that have a not nil maxReplicas.
-3. the number of active Pods in this subset > maxReplicas, two class: (a) deletion-cost = -100, (b) deletion-cost = +100.
-   indicating we prefer deleting the Pod have -100 deletion-cost in this subset in order to control the instance of subset
+3. the number of active Pods in this subset > maxReplicas, two class: (a) deletion-cost = -100, (b) deletion-cost = +100. \
+   indicating we prefer deleting the Pod have -100 deletion-cost in this subset in order to control the instance of subset \
    meeting up the desired maxReplicas number.
 
 CloneSet has supported deletion-cost feature in the recent versions.
@@ -211,27 +204,20 @@ Since Kubernetes 1.21, there is a new annotation definition on Pod:
 
 (In 1.21, users need to enable `PodDeletionCost` feature-gate, and since 1.22 it will be enabled by default)
 
-
-### Comparison with PodTopologySpread 
+### Comparison with PodTopologySpread
 
 #### PodTopologySpread
 
-You can use topology spread constraints to control how Pods are spread across your cluster among failure-domains 
-such as regions, zones, nodes, and other user-defined topology domains. 
+You can use topology spread constraints to control how Pods are spread across your cluster among failure-domains such as regions, zones, nodes, and other user-defined topology domains. 
 This can help to achieve high availability as well as efficient resource utilization.
-  
-#### For WorkloadSpread
-1. WorkloadSpread's subset maxReplicas can be a percentage string, which defines the percentage spread in multiple topology, but PodTopologySpread
-   doesn't support this feature.
-   
-2. Only if the Pods number is equal with maxReplicas of this subset, WorkloadSpread inject Pod into the next available 
-   subset. Therefore, workload spread has an order attribution, and the order of subset influence creation and deletion order
-   
-3. For PodTopologySpread, there's no guarantee that the constraints remain satisfied when Pods are removed. 
-   For example, scaling down a Deployment may result in imbalanced Pods distribution.
-   For WorkloadSpread, controller will guarantee the workload replicas meeting up maxReplicas by deletion-cost feature. 
-   
-4. WorkloadSpread support subset change desired Pod numbers by configuring maxReplicas for elastic.
 
-### Known Limitations
-- The maxReplicas of the last subset must is null because some Pods could be scheduled failed, the last subset can be scheduled forever.
+#### For WorkloadSpread
+1. WorkloadSpread's subset maxReplicas can be a percentage string, which defines the percentage spread in multiple topology, but PodTopologySpread doesn't support this feature.
+   
+2. Only if the Pods number is equal with maxReplicas of this subset, WorkloadSpread inject Pod into the next available subset. Therefore, workload spread has an order attribution, and the order of subset influence creation and deletion order
+   
+3. For PodTopologySpread, there's no guarantee that the constraints remain satisfied when Pods are removed.
+   For example, scaling down a Deployment may result in imbalanced Pods distribution.
+   For WorkloadSpread, controller will guarantee the workload replicas meeting up maxReplicas by deletion-cost feature.
+   
+4. WorkloadSpread support subset changes desired Pod numbers by configuring maxReplicas for elastic.
