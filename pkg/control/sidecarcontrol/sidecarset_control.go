@@ -41,9 +41,23 @@ func (c *commonControl) IsActiveSidecarSet() bool {
 	return true
 }
 
-func (c *commonControl) UpdateSidecarContainerToLatest(containerInSidecarSet, containerInPod v1.Container) v1.Container {
-	containerInPod.Image = containerInSidecarSet.Image
-	return containerInPod
+func (c *commonControl) UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container {
+	var nameToUpgrade, otherContainer, oldImage string
+	if IsHotUpgradeContainer(sidecarContainer) {
+		nameToUpgrade, otherContainer = findContainerToHotUpgrade(sidecarContainer, pod, c)
+		oldImage = util.GetContainer(otherContainer, pod).Image
+	} else {
+		nameToUpgrade = sidecarContainer.Name
+		oldImage = util.GetContainer(nameToUpgrade, pod).Image
+	}
+	// community in-place upgrades are only allowed to update image
+	if sidecarContainer.Image == oldImage {
+		return nil
+	}
+	container := util.GetContainer(nameToUpgrade, pod)
+	container.Image = sidecarContainer.Image
+	klog.V(3).Infof("upgrade pod(%s/%s) container(%s) Image from(%s) -> to(%s)", pod.Namespace, pod.Name, nameToUpgrade, oldImage, container.Image)
+	return container
 }
 
 func (c *commonControl) NeedToInjectVolumeMount(volumeMount v1.VolumeMount) bool {
@@ -130,7 +144,7 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 }
 
 // only check sidecar container is consistent
-func (c *commonControl) IsPodUpdatedConsistently(pod *v1.Pod, sidecarContainers sets.String) bool {
+func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets.String) bool {
 	if len(pod.Spec.Containers) != len(pod.Status.ContainerStatuses) {
 		return false
 	}
@@ -185,7 +199,7 @@ func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
 		// when containerStatus.Ready == true and container non-consistent,
 		// indicates that sidecar container is in the process of being upgraded
 		// wait for the last upgrade to complete before performing this upgrade
-		if cStatus[sidecar] && !c.IsPodUpdatedConsistently(pod, sets.NewString(sidecar)) {
+		if cStatus[sidecar] && !c.IsPodStateConsistent(pod, sets.NewString(sidecar)) {
 			return false
 		}
 	}

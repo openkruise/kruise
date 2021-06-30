@@ -20,9 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 )
 
@@ -58,18 +61,6 @@ func GetPodSidecarSetVersionAltAnnotation(cName string) string {
 // whether sidecar container update strategy is HotUpdate
 func IsHotUpgradeContainer(sidecarContainer *appsv1alpha1.SidecarContainer) bool {
 	return sidecarContainer.UpgradeStrategy.UpgradeType == appsv1alpha1.SidecarContainerHotUpgrade
-}
-
-// sidecarToUpgrade: sidecarSet.Spec.Container[x].name -> sidecar container in pod
-// for example: mesh -> mesh-1, envoy -> envoy-2...
-func RecordHotUpgradeInfoInAnnotations(sidecarToUpgrade map[string]string, pod *corev1.Pod) {
-	hotUpgradeContainerInfos := GetPodHotUpgradeInfoInAnnotations(pod)
-	for sidecar, containerInPod := range sidecarToUpgrade {
-		hotUpgradeContainerInfos[sidecar] = containerInPod
-	}
-
-	by, _ := json.Marshal(hotUpgradeContainerInfos)
-	pod.Annotations[SidecarSetWorkingHotUpgradeContainer] = string(by)
 }
 
 // which hot upgrade sidecar container is working now
@@ -108,4 +99,35 @@ func GetPodHotUpgradeContainers(sidecarName string, pod *corev1.Pod) (workContai
 	}
 
 	return
+}
+
+// para1: nameToUpgrade, para2: otherContainer
+func findContainerToHotUpgrade(sidecarContainer *appsv1alpha1.SidecarContainer, pod *corev1.Pod, control SidecarControl) (string, string) {
+	containerInPods := make(map[string]corev1.Container)
+	for _, containerInPod := range pod.Spec.Containers {
+		containerInPods[containerInPod.Name] = containerInPod
+	}
+	name1, name2 := GetHotUpgradeContainerName(sidecarContainer.Name)
+	c1, c2 := containerInPods[name1], containerInPods[name2]
+
+	// First, empty hot sidecar container will be upgraded with the latest sidecarSet specification
+	if c1.Image == sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage {
+		return c1.Name, c2.Name
+	} else if c2.Image == sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage {
+		return c2.Name, c1.Name
+	}
+
+	// Second, Not ready sidecar container will be upgraded
+	c1Ready := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, c1.Name).Ready && control.IsPodStateConsistent(pod, sets.NewString(c1.Name))
+	c2Ready := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, c2.Name).Ready && control.IsPodStateConsistent(pod, sets.NewString(c2.Name))
+	klog.V(3).Infof("pod(%s.%s) container(%s) ready(%v) container(%s) ready(%v)", pod.Namespace, pod.Name, c1.Name, c1Ready, c2.Name, c2Ready)
+	if c1Ready && !c2Ready {
+		return c2.Name, c1.Name
+	} else if !c1Ready && c2Ready {
+		return c1.Name, c2.Name
+	}
+
+	// Third, the older sidecar container will be upgraded
+	workContianer, olderContainer := GetPodHotUpgradeContainers(sidecarContainer.Name, pod)
+	return olderContainer, workContianer
 }
