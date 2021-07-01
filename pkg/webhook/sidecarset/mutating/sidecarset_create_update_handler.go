@@ -22,8 +22,6 @@ import (
 	"net/http"
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
