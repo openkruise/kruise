@@ -61,7 +61,7 @@ func (d *dockerImageService) createRuntimeClientIfNecessary() error {
 }
 
 func (d *dockerImageService) handleRuntimeError(err error) {
-	if filterCloseErr(err) {
+	if daemonutil.FilterCloseErr(err) {
 		d.Lock()
 		defer d.Unlock()
 		d.client = nil
