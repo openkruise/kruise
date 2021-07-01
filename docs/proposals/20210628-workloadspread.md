@@ -100,7 +100,7 @@ status:
 - `targetRef`: reference to a specific workload, it supports `Deployment` in `apps` group and `CloneSet` in `apps.kruise.io` group
 - `subsets`: list of subsets which defines different topologies
   - `name`: name of this subset
-  - `requiredNodeSelectorTerm`: the additional node selector of this subset, it will be appended into the `pod.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms`
+  - `requiredNodeSelectorTerm`: the additional node selector of this subset, it will be injected into each term of the `pod.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms`
   - `preferredNodeSelectorTerms`: the additional node selector of this subset, it will be appended into the `pod.spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution`
   - `tolerations`: the additional tolerations of this subset, it will be injected into `pod.spec.tolerations`
   - `patch`: the specified strategic patch body of this subset, it will be patched to Pods that belong to this subset
