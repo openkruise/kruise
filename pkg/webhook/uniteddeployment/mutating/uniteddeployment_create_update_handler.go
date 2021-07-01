@@ -24,11 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 // UnitedDeploymentCreateUpdateHandler handles UnitedDeployment

@@ -18,6 +18,7 @@ package core
 
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	v1 "k8s.io/api/core/v1"
 )
@@ -35,6 +36,7 @@ type Control interface {
 		expectedCreations, expectedCurrentCreations int,
 		availableIDs []string,
 	) ([]*v1.Pod, error)
+	GetPodSpreadConstraint() []clonesetutils.PodSpreadConstraint
 
 	// update
 	IsPodUpdatePaused(pod *v1.Pod) bool

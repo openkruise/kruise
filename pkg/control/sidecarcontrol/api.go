@@ -46,15 +46,16 @@ type SidecarControl interface {
 	IsPodAvailabilityChanged(pod, oldPod *v1.Pod) bool
 
 	//*****upgrade portion*****//
-	// IsPodUpdatedConsistently indicates whether pod.spec and pod.status are consistent after updating the sidecar containers
-	IsPodUpdatedConsistently(pod *v1.Pod, sidecarContainers sets.String) bool
+	// IsPodStateConsistent indicates whether pod.spec and pod.status are consistent after updating the sidecar containers
+	IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets.String) bool
 	// IsPodReady indicates whether pod is fully ready
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
 	// 3. whether empty sidecar container is HotUpgradeEmptyImage
 	IsPodReady(pod *v1.Pod) bool
-	// update pod sidecar container to sidecarSet latest version
-	UpdateSidecarContainerToLatest(containerInSidecarSet, containerInPod v1.Container) v1.Container
+	// upgrade pod sidecar container to sidecarSet latest version
+	// if container==nil means no change, no need to update, otherwise need to update
+	UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container
 	// When upgrading the pod sidecar container, you need to record some in-place upgrade information in pod annotations,
 	// which is needed by the sidecarset controller to determine whether the upgrade is completed.
 	UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod)
