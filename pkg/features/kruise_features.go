@@ -61,11 +61,16 @@ const (
 
 	// Whether to enable pub capability, default: false
 	PodUnavailableBudgetGate featuregate.Feature = "PodUnavailableBudgetGate"
+
+	// DaemonWatchingPod enables kruise-daemon to list watch pods that belong to the same node.
+	DaemonWatchingPod featuregate.Feature = "DaemonWatchingPod"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	PodWebhook:                       {Default: true, PreRelease: featuregate.Beta},
-	KruiseDaemon:                     {Default: true, PreRelease: featuregate.Beta},
+	PodWebhook:        {Default: true, PreRelease: featuregate.Beta},
+	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
+	DaemonWatchingPod: {Default: true, PreRelease: featuregate.Beta},
+
 	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
 	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
 	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
@@ -91,9 +96,13 @@ func compatibleEnv() {
 	}
 }
 
-func ValidateFeatureGates() error {
-	if utilfeature.DefaultFeatureGate.Enabled(KruisePodReadinessGate) && !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
-		return fmt.Errorf("can not enable feature-gate %s because of %s disabled", KruisePodReadinessGate, PodWebhook)
+func SetDefaultFeatureGates() {
+	if !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", KruisePodReadinessGate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ResourcesDeletionProtection))
 	}
-	return nil
+	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DaemonWatchingPod))
+	}
 }
