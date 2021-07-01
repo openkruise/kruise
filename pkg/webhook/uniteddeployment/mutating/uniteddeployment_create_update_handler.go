@@ -19,9 +19,10 @@ package mutating
 import (
 	"context"
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
 	"reflect"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/klog"
