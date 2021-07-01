@@ -139,7 +139,7 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 		// 1. sidecar containers have been updated to the latest sidecarSet version, for pod.spec.containers
 		// 2. whether pod.spec and pod.status is inconsistent after updating the sidecar containers
 		// 3. whether pod is not ready
-		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) && (!coreControl.IsPodUpdatedConsistently(pod, nil) || !coreControl.IsPodReady(pod)) {
+		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) && (!coreControl.IsPodStateConsistent(pod, nil) || !coreControl.IsPodReady(pod)) {
 			upgradeAndNotReadyCount++
 		}
 	}
