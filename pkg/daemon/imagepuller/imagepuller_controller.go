@@ -23,12 +23,11 @@ import (
 	"reflect"
 	"time"
 
-	kruiseapis "github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
@@ -46,15 +45,8 @@ import (
 	"k8s.io/klog"
 )
 
-var (
-	scheme = runtime.NewScheme()
-)
-
-func init() {
-	_ = kruiseapis.AddToScheme(scheme)
-}
-
 type Controller struct {
+	scheme                *runtime.Scheme
 	queue                 workqueue.RateLimitingInterface
 	puller                puller
 	imagePullNodeInformer cache.SharedIndexInformer
@@ -63,14 +55,13 @@ type Controller struct {
 }
 
 // NewController returns the controller for image pulling
-func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonutil.SecretManager, healthz *daemonutil.Healthz) (*Controller, error) {
-	nodeName, _ := daemonutil.NodeName()
+func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretManager) (*Controller, error) {
 	genericClient := client.GetGenericClientWithName("kruise-daemon-imagepuller")
-	informer := newNodeImageInformer(genericClient.KruiseClient, nodeName)
+	informer := newNodeImageInformer(genericClient.KruiseClient, opts.NodeName)
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kruise-daemon-imagepuller", Host: nodeName})
+	recorder := eventBroadcaster.NewRecorder(opts.Scheme, v1.EventSource{Component: "kruise-daemon-imagepuller", Host: opts.NodeName})
 
 	queue := workqueue.NewNamedRateLimitingQueue(
 		// Backoff duration from 500ms to 50~55s
@@ -101,12 +92,12 @@ func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonuti
 		},
 	})
 
-	puller, err := newRealPuller(runtimeFactory.GetImageService(), secretManager, recorder)
+	puller, err := newRealPuller(opts.RuntimeFactory.GetImageService(), secretManager, recorder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new puller: %v", err)
 	}
 
-	healthz.RegisterFunc("nodeImageInformerSynced", func(_ *http.Request) error {
+	opts.Healthz.RegisterFunc("nodeImageInformerSynced", func(_ *http.Request) error {
 		if !informer.HasSynced() {
 			return fmt.Errorf("not synced")
 		}
@@ -114,6 +105,7 @@ func NewController(runtimeFactory daemonruntime.Factory, secretManager daemonuti
 	})
 
 	return &Controller{
+		scheme:                opts.Scheme,
 		queue:                 queue,
 		puller:                puller,
 		imagePullNodeInformer: informer,
@@ -139,7 +131,7 @@ func newNodeImageInformer(client kruiseclient.Interface, nodeName string) cache.
 			},
 		},
 		&appsv1alpha1.NodeImage{},
-		time.Hour*12,
+		0, // do not resync
 		cache.Indexers{},
 	)
 }
@@ -221,7 +213,7 @@ func (c *Controller) sync(key string) (retErr error) {
 		}
 	}()
 
-	ref, _ := reference.GetReference(scheme, nodeImage)
+	ref, _ := reference.GetReference(c.scheme, nodeImage)
 	retErr = c.puller.Sync(nodeImage.DeepCopy(), ref)
 	if retErr != nil {
 		return

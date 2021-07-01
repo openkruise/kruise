@@ -23,20 +23,42 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+
+	kruiseapis "github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
 	varRunMountPath = "/hostvarrun"
 )
+
+var (
+	scheme = runtime.NewScheme()
+)
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = kruiseapis.AddToScheme(scheme)
+}
 
 // Daemon is interface for process to run every node
 type Daemon interface {
@@ -45,6 +67,7 @@ type Daemon interface {
 
 type daemon struct {
 	runtimeFactory   daemonruntime.Factory
+	podInformer      cache.SharedIndexInformer
 	pullerController *imagepuller.Controller
 	crrController    *containerrecreate.Controller
 
@@ -72,9 +95,19 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 
 	healthz := daemonutil.NewHealthz()
 
+	runtimeClient, err := runtimeclient.New(cfg, runtimeclient.Options{Scheme: scheme})
+	if err != nil {
+		return nil, fmt.Errorf("failed to new controller-runtime client: %v", err)
+	}
+
 	genericClient := client.GetGenericClient()
 	if genericClient == nil || genericClient.KubeClient == nil || genericClient.KruiseClient == nil {
 		return nil, fmt.Errorf("generic client can not be nil")
+	}
+
+	var podInformer cache.SharedIndexInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.DaemonWatchingPod) {
+		podInformer = newPodInformer(genericClient.KubeClient, nodeName)
 	}
 
 	accountManager := daemonutil.NewImagePullAccountManager(genericClient.KubeClient)
@@ -84,18 +117,29 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 	}
 
 	secretManager := daemonutil.NewCacheBasedSecretManager(genericClient.KubeClient)
-	puller, err := imagepuller.NewController(runtimeFactory, secretManager, healthz)
+
+	opts := daemonoptions.Options{
+		NodeName:       nodeName,
+		Scheme:         scheme,
+		RuntimeClient:  runtimeClient,
+		PodInformer:    podInformer,
+		RuntimeFactory: runtimeFactory,
+		Healthz:        healthz,
+	}
+
+	puller, err := imagepuller.NewController(opts, secretManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new image puller controller: %v", err)
 	}
 
-	crrController, err := containerrecreate.NewController(cfg, runtimeFactory, healthz)
+	crrController, err := containerrecreate.NewController(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new crr daemon controller: %v", err)
 	}
 
 	return &daemon{
 		runtimeFactory:   runtimeFactory,
+		podInformer:      podInformer,
 		pullerController: puller,
 		crrController:    crrController,
 
@@ -105,7 +149,35 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 	}, nil
 }
 
+func newPodInformer(client clientset.Interface, nodeName string) cache.SharedIndexInformer {
+	tweakListOptionsFunc := func(opt *metav1.ListOptions) {
+		opt.FieldSelector = "spec.nodeName=" + nodeName
+	}
+	return cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				tweakListOptionsFunc(&options)
+				return client.CoreV1().Pods(v1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				tweakListOptionsFunc(&options)
+				return client.CoreV1().Pods(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&v1.Pod{},
+		0, // do not resync
+		cache.Indexers{},
+	)
+}
+
 func (d *daemon) Run(stop <-chan struct{}) error {
+	if d.podInformer != nil {
+		go d.podInformer.Run(stop)
+		if !cache.WaitForCacheSync(stop, d.podInformer.HasSynced) {
+			return fmt.Errorf("error waiting for pod informer synced")
+		}
+	}
+
 	go d.serve(stop)
 	go d.pullerController.Run(stop)
 	go d.crrController.Run(stop)

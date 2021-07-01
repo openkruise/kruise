@@ -23,6 +23,9 @@ import (
 
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/daemon"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/spf13/pflag"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -33,9 +36,12 @@ var (
 )
 
 func main() {
+	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	klog.InitFlags(nil)
-	flag.Parse()
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 	rand.Seed(time.Now().UnixNano())
+	features.SetDefaultFeatureGates()
 
 	cfg := config.GetConfigOrDie()
 	cfg.UserAgent = "kruise-daemon"

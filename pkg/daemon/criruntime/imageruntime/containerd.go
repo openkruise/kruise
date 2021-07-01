@@ -29,11 +29,9 @@ import (
 
 	"github.com/alibaba/pouch/pkg/jsonstream"
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/docker/distribution/reference"
@@ -50,20 +48,15 @@ import (
 )
 
 const (
-	defaultTag                 = "latest"
-	defaultContainerdNamespace = "k8s.io"
+	defaultTag             = "latest"
+	k8sContainerdNamespace = "k8s.io"
 )
 
 // NewContainerdImageService returns containerd-type ImageService
 func NewContainerdImageService(
-	address string, // containerd will be servicing basic API and CRI-API
+	conn *grpc.ClientConn,
 	accountManager daemonutil.ImagePullAccountManager,
 ) (ImageService, error) {
-	conn, err := getContainerdConn(address)
-	if err != nil {
-		return nil, err
-	}
-
 	snapshotter, httpProxy, err := getDefaultValuesFromCRIStatus(conn)
 	if err != nil {
 		return nil, err
@@ -75,7 +68,6 @@ func NewContainerdImageService(
 	}
 
 	return &containerdImageClient{
-		namespace:      defaultContainerdNamespace,
 		accountManager: accountManager,
 		snapshotter:    snapshotter,
 		client:         client,
@@ -85,7 +77,6 @@ func NewContainerdImageService(
 }
 
 type containerdImageClient struct {
-	namespace      string
 	accountManager daemonutil.ImagePullAccountManager
 	snapshotter    string
 	client         *containerd.Client
@@ -95,7 +86,7 @@ type containerdImageClient struct {
 
 // PullImage implements ImageService.PullImage.
 func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (ImagePullStatusReader, error) {
-	ctx = namespaces.WithNamespace(ctx, d.namespace)
+	ctx = namespaces.WithNamespace(ctx, k8sContainerdNamespace)
 
 	if tag == "" {
 		tag = defaultTag
@@ -359,29 +350,6 @@ func getDefaultValuesFromCRIStatus(conn *grpc.ClientConn) (snapshotter string, h
 	snapshotter = partInfo.ContainerdConfig.Snapshotter
 	httpproxy = partInfo.Registry.Proxy
 	return
-}
-
-// getContainerdConn dails to address and return grpc client conn.
-func getContainerdConn(address string) (*grpc.ClientConn, error) {
-	timeout := 10 * time.Second
-
-	gopts := []grpc.DialOption{
-		grpc.WithBlock(),
-		grpc.WithInsecure(),
-		grpc.FailOnNonTempDialError(true),
-		grpc.WithBackoffMaxDelay(3 * time.Second),
-		grpc.WithContextDialer(dialer.ContextDialer),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to dial %q", address)
-	}
-	return conn, nil
 }
 
 // getRepoDigest returns image digest string

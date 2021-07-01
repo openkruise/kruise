@@ -25,14 +25,13 @@ import (
 	"sort"
 	"time"
 
-	kruiseapis "github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
@@ -42,9 +41,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -61,15 +58,8 @@ const (
 )
 
 var (
-	scheme = runtime.NewScheme()
-
 	resourceVersionExpectation = expectations.NewResourceVersionExpectation()
 )
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = kruiseapis.AddToScheme(scheme)
-}
 
 type Controller struct {
 	queue          workqueue.RateLimitingInterface
@@ -81,19 +71,13 @@ type Controller struct {
 }
 
 // NewController returns the controller for CRR
-func NewController(cfg *rest.Config, runtimeFactory daemonruntime.Factory, healthz *daemonutil.Healthz) (*Controller, error) {
-	nodeName, _ := daemonutil.NodeName()
-
-	runtimeClient, err := runtimeclient.New(cfg, runtimeclient.Options{Scheme: scheme})
-	if err != nil {
-		return nil, err
-	}
+func NewController(opts daemonoptions.Options) (*Controller, error) {
 	genericClient := client.GetGenericClientWithName("kruise-daemon-crr")
-	informer := newCRRInformer(genericClient.KruiseClient, nodeName)
+	informer := newCRRInformer(genericClient.KruiseClient, opts.NodeName)
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kruise-daemon-crr", Host: nodeName})
+	recorder := eventBroadcaster.NewRecorder(opts.Scheme, v1.EventSource{Component: "kruise-daemon-crr", Host: opts.NodeName})
 
 	queue := workqueue.NewNamedRateLimitingQueue(
 		// Backoff duration from 500ms to 50~55s
@@ -122,7 +106,7 @@ func NewController(cfg *rest.Config, runtimeFactory daemonruntime.Factory, healt
 		},
 	})
 
-	healthz.RegisterFunc("crrInformerSynced", func(_ *http.Request) error {
+	opts.Healthz.RegisterFunc("crrInformerSynced", func(_ *http.Request) error {
 		if !informer.HasSynced() {
 			return fmt.Errorf("not synced")
 		}
@@ -131,11 +115,11 @@ func NewController(cfg *rest.Config, runtimeFactory daemonruntime.Factory, healt
 
 	return &Controller{
 		queue:          queue,
-		runtimeClient:  runtimeClient,
+		runtimeClient:  opts.RuntimeClient,
 		crrInformer:    informer,
 		crrLister:      listersalpha1.NewContainerRecreateRequestLister(informer.GetIndexer()),
 		eventRecorder:  recorder,
-		runtimeFactory: runtimeFactory,
+		runtimeFactory: opts.RuntimeFactory,
 	}, nil
 }
 
@@ -159,7 +143,7 @@ func newCRRInformer(client kruiseclient.Interface, nodeName string) cache.Shared
 			},
 		},
 		&appsv1alpha1.ContainerRecreateRequest{},
-		time.Hour*12,
+		0, // do not resync
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	return im
