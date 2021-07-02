@@ -21,6 +21,8 @@ any additional information provided beyond the standard proposal template.
 
 ## Motivation
 
+
+
 Define a CRD named WorkloadSpread, which can support configuration and management for elastic and multi-domain applications,
 even more powerful and flexible than [UnitedDeployment](https://openkruise.io/en-us/docs/uniteddeployment.html) in some ways.
 
@@ -245,30 +247,32 @@ We have three types for subset's Pod deletion-cost
 
 ### UnitedDeployment
 
-Both UnitedDeployment and WorkloadSpread allow the workload to be distributed in different subsets.
-
-The topology distribution of UnitedDeployment is defined in advance by the user, but the topology distribution of WorkloadSpread has a sequential attribute.
-Only if the number of Pods of the current Subset is equal to maxReplicas, the remaining replicas will be scheduled to the next Subset.
-The order attribution of subset makes WorkloadSpread better meeting up the elastic demand of workload.
-
-For example, WorkloadSpread has two subsets: subset-a and subset-b, maxReplicas are 50 and null(no limit).
-The number of replicas of workload will change with the actual business load.
-
-workload replicas changes: 40 -> 100 -> 30
-
-subset replicas distribution:
-
-|subset-a(50) |subset-b(no limit)|
-|----| ----|
-| 40  | 0  |
-| 50  | 50 |
-| 30  | 0  |
-
-The subset-b will only be allocated Pods when the application load is higher (100 replicas), and not provide resources during the rest of the time.
-This will reduce a lot of resources belongs to subset-b for us, and the application can get a better elastic support.
-
-The UnitedDeployment can also be improved to support the subset preferences, **but the WorkloadSpread requires no workload api changes**.
+Both UnitedDeployment and WorkloadSpread allow the workload to be distributed in different subsets, **but the WorkloadSpread requires no workload api changes**.
 One can use vanilla CloneSet even Deployment while attaching extra topology constraints.
+
+WorkloadSpread can also support the elastic scenario. For example, user has two topology subset: ECS and virtual-kubelet.
+ECS should hold on 30 replicas, and the extra Pods should be scheduled to virtual-kubelet.
+```yaml
+  subsets:
+    - name: ecs
+      requiredNodeSelectorTerm:
+        matchExpressions:
+          - key: type
+            operator: NotIn
+            values:
+              - virtual-kubelet
+      maxReplicas: 30
+    - name: vk
+      requiredNodeSelectorTerm:
+        matchExpressions:
+          - key: type
+            operator: In
+            values:
+              - virtual-kubelet
+      tolerations:
+        - key: virtual-kubelet.io/provider
+          operator: Exists
+```
 
 ### NodeAffinity
 
@@ -283,7 +287,6 @@ You can use topology spread constraints to control how Pods are spread across yo
 This can help to achieve high availability as well as efficient resource utilization.
 
 1. WorkloadSpread's subset maxReplicas can be a percentage string, which defines the percentage spread in multiple topology, but PodTopologySpread doesn't support this feature.
-2. WorkloadSpread has an order attribution, and the order of subset influence creation and deletion order
-3. For PodTopologySpread, there's no guarantee that the constraints remain satisfied when Pods are removed.
+2. For PodTopologySpread, there's no guarantee that the constraints remain satisfied when Pods are removed.
    For example, scaling down a Deployment may result in imbalanced Pods distribution.
    For WorkloadSpread, controller will guarantee the workload replicas meeting up maxReplicas by deletion-cost feature.
