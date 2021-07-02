@@ -173,15 +173,15 @@ status:
      - `unscheduledTime`: last time for unscheduled.
      - `failedCount`: the number of subset was marked with unschedulable.
        > failedCount just records the number of failures. Every failure can lead subset unschedulable for 10 minutes.
-### Requirements
 
-#### Pod Webhook
+## Requirements
 
+### Pod Webhook
 WorkloadSpread requires Pod webhook to inject rules into Pods and notice the deletion and eviction of Pods.
 
 So if the `PodWebhook` feature-gate is set to `false`, WorkloadSpread will also be disabled.
 
-#### deletion-cost feature
+### deletion-cost feature
 
 CloneSet has supported deletion-cost feature in the latest versions.
 
@@ -193,7 +193,7 @@ Since Kubernetes 1.21, there is a new annotation definition on Pod:
 
 (In 1.21, users need to enable `PodDeletionCost` feature-gate, and since 1.22 it will be enabled by default)
 
-### Implementation Details/Notes/Constraints
+## Implementation Details/Notes/Constraints
 
 WorkloadSpread has both webhook and controller. Controller should collaborate with webhook to maintain WorkloadSpread's status together.
 
@@ -201,9 +201,9 @@ The webhook is responsible for injecting rules into pod, updating `missingReplic
 
 The controller is responsible for updating the missingReplicas along with other statics, and clean `creatingPods` and `deletingPods` map.
 
-#### Replicas control
+### Replicas control
 
-##### Pod creation
+#### Pod creation
 
 When a Pod is creating and its workload has a related WorkloadSpread, webhook will check the subsetStatuses in the WorkloadSpread one by one:
 1. if `missingReplicas` > 0 or `missingReplicas` = -1 and this subset is not unschedulable, choose this subset temporarily. \
@@ -213,15 +213,15 @@ When a Pod is creating and its workload has a related WorkloadSpread, webhook wi
 2. if `missingReplicas` = 0, go to the next subset.
 3. if there is no available subset left, just let the Pod go.
 
-##### Pod deletion
+#### Pod deletion
 
 Also, when a Pod that belongs to a subset is being deleted or evicted, webhook will put it into the `deletingPods` map in subsetStatus and update `missingReplicas` += 1.
 
-##### Update Pod Status
+#### Update Pod Status
 
 When a Pod that belongs to a subset changes status phase to 'succeed' or 'failed', which means Pod has been terminated lifecycle, webhook will update `missingReplicas` += 1.
 
-#### Reschedule strategy
+### Reschedule strategy
 
 Reschedule strategy will delete unscheduled Pods that still in pending status. Some subsets have no sufficient resource can lead to some Pods unscheduable.
 WorkloadSpread has multiple subset, so the unschedulable pods should be rescheduled to other subsets.
@@ -231,7 +231,7 @@ And then controller cleans up all unscheduable Pods to trigger workload creating
 
 The unscheduled subset can be kept for 10 minutes and then should be recovered schedulable to schedule Pod again by controller.
 
-#### Deletion priority
+### Deletion priority
 
 We have three types for subset's Pod deletion-cost
 1. the number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods \
@@ -241,10 +241,9 @@ We have three types for subset's Pod deletion-cost
 3. the number of active Pods in this subset > maxReplicas, two class: (a) deletion-cost = -100, (b) deletion-cost = +100. \
    indicating we prefer deleting the Pod have -100 deletion-cost in this subset in order to control the instance of subset \
    meeting up the desired maxReplicas number.
-   
-### Alternative Considered
+## Alternative Considered
 
-#### UnitedDeployment
+### UnitedDeployment
 
 Both UnitedDeployment and WorkloadSpread allow the workload to be distributed in different subsets.
 
@@ -271,14 +270,14 @@ This will reduce a lot of resources belongs to subset-b for us, and the applicat
 The UnitedDeployment can also be improved to support the subset preferences, **but the WorkloadSpread requires no workload api changes**.
 One can use vanilla CloneSet even Deployment while attaching extra topology constraints.
 
-#### NodeAffinity
+### NodeAffinity
 
 Add nodeAffinity to the workload template, such as preferredDuringSchedulingIgnoredDuringExecution, which can be scheduled in multiple regions.
 However, it cannot limit the replica numbers of a subset, and it is only effective when scaling out the workload, not effective when scaling in.
 
 The internal implementation of WorkloadSpread is also based on nodeAffinity, but it will provide richer control for multiple subset.
 
-#### PodTopologySpread
+### PodTopologySpread
 
 You can use topology spread constraints to control how Pods are spread across your cluster among failure-domains such as regions, zones, nodes, and other user-defined topology domains.
 This can help to achieve high availability as well as efficient resource utilization.
