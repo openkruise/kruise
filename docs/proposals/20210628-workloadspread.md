@@ -21,8 +21,6 @@ any additional information provided beyond the standard proposal template.
 
 ## Motivation
 
-
-
 Define a CRD named WorkloadSpread, which can support configuration and management for elastic and multi-domain applications,
 even more powerful and flexible than [UnitedDeployment](https://openkruise.io/en-us/docs/uniteddeployment.html) in some ways.
 
@@ -273,6 +271,7 @@ ECS should hold on 30 replicas, and the extra Pods should be scheduled to virtua
         - key: virtual-kubelet.io/provider
           operator: Exists
 ```
+**If the workload instance is scaled out, but the WorkloadSpread CR is not adjusted accordingly, unexpected behaviors may happen.**
 
 ### NodeAffinity
 
