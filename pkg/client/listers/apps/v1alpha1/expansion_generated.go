@@ -88,3 +88,11 @@ type UnitedDeploymentListerExpansion interface{}
 // UnitedDeploymentNamespaceListerExpansion allows custom methods to be added to
 // UnitedDeploymentNamespaceLister.
 type UnitedDeploymentNamespaceListerExpansion interface{}
+
+// WorkloadSpreadListerExpansion allows custom methods to be added to
+// WorkloadSpreadLister.
+type WorkloadSpreadListerExpansion interface{}
+
+// WorkloadSpreadNamespaceListerExpansion allows custom methods to be added to
+// WorkloadSpreadNamespaceLister.
+type WorkloadSpreadNamespaceListerExpansion interface{}
