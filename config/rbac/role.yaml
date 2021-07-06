@@ -79,8 +79,12 @@ rules:
   resources:
   - replicasets
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - apps
@@ -304,6 +308,26 @@ rules:
   - apps.kruise.io
   resources:
   - uniteddeployments/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - workloadspreads
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - workloadspreads/status
   verbs:
   - get
   - patch

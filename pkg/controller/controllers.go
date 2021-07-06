@@ -28,6 +28,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/sidecarset"
 	"github.com/openkruise/kruise/pkg/controller/statefulset"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment"
+	"github.com/openkruise/kruise/pkg/controller/workloadspread"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -47,6 +48,7 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, sidecarset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, statefulset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, uniteddeployment.Add)
+	controllerAddFuncs = append(controllerAddFuncs, workloadspread.Add)
 }
 
 func SetupWithManager(m manager.Manager) error {
