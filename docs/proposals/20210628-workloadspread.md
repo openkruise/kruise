@@ -7,7 +7,7 @@ reviewers:
   - "@furykerry"
   - "@FillZpp"
 creation-date: 2021-06-28
-last-updated: 2021-07-05
+last-updated: 2021-07-06
 status: implementable
 ---
 
@@ -53,14 +53,14 @@ spec:
         operator: In
         values:
         - zone-a
-    preferredNodeSelectorTerms:
-    - weight: 50
-      preference:
-      matchExpressions:
-      - key: topology.kubernetes.io/zone
-        operator: In
-        values:
-        - zone-c
+#   preferredNodeSelectorTerms:
+#   - weight: 50
+#     preference:
+#     matchExpressions:
+#     - key: topology.kubernetes.io/zone
+#       operator: In
+#       values:
+#       - zone-a
     maxReplicas: 3
     tolertions: []
     patch:
