@@ -131,7 +131,7 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if subsets == nil || len(subsets) == 0 {
+	if len(subsets) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "no subsets defined in WorkloadSpread"))
 	} else {
 		subSetNames := sets.String{}
@@ -198,8 +198,8 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas exceeds 100% for subset"))
 					}
 				} else {
-					// validate maxReplicas of the default subset
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas of default subset must be nil"))
+					// validate maxReplicas of the end subset
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas of end subset must be nil"))
 				}
 			}
 		}
