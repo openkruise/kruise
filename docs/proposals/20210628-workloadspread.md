@@ -24,7 +24,7 @@ any additional information provided beyond the standard proposal template.
 Define a CRD named WorkloadSpread, which can support configuration and management for elastic and multi-domain applications,
 even more powerful and flexible than [UnitedDeployment](https://openkruise.io/en-us/docs/uniteddeployment.html) in some ways.
 
-Not like the workload type, WorkloadSpread can be used with those stateless workloads, such as CloneSet, Deployment and ReplicaSet.
+Not like the workload type, WorkloadSpread can be used with those stateless workloads, such as CloneSet, Deployment, ReplicaSet and even Job.
 
 So users needn't learn the usage of a new workload and how to deploy and update their application by it.
 They only have to create WorkloadSpread CRs related to their existing workloads. Everything is just great!
@@ -232,15 +232,22 @@ And then controller cleans up all unscheduable Pods to trigger workload creating
 The unscheduled subset can be kept for 10 minutes and then should be recovered schedulable to schedule Pod again by controller.
 
 ### Deletion priority
+We use deletion-cost feature to restrict replica numbers of each subset when scaling down.
+If `controller.kubernetes.io/pod-deletion-cost` annotation is set, then the pod with the lower value will be deleted first.
 
 We have three types for subset's Pod deletion-cost
 1. the number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods \
    in this subset is higher than other Pods in workload.
-2. subset's maxReplicas is nil, deletion-cost = 0. indicating the priority of Pods in this subset is lower than \
-   other subsets that have a not nil maxReplicas.
+2. subset's maxReplicas is nil, deletion-cost = 0.
 3. the number of active Pods in this subset > maxReplicas, two class: (a) deletion-cost = -100, (b) deletion-cost = +100. \
    indicating we prefer deleting the Pod have -100 deletion-cost in this subset in order to control the instance of subset \
    meeting up the desired maxReplicas number.
+
+If WorkloadSpread changes its subset maxReplicas, Pods will not be recreated, but WorkloadSpread will adjust deletion-cost annotation through the above algorithm.
+**We shouldn't change maxReplicas frequently because this operation may increase the pressure of api-server.**
+
+To change scheduleStrategy of WorkloadSpread will keep the deletion-cost annotation of Pod.
+
 ## Alternative Considered
 
 ### UnitedDeployment
