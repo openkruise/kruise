@@ -95,7 +95,6 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
 	_ = appsv1alpha1.AddToScheme(scheme)
 }
 
@@ -292,6 +291,20 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets = nil
+				return workloadSpread
+			},
+			errorSuffix: "spec.subsets",
+		},
+		{
+			name: "one subset",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+					{
+						Name:        "subset-a",
+						MaxReplicas: nil,
+					},
+				}
 				return workloadSpread
 			},
 			errorSuffix: "spec.subsets",
