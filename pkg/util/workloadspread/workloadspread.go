@@ -16,6 +16,13 @@ limitations under the License.
 
 package workloadspread
 
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+)
+
 const (
 	// MatchedWorkloadSpreadSubsetAnnotations matched pod workloadSpread
 	MatchedWorkloadSpreadSubsetAnnotations = "apps.kruise.io/matched-workloadspread"
@@ -34,4 +41,24 @@ type InjectWorkloadSpread struct {
 	Subset string `json:"subset"`
 	// generate id if the Pod' name is nil.
 	UID string `json:"uid,omitempty"`
+}
+
+func VerifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
+	gv, err := schema.ParseGroupVersion(ref.APIVersion)
+	if err != nil {
+		klog.Errorf("failed to parse GroupVersion for apiVersion (%s): %s", ref.APIVersion, err.Error())
+		return false, err
+	}
+
+	if ref.Kind != expectedKind {
+		return false, nil
+	}
+
+	for _, group := range expectedGroups {
+		if group == gv.Group {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

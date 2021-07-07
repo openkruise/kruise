@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
@@ -197,7 +196,7 @@ func (r *ReconcileWorkloadSpread) finders() []podControllerFinder {
 
 // getPodKruiseCloneSet returns the kruise cloneSet referenced by the provided controllerRef.
 func (r *ReconcileWorkloadSpread) getPodKruiseCloneSet(ref *appsv1alpha1.TargetReference, namespace string) (*scaleAndSelector, error) {
-	ok, _ := VerifyGroupKind(ref, controllerKruiseKindCS.Kind, []string{controllerKruiseKindCS.Group})
+	ok, _ := wsutil.VerifyGroupKind(ref, controllerKruiseKindCS.Kind, []string{controllerKruiseKindCS.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -221,7 +220,7 @@ func (r *ReconcileWorkloadSpread) getPodKruiseCloneSet(ref *appsv1alpha1.TargetR
 
 // getPodDeployment returns Pods managed by Deployment object.
 func (r *ReconcileWorkloadSpread) getPodDeployment(ref *appsv1alpha1.TargetReference, namespace string) ([]*corev1.Pod, int32, error) {
-	ok, _ := VerifyGroupKind(ref, controllerKindDep.Kind, []string{controllerKindDep.Group})
+	ok, _ := wsutil.VerifyGroupKind(ref, controllerKindDep.Kind, []string{controllerKindDep.Group})
 	if !ok {
 		return nil, -1, nil
 	}
@@ -282,7 +281,7 @@ func (r *ReconcileWorkloadSpread) getPodDeployment(ref *appsv1alpha1.TargetRefer
 }
 
 func (r *ReconcileWorkloadSpread) getPodReplicasSet(ref *appsv1alpha1.TargetReference, namespace string) (*scaleAndSelector, error) {
-	ok, _ := VerifyGroupKind(ref, controllerKindRS.Kind, []string{controllerKindRS.Group})
+	ok, _ := wsutil.VerifyGroupKind(ref, controllerKindRS.Kind, []string{controllerKindRS.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -302,26 +301,6 @@ func (r *ReconcileWorkloadSpread) getPodReplicasSet(ref *appsv1alpha1.TargetRefe
 		scale:    *(rs.Spec.Replicas),
 		selector: rs.Spec.Selector,
 	}, nil
-}
-
-func VerifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
-	gv, err := schema.ParseGroupVersion(ref.APIVersion)
-	if err != nil {
-		klog.Errorf("failed to parse GroupVersion for apiVersion (%s): %s", ref.APIVersion, err.Error())
-		return false, err
-	}
-
-	if ref.Kind != expectedKind {
-		return false, nil
-	}
-
-	for _, group := range expectedGroups {
-		if group == gv.Group {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 // getPodsForWorkloadSpread returns Pods managed by the WorkloadSpread object.

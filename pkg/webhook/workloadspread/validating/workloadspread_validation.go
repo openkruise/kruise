@@ -26,13 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
 var (
@@ -41,26 +41,6 @@ var (
 	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
 )
-
-func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
-	gv, err := schema.ParseGroupVersion(ref.APIVersion)
-	if err != nil {
-		klog.Errorf("failed to parse GroupVersion for apiVersion (%s): %s", ref.APIVersion, err.Error())
-		return false, err
-	}
-
-	if ref.Kind != expectedKind {
-		return false, nil
-	}
-
-	for _, group := range expectedGroups {
-		if group == gv.Group {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
 
 func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *appsv1alpha1.WorkloadSpread) field.ErrorList {
 	// validate ws.spec.
@@ -90,17 +70,17 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 		} else {
 			switch spec.TargetReference.Kind {
 			case controllerKruiseKindCS.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKruiseKindCS.Kind, []string{"apps.kruise.io"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKruiseKindCS.Kind, []string{"apps.kruise.io"})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for CloneSet."))
 				}
 			case controllerKindDep.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKindDep.Kind, []string{"apps"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindDep.Kind, []string{"apps"})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Deployment."))
 				}
 			case controllerKindRS.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKindRS.Kind, []string{"apps"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindRS.Kind, []string{"apps"})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for ReplicaSet."))
 				}
