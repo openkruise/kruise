@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
 
@@ -626,6 +627,14 @@ var _ = SIGDescribe("sidecarset", func() {
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
+			except := &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      2,
+				UpdatedPods:      2,
+				UpdatedReadyPods: 2,
+				ReadyPods:        2,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
+
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:latest"
 			// update sidecarSet selector
@@ -634,13 +643,13 @@ var _ = SIGDescribe("sidecarset", func() {
 				StrVal: "50%",
 			}
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except := &appsv1alpha1.SidecarSetStatus{
+			except = &appsv1alpha1.SidecarSetStatus{
 				MatchedPods:      2,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 1,
 				ReadyPods:        2,
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(time.Second * 10)
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
 			// update sidecarSet partition, update all pods
@@ -652,7 +661,7 @@ var _ = SIGDescribe("sidecarset", func() {
 				UpdatedReadyPods: 2,
 				ReadyPods:        2,
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(time.Second * 10)
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image, and partition done"))
@@ -723,17 +732,26 @@ var _ = SIGDescribe("sidecarset", func() {
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
-			// update sidecarSet sidecar container
-			sidecarSetIn.Spec.InitContainers[0].Image = "busybox:failed"
-			tester.UpdateSidecarSet(sidecarSetIn)
+			// check sidecarSet
 			except := &appsv1alpha1.SidecarSetStatus{
 				MatchedPods:      1,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 1,
 				ReadyPods:        1,
 			}
-			time.Sleep(time.Minute)
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
+			sidecarSetIn, _ = kc.AppsV1alpha1().SidecarSets().Get(sidecarSetIn.Name, metav1.GetOptions{})
+			hash1 := sidecarSetIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation]
+
+			// update sidecarSet sidecar container
+			sidecarSetIn.Spec.InitContainers[0].Image = "busybox:failed"
+			tester.UpdateSidecarSet(sidecarSetIn)
+			ginkgo.By(fmt.Sprintf("update sidecarset init container image, and sidecarSet hash not changed"))
+			time.Sleep(time.Second * 5)
+			sidecarSetIn, _ = kc.AppsV1alpha1().SidecarSets().Get(sidecarSetIn.Name, metav1.GetOptions{})
+			hash2 := sidecarSetIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation]
+			// hash not changed
+			gomega.Expect(hash1).To(gomega.Equal(hash2))
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade init sidecar container, and don't upgrade done"))
 		})
 	})

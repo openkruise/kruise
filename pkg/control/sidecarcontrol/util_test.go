@@ -24,9 +24,20 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
+	// image.Name -> image.Id
+	ImageIds = map[string]string{
+		"main:v1":          "4120593193b4",
+		"cold-sidecar:v1":  "docker-pullable://cold-sidecar@sha256:9ead06a1362e",
+		"cold-sidecar:v2":  "docker-pullable://cold-sidecar@sha256:7223aa0f3a7a",
+		"hot-sidecar:v1":   "docker-pullable://hot-sidecar@sha256:86618128c92e",
+		"hot-sidecar:v2":   "docker-pullable://hot-sidecar@sha256:74abd85af1e9",
+		"hotupgrade:empty": "docker-pullable://hotupgrade@sha256:0e9daf5c02e7",
+	}
+
 	podDemo = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations:     map[string]string{},
@@ -34,6 +45,61 @@ var (
 			Namespace:       "default",
 			Labels:          map[string]string{"app": "nginx"},
 			ResourceVersion: "495711227",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "main",
+					Image: "main:v1",
+				},
+				{
+					Name:  "cold-sidecar",
+					Image: "cold-sidecar:v1",
+				},
+				{
+					Name:  "hot-sidecar-1",
+					Image: "hot-sidecar:v1",
+				},
+				{
+					Name:  "hot-sidecar-2",
+					Image: "hotupgrade:empty",
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:    "main",
+					Image:   "main:v1",
+					ImageID: ImageIds["main:v1"],
+					Ready:   true,
+				},
+				{
+					Name:    "cold-sidecar",
+					Image:   "cold-sidecar:v1",
+					ImageID: ImageIds["cold-sidecar:v1"],
+					Ready:   true,
+				},
+				{
+					Name:    "hot-sidecar-1",
+					Image:   "hot-sidecar:v1",
+					ImageID: ImageIds["hot-sidecar:v1"],
+					Ready:   true,
+				},
+				{
+					Name:    "hot-sidecar-2",
+					Image:   "hotupgrade:empty",
+					ImageID: ImageIds["hotupgrade:empty"],
+					Ready:   true,
+				},
+			},
 		},
 	}
 
@@ -47,8 +113,154 @@ var (
 			Name:   "test-sidecarset",
 			Labels: map[string]string{},
 		},
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "cold-sidecar",
+						Image: "cold-image:v1",
+					},
+					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+					},
+				},
+				{
+					Container: corev1.Container{
+						Name:  "hot-sidecar",
+						Image: "hot-image:v1",
+					},
+					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+						UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+						HotUpgradeEmptyImage: "hotupgrade:empty",
+					},
+				},
+			},
+		},
 	}
 )
+
+func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
+	cases := []struct {
+		name              string
+		getPod            func() *corev1.Pod
+		upgradeSidecars   func() (sets.String, sets.String)
+		expectedCompleted bool
+	}{
+		{
+			name: "only inject sidecar, not upgrade",
+			getPod: func() *corev1.Pod {
+				return podDemo.DeepCopy()
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("cold-sidecar", "hot-sidecar-1", "hot-sidecar-2")
+			},
+			expectedCompleted: true,
+		},
+		{
+			name: "upgrade cold sidecar, upgrade not completed",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				control := New(sidecarSetDemo.DeepCopy())
+				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
+				return pod
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("cold-sidecar", "hot-sidecar-1", "hot-sidecar-2")
+			},
+			expectedCompleted: false,
+		},
+		{
+			name: "upgrade cold sidecar, upgrade completed",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				control := New(sidecarSetDemo.DeepCopy())
+				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
+				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
+				return pod
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("cold-sidecar", "hot-sidecar-1", "hot-sidecar-2")
+			},
+			expectedCompleted: true,
+		},
+		{
+			name: "upgrade hot sidecar, upgrade hot-sidecar-2 not completed",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				control := New(sidecarSetDemo.DeepCopy())
+				// upgrade cold sidecar completed
+				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
+				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
+				// start upgrading hot sidecar
+				pod.Spec.Containers[3].Image = "hot-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"hot-sidecar-2"}, pod)
+				return pod
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("cold-sidecar", "hot-sidecar-1", "hot-sidecar-2")
+			},
+			expectedCompleted: false,
+		},
+		{
+			name: "upgrade hot sidecar, upgrade hot-sidecar-1 not completed",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				control := New(sidecarSetDemo.DeepCopy())
+				// upgrade cold sidecar completed
+				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
+				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
+				// start upgrading hot sidecar
+				pod.Spec.Containers[3].Image = "hot-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"hot-sidecar-2"}, pod)
+				pod.Status.ContainerStatuses[3].ImageID = ImageIds["hot-sidecar:v2"]
+				pod.Spec.Containers[2].Image = "hotupgrade:empty"
+				control.UpdatePodAnnotationsInUpgrade([]string{"hot-sidecar-1"}, pod)
+				return pod
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("cold-sidecar", "hot-sidecar-1", "hot-sidecar-2")
+			},
+			expectedCompleted: false,
+		},
+		{
+			name: "upgrade hot sidecar, upgrade hot-sidecar completed",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				control := New(sidecarSetDemo.DeepCopy())
+				// upgrade cold sidecar completed
+				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
+				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
+				// start upgrading hot sidecar
+				pod.Spec.Containers[3].Image = "hot-sidecar:v2"
+				control.UpdatePodAnnotationsInUpgrade([]string{"hot-sidecar-2"}, pod)
+				pod.Status.ContainerStatuses[3].ImageID = ImageIds["hot-sidecar:v2"]
+				pod.Spec.Containers[2].Image = "hotupgrade:empty"
+				control.UpdatePodAnnotationsInUpgrade([]string{"hot-sidecar-1"}, pod)
+				pod.Status.ContainerStatuses[2].ImageID = ImageIds["hotupgrade:empty"]
+				return pod
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("cold-sidecar", "hot-sidecar-1", "hot-sidecar-2")
+			},
+			expectedCompleted: true,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			pod := cs.getPod()
+			sidecarSets, containers := cs.upgradeSidecars()
+			if IsSidecarContainerUpdateCompleted(pod, sidecarSets, containers) != cs.expectedCompleted {
+				t.Fatalf("IsSidecarContainerUpdateCompleted failed: %s", cs.name)
+			}
+		})
+	}
+}
 
 func TestGetPodSidecarSetRevision(t *testing.T) {
 	cases := []struct {

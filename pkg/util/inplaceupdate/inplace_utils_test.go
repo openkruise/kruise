@@ -212,12 +212,12 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 	}
 
 	for _, p := range succeedPods {
-		if err := defaultCheckInPlaceUpdateCompleted(p); err != nil {
+		if err := DefaultCheckInPlaceUpdateCompleted(p); err != nil {
 			t.Errorf("pod %s expected check success, got %v", p.Name, err)
 		}
 	}
 	for _, p := range failPods {
-		if err := defaultCheckInPlaceUpdateCompleted(p); err == nil {
+		if err := DefaultCheckInPlaceUpdateCompleted(p); err == nil {
 			t.Errorf("pod %s expected check failure, got no error", p.Name)
 		}
 	}
