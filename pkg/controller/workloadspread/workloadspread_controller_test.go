@@ -18,7 +18,6 @@ package workloadspread
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -1278,15 +1277,13 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				t.Fatalf("sync WorkloadSpread failed: %s", err.Error())
 			}
 
-			latestPodList, err := getLatestPods(fakeClient, workloadSpread)
+			latestPodList, _ := getLatestPods(fakeClient, workloadSpread)
 			expectPodList := cs.expectPods()
 
 			for i := range latestPodList {
 				annotation1 := latestPodList[i].Annotations
 				annotation2 := expectPodList[i].Annotations
 				if !reflect.DeepEqual(annotation1, annotation2) {
-					fmt.Println(annotation1)
-					fmt.Println(annotation2)
 					t.Fatalf("set Pod deletion-coset annotation failed")
 				}
 			}
@@ -1300,13 +1297,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			for i := range latestStatus.SubsetStatuses {
 				latestStatus.SubsetStatuses[i].SubsetUnscheduledStatus.UnscheduledTime = metav1.Time{}
 			}
-			by, _ := json.Marshal(latestStatus)
-			fmt.Println(string(by))
-
 			exceptStatus := cs.expectWorkloadSpread().Status
-			by, _ = json.Marshal(exceptStatus)
-			fmt.Println(string(by))
-
 			if !apiequality.Semantic.DeepEqual(latestStatus, exceptStatus) {
 				t.Fatalf("workloadSpread status DeepEqual failed")
 			}

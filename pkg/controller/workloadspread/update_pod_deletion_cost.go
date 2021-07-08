@@ -35,8 +35,7 @@ import (
 // We have three types for subset's Pod deletion-cost
 // 1. the number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods
 //    in this subset is more higher than other Pods in workload.
-// 2. subset's maxReplicas is nil, deletion-cost = 0. indicating the priority of Pods in this subset is more lower than
-//    other subsets that have a not nil maxReplicas.
+// 2. subset's maxReplicas is nil, deletion-cost = 0.
 // 3. the number of active Pods in this subset > maxReplicas, two class: (a) deletion-cost = -100, (b) deletion-cost = +100.
 //    indicating we prefer deleting the Pod have -100 deletion-cost in this subset in order to control the instance of subset
 //    meeting up the desired maxReplicas number.
