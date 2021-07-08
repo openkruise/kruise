@@ -199,7 +199,7 @@ WorkloadSpread has both webhook and controller. Controller should collaborate wi
 
 The webhook is responsible for injecting rules into pod, updating `missingReplicas` and recording the creation or deletion entry of Pod into map.
 
-The controller is responsible for updating the missingReplicas along with other statics, and clean `creatingPods` and `deletingPods` map.
+The controller is responsible for updating the missingReplicas along with other statics, and cleaning `creatingPods` and `deletingPods` map.
 
 ### Replicas control
 
@@ -244,9 +244,11 @@ We have three types for subset's Pod deletion-cost
    meeting up the desired maxReplicas number.
 
 If WorkloadSpread changes its subset maxReplicas, Pods will not be recreated, but WorkloadSpread will adjust deletion-cost annotation through the above algorithm.
-**We shouldn't change maxReplicas frequently because this operation may increase the pressure of api-server.**
 
 To change scheduleStrategy of WorkloadSpread will keep the deletion-cost annotation of Pod.
+
+## Caution
+When you adjust the subset's maxReplicas, you need to trigger the workload's rollout to make the existing Pods meeting the new topology spread.
 
 ## Alternative Considered
 
@@ -285,7 +287,7 @@ ECS should hold on 30 replicas, and the extra Pods should be scheduled to virtua
 Add nodeAffinity to the workload template, such as preferredDuringSchedulingIgnoredDuringExecution, which can be scheduled in multiple regions.
 However, it cannot limit the replica numbers of a subset, and it is only effective when scaling out the workload, not effective when scaling in.
 
-The internal implementation of WorkloadSpread is also based on nodeAffinity, but it will provide richer control for multiple subset.
+The internal implementation of WorkloadSpread is also based on nodeAffinity, but it will provide richer control for multiple subsets.
 
 ### PodTopologySpread
 
