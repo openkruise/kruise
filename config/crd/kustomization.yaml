@@ -12,6 +12,7 @@ resources:
 - bases/apps.kruise.io_imagepulljobs.yaml
 - bases/apps.kruise.io_advancedcronjobs.yaml
 - bases/apps.kruise.io_containerrecreaterequests.yaml
+- bases/policy.kruise.io_podunavailablebudgets.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
