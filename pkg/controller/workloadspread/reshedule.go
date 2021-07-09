@@ -28,15 +28,15 @@ import (
 const ScheduledFailedDuration = 10 * time.Minute
 
 // rescheduleSubset will delete some unscheduled Pods that still in pending status. Some subsets have no
-// sufficient resource can lead to some Pods scheduled failed. WorkloadSpread has multiple subset, so some
-// Pods scheduled failed should be rescheduled to other subsets.
-// controller will mark the subset contains Pods scheduled failed to unscheduable status and Webhook cannot inject
-// Pod into this subset by check subset's status. The unscheduled subset can be kept for 10 minutes and then
-// should be recovered schedulable status to schedule Pod again.
-// TODO optimize the unscheduable duration of subset.
+// sufficient resource can lead to some Pods scheduled failed. WorkloadSpread has multiple subset, so these
+// unschedulable Pods should be rescheduled to other subsets.
+// Controller will mark the subset contains unschedulable Pods to unschedulable status and Webhook cannot inject
+// Pod into this subset by check subset's status. The unscheduled subset' status can be kept for 10 minutes and then
+// should be recovered schedulable status to try scheduling Pods again.
+// TODO optimize the unschedulable duration of subset.
 // return two parameters
 // 1. new SubsetUnscheduledStatus
-// 2. schedule failed Pods belongs to this subset
+// 2. unschedulable Pods belongs to this subset
 func rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
 	pods []*corev1.Pod,
 	oldSubsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus) (*appsv1alpha1.SubsetUnscheduledStatus, []*corev1.Pod) {

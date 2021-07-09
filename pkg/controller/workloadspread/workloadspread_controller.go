@@ -363,7 +363,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) error {
 	pods, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)
 	if err != nil || workloadReplicas == -1 {
-		klog.Errorf("WorkloadSpread (%s/%s) get matched pods failed: %s", ws.Namespace, ws.Name, err.Error())
+		klog.Errorf("WorkloadSpread (%s/%s) get matched pods failed: %v", ws.Namespace, ws.Name, err)
 		return err
 	}
 	if len(pods) == 0 {
@@ -392,7 +392,7 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 		return err
 	}
 
-	// clean up the unscheduable Pods
+	// clean up the unschedulable Pods
 	return r.cleanupUnscheduledPods(ws, scheduleFailedPodMap)
 }
 
