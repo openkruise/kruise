@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,6 +39,7 @@ var (
 	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
 	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
 )
 
 func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
@@ -102,6 +104,11 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for ReplicaSet."))
 				}
+			case controllerKindJob.Kind:
+				ok, err := verifyGroupKind(spec.TargetReference, controllerKindJob.Kind, []string{"batch"})
+				if !ok || err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
+				}
 			default:
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference's GroupKind is not permitted."))
 			}
@@ -135,6 +142,8 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 		allErrs = append(allErrs, field.Required(fldPath, "subsets number must > 1 in WorkloadSpread"))
 	} else {
 		subSetNames := sets.String{}
+		maxReplicasSum := 0
+
 		for i, subset := range subsets {
 			subsetName := subset.Name
 			if subsetName == "" {
@@ -194,8 +203,11 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 					if err != nil || subsetMaxReplicas < 0 {
 						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas is not valid for subset"))
 					}
-					if subset.MaxReplicas.Type == intstr.String && subsetMaxReplicas > 100 {
-						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas exceeds 100% for subset"))
+					if subset.MaxReplicas.Type == intstr.String {
+						maxReplicasSum += subsetMaxReplicas
+						if maxReplicasSum > 100 {
+							allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas sum exceeds 100% for subset"))
+						}
 					}
 				} else {
 					// validate maxReplicas of the end subset

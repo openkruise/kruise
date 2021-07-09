@@ -88,6 +88,10 @@ var (
 						Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
 					},
 				},
+				{
+					Name:        "subset-c",
+					MaxReplicas: nil,
+				},
 			},
 		},
 	}
@@ -165,7 +169,87 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-2", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.WorkloadSpreadSpec{
-				TargetReference: &targetRef,
+				TargetReference: &appsv1alpha1.TargetReference{
+					APIVersion: controllerKindDep.GroupVersion().String(),
+					Kind:       controllerKindDep.Kind,
+					Name:       "test",
+				},
+				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+					{
+						Name:        "subset-a",
+						MaxReplicas: &replicas1,
+						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "topology.kubernetes.io/zone",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-a"},
+								},
+							},
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "ecs",
+								Operator: corev1.TolerationOpExists,
+							},
+						},
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+						},
+					},
+					{
+						Name:        "subset-b",
+						MaxReplicas: &replicas2,
+						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "topology.kubernetes.io/zone",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-b"},
+								},
+							},
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "ecs",
+								Operator: corev1.TolerationOpExists,
+							},
+						},
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+						},
+					},
+					{
+						Name:        "subset-c",
+						MaxReplicas: nil,
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "ecs",
+								Operator: corev1.TolerationOpExists,
+							},
+						},
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-c"}}}`),
+						},
+					},
+				},
+				ScheduleStrategy: appsv1alpha1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+						RescheduleCriticalSeconds: pointer.Int32Ptr(30),
+						DisableSimulationSchedule: true,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "ws-3", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.WorkloadSpreadSpec{
+				TargetReference: &appsv1alpha1.TargetReference{
+					APIVersion: controllerKindJob.GroupVersion().String(),
+					Kind:       controllerKindJob.Kind,
+					Name:       "test",
+				},
 				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
@@ -408,13 +492,13 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			errorSuffix: "spec.subsets[0].preferredSchedulingTerms[0].preference.matchExpressions[0].values",
 		},
 		{
-			name: "subset-b's maxReplicas is not nil",
+			name: "subset-c's maxReplicas is not nil",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.Subsets[1].MaxReplicas = &maxReplicasDemo
+				workloadSpread.Spec.Subsets[2].MaxReplicas = &maxReplicasDemo
 				return workloadSpread
 			},
-			errorSuffix: "spec.subsets[1].maxReplicas",
+			errorSuffix: "spec.subsets[2].maxReplicas",
 		},
 		{
 			name: "subset-a's maxReplicas < 0",
@@ -455,6 +539,18 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				return workloadSpread
 			},
 			errorSuffix: "spec.subsets[0].maxReplicas",
+		},
+		{
+			name: "subset-a's maxReplicas = 40%, subset-b's maxReplicas = 70%",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				maxReplicas1 := intstr.FromString("40%")
+				maxReplicas2 := intstr.FromString("70%")
+				workloadSpread.Spec.Subsets[0].MaxReplicas = &maxReplicas1
+				workloadSpread.Spec.Subsets[1].MaxReplicas = &maxReplicas2
+				return workloadSpread
+			},
+			errorSuffix: "spec.subsets[1].maxReplicas",
 		},
 		{
 			name: "subset-a's maxReplicas = -1%",
