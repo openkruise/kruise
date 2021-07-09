@@ -19,6 +19,8 @@ package workloadspread
 import (
 	"context"
 	"encoding/json"
+
+	batchv1 "k8s.io/api/batch/v1"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -110,6 +112,10 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 		oldReplicas = *evt.ObjectOld.(*appsv1.ReplicaSet).Spec.Replicas
 		newReplicas = *evt.ObjectNew.(*appsv1.ReplicaSet).Spec.Replicas
 		gvk = controllerKindRS
+	case *batchv1.Job:
+		oldReplicas = *evt.ObjectOld.(*batchv1.Job).Spec.Parallelism
+		newReplicas = *evt.ObjectNew.(*batchv1.Job).Spec.Parallelism
+		gvk = controllerKindJob
 	default:
 		return
 	}
@@ -152,6 +158,8 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 		gvk = controllerKindDep
 	case *appsv1.ReplicaSet:
 		gvk = controllerKindRS
+	case *batchv1.Job:
+		gvk = controllerKindJob
 	default:
 		return
 	}

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	batchv1 "k8s.io/api/batch/v1"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -77,6 +78,7 @@ var (
 	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
 	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
 )
 
 // this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
@@ -129,6 +131,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for parallelism changes to Job
+	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &workloadEventHandler{Reader: mgr.GetCache()})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -156,6 +164,7 @@ type ReconcileWorkloadSpread struct {
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ReconcileWorkloadSpread) Reconcile(req reconcile.Request) (reconcile.Result, error) {
@@ -191,7 +200,7 @@ type scaleAndSelector struct {
 type podControllerFinder func(ref *appsv1alpha1.TargetReference, namespace string) (*scaleAndSelector, error)
 
 func (r *ReconcileWorkloadSpread) finders() []podControllerFinder {
-	return []podControllerFinder{r.getPodKruiseCloneSet, r.getPodReplicasSet}
+	return []podControllerFinder{r.getPodKruiseCloneSet, r.getPodReplicasSet, r.getPodJob}
 }
 
 // getPodKruiseCloneSet returns the kruise cloneSet referenced by the provided controllerRef.
@@ -300,6 +309,29 @@ func (r *ReconcileWorkloadSpread) getPodReplicasSet(ref *appsv1alpha1.TargetRefe
 		UID:      rs.UID,
 		scale:    *(rs.Spec.Replicas),
 		selector: rs.Spec.Selector,
+	}, nil
+}
+
+func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, namespace string) (*scaleAndSelector, error) {
+	ok, _ := wsutil.VerifyGroupKind(ref, controllerKindJob.Kind, []string{controllerKindJob.Group})
+	if !ok {
+		return nil, nil
+	}
+
+	job := &batchv1.Job{}
+	err := r.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: ref.Name}, job)
+	if err != nil {
+		// when error is NotFound, it is ok here.
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &scaleAndSelector{
+		UID:      job.UID,
+		scale:    *(job.Spec.Parallelism),
+		selector: job.Spec.Selector,
 	}, nil
 }
 
