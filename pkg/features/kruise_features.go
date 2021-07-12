@@ -21,10 +21,11 @@ import (
 	"os"
 	"strings"
 
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/featuregate"
+
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
