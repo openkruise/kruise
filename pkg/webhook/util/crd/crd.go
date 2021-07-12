@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"reflect"
 
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
+
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters.CustomResourceDefinitionLister, caBundle []byte) error {
