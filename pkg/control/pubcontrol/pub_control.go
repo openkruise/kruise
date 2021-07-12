@@ -45,6 +45,10 @@ func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
 }
 
 func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool {
+	// kruise workload in-place situation
+	if newPod == nil || oldPod == nil {
+		return true
+	}
 	// If pod.spec changed, pod will be in unavailable condition
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
 		klog.V(3).Infof("pod(%s.%s) specification changed, and maybe cause unavailability", newPod.Namespace, newPod.Name)

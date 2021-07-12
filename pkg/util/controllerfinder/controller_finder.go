@@ -39,6 +39,8 @@ type ScaleAndSelector struct {
 	Scale int32
 	// controller.spec.Selector
 	Selector *metav1.LabelSelector
+	// metadata
+	Metadata metav1.ObjectMeta
 }
 
 type ControllerReference struct {
@@ -112,16 +114,11 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 	if !ok {
 		return nil, nil
 	}
-	replicaSet := &apps.ReplicaSet{}
-	err := r.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: ref.Name}, replicaSet)
+	replicaSet, err := r.getReplicaSet(ref, namespace)
 	if err != nil {
-		// when error is NotFound, it is ok here.
-		if errors.IsNotFound(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
-	if ref.UID != "" && replicaSet.UID != ref.UID {
+	if replicaSet == nil {
 		return nil, nil
 	}
 	controllerRef := metav1.GetControllerOf(replicaSet)
@@ -143,7 +140,30 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 			Name:       replicaSet.Name,
 			UID:        replicaSet.UID,
 		},
+		Metadata: replicaSet.ObjectMeta,
 	}, nil
+}
+
+// getPodReplicaSet finds a replicaset which has no matching deployments.
+func (r *ControllerFinder) getReplicaSet(ref ControllerReference, namespace string) (*apps.ReplicaSet, error) {
+	// This error is irreversible, so there is no need to return error
+	ok, _ := verifyGroupKind(ref, controllerKindRS.Kind, []string{controllerKindRS.Group})
+	if !ok {
+		return nil, nil
+	}
+	replicaSet := &apps.ReplicaSet{}
+	err := r.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: ref.Name}, replicaSet)
+	if err != nil {
+		// when error is NotFound, it is ok here.
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if ref.UID != "" && replicaSet.UID != ref.UID {
+		return nil, nil
+	}
+	return replicaSet, nil
 }
 
 // getPodStatefulSet returns the statefulset referenced by the provided controllerRef.
@@ -175,6 +195,7 @@ func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace 
 			Name:       statefulSet.Name,
 			UID:        statefulSet.UID,
 		},
+		Metadata: statefulSet.ObjectMeta,
 	}, nil
 }
 
@@ -206,6 +227,7 @@ func (r *ControllerFinder) getPodDeployment(ref ControllerReference, namespace s
 			Name:       deployment.Name,
 			UID:        deployment.UID,
 		},
+		Metadata: deployment.ObjectMeta,
 	}, nil
 }
 
@@ -236,6 +258,7 @@ func (r *ControllerFinder) getPodReplicationController(ref ControllerReference, 
 			Name:       rc.Name,
 			UID:        rc.UID,
 		},
+		Metadata: rc.ObjectMeta,
 	}, nil
 }
 
@@ -268,6 +291,7 @@ func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespa
 			Name:       cloneSet.Name,
 			UID:        cloneSet.UID,
 		},
+		Metadata: cloneSet.ObjectMeta,
 	}, nil
 }
 
@@ -300,6 +324,7 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 			Name:       ss.Name,
 			UID:        ss.UID,
 		},
+		Metadata: ss.ObjectMeta,
 	}, nil
 }
 

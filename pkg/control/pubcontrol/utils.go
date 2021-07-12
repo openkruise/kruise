@@ -22,10 +22,13 @@ import (
 	"time"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -49,18 +52,19 @@ type Operation string
 
 const (
 	UpdateOperation = "UPDATE"
-	DeleteOperation = "DELETE"
+	//DeleteOperation = "DELETE"
 )
 
-func PodUnavailableBudgetValidatePod(client client.Client, pod *corev1.Pod, control PubControl,
-	operation Operation, dryRun bool) (allowed bool, reason string, err error) {
+// parameters:
+// 1. allowed(bool) indicates whether to allow this update operation
+// 2. err(error)
+func PodUnavailableBudgetValidatePod(client client.Client, pod *corev1.Pod, control PubControl, operation Operation, dryRun bool) (allowed bool, reason string, err error) {
+	pub := control.GetPodUnavailableBudget()
 	// If the pod is not ready, it doesn't count towards healthy and we should not decrement
 	if !control.IsPodReady(pod) {
 		klog.V(3).Infof("pod(%s.%s) is not ready, then don't need check pub", pod.Namespace, pod.Name)
 		return true, "", nil
 	}
-
-	pub := control.GetPodUnavailableBudget()
 	// pod is in pub.Status.DisruptedPods or pub.Status.UnavailablePods, then don't need check it
 	if isPodRecordedInPub(pod.Name, pub) {
 		klog.V(5).Infof("pod(%s.%s) already is recorded in pub(%s.%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
@@ -150,4 +154,80 @@ func isPodRecordedInPub(podName string, pub *policyv1alpha1.PodUnavailableBudget
 		return true
 	}
 	return false
+}
+
+func GetPodUnavailableBudgetForPod(kClient client.Client, finders *controllerfinder.ControllerFinder, pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+	var err error
+	if len(pod.Labels) == 0 {
+		return nil, nil
+	}
+
+	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	if err = kClient.List(context.TODO(), pubList, &client.ListOptions{Namespace: pod.Namespace}); err != nil {
+		return nil, err
+	}
+
+	var matchedPubs []policyv1alpha1.PodUnavailableBudget
+	for _, pub := range pubList.Items {
+		// if targetReference isn't nil, priority to take effect
+		if pub.Spec.TargetReference != nil {
+			targetRef := pub.Spec.TargetReference
+			// check whether APIVersion, Kind, Name is equal
+			ref := metav1.GetControllerOf(pod)
+			if ref == nil {
+				continue
+			}
+			// recursive fetch pod reference, e.g. ref.Kind=Replicas, return podRef.Kind=Deployment
+			podRef, err := finders.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, ref.UID)
+			if err != nil {
+				return nil, err
+			}
+			pubRef, err := finders.GetScaleAndSelectorForRef(targetRef.APIVersion, targetRef.Kind, pub.Namespace, targetRef.Name, "")
+			if err != nil {
+				return nil, err
+			}
+			if podRef == nil || pubRef == nil {
+				continue
+			}
+			// belongs the same workload
+			if isReferenceEqual(podRef, pubRef) {
+				matchedPubs = append(matchedPubs, pub)
+			}
+		} else {
+			// This error is irreversible, so continue
+			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			if err != nil {
+				continue
+			}
+			// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
+			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+			matchedPubs = append(matchedPubs, pub)
+		}
+	}
+
+	if len(matchedPubs) == 0 {
+		klog.V(6).Infof("could not find PodUnavailableBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		return nil, nil
+	}
+	if len(matchedPubs) > 1 {
+		klog.Warningf("Pod %q/%q matches multiple PodUnavailableBudgets. Choose %q arbitrarily.", pod.Namespace, pod.Name, matchedPubs[0].Name)
+	}
+
+	return &matchedPubs[0], nil
+}
+
+// check APIVersion, Kind, Name
+func isReferenceEqual(ref1, ref2 *controllerfinder.ScaleAndSelector) bool {
+	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
+	if err != nil {
+		return false
+	}
+	gv2, err := schema.ParseGroupVersion(ref2.APIVersion)
+	if err != nil {
+		return false
+	}
+	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind &&
+		ref1.Name == ref2.Name && ref1.UID == ref2.UID
 }

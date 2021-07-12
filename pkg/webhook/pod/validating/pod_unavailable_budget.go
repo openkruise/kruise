@@ -23,6 +23,7 @@ import (
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/util/dryrun"
@@ -84,11 +85,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 			klog.V(6).Infof("pod(%s.%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
 			return true, "", nil
 		}
-		key := types.NamespacedName{
-			Namespace: req.AdmissionRequest.Namespace,
-			Name:      req.AdmissionRequest.Name,
-		}
-		if err := p.Client.Get(ctx, key, newPod); err != nil {
+		if err := p.Decoder.DecodeRaw(req.OldObject, newPod); err != nil {
 			return false, "", err
 		}
 		deletion := &metav1.DeleteOptions{}
@@ -98,6 +95,20 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		// if dry run
 		dryRun = dryrun.IsDryRun(deletion.DryRun)
+
+		// Get the workload corresponding to the pod, if it has been deleted then it is not protected
+		if ref := metav1.GetControllerOf(newPod); ref != nil {
+			workload, err := p.finders.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, newPod.Namespace, ref.Name, ref.UID)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return true, "", nil
+				}
+				return false, "", err
+			}
+			if workload == nil || !workload.Metadata.DeletionTimestamp.IsZero() {
+				return true, "", nil
+			}
+		}
 
 	// filter out invalid Create operation, only validate create pod eviction subresource
 	case admissionv1beta1.Create:
@@ -123,7 +134,6 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 	}
 
-	isUpdated := req.AdmissionRequest.Operation == admissionv1beta1.Update
 	// returns true for pod conditions that allow the operation for pod without checking PUB.
 	if newPod.Status.Phase == corev1.PodSucceeded || newPod.Status.Phase == corev1.PodFailed ||
 		newPod.Status.Phase == corev1.PodPending || newPod.Status.Phase == "" || !newPod.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -131,7 +141,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		return true, "", nil
 	}
 
-	pub, err := pubcontrol.GetPodUnavailableBudgetForPod(p.Client, p.controllerFinder, newPod)
+	pub, err := pubcontrol.GetPodUnavailableBudgetForPod(p.Client, p.finders, newPod)
 	if err != nil {
 		return false, "", err
 	}
@@ -143,17 +153,10 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	klog.V(3).Infof("validating pod(%s.%s) operation(%s) for pub(%s.%s)", newPod.Namespace, newPod.Name, req.Operation, pub.Namespace, pub.Name)
 
 	// the change will not cause pod unavailability, then pass
-	if isUpdated && !control.IsPodUnavailableChanged(oldPod, newPod) {
+	if req.Operation == admissionv1beta1.Update && !control.IsPodUnavailableChanged(oldPod, newPod) {
 		klog.V(3).Infof("validate pod(%s.%s) changed cannot cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
 		return true, "", nil
 	}
 
-	// when update operation, we should check whether old pod is ready
-	var checkPod *corev1.Pod
-	if isUpdated {
-		checkPod = oldPod
-	} else {
-		checkPod = newPod
-	}
-	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, checkPod, control, pubcontrol.Operation(req.Operation), dryRun)
+	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, newPod, control, pubcontrol.Operation(req.Operation), dryRun)
 }
