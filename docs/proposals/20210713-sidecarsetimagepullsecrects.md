@@ -36,7 +36,7 @@ One of the most common-used features of it is to pull images from private reposi
 ## Proposal
 **Main idea**: In this design, we separate the logic of `Secret Distribution` and `SidecarSet`. In `SidecarSet` part, we only consider injecting their `imagePullSecrets` feilds into Pod.
 
-###API Definition
+### API Definition
 We add `imagePullSecrets` field in `apis/apps/v1alpha1/sidecarset_types.go`:
 ```go
 type SidecarSetSpec struct {
