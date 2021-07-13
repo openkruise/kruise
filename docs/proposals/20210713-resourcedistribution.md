@@ -121,8 +121,8 @@ Problem: When users delete the original secret, how to delete its copies in othe
 
 Solution #1: Users delete the copies by clearing the `Annotation["openkruise.io/sync-to"]`, then delete the original secret. Of course, we must add the note in the document.
 
-Solution #2: When `delete event` is observed, we will delete all copies of the secret.
-However, once the `delete event` is lost, or panic happens after `delete event`,  the copies of secret may no longer be deleted.
+Solution #2: When the `delete event` is observed, we will delete all copies of the secret.
+However, once the `delete event` is lost, or panic happens after the `delete event`,  the copies of secret may no longer be deleted.
 
 ## Implementation History
 - [ ] 13/07/2021: Proposal submission
