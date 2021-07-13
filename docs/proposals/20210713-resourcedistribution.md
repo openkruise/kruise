@@ -38,7 +38,8 @@ In this situation, we may need a resource distribution mechanism to help us do i
 ## Proposal
 **Main idea**: Distribute and Update the resources by the user-defined annotation.
 
-Next, we will take `Secret Distribution` as an example to illustrate our proposal.
+Next, we will take the `Secret Distribution` as an example to illustrate our proposal.
+The `ConfigMap Distribution` is similar with it.
 
 ### User Stories
 #### Story 1: distribute to other namespaces
@@ -73,7 +74,7 @@ stringData:
 When `kubectl apply -f my-secret.yaml`,  the secret will be created or updated in **all namespaces**.
 
 ### Implementation Plan
-We will watch all the events about `Secret`, and sync it when reconciling it.
+We will watch all the events about the `Secret`, and sync it when reconciling it.
 The main logic looks like this:
 ```go
 package secret
@@ -110,7 +111,7 @@ for _, namespace := range allNamespaces {
 		}
 	} else {
 		
-		// 6. Delete the copy that don't belong to syncNamespaces  (When the namespace is deleted in the `Annotation`) 
+		// 6. Delete the copy that don't belong to syncNamespaces  (When the namespace is deleted in the `Annotations`) 
 		if IsSecretExisted(secret, namespace) {
 			r.Client.Delete(ctx.TODO(), secret)
 		}
@@ -122,7 +123,7 @@ for _, namespace := range allNamespaces {
 ### Risks and Mitigations
 Problem: When users delete the original secret, how to delete its copies in other namespaces? 
 
-Solution #1: Users delete the copies by clearing the `Annotation["openkruise.io/sync-to"]`, then delete the original secret. Of course, we must add the note in the document.
+Solution #1: Users delete the copies by clearing the `Annotations["openkruise.io/sync-to"]`, then delete the original secret. Of course, we must add the note in the document.
 
 Solution #2: When the `delete event` is observed, we will delete all copies of the secret.
 However, once the `delete event` is lost, or panic happens after the `delete event`,  the copies of secret may no longer be deleted.
