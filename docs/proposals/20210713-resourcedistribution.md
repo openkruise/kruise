@@ -86,14 +86,19 @@ instance := &corev1.Secret{}
 if err := r.client.Get(context.TODO(), request.NamespacedName, instance); err != nil {
 	...
 }
+
 target, _ := Annotation["openkruise.io/sync-to"]
+
 //2. Get sync namespaces, return empty slice when target is nil
 syncNamespaces := GetSyncNamespace(target)
+
 //3. Get all namespaces
 allNamespaces := GetAllNamespace()
+
 //4. Create or update secret for required namespaces
 for _, namespace := range allNamespaces {
     secret = NewSecret(namespace, instance)
+    
     // 5.Check and see if the namespace needs to sync 
     if IsIn(namespace, syncNamespaces) {
         if IsSecretExisted(secret, namespace) {
@@ -102,7 +107,7 @@ for _, namespace := range allNamespaces {
             r.Client.Create(ctx.TODO(), secret)
         }
     } else {
-        // 6. Delete the secrets that don't belong to syncNamespaces  
+        // 6. Delete the copy that don't belong to syncNamespaces  
         if IsSecretExisted(secret, namespace) {
             r.Client.Delete(ctx.TODO(), secret)
         }
@@ -112,12 +117,12 @@ for _, namespace := range allNamespaces {
 ```
 
 ### Risks and Mitigations
-Problem: When users delete the original secrets, how to delete their copies in other namespaces? 
+Problem: When users delete the original secret, how to delete its copies in other namespaces? 
 
 Solution #1: Users delete the copies by clearing the `Annotation["openkruise.io/sync-to"]`, then delete the original secret. Of course, we must add the note in the document.
 
 Solution #2: When `delete event` is observed, we will delete all copies of the secret.
-However, once the `delete event` is lost, the copies of secret may no longer be deleted.
+However, once the `delete event` is lost, or panic happens after `delete event`,  the copies of secret may no longer be deleted.
 
 ## Implementation History
 - [ ] 13/07/2021: Proposal submission
