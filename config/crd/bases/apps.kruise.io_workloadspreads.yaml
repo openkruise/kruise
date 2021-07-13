@@ -169,9 +169,9 @@ spec:
               format: int64
               type: integer
             observedWorkloadGeneration:
-              description: ObservedWorkloadGeneration is the most most recent generation
-                observed for Target Workload.
-              format: int32
+              description: ObservedWorkloadGeneration is the most recent generation
+                observed for target Workload.
+              format: int64
               type: integer
             subsetStatuses:
               description: Contains the status of each subset. Each element in this

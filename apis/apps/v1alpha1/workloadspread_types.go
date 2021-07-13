@@ -122,7 +122,7 @@ type WorkloadSpreadStatus struct {
 
 	// ObservedWorkloadGeneration is the most recent generation observed for target Workload.
 	// +optional
-	ObservedWorkloadGeneration int32 `json:"observedWorkloadGeneration,omitempty"`
+	ObservedWorkloadGeneration int64 `json:"observedWorkloadGeneration,omitempty"`
 
 	// Contains the status of each subset. Each element in this array represents one subset
 	// +optional
