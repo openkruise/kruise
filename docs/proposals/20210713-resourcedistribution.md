@@ -87,9 +87,8 @@ if err := r.client.Get(context.TODO(), request.NamespacedName, instance); err !=
 	...
 }
 
-target, _ := Annotation["openkruise.io/sync-to"]
-
 //2. Get sync namespaces, return empty slice when target is nil
+target, _ := Annotation["openkruise.io/sync-to"]
 syncNamespaces := GetSyncNamespace(target)
 
 //3. Get all namespaces
