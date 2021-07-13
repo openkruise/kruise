@@ -138,85 +138,80 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(subsets) < 2 {
-		allErrs = append(allErrs, field.Required(fldPath, "subsets number must > 1 in WorkloadSpread"))
-	} else {
-		subSetNames := sets.String{}
-		maxReplicasSum := 0
-
-		for i, subset := range subsets {
-			subsetName := subset.Name
-			if subsetName == "" {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), subsetName, ""))
-			} else {
-				if subSetNames.Has(subsetName) {
-					// Name should be unique between all of the subsets under one WorkloadSpread.
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), subsetName, fmt.Sprintf("duplicated subset name %s", subsetName)))
-				}
-				subSetNames.Insert(subsetName)
-			}
-
-			// need requiredNodeSelectorTerm or preferredNodeSelectorTerms except the end subset.
-			if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil && i != len(subsets)-1 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "empty RequiredNodeSelectorTerm and PreferredNodeSelectorTerms is not valid for WorkloadSpread"))
-			} else {
-				if subset.RequiredNodeSelectorTerm != nil {
-					coreNodeSelectorTerm := &core.NodeSelectorTerm{}
-					if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.RequiredNodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
-						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
-					} else {
-						allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Index(i).Child("requiredNodeSelectorTerm"))...)
-					}
-				}
-
-				if subset.PreferredNodeSelectorTerms != nil {
-					corePreferredSchedulingTerms := make([]core.PreferredSchedulingTerm, 0, len(subset.PreferredNodeSelectorTerms))
-					for i, term := range subset.PreferredNodeSelectorTerms {
-						corePreferredSchedulingTerm := &core.PreferredSchedulingTerm{}
-						if err := corev1.Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm(term.DeepCopy(), corePreferredSchedulingTerm, nil); err != nil {
-							allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredSchedulingTerms"), subset.PreferredNodeSelectorTerms, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
-						} else {
-							corePreferredSchedulingTerms = append(corePreferredSchedulingTerms, *corePreferredSchedulingTerm)
-						}
-					}
-
-					allErrs = append(allErrs, corevalidation.ValidatePreferredSchedulingTerms(corePreferredSchedulingTerms, fldPath.Index(i).Child("preferredSchedulingTerms"))...)
-				}
-			}
-
-			if subset.Tolerations != nil {
-				var coreTolerations []core.Toleration
-				for i, toleration := range subset.Tolerations {
-					coreToleration := &core.Toleration{}
-					if err := corev1.Convert_v1_Toleration_To_core_Toleration(&toleration, coreToleration, nil); err != nil {
-						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("tolerations"), subset.Tolerations, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
-					} else {
-						coreTolerations = append(coreTolerations, *coreToleration)
-					}
-				}
-				allErrs = append(allErrs, corevalidation.ValidateTolerations(coreTolerations, fldPath.Index(i).Child("tolerations"))...)
-			}
-
-			if subset.MaxReplicas != nil {
-				if i < len(subsets)-1 {
-					subsetMaxReplicas, err := intstr.GetValueFromIntOrPercent(subset.MaxReplicas, 100, true)
-					if err != nil || subsetMaxReplicas < 0 {
-						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas is not valid for subset"))
-					}
-					if subset.MaxReplicas.Type == intstr.String {
-						maxReplicasSum += subsetMaxReplicas
-						if maxReplicasSum > 100 {
-							allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas sum exceeds 100% for subset"))
-						}
-					}
-				} else {
-					// validate maxReplicas of the end subset
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas of end subset must be nil"))
-				}
-			}
-		}
+	if len(subsets) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "subsets number must > 0 in WorkloadSpread"))
+		return allErrs
 	}
 
+	subSetNames := sets.String{}
+	maxReplicasSum := 0
+	for i, subset := range subsets {
+		subsetName := subset.Name
+		if subsetName == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), subsetName, ""))
+		} else {
+			if subSetNames.Has(subsetName) {
+				// Name should be unique between all of the subsets under one WorkloadSpread.
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), subsetName, fmt.Sprintf("duplicated subset name %s", subsetName)))
+			}
+			subSetNames.Insert(subsetName)
+		}
+
+		// need requiredNodeSelectorTerm or preferredNodeSelectorTerms except the end subset.
+		if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "empty RequiredNodeSelectorTerm and PreferredNodeSelectorTerms is not valid for WorkloadSpread"))
+		} else {
+			if subset.RequiredNodeSelectorTerm != nil {
+				coreNodeSelectorTerm := &core.NodeSelectorTerm{}
+				if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.RequiredNodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
+				} else {
+					allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Index(i).Child("requiredNodeSelectorTerm"))...)
+				}
+			}
+
+			if subset.PreferredNodeSelectorTerms != nil {
+				corePreferredSchedulingTerms := make([]core.PreferredSchedulingTerm, 0, len(subset.PreferredNodeSelectorTerms))
+				for i, term := range subset.PreferredNodeSelectorTerms {
+					corePreferredSchedulingTerm := &core.PreferredSchedulingTerm{}
+					if err := corev1.Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm(term.DeepCopy(), corePreferredSchedulingTerm, nil); err != nil {
+						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredSchedulingTerms"), subset.PreferredNodeSelectorTerms, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
+					} else {
+						corePreferredSchedulingTerms = append(corePreferredSchedulingTerms, *corePreferredSchedulingTerm)
+					}
+				}
+
+				allErrs = append(allErrs, corevalidation.ValidatePreferredSchedulingTerms(corePreferredSchedulingTerms, fldPath.Index(i).Child("preferredSchedulingTerms"))...)
+			}
+		}
+
+		if subset.Tolerations != nil {
+			var coreTolerations []core.Toleration
+			for i, toleration := range subset.Tolerations {
+				coreToleration := &core.Toleration{}
+				if err := corev1.Convert_v1_Toleration_To_core_Toleration(&toleration, coreToleration, nil); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("tolerations"), subset.Tolerations, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
+				} else {
+					coreTolerations = append(coreTolerations, *coreToleration)
+				}
+			}
+			allErrs = append(allErrs, corevalidation.ValidateTolerations(coreTolerations, fldPath.Index(i).Child("tolerations"))...)
+		}
+
+		if subset.MaxReplicas != nil {
+			subsetMaxReplicas, err := intstr.GetValueFromIntOrPercent(subset.MaxReplicas, 100, true)
+			if err != nil || subsetMaxReplicas < 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas is not valid for subset"))
+			}
+			if subset.MaxReplicas.Type == intstr.String {
+				maxReplicasSum += subsetMaxReplicas
+				if maxReplicasSum > 100 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas sum exceeds 100% for subset"))
+				}
+			}
+
+		}
+	}
 	return allErrs
 }
 

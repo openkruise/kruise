@@ -168,6 +168,11 @@ spec:
                 which is updated on mutation by the API Server.
               format: int64
               type: integer
+            observedWorkloadGeneration:
+              description: ObservedWorkloadGeneration is the most most recent generation
+                observed for Target Workload.
+              format: int32
+              type: integer
             subsetStatuses:
               description: Contains the status of each subset. Each element in this
                 array represents one subset

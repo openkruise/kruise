@@ -68,13 +68,13 @@ var (
 				},
 				{
 					Name:        "subset-b",
-					MaxReplicas: nil,
+					MaxReplicas: &maxReplicasDemo,
 					RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 						MatchExpressions: []corev1.NodeSelectorRequirement{
 							{
 								Key:      "topology.kubernetes.io/zone",
-								Operator: corev1.NodeSelectorOpNotIn,
-								Values:   []string{"zone-a"},
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"zone-b"},
 							},
 						},
 					},
@@ -89,8 +89,16 @@ var (
 					},
 				},
 				{
-					Name:        "subset-c",
-					MaxReplicas: nil,
+					Name: "subset-c",
+					RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "topology.kubernetes.io/zone",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"zone-c"},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -219,19 +227,6 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
 						},
 					},
-					{
-						Name:        "subset-c",
-						MaxReplicas: nil,
-						Tolerations: []corev1.Toleration{
-							{
-								Key:      "ecs",
-								Operator: corev1.TolerationOpExists,
-							},
-						},
-						Patch: runtime.RawExtension{
-							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-c"}}}`),
-						},
-					},
 				},
 				ScheduleStrategy: appsv1alpha1.WorkloadSpreadScheduleStrategy{
 					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
@@ -253,7 +248,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
-						MaxReplicas: &replicas1,
+						MaxReplicas: &replicas2,
 						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
@@ -298,6 +293,15 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 					{
 						Name:        "subset-c",
 						MaxReplicas: nil,
+						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "topology.kubernetes.io/zone",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-c"},
+								},
+							},
+						},
 						Tolerations: []corev1.Toleration{
 							{
 								Key:      "ecs",
@@ -490,15 +494,6 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				return workloadSpread
 			},
 			errorSuffix: "spec.subsets[0].preferredSchedulingTerms[0].preference.matchExpressions[0].values",
-		},
-		{
-			name: "subset-c's maxReplicas is not nil",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.Subsets[2].MaxReplicas = &maxReplicasDemo
-				return workloadSpread
-			},
-			errorSuffix: "spec.subsets[2].maxReplicas",
 		},
 		{
 			name: "subset-a's maxReplicas < 0",
