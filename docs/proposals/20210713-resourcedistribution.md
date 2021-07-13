@@ -21,12 +21,15 @@ A table of contents is helpful for quickly jumping to sections of a proposal and
 any additional information provided beyond the standard proposal template.
 [Tools for generating](https://github.com/ekalinin/github-markdown-toc) a table of contents from markdown are available.
 
-- [SidecarSet ImagePullSecrets](#sidecarset-imagepullsecrets)
+- [Resource Distribution](#resource-distribution)
   - [Table of Contents](#table-of-contents)
   - [Motivation](#motivation)
   - [Proposal](#proposal)
-    - [User Story](#user-story)
+    - [User Stories](#user-stories)
+      - [Story 1: distribute to other namespaces](#story-1-distribute-to-other-namespaces)
+      - [Story 2: distribute to the whole cluster](#story-2-distribute-to-the-whole-cluster)
     - [Implementation Plan](#implementation-plan)
+    - [Risks and Mitigations](#risks-and-mitigations)
   - [Implementation History](#implementation-history)
   
 ## Motivation
