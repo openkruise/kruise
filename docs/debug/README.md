@@ -52,8 +52,8 @@ The deployment can be done by following steps assuming a fresh environment:
 * step 3: `make docker-build` to build the image locally;
 * step 4: `make docker-push` to push the image to dock hub under the `kruise` repository;
 * step 5: `export KUBECONFIG=<your_kube_config>` to choose the target k8s cluster, e.g., `export KUBECONFIG=~/.kube/config`;
-* step 6: `kubectl delete deployment kruise-controller-manager -n kruise-system` to remove the old Kruise Deployment if any;
-* step 7: `make deploy IMG=$IMG` to deploy your Kruise into the target cluster $KUBECONFIG；
+* step 6: `make deploy IMG=$IMG` to deploy your Kruise into the target cluster $KUBECONFIG；
 
 Then one can perform manual tests and use `kubectl logs <your kruise-controller-manager pod-name> -n kruise-system` to check controller logs for debugging. You can get `<your kruise-controller-manager pod-name>` by `kubectl get pods -n kruise-system`.
 
+**Delete** all resources installed by `make deploy`, you should use `./scripts/uninstall.sh`.
