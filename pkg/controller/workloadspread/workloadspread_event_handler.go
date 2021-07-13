@@ -126,7 +126,7 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 			Namespace: evt.MetaNew.GetNamespace(),
 			Name:      evt.MetaNew.GetName(),
 		}
-		ws, err := getWorkloadSpreadForWorkload(w.Reader, workloadNsn, gvk)
+		ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk)
 		if err != nil {
 			klog.Errorf("unable to get WorkloadSpread related with %s (%s/%s), err: %v",
 				gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, err)
@@ -168,7 +168,7 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 		Namespace: meta.GetNamespace(),
 		Name:      meta.GetName(),
 	}
-	ws, err := getWorkloadSpreadForWorkload(w.Reader, workloadNsn, gvk)
+	ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk)
 	if err != nil {
 		klog.Errorf("unable to get WorkloadSpread related with %s (%s/%s), err: %v",
 			gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, err)
@@ -182,12 +182,12 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 	}
 }
 
-func getWorkloadSpreadForWorkload(reader client.Reader,
+func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
 	workloadNamespaceName types.NamespacedName,
 	gvk schema.GroupVersionKind) (*appsalphav1.WorkloadSpread, error) {
 	wsList := &appsalphav1.WorkloadSpreadList{}
 	listOptions := &client.ListOptions{Namespace: workloadNamespaceName.Namespace}
-	if err := reader.List(context.TODO(), wsList, listOptions); err != nil {
+	if err := w.List(context.TODO(), wsList, listOptions); err != nil {
 		klog.Errorf("List WorkloadSpread failed: %s", err.Error())
 		return nil, err
 	}

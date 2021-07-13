@@ -23,6 +23,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -68,6 +69,27 @@ var (
 		},
 		Spec: appsv1.ReplicaSetSpec{
 			Replicas: pointer.Int32Ptr(10),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "nginx",
+				},
+			},
+		},
+	}
+
+	jobDemo = &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Job",
+			APIVersion: "batch/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "job-test",
+			Namespace: "default",
+			UID:       types.UID("a03eb001-27eb-4713-b634-7c46f6861758"),
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism: pointer.Int32Ptr(2),
+			Completions: pointer.Int32Ptr(10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -315,7 +337,8 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 				Namespace: cs.getCloneSet().Namespace,
 				Name:      cs.getCloneSet().Name,
 			}
-			workloadSpread, _ := getWorkloadSpreadForWorkload(fakeClient, nsn, controllerKruiseKindCS)
+			handler := workloadEventHandler{Reader: fakeClient}
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKruiseKindCS)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
@@ -423,10 +446,87 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 				return workloadSpread
 			},
 		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClientWithScheme(scheme)
+			for _, ws := range cs.getWorkloadSpreads() {
+				newWorkloadSpread := ws.DeepCopy()
+				err := fakeClient.Create(context.TODO(), newWorkloadSpread)
+				if err != nil {
+					t.Fatalf("create WorkloadSpread failed: %s", err.Error())
+				}
+			}
+
+			nsn := types.NamespacedName{
+				Namespace: cs.getDeployment().Namespace,
+				Name:      cs.getDeployment().Name,
+			}
+			handler := workloadEventHandler{Reader: fakeClient}
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindDep)
+			expectTopology := cs.expectWorkloadSpread()
+
+			if expectTopology == nil {
+				if workloadSpread != nil {
+					t.Fatalf("get WorkloadSpread for Deployment failed")
+				}
+			} else {
+				if workloadSpread == nil || workloadSpread.Name != expectTopology.Name {
+					t.Fatalf("get WorkloadSpread for Deployment failed")
+				}
+			}
+		})
+	}
+}
+
+func TestGetWorkloadSpreadForJob(t *testing.T) {
+	targetRef := appsalphav1.TargetReference{
+		APIVersion: "batch/v1",
+		Kind:       "Job",
+		Name:       "job-test",
+	}
+	ws := workloadSpreadDemo.DeepCopy()
+	ws.Spec.TargetReference = &targetRef
+
+	cases := []struct {
+		name                 string
+		getJob               func() *batchv1.Job
+		getWorkloadSpreads   func() []*appsalphav1.WorkloadSpread
+		expectWorkloadSpread func() *appsalphav1.WorkloadSpread
+	}{
+		{
+			name: "no matched WorkloadSpread",
+			getJob: func() *batchv1.Job {
+				return jobDemo.DeepCopy()
+			},
+			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+				workloadSpread1 := ws.DeepCopy()
+				workloadSpread1.Name = "ws-1"
+				workloadSpread1.Spec.TargetReference = nil
+
+				workloadSpread2 := ws.DeepCopy()
+				workloadSpread2.Name = "ws-2"
+				workloadSpread2.Spec.TargetReference.APIVersion = "apps.kruise.io/v1"
+
+				workloadSpread3 := ws.DeepCopy()
+				workloadSpread3.Name = "ws-3"
+				workloadSpread3.Spec.TargetReference.Kind = "CloneSet"
+
+				workloadSpread4 := ws.DeepCopy()
+				workloadSpread4.Name = "ws-4"
+				workloadSpread4.Spec.TargetReference.Name = "test"
+
+				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
+			},
+			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+				return nil
+			},
+		},
 		{
 			name: "matched WorkloadSpread ws-1",
-			getDeployment: func() *appsv1.Deployment {
-				return deploymentDemo.DeepCopy()
+			getJob: func() *batchv1.Job {
+				return jobDemo.DeepCopy()
 			},
 			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
@@ -462,19 +562,20 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 			}
 
 			nsn := types.NamespacedName{
-				Namespace: cs.getDeployment().Namespace,
-				Name:      cs.getDeployment().Name,
+				Namespace: cs.getJob().Namespace,
+				Name:      cs.getJob().Name,
 			}
-			workloadSpread, _ := getWorkloadSpreadForWorkload(fakeClient, nsn, controllerKindDep)
+			handler := workloadEventHandler{Reader: fakeClient}
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindJob)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
 				if workloadSpread != nil {
-					t.Fatalf("get WorkloadSpread for Deployment failed")
+					t.Fatalf("get WorkloadSpread for Job failed")
 				}
 			} else {
 				if workloadSpread == nil || workloadSpread.Name != expectTopology.Name {
-					t.Fatalf("get WorkloadSpread for Deployment failed")
+					t.Fatalf("get WorkloadSpread for Job failed")
 				}
 			}
 		})
@@ -590,16 +691,17 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 				Namespace: cs.getReplicaset().Namespace,
 				Name:      cs.getReplicaset().Name,
 			}
-			workloadSpread, _ := getWorkloadSpreadForWorkload(fakeClient, nsn, controllerKindRS)
+			handler := workloadEventHandler{Reader: fakeClient}
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindRS)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
 				if workloadSpread != nil {
-					t.Fatalf("get WorkloadSpread for Deployment failed")
+					t.Fatalf("get WorkloadSpread for ReplicaSet failed")
 				}
 			} else {
 				if workloadSpread == nil || workloadSpread.Name != expectTopology.Name {
-					t.Fatalf("get WorkloadSpread for Deployment failed")
+					t.Fatalf("get WorkloadSpread for ReplicaSet failed")
 				}
 			}
 		})
