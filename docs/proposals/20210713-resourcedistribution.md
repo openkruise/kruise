@@ -74,6 +74,22 @@ When `kubectl apply -f my-secret.yaml`,  the secret will be created or updated i
 
 ### Implementation Plan
 
+#### WebHook Mutating
+
+Add the original namespace of secret to the annotations if `"openkruise.io/sync-to"` is not in the `secret.ObjectMeta.Annotations`
+```go
+package mutating
+
+// check and see 1. if "openkruise.io/sync-to" is not in secret.ObjectMeta.Annotations
+// check and see 2. if the secret is a copy
+_, ok1 = Annotations["openkruise.io/sync-to"]
+_, ok2 = Annotations["openkruise.io/sync-from"]
+if !ok1 && !ok2 {
+	Annotations["openkruise.io/sync-to"] = "namespace"
+	Annotations["openkruise.io/sync-to/namespace"] = secret.ObjectMeta.Namespace
+}
+```
+
 #### Controller Reconcile 
 
 We watch all the events about `Secret`, and sync it when reconciling it.
@@ -88,30 +104,29 @@ if err := r.client.Get(context.TODO(), request.NamespacedName, instance); err !=
 }
 
 //2. Get sync namespaces, return empty slice when target is nil
-target, _ := Annotation["openkruise.io/sync-to"]
+target, _ := instance.ObjectMeta.Annotations["openkruise.io/sync-to"]
 syncNamespaces := GetSyncNamespace(target)
 
 //3. Get all namespaces
 allNamespaces := GetAllNamespace()
 
-//4. Create or update secret for required namespaces
+//4. Create, update, and delete the secret for corresponding namespaces
 for _, namespace := range allNamespaces {
-    secret = NewSecret(namespace, instance)
-    
-    // 5.Check and see if the namespace needs to sync 
-    if IsIn(namespace, syncNamespaces) {
-        if IsSecretExisted(secret, namespace) {
-            r.Client.Update(ctx.TODO(), secret)
-        } else {
-            r.Client.Create(ctx.TODO(), secret)
-        }
-    } else {
-      
-        // 6. Delete the copy that don't belong to syncNamespaces  
-        if IsSecretExisted(secret, namespace) {
-            r.Client.Delete(ctx.TODO(), secret)
-        }
-    }
+	// set secret.ObjectMeta.Annotations["openkruise.io/sync-from"] = instance.ObjectMeta.Namespace 
+	secret = NewSecret(namespace, instance) 
+	// 5.Check and see if the namespace in syncNamespaces 
+	if IsIn(namespace, syncNamespaces) {
+		if IsSecretExisted(secret, namespace) {
+			r.Client.Update(ctx.TODO(), secret) // if it has been created
+		} else {
+			r.Client.Create(ctx.TODO(), secret)
+		}
+	} else {
+		// 6. Delete the copy that don't belong to syncNamespaces  (When the namespace is deleted in the `Annotation`) 
+		if IsSecretExisted(secret, namespace) {
+			r.Client.Delete(ctx.TODO(), secret)
+		}
+	}
 }
 
 ```
