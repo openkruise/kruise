@@ -7,7 +7,7 @@ reviewers:
   - "@furykerry"
   - "@FillZpp"
 creation-date: 2021-06-28
-last-updated: 2021-07-09
+last-updated: 2021-07-13
 status: implementable
 ---
 
@@ -81,6 +81,7 @@ spec:
       rescheduleCriticalSeconds: 30
 status:
   observedGeneration: 12
+  observedWorkloadGeneration: 3
   subsetStatuses:
   - name: subset-a
     missingReplicas: 2
@@ -246,6 +247,15 @@ We have three types for subset's Pod deletion-cost
 If WorkloadSpread changes its subset maxReplicas, Pods will not be recreated, but WorkloadSpread will adjust deletion-cost annotation through the above algorithm.
 
 To change scheduleStrategy of WorkloadSpread will keep the deletion-cost annotation of Pod.
+
+### MissingReplicas consistency
+
+Webhook will select suitable subset to inject pod by checking whether missingReplicas of the subset > 0. Therefore, the consistency of missingReplicas is very important.
+
+We determine the observedGeneration == CR generation to guarantee the newest CR and observedWorkloadGeneration == workload generation to guarantee the newest workload instance when the webhook is mutating Pod.
+
+Sometimes the kruise informer may have a bigger latency, which will cause the webhook to get two generations are all old data.
+It may cause some error when the webhook is mutating Pod.
 
 ## Caution
 When you adjust the subset's maxReplicas, you need to trigger the workload's rollout to make the existing Pods meeting the new topology spread.
