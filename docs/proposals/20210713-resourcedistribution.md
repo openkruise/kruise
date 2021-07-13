@@ -106,6 +106,7 @@ for _, namespace := range allNamespaces {
             r.Client.Create(ctx.TODO(), secret)
         }
     } else {
+      
         // 6. Delete the copy that don't belong to syncNamespaces  
         if IsSecretExisted(secret, namespace) {
             r.Client.Delete(ctx.TODO(), secret)
