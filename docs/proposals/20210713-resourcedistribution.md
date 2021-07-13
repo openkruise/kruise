@@ -123,7 +123,7 @@ for _, namespace := range allNamespaces {
 ### Risks and Mitigations
 Problem: When users delete the original secret, how to delete its copies in other namespaces? 
 
-Solution #1: Users delete the copies by clearing the `Annotations["openkruise.io/sync-to"]`, then delete the original secret. Of course, we must add the note in the document.
+Solution #1: Users first delete the copies by clearing the `Annotations["openkruise.io/sync-to"]`, then delete the original secret. Of course, we must add the note in the document.
 
 Solution #2: When the `delete event` is observed, we will delete all copies of the secret.
 However, once the `delete event` is lost, or panic happens after the `delete event`,  the copies of secret may no longer be deleted.
