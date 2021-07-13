@@ -138,8 +138,8 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(subsets) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "subsets number must > 0 in WorkloadSpread"))
+	if len(subsets) <= 1 {
+		allErrs = append(allErrs, field.Required(fldPath, "subsets number must > 1 in WorkloadSpread"))
 		return allErrs
 	}
 
