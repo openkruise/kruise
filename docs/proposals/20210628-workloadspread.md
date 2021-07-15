@@ -7,7 +7,7 @@ reviewers:
   - "@furykerry"
   - "@FillZpp"
 creation-date: 2021-06-28
-last-updated: 2021-07-13
+last-updated: 2021-07-15
 status: implementable
 ---
 
@@ -207,12 +207,12 @@ The controller is responsible for updating the missingReplicas along with other 
 #### Pod creation
 
 When a Pod is creating and its workload has a related WorkloadSpread, webhook will check the subsetStatuses in the WorkloadSpread one by one:
-1. if `missingReplicas` > 0 or `missingReplicas` = -1 and this subset is not unschedulable, choose this subset temporarily. \
-   (1). update `missingReplicas` -= 1 and put this pod into `creatingPods` map and try to update subsetStatus. \
+1. If `missingReplicas` > 0 or `missingReplicas` = -1 and this subset is not unschedulable, choose this subset temporarily. \
+   (1). Update `missingReplicas` -= 1 and put this pod into `creatingPods` map and try to update subsetStatus. \
    (2). If update to WorkloadSpread conflicts with other updates, get the WorkloadSpread again and go back to step (1). \
    (3). if update to WorkloadSpread successfully, inject the rules of this subset into the Pod.
-2. if `missingReplicas` = 0, go to the next subset.
-3. if there is no available subset left, just let the Pod go.
+2. If `missingReplicas` = 0, go to the next subset.
+3. If there is no available subset left, just let the Pod go.
 
 #### Pod deletion
 
@@ -236,26 +236,128 @@ The unscheduled subset can be kept for 10 minutes and then should be recovered s
 We use deletion-cost feature to restrict replica numbers of each subset when scaling down.
 If `controller.kubernetes.io/pod-deletion-cost` annotation is set, then the pod with the lower value will be deleted first.
 
-We have three types for subset's Pod deletion-cost
-1. the number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods \
+We have four types for subset's Pod deletion-cost
+1. The number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods \
    in this subset is higher than other Pods in workload.
-2. subset's maxReplicas is nil, deletion-cost = 0.
-3. the number of active Pods in this subset > maxReplicas, two class: (a) deletion-cost = -100, (b) deletion-cost = +100. \
+2. The subset's maxReplicas is nil, deletion-cost = 0.
+3. The number of active Pods in this subset > maxReplicas, two class: (a) deletion-cost = -100, (b) deletion-cost = +100. \
    indicating we prefer deleting the Pod have -100 deletion-cost in this subset in order to control the instance of subset \
    meeting up the desired maxReplicas number.
+4. The remaining pods do not belong to any subset, deletion-cost = -100.
 
 If WorkloadSpread changes its subset maxReplicas, Pods will not be recreated, but WorkloadSpread will adjust deletion-cost annotation through the above algorithm.
 
 To change scheduleStrategy of WorkloadSpread will keep the deletion-cost annotation of Pod.
 
-### MissingReplicas consistency
+### Consistency
 
-Webhook will select suitable subset to inject pod by checking whether missingReplicas of the subset > 0. Therefore, the consistency of missingReplicas is very important.
+Webhook selects a suitable subset to inject pod by checking whether missingReplicas of the subset > 0. However, it may have two dangerous condition to lead the new created replicas of workload can't be scheduled into the suitable subset.
 
-We determine the observedGeneration == CR generation to guarantee the newest CR and observedWorkloadGeneration == workload generation to guarantee the newest workload instance when the webhook is mutating Pod.
+1.The workload scales up before the WorkloadSpread controller updates the latest CR status. It can lead the subset's missingReplicas is not newest and cause the failure spread. \
 
-Sometimes the kruise informer may have a bigger latency, which will cause the webhook to get two generations are all old data.
-It may cause some error when the webhook is mutating Pod.
+For example:
+   ```yaml
+   CR:
+     metadata:
+       generation: 1
+     spec:
+       subsets:
+       - name: subset-a
+         maxReplicas: 100
+       - name: subset-b
+         maxReplicas: 100
+     status:
+       observedGeneration: 1
+       subsetsStatuses:
+       - name: subset-a
+         missingReplicas: 0
+       - name: subset-b
+         missingReplicas: 0
+   ---
+   workload:
+     replicas: 200
+   ```
+   ```yaml
+   CR:
+     metadata:
+       generation: 2
+     spec:
+       subsets:
+       - name: subset-a
+         maxReplicas: 200 # 100 + 100
+       - name: subset-b
+         maxReplicas: 100 # 100 + 0
+     status:
+       observedGeneration: 2
+       subsetsStatuses:
+       - name: subset-a
+         missingReplicas: 0 # should equal 100
+       - name: subset-b
+         missingReplicas: 0
+   ---
+   workload:
+     replicas: 300 # 200 + 100
+   ```
+
+The workload scales up from 200 to 300, but the WorkloadSpread controller has not completed updating the CR status.
+#### solution:
+Before the workload controller scales up, which should check whether the missingReplicas is true.
+
+2.The workload scales up when it's maxReplicas type is percent, but the WorkloadSpread controller doesn't update the latest workloadReplicas, the corresponding missingReplicas can't be scaled up in time.
+The possible reason is the race between the kruise informer and the controller-manager informer.
+
+For example:
+   ```yaml
+   CR:
+     metadata:
+       generation: 1
+     spec:
+       subsets:
+       - name: subset-a
+         maxReplicas: 50%
+       - name: subset-b
+         missingReplicas: 50%
+     status:
+       observedGeneration: 1
+       observedWorkloadGeneration: 2
+       subsetsStatuses:
+       - name: subset-a
+         missingReplicas: 0
+       - name: subset-b
+         missingReplicas: 0
+   ---
+   workload:
+     generation: 2
+     replicas: 200
+   ```
+   ```yaml
+   CR:
+     metadata:
+       generation: 1
+     spec:
+       subsets:
+       - name: subset-a
+         maxReplicas: 50% # 100 + 100
+       - name: subset-b
+         missingReplicas: 50% # 100 + 0
+     status:
+       observedGeneration: 1
+       observedWorkloadGeneration: 2
+       subsetsStatuses:
+       - name: subset-a
+         missingReplicas: 0 # should equal 50
+       - name: subset-b
+         missingReplicas: 0 # should equal 50
+   ---
+   workload:
+     generation: 3
+     replicas: 300 # 200 + 100
+   ```
+The workload scales up from 200 to 300 and doesn't change the subset maxReplicas. The generation of WorkloadSpread is ture, but the CR doesn't adjust missingReplicas to 50 because the informer race.
+
+#### Solution
+Add a observedWorkloadGeneration into status represents the controller reconciles the latest CR with corresponding workload' generation. Webhook should mutate Pod only if the observedWorkloadGeneration is equal the workload's generation.
+However, it is a minor possibility that two generation are equal but are all the old generation because the kruise informer' watch is slower than the controller-manager's informer.
 
 ## Caution
 When you adjust the subset's maxReplicas, you need to trigger the workload's rollout to make the existing Pods meeting the new topology spread.
