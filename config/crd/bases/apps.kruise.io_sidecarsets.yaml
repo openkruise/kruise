@@ -107,6 +107,15 @@ spec:
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               type: array
+            imagePullSecrets:
+              description: List of the names of secrets required by pulling sidecar
+                container images
+              items:
+                description: LocalObjectReference contains enough information to let
+                  you locate the referenced object inside the same namespace.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              type: array
             initContainers:
               description: Containers is the list of init containers to be injected
                 into the selected pod We will inject those containers by their name

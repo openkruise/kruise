@@ -98,7 +98,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	klog.V(3).Infof("[sidecar inject] begin to operation(%s) pod(%s/%s) resources(%s) subResources(%s)",
 		req.Operation, req.Namespace, req.Name, req.Resource, req.SubResource)
 	//build sidecar containers, sidecar initContainers, sidecar volumes, annotations to inject into pod object
-	sidecarContainers, sidecarInitContainers, volumesInSidecar, injectedAnnotations, err := buildSidecars(isUpdated, pod, oldPod, matchedSidecarSets)
+	sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations, err := buildSidecars(isUpdated, pod, oldPod, matchedSidecarSets)
 	if err != nil {
 		return err
 	} else if len(sidecarContainers) == 0 && len(sidecarInitContainers) == 0 {
@@ -106,8 +106,8 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		return nil
 	}
 
-	klog.V(3).Infof("[sidecar inject] begin inject sidecarContainers(%v) sidecarInitContainers(%v) volumes(%s)"+
-		"annotations(%v) into pod(%s.%s)", sidecarContainers, sidecarInitContainers, volumesInSidecar, injectedAnnotations,
+	klog.V(3).Infof("[sidecar inject] begin inject sidecarContainers(%v) sidecarInitContainers(%v) sidecarSecrets(%v), volumes(%s)"+
+		"annotations(%v) into pod(%s.%s)", sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations,
 		pod.Namespace, pod.Name)
 	klog.V(4).Infof("[sidecar inject] before mutating: %v", util.DumpJSON(pod))
 	// apply sidecar set info into pod
@@ -122,7 +122,9 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	pod.Spec.Containers = mergeSidecarContainers(pod.Spec.Containers, sidecarContainers)
 	// 3. inject volumes
 	pod.Spec.Volumes = util.MergeVolumes(pod.Spec.Volumes, volumesInSidecar)
-	// 4. apply annotations
+	// 4. inject imagePullSecrets
+	pod.Spec.ImagePullSecrets = mergeSidecarSecrets(pod.Spec.ImagePullSecrets, sidecarSecrets)
+	// 5. apply annotations
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
@@ -131,6 +133,23 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	}
 	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
 	return nil
+}
+
+func mergeSidecarSecrets(secretsInPod, secretsInSidecar []corev1.LocalObjectReference) (allSecrets []corev1.LocalObjectReference) {
+	secretFilter := make(map[string]bool)
+	for _, podSecret := range secretsInPod {
+		if _, ok := secretFilter[podSecret.Name]; !ok {
+			secretFilter[podSecret.Name] = true
+			allSecrets = append(allSecrets, podSecret)
+		}
+	}
+	for _, sidecarSecret := range secretsInSidecar {
+		if _, ok := secretFilter[sidecarSecret.Name]; !ok {
+			secretFilter[sidecarSecret.Name] = true
+			allSecrets = append(allSecrets, sidecarSecret)
+		}
+	}
+	return allSecrets
 }
 
 func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1alpha1.SidecarContainer) []corev1.Container {
@@ -164,7 +183,7 @@ func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1alpha1
 }
 
 func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedSidecarSets []sidecarcontrol.SidecarControl) (
-	sidecarContainers, sidecarInitContainers []*appsv1alpha1.SidecarContainer,
+	sidecarContainers, sidecarInitContainers []*appsv1alpha1.SidecarContainer, sidecarSecrets []corev1.LocalObjectReference,
 	volumesInSidecars []corev1.Volume, injectedAnnotations map[string]string, err error) {
 
 	// injected into pod
@@ -179,7 +198,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			// to be compatible with older sidecarSet hash struct, map[string]string
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
-				return nil, nil, nil, nil,
+				return nil, nil, nil, nil, nil,
 					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
 			}
 			for k, v := range olderSidecarSetHash {
@@ -195,7 +214,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			// to be compatible with older sidecarSet hash struct, map[string]string
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
-				return nil, nil, nil, nil,
+				return nil, nil, nil, nil, nil,
 					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
 			}
 			for k, v := range olderSidecarSetHash {
@@ -238,6 +257,9 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				sidecarInitContainers = append(sidecarInitContainers, initContainer)
 			}
 		}
+
+		//process imagePullSecrets
+		sidecarSecrets = append(sidecarSecrets, sidecarSet.Spec.ImagePullSecrets...)
 
 		//process containers
 		for i := range sidecarSet.Spec.Containers {
@@ -301,7 +323,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 	sidecarSetNameList := strings.Join(sidecarSetNames, ",")
 	// store matched sidecarset list in pod annotations
 	injectedAnnotations[sidecarcontrol.SidecarSetListAnnotation] = sidecarSetNameList
-	return sidecarContainers, sidecarInitContainers, volumesInSidecars, injectedAnnotations, nil
+	return sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecars, injectedAnnotations, nil
 }
 
 func getVolumesMapInSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) map[string]*corev1.Volume {
