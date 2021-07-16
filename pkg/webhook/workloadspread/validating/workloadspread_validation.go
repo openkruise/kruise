@@ -125,10 +125,22 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("type"),
 			spec.ScheduleStrategy.Type, "ScheduleStrategy's type is not valid"))
 	}
-	if spec.ScheduleStrategy.Adaptive != nil && spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil {
-		if *spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds <= 0 {
+
+	if spec.ScheduleStrategy.Adaptive != nil {
+		if spec.ScheduleStrategy.Type != appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("type"),
+				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the scheduleStrategy's type must be adaptive when using adaptive scheduleStrategy"))
+		}
+
+		if len(spec.Subsets) > 1 && spec.Subsets[len(spec.Subsets)-1].MaxReplicas != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive"),
+				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the last subset must be not specified when using adaptive scheduleStrategy"))
+		}
+
+		if spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil &&
+			*spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds <= 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive").Child("rescheduleCriticalSeconds"),
-				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "RescheduleCriticalSeconds <= 0 is not permitted"))
+				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "rescheduleCriticalSeconds <= 0 is not permitted"))
 		}
 	}
 
@@ -138,13 +150,15 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(subsets) <= 1 {
-		allErrs = append(allErrs, field.Required(fldPath, "subsets number must > 1 in WorkloadSpread"))
+	if len(subsets) < 2 {
+		allErrs = append(allErrs, field.Required(fldPath, "subsets number must >= 2 in WorkloadSpread"))
 		return allErrs
 	}
 
 	subSetNames := sets.String{}
 	maxReplicasSum := 0
+	var firstMaxReplicasType *intstr.Type
+
 	for i, subset := range subsets {
 		subsetName := subset.Name
 		if subsetName == "" {
@@ -198,19 +212,40 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 			allErrs = append(allErrs, corevalidation.ValidateTolerations(coreTolerations, fldPath.Index(i).Child("tolerations"))...)
 		}
 
+		//1. All subset maxReplicas must be the same type: int or percent.
+		//2. Only the last subset maxReplicas can be not specified, indicates subset replicas is not limited.
+		//3. TODO: Fixed: the last subset must be specified.
+		//4. Adaptive: the last subset must be not specified.
+		//5. If all maxReplicas is specified as percent, the total maxReplicas must equal 1, except the last subset is not specified.
 		if subset.MaxReplicas != nil {
+			if firstMaxReplicasType == nil {
+				firstMaxReplicasType = &subset.MaxReplicas.Type
+			} else if subset.MaxReplicas.Type != *firstMaxReplicasType {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "the maxReplicas type of all subsets must be the same"))
+				return allErrs
+			}
+
 			subsetMaxReplicas, err := intstr.GetValueFromIntOrPercent(subset.MaxReplicas, 100, true)
 			if err != nil || subsetMaxReplicas < 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas is not valid for subset"))
+				return allErrs
 			}
+
 			if subset.MaxReplicas.Type == intstr.String {
 				maxReplicasSum += subsetMaxReplicas
 				if maxReplicasSum > 100 {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "maxReplicas sum exceeds 100% for subset"))
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "the sum of all subset's maxReplicas exceeds 100% is no permitted"))
+					return allErrs
 				}
 			}
-
+		} else if i != len(subsets)-1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "only the last subset's maxReplicas can be nil"))
+			return allErrs
 		}
+	}
+
+	if *firstMaxReplicasType == intstr.String && maxReplicasSum < 100 && subsets[len(subsets)-1].MaxReplicas != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Index(0).Child("maxReplicas"), subsets[0].MaxReplicas, "maxReplicas sum of all subsets must equal 100% when type is specified as percent"))
 	}
 	return allErrs
 }

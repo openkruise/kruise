@@ -81,8 +81,8 @@ type AdaptiveWorkloadSpreadStrategy struct {
 	DisableSimulationSchedule bool `json:"disableSimulationSchedule,omitempty"`
 
 	// RescheduleCriticalSeconds indicates how long controller will reschedule a schedule failed Pod to the subset that has
-	// redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in a pending status
-	// over RescheduleCriticalSeconds duration, the controller will reschedule it to the suitable subset.
+	// redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in a unschedulabe status
+	// over RescheduleCriticalSeconds duration, the controller will reschedule it to a suitable subset.
 	// +optional
 	RescheduleCriticalSeconds *int32 `json:"rescheduleCriticalSeconds,omitempty"`
 }
@@ -132,6 +132,11 @@ type WorkloadSpreadStatus struct {
 // SubsetUnscheduledStatus contains the details for the unscheduled subset.
 type SubsetUnscheduledStatus struct {
 	// Unschedulable is true indicates this Subset cannot be scheduled. The default is false.
+	// It's valid only when the WorkloadSpreadScheduleStrategy is 'adaptive', otherwise it is always false.
+	// When one pod in a subset has condition[PodScheduled] = false, the subset is considered temporarily unschedulable.
+	// The condition[PodScheduled] = false, which means the cluster does not have enough resources to schedule at this moment,
+	// even if only single Pod scheduled fails.
+	// This state is temporary, and after a period of time(e.g. 5m), the spread controller will mark it schedulable.
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty"`
 
@@ -139,7 +144,7 @@ type SubsetUnscheduledStatus struct {
 	// +optional
 	UnscheduledTime metav1.Time `json:"unscheduledTime,omitempty"`
 
-	// the number of subset was marked with unschedulable.
+	// the counts of subset was marked with unschedulable.
 	// +optional
 	FailedCount int32 `json:"failedCount,omitempty"`
 }

@@ -117,7 +117,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		Name:       "test",
 	}
 	replicas1 := intstr.FromInt(50)
-	replicas2 := intstr.FromString("30%")
+	replicas2 := intstr.FromString("50%")
 	successCases := []appsv1alpha1.WorkloadSpread{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
@@ -207,7 +207,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 					},
 					{
 						Name:        "subset-b",
-						MaxReplicas: &replicas2,
+						MaxReplicas: nil,
 						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
@@ -239,6 +239,62 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-3", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.WorkloadSpreadSpec{
+				TargetReference: &appsv1alpha1.TargetReference{
+					APIVersion: controllerKindJob.GroupVersion().String(),
+					Kind:       controllerKindJob.Kind,
+					Name:       "test",
+				},
+				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+					{
+						Name:        "subset-a",
+						MaxReplicas: &replicas2,
+						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "topology.kubernetes.io/zone",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-a"},
+								},
+							},
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "ecs",
+								Operator: corev1.TolerationOpExists,
+							},
+						},
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+						},
+					},
+					{
+						Name:        "subset-b",
+						MaxReplicas: &replicas2,
+						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "topology.kubernetes.io/zone",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-b"},
+								},
+							},
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "ecs",
+								Operator: corev1.TolerationOpExists,
+							},
+						},
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "ws-4", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.WorkloadSpreadSpec{
 				TargetReference: &appsv1alpha1.TargetReference{
 					APIVersion: controllerKindJob.GroupVersion().String(),
@@ -548,6 +604,19 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			errorSuffix: "spec.subsets[1].maxReplicas",
 		},
 		{
+			name: "subset-a's maxReplicas = 40%, subset-b's maxReplicas = 20%,, subset-c's maxReplicas = 20%",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				maxReplicas1 := intstr.FromString("40%")
+				maxReplicas2 := intstr.FromString("20%")
+				workloadSpread.Spec.Subsets[0].MaxReplicas = &maxReplicas1
+				workloadSpread.Spec.Subsets[1].MaxReplicas = &maxReplicas2
+				workloadSpread.Spec.Subsets[2].MaxReplicas = &maxReplicas2
+				return workloadSpread
+			},
+			errorSuffix: "spec.subsets[0].maxReplicas",
+		},
+		{
 			name: "subset-a's maxReplicas = -1%",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
@@ -565,6 +634,16 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				return workloadSpread
 			},
 			errorSuffix: "spec.scheduleStrategy.type",
+		},
+		{
+			name: "subset-b's maxReplicas = nil,, subset-c's maxReplicas = nil",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.Subsets[1].MaxReplicas = nil
+				workloadSpread.Spec.Subsets[2].MaxReplicas = nil
+				return workloadSpread
+			},
+			errorSuffix: "spec.subsets[1].maxReplicas",
 		},
 		{
 			name: "rescheduleCriticalSeconds = 0",
@@ -595,6 +674,37 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				return workloadSpread
 			},
 			errorSuffix: "spec.scheduleStrategy.adaptive.rescheduleCriticalSeconds",
+		},
+		{
+			name: "scheduleStrategy's type is not matched",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+						RescheduleCriticalSeconds: pointer.Int32Ptr(20),
+						DisableSimulationSchedule: true,
+					},
+				}
+				return workloadSpread
+			},
+			errorSuffix: "spec.scheduleStrategy.type",
+		},
+		{
+			name: "the last subset's maxReplicas is not nil when using adaptive",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+						RescheduleCriticalSeconds: pointer.Int32Ptr(20),
+						DisableSimulationSchedule: true,
+					},
+				}
+				workloadSpread.Spec.Subsets[2].MaxReplicas = &maxReplicasDemo
+				return workloadSpread
+			},
+			errorSuffix: "spec.scheduleStrategy.adaptive",
 		},
 	}
 
