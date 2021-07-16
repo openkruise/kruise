@@ -85,7 +85,7 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for ReplicaSet."))
 				}
 			case controllerKindJob.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKindJob.Kind, []string{"batch"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindJob.Kind, []string{"batch"})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
 				}
