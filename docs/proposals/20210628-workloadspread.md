@@ -253,7 +253,7 @@ To change scheduleStrategy of WorkloadSpread will keep the deletion-cost annotat
 
 Webhook selects a suitable subset to inject pod by checking whether missingReplicas of the subset > 0. However, it may have two dangerous condition to lead the new created replicas of workload can't be scheduled into the suitable subset.
 
-1.The workload scales up before the WorkloadSpread controller updates the latest CR status. It can lead the subset's missingReplicas is not newest and cause the failure spread. \
+1.The workload scales up before the WorkloadSpread controller updates the latest CR status. It can lead the subset's missingReplicas is not newest and cause the failure spread.
 
 For example:
    ```yaml
@@ -288,7 +288,7 @@ For example:
        - name: subset-b
          maxReplicas: 100 # 100 + 0
      status:
-       observedGeneration: 2
+       observedGeneration: 1 # should equal 2
        subsetsStatuses:
        - name: subset-a
          missingReplicas: 0 # should equal 100
@@ -299,7 +299,7 @@ For example:
      replicas: 300 # 200 + 100
    ```
 
-The workload scales up from 200 to 300, but the WorkloadSpread controller has not completed updating the CR status.
+The workload scales up from 200 to 300, but the WorkloadSpread controller has not completed updating the CR status by comparing observedGeneration with generation.
 #### solution:
 Before the workload controller scales up, which should check whether the missingReplicas is true.
 
