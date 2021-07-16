@@ -131,7 +131,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
 									Key:      "topology.kubernetes.io/zone",
-									Operator: corev1.NodeSelectorOpIn,
+									Operator: corev1.NodeSelectorOpNotIn,
 									Values:   []string{"zone-a"},
 								},
 							},
@@ -186,12 +186,17 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas1,
-						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
-							MatchExpressions: []corev1.NodeSelectorRequirement{
-								{
-									Key:      "topology.kubernetes.io/zone",
-									Operator: corev1.NodeSelectorOpIn,
-									Values:   []string{"zone-a"},
+						PreferredNodeSelectorTerms: []corev1.PreferredSchedulingTerm{
+							{
+								Weight: 20,
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"zone-a"},
+										},
+									},
 								},
 							},
 						},
@@ -349,15 +354,6 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 					{
 						Name:        "subset-c",
 						MaxReplicas: nil,
-						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
-							MatchExpressions: []corev1.NodeSelectorRequirement{
-								{
-									Key:      "topology.kubernetes.io/zone",
-									Operator: corev1.NodeSelectorOpIn,
-									Values:   []string{"zone-c"},
-								},
-							},
-						},
 						Tolerations: []corev1.Toleration{
 							{
 								Key:      "ecs",
@@ -481,11 +477,12 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			errorSuffix: "spec.subsets[1].name",
 		},
 		{
-			name: "subset[0]'s requiredNodeSelectorTerm and preferredNodeSelectorTerms are all empty",
+			name: "subset[0]'s requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are all empty",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets[0].RequiredNodeSelectorTerm = nil
 				workloadSpread.Spec.Subsets[0].PreferredNodeSelectorTerms = nil
+				workloadSpread.Spec.Subsets[0].Tolerations = nil
 				return workloadSpread
 			},
 			errorSuffix: "spec.subsets[0].requiredNodeSelectorTerm",

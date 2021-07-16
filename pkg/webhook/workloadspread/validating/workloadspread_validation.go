@@ -171,9 +171,9 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 			subSetNames.Insert(subsetName)
 		}
 
-		// need requiredNodeSelectorTerm or preferredNodeSelectorTerms except the end subset.
-		if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "empty RequiredNodeSelectorTerm and PreferredNodeSelectorTerms is not valid for WorkloadSpread"))
+		// at least one of requiredNodeSelectorTerm, preferredNodeSelectorTerms, tolerations.
+		if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil && subset.Tolerations == nil{
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "The requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are empty that is not valid for WorkloadSpread"))
 		} else {
 			if subset.RequiredNodeSelectorTerm != nil {
 				coreNodeSelectorTerm := &core.NodeSelectorTerm{}
