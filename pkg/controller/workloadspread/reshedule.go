@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const ScheduledFailedDuration = 10 * time.Minute
+const ScheduledFailedDuration = 5 * time.Minute
 
 // rescheduleSubset will delete some unscheduled Pods that still in pending status. Some subsets have no
 // sufficient resource can lead to some Pods scheduled failed. WorkloadSpread has multiple subset, so these
@@ -96,12 +96,12 @@ func (r *ReconcileWorkloadSpread) deleteUnscheduledPodsForSubset(ws *appsv1alpha
 		if err := r.Client.Delete(context.TODO(), pod); err != nil {
 			r.recorder.Eventf(ws, corev1.EventTypeWarning,
 				"DeletePodFailed",
-				"WorkloadSpread %s/%s failed to delete unscheduled Pod %s/%s in subset %s",
+				"WorkloadSpread %s/%s failed to delete unschedulabe Pod %s/%s in subset %s",
 				ws.Namespace, ws.Name, pod.Namespace, pod.Name, subsetName)
 			return err
 		}
 		r.recorder.Eventf(ws, corev1.EventTypeNormal, "DeleteUnscheduledPod",
-			"WorkloadSpread %s/%s delete unscheduled Pod %s/%s in subset %s successfully",
+			"WorkloadSpread %s/%s delete unschedulabe Pod %s/%s in subset %s successfully",
 			ws.Namespace, ws.Name, pod.Namespace, pod.Name, subsetName)
 	}
 	return nil

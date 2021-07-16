@@ -31,6 +31,21 @@ import (
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
+
+func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSpread,
+	podMap map[string][]*corev1.Pod,
+	orphanPods []*corev1.Pod,
+	workloadReplicas int32) error {
+	// update Pod's deletion-cost annotation in each subset
+	for _, subset := range ws.Spec.Subsets {
+		if err := r.syncSubsetPodDeletionCost(ws, &subset, podMap[subset.Name], workloadReplicas); err != nil {
+			return err
+		}
+	}
+	// update orphanPods, deletion-cost = -100
+	return r.updateDeletionCostForSubsetPods(ws, "orphan", orphanPods, wsutil.PodDeletionCostNegative)
+}
+
 // syncSubsetPodDeletionCost calculates the deletion-cost for the Pods belong to subset and update deletion-cost annotation.
 // We have three types for subset's Pod deletion-cost
 // 1. the number of active Pods in this subset <= maxReplicas, deletion-cost = 100. indicating the priority of Pods
@@ -95,15 +110,15 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 		}
 	}
 
-	err = r.updateDeletionCostForSubsetPods(ws, subset, positivePods, wsutil.PodDeletionCostPositive)
+	err = r.updateDeletionCostForSubsetPods(ws, subset.Name, positivePods, wsutil.PodDeletionCostPositive)
 	if err != nil {
 		return err
 	}
-	err = r.updateDeletionCostForSubsetPods(ws, subset, negativePods, wsutil.PodDeletionCostNegative)
+	err = r.updateDeletionCostForSubsetPods(ws, subset.Name, negativePods, wsutil.PodDeletionCostNegative)
 	if err != nil {
 		return err
 	}
-	err = r.updateDeletionCostForSubsetPods(ws, subset, zeroPods, wsutil.PodDeletionCostDefault)
+	err = r.updateDeletionCostForSubsetPods(ws, subset.Name, zeroPods, wsutil.PodDeletionCostDefault)
 	if err != nil {
 		return err
 	}
@@ -112,13 +127,13 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 }
 
 func (r *ReconcileWorkloadSpread) updateDeletionCostForSubsetPods(ws *appsv1alpha1.WorkloadSpread,
-	subset *appsv1alpha1.WorkloadSpreadSubset, pods []*corev1.Pod, deletionCostStr string) error {
+	subsetName string, pods []*corev1.Pod, deletionCostStr string) error {
 	for _, pod := range pods {
 		if err := r.updatePodDeletionCost(ws, pod, deletionCostStr); err != nil {
 			r.recorder.Eventf(ws, corev1.EventTypeWarning,
 				"UpdatePodDeletionCostFailed",
 				"WorkloadSpread %s/%s failed to update deletion-cost annotation to %d for Pod %s/%s in subset %s",
-				ws.Namespace, ws.Name, deletionCostStr, pod.Namespace, pod.Name, subset.Name)
+				ws.Namespace, ws.Name, deletionCostStr, pod.Namespace, pod.Name, subsetName)
 			return err
 		}
 	}
