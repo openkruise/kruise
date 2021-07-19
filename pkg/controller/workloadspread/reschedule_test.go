@@ -188,7 +188,7 @@ func TestRescheduleSubset(t *testing.T) {
 			},
 		},
 		{
-			name: "subset-a was unscheduable and not reach up 10 minutes",
+			name: "subset-a was unscheduable and not reach up 5 minutes",
 			getPods: func() []*corev1.Pod {
 				pods := make([]*corev1.Pod, 0)
 				return pods
@@ -202,7 +202,7 @@ func TestRescheduleSubset(t *testing.T) {
 				ws.Status.ObservedGeneration = 10
 				ws.Status.SubsetStatuses[0].MissingReplicas = 3
 				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.Unschedulable = true
-				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.UnscheduledTime = metav1.Time{Time: currentTime.Add(5 * m)}
+				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.UnscheduledTime = metav1.Time{Time: currentTime.Add(4 * m)}
 				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.FailedCount = 1
 				return ws
 			},
@@ -216,7 +216,7 @@ func TestRescheduleSubset(t *testing.T) {
 				ws := wsDemo.DeepCopy()
 				ws.Status.SubsetStatuses[0].MissingReplicas = 5
 				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.Unschedulable = true
-				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.UnscheduledTime = metav1.Time{Time: currentTime.Add(5 * m)}
+				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.UnscheduledTime = metav1.Time{Time: currentTime.Add(4 * m)}
 				ws.Status.SubsetStatuses[0].SubsetUnscheduledStatus.FailedCount = 1
 				return ws
 			},

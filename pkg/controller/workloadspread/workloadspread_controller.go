@@ -408,8 +408,8 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 		klog.Warningf("WorkloadSpread (%s/%s) has no matched pods", ws.Namespace, ws.Name)
 	}
 
-	// group Pods by subset
-	podMap, orphanPods := getPodMap(ws, pods)
+	// group Pods by subset and the extra pods called orphan.
+	podMap, orphanPods := groupPod(ws, pods)
 
 	// update deletion-cost for each subset and orphan pods
 	err = r.updateDeletionCost(ws, podMap, orphanPods, workloadReplicas)
@@ -448,10 +448,10 @@ func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSprea
 	return injectWS
 }
 
-// getPodMap returns two parameters,
+// groupPod returns two parameters,
 // 1.a map, the key is the name of subset and the value represents the Pods of the corresponding subset.
 // 2.a slice containing the extra Pods not belongs to any subset of ws.
-func getPodMap(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod) (map[string][]*corev1.Pod, []*corev1.Pod) {
+func groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod) (map[string][]*corev1.Pod, []*corev1.Pod) {
 	podMap := make(map[string][]*corev1.Pod, len(ws.Spec.Subsets))
 	for _, subset := range ws.Spec.Subsets {
 		podMap[subset.Name] = []*corev1.Pod{}

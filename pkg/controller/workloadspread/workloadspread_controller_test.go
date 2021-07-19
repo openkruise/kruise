@@ -1371,7 +1371,7 @@ func TestUpdateSubsetSequence(t *testing.T) {
 		"test-pod-1": {Time: currentTime.Add(2 * s)},
 	}
 
-	subsetsPods, _ := getPodMap(workloadSpread, pods)
+	subsetsPods, _ := groupPod(workloadSpread, pods)
 
 	r := ReconcileWorkloadSpread{}
 	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, 5, 10)
