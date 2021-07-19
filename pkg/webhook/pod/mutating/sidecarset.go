@@ -248,7 +248,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		}
 
 		//process initContainers
-		//only when created pod, inject initContainer
+		//only when created pod, inject initContainer and pullSecrets
 		if !isUpdated {
 			for i := range sidecarSet.Spec.InitContainers {
 				initContainer := &sidecarSet.Spec.InitContainers[i]
@@ -256,10 +256,10 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				initContainer.Env = append(initContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
 				sidecarInitContainers = append(sidecarInitContainers, initContainer)
 			}
-		}
 
-		//process imagePullSecrets
-		sidecarSecrets = append(sidecarSecrets, sidecarSet.Spec.ImagePullSecrets...)
+			//process imagePullSecrets
+			sidecarSecrets = append(sidecarSecrets, sidecarSet.Spec.ImagePullSecrets...)
+		}
 
 		//process containers
 		for i := range sidecarSet.Spec.Containers {
