@@ -26,6 +26,10 @@ any additional information provided beyond the standard proposal template.
   - [What should it look like](#what-should-it-look-like)
   - [Proposal](#proposal)
     - [User Story](#user-story)
+      - [Annotations](#annotations)
+      - [WritePolicy](#writepolicy)
+      - [Targets](#targets)
+      - [Synchronization](#synchronization)
     - [How to Implement](#how-to-implement)
       - [API definition](#api-definition)
       - [WebHook Validation](#webhook-validation)
@@ -41,7 +45,7 @@ For example, in the following scenarios, the `Resource Distribution` may be help
 ## What should it look like
 In our mind, the `Resource Distribution` should:
 1. Support distributing resources to all namespaces or listed namespaces;
-2. Support label selector, including pod label selector and namespace label selector;
+2. Support label selector, including workload label selector and namespace label selector;
 3. Support managing the resources, including synchronization and clean;
 4. Be safe.
 
@@ -51,8 +55,8 @@ In our mind, the `Resource Distribution` should:
 We provide a CRD solution in this proposal.
 If you want to achieve `Resource Distribution` based on `Spec.Annotations`, I recommend you to use [kubernetes-replicator](https://github.com/mittwald/kubernetes-replicator).
 
-But, compared with [kubernetes-replicator](https://github.com/mittwald/kubernetes-replicator), the unique of our design are that:
-1. Support pod label selector;
+But, compared with [kubernetes-replicator](https://github.com/mittwald/kubernetes-replicator), the uniques of our design are that:
+1. Support workload label selector;
 2. Support automated replica cleanup.
 
 Sure, we also have some disadvantages compared with kubernetes-replicator:
@@ -63,54 +67,90 @@ In this design, we will support the distribution for the following resources:
 1. Secret;
 2. ConfigMap.
 
+By the way, why we cannot support distribute existing resources:
+1. Pull secret from other namespace is very unsafe and dangerous;
+2. When the source is deleted, its replicas may be no longer cleaned.
+
 ### User Story
 ```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: ResourceDistribution
 metadata:
   name: secret-distribution
-  namespace: users-namespace
-spec: # written by user
-  resource: # using runtime.RawExtension to implement
+  namespace: resource-namespace
+spec:
+  resource:
     apiVersion: apps/v1
     kind: Secret # We will validate and limit the kind of the resource
     metadata:
-      ame: secret-sa-sample
-      annotations:
-        kubernetes.io/service-account.name: "sa-name"
+      name: secret-sa-sample
+      ownerReferences: # written by `ResourceDistribution` automatically
+        ...
+      annotations: # written by `ResourceDistribution` automatically
+        openKruise.io/resource-distributed-by: "resource-distribution:secret-distribution"
+        openKruise.io/resource-distributed-time: "2021-07-20T03:00:00"
     type: kubernetes.io/service-account-token
     data:
       extra: YmFyCg==
+  wirtePolicy: strict #strict for default, or use [`overwrite`, 'ignore']
   targets: # options: ["cluster", "namespaces", "podLabelSelector", "namespaceLabelSelector"]
     all: #all namespaces will be selected, except for kube-system, kube-public and the listed namespaces.
        - exception: some-ignored-ns-1
        - exception: some-ignored-ns-2
+- Status: #written by `ResourceDistribution` automatically if resource distribution failed.
+  description: "Resource distribution failed: Name Conflict." # logs: "Resource %s has existed in some namespaces, please rename your resource or use [`overwrite`, 'ignore'] writePolicy."
+  conflictingNamespaces:
+    - name: some-conflict-ns-1
+    - name: some-conflict-ns-2
 ```
+#### Annotations
+Record the source of resource and creation time.
+
+#### WritePolicy
+The `writePolicy` specifies the write operation when the resource conflict with existing resources.
+
+1. If `writePolicy` is `strict`:
+ - The resource will be distributed **iff** there is no conflict (distribute to all, or none of them);
+ - All conflicting namespaces will be listed in `conflictingNamespaces`;
+ - Users can get `Name Conflict` in kruise log.
+2. If `writePolicy` is `overwrite`:
+ - The existing resources with the same name will be overwritten;
+ - All conflicting namespaces will be listed in `conflictingNamespaces`;
+3. If `writePolicy` is `ignore`:
+ - The resource will not be distributed to the conflicting namespaces (but will distribute to the others);
+ - All conflicting namespaces will be listed in `conflictingNamespaces`;
+
+#### Targets
 The `targets` field has other three options except for `all`:
-1. if choose `namespaces`, the listed namespaces will be selected.
+1. If choose `namespaces`, the listed namespaces will be selected.
 ```yaml
   targets:
     namespaces:
        - name: some-target-ns-1
        - name: some-target-ns-2
 ```
-2. if choose `namespaceLabelSelector`, the matched namespaces will be selected.
+2. If choose `namespaceLabelSelector`, the matched namespaces will be selected.
 ```yaml
   targets:
     namespaceLabelSelector:
        group: seven
        environment: test
 ```
-3. if choose `podLabelSelector`, the namespaces that contains any matched pods will be selected.
+3. If choose `workloadLabelSelector`, the namespaces that contains any matched workload will be selected.
 ```yaml
   targets:
-    podLabelSelector:
+    workloadLabelSelector:
       app: nginx
 ```
-**Special Cases:**
 
+#### Synchronization
+1. Only when the `ResourceDistribution` is updated, the resource and its replica will be synchronized.
+2. When replicated resource is deleted or updated alone, the `ResourceDistribution` controller will do nothing.
+
+#### Special Cases
 1. The default target is `all`.
-2. If more than one `targets` were chosen, the union of their results will be applied.
+2. The default writePolicy is `strict`.
+3. If more than one `targets` were chosen, the union of their results will be applied.
 
 ### How to Implement
 
@@ -123,28 +163,34 @@ type ResourceDistribution struct{
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec   ResourceDistributionSpec   `json:"spec,omitempty"`
+	Status ResourceDistributionStatus 'json:"status,omitempty"'
 }
 
 type ResourceDistributionSpec struct{
 	Resource runtime.RawExtension `json:"resource,omitempty"`
+	WritePolicy string `json:"writePolicy,omitempty"`
 	Targets ResourceDistributionTargets `json:"targets,omitempty"`
 }
 
 type ResourceDistributionTargets struct{
 	All []TargetException `json:"all,omitempty"`
-	Namespaces []TargetNamespace `json:"namespaces,omitempty"`
+	Namespaces []NamespaceName `json:"namespaces,omitempty"`
 	NamespaceLabelSelector map[string]string `json:"namespaceLabelSelector,omitempty"`
-	PodLabelSelector map[string]string `json:"podLabelSelector,omitempty"`
+	WorkloadLabelSelector map[string]string `json:"workloadLabelSelector,omitempty"`
+}
+
+type ResourceDistributionStatus struct{
+	Description string `json:"description,omitempty"`
+	ConflictedNamespaces []NamespaceName `json:"exception,omitempty"`
 }
 
 type TargetException struct {
 	Exception string `json:"exception,omitempty"`
 }
 
-type TargetNamespace struct{
+type NamespaceName struct{
 	Name string `json:"name,omitempty"`
 }
-
 ```
 #### WebHook Validation
 Check if the source resource belongs to `Secret` or `ConfigMap`.
@@ -152,20 +198,21 @@ Check if the source resource belongs to `Secret` or `ConfigMap`.
 #### Distribution and Synchronization
 
 1. Create and Distribute
+- Parse and analyze the resource and the target namespaces.
+- Check conflicts and `WritePolicy`.
 - Create the resource based on `Resouce` field.
-- Parse and analyze target namespaces.
 - Replicate and distribute the resource, and set their `OwnerReference` to the `ResourceDistribution`.
 
 2. Update and Synchronize
-- If `Resource` field is updated:
+- When `Resource` field is updated:
   - Update resource and synchronize its replicas.
-- If `Targets` field is updated:
+- When `Targets` field is updated:
   - Parse and analyze new target namespaces;
   - Clear replicas for the old namespaces that aren't in the new targets;
   - Replicate resource to the new target namespaces.
-- If New pod or namespace is created:
+- When a new workload or namespace is created:
   - Get all `ResourceDistribution`
-  - Check whether each `ResourceDistribution` is matched with the pod or namespace, if so, replica and synchronize its resource.
+  - Check whether each `ResourceDistribution` is matched with the workload or namespace, if so, replica and synchronize its resource.
 
 3. Delete
 - Benefiting from `OwnerReference`, the resource and its replicas will be cleaned when the `ResourceDistribution` is deleted.
