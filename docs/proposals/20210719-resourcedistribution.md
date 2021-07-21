@@ -77,10 +77,9 @@ apiVersion: apps.kruise.io/v1alpha1
 kind: ResourceDistribution
 metadata:
   name: secret-distribution
-  namespace: resource-namespace
 spec:
   resource:
-    apiVersion: apps/v1
+    apiVersion: v1
     kind: Secret # We will validate and limit the kind of the resource
     metadata:
       name: secret-sa-sample
@@ -93,12 +92,12 @@ spec:
     data:
       extra: YmFyCg==
   wirtePolicy: strict #strict for default, or use [`overwrite`, 'ignore']
-  targets: # options: ["cluster", "namespaces", "podLabelSelector", "namespaceLabelSelector"]
+  targets: # options: ["cluster", "namespaces", "workloadLabelSelector", "namespaceLabelSelector"]
     all: #all namespaces will be selected, except for kube-system, kube-public and the listed namespaces.
        - exception: some-ignored-ns-1
        - exception: some-ignored-ns-2
 - Status: #written by `ResourceDistribution` automatically if resource distribution failed.
-  description: "Resource distribution failed: Name Conflict." # logs: "Resource %s has existed in some namespaces, please rename your resource or use [`overwrite`, 'ignore'] writePolicy."
+  description: "Resource distribution failed: Name Conflict." # logs: "Resource %s has existed in some namespaces, please rename your resource or adopt [`overwrite`, 'ignore'] writePolicy."
   conflictingNamespaces:
     - name: some-conflict-ns-1
     - name: some-conflict-ns-2
@@ -117,7 +116,7 @@ The `writePolicy` specifies the write operation when the resource conflict with 
  - The existing resources with the same name will be overwritten;
  - All conflicting namespaces will be listed in `conflictingNamespaces`;
 3. If `writePolicy` is `ignore`:
- - The resource will not be distributed to the conflicting namespaces (but will distribute to the others);
+ - The resource will not be distributed to the conflicting namespaces (but will be distributed to the others);
  - All conflicting namespaces will be listed in `conflictingNamespaces`;
 
 #### Targets
@@ -133,14 +132,17 @@ The `targets` field has other three options except for `all`:
 ```yaml
   targets:
     namespaceLabelSelector:
-       group: seven
-       environment: test
+      matchLabels:
+        group: seven
+        environment: test
 ```
 3. If choose `workloadLabelSelector`, the namespaces that contains any matched workload will be selected.
 ```yaml
   targets:
     workloadLabelSelector:
-      app: nginx
+      kind: CloneSet
+      matchLabels:
+        app: nginx
 ```
 
 #### Synchronization
@@ -150,7 +152,7 @@ The `targets` field has other three options except for `all`:
 #### Special Cases
 1. The default target is `all`.
 2. The default writePolicy is `strict`.
-3. If more than one `targets` were chosen, the union of their results will be applied.
+3. If more than one `targets` were chosen, the intersection of their results will be applied.
 
 ### How to Implement
 
@@ -175,8 +177,17 @@ type ResourceDistributionSpec struct{
 type ResourceDistributionTargets struct{
 	All []TargetException `json:"all,omitempty"`
 	Namespaces []NamespaceName `json:"namespaces,omitempty"`
-	NamespaceLabelSelector map[string]string `json:"namespaceLabelSelector,omitempty"`
-	WorkloadLabelSelector map[string]string `json:"workloadLabelSelector,omitempty"`
+	NamespaceLabelSelector ResourceDistributionNamespaceLabelSelector `json:"namespaceLabelSelector,omitempty"`
+	WorkloadLabelSelector  ResourceDistributionWorkloadLabelSelector `json:"workloadLabelSelector,omitempty"`
+}
+
+type ResourceDistributionNamespaceLabelSelector struct{
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+}
+
+type ResourceDistributionWorkloadLabelSelector struct{
+	Kind string `json:"kind,omitempty"`
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
 }
 
 type ResourceDistributionStatus struct{
@@ -193,7 +204,7 @@ type NamespaceName struct{
 }
 ```
 #### WebHook Validation
-Check if the source resource belongs to `Secret` or `ConfigMap`.
+Check if the resource belongs to `Secret` or `ConfigMap`.
 
 #### Distribution and Synchronization
 
@@ -215,7 +226,7 @@ Check if the source resource belongs to `Secret` or `ConfigMap`.
   - Check whether each `ResourceDistribution` is matched with the workload or namespace, if so, replica and synchronize its resource.
 
 3. Delete
-- Benefiting from `OwnerReference`, the resource and its replicas will be cleaned when the `ResourceDistribution` is deleted.
+- Benefiting from `OwnerReference`, the replicas will be cleaned when the `ResourceDistribution` is deleted.
 
 ## Implementation History
 - [ ] 07/19/2021: Proposal submission
