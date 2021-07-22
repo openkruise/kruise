@@ -412,6 +412,41 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-pod
+  failurePolicy: Fail
+  name: vpod.kb.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - UPDATE
+    - DELETE
+    resources:
+    - pods
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-pod
+  failurePolicy: Fail
+  name: vpodeviction.kb.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods/eviction
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-policy-kruise-io-podunavailablebudget
   failurePolicy: Fail
   name: vpodunavailablebudget.kb.io

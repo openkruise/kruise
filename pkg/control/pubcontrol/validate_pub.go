@@ -54,7 +54,6 @@ const (
 
 func PodUnavailableBudgetValidatePod(client client.Client, pod *corev1.Pod, control PubControl,
 	operation Operation, dryRun bool) (allowed bool, reason string, err error) {
-
 	// If the pod is not ready, it doesn't count towards healthy and we should not decrement
 	if !control.IsPodReady(pod) {
 		klog.V(3).Infof("pod(%s.%s) is not ready, then don't need check pub", pod.Namespace, pod.Name)
@@ -104,7 +103,7 @@ func PodUnavailableBudgetValidatePod(client client.Client, pod *corev1.Pod, cont
 		return err
 	})
 	if err != nil && err != wait.ErrWaitTimeout {
-		klog.Errorf("pod(%s.%s) operation(%s) for pub(%s.%s) failed: %s", pod.Namespace, pod.Name, operation, pub.Namespace, pub.Name, err.Error())
+		klog.V(3).Infof("pod(%s.%s) operation(%s) for pub(%s.%s) failed: %s", pod.Namespace, pod.Name, operation, pub.Namespace, pub.Name, err.Error())
 		return false, err.Error(), nil
 	} else if err == wait.ErrWaitTimeout {
 		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodUnavailableBudget %s due to conflicts", pub.Name), 10)
