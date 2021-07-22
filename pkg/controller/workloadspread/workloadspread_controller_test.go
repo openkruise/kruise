@@ -645,7 +645,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.ObservedGeneration = 10
-				workloadSpread.Status.ObservedWorkloadGeneration = -1
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -674,7 +673,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.ObservedGeneration = 10
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, 2)
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 5
@@ -731,7 +729,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.ObservedGeneration = 10
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, 2)
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
@@ -769,7 +766,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -805,7 +801,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -841,7 +836,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -882,7 +876,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				currentTime, _ = time.ParseInLocation(timeFormat, formatTime, time.Local)
 
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{
 					"test-pod-1": {Time: currentTime.Add(2 * s)},
@@ -922,7 +915,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -968,7 +960,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -1017,7 +1008,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -1062,7 +1052,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -1086,7 +1075,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{
 					"test-pod-3": {Time: currentTime.Add(5 * s)},
 					"test-pod-4": {Time: currentTime.Add(5 * s)},
@@ -1116,7 +1104,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -1164,7 +1151,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 
@@ -1217,7 +1203,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -1266,7 +1251,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.ObservedWorkloadGeneration = 10
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
@@ -1322,9 +1306,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			}
 
 			latestStatus := latestWorkloadSpread.Status
-			for i := range latestStatus.SubsetStatuses {
-				latestStatus.SubsetStatuses[i].SubsetUnscheduledStatus.UnscheduledTime = metav1.Time{}
-			}
 			by, _ := json.Marshal(latestStatus)
 			fmt.Println(string(by))
 
@@ -1374,7 +1355,7 @@ func TestUpdateSubsetSequence(t *testing.T) {
 	subsetsPods, _ := groupPod(workloadSpread, pods)
 
 	r := ReconcileWorkloadSpread{}
-	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, 5, 10)
+	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, 5)
 	if status == nil {
 		t.Fatalf("error get WorkloadSpread status")
 	} else {
