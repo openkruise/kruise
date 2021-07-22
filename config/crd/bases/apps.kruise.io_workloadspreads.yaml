@@ -168,11 +168,6 @@ spec:
                 which is updated on mutation by the API Server.
               format: int64
               type: integer
-            observedWorkloadGeneration:
-              description: ObservedWorkloadGeneration is the most recent generation
-                observed for target Workload.
-              format: int64
-              type: integer
             subsetStatuses:
               description: Contains the status of each subset. Each element in this
                 array represents one subset
@@ -180,6 +175,35 @@ spec:
                 description: WorkloadSpreadSubsetStatus defines the observed state
                   of subset
                 properties:
+                  conditions:
+                    description: Conditions is an array of current observed subset
+                      conditions.
+                    items:
+                      properties:
+                        lastTransitionTime:
+                          description: Last time the condition transitioned from one
+                            status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: A human readable message indicating details
+                            about the transition.
+                          type: string
+                        reason:
+                          description: The reason for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status of the condition, one of True, False,
+                            Unknown.
+                          type: string
+                        type:
+                          description: Type of in place set condition.
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
                   creatingPods:
                     additionalProperties:
                       format: date-time
@@ -217,31 +241,6 @@ spec:
                     description: Name should be unique between all of the subsets
                       under one WorkloadSpread.
                     type: string
-                  subsetUnscheduledStatus:
-                    description: SubsetUnscheduledStatus contains the details for
-                      the unscheduled subset.
-                    properties:
-                      failedCount:
-                        description: the counts of subset was marked with unschedulable.
-                        format: int32
-                        type: integer
-                      unschedulable:
-                        description: Unschedulable is true indicates this Subset cannot
-                          be scheduled. The default is false. It's valid only when
-                          the WorkloadSpreadScheduleStrategy is 'adaptive', otherwise
-                          it is always false. When one pod in a subset has condition[PodScheduled]
-                          = false, the subset is considered temporarily unschedulable.
-                          The condition[PodScheduled] = false, which means the cluster
-                          does not have enough resources to schedule at this moment,
-                          even if only single Pod scheduled fails. This state is temporary,
-                          and after a period of time(e.g. 5m), the spread controller
-                          will mark it schedulable.
-                        type: boolean
-                      unscheduledTime:
-                        description: last time for unscheduled
-                        format: date-time
-                        type: string
-                    type: object
                 required:
                 - missingReplicas
                 - name

@@ -120,33 +120,40 @@ type WorkloadSpreadStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// ObservedWorkloadGeneration is the most recent generation observed for target Workload.
-	// +optional
-	ObservedWorkloadGeneration int64 `json:"observedWorkloadGeneration,omitempty"`
-
 	// Contains the status of each subset. Each element in this array represents one subset
 	// +optional
 	SubsetStatuses []WorkloadSpreadSubsetStatus `json:"subsetStatuses,omitempty"`
 }
 
-// SubsetUnscheduledStatus contains the details for the unscheduled subset.
-type SubsetUnscheduledStatus struct {
-	// Unschedulable is true indicates this Subset cannot be scheduled. The default is false.
-	// It's valid only when the WorkloadSpreadScheduleStrategy is 'adaptive', otherwise it is always false.
-	// When one pod in a subset has condition[PodScheduled] = false, the subset is considered temporarily unschedulable.
+type WorkloadSpreadSubsetConditionType string
+
+const (
+	// SubsetSchedulable means the nodes in this subset have sufficient resources to schedule a fixed number of Pods of a workload.
+	// When one or more one pods in a subset have condition[PodScheduled] = false, the subset is considered temporarily unschedulable.
 	// The condition[PodScheduled] = false, which means the cluster does not have enough resources to schedule at this moment,
 	// even if only single Pod scheduled fails.
-	// This state is temporary, and after a period of time(e.g. 5m), the spread controller will mark it schedulable.
-	// +optional
-	Unschedulable bool `json:"unschedulable,omitempty"`
+	// After a period of time(e.g. 5m), the controller will recover the subset to be schedulable.
+	SubsetSchedulable WorkloadSpreadSubsetConditionType = "Schedulable"
+)
 
-	// last time for unscheduled
-	// +optional
-	UnscheduledTime metav1.Time `json:"unscheduledTime,omitempty"`
+type WorkloadSpreadSubsetCondition struct {
+	// Type of in place set condition.
+	Type WorkloadSpreadSubsetConditionType `json:"type"`
 
-	// the counts of subset was marked with unschedulable.
+	// Status of the condition, one of True, False, Unknown.
+	Status corev1.ConditionStatus `json:"status"`
+
+	// Last time the condition transitioned from one status to another.
 	// +optional
-	FailedCount int32 `json:"failedCount,omitempty"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+
+	// The reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// A human readable message indicating details about the transition.
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 // WorkloadSpreadSubsetStatus defines the observed state of subset
@@ -154,9 +161,9 @@ type WorkloadSpreadSubsetStatus struct {
 	// Name should be unique between all of the subsets under one WorkloadSpread.
 	Name string `json:"name"`
 
-	// SubsetUnscheduledStatus contains the details for the unscheduled subset.
+	// Conditions is an array of current observed subset conditions.
 	// +optional
-	SubsetUnscheduledStatus SubsetUnscheduledStatus `json:"subsetUnscheduledStatus,omitempty"`
+	Conditions []WorkloadSpreadSubsetCondition `json:"conditions,omitempty"`
 
 	// MissingReplicas is the number of replicas belong to this subset not be found.
 	// MissingReplicas > 0 indicates the subset is still missing MissingReplicas pods to create
