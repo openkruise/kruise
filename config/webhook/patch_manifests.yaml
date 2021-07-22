@@ -39,3 +39,13 @@ webhooks:
     matchExpressions:
     - key: policy.kruise.io/delete-protection
       operator: Exists
+- name: vpod.kb.io
+  namespaceSelector:
+    matchExpressions:
+      - key: control-plane
+        operator: DoesNotExist
+- name: vpodeviction.kb.io
+  namespaceSelector:
+    matchExpressions:
+      - key: control-plane
+        operator: DoesNotExist
