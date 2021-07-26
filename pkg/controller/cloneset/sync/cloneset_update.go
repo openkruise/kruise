@@ -86,9 +86,13 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		}
 		if waitUpdate {
 			switch lifecycle.GetPodLifecycleState(pod) {
-			case appspub.LifecycleStatePreparingDelete, appspub.LifecycleStateUpdated:
+			case appspub.LifecycleStatePreparingDelete:
 				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
 					cs.Namespace, cs.Name, pod.Name, lifecycle.GetPodLifecycleState(pod))
+			case appspub.LifecycleStateUpdated:
+				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s but not in updated revision",
+					cs.Namespace, cs.Name, pod.Name, appspub.LifecycleStateUpdated)
+				canUpdate = true
 			default:
 				if gracePeriod, _ := appspub.GetInPlaceUpdateGrace(pod); gracePeriod != "" {
 					klog.V(3).Infof("CloneSet %s/%s find pod %s still in grace period %s, so skip to update it",
@@ -198,6 +202,19 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 					}
 					return 0, err
 				}
+			case appspub.LifecycleStateUpdated:
+				var err error
+				var updated bool
+				var inPlaceUpdateHandler *appspub.LifecycleHook
+				if cs.Spec.Lifecycle != nil {
+					inPlaceUpdateHandler = cs.Spec.Lifecycle.InPlaceUpdate
+				}
+				if updated, err = c.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
+					clonesetutils.ResourceVersionExpectations.Expect(pod)
+					klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
+						clonesetutils.GetControllerKey(cs), pod.Name)
+				}
+				return 0, err
 			case appspub.LifecycleStatePreparingUpdate:
 				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 					return 0, nil
