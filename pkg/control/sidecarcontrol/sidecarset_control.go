@@ -41,9 +41,23 @@ func (c *commonControl) IsActiveSidecarSet() bool {
 	return true
 }
 
-func (c *commonControl) UpdateSidecarContainerToLatest(containerInSidecarSet, containerInPod v1.Container) v1.Container {
-	containerInPod.Image = containerInSidecarSet.Image
-	return containerInPod
+func (c *commonControl) UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container {
+	var nameToUpgrade, otherContainer, oldImage string
+	if IsHotUpgradeContainer(sidecarContainer) {
+		nameToUpgrade, otherContainer = findContainerToHotUpgrade(sidecarContainer, pod, c)
+		oldImage = util.GetContainer(otherContainer, pod).Image
+	} else {
+		nameToUpgrade = sidecarContainer.Name
+		oldImage = util.GetContainer(nameToUpgrade, pod).Image
+	}
+	// community in-place upgrades are only allowed to update image
+	if sidecarContainer.Image == oldImage {
+		return nil
+	}
+	container := util.GetContainer(nameToUpgrade, pod)
+	container.Image = sidecarContainer.Image
+	klog.V(3).Infof("upgrade pod(%s/%s) container(%s) Image from(%s) -> to(%s)", pod.Namespace, pod.Name, nameToUpgrade, oldImage, container.Image)
+	return container
 }
 
 func (c *commonControl) NeedToInjectVolumeMount(volumeMount v1.VolumeMount) bool {
@@ -130,7 +144,7 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 }
 
 // only check sidecar container is consistent
-func (c *commonControl) IsPodUpdatedConsistently(pod *v1.Pod, sidecarContainers sets.String) bool {
+func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets.String) bool {
 	if len(pod.Spec.Containers) != len(pod.Status.ContainerStatuses) {
 		return false
 	}
@@ -164,7 +178,7 @@ func (c *commonControl) IsPodUpdatedConsistently(pod *v1.Pod, sidecarContainers 
 	}
 
 	// check container InpalceUpdate status
-	return isSidecarContainerUpdateCompleted(pod, sidecarset.Name, sidecarContainers)
+	return IsSidecarContainerUpdateCompleted(pod, sets.NewString(sidecarset.Name), sidecarContainers)
 }
 
 // k8s only allow modify pod.spec.container[x].image,
@@ -185,7 +199,7 @@ func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
 		// when containerStatus.Ready == true and container non-consistent,
 		// indicates that sidecar container is in the process of being upgraded
 		// wait for the last upgrade to complete before performing this upgrade
-		if cStatus[sidecar] && !c.IsPodUpdatedConsistently(pod, sets.NewString(sidecar)) {
+		if cStatus[sidecar] && !c.IsPodStateConsistent(pod, sets.NewString(sidecar)) {
 			return false
 		}
 	}
@@ -199,7 +213,7 @@ func (c *commonControl) IsPodAvailabilityChanged(pod, oldPod *v1.Pod) bool {
 
 // isContainerInplaceUpdateCompleted checks whether imageID in container status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated containers in Pod.
-func isSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSetName string, containers sets.String) bool {
+func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets.String) bool {
 	//format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
 	// when the pod annotation not found, indicates the pod only injected sidecar container, and never inplace update
@@ -213,11 +227,16 @@ func isSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSetName string, conta
 		return false
 	}
 
-	// when the sidecarset InPlaceUpdateState not found, indicates the pod only injected sidecar container, and never inplace update
-	// then always think it update complete
-	inPlaceUpdateState, ok := sidecarUpdateStates[sidecarSetName]
-	if !ok {
-		return true
+	// The container imageId recorded before the in-place sidecar upgrade
+	// when the container imageId not found, indicates the pod only injected the sidecar container,
+	// and never in-place update sidecar, then always think it update complete
+	lastContainerStatus := make(map[string]pub.InPlaceUpdateContainerStatus)
+	for _, sidecarSetName := range sidecarSets.List() {
+		if inPlaceUpdateState, ok := sidecarUpdateStates[sidecarSetName]; ok {
+			for name, status := range inPlaceUpdateState.LastContainerStatuses {
+				lastContainerStatus[name] = status
+			}
+		}
 	}
 
 	containerImages := make(map[string]string, len(pod.Spec.Containers))
@@ -231,7 +250,7 @@ func isSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSetName string, conta
 		if !containers.Has(cs.Name) {
 			continue
 		}
-		if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
+		if oldStatus, ok := lastContainerStatus[cs.Name]; ok {
 			// we assume that users should not update workload template with new image
 			// which actually has the same imageID as the old image
 			if oldStatus.ImageID == cs.ImageID && containerImages[cs.Name] != cs.Image {

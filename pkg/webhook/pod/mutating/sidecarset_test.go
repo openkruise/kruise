@@ -382,6 +382,48 @@ func testPodHasNoMatchedSidecarSet(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 	}
 }
 
+func TestMergeSidecarSecrets(t *testing.T) {
+	sidecarSetIn := sidecarSet1.DeepCopy()
+	testMergeSidecarSecrets(t, sidecarSetIn)
+}
+
+func testMergeSidecarSecrets(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
+	sidecarImagePullSecrets := []corev1.LocalObjectReference{
+		{Name: "s0"}, {Name: "s1"}, {Name: "s2"},
+	}
+	podImagePullSecrets := []corev1.LocalObjectReference{
+		{Name: "s2"}, {Name: "s3"}, {Name: "s3"},
+	}
+	// 3 + 3 - 2 = 4
+	sidecarSetIn.Spec.ImagePullSecrets = sidecarImagePullSecrets
+	doMergeSidecarSecretsTest(t, sidecarSetIn, podImagePullSecrets, 2)
+	// 3 + 3 - 0 = 6
+	podImagePullSecrets = []corev1.LocalObjectReference{
+		{Name: "s3"}, {Name: "s4"}, {Name: "s5"},
+	}
+	doMergeSidecarSecretsTest(t, sidecarSetIn, podImagePullSecrets, 0)
+	// 3 + 0 - 0 = 3
+	doMergeSidecarSecretsTest(t, sidecarSetIn, nil, 0)
+	// 0 + 3 - 0 = 3
+	sidecarSetIn.Spec.ImagePullSecrets = nil
+	doMergeSidecarSecretsTest(t, sidecarSetIn, podImagePullSecrets, 0)
+}
+
+func doMergeSidecarSecretsTest(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet, podImagePullSecrets []corev1.LocalObjectReference, repeat int) {
+	podIn := pod1.DeepCopy()
+	podIn.Spec.ImagePullSecrets = podImagePullSecrets
+	podOut := podIn.DeepCopy()
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewFakeClient(sidecarSetIn)
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+
+	if len(podOut.Spec.ImagePullSecrets) != len(podIn.Spec.ImagePullSecrets)+len(sidecarSetIn.Spec.ImagePullSecrets)-repeat {
+		t.Fatalf("expect %v secrets but got %v", len(podIn.Spec.ImagePullSecrets)+len(sidecarSetIn.Spec.ImagePullSecrets)-repeat, len(podOut.Spec.ImagePullSecrets))
+	}
+}
+
 func TestSidecarSetPodInjectPolicy(t *testing.T) {
 	sidecarSetIn := sidecarSet1.DeepCopy()
 	testSidecarSetPodInjectPolicy(t, sidecarSetIn)
@@ -504,7 +546,7 @@ func TestPodSidecarSetHashCompatibility(t *testing.T) {
 	podIn.Annotations = map[string]string{}
 	podIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = `{"sidecarset-test":"bv6d2fbw97wz8xx5x4v4wddwbd5z744wcf7c786dd4dvxvd5w6w424df7vx47989"}`
 	podIn.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = `{"sidecarset-test":"54x5977vf9zz4248w7v44456zf655b8bcffv7x74w88f6dwb994fw48b8f9b8959"}`
-	_, _, _, annotations, err := buildSidecars(false, podIn, nil, nil)
+	_, _, _, _, annotations, err := buildSidecars(false, podIn, nil, nil)
 	if err != nil {
 		t.Fatalf("compatible pod sidecarSet Hash failed: %s", err.Error())
 	}

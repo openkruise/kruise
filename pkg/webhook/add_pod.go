@@ -18,10 +18,12 @@ package webhook
 
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
+	"github.com/openkruise/kruise/pkg/webhook/pod/validating"
 )
 
 func init() {
@@ -32,6 +34,19 @@ func init() {
 
 		// Currently, if SidecarSet is not installed, we can also disable pod webhook.
 		if !utildiscovery.DiscoverObject(&appsv1alpha1.SidecarSet{}) {
+			return false
+		}
+
+		return true
+	})
+
+	addHandlersWithGate(validating.HandlerMap, func() (enabled bool) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.PodWebhook) {
+			return false
+		}
+
+		// Currently, if SidecarSet is not installed, we can also disable pod webhook.
+		if !utildiscovery.DiscoverObject(&policyv1alpha1.PodUnavailableBudget{}) {
 			return false
 		}
 

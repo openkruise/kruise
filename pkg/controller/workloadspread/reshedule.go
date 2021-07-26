@@ -22,7 +22,6 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const ScheduledFailedDuration = 5 * time.Minute
@@ -37,48 +36,48 @@ const ScheduledFailedDuration = 5 * time.Minute
 // return two parameters
 // 1. new SubsetUnscheduledStatus
 // 2. unschedulable Pods belongs to this subset
-func rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
-	pods []*corev1.Pod,
-	oldSubsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus) (*appsv1alpha1.SubsetUnscheduledStatus, []*corev1.Pod) {
-	subsetUnscheduledStatus := &appsv1alpha1.SubsetUnscheduledStatus{}
-	subsetUnscheduledStatus.UnscheduledTime = metav1.Now()
-	if oldSubsetStatus != nil {
-		subsetUnscheduledStatus.FailedCount = oldSubsetStatus.SubsetUnscheduledStatus.FailedCount
-	}
-
-	scheduleFailedPods := make([]*corev1.Pod, 0)
-	for i := range pods {
-		if PodUnscheduledTimeout(ws, pods[i]) {
-			scheduleFailedPods = append(scheduleFailedPods, pods[i])
-		}
-	}
-	unschedulable := len(scheduleFailedPods) > 0
-
-	if unschedulable {
-		subsetUnscheduledStatus.Unschedulable = true
-		if oldSubsetStatus == nil {
-			subsetUnscheduledStatus.FailedCount = 1
-		} else if !oldSubsetStatus.SubsetUnscheduledStatus.Unschedulable {
-			subsetUnscheduledStatus.FailedCount = oldSubsetStatus.SubsetUnscheduledStatus.FailedCount + 1
-		}
-	} else {
-		if oldSubsetStatus != nil && oldSubsetStatus.SubsetUnscheduledStatus.Unschedulable {
-			expectReschedule := oldSubsetStatus.SubsetUnscheduledStatus.UnscheduledTime.Add(ScheduledFailedDuration)
-			currentTime := time.Now()
-			// the duration of unschedule status more than 10 minutes, recover to schedulable.
-			if expectReschedule.Before(currentTime) {
-				subsetUnscheduledStatus.Unschedulable = false
-			} else {
-				// less 10 minutes, keep unschedulable and set UnscheduledTime to the oldStatus's UnscheduledTime.
-				subsetUnscheduledStatus.Unschedulable = true
-				subsetUnscheduledStatus.UnscheduledTime = oldSubsetStatus.SubsetUnscheduledStatus.UnscheduledTime
-				durationStore.Push(getWorkloadSpreadKey(ws), expectReschedule.Sub(currentTime))
-			}
-		}
-	}
-
-	return subsetUnscheduledStatus, scheduleFailedPods
-}
+//func rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
+//	pods []*corev1.Pod,
+//	oldSubsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus) (*appsv1alpha1.SubsetUnscheduledStatus, []*corev1.Pod) {
+//	subsetUnscheduledStatus := &appsv1alpha1.SubsetUnscheduledStatus{}
+//	subsetUnscheduledStatus.UnscheduledTime = metav1.Now()
+//	if oldSubsetStatus != nil {
+//		subsetUnscheduledStatus.FailedCount = oldSubsetStatus.SubsetUnscheduledStatus.FailedCount
+//	}
+//
+//	scheduleFailedPods := make([]*corev1.Pod, 0)
+//	for i := range pods {
+//		if PodUnscheduledTimeout(ws, pods[i]) {
+//			scheduleFailedPods = append(scheduleFailedPods, pods[i])
+//		}
+//	}
+//	unschedulable := len(scheduleFailedPods) > 0
+//
+//	if unschedulable {
+//		subsetUnscheduledStatus.Unschedulable = true
+//		if oldSubsetStatus == nil {
+//			subsetUnscheduledStatus.FailedCount = 1
+//		} else if !oldSubsetStatus.SubsetUnscheduledStatus.Unschedulable {
+//			subsetUnscheduledStatus.FailedCount = oldSubsetStatus.SubsetUnscheduledStatus.FailedCount + 1
+//		}
+//	} else {
+//		if oldSubsetStatus != nil && oldSubsetStatus.SubsetUnscheduledStatus.Unschedulable {
+//			expectReschedule := oldSubsetStatus.SubsetUnscheduledStatus.UnscheduledTime.Add(ScheduledFailedDuration)
+//			currentTime := time.Now()
+//			// the duration of unschedule status more than 10 minutes, recover to schedulable.
+//			if expectReschedule.Before(currentTime) {
+//				subsetUnscheduledStatus.Unschedulable = false
+//			} else {
+//				// less 10 minutes, keep unschedulable and set UnscheduledTime to the oldStatus's UnscheduledTime.
+//				subsetUnscheduledStatus.Unschedulable = true
+//				subsetUnscheduledStatus.UnscheduledTime = oldSubsetStatus.SubsetUnscheduledStatus.UnscheduledTime
+//				durationStore.Push(getWorkloadSpreadKey(ws), expectReschedule.Sub(currentTime))
+//			}
+//		}
+//	}
+//
+//	return subsetUnscheduledStatus, scheduleFailedPods
+//}
 
 func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ws *appsv1alpha1.WorkloadSpread,
 	scheduleFailedPodsMap map[string][]*corev1.Pod) error {
@@ -106,6 +105,7 @@ func (r *ReconcileWorkloadSpread) deleteUnscheduledPodsForSubset(ws *appsv1alpha
 	}
 	return nil
 }
+
 
 // PodUnscheduledTimeout return true when Pod was scheduled failed and timeout.
 func PodUnscheduledTimeout(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) bool {

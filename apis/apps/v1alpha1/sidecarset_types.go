@@ -44,6 +44,9 @@ type SidecarSetSpec struct {
 
 	// The sidecarset updateStrategy to use to replace existing pods with new ones.
 	UpdateStrategy SidecarSetUpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// List of the names of secrets required by pulling sidecar container images
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // SidecarContainer defines the container of Sidecar

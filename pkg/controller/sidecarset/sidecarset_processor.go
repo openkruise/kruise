@@ -18,6 +18,7 @@ package sidecarset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -98,7 +99,7 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 					sidecarContainers.Delete(emptyContainer)
 				}
 			}
-			if isPodSidecarInHotUpgrading(sidecarSet, pod) && control.IsPodUpdatedConsistently(pod, sidecarContainers) &&
+			if isPodSidecarInHotUpgrading(sidecarSet, pod) && control.IsPodStateConsistent(pod, sidecarContainers) &&
 				isHotUpgradingReady(sidecarSet, pod) {
 				podsInHotUpgrading = append(podsInHotUpgrading, pod)
 			}
@@ -298,7 +299,7 @@ func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) 
 		if updated {
 			updatedPods++
 		}
-		if control.IsPodUpdatedConsistently(pod, nil) && control.IsPodReady(pod) {
+		if control.IsPodStateConsistent(pod, nil) && control.IsPodReady(pod) {
 			readyPods++
 			if updated {
 				updatedAndReady++
@@ -328,28 +329,6 @@ func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
 	return true
 }
 
-func updateColdUpgradeContainerInPod(sidecarContainer *appsv1alpha1.SidecarContainer, control sidecarcontrol.SidecarControl, pod *corev1.Pod) (changedContainer string) {
-	var containerToUpgrade corev1.Container
-	for _, containerInPod := range pod.Spec.Containers {
-		if containerInPod.Name == sidecarContainer.Name {
-			containerToUpgrade = containerInPod
-			break
-		}
-	}
-	beforeContainerSpec := util.DumpJSON(containerToUpgrade)
-	newContainer := control.UpdateSidecarContainerToLatest(sidecarContainer.Container, containerToUpgrade)
-	afterContainerSpec := util.DumpJSON(newContainer)
-
-	// pod.container definition changed, then update container spec in pod
-	if beforeContainerSpec != afterContainerSpec {
-		klog.V(3).Infof("try to update container %v/%v/%v, before: %v, after: %v",
-			pod.Namespace, pod.Name, newContainer.Name, beforeContainerSpec, afterContainerSpec)
-		updateContainerInPod(newContainer, pod)
-		changedContainer = newContainer.Name
-	}
-	return
-}
-
 func updateContainerInPod(container corev1.Container, pod *corev1.Pod) {
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name == container.Name {
@@ -360,10 +339,10 @@ func updateContainerInPod(container corev1.Container, pod *corev1.Pod) {
 }
 
 func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev1.Pod) {
-	sidecarset := control.GetSidecarset()
+	sidecarSet := control.GetSidecarset()
 
 	var changedContainers []string
-	for _, sidecarContainer := range sidecarset.Spec.Containers {
+	for _, sidecarContainer := range sidecarSet.Spec.Containers {
 		//sidecarContainer := &sidecarset.Spec.Containers[i]
 		// volumeMounts that injected into sidecar container
 		// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
@@ -378,14 +357,35 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 		// merged Env from sidecar.Env and transfer envs
 		sidecarContainer.Env = util.MergeEnvVar(sidecarContainer.Env, transferEnvs)
 
-		var changedContainer string
-		if sidecarcontrol.IsHotUpgradeContainer(&sidecarContainer) {
-			changedContainer = updateHotUpgradeContainerInPod(&sidecarContainer, control, pod)
-		} else {
-			changedContainer = updateColdUpgradeContainerInPod(&sidecarContainer, control, pod)
+		// upgrade sidecar container to latest
+		newContainer := control.UpgradeSidecarContainer(&sidecarContainer, pod)
+		// no change, then continue
+		if newContainer == nil {
+			continue
 		}
-		if changedContainer != "" {
-			changedContainers = append(changedContainers, changedContainer)
+		// change, and need to update in pod
+		updateContainerInPod(*newContainer, pod)
+		changedContainers = append(changedContainers, newContainer.Name)
+		// hot upgrade sidecar container
+		if sidecarcontrol.IsHotUpgradeContainer(&sidecarContainer) {
+			var olderSidecar string
+			name1, name2 := sidecarcontrol.GetHotUpgradeContainerName(sidecarContainer.Name)
+			if name1 == newContainer.Name {
+				olderSidecar = name2
+			} else {
+				olderSidecar = name1
+			}
+			// hot upgrade annotations
+			// hotUpgradeContainerInfos: sidecarSet.Spec.Container[x].name -> working sidecar container
+			// for example: mesh -> mesh-1, envoy -> envoy-2...
+			hotUpgradeContainerInfos := sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(pod)
+			hotUpgradeContainerInfos[sidecarContainer.Name] = newContainer.Name
+			by, _ := json.Marshal(hotUpgradeContainerInfos)
+			pod.Annotations[sidecarcontrol.SidecarSetWorkingHotUpgradeContainer] = string(by)
+			// update sidecar container resource version in annotations
+			pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(newContainer.Name)] = sidecarSet.ResourceVersion
+			pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(newContainer.Name)] = pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(olderSidecar)]
+			pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(olderSidecar)] = sidecarSet.ResourceVersion
 		}
 	}
 	// update pod information in upgrade

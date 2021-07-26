@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -70,22 +71,22 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 		} else {
 			switch spec.TargetReference.Kind {
 			case controllerKruiseKindCS.Kind:
-				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKruiseKindCS.Kind, []string{"apps.kruise.io"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKruiseKindCS.Kind, []string{controllerKruiseKindCS.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for CloneSet."))
 				}
 			case controllerKindDep.Kind:
-				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindDep.Kind, []string{"apps"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindDep.Kind, []string{controllerKindDep.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Deployment."))
 				}
 			case controllerKindRS.Kind:
-				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindRS.Kind, []string{"apps"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindRS.Kind, []string{controllerKindRS.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for ReplicaSet."))
 				}
 			case controllerKindJob.Kind:
-				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindJob.Kind, []string{"batch"})
+				ok, err := wsutil.VerifyGroupKind(spec.TargetReference, controllerKindJob.Kind, []string{controllerKindJob.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
 				}
@@ -152,7 +153,7 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 		}
 
 		// at least one of requiredNodeSelectorTerm, preferredNodeSelectorTerms, tolerations.
-		if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil && subset.Tolerations == nil{
+		if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil && subset.Tolerations == nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "The requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are empty that is not valid for WorkloadSpread"))
 		} else {
 			if subset.RequiredNodeSelectorTerm != nil {
@@ -191,6 +192,8 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 			}
 			allErrs = append(allErrs, corevalidation.ValidateTolerations(coreTolerations, fldPath.Index(i).Child("tolerations"))...)
 		}
+
+		//TODO validate patch
 
 		//1. All subset maxReplicas must be the same type: int or percent.
 		//2. Only the last subset maxReplicas can be not specified, indicates subset replicas is not limited.

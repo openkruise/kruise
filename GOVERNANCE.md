@@ -1,47 +1,22 @@
 # Governance
 
-This document defines governance policies for the entire Openkruise project hosted and managed by the [Openkruise organization](https://github.com/openkruise).
+The governance model adopted in OpenKruise is influenced by many CNCF projects.
 
 ## Principles
 
 - **Open**: Openkruise is an open source community.
-- **Welcoming and respectful**: See [Code of Conduct](CODE_OF_CONDUCT.md).
+- **Welcoming and respectful**: See [Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 - **Transparent and accessible**: Work and collaboration should be done in public.
 - **Merit**: Ideas and contributions are accepted according to their technical merit
   and alignment with project objectives, scope and design principles.
 
-## Project Maintainers
+## Code of Conduct
 
-Maintainers are the first and foremost contributors that are committed to the success of Openkruise project.
-They normally take the following responsibilities:
+The OpenKruise [Code of Conduct](CODE_OF_CONDUCT.md) is aligned with the CNCF Code of Conduct.
 
-- Classify GitHub issues and perform pull request reviews for other maintainers and the community.
-- During GitHub issue classification, apply all applicable [labels](https://github.com/openkruise/kruise/labels)
-  to each new issue. Labels are extremely useful for follow-up of future issues. Which labels to apply
-  is somewhat subjective so just use your best judgment.
-- Make sure that ongoing PRs are moving forward at the right pace or closing them if they are not
-  moving in a productive direction.
-- Participate when called upon in the security release process. Note
-  that although this should be a rare occurrence, if a serious vulnerability is found, the process
-  may take up to several full days of work to implement.
+## Community Membership
 
-## Process of becoming a maintainer
-
-- Talk to one of the existing project [maintainers](MAINTAINERS.md) that you are interested in becoming a
-  maintainer, and he will nominate you as a new maintainer. After nomination, you will need to
-  create a PR to update the list in [MAINTAINERS.md](MAINTAINERS.md).
-- We will expect you to start contributing increasingly complicated PRs, under the guidance
-  of the existing maintainers.
-- We may ask you to do some PRs from our backlog. As you gain experience with the code base and our standards,
-  we will ask you to do code reviews for incoming PRs.
-- Once the existing maintainers have made a consensus that the nominating maintainer has deep understanding
-  about the project and is able to independently take the maintainer responsibilities,
-  the PR will be approved and the new maintainer becomes active.
-
-## When does a maintainer lose maintainer status
-
-- If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they should volunteer to be moved to emeritus status.
-- In extreme cases this can also occur by a vote of the maintainers per the voting process. The voting process is a simple majority in which each maintainer receives one vote.
+See [community membership](https://github.com/openkruise/community/blob/master/community-membership.md).
 
 ## Decision making process
 
@@ -52,10 +27,6 @@ In general, we prefer that technical issues and maintainer membership are amicab
 If a dispute cannot be decided independently, get a third-party maintainer (e.g. a mutual contact with some background
 on the issue, but not involved in the conflict) to intercede and the final decision will be made.
 Decision making process should be transparent to adhere to the principles of Openkruise project.
-
-## Code of Conduct
-
-The Openkruise [Code of Conduct](CODE_OF_CONDUCT.md) is aligned with the CNCF Code of Conduct.
 
 ## Credits
 

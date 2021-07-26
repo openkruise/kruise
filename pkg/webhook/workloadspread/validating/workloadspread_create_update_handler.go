@@ -53,7 +53,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admi
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		if allErrs := h.validatingWorkloadSpreadFn(obj); len(allErrs) > 0 {
-			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+			return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 		}
 	case admissionv1beta1.Update:
 		if err := h.Decoder.Decode(req, obj); err != nil {
@@ -66,7 +66,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admi
 		validationErrorList := h.validatingWorkloadSpreadFn(obj)
 		updateErrorList := validateWorkloadSpreadUpdate(obj, oldObj)
 		if allErrs := append(validationErrorList, updateErrorList...); len(allErrs) > 0 {
-			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+			return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 		}
 	}
 

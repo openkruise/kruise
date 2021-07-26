@@ -108,7 +108,7 @@ type WorkloadSpreadSubset struct {
 	// +optional
 	MaxReplicas *intstr.IntOrString `json:"maxReplicas,omitempty"`
 
-	// Patch indicates the patch metadata to the Pod.
+	// Patch indicates patching podTemplate to the Pod.
 	// +optional
 	Patch runtime.RawExtension `json:"patch,omitempty"`
 }

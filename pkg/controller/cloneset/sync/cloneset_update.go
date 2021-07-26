@@ -276,12 +276,12 @@ func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32,
 
 	var notReadyCount, canUpdateCount int
 	for _, p := range pods {
-		if !isPodReady(coreControl, p, minReadySeconds) {
+		if !isPodAvailable(coreControl, p, minReadySeconds) {
 			notReadyCount++
 		}
 	}
 	for _, i := range waitUpdateIndexes {
-		if isPodReady(coreControl, pods[i], minReadySeconds) {
+		if isPodAvailable(coreControl, pods[i], minReadySeconds) {
 			if notReadyCount >= diffRes.updateMaxUnavailable {
 				break
 			}

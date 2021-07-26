@@ -105,7 +105,7 @@ spec:
                       under one WorkloadSpread.
                     type: string
                   patch:
-                    description: Patch indicates the patch metadata to the Pod.
+                    description: Patch indicates patching podTemplate to the Pod.
                     type: object
                   preferredNodeSelectorTerms:
                     description: Indicates the node preferred selector to form the

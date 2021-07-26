@@ -31,7 +31,6 @@ import (
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
-
 func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSpread,
 	podMap map[string][]*corev1.Pod,
 	orphanPods []*corev1.Pod,

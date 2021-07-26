@@ -35,6 +35,7 @@ var (
 	kruiseKindCloneSet = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
 	handler            = &WorkloadSpreadCreateUpdateHandler{}
 	maxReplicasDemo    = intstr.FromInt(50)
+	patchResource      = []byte(`{"spec":{"containers":[{"name":"main","resources":{"limits":{"cpu":"2","memory":"8000Mi"}}}]}}`)
 	workloadSpreadDemo = &appsv1alpha1.WorkloadSpread{
 		ObjectMeta: metav1.ObjectMeta{Name: "workloadSpread", Namespace: metav1.NamespaceDefault},
 		Spec: appsv1alpha1.WorkloadSpreadSpec{
@@ -207,7 +208,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 							},
 						},
 						Patch: runtime.RawExtension{
-							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+							Raw: patchResource,
 						},
 					},
 					{
@@ -229,7 +230,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 							},
 						},
 						Patch: runtime.RawExtension{
-							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+							Raw: patchResource,
 						},
 					},
 				},

@@ -206,8 +206,8 @@ func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1
 	control := sidecarcontrol.New(sidecarSet)
 	var enqueueDelayTime time.Duration
 	// contain sidecar empty container
-	oldConsistent := control.IsPodUpdatedConsistently(oldPod, nil)
-	newConsistent := control.IsPodUpdatedConsistently(newPod, nil)
+	oldConsistent := control.IsPodStateConsistent(oldPod, nil)
+	newConsistent := control.IsPodStateConsistent(newPod, nil)
 	if oldConsistent != newConsistent {
 		klog.V(3).Infof("pod(%s.%s) sidecarSet consistent(all sidecar containers) changed(from %v to %v), and reconcile sidecarSet",
 			newPod.Namespace, newPod.Name, oldConsistent, newConsistent)
