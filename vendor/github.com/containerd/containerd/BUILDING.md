@@ -14,10 +14,9 @@ This doc includes:
 
 To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
 
-* Go 1.10.x or above
+* Go 1.13.x or above except 1.14.x
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/google/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
-* `libseccomp` is required if you're building with seccomp support
 
 ## Build the development environment
 
@@ -31,11 +30,11 @@ At this point you can use `go` to checkout `containerd` in your `GOPATH`:
 go get github.com/containerd/containerd
 ```
 
-For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.5.0 release for a 64-bit Linux host:
+For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.11.4 release for a 64-bit Linux host:
 
 ```
-$ wget -c https://github.com/google/protobuf/releases/download/v3.5.0/protoc-3.5.0-linux-x86_64.zip
-$ sudo unzip protoc-3.5.0-linux-x86_64.zip -d /usr/local
+$ wget -c https://github.com/google/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
+$ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
 
 `containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
@@ -43,10 +42,8 @@ need to satisfy this dependencies in your system:
 
 * CentOS/Fedora: `yum install btrfs-progs-devel`
 * Debian/Ubuntu: `apt-get install btrfs-tools`
-
-If you're building with seccomp, you'll need to install it with the following:
-
-* Debian/Ubuntu: `apt install libseccomp-dev`
+	* Debian Buster/Ubuntu 19.10:
+	    `apt-get install btrfs-progs libbtrfs-dev`
 
 At this point you are ready to build `containerd` yourself!
 
@@ -79,7 +76,8 @@ result in undefined behavior.
 `containerd` uses `make` to create a repeatable build flow. It means that you
 can run:
 
-```sudo
+```
+cd $GOPATH/src/github.com/containerd/containerd
 make
 ```
 
@@ -102,6 +100,9 @@ make generate
 > * `no_btrfs`: A build tag disables building the btrfs snapshot driver.
 > * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
+> * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
+> * `apparmor`: Enables apparmor support in the cri plugin
+> * `selinux`: Enables selinux support in the cri plugin
 >
 > For example, adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
 > Makefile target will disable the btrfs driver within the containerd Go build.
@@ -116,13 +117,13 @@ You can build static binaries by providing a few variables to `make`:
 
 ```sudo
 make EXTRA_FLAGS="-buildmode pie" \
-	EXTRA_LDFLAGS='-extldflags "-fno-PIC -static"' \
+	EXTRA_LDFLAGS='-linkmode external -extldflags "-fno-PIC -static"' \
 	BUILDTAGS="netgo osusergo static_build"
 ```
 
 > *Note*:
 > - static build is discouraged
-> - static containerd binary does not support loading plugins
+> - static containerd binary does not support loading shared object plugins (`*.so`)
 
 # Via Docker container
 
@@ -135,7 +136,7 @@ You can build an image from this `Dockerfile`:
 FROM golang
 
 RUN apt-get update && \
-    apt-get install -y btrfs-tools libseccomp-dev
+    apt-get install -y libbtrfs-dev
 ```
 
 Let's suppose that you built an image called `containerd/build`. From the
@@ -157,7 +158,7 @@ You are now ready to [build](#build-containerd):
 ```
 
 ## Build containerd and runc
-To have complete core container runtime, you will both `containerd` and `runc`. It is possible to build both of these via Docker container.
+To have complete core container runtime, you will need both `containerd` and `runc`. It is possible to build both of these via Docker container.
 
 You can use `go` to checkout `runc` in your `GOPATH`:
 
@@ -171,11 +172,17 @@ We can build an image from this `Dockerfile`:
 FROM golang
 
 RUN apt-get update && \
-    apt-get install -y btrfs-tools libseccomp-dev
+    apt-get install -y libbtrfs-dev libseccomp-dev
 
 ```
 
-In our Docker container we will use a specific `runc` build which includes [seccomp](https://en.wikipedia.org/wiki/seccomp) and [apparmor](https://en.wikipedia.org/wiki/AppArmor) support. Hence why our Dockerfile includes `libseccomp-dev` as a dependency (apparmor support doesn't require external libraries). Please refer to [RUNC.md](/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+In our Docker container we will build `runc` build, which includes
+[seccomp](https://en.wikipedia.org/wiki/seccomp), [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux),
+and [AppArmor](https://en.wikipedia.org/wiki/AppArmor) support. Seccomp support
+in runc requires `libseccomp-dev` as a dependency (AppArmor and SELinux support
+do not require external libraries at build time). Refer to [RUNC.md](docs/RUNC.md)
+in the docs directory to for details about building runc, and to learn about
+supported versions of `runc` as used by containerd.
 
 Let's suppose you build an image called `containerd/build` from the above Dockerfile. You can run the following command:
 
@@ -204,8 +211,11 @@ Next, let's build `runc`:
 
 ```sh
 cd /go/src/github.com/opencontainers/runc
-make BUILDTAGS='seccomp apparmor' && make install
+make && make install
 ```
+
+For further details about building runc, refer to [RUNC.md](docs/RUNC.md) in the
+docs directory.
 
 When working with `ctr`, the simple test client we just built, don't forget to start the daemon!
 
@@ -218,8 +228,7 @@ containerd --config config.toml
 During the automated CI the unit tests and integration tests are run as part of the PR validation. As a developer you can run these tests locally by using any of the following `Makefile` targets:
  - `make test`: run all non-integration tests that do not require `root` privileges
  - `make root-test`: run all non-integration tests which require `root`
- - `make integration`: run all tests, including integration tests and those which require `root`
- - `make integration-parallel`: run all tests (integration and root-required included) in parallel mode
+ - `make integration`: run all tests, including integration tests and those which require `root`. `TESTFLAGS_PARALLEL` can be used to control parallelism. For example, `TESTFLAGS_PARALLEL=1 make integration` will lead a non-parallel execution. The default value of `TESTFLAGS_PARALLEL` is **8**.
 
 To execute a specific test or set of tests you can use the `go test` capabilities
 without using the `Makefile` targets. The following examples show how to specify a test

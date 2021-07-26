@@ -72,17 +72,19 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 	}
 
 	var wg = &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		p := bufPool.Get().(*[]byte)
-		defer bufPool.Put(p)
+	if fifos.Stdout != "" {
+		wg.Add(1)
+		go func() {
+			p := bufPool.Get().(*[]byte)
+			defer bufPool.Put(p)
 
-		io.CopyBuffer(ioset.Stdout, pipes.Stdout, *p)
-		pipes.Stdout.Close()
-		wg.Done()
-	}()
+			io.CopyBuffer(ioset.Stdout, pipes.Stdout, *p)
+			pipes.Stdout.Close()
+			wg.Done()
+		}()
+	}
 
-	if !fifos.Terminal {
+	if !fifos.Terminal && fifos.Stderr != "" {
 		wg.Add(1)
 		go func() {
 			p := bufPool.Get().(*[]byte)
@@ -130,7 +132,7 @@ func openFifos(ctx context.Context, fifos *FIFOSet) (pipes, error) {
 			}
 		}()
 	}
-	if fifos.Stderr != "" {
+	if !fifos.Terminal && fifos.Stderr != "" {
 		if f.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); err != nil {
 			return f, errors.Wrapf(err, "failed to open stderr fifo")
 		}
