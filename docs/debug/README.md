@@ -31,7 +31,7 @@ debugging methodology before.
 
 **Install docker**
 
-Following the [official docker installation guide](https://docs.docker.com/install/).
+Following the [official docker installation guide](https://docs.docker.com/get-docker/).
 
 **Install minikube**
 
@@ -39,43 +39,21 @@ Follow the [official minikube installation guide](https://kubernetes.io/docs/tas
 
 **Develop locally**
 
-Make your own code changes and validate the build by running `make manager` in Kruise directory.
+Make your own code changes and validate the build by running `make manager` and `make manifests` in Kruise directory.
 
 **Deploy customized controller manager**
 
-The new controller manager will be deployed via a statefulset to replace the default Kruise controller manager.
+The new controller manager will be deployed via a `Deployment` to replace the default Kruise controller manager.
 The deployment can be done by following steps assuming a fresh environment:
 
-* Prerequisites: create new/use existing [dock hub](https://hub.docker.com/) account ($DOCKERID), and create a `kruise` repository in it. Also, [install Kruise CRDs](../../README.md#install-crds);
+* Prerequisites: create new/use existing [dock hub](https://hub.docker.com/) account ($DOCKERID), and create a `kruise` repository in it;
 * step 1: `docker login` with the $DOCKERID account;
 * step 2: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
 * step 3: `make docker-build` to build the image locally;
 * step 4: `make docker-push` to push the image to dock hub under the `kruise` repository;
-* step 5: change the `config/manager/all_in_one.yaml` and replace the container image of the controller manager statefulset to `$DOCKERID/kruise:test`
+* step 5: `export KUBECONFIG=<your_k8s_config>` to specify the k8s cluster config. e.g., `export KUBECONFIG=$~/.kube/config`;
+* step 6: `make deploy IMG=${IMG}` to deploy your kruise-controller-manager to the k8s cluster;
 
-```yaml
-spec:
-      containers:
-        - command:
-            - /manager
-          args:
-            - "--metrics-addr=127.0.0.1:8080"
-            - "--logtostderr=true"
-            - "--v=4"
-          env:
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: SECRET_NAME
-              value: kruise-webhook-server-secret
-          image: $DOCKERID/kruise:test
-          imagePullPolicy: Always
-          name: manager
-```
-
-* step 6: `kubectl delete sts kruise-controller-manager -n kruise-system` to remove the old statefulset if any;
-* step 7: `kubectl apply -f config/manager/all_in_one.yaml` to install the new statefulset with the customized controller manager image;
-
-Then one can perform manual tests and use `kubectl logs kruise-controller-manager-0 -n kruise-system` to check controller logs for debugging.
-
+Tips:
+* If you need to update `mutatingwebhookconfiguration` or `validatingwebhookconfiguration` of kruise, please run `./scripts/uninstall.sh` in Kruise directory to uninstall them `before step 6`.
+* You can perform manual tests and use `kubectl logs <kruise-pod-name> -n kruise-system` to check controller logs for debugging, and you can see your `<kruise-pod-name>` by applying `kubectl get pod -n kruise-system`.

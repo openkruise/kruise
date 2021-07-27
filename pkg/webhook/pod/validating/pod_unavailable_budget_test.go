@@ -722,7 +722,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			podRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.newPod())),
 			}
-			req := newAdmission(admissionv1beta1.Delete, podRaw, runtime.RawExtension{}, cs.subresource)
+			req := newAdmission(admissionv1beta1.Delete, runtime.RawExtension{}, podRaw, cs.subresource)
 			req.AdmissionRequest.Options = deletionRaw
 			allow, _, err := podHandler.podUnavailableBudgetValidatingPod(context.TODO(), req)
 			if err != nil {

@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -34,6 +35,7 @@ import (
 // Interface for managing pods lifecycle.
 type Interface interface {
 	UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType) (bool, error)
+	UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook) (bool, error)
 }
 
 type realControl struct {
@@ -89,6 +91,52 @@ func (c *realControl) UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleSta
 		)
 		err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 	} else {
+		SetPodLifecycle(state)(pod)
+		err = c.adp.UpdatePod(pod)
+	}
+
+	return true, err
+}
+
+func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook) (bool, error) {
+	if inPlaceUpdateHandler == nil || pod == nil {
+		return false, nil
+	}
+
+	if GetPodLifecycleState(pod) == state {
+		return false, nil
+	}
+
+	var err error
+	if adp, ok := c.adp.(podadapter.AdapterWithPatch); ok {
+		var labelsHandler, finalizersHandler string
+		for k, v := range inPlaceUpdateHandler.LabelsHandler {
+			labelsHandler = fmt.Sprintf(`%s,"%s":"%s"`, labelsHandler, k, v)
+		}
+		for _, v := range inPlaceUpdateHandler.FinalizersHandler {
+			finalizersHandler = fmt.Sprintf(`%s,"%s"`, finalizersHandler, v)
+		}
+		finalizersHandler = fmt.Sprintf(`[%s]`, strings.TrimLeft(finalizersHandler, ","))
+
+		body := fmt.Sprintf(
+			`{"metadata":{"labels":{"%s":"%s"%s},"annotations":{"%s":"%s"},"finalizers":%s}}`,
+			appspub.LifecycleStateKey,
+			string(state),
+			labelsHandler,
+			appspub.LifecycleTimestampKey,
+			time.Now().Format(time.RFC3339),
+			finalizersHandler,
+		)
+		err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	} else {
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		for k, v := range inPlaceUpdateHandler.LabelsHandler {
+			pod.Labels[k] = v
+		}
+		pod.Finalizers = append(pod.Finalizers, inPlaceUpdateHandler.FinalizersHandler...)
+
 		SetPodLifecycle(state)(pod)
 		err = c.adp.UpdatePod(pod)
 	}

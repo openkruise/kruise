@@ -31,8 +31,12 @@ type ImagePullJobExpansion interface{}
 
 type NodeImageExpansion interface{}
 
+type ResourceDistributionExpansion interface{}
+
 type SidecarSetExpansion interface{}
 
 type StatefulSetExpansion interface{}
 
 type UnitedDeploymentExpansion interface{}
+
+type WorkloadSpreadExpansion interface{}

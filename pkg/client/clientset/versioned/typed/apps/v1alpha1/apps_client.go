@@ -32,9 +32,11 @@ type AppsV1alpha1Interface interface {
 	DaemonSetsGetter
 	ImagePullJobsGetter
 	NodeImagesGetter
+	ResourceDistributionsGetter
 	SidecarSetsGetter
 	StatefulSetsGetter
 	UnitedDeploymentsGetter
+	WorkloadSpreadsGetter
 }
 
 // AppsV1alpha1Client is used to interact with features provided by the apps.kruise.io group.
@@ -70,6 +72,10 @@ func (c *AppsV1alpha1Client) NodeImages() NodeImageInterface {
 	return newNodeImages(c)
 }
 
+func (c *AppsV1alpha1Client) ResourceDistributions() ResourceDistributionInterface {
+	return newResourceDistributions(c)
+}
+
 func (c *AppsV1alpha1Client) SidecarSets() SidecarSetInterface {
 	return newSidecarSets(c)
 }
@@ -80,6 +86,10 @@ func (c *AppsV1alpha1Client) StatefulSets(namespace string) StatefulSetInterface
 
 func (c *AppsV1alpha1Client) UnitedDeployments(namespace string) UnitedDeploymentInterface {
 	return newUnitedDeployments(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) WorkloadSpreads(namespace string) WorkloadSpreadInterface {
+	return newWorkloadSpreads(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1alpha1Client for the given config.

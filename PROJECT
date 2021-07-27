@@ -38,4 +38,10 @@ resources:
 - group: policy
   kind: PodUnavailableBudget
   version: v1alpha1
+- group: apps
+  kind: WorkloadSpread
+  version: v1alpha1
+- group: apps
+  kind: ResourceDistribution
+  version: v1alpha1
 version: "2"

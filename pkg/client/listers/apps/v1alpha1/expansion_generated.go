@@ -69,6 +69,10 @@ type ImagePullJobNamespaceListerExpansion interface{}
 // NodeImageLister.
 type NodeImageListerExpansion interface{}
 
+// ResourceDistributionListerExpansion allows custom methods to be added to
+// ResourceDistributionLister.
+type ResourceDistributionListerExpansion interface{}
+
 // SidecarSetListerExpansion allows custom methods to be added to
 // SidecarSetLister.
 type SidecarSetListerExpansion interface{}
@@ -88,3 +92,11 @@ type UnitedDeploymentListerExpansion interface{}
 // UnitedDeploymentNamespaceListerExpansion allows custom methods to be added to
 // UnitedDeploymentNamespaceLister.
 type UnitedDeploymentNamespaceListerExpansion interface{}
+
+// WorkloadSpreadListerExpansion allows custom methods to be added to
+// WorkloadSpreadLister.
+type WorkloadSpreadListerExpansion interface{}
+
+// WorkloadSpreadNamespaceListerExpansion allows custom methods to be added to
+// WorkloadSpreadNamespaceLister.
+type WorkloadSpreadNamespaceListerExpansion interface{}

@@ -150,7 +150,7 @@ func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*app
 				Name: sidecarSetName,
 			}, sidecarSet); err != nil {
 				if errors.IsNotFound(err) {
-					klog.Errorf("sidecarSet %v not fount", sidecarSetName)
+					klog.Errorf("sidecarSet %v not found", sidecarSetName)
 					continue
 				}
 				return nil, err

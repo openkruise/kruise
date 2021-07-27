@@ -665,7 +665,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-
+			// todo validate in-place for pub
 			inplacing, inplaceUpdateErr := ssc.inPlaceUpdatePod(set, replicas[target], updateRevision, revisions)
 			if inplaceUpdateErr != nil {
 				return &status, inplaceUpdateErr
@@ -827,6 +827,18 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 				}
 				return true, err
 			}
+		case appspub.LifecycleStateUpdated:
+			var err error
+			var updated bool
+			var inPlaceUpdateHandler *appspub.LifecycleHook
+			if set.Spec.Lifecycle != nil {
+				inPlaceUpdateHandler = set.Spec.Lifecycle.InPlaceUpdate
+			}
+			if updated, err = ssc.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
+				klog.V(3).Infof("StatefulSet %s updated pod %s lifecycle to PreparingUpdate",
+					getStatefulSetKey(set), pod.Name)
+			}
+			return true, err
 		case appspub.LifecycleStatePreparingUpdate:
 			if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
 				return true, nil

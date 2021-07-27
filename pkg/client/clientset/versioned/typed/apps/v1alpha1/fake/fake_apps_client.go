@@ -55,6 +55,10 @@ func (c *FakeAppsV1alpha1) NodeImages() v1alpha1.NodeImageInterface {
 	return &FakeNodeImages{c}
 }
 
+func (c *FakeAppsV1alpha1) ResourceDistributions() v1alpha1.ResourceDistributionInterface {
+	return &FakeResourceDistributions{c}
+}
+
 func (c *FakeAppsV1alpha1) SidecarSets() v1alpha1.SidecarSetInterface {
 	return &FakeSidecarSets{c}
 }
@@ -65,6 +69,10 @@ func (c *FakeAppsV1alpha1) StatefulSets(namespace string) v1alpha1.StatefulSetIn
 
 func (c *FakeAppsV1alpha1) UnitedDeployments(namespace string) v1alpha1.UnitedDeploymentInterface {
 	return &FakeUnitedDeployments{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) WorkloadSpreads(namespace string) v1alpha1.WorkloadSpreadInterface {
+	return &FakeWorkloadSpreads{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

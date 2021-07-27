@@ -23,9 +23,14 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
@@ -86,9 +91,13 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		}
 		if waitUpdate {
 			switch lifecycle.GetPodLifecycleState(pod) {
-			case appspub.LifecycleStatePreparingDelete, appspub.LifecycleStateUpdated:
+			case appspub.LifecycleStatePreparingDelete:
 				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
 					cs.Namespace, cs.Name, pod.Name, lifecycle.GetPodLifecycleState(pod))
+			case appspub.LifecycleStateUpdated:
+				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s but not in updated revision",
+					cs.Namespace, cs.Name, pod.Name, appspub.LifecycleStateUpdated)
+				canUpdate = true
 			default:
 				if gracePeriod, _ := appspub.GetInPlaceUpdateGrace(pod); gracePeriod != "" {
 					klog.V(3).Infof("CloneSet %s/%s find pod %s still in grace period %s, so skip to update it",
@@ -109,9 +118,28 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	// 5. limit max count of pods can update
 	waitUpdateIndexes = limitUpdateIndexes(coreControl, cs.Spec.MinReadySeconds, diffRes, waitUpdateIndexes, pods)
 
+	// Determine the pub before updating the pod
+	var pub *policyv1alpha1.PodUnavailableBudget
+	var err error
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) && len(waitUpdateIndexes) > 0 {
+		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, controllerfinder.NewControllerFinder(c.Client), pods[waitUpdateIndexes[0]])
+		if err != nil {
+			return requeueDuration.Get(), err
+		}
+	}
 	// 6. update pods
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
+		// Determine the pub before updating the pod
+		if pub != nil {
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, pod, pubcontrol.NewPubControl(pub), pubcontrol.UpdateOperation, false)
+			if err != nil {
+				return requeueDuration.Get(), err
+				// pub check does not pass, try again in seconds
+			} else if !allowed {
+				return time.Second, nil
+			}
+		}
 		targetRevision := updateRevision
 		if diffRes.updateNum < 0 {
 			targetRevision = currentRevision
@@ -198,6 +226,19 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 					}
 					return 0, err
 				}
+			case appspub.LifecycleStateUpdated:
+				var err error
+				var updated bool
+				var inPlaceUpdateHandler *appspub.LifecycleHook
+				if cs.Spec.Lifecycle != nil {
+					inPlaceUpdateHandler = cs.Spec.Lifecycle.InPlaceUpdate
+				}
+				if updated, err = c.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
+					clonesetutils.ResourceVersionExpectations.Expect(pod)
+					klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
+						clonesetutils.GetControllerKey(cs), pod.Name)
+				}
+				return 0, err
 			case appspub.LifecycleStatePreparingUpdate:
 				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 					return 0, nil

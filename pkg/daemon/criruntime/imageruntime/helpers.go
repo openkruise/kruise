@@ -20,15 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
-	"os"
 	"strings"
-	"syscall"
 
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -258,33 +254,4 @@ func parseRepositoryTag(repos string) (string, string) {
 		return repos[:n], tag
 	}
 	return repos, ""
-}
-
-// filterCloseErr rewrites EOF and EPIPE errors to bool. Use when
-// returning from call or handling errors from main read loop.
-//
-// This purposely ignores errors with a wrapped cause.
-func filterCloseErr(err error) bool {
-	switch {
-	case err == io.EOF:
-		return true
-	case errors.Cause(err) == io.EOF:
-		return true
-	case strings.Contains(err.Error(), "use of closed network connection"):
-		return true
-	case strings.Contains(err.Error(), "connect: no such file or directory"):
-		return true
-	default:
-		// if we have an epipe on a write or econnreset on a read , we cast to errclosed
-		if oerr, ok := err.(*net.OpError); ok && (oerr.Op == "write" || oerr.Op == "read") {
-			serr, sok := oerr.Err.(*os.SyscallError)
-			if sok && ((serr.Err == syscall.EPIPE && oerr.Op == "write") ||
-				(serr.Err == syscall.ECONNRESET && oerr.Op == "read")) {
-
-				return true
-			}
-		}
-	}
-
-	return false
 }

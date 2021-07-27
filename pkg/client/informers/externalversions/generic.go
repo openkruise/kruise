@@ -68,12 +68,16 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ImagePullJobs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("nodeimages"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().NodeImages().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("resourcedistributions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ResourceDistributions().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("sidecarsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().SidecarSets().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().StatefulSets().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("uniteddeployments"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().UnitedDeployments().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("workloadspreads"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().WorkloadSpreads().Informer()}, nil
 
 		// Group=apps.kruise.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):

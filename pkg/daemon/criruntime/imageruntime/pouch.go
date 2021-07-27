@@ -63,7 +63,7 @@ func (d *pouchImageService) createRuntimeClientIfNecessary() error {
 }
 
 func (d *pouchImageService) handleRuntimeError(err error) {
-	if filterCloseErr(err) {
+	if daemonutil.FilterCloseErr(err) {
 		d.Lock()
 		defer d.Unlock()
 		d.client = nil

@@ -58,16 +58,31 @@ const (
 	// 1. Webhook for deletion operation of namespace, crd, deployment, statefulset, replicaset and workloads in Kruise.
 	// 2. ClusterRole for reading all resource types, because CRD validation needs to list the CRs of this CRD.
 	ResourcesDeletionProtection featuregate.Feature = "ResourcesDeletionProtection"
+
+	// Whether to enable pub capability, default: false
+	// Protection only pod deletion and eviction request
+	PodUnavailableBudgetDeleteGate featuregate.Feature = "PodUnavailableBudgetDeleteGate"
+
+	// Whether to enable pub capability, default: false
+	// Protection only pod update request
+	PodUnavailableBudgetUpdateGate featuregate.Feature = "PodUnavailableBudgetUpdateGate"
+
+	// DaemonWatchingPod enables kruise-daemon to list watch pods that belong to the same node.
+	DaemonWatchingPod featuregate.Feature = "DaemonWatchingPod"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	PodWebhook:                       {Default: true, PreRelease: featuregate.Beta},
-	KruiseDaemon:                     {Default: true, PreRelease: featuregate.Beta},
+	PodWebhook:        {Default: true, PreRelease: featuregate.Beta},
+	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
+	DaemonWatchingPod: {Default: true, PreRelease: featuregate.Beta},
+
 	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
 	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
 	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetPartitionRollback:        {Default: false, PreRelease: featuregate.Alpha},
 	ResourcesDeletionProtection:      {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetDeleteGate:   {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetUpdateGate:   {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -87,9 +102,13 @@ func compatibleEnv() {
 	}
 }
 
-func ValidateFeatureGates() error {
-	if utilfeature.DefaultFeatureGate.Enabled(KruisePodReadinessGate) && !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
-		return fmt.Errorf("can not enable feature-gate %s because of %s disabled", KruisePodReadinessGate, PodWebhook)
+func SetDefaultFeatureGates() {
+	if !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", KruisePodReadinessGate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ResourcesDeletionProtection))
 	}
-	return nil
+	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DaemonWatchingPod))
+	}
 }

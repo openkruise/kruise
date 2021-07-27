@@ -10,10 +10,11 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.14'
+  GO_VERSION: '1.15'
   GOLANGCI_VERSION: 'v1.31'
   DOCKER_BUILDX_VERSION: 'v0.4.2'
-  KIND_VERSION: 'v0.9.0'
+  KIND_IMAGE: 'kindest/node:v1.20.7'
+  KIND_CLUSTER_NAME: 'ci-testing'
   KUSTOMIZE_VERSION: '3.9.2'
 
   # Common users. We can't run a step 'if secrets.AWS_USR != ""' but we can run
@@ -48,6 +49,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: ${{ env.GOLANGCI_VERSION }}
+          args: --verbose
 
   markdownlint-misspell-shellcheck:
     runs-on: ubuntu-18.04
@@ -120,9 +122,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: engineerd/setup-kind@v0.5.0
+        uses: helm/kind-action@v1.2.0
         with:
-          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v1
         with:
@@ -131,7 +134,7 @@ jobs:
         run: |
           export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
           docker build --pull --no-cache . -t $IMAGE
-          kind load docker-image $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
           set -ex
@@ -149,6 +152,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
@@ -177,9 +181,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: engineerd/setup-kind@v0.5.0
+        uses: helm/kind-action@v1.2.0
         with:
-          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v1
         with:
@@ -188,7 +193,7 @@ jobs:
         run: |
           export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
           docker build --pull --no-cache . -t $IMAGE
-          kind load docker-image $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
           set -ex
@@ -206,6 +211,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
@@ -234,9 +240,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: engineerd/setup-kind@v0.5.0
+        uses: helm/kind-action@v1.2.0
         with:
-          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v1
         with:
@@ -245,7 +252,7 @@ jobs:
         run: |
           export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
           docker build --pull --no-cache . -t $IMAGE
-          kind load docker-image $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
           set -ex
@@ -263,6 +270,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
@@ -291,9 +299,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: engineerd/setup-kind@v0.5.0
+        uses: helm/kind-action@v1.2.0
         with:
-          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v1
         with:
@@ -302,7 +311,7 @@ jobs:
         run: |
           export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
           docker build --pull --no-cache . -t $IMAGE
-          kind load docker-image $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
           set -ex
@@ -320,6 +329,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
@@ -336,7 +346,7 @@ jobs:
           go install github.com/onsi/ginkgo/ginkgo
           ./scripts/generate_bindata.sh
           set +e
-          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet)' test/e2e
+          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|ResourceDistribution)' test/e2e
 #          retVal=$?
 #          if [ $retVal -ne 0 ]; then
 #            kubectl get pod -n kruise-system -o wide

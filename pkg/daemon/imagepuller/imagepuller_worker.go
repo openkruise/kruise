@@ -446,15 +446,15 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 		select {
 		case <-w.stopCh:
 			klog.V(2).Infof("Pulling image %v:%v is stopped.", w.name, tag)
-			return fmt.Errorf("Pulling image %s:%s is stopped", w.name, tag)
+			return fmt.Errorf("pulling image %s:%s is stopped", w.name, tag)
 		case <-ctx.Done():
 			klog.V(2).Infof("Pulling image %s:%s is canceled", w.name, tag)
-			return fmt.Errorf("Pulling image %s:%s is canceled", w.name, tag)
+			return fmt.Errorf("pulling image %s:%s is canceled", w.name, tag)
 		case <-logTicker.C:
 			klog.V(2).Infof("Pulling image %s:%s, cost: %v, progress: %v%%, detail: %v", w.name, tag, time.Since(startTime.Time), progress, progressInfo)
 		case progressStatus, ok := <-statusReader.C():
 			if !ok {
-				return fmt.Errorf("Pulling image %s:%s internal error", w.name, tag)
+				return fmt.Errorf("pulling image %s:%s internal error", w.name, tag)
 			}
 			progress = progressStatus.Process
 			progressInfo = progressStatus.DetailInfo

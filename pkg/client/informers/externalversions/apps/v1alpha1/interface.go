@@ -37,12 +37,16 @@ type Interface interface {
 	ImagePullJobs() ImagePullJobInformer
 	// NodeImages returns a NodeImageInformer.
 	NodeImages() NodeImageInformer
+	// ResourceDistributions returns a ResourceDistributionInformer.
+	ResourceDistributions() ResourceDistributionInformer
 	// SidecarSets returns a SidecarSetInformer.
 	SidecarSets() SidecarSetInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
 	// UnitedDeployments returns a UnitedDeploymentInformer.
 	UnitedDeployments() UnitedDeploymentInformer
+	// WorkloadSpreads returns a WorkloadSpreadInformer.
+	WorkloadSpreads() WorkloadSpreadInformer
 }
 
 type version struct {
@@ -91,6 +95,11 @@ func (v *version) NodeImages() NodeImageInformer {
 	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
+// ResourceDistributions returns a ResourceDistributionInformer.
+func (v *version) ResourceDistributions() ResourceDistributionInformer {
+	return &resourceDistributionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
 // SidecarSets returns a SidecarSetInformer.
 func (v *version) SidecarSets() SidecarSetInformer {
 	return &sidecarSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
@@ -104,4 +113,9 @@ func (v *version) StatefulSets() StatefulSetInformer {
 // UnitedDeployments returns a UnitedDeploymentInformer.
 func (v *version) UnitedDeployments() UnitedDeploymentInformer {
 	return &unitedDeploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// WorkloadSpreads returns a WorkloadSpreadInformer.
+func (v *version) WorkloadSpreads() WorkloadSpreadInformer {
+	return &workloadSpreadInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

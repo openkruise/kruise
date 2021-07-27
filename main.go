@@ -92,11 +92,7 @@ func main() {
 	pflag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	ctrl.SetLogger(klogr.New())
-
-	if err := features.ValidateFeatureGates(); err != nil {
-		setupLog.Error(err, "unable to setup feature-gates")
-		os.Exit(1)
-	}
+	features.SetDefaultFeatureGates()
 
 	if enablePprof {
 		go func() {
