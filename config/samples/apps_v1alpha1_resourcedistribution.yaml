@@ -1,0 +1,29 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: ResourceDistribution
+metadata:
+  name: sample
+spec:
+  resource:
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: secret-sa-sample
+    type: kubernetes.io/service-account-token
+    data:
+      extra: YmFyCg==
+  wirtePolicy: strict
+  targets:
+    all:
+      - exception: some-ignored-ns-1
+      - exception: some-ignored-ns-2
+    namespaces:
+      - name: some-target-name-1
+      - name: some-target-name-2
+    namespaceLabelSelector:
+      matchLabels:
+        environment: test
+    workloadLabelSelector:
+      apiVersion: apps/v1
+      kind: Deployment
+      matchLabels:
+        app: nginx

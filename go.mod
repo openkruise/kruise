@@ -7,6 +7,7 @@ require (
 	github.com/alibaba/pouch v0.0.0-20190328125340-37051654f368
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
+	github.com/containerd/cgroups v1.0.1 // indirect
 	github.com/containerd/containerd v1.2.10
 	github.com/containerd/continuity v0.0.0-20201208142359-180525291bb7 // indirect
 	github.com/containerd/fifo v0.0.0-20201026212402-0724c46b320c // indirect
@@ -18,6 +19,7 @@ require (
 	github.com/go-openapi/spec v0.19.2
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gorilla/mux v1.7.3
+	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0
@@ -26,9 +28,9 @@ require (
 	github.com/prometheus/client_golang v1.0.0
 	github.com/robfig/cron v1.2.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.6.1
 	github.com/xyproto/simpleredis v0.0.0-20200201215242-1ff0da2967b4
-	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	gomodules.xyz/jsonpatch/v2 v2.0.1
 	google.golang.org/grpc v1.23.0
