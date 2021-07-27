@@ -69,6 +69,10 @@ type ImagePullJobNamespaceListerExpansion interface{}
 // NodeImageLister.
 type NodeImageListerExpansion interface{}
 
+// ResourceDistributionListerExpansion allows custom methods to be added to
+// ResourceDistributionLister.
+type ResourceDistributionListerExpansion interface{}
+
 // SidecarSetListerExpansion allows custom methods to be added to
 // SidecarSetLister.
 type SidecarSetListerExpansion interface{}

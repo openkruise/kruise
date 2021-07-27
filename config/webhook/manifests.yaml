@@ -465,6 +465,24 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-resourcedistribution
+  failurePolicy: Fail
+  name: vresourcedistribution.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - resourcedistributions
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-apps-kruise-io-v1alpha1-sidecarset
   failurePolicy: Fail
   name: vsidecarset.kb.io
