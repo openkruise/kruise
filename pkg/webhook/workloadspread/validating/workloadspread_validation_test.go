@@ -634,16 +634,6 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			errorSuffix: "spec.scheduleStrategy.type",
 		},
 		{
-			name: "subset-b's maxReplicas = nil,, subset-c's maxReplicas = nil",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.Subsets[1].MaxReplicas = nil
-				workloadSpread.Spec.Subsets[2].MaxReplicas = nil
-				return workloadSpread
-			},
-			errorSuffix: "spec.subsets[1].maxReplicas",
-		},
-		{
 			name: "rescheduleCriticalSeconds = 0",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()

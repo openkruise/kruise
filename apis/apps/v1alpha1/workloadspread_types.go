@@ -161,6 +161,9 @@ type WorkloadSpreadSubsetStatus struct {
 	// Name should be unique between all of the subsets under one WorkloadSpread.
 	Name string `json:"name"`
 
+	// Replicas is the most recently observed number of replicas for subset.
+	Replicas int32 `json:"replicas"`
+
 	// Conditions is an array of current observed subset conditions.
 	// +optional
 	Conditions []WorkloadSpreadSubsetCondition `json:"conditions,omitempty"`
