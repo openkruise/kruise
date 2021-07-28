@@ -7,7 +7,7 @@ reviewers:
 - "@furykerry"
 - "@FillZpp"
 creation-date: 2021-07-19
-last-updated: 2021-07-19
+last-updated: 2021-07-28
 status: implementable
 ---
 
@@ -27,7 +27,7 @@ any additional information provided beyond the standard proposal template.
   - [Proposal](#proposal)
     - [User Story](#user-story)
       - [Annotations](#annotations)
-      - [WritePolicy](#writepolicy)
+      - [Resource Conflict](#resource-conflict)
       - [Targets](#targets)
       - [Synchronization](#synchronization)
     - [How to Implement](#how-to-implement)
@@ -91,9 +91,8 @@ spec:
     type: kubernetes.io/service-account-token
     data:
       extra: YmFyCg==
-  wirtePolicy: strict #strict for default, or use [`overwrite`, 'ignore']
   targets: # options: ["cluster", "namespaces", "workloadLabelSelector", "namespaceLabelSelector"]
-    all: #all namespaces will be selected, except for kube-system, kube-public and the listed namespaces.
+    allButExceptedNamespaces: #all namespaces will be selected, except for kube-system, kube-public and the listed namespaces.
        - exception: some-ignored-ns-1
        - exception: some-ignored-ns-2
 - Status: #written by `ResourceDistribution` automatically if resource distribution failed.
@@ -103,24 +102,17 @@ spec:
     - name: some-conflict-ns-2
 ```
 #### Annotations
-Record the source of resource and creation time.
+Record the source and version of Resource.
 
-#### WritePolicy
-The `writePolicy` specifies the write operation when the resource conflict with existing resources.
+#### Resource Conflict
 
-1. If `writePolicy` is `strict`:
+Resource will conflict with the resources with the same name that already exist in target namespaces.
+ - ResourceDistribution is created only when no conflict occurs.
  - The resource will be distributed **iff** there is no conflict (distribute to all, or none of them);
- - All conflicting namespaces will be listed in `conflictingNamespaces`;
- - Users can get `Name Conflict` in kruise log.
-2. If `writePolicy` is `overwrite`:
- - The existing resources with the same name will be overwritten;
- - All conflicting namespaces will be listed in `conflictingNamespaces`;
-3. If `writePolicy` is `ignore`:
- - The resource will not be distributed to the conflicting namespaces (but will be distributed to the others);
- - All conflicting namespaces will be listed in `conflictingNamespaces`;
+ - All conflicting namespaces will be detected and listed when creating ResourceDistribution;
 
 #### Targets
-The `targets` field has other three options except for `all`:
+The `targets` field has other three options except for `allButExceptedNamespaces`:
 1. If choose `namespaces`, the listed namespaces will be selected.
 ```yaml
   targets:
@@ -145,14 +137,13 @@ The `targets` field has other three options except for `all`:
         app: nginx
 ```
 
-#### Synchronization
-1. Only when the `ResourceDistribution` is updated, the resource and its replica will be synchronized.
-2. When replicated resource is deleted or updated alone, the `ResourceDistribution` controller will do nothing.
+**Special Cases:**
+1. The default target is `allButExceptedNamespaces`.
+3. If more than one `targets` options were enabled, the intersection of their results will be selected.
 
-#### Special Cases
-1. The default target is `all`.
-2. The default writePolicy is `strict`.
-3. If more than one `targets` were chosen, the intersection of their results will be applied.
+#### Synchronization
+1. When the `ResourceDistribution` is updated, the resource and its replica will be synchronized.
+2. After ResourceDistribution creation, you can image that ResourceDistribution is `Deployment`, and the Resource is `Pod`. If `Pod` (`Resource`) is modified directly, `Deployment`(`ResourceDistribution`) will restore it back when reconciling.
 
 ### How to Implement
 
@@ -161,56 +152,80 @@ The `targets` field has other three options except for `all`:
 ```go
 package resourcedistribution
 
-type ResourceDistribution struct{
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec   ResourceDistributionSpec   `json:"spec,omitempty"`
-	Status ResourceDistributionStatus 'json:"status,omitempty"'
+type ResourceDistribution struct {
+  metav1.TypeMeta   `json:",inline"`
+  metav1.ObjectMeta `json:"metadata,omitempty"`
+
+  Spec   ResourceDistributionSpec   `json:"spec,omitempty"`
+  Status ResourceDistributionStatus `json:"status,omitempty"`
+}
+// ResourceDistributionSpec defines the desired state of ResourceDistribution.
+type ResourceDistributionSpec struct {
+  // Resource must be the complete yaml that users want to distribute
+  Resource runtime.RawExtension `json:"resource,omitempty"`
+
+  // Targets defines the namespaces that users want to distribute to
+  Targets ResourceDistributionTargets `json:"targets,omitempty"`
 }
 
-type ResourceDistributionSpec struct{
-	Resource runtime.RawExtension `json:"resource,omitempty"`
-	WritePolicy string `json:"writePolicy,omitempty"`
-	Targets ResourceDistributionTargets `json:"targets,omitempty"`
+// ResourceDistributionTargets defines the targets of Resource.
+// Four options are provided to select target namespaces.
+// If more than options were selected, their **intersection** will be selected.
+type ResourceDistributionTargets struct {
+  // Resource will be distributed to all namespaces, except listed namespaces
+  // Default target
+  // +optional
+  AllButExceptedNamespaces []ResourceDistributionTargetException `json:"allButExceptedNamespaces,omitempty"`
+
+  // If it is not empty, Resource will be distributed to the listed namespaces
+  // +optional
+  Namespaces []ResourceDistributionTargetNamespace `json:"namespaces,omitempty"`
+
+  // If NamespaceLabelSelector is not empty, Resource will be distributed to the matched namespaces
+  // +optional
+  NamespaceLabelSelector metav1.LabelSelector `json:"namespaceLabelSelector,omitempty"`
+
+  // If WorkloadLabelSelector is not empty, Resource will be distributed to the namespaces that contain any matched workload
+  // +optional
+  WorkloadLabelSelector ResourceDistributionWorkloadLabelSelector `json:"workloadLabelSelector,omitempty"`
 }
 
-type ResourceDistributionTargets struct{
-	All []TargetException `json:"all,omitempty"`
-	Namespaces []NamespaceName `json:"namespaces,omitempty"`
-	NamespaceLabelSelector ResourceDistributionNamespaceLabelSelector `json:"namespaceLabelSelector,omitempty"`
-	WorkloadLabelSelector  ResourceDistributionWorkloadLabelSelector `json:"workloadLabelSelector,omitempty"`
+type ResourceDistributionWorkloadLabelSelector struct {
+  // Workload APIVersion
+  APIVersion string `json:"apiVersion,omitempty"`
+  // Workload Kind
+  Kind string `json:"kind,omitempty"`
+  // Workload labels that users want to select
+  metav1.LabelSelector `json:",inline"`
 }
 
-type ResourceDistributionNamespaceLabelSelector struct{
-	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+// ResourceDistributionStatus defines the observed state of ResourceDistribution.
+// ResourceDistributionStatus is recorded by kruise, users' modification is invalid and meaningless.
+type ResourceDistributionStatus struct {
+  // INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+  // Important: Run "make" to regenerate code after modifying this file
+
+  // Describe ResourceDistribution Status
+  Description string `json:"description,omitempty"`
+
+  // DistributedResources lists the resources that has been distributed by this ResourceDistribution
+  // example: "ns-1": "12334234", "ns-1" denotes a namespace name, "12334234" is the Resource version
+  DistributedResources map[string]string `json:"distributedResources,omitempty"`
 }
 
-type ResourceDistributionWorkloadLabelSelector struct{
-	Kind string `json:"kind,omitempty"`
-	MatchLabels map[string]string `json:"matchLabels,omitempty"`
-}
-
-type ResourceDistributionStatus struct{
-	Description string `json:"description,omitempty"`
-	ConflictedNamespaces []NamespaceName `json:"exception,omitempty"`
-}
-
-type TargetException struct {
-	Exception string `json:"exception,omitempty"`
-}
-
-type NamespaceName struct{
-	Name string `json:"name,omitempty"`
-}
 ```
 #### WebHook Validation
-Check if the resource belongs to `Secret` or `ConfigMap`.
+**Create:**
+1. Check whether Resource belongs to `Secret` or `ConfigMap`;
+2. Check the conflicts with Resource;
+
+**Update:**
+1. Check whether the Resource apiVersion, kind, and name are changed.
 
 #### Distribution and Synchronization
 
 1. Create and Distribute
 - Parse and analyze the resource and the target namespaces.
-- Check conflicts and `WritePolicy`.
 - Create the resource based on `Resouce` field.
 - Replicate and distribute the resource, and set their `OwnerReference` to the `ResourceDistribution`.
 
@@ -220,7 +235,7 @@ Check if the resource belongs to `Secret` or `ConfigMap`.
 - When `Targets` field is updated:
   - Parse and analyze new target namespaces;
   - Clear replicas for the old namespaces that aren't in the new targets;
-  - Replicate resource to the new target namespaces.
+  - Replicate or update resource for the new target namespaces.
 - When a new workload or namespace is created:
   - Get all `ResourceDistribution`
   - Check whether each `ResourceDistribution` is matched with the workload or namespace, if so, replica and synchronize its resource.
@@ -229,4 +244,4 @@ Check if the resource belongs to `Secret` or `ConfigMap`.
 - Benefiting from `OwnerReference`, the replicas will be cleaned when the `ResourceDistribution` is deleted.
 
 ## Implementation History
-- [ ] 07/19/2021: Proposal submission
+- [ ] 07/28/2021: Proposal submission
