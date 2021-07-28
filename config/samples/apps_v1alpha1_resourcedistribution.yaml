@@ -5,25 +5,24 @@ metadata:
 spec:
   resource:
     apiVersion: v1
-    kind: Secret
+    kind: ConfigMap
     metadata:
-      name: secret-sa-sample
-    type: kubernetes.io/service-account-token
+      name: game-demo
     data:
-      extra: YmFyCg==
-  wirtePolicy: strict
+      player_initial_lives: "3"
+      ui_properties_file_name: "user-interface.properties"
+      game.properties: |
+        enemy.types=aliens,monsters
+        player.maximum-lives=5
+      user-interface.properties: |
+        color.good=purple
+        color.bad=yellow
+        allow.textmode=true
   targets:
-    all:
-      - exception: some-ignored-ns-1
-      - exception: some-ignored-ns-2
-    namespaces:
-      - name: some-target-name-1
-      - name: some-target-name-2
-    namespaceLabelSelector:
-      matchLabels:
-        environment: test
-    workloadLabelSelector:
-      apiVersion: apps/v1
-      kind: Deployment
-      matchLabels:
-        app: nginx
+    excludedNamespaces:
+      - name: ns-3
+    includedNamespaces:
+      - name: ns-1
+      - name: ns-2
+      - name: ns-3
+      - name: ns-4

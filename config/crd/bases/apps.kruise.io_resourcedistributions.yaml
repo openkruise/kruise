@@ -44,13 +44,23 @@ spec:
               description: Targets defines the namespaces that users want to distribute
                 to
               properties:
-                all:
+                excludedNamespaces:
                   description: Resource will be distributed to all namespaces, except
                     listed namespaces Default target
                   items:
                     properties:
-                      exception:
-                        description: The name of excepted namespace
+                      name:
+                        description: Namespace name
+                        type: string
+                    type: object
+                  type: array
+                includedNamespaces:
+                  description: If it is not empty, Resource will be distributed to
+                    the listed namespaces
+                  items:
+                    properties:
+                      name:
+                        description: Namespace name
                         type: string
                     type: object
                   type: array
@@ -99,90 +109,23 @@ spec:
                         are ANDed.
                       type: object
                   type: object
-                namespaces:
-                  description: If it is not empty, Resource will be distributed to
-                    the listed namespaces
-                  items:
-                    properties:
-                      name:
-                        description: Namespace name
-                        type: string
-                    type: object
-                  type: array
-                workloadLabelSelector:
-                  description: If WorkloadLabelSelector is not empty, Resource will
-                    be distributed to the namespaces that contain any matched workload
-                  properties:
-                    apiVersion:
-                      description: Workload APIVersion
-                      type: string
-                    kind:
-                      description: Workload Kind
-                      type: string
-                    matchExpressions:
-                      description: matchExpressions is a list of label selector requirements.
-                        The requirements are ANDed.
-                      items:
-                        description: A label selector requirement is a selector that
-                          contains values, a key, and an operator that relates the
-                          key and values.
-                        properties:
-                          key:
-                            description: key is the label key that the selector applies
-                              to.
-                            type: string
-                          operator:
-                            description: operator represents a key's relationship
-                              to a set of values. Valid operators are In, NotIn, Exists
-                              and DoesNotExist.
-                            type: string
-                          values:
-                            description: values is an array of string values. If the
-                              operator is In or NotIn, the values array must be non-empty.
-                              If the operator is Exists or DoesNotExist, the values
-                              array must be empty. This array is replaced during a
-                              strategic merge patch.
-                            items:
-                              type: string
-                            type: array
-                        required:
-                        - key
-                        - operator
-                        type: object
-                      type: array
-                    matchLabels:
-                      additionalProperties:
-                        type: string
-                      description: matchLabels is a map of {key,value} pairs. A single
-                        {key,value} in the matchLabels map is equivalent to an element
-                        of matchExpressions, whose key field is "key", the operator
-                        is "In", and the values array contains only "value". The requirements
-                        are ANDed.
-                      type: object
-                  type: object
               type: object
-            writePolicy:
-              description: WritePolicy define the behavior when other resources with
-                the same name already exist in target namespaces
-              type: string
           type: object
         status:
           description: ResourceDistributionStatus defines the observed state of ResourceDistribution.
             ResourceDistributionStatus is recorded by kruise, users' modification
             is invalid and meaningless.
           properties:
-            conflictingNamespaces:
-              description: List conflicting namespaces
-              items:
-                properties:
-                  name:
-                    description: Namespace name
-                    type: string
-                type: object
-              type: array
             description:
               description: Describe ResourceDistribution Status
               type: string
+            distributedResources:
+              additionalProperties:
+                type: string
+              description: 'DistributedResources lists the resources that has been
+                distributed by this ResourceDistribution Example: "ns-1": "12334234",
+                "ns-1" denotes a namespace name, "12334234" is the Resource version'
+              type: object
           type: object
       type: object
   version: v1alpha1

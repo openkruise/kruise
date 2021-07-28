@@ -29,16 +29,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	//add apps group schemes to legacyscheme
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+	//add core group schemes to legacyscheme
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 // This file holds all operations about varying resources in this package;
 // If you want to add new-type resource, you only need to modified this file.
 
+const (
+	ResourceHashCodeAnnotation           = "kruise.io/resource-distribution.resource-hashcode"
+	SourceResourceDistributionOfResource = "kruise.io/from-resourcedistribution"
+)
+
 // UnifiedResource abstracts all behaviors of Resource
 type UnifiedResource interface {
 	GetName() string
-	GetObject() *runtime.Object
-	GetObjectCopy() runtime.Object
+	GetObject() runtime.Object
+	NewObject() runtime.Object
+	GetObjectDeepCopy() runtime.Object
 	GetObjectMeta() *metav1.ObjectMeta
 	GetGroupVersionKind() *schema.GroupVersionKind
 }
@@ -60,6 +71,17 @@ func (r *Resource) GetName() string {
 	}
 }
 
+func (r *Resource) NewObject() runtime.Object {
+	switch r.Object.(type) {
+	case *corev1.Secret:
+		return &corev1.Secret{}
+	case *corev1.ConfigMap:
+		return &corev1.ConfigMap{}
+	default:
+		return nil
+	}
+}
+
 func (r *Resource) GetObjectMeta() *metav1.ObjectMeta {
 	switch resource := r.Object.(type) {
 	case *corev1.Secret:
@@ -71,11 +93,11 @@ func (r *Resource) GetObjectMeta() *metav1.ObjectMeta {
 	}
 }
 
-func (r *Resource) GetObject() *runtime.Object {
-	return &r.Object
+func (r *Resource) GetObject() runtime.Object {
+	return r.Object
 }
 
-func (r *Resource) GetObjectCopy() runtime.Object {
+func (r *Resource) GetObjectDeepCopy() runtime.Object {
 	return r.Object.DeepCopyObject()
 }
 
@@ -83,7 +105,7 @@ func (r *Resource) GetGroupVersionKind() *schema.GroupVersionKind {
 	return &r.GroupVersionKind
 }
 
-// MakeUnifiedResourceFromObject receives runtime.Object, return UnifiedResource
+// MakeUnifiedResourceFromObject receives runtime.Object, returns UnifiedResource
 func MakeUnifiedResourceFromObject(resourceObject runtime.Object, fldPath *field.Path) (resource UnifiedResource, allErrs field.ErrorList) {
 	switch specificObject := resourceObject.(type) {
 	case *corev1.Secret, *corev1.ConfigMap:
@@ -98,46 +120,49 @@ func MakeUnifiedResourceFromObject(resourceObject runtime.Object, fldPath *field
 	return
 }
 
-// DecodeResource receives yaml of resource, return UnifiedResource
-func DecodeResource(resourceYAML *runtime.RawExtension, fldPath *field.Path) (resource UnifiedResource, allErrs field.ErrorList) {
-	//Decode Yaml
+// DeserializeResource receives yaml of resource, returns UnifiedResource
+func DeserializeResource(resourceYAML *runtime.RawExtension, fldPath *field.Path) (resource UnifiedResource, allErrs field.ErrorList) {
+	// check whether resource yaml is empty
 	if resourceYAML.Raw == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "empty resource is not allowed"))
 		return
 	}
+	// deserialize yaml
 	resourceObject, _, err := legacyscheme.Codecs.UniversalDeserializer().Decode(resourceYAML.Raw, nil, nil)
 	if err != nil {
 		allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("failed to deserialize resource, err %v", err)))
 	}
 
-	// convert to specific resource
+	// convert resourceObject to UnifiedResource
 	resource, errs := MakeUnifiedResourceFromObject(resourceObject, fldPath)
 	allErrs = append(allErrs, errs...)
 
 	return
 }
 
-// GetConflictingNamespaces returns all conflicting namespaces that contain resource with the same kind and name as Resource
+// GetConflictingNamespaces returns all conflicting namespaces that contain resource with the same kind and name as spec.Resource
 func GetConflictingNamespaces(handlerClient client.Client, resource UnifiedResource, targetNamespaces []string, rdName string, fldPath *field.Path) (conflictingNamespaces []string, allErrs field.ErrorList) {
 	for _, namespace := range targetNamespaces {
-		switch instance := resource.GetObjectCopy().(type) {
+
+		switch instance := resource.GetObjectDeepCopy().(type) {
 		case *corev1.Secret, *corev1.ConfigMap:
 			// check whether conflict resource exists
 			if err := handlerClient.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: resource.GetName()}, instance); err != nil {
-				if errors.IsNotFound(err) {
-					continue
-				} else {
-					allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("get secret failed, err: %v", err)))
+				if !errors.IsNotFound(err) {
+					allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("get resource failed, err: %v", err)))
 				}
+				continue
 			}
+			// convert instance to UnifiedResource
 			uResource, errs := MakeUnifiedResourceFromObject(instance, fldPath)
-			// check whether the existing resource belongs to this ResourceDistribution
-			if len(errs) != 0 || uResource.GetObjectMeta().Annotations["kruise.io/from-resource-distribution"] == rdName {
-				allErrs = append(allErrs, errs...)
+			// check whether instance belongs to this ResourceDistribution
+			if len(errs) != 0 || uResource.GetObjectMeta().Annotations[SourceResourceDistributionOfResource] == rdName {
+				allErrs = append(allErrs, errs...) // do nothing
 			} else {
-				conflictingNamespaces = append(conflictingNamespaces, namespace)
+				conflictingNamespaces = append(conflictingNamespaces, namespace) // record conflict
 			}
 		}
+
 	}
 
 	return

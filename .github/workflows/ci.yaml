@@ -336,7 +336,7 @@ jobs:
           go install github.com/onsi/ginkgo/ginkgo
           ./scripts/generate_bindata.sh
           set +e
-          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet)' test/e2e
+          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|ResourceDistribution)' test/e2e
 #          retVal=$?
 #          if [ $retVal -ne 0 ]; then
 #            kubectl get pod -n kruise-system -o wide

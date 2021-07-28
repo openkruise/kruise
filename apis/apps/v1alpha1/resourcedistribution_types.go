@@ -29,31 +29,9 @@ type ResourceDistributionSpec struct {
 	// Resource must be the complete yaml that users want to distribute
 	Resource runtime.RawExtension `json:"resource,omitempty"`
 
-	// WritePolicy define the behavior when other resources with the same name already exist in target namespaces
-	WritePolicy ResourceDistributionWritePolicyType `json:"writePolicy,omitempty"`
-
 	// Targets defines the namespaces that users want to distribute to
 	Targets ResourceDistributionTargets `json:"targets,omitempty"`
 }
-
-// ResourceDistributionWritePolicyType defines the behaviors,
-// when Resource has the same kind and name with existing resources.
-type ResourceDistributionWritePolicyType string
-
-const (
-	// RESOURCEDISTRIBUTION_STRICT_WRITEPOLICY means that ResourceDistribution is successful if and only if there is no Name Conflict
-	// In case of conflict, Resource will not be distributed anywhere
-	// Default WritePolicy
-	RESOURCEDISTRIBUTION_STRICT_WRITEPOLICY ResourceDistributionWritePolicyType = "strict"
-
-	// RESOURCEDISTRIBUTION_IGNORE_WRITEPOLICY means that ResourceDistribution will ignore conflicting namespaces.
-	// In case of conflict, Resource just will be distributed to the non-conflicting namespaces, AND
-	// will NOT be distributed to the conflicting namespaces
-	RESOURCEDISTRIBUTION_IGNORE_WRITEPOLICY ResourceDistributionWritePolicyType = "ignore"
-
-	// RESOURCEDISTRIBUTION_OVERWRITE_WRITEPOLICY means that conflicting resources will be over-written
-	RESOURCEDISTRIBUTION_OVERWRITE_WRITEPOLICY ResourceDistributionWritePolicyType = "overwrite"
-)
 
 // ResourceDistributionTargets defines the targets of Resource.
 // Four options are provided to select target namespaces.
@@ -62,38 +40,20 @@ type ResourceDistributionTargets struct {
 	// Resource will be distributed to all namespaces, except listed namespaces
 	// Default target
 	// +optional
-	All []ResourceDistributionTargetException `json:"all,omitempty"`
+	ExcludedNamespaces []ResourceDistributionNamespace `json:"excludedNamespaces,omitempty"`
 
 	// If it is not empty, Resource will be distributed to the listed namespaces
 	// +optional
-	Namespaces []ResourceDistributionNamespace `json:"namespaces,omitempty"`
+	IncludedNamespaces []ResourceDistributionNamespace `json:"includedNamespaces,omitempty"`
 
 	// If NamespaceLabelSelector is not empty, Resource will be distributed to the matched namespaces
 	// +optional
 	NamespaceLabelSelector metav1.LabelSelector `json:"namespaceLabelSelector,omitempty"`
-
-	// If WorkloadLabelSelector is not empty, Resource will be distributed to the namespaces that contain any matched workload
-	// +optional
-	WorkloadLabelSelector ResourceDistributionWorkloadLabelSelector `json:"workloadLabelSelector,omitempty"`
-}
-
-type ResourceDistributionTargetException struct {
-	// The name of excepted namespace
-	Exception string `json:"exception,omitempty"`
 }
 
 type ResourceDistributionNamespace struct {
 	// Namespace name
 	Name string `json:"name,omitempty"`
-}
-
-type ResourceDistributionWorkloadLabelSelector struct {
-	// Workload APIVersion
-	APIVersion string `json:"apiVersion,omitempty"`
-	// Workload Kind
-	Kind string `json:"kind,omitempty"`
-	// Workload labels that users want to select
-	metav1.LabelSelector `json:",inline"`
 }
 
 // ResourceDistributionStatus defines the observed state of ResourceDistribution.
@@ -105,8 +65,9 @@ type ResourceDistributionStatus struct {
 	// Describe ResourceDistribution Status
 	Description string `json:"description,omitempty"`
 
-	// List conflicting namespaces
-	ConflictingNamespaces []ResourceDistributionNamespace `json:"conflictingNamespaces,omitempty"`
+	// DistributedResources lists the resources that has been distributed by this ResourceDistribution
+	// Example: "ns-1": "12334234", "ns-1" denotes a namespace name, "12334234" is the Resource version
+	DistributedResources map[string]string `json:"distributedResources,omitempty"`
 }
 
 // +genclient

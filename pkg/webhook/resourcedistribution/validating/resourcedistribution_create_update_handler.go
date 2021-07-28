@@ -1,12 +1,9 @@
 /*
 Copyright 2021 The Kruise Authors.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,10 +16,10 @@ package validating
 import (
 	"context"
 	"fmt"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"net/http"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog"
@@ -46,35 +43,26 @@ var _ admission.Handler = &ResourceDistributionCreateUpdateHandler{}
 func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(obj, oldObj *appsv1alpha1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
 	spec := &obj.Spec
 
-	// validate WritePolicy
-	switch spec.WritePolicy {
-	case "",
-		appsv1alpha1.RESOURCEDISTRIBUTION_STRICT_WRITEPOLICY,
-		appsv1alpha1.RESOURCEDISTRIBUTION_IGNORE_WRITEPOLICY,
-		appsv1alpha1.RESOURCEDISTRIBUTION_OVERWRITE_WRITEPOLICY:
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("writePolicy"), spec.WritePolicy, fmt.Sprintf("Unknown or unsupported WritePolicy type %s.", spec.WritePolicy)))
+	// decode resource
+	resource, errs := DeserializeResource(&spec.Resource, fldPath)
+	if resource == nil {
+		allErrs = append(allErrs, errs...)
+		return
 	}
 
-	// decode resource
-	resource, errs := DecodeResource(&spec.Resource, fldPath)
+	// get old resource
+	var oldResource UnifiedResource = nil
+	if oldObj != nil {
+		oldResource, errs = DeserializeResource(&oldObj.Spec.Resource, fldPath)
+		allErrs = append(allErrs, errs...)
+	}
+
+	// validate resource
+	errs = h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"))
 	allErrs = append(allErrs, errs...)
 
-	if resource != nil {
-		// get old resource
-		var oldResource UnifiedResource = nil
-		if oldObj != nil {
-			oldResource, errs = DecodeResource(&oldObj.Spec.Resource, fldPath)
-			allErrs = append(allErrs, errs...)
-		}
-
-		// validate resource
-		errs = h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"))
-		allErrs = append(allErrs, errs...)
-
-		// validate targets and conflict
-		allErrs = append(allErrs, h.validateResourceDistributionSpecTargets(obj, resource, fldPath.Child("targets"))...)
-	}
+	// validate targets and conflict
+	allErrs = append(allErrs, h.validateResourceDistributionSpecTargets(obj, resource, fldPath.Child("targets"))...)
 
 	return
 }
@@ -84,9 +72,9 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 	allErrs = append(allErrs, apimachineryvalidation.ValidateObjectMeta(resource.GetObjectMeta(), false, apimachineryvalidation.NameIsDNSSubdomain, fldPath.Child("metadata"))...)
 
 	// validate resource groupVersionKind and name when updating
-	if oldResource != nil {
+	if len(allErrs) == 0 && oldResource != nil {
 		if resource.GetName() != oldResource.GetName() || !apiequality.Semantic.DeepEqual(resource.GetGroupVersionKind(), oldResource.GetGroupVersionKind()) {
-			allErrs = append(allErrs, field.Invalid(fldPath, nil, "resource apiVersion, kind and name are immutable"))
+			allErrs = append(allErrs, field.Invalid(fldPath, nil, "resource apiVersion, kind, and name are immutable"))
 		}
 	}
 
@@ -96,24 +84,16 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecTargets(obj *appsv1alpha1.ResourceDistribution, resource UnifiedResource, fldPath *field.Path) (allErrs field.ErrorList) {
 	spec := &obj.Spec
 
-	//validate whether WorkloadLabelSelector.APIVersion and Kind is empty
-	if (spec.Targets.WorkloadLabelSelector.APIVersion == "" || spec.Targets.WorkloadLabelSelector.Kind == "") &&
-		(len(spec.Targets.WorkloadLabelSelector.MatchLabels) != 0 || len(spec.Targets.WorkloadLabelSelector.MatchExpressions) != 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Targets").Child("WorkloadLabelSelector"),
-			spec.Targets.WorkloadLabelSelector, "must specify the apiVersion and kind of workload in workloadLabelSelector"))
-	}
+	// select target namespaces
+	targetNamespaces, errs := GetTargetNamespaces(h.Client, &spec.Targets)
+	allErrs = append(allErrs, errs...)
 
-	//select target namespaces
-	targetNamespaces, errs1 := GetTargetNamespaces(h.Client, &spec.Targets, fldPath.Child("targets"))
-	allErrs = append(allErrs, errs1...)
-
-	//detect conflicting namespaces
-	conflictingNamespaces, errs2 := GetConflictingNamespaces(h.Client, resource, targetNamespaces, obj.Name, fldPath)
-	allErrs = append(allErrs, errs2...)
-
-	//resource may conflict with existing resources in cluster if writePolicy is STRICT
-	if len(conflictingNamespaces) != 0 && (spec.WritePolicy == "" || spec.WritePolicy == appsv1alpha1.RESOURCEDISTRIBUTION_STRICT_WRITEPOLICY) {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec, fmt.Sprintf("writePolicy is 'strict', however conflict happens in namespaces %v", conflictingNamespaces)))
+	// detect conflicting namespaces
+	// resource may conflict with existing resources in cluster
+	conflictingNamespaces, errs := GetConflictingNamespaces(h.Client, resource, targetNamespaces, obj.Name, fldPath)
+	allErrs = append(allErrs, errs...)
+	if len(conflictingNamespaces) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, fmt.Sprintf("resource with the same name already exists in namespaces %v", conflictingNamespaces)))
 	}
 
 	return
