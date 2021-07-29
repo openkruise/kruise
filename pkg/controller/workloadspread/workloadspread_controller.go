@@ -517,7 +517,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 			} else {
 				oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatusMap[subset.Name], appsv1alpha1.SubsetSchedulable)
 				if oldCondition != nil {
-					SetWorkloadSpreadSubsetCondition(subsetStatus, oldCondition)
+					SetWorkloadSpreadSubsetCondition(subsetStatus, oldCondition.DeepCopy())
 				}
 				SetWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""))
 			}
@@ -540,6 +540,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 	// current subsetStatus in this reconcile
 	subsetStatus := &appsv1alpha1.WorkloadSpreadSubsetStatus{}
 	subsetStatus.Name = subset.Name
+	subsetStatus.Replicas = int32(len(pods))
 	subsetStatus.CreatingPods = make(map[string]metav1.Time)
 	subsetStatus.DeletingPods = make(map[string]metav1.Time)
 
@@ -675,6 +676,10 @@ func makeStatusChangedLog(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.
 		newStatus := status.SubsetStatuses[i]
 
 		log += fmt.Sprintf(" (<subset name: %s>", subset.Name)
+
+		if oldStatus.Replicas != newStatus.Replicas {
+			log += fmt.Sprintf(" <Replicas: %d -> %d>", oldStatus.Replicas, newStatus.Replicas)
+		}
 
 		if oldStatus.MissingReplicas != newStatus.MissingReplicas {
 			log += fmt.Sprintf(" <missingReplicas: %d -> %d>", oldStatus.MissingReplicas, newStatus.MissingReplicas)

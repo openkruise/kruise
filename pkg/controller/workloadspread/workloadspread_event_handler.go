@@ -77,7 +77,7 @@ func (p *podEventHandler) handlePod(q workqueue.RateLimitingInterface, obj runti
 		injectWorkloadSpread := &wsutil.InjectWorkloadSpread{}
 		if err := json.Unmarshal([]byte(value), injectWorkloadSpread); err == nil {
 			nsn := types.NamespacedName{Namespace: pod.GetNamespace(), Name: injectWorkloadSpread.Name}
-			klog.V(5).Infof("%s Pod (%s/%s) and reconcile workloadSpread (%s/%s)",
+			klog.V(5).Infof("%s Pod (%s/%s) and reconcile WorkloadSpread (%s/%s)",
 				action, pod.Namespace, pod.Name, nsn.Namespace, nsn.Name)
 			q.Add(reconcile.Request{NamespacedName: nsn})
 		}

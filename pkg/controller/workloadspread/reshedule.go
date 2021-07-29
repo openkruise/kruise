@@ -56,8 +56,7 @@ func rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
 		return scheduleFailedPods
 	}
 
-	SetWorkloadSpreadSubsetCondition(subsetStatus, oldCondition)
-
+	SetWorkloadSpreadSubsetCondition(subsetStatus, oldCondition.DeepCopy())
 	if unschedulable {
 		SetWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionFalse, "", ""))
 	} else {
@@ -80,14 +79,14 @@ func rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
 func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ws *appsv1alpha1.WorkloadSpread,
 	scheduleFailedPodsMap map[string][]*corev1.Pod) error {
 	for subsetName, pods := range scheduleFailedPodsMap {
-		if err := r.deleteUnscheduledPodsForSubset(ws, pods, subsetName); err != nil {
+		if err := r.deletePodsForSubset(ws, pods, subsetName); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ReconcileWorkloadSpread) deleteUnscheduledPodsForSubset(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadSpread,
 	pods []*corev1.Pod, subsetName string) error {
 	for _, pod := range pods {
 		if err := r.Client.Delete(context.TODO(), pod); err != nil {

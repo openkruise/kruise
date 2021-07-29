@@ -732,10 +732,12 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, 2)
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[1].Name = "subset-b"
 				workloadSpread.Status.SubsetStatuses[1].MissingReplicas = 4
+				workloadSpread.Status.SubsetStatuses[1].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[1].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[1].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -767,6 +769,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -802,6 +805,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -837,6 +841,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -877,6 +882,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{
 					"test-pod-1": {Time: currentTime.Add(2 * s)},
 				}
@@ -916,6 +922,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
@@ -961,6 +968,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 2
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -1009,6 +1017,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -1053,6 +1062,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -1105,6 +1115,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -1152,6 +1163,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 
 				formatTime := currentTime.Format(timeFormat)
@@ -1204,6 +1216,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -1252,6 +1265,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
