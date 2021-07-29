@@ -241,9 +241,15 @@ spec:
                     description: Name should be unique between all of the subsets
                       under one WorkloadSpread.
                     type: string
+                  replicas:
+                    description: Replicas is the most recently observed number of
+                      replicas for subset.
+                    format: int32
+                    type: integer
                 required:
                 - missingReplicas
                 - name
+                - replicas
                 type: object
               type: array
           type: object

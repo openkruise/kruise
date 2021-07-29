@@ -196,10 +196,8 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 		//TODO validate patch
 
 		//1. All subset maxReplicas must be the same type: int or percent.
-		//2. Only the last subset maxReplicas can be not specified, indicates subset replicas is not limited.
-		//3. TODO: Fixed: the last subset must be specified.
-		//4. Adaptive: the last subset must be not specified.
-		//5. If all maxReplicas is specified as percent, the total maxReplicas must equal 1, except the last subset is not specified.
+		//2. Adaptive: the last subset must be not specified.
+		//3. If all maxReplicas is specified as percent, the total maxReplicas must equal 1, except the last subset is not specified.
 		if subset.MaxReplicas != nil {
 			if firstMaxReplicasType == nil {
 				firstMaxReplicasType = &subset.MaxReplicas.Type
@@ -221,9 +219,6 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 					return allErrs
 				}
 			}
-		} else if i != len(subsets)-1 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "only the last subset's maxReplicas can be nil"))
-			return allErrs
 		}
 	}
 
