@@ -78,4 +78,3 @@ func filterOutCondition(conditions []appsv1alpha1.WorkloadSpreadSubsetCondition,
 	}
 	return newConditions
 }
-

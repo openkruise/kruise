@@ -56,7 +56,9 @@ func rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
 		return scheduleFailedPods
 	}
 
+	// initialize to old condition.
 	SetWorkloadSpreadSubsetCondition(subsetStatus, oldCondition.DeepCopy())
+
 	if unschedulable {
 		SetWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionFalse, "", ""))
 	} else {

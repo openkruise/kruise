@@ -95,6 +95,31 @@ func TestRescheduleSubset(t *testing.T) {
 		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
 		{
+			name: "close reschedule strategy, condition is null",
+			getPods: func() []*corev1.Pod {
+				return []*corev1.Pod{}
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := wsDemo.DeepCopy()
+				ws.Spec.ScheduleStrategy.Type = appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType
+				ws.Status.SubsetStatuses[0].Conditions = nil
+				ws.Status.SubsetStatuses[1].Conditions = nil
+				return ws
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				return cloneSetDemo.DeepCopy()
+			},
+			expectPods: func() []*corev1.Pod {
+				return []*corev1.Pod{}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := wsDemo.DeepCopy()
+				ws.Status.SubsetStatuses[0].Conditions = nil
+				ws.Status.SubsetStatuses[1].Conditions = nil
+				return ws
+			},
+		},
+		{
 			name: "create no Pods, subset-a is scheduable",
 			getPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
@@ -276,7 +301,13 @@ func TestRescheduleSubset(t *testing.T) {
 				lc := GetWorkloadSpreadSubsetCondition(&latestStatus.SubsetStatuses[i], appsv1alpha1.SubsetSchedulable)
 				ec := GetWorkloadSpreadSubsetCondition(&exceptStatus.SubsetStatuses[i], appsv1alpha1.SubsetSchedulable)
 
-				if lc.Status != ec.Status {
+				if lc == nil && ec != nil {
+					t.Fatalf("rescheudle failed")
+				}
+				if lc != nil && ec == nil {
+					t.Fatalf("rescheudle failed")
+				}
+				if lc != nil && ec != nil && lc.Status != ec.Status {
 					t.Fatalf("rescheudle failed")
 				}
 			}
