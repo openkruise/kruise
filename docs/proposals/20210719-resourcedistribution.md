@@ -45,7 +45,7 @@ For example, in the following scenarios, the `Resource Distribution` may be help
 ## What should it look like
 In our mind, the `Resource Distribution` should:
 1. Support distributing resources to all namespaces or listed namespaces;
-2. Support label selector, including workload label selector and namespace label selector;
+2. Support namespace label selector;
 3. Support managing the resources, including synchronization and clean;
 4. Be safe.
 
@@ -55,19 +55,20 @@ In our mind, the `Resource Distribution` should:
 We provide a CRD solution in this proposal.
 If you want to achieve `Resource Distribution` based on `Spec.Annotations`, I recommend you to use [kubernetes-replicator](https://github.com/mittwald/kubernetes-replicator).
 
-But, compared with [kubernetes-replicator](https://github.com/mittwald/kubernetes-replicator), the uniques of our design are that:
-1. Support workload label selector;
-2. Support automated replica cleanup.
+But, compared with [kubernetes-replicator](https://github.com/mittwald/kubernetes-replicator), the uniques of our design are:
+1. More flexible support for adding other types of resources (if you need);
+2. Support for automated resource cleanup.
 
 Sure, we also have some disadvantages compared with kubernetes-replicator:
 1. Cannot distribute existing resources (for safety);
 2. Higher cost of use (users have to write more yaml).
 
-In this design, we will support the distribution for the following resources:
+In this design, we will support the distribution for the following resources (we may support more types of resources in the future
+):
 1. Secret;
 2. ConfigMap.
 
-By the way, why we cannot support distribute existing resources:
+By the way, why we don't support distribute existing resources:
 1. Pull secret from other namespace is very unsafe and dangerous;
 2. When the source is deleted, its replicas may be no longer cleaned.
 
@@ -91,10 +92,10 @@ spec:
     type: kubernetes.io/service-account-token
     data:
       extra: YmFyCg==
-  targets: # options: ["cluster", "namespaces", "workloadLabelSelector", "namespaceLabelSelector"]
-    allButExceptedNamespaces: #all namespaces will be selected, except for kube-system, kube-public and the listed namespaces.
-       - exception: some-ignored-ns-1
-       - exception: some-ignored-ns-2
+  targets: # options: ["cluster", "namespaces", "namespaceLabelSelector"]
+    excludedNamespaces: #all namespaces will be selected, except for kube-system, kube-public and the listed namespaces.
+       - Name: some-ignored-ns-1
+       - Name: some-ignored-ns-2
 - Status: #written by `ResourceDistribution` automatically if resource distribution failed.
   description: "Resource distribution failed: Name Conflict." # logs: "Resource %s has existed in some namespaces, please rename your resource or adopt [`overwrite`, 'ignore'] writePolicy."
   conflictingNamespaces:
@@ -102,21 +103,21 @@ spec:
     - name: some-conflict-ns-2
 ```
 #### Annotations
-Record the source and version of Resource.
+Record the source and version of resource.
 
 #### Resource Conflict
 
 Resource will conflict with the resources with the same name that already exist in target namespaces.
  - ResourceDistribution is created only when no conflict occurs.
- - The resource will be distributed **iff** there is no conflict (distribute to all, or none of them);
+ - The resource will be distributed **if and only if** there is no conflict (distribute to all, or none of them);
  - All conflicting namespaces will be detected and listed when creating ResourceDistribution;
 
 #### Targets
-The `targets` field has other three options except for `allButExceptedNamespaces`:
-1. If choose `namespaces`, the listed namespaces will be selected.
+The `targets` field has other two options except for `excludedNamespaces`:
+1. If choose `includedNamespaces`, the listed namespaces will be selected.
 ```yaml
   targets:
-    namespaces:
+    includedNamespaces:
        - name: some-target-ns-1
        - name: some-target-ns-2
 ```
@@ -128,27 +129,18 @@ The `targets` field has other three options except for `allButExceptedNamespaces
         group: seven
         environment: test
 ```
-3. If choose `workloadLabelSelector`, the namespaces that contains any matched workload will be selected.
-```yaml
-  targets:
-    workloadLabelSelector:
-      kind: CloneSet
-      matchLabels:
-        app: nginx
-```
 
 **Special Cases:**
-1. The default target is `allButExceptedNamespaces`.
-3. If more than one `targets` options were enabled, the intersection of their results will be selected.
+1. The default target is `excludedNamespaces`, if no targets option is enabled, it will distribute to all namespaces.
+3. If more than one `targets` options were enabled, **the intersection** of their results will be distributed to.
 
 #### Synchronization
 1. When the `ResourceDistribution` is updated, the resource and its replica will be synchronized.
-2. After ResourceDistribution creation, you can image that ResourceDistribution is `Deployment`, and the Resource is `Pod`. If `Pod` (`Resource`) is modified directly, `Deployment`(`ResourceDistribution`) will restore it back when reconciling.
+2. After ResourceDistribution creation, you can image that ResourceDistribution is `Deployment`, and the Resource is `Pod`. If `Pod` (`Resource`) is modified directly, `Deployment`(`ResourceDistribution`) will not restore it back when reconciling.
 
 ### How to Implement
 
 #### API definition
-
 ```go
 package resourcedistribution
 
@@ -161,6 +153,9 @@ type ResourceDistribution struct {
 }
 // ResourceDistributionSpec defines the desired state of ResourceDistribution.
 type ResourceDistributionSpec struct {
+  // INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+  // Important: Run "make" to regenerate code after modifying this file
+
   // Resource must be the complete yaml that users want to distribute
   Resource runtime.RawExtension `json:"resource,omitempty"`
 
@@ -175,28 +170,20 @@ type ResourceDistributionTargets struct {
   // Resource will be distributed to all namespaces, except listed namespaces
   // Default target
   // +optional
-  AllButExceptedNamespaces []ResourceDistributionTargetException `json:"allButExceptedNamespaces,omitempty"`
+  ExcludedNamespaces []ResourceDistributionNamespace `json:"excludedNamespaces,omitempty"`
 
   // If it is not empty, Resource will be distributed to the listed namespaces
   // +optional
-  Namespaces []ResourceDistributionTargetNamespace `json:"namespaces,omitempty"`
+  IncludedNamespaces []ResourceDistributionNamespace `json:"includedNamespaces,omitempty"`
 
   // If NamespaceLabelSelector is not empty, Resource will be distributed to the matched namespaces
   // +optional
   NamespaceLabelSelector metav1.LabelSelector `json:"namespaceLabelSelector,omitempty"`
-
-  // If WorkloadLabelSelector is not empty, Resource will be distributed to the namespaces that contain any matched workload
-  // +optional
-  WorkloadLabelSelector ResourceDistributionWorkloadLabelSelector `json:"workloadLabelSelector,omitempty"`
 }
 
-type ResourceDistributionWorkloadLabelSelector struct {
-  // Workload APIVersion
-  APIVersion string `json:"apiVersion,omitempty"`
-  // Workload Kind
-  Kind string `json:"kind,omitempty"`
-  // Workload labels that users want to select
-  metav1.LabelSelector `json:",inline"`
+type ResourceDistributionNamespace struct {
+  // Namespace name
+  Name string `json:"name,omitempty"`
 }
 
 // ResourceDistributionStatus defines the observed state of ResourceDistribution.
@@ -209,15 +196,16 @@ type ResourceDistributionStatus struct {
   Description string `json:"description,omitempty"`
 
   // DistributedResources lists the resources that has been distributed by this ResourceDistribution
-  // example: "ns-1": "12334234", "ns-1" denotes a namespace name, "12334234" is the Resource version
+  // Example: "ns-1": "12334234", "ns-1" denotes a namespace name, "12334234" is the Resource version
   DistributedResources map[string]string `json:"distributedResources,omitempty"`
 }
+
 
 ```
 #### WebHook Validation
 **Create:**
 1. Check whether Resource belongs to `Secret` or `ConfigMap`;
-2. Check the conflicts with Resource;
+2. Check the conflicts with existing resource;
 
 **Update:**
 1. Check whether the Resource apiVersion, kind, and name are changed.
@@ -227,7 +215,7 @@ type ResourceDistributionStatus struct {
 1. Create and Distribute
 - Parse and analyze the resource and the target namespaces.
 - Create the resource based on `Resouce` field.
-- Replicate and distribute the resource, and set their `OwnerReference` to the `ResourceDistribution`.
+- Replicate and distribute the resource, and set their `OwnerReference` as the `ResourceDistribution`.
 
 2. Update and Synchronize
 - When `Resource` field is updated:
@@ -236,11 +224,11 @@ type ResourceDistributionStatus struct {
   - Parse and analyze new target namespaces;
   - Clear replicas for the old namespaces that aren't in the new targets;
   - Replicate or update resource for the new target namespaces.
-- When a new workload or namespace is created:
+- When a new namespace is created:
   - Get all `ResourceDistribution`
-  - Check whether each `ResourceDistribution` is matched with the workload or namespace, if so, replica and synchronize its resource.
+  - Check whether each `ResourceDistribution` is matched with the namespace, if so, distribute this resource.
 
-3. Delete
+#### Deletion
 - Benefiting from `OwnerReference`, the replicas will be cleaned when the `ResourceDistribution` is deleted.
 
 ## Implementation History
