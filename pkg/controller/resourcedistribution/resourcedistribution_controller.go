@@ -60,8 +60,6 @@ var (
 	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("ResourceDistribution")
 )
 
-const ()
-
 // Add creates a new ResourceDistribution Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {

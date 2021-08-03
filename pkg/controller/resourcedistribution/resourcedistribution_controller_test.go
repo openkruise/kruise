@@ -89,25 +89,6 @@ stringData:
 	return buildResourceDistribution(raw)
 }
 
-func buildResourceDistributionWithConfigMap() *appsv1alpha1.ResourceDistribution {
-	const resourceYaml = `apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: game-demo
-data:
-  player_initial_lives: "3"
-  ui_properties_file_name: "user-interface.properties"
-  game.properties: |
-    enemy.types=aliens,monsters
-    player.maximum-lives=5
-  user-interface.properties: |
-    color.good=purple
-    color.bad=yellow
-    allow.textmode=true`
-	raw := runtime.RawExtension{Raw: []byte(resourceYaml)}
-	return buildResourceDistribution(raw)
-}
-
 func buildResourceDistribution(raw runtime.RawExtension) *appsv1alpha1.ResourceDistribution {
 	return &appsv1alpha1.ResourceDistribution{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-resource-distribution"},
