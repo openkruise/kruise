@@ -10,22 +10,20 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"golang.org/x/tools/internal/fastwalk"
 )
 
 // Options controls the behavior of a Walk call.
 type Options struct {
-	// If Logf is non-nil, debug logging is enabled through this function.
-	Logf func(format string, args ...interface{})
-	// Search module caches. Also disables legacy goimports ignore rules.
-	ModulesEnabled bool
+	Debug          bool // Enable debug logging
+	ModulesEnabled bool // Search module caches. Also disables legacy goimports ignore rules.
 }
 
 // RootType indicates the type of a Root.
@@ -44,6 +42,16 @@ const (
 type Root struct {
 	Path string
 	Type RootType
+}
+
+// SrcDirsRoots returns the roots from build.Default.SrcDirs(). Not modules-compatible.
+func SrcDirsRoots(ctx *build.Context) []Root {
+	var roots []Root
+	roots = append(roots, Root{filepath.Join(ctx.GOROOT, "src"), RootGOROOT})
+	for _, p := range filepath.SplitList(ctx.GOPATH) {
+		roots = append(roots, Root{filepath.Join(p, "src"), RootGOPATH})
+	}
+	return roots
 }
 
 // Walk walks Go source directories ($GOROOT, $GOPATH, etc) to find packages.
@@ -68,17 +76,15 @@ func WalkSkip(roots []Root, add func(root Root, dir string), skip func(root Root
 	}
 }
 
-// walkDir creates a walker and starts fastwalk with this walker.
 func walkDir(root Root, add func(Root, string), skip func(root Root, dir string) bool, opts Options) {
 	if _, err := os.Stat(root.Path); os.IsNotExist(err) {
-		if opts.Logf != nil {
-			opts.Logf("skipping nonexistent directory: %v", root.Path)
+		if opts.Debug {
+			log.Printf("skipping nonexistent directory: %v", root.Path)
 		}
 		return
 	}
-	start := time.Now()
-	if opts.Logf != nil {
-		opts.Logf("gopathwalk: scanning %s", root.Path)
+	if opts.Debug {
+		log.Printf("scanning %s", root.Path)
 	}
 	w := &walker{
 		root: root,
@@ -91,8 +97,8 @@ func walkDir(root Root, add func(Root, string), skip func(root Root, dir string)
 		log.Printf("gopathwalk: scanning directory %v: %v", root.Path, err)
 	}
 
-	if opts.Logf != nil {
-		opts.Logf("gopathwalk: scanned %s in %v", root.Path, time.Since(start))
+	if opts.Debug {
+		log.Printf("scanned %s", root.Path)
 	}
 }
 
@@ -106,7 +112,7 @@ type walker struct {
 	ignoredDirs []os.FileInfo // The ignored directories, loaded from .goimportsignore files.
 }
 
-// init initializes the walker based on its Options
+// init initializes the walker based on its Options.
 func (w *walker) init() {
 	var ignoredPaths []string
 	if w.root.Type == RootModuleCache {
@@ -121,11 +127,11 @@ func (w *walker) init() {
 		full := filepath.Join(w.root.Path, p)
 		if fi, err := os.Stat(full); err == nil {
 			w.ignoredDirs = append(w.ignoredDirs, fi)
-			if w.opts.Logf != nil {
-				w.opts.Logf("Directory added to ignore list: %s", full)
+			if w.opts.Debug {
+				log.Printf("Directory added to ignore list: %s", full)
 			}
-		} else if w.opts.Logf != nil {
-			w.opts.Logf("Error statting ignored directory: %v", err)
+		} else if w.opts.Debug {
+			log.Printf("Error statting ignored directory: %v", err)
 		}
 	}
 }
@@ -136,11 +142,11 @@ func (w *walker) init() {
 func (w *walker) getIgnoredDirs(path string) []string {
 	file := filepath.Join(path, ".goimportsignore")
 	slurp, err := ioutil.ReadFile(file)
-	if w.opts.Logf != nil {
+	if w.opts.Debug {
 		if err != nil {
-			w.opts.Logf("%v", err)
+			log.Print(err)
 		} else {
-			w.opts.Logf("Read %s", file)
+			log.Printf("Read %s", file)
 		}
 	}
 	if err != nil {
@@ -159,7 +165,6 @@ func (w *walker) getIgnoredDirs(path string) []string {
 	return ignoredDirs
 }
 
-// shouldSkipDir reports whether the file should be skipped or not.
 func (w *walker) shouldSkipDir(fi os.FileInfo, dir string) bool {
 	for _, ignoredDir := range w.ignoredDirs {
 		if os.SameFile(fi, ignoredDir) {
@@ -173,21 +178,20 @@ func (w *walker) shouldSkipDir(fi os.FileInfo, dir string) bool {
 	return false
 }
 
-// walk walks through the given path.
 func (w *walker) walk(path string, typ os.FileMode) error {
 	dir := filepath.Dir(path)
 	if typ.IsRegular() {
 		if dir == w.root.Path && (w.root.Type == RootGOROOT || w.root.Type == RootGOPATH) {
 			// Doesn't make sense to have regular files
 			// directly in your $GOPATH/src or $GOROOT/src.
-			return fastwalk.ErrSkipFiles
+			return fastwalk.SkipFiles
 		}
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
 
 		w.add(w.root, dir)
-		return fastwalk.ErrSkipFiles
+		return fastwalk.SkipFiles
 	}
 	if typ == os.ModeDir {
 		base := filepath.Base(path)
@@ -215,7 +219,7 @@ func (w *walker) walk(path string, typ os.FileMode) error {
 			return nil
 		}
 		if w.shouldTraverse(dir, fi) {
-			return fastwalk.ErrTraverseLink
+			return fastwalk.TraverseLink
 		}
 	}
 	return nil

@@ -1,6 +1,6 @@
 // Copyright 2017, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// license that can be found in the LICENSE.md file.
 
 package cmp
 
@@ -177,8 +177,7 @@ type structField struct {
 	// pvx, pvy, and field are only valid if unexported is true.
 	unexported bool
 	mayForce   bool                // Forcibly allow visibility
-	paddr      bool                // Was parent addressable?
-	pvx, pvy   reflect.Value       // Parent values (always addressible)
+	pvx, pvy   reflect.Value       // Parent values
 	field      reflect.StructField // Field information
 }
 
@@ -190,8 +189,8 @@ func (sf StructField) Values() (vx, vy reflect.Value) {
 
 	// Forcibly obtain read-write access to an unexported struct field.
 	if sf.mayForce {
-		vx = retrieveUnexportedField(sf.pvx, sf.field, sf.paddr)
-		vy = retrieveUnexportedField(sf.pvy, sf.field, sf.paddr)
+		vx = retrieveUnexportedField(sf.pvx, sf.field)
+		vy = retrieveUnexportedField(sf.pvy, sf.field)
 		return vx, vy // CanInterface reports true
 	}
 	return sf.vx, sf.vy // CanInterface reports false

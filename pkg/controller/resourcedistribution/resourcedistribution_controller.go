@@ -35,7 +35,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	types2 "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -199,7 +198,7 @@ func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.Re
 	for _, namespace := range allNamespaces {
 		// 5.1 try to fetch existing resource
 		existedResource := newResource.GetObjectDeepCopy()
-		err := r.Client.Get(context.TODO(), types2.NamespacedName{Namespace: namespace, Name: newResource.GetName()}, existedResource)
+		err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: newResource.GetName()}, existedResource)
 		if err != nil && !errors.IsNotFound(err) {
 			klog.Errorf("ResourceDistribution get resource error, err: %v, name: %s", err, distributor.Name)
 			return updateNewStatus(newStatus, failedNamespaces), err

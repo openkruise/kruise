@@ -83,7 +83,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 
 			tester.DeleteResourceDistributions(nsPrefix1)
 			tester.DeleteNamespaces(nsPrefix1)
-			ginkgo.By(fmt.Sprintf("test no matched sidecarSet done"))
+			ginkgo.By(fmt.Sprintf("test done when no namespace matches with ResourceDistribution"))
 		})
 
 		ginkgo.It("When namespaces do not exist", func() {
@@ -114,7 +114,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			// clear namespaces
 			tester.DeleteResourceDistributions(nsPrefix2)
 			tester.DeleteNamespaces(nsPrefix2)
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container done"))
+			ginkgo.By("test done when namespaces do not exist")
 		})
 
 		ginkgo.It("When namespace is created after ResourceDistribution", func() {
@@ -156,7 +156,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			//clear all resources in cluster
 			tester.DeleteResourceDistributions(nsPrefix3)
 			tester.DeleteNamespaces(nsPrefix3)
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container done"))
+			ginkgo.By("test done when namespace is created after ResourceDistribution")
 		})
 
 		ginkgo.It("Test for other situations", func() {
@@ -298,7 +298,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 				tester.DeleteResourceDistributions(nsPrefix4)
 				tester.DeleteNamespaces(nsPrefix4)
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container volumeMounts, SubPathExpr with expanded subpath done"))
+			ginkgo.By("Test done for other situations")
 		})
 	})
 })
