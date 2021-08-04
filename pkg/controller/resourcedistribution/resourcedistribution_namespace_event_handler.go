@@ -62,7 +62,7 @@ func (p *enqueueRequestForNamespace) addNamespace(q workqueue.RateLimitingInterf
 	}
 }
 
-// When labels of a Namespace are created, figure out what ResourceDistribution it will work on it and enqueue them.
+// When labels of a Namespace are updated, figure out what ResourceDistribution it will work on it and enqueue them.
 // objOld and objNew must have *v1.Namespace type.
 func (p *enqueueRequestForNamespace) updateNamespace(q workqueue.RateLimitingInterface, objOld, objNew runtime.Object) {
 	namespaceOld, okOld := objOld.(*corev1.Namespace)

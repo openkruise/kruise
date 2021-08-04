@@ -166,6 +166,7 @@ func (r *ReconcileResourceDistribution) Reconcile(req ctrl.Request) (ctrl.Result
 	return ctrl.Result{}, err
 }
 
+// doReconcile distribute and sync the resource
 func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.ResourceDistribution) (*appsv1alpha1.ResourceDistributionStatus, error) {
 	// 1. init new distributor status
 	failedNamespaces := make(map[string]struct{})
@@ -176,10 +177,10 @@ func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.Re
 	isInTargets, allNamespaces, err := prepareNamespaces(r.Client, distributor)
 	if err != nil {
 		klog.Errorf("ResourceDistribution parse namespaces error, err: %v, name: %s", err, distributor.Name)
-		return updateNewStatus(newStatus, failedNamespaces), err
+		return makeNewStatus(newStatus, failedNamespaces), err
 	}
 
-	// deep copy target namespaces
+	// deep copy from target namespaces
 	for namespace := range isInTargets {
 		failedNamespaces[namespace] = struct{}{}
 	}
@@ -187,11 +188,11 @@ func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.Re
 	// 3. hash resource yaml as its version ID
 	newResourceHashCode := hashResource(distributor.Spec.Resource)
 
-	// 4. deserialize new resource as UnifiedResource type
+	// 4. deserialize new resource as UnifiedResource type for setting its metadata
 	newResource, errs := utils.DeserializeResource(&distributor.Spec.Resource, field.NewPath("resource"))
 	if len(errs) != 0 {
 		klog.Errorf("ResourceDistribution deserialize resource error, err: %v, name: %s", errs.ToAggregate(), distributor.Name)
-		return updateNewStatus(newStatus, failedNamespaces), errs.ToAggregate()
+		return makeNewStatus(newStatus, failedNamespaces), errs.ToAggregate()
 	}
 
 	// 5. begin to distribute and update resource
@@ -201,17 +202,17 @@ func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.Re
 		err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: newResource.GetName()}, existedResource)
 		if err != nil && !errors.IsNotFound(err) {
 			klog.Errorf("ResourceDistribution get resource error, err: %v, name: %s", err, distributor.Name)
-			return updateNewStatus(newStatus, failedNamespaces), err
+			return makeNewStatus(newStatus, failedNamespaces), err
 		}
 
 		// 5.2 resource doesn't exist
-		//	(1).if the namespace is in targets, distribute resource;
+		//  (1).if the namespace is in targets, distribute resource;
 		//  (2).else the namespace is NOT in targets, do nothing;
 		if err != nil && errors.IsNotFound(err) {
 			if _, ok := isInTargets[namespace]; ok {
 				if err := r.distributeResource(distributor, namespace, newResource, newResourceHashCode); err != nil {
 					klog.Errorf("ResourceDistribution create resource error, err: %v, name: %s", err, distributor.Name)
-					return updateNewStatus(newStatus, failedNamespaces), err
+					return makeNewStatus(newStatus, failedNamespaces), err
 				}
 				delete(failedNamespaces, namespace) // delete this namespace from this map if successful
 				newStatus.DistributedResources[namespace] = newResourceHashCode
@@ -220,42 +221,44 @@ func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.Re
 			continue
 		}
 
-		// 5.3 convert existedResource to UnifiedResource type for doing something
+		// 5.3 convert existedResource to UnifiedResource type for getting its annotations
 		oldResource, errs := utils.MakeUnifiedResourceFromObject(existedResource, field.NewPath(""))
 		if len(errs) != 0 {
 			klog.Errorf("ResourceDistribution convert resource to unifiedResource error, err: %v, name: %s", errs.ToAggregate(), distributor.Name)
-			return updateNewStatus(newStatus, failedNamespaces), errs.ToAggregate()
+			return makeNewStatus(newStatus, failedNamespaces), errs.ToAggregate()
 		}
 
 		// 5.4 resource exits
-		//	(1).if the namespace is in targets, update the resource;
+		//  (1).if the namespace is in targets and the old resource needs to update, update the resource;
 		//  (2).else if the namespace is NOT in targets and it was distributed by this distributor, delete the resource;
 		annotations := oldResource.GetObjectMeta().Annotations
 		_, ok := isInTargets[namespace]
 		if ok && (annotations != nil && newResourceHashCode != annotations[utils.ResourceHashCodeAnnotation]) {
 			if err := r.updateResource(distributor, namespace, newResource, newResourceHashCode); err != nil {
 				klog.Errorf("ResourceDistribution update resource error, err: %v, name: %s", err, distributor.Name)
-				return updateNewStatus(newStatus, failedNamespaces), err
+				return makeNewStatus(newStatus, failedNamespaces), err
 			}
-			delete(failedNamespaces, namespace) // delete this namespace from this map if successful
 			newStatus.DistributedResources[namespace] = newResourceHashCode
 			klog.V(3).Infof("ResourceDistribution(%s) update (%s/%s) for namespaces %s", distributor.Name, newResource.GetGroupVersionKind().Kind, newResource.GetName(), namespace)
 		} else if !ok && (annotations != nil && annotations[utils.SourceResourceDistributionOfResource] == distributor.Name) {
 			if err := r.deleteResource(namespace, oldResource); err != nil {
 				klog.Errorf("ResourceDistribution delete resource error, err: %v, name: %s", err, distributor.Name)
-				return updateNewStatus(newStatus, failedNamespaces), err
+				return makeNewStatus(newStatus, failedNamespaces), err
 			}
 			delete(failedNamespaces, namespace) // delete this namespace from this map if successful
-			delete(distributor.Status.DistributedResources, namespace)
 			klog.V(3).Infof("ResourceDistribution(%s) delete (%s/%s) for namespaces %s", distributor.Name, oldResource.GetGroupVersionKind().Kind, oldResource.GetName(), namespace)
+		}
+
+		if ok { // here means that target namespace has been processed successfully
+			delete(failedNamespaces, namespace) // delete this namespace from this map if successful
 		}
 	}
 
-	return newStatus, nil
+	return makeNewStatus(newStatus, failedNamespaces), nil
 }
 
-// updateNewStatus update Description field of status
-func updateNewStatus(status *appsv1alpha1.ResourceDistributionStatus, failedNamespaces map[string]struct{}) *appsv1alpha1.ResourceDistributionStatus {
+// makeNewStatus update Description field of status
+func makeNewStatus(status *appsv1alpha1.ResourceDistributionStatus, failedNamespaces map[string]struct{}) *appsv1alpha1.ResourceDistributionStatus {
 	var namespaceList []string
 	for namespace := range failedNamespaces {
 		namespaceList = append(namespaceList, namespace)
@@ -265,6 +268,7 @@ func updateNewStatus(status *appsv1alpha1.ResourceDistributionStatus, failedName
 	} else {
 		status.Description = fmt.Sprintf("%s: %v", ResourceDistributionFailed, namespaceList)
 	}
+
 	return status
 }
 
@@ -329,7 +333,7 @@ func (r *ReconcileResourceDistribution) updateDistributorStatus(distributor *app
 		return err
 	}
 
-	klog.V(3).Infof("RD(%s) update status success", distributor.Name)
+	klog.V(3).Infof("ResourceDistribution(%s) update status success", distributor.Name)
 	return nil
 }
 

@@ -40,6 +40,10 @@ type ResourceDistributionCreateUpdateHandler struct {
 
 var _ admission.Handler = &ResourceDistributionCreateUpdateHandler{}
 
+// validateResourceDistributionSpec validate Spec when creating and updating
+// 1. validate resource deserialization
+// 2. validate resource itself
+// 3. validate targets
 func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(obj, oldObj *appsv1alpha1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
 	spec := &obj.Spec
 
@@ -67,6 +71,9 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 	return
 }
 
+// validateResourceDistributionSpecResource validate Spec.Resource when creating and updating
+// 1. validate resource metadata
+// 2. validate updating conflict, GVK and name cannot be modified
 func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(resource, oldResource UnifiedResource, fldPath *field.Path) (allErrs field.ErrorList) {
 	// validate resource metadata
 	allErrs = append(allErrs, apimachineryvalidation.ValidateObjectMeta(resource.GetObjectMeta(), false, apimachineryvalidation.NameIsDNSSubdomain, fldPath.Child("metadata"))...)
@@ -81,6 +88,9 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 	return
 }
 
+// validateResourceDistributionSpecTargets validate Spec.Targets
+// 1. parse target namespaces
+// 2. validate conflict between existing resources
 func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecTargets(obj *appsv1alpha1.ResourceDistribution, resource UnifiedResource, fldPath *field.Path) (allErrs field.ErrorList) {
 	spec := &obj.Spec
 
@@ -99,6 +109,9 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 	return
 }
 
+// validateResourceDistribution is an entrance to validate ResourceDistribution when creating and updating
+// 1. validate ResourceDistribution metadata
+// 2. validate Spec
 func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1alpha1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
 	// validate metadata
 	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))

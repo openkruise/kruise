@@ -98,14 +98,17 @@ func TestResourceDistributionUpdateValidation(t *testing.T) {
 
 func TestResourceDistributionUpdateConflict(t *testing.T) {
 	// resource details
-	const changedResourceYaml = `apiVersion: v1
-kind: Secret
-metadata:
-  name: test-secret-modified-name
-type: kubernetes.io/basic-auth
-stringData:
-  username: admin
-  password: t0p-Secret`
+	const changedResourceJson = `{
+		"apiVersion": "v1",
+		"data": {
+			"test": "MWYyZDFlMmU2N2Rm"
+		},
+		"kind": "Secret",
+		"metadata": {
+			"name": "test-secret-1"
+		},
+		"type": "Opaque"
+	}`
 	// env details
 	conflictingResource := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -117,7 +120,7 @@ stringData:
 	// build rd objects
 	oldRD := buildResourceDistributionWithSecret()
 	newRD := oldRD.DeepCopy()
-	newRD.Spec.Resource.Raw = []byte(changedResourceYaml)
+	newRD.Spec.Resource.Raw = []byte(changedResourceJson)
 
 	makeEnvironment(oldRD, conflictingResource)
 
@@ -144,33 +147,35 @@ func TestGetTargetNamespaces(t *testing.T) {
 }
 
 func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
-	const resourceYaml = `apiVersion: v1
-kind: Secret
-metadata:
-  name: test-secret-1
-type: kubernetes.io/basic-auth
-stringData:
-  username: admin
-  password: t0p-Secret`
-	return buildResourceDistribution(resourceYaml)
+	const resourceJson = `{
+		"apiVersion": "v1",
+		"data": {
+			"test": "test"
+		},
+		"kind": "Secret",
+		"metadata": {
+			"name": "test-secret-1"
+		},
+		"type": "Opaque"
+	}`
+	return buildResourceDistribution(resourceJson)
 }
 
 func buildResourceDistributionWithConfigMap() *appsv1alpha1.ResourceDistribution {
-	const resourceYaml = `apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: game-demo
-data:
-  player_initial_lives: "3"
-  ui_properties_file_name: "user-interface.properties"
-  game.properties: |
-    enemy.types=aliens,monsters
-    player.maximum-lives=5
-  user-interface.properties: |
-    color.good=purple
-    color.bad=yellow
-    allow.textmode=true`
-	return buildResourceDistribution(resourceYaml)
+	const resourceJson = `{
+		"apiVersion": "v1",
+		"data": {
+			"game.properties": "enemy.types=aliens,monsters\nplayer.maximum-lives=5\n",
+			"player_initial_lives": "3",
+			"ui_properties_file_name": "user-interface.properties",
+			"user-interface.properties": "color.good=purple\ncolor.bad=yellow\nallow.textmode=true\n"
+		},
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "game-demo"
+		}
+	}`
+	return buildResourceDistribution(resourceJson)
 }
 
 func buildResourceDistribution(resourceYaml string) *appsv1alpha1.ResourceDistribution {

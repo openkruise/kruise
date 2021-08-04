@@ -77,15 +77,18 @@ func TestGetNamespaces(t *testing.T) {
 }
 
 func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
-	const resourceYaml = `apiVersion: v1
-kind: Secret
-metadata:
-  name: test-secret-1
-type: kubernetes.io/basic-auth
-stringData:
-  username: admin
-  password: t0p-Secret`
-	raw := runtime.RawExtension{Raw: []byte(resourceYaml)}
+	const resourceJson = `{
+		"apiVersion": "v1",
+		"data": {
+			"test": "test"
+		},
+		"kind": "Secret",
+		"metadata": {
+			"name": "test-secret-1"
+		},
+		"type": "Opaque"
+	}`
+	raw := runtime.RawExtension{Raw: []byte(resourceJson)}
 	return buildResourceDistribution(raw)
 }
 

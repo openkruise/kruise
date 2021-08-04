@@ -37,18 +37,17 @@ import (
 )
 
 // This file holds all operations about varying resources in this package;
-// If you want to add new-type resource, you only need to modified this file.
+// If you want to add new-type resource, you only need to modified this file, but don't forget add rbac in controller.
 
 const (
-	ResourceHashCodeAnnotation           = "kruise.io/resource-distribution.resource-hashcode"
-	SourceResourceDistributionOfResource = "kruise.io/from-resourcedistribution"
+	ResourceHashCodeAnnotation           = "kruise.io/resourcedistribution.resource.hashcode"
+	SourceResourceDistributionOfResource = "kruise.io/resourcedistribution.resource.from"
 )
 
 // UnifiedResource abstracts all behaviors of Resource
 type UnifiedResource interface {
 	GetName() string
 	GetObject() runtime.Object
-	NewObject() runtime.Object
 	GetObjectDeepCopy() runtime.Object
 	GetObjectMeta() *metav1.ObjectMeta
 	GetGroupVersionKind() *schema.GroupVersionKind
@@ -68,17 +67,6 @@ func (r *Resource) GetName() string {
 		return resource.Name
 	default:
 		return ""
-	}
-}
-
-func (r *Resource) NewObject() runtime.Object {
-	switch r.Object.(type) {
-	case *corev1.Secret:
-		return &corev1.Secret{}
-	case *corev1.ConfigMap:
-		return &corev1.ConfigMap{}
-	default:
-		return nil
 	}
 }
 
@@ -121,14 +109,14 @@ func MakeUnifiedResourceFromObject(resourceObject runtime.Object, fldPath *field
 }
 
 // DeserializeResource receives yaml of resource, returns UnifiedResource
-func DeserializeResource(resourceYAML *runtime.RawExtension, fldPath *field.Path) (resource UnifiedResource, allErrs field.ErrorList) {
+func DeserializeResource(resourceRawExtension *runtime.RawExtension, fldPath *field.Path) (resource UnifiedResource, allErrs field.ErrorList) {
 	// check whether resource yaml is empty
-	if resourceYAML.Raw == nil {
+	if resourceRawExtension.Raw == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "empty resource is not allowed"))
 		return
 	}
 	// deserialize yaml
-	resourceObject, _, err := legacyscheme.Codecs.UniversalDeserializer().Decode(resourceYAML.Raw, nil, nil)
+	resourceObject, _, err := legacyscheme.Codecs.UniversalDeserializer().Decode(resourceRawExtension.Raw, nil, nil)
 	if err != nil {
 		allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("failed to deserialize resource, err %v", err)))
 	}
