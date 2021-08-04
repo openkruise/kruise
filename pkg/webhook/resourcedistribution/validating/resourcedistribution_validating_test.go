@@ -98,7 +98,7 @@ func TestResourceDistributionUpdateValidation(t *testing.T) {
 
 func TestResourceDistributionUpdateConflict(t *testing.T) {
 	// resource details
-	const changedResourceJson = `{
+	const changedResourceJSON = `{
 		"apiVersion": "v1",
 		"data": {
 			"test": "MWYyZDFlMmU2N2Rm"
@@ -120,7 +120,7 @@ func TestResourceDistributionUpdateConflict(t *testing.T) {
 	// build rd objects
 	oldRD := buildResourceDistributionWithSecret()
 	newRD := oldRD.DeepCopy()
-	newRD.Spec.Resource.Raw = []byte(changedResourceJson)
+	newRD.Spec.Resource.Raw = []byte(changedResourceJSON)
 
 	makeEnvironment(oldRD, conflictingResource)
 
@@ -147,7 +147,7 @@ func TestGetTargetNamespaces(t *testing.T) {
 }
 
 func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
-	const resourceJson = `{
+	const resourceJSON = `{
 		"apiVersion": "v1",
 		"data": {
 			"test": "test"
@@ -158,11 +158,11 @@ func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
 		},
 		"type": "Opaque"
 	}`
-	return buildResourceDistribution(resourceJson)
+	return buildResourceDistribution(resourceJSON)
 }
 
 func buildResourceDistributionWithConfigMap() *appsv1alpha1.ResourceDistribution {
-	const resourceJson = `{
+	const resourceJSON = `{
 		"apiVersion": "v1",
 		"data": {
 			"game.properties": "enemy.types=aliens,monsters\nplayer.maximum-lives=5\n",
@@ -175,7 +175,7 @@ func buildResourceDistributionWithConfigMap() *appsv1alpha1.ResourceDistribution
 			"name": "game-demo"
 		}
 	}`
-	return buildResourceDistribution(resourceJson)
+	return buildResourceDistribution(resourceJSON)
 }
 
 func buildResourceDistribution(resourceYaml string) *appsv1alpha1.ResourceDistribution {

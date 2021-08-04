@@ -77,7 +77,7 @@ func TestGetNamespaces(t *testing.T) {
 }
 
 func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
-	const resourceJson = `{
+	const resourceJSON = `{
 		"apiVersion": "v1",
 		"data": {
 			"test": "test"
@@ -88,7 +88,7 @@ func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
 		},
 		"type": "Opaque"
 	}`
-	raw := runtime.RawExtension{Raw: []byte(resourceJson)}
+	raw := runtime.RawExtension{Raw: []byte(resourceJSON)}
 	return buildResourceDistribution(raw)
 }
 
