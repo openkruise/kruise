@@ -25,6 +25,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/imagepulljob"
 	"github.com/openkruise/kruise/pkg/controller/nodeimage"
 	"github.com/openkruise/kruise/pkg/controller/podreadiness"
+	"github.com/openkruise/kruise/pkg/controller/podunavailablebudget"
 	"github.com/openkruise/kruise/pkg/controller/sidecarset"
 	"github.com/openkruise/kruise/pkg/controller/statefulset"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment"
@@ -47,6 +48,7 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, sidecarset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, statefulset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, uniteddeployment.Add)
+	controllerAddFuncs = append(controllerAddFuncs, podunavailablebudget.Add)
 }
 
 func SetupWithManager(m manager.Manager) error {

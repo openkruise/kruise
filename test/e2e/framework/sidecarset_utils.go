@@ -138,6 +138,7 @@ func (s *SidecarSetTester) CreateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	s.WaitForSidecarSetCreated(sidecarSet)
 	sidecarSet, _ = s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
+	time.Sleep(time.Second)
 	return sidecarSet
 }
 

@@ -23,7 +23,9 @@ import (
 	"reflect"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,8 +54,11 @@ var _ admission.Handler = &PodUnavailableBudgetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &policyv1alpha1.PodUnavailableBudget{}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetGate) {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("feature PodUnavailableBudget is invalid, please open via feature-gate(%s)", features.PodUnavailableBudgetGate))
+	}
 
+	obj := &policyv1alpha1.PodUnavailableBudget{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
