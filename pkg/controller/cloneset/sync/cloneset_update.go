@@ -23,9 +23,14 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
@@ -113,9 +118,28 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	// 5. limit max count of pods can update
 	waitUpdateIndexes = limitUpdateIndexes(coreControl, cs.Spec.MinReadySeconds, diffRes, waitUpdateIndexes, pods)
 
+	// Determine the pub before updating the pod
+	var pub *policyv1alpha1.PodUnavailableBudget
+	var err error
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetGate) && len(waitUpdateIndexes) > 0 {
+		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, controllerfinder.NewControllerFinder(c.Client), pods[waitUpdateIndexes[0]])
+		if err != nil {
+			return requeueDuration.Get(), err
+		}
+	}
 	// 6. update pods
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
+		// Determine the pub before updating the pod
+		if pub != nil {
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, pod, pubcontrol.NewPubControl(pub), pubcontrol.UpdateOperation, false)
+			if err != nil {
+				return requeueDuration.Get(), err
+				// pub check does not pass, try again in seconds
+			} else if !allowed {
+				return time.Second, nil
+			}
+		}
 		targetRevision := updateRevision
 		if diffRes.updateNum < 0 {
 			targetRevision = currentRevision

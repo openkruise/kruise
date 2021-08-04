@@ -385,6 +385,8 @@ var _ = SIGDescribe("sidecarset", func() {
 			// get pods
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn := pods[0]
+			gomega.Expect(podIn.Spec.Containers).To(gomega.HaveLen(2))
 			// except envs
 			exceptEnvs := map[string]string{
 				"POD_NAME":    "bar",
@@ -392,7 +394,7 @@ var _ = SIGDescribe("sidecarset", func() {
 				"PROXY_IP":    "127.0.0.1",
 				"SidecarName": "nginx-sidecar",
 			}
-			sidecarContainer := &pods[0].Spec.Containers[0]
+			sidecarContainer := &podIn.Spec.Containers[0]
 			// envs
 			for key, value := range exceptEnvs {
 				object := util.GetContainerEnvValue(sidecarContainer, key)

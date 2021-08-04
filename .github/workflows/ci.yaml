@@ -152,6 +152,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
@@ -210,6 +211,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
@@ -268,6 +270,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
@@ -326,6 +329,7 @@ jobs:
           done
           set +e
           PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
           kubectl get all -n kruise-system -o yaml
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
           kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
