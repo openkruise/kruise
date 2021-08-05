@@ -24,6 +24,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -44,9 +45,18 @@ type PodCreateHandler struct {
 }
 
 func (h *PodCreateHandler) validatingPodFn(ctx context.Context, req admission.Request) (allowed bool, reason string, err error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetGate) {
-		allowed, reason, err = h.podUnavailableBudgetValidatingPod(ctx, req)
+	allowed = true
+	switch req.Operation {
+	case admissionv1beta1.Update:
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
+			allowed, reason, err = h.podUnavailableBudgetValidatingPod(ctx, req)
+		}
+	case admissionv1beta1.Delete, admissionv1beta1.Create:
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetDeleteGate) {
+			allowed, reason, err = h.podUnavailableBudgetValidatingPod(ctx, req)
+		}
 	}
+
 	return
 }
 

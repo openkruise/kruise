@@ -121,7 +121,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	// Determine the pub before updating the pod
 	var pub *policyv1alpha1.PodUnavailableBudget
 	var err error
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetGate) && len(waitUpdateIndexes) > 0 {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) && len(waitUpdateIndexes) > 0 {
 		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, controllerfinder.NewControllerFinder(c.Client), pods[waitUpdateIndexes[0]])
 		if err != nil {
 			return requeueDuration.Get(), err
