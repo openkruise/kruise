@@ -45,7 +45,7 @@ func NewGenericRuntime(
 	runtimeName string,
 	runtimeService criapi.RuntimeService,
 	recorder record.EventRecorder,
-	httpClient kubelettypes.HttpGetter,
+	httpClient kubelettypes.HTTPGetter,
 ) Runtime {
 	kubeRuntimeManager := &genericRuntimeManager{
 		runtimeName:    runtimeName,

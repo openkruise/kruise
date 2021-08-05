@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -36,7 +37,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-var _ = SIGDescribe("sidecarset", func() {
+var _ = SIGDescribe("SidecarSet", func() {
 	f := framework.NewDefaultFramework("sidecarset")
 	var ns string
 	var c clientset.Interface
@@ -742,7 +743,7 @@ var _ = SIGDescribe("sidecarset", func() {
 				ReadyPods:        1,
 			}
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
-			sidecarSetIn, _ = kc.AppsV1alpha1().SidecarSets().Get(sidecarSetIn.Name, metav1.GetOptions{})
+			sidecarSetIn, _ = kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetIn.Name, metav1.GetOptions{})
 			hash1 := sidecarSetIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation]
 
 			// update sidecarSet sidecar container
@@ -750,7 +751,7 @@ var _ = SIGDescribe("sidecarset", func() {
 			tester.UpdateSidecarSet(sidecarSetIn)
 			ginkgo.By(fmt.Sprintf("update sidecarset init container image, and sidecarSet hash not changed"))
 			time.Sleep(time.Second * 5)
-			sidecarSetIn, _ = kc.AppsV1alpha1().SidecarSets().Get(sidecarSetIn.Name, metav1.GetOptions{})
+			sidecarSetIn, _ = kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetIn.Name, metav1.GetOptions{})
 			hash2 := sidecarSetIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation]
 			// hash not changed
 			gomega.Expect(hash1).To(gomega.Equal(hash2))

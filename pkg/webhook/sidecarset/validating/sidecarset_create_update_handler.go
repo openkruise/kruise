@@ -219,7 +219,7 @@ func validateContainersForSidecarSet(
 		},
 	}
 
-	allErrs = append(allErrs, corevalidation.ValidatePod(fakePod)...)
+	allErrs = append(allErrs, corevalidation.ValidatePod(fakePod, corevalidation.PodValidationOptions{})...)
 
 	return allErrs
 }

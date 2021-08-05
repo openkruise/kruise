@@ -26,7 +26,7 @@ var (
 
 	sidecarSetDemo = &appsv1alpha1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Generation: 123,
+			//Generation: 123,
 			Annotations: map[string]string{
 				sidecarcontrol.SidecarSetHashAnnotation: "bbb",
 			},
@@ -59,10 +59,9 @@ var (
 			Annotations: map[string]string{
 				sidecarcontrol.SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"aaa"}}`,
 			},
-			Name:            "test-pod-1",
-			Namespace:       "default",
-			Labels:          map[string]string{"app": "nginx"},
-			ResourceVersion: "495711227",
+			Name:      "test-pod-1",
+			Namespace: "default",
+			Labels:    map[string]string{"app": "nginx"},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{

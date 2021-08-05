@@ -18,6 +18,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -60,13 +61,13 @@ func NewFilteredStatefulSetInformer(client versioned.Interface, namespace string
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta1().StatefulSets(namespace).List(options)
+				return client.AppsV1beta1().StatefulSets(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1beta1().StatefulSets(namespace).Watch(options)
+				return client.AppsV1beta1().StatefulSets(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&appsv1beta1.StatefulSet{},

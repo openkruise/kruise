@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
@@ -70,11 +71,11 @@ func (t *CloneSetTester) NewCloneSet(name string, replicas int32, updateStrategy
 }
 
 func (t *CloneSetTester) CreateCloneSet(cs *appsv1alpha1.CloneSet) (*appsv1alpha1.CloneSet, error) {
-	return t.kc.AppsV1alpha1().CloneSets(t.ns).Create(cs)
+	return t.kc.AppsV1alpha1().CloneSets(t.ns).Create(context.TODO(), cs, metav1.CreateOptions{})
 }
 
 func (t *CloneSetTester) GetCloneSet(name string) (*appsv1alpha1.CloneSet, error) {
-	return t.kc.AppsV1alpha1().CloneSets(t.ns).Get(name, metav1.GetOptions{})
+	return t.kc.AppsV1alpha1().CloneSets(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (t *CloneSetTester) UpdateCloneSet(name string, fn func(cs *appsv1alpha1.CloneSet)) error {
@@ -85,13 +86,13 @@ func (t *CloneSetTester) UpdateCloneSet(name string, fn func(cs *appsv1alpha1.Cl
 		}
 
 		fn(cs)
-		_, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Update(cs)
+		_, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Update(context.TODO(), cs, metav1.UpdateOptions{})
 		return err
 	})
 }
 
 func (t *CloneSetTester) ListImagePullJobsForCloneSet(name string) (jobs []*appsv1alpha1.ImagePullJob, err error) {
-	jobList, err := t.kc.AppsV1alpha1().ImagePullJobs(t.ns).List(metav1.ListOptions{})
+	jobList, err := t.kc.AppsV1alpha1().ImagePullJobs(t.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -105,5 +106,5 @@ func (t *CloneSetTester) ListImagePullJobsForCloneSet(name string) (jobs []*apps
 }
 
 func (t *CloneSetTester) DeleteCloneSet(name string) error {
-	return t.kc.AppsV1alpha1().CloneSets(t.ns).Delete(name, &metav1.DeleteOptions{})
+	return t.kc.AppsV1alpha1().CloneSets(t.ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }

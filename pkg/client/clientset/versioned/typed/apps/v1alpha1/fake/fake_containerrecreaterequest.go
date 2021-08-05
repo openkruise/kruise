@@ -18,6 +18,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -38,7 +40,7 @@ var containerrecreaterequestsResource = schema.GroupVersionResource{Group: "apps
 var containerrecreaterequestsKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "ContainerRecreateRequest"}
 
 // Get takes name of the containerRecreateRequest, and returns the corresponding containerRecreateRequest object, and an error if there is any.
-func (c *FakeContainerRecreateRequests) Get(name string, options v1.GetOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *FakeContainerRecreateRequests) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(containerrecreaterequestsResource, c.ns, name), &v1alpha1.ContainerRecreateRequest{})
 
@@ -49,7 +51,7 @@ func (c *FakeContainerRecreateRequests) Get(name string, options v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of ContainerRecreateRequests that match those selectors.
-func (c *FakeContainerRecreateRequests) List(opts v1.ListOptions) (result *v1alpha1.ContainerRecreateRequestList, err error) {
+func (c *FakeContainerRecreateRequests) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ContainerRecreateRequestList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(containerrecreaterequestsResource, containerrecreaterequestsKind, c.ns, opts), &v1alpha1.ContainerRecreateRequestList{})
 
@@ -71,14 +73,14 @@ func (c *FakeContainerRecreateRequests) List(opts v1.ListOptions) (result *v1alp
 }
 
 // Watch returns a watch.Interface that watches the requested containerRecreateRequests.
-func (c *FakeContainerRecreateRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeContainerRecreateRequests) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(containerrecreaterequestsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a containerRecreateRequest and creates it.  Returns the server's representation of the containerRecreateRequest, and an error, if there is any.
-func (c *FakeContainerRecreateRequests) Create(containerRecreateRequest *v1alpha1.ContainerRecreateRequest) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *FakeContainerRecreateRequests) Create(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.CreateOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(containerrecreaterequestsResource, c.ns, containerRecreateRequest), &v1alpha1.ContainerRecreateRequest{})
 
@@ -89,7 +91,7 @@ func (c *FakeContainerRecreateRequests) Create(containerRecreateRequest *v1alpha
 }
 
 // Update takes the representation of a containerRecreateRequest and updates it. Returns the server's representation of the containerRecreateRequest, and an error, if there is any.
-func (c *FakeContainerRecreateRequests) Update(containerRecreateRequest *v1alpha1.ContainerRecreateRequest) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *FakeContainerRecreateRequests) Update(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.UpdateOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(containerrecreaterequestsResource, c.ns, containerRecreateRequest), &v1alpha1.ContainerRecreateRequest{})
 
@@ -101,7 +103,7 @@ func (c *FakeContainerRecreateRequests) Update(containerRecreateRequest *v1alpha
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeContainerRecreateRequests) UpdateStatus(containerRecreateRequest *v1alpha1.ContainerRecreateRequest) (*v1alpha1.ContainerRecreateRequest, error) {
+func (c *FakeContainerRecreateRequests) UpdateStatus(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.UpdateOptions) (*v1alpha1.ContainerRecreateRequest, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(containerrecreaterequestsResource, "status", c.ns, containerRecreateRequest), &v1alpha1.ContainerRecreateRequest{})
 
@@ -112,7 +114,7 @@ func (c *FakeContainerRecreateRequests) UpdateStatus(containerRecreateRequest *v
 }
 
 // Delete takes name of the containerRecreateRequest and deletes it. Returns an error if one occurs.
-func (c *FakeContainerRecreateRequests) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeContainerRecreateRequests) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(containerrecreaterequestsResource, c.ns, name), &v1alpha1.ContainerRecreateRequest{})
 
@@ -120,15 +122,15 @@ func (c *FakeContainerRecreateRequests) Delete(name string, options *v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeContainerRecreateRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(containerrecreaterequestsResource, c.ns, listOptions)
+func (c *FakeContainerRecreateRequests) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(containerrecreaterequestsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ContainerRecreateRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched containerRecreateRequest.
-func (c *FakeContainerRecreateRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *FakeContainerRecreateRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(containerrecreaterequestsResource, c.ns, name, pt, data, subresources...), &v1alpha1.ContainerRecreateRequest{})
 

@@ -18,6 +18,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -36,15 +37,15 @@ type BroadcastJobsGetter interface {
 
 // BroadcastJobInterface has methods to work with BroadcastJob resources.
 type BroadcastJobInterface interface {
-	Create(*v1alpha1.BroadcastJob) (*v1alpha1.BroadcastJob, error)
-	Update(*v1alpha1.BroadcastJob) (*v1alpha1.BroadcastJob, error)
-	UpdateStatus(*v1alpha1.BroadcastJob) (*v1alpha1.BroadcastJob, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.BroadcastJob, error)
-	List(opts v1.ListOptions) (*v1alpha1.BroadcastJobList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.BroadcastJob, err error)
+	Create(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.CreateOptions) (*v1alpha1.BroadcastJob, error)
+	Update(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (*v1alpha1.BroadcastJob, error)
+	UpdateStatus(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (*v1alpha1.BroadcastJob, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.BroadcastJob, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.BroadcastJobList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.BroadcastJob, err error)
 	BroadcastJobExpansion
 }
 
@@ -63,20 +64,20 @@ func newBroadcastJobs(c *AppsV1alpha1Client, namespace string) *broadcastJobs {
 }
 
 // Get takes name of the broadcastJob, and returns the corresponding broadcastJob object, and an error if there is any.
-func (c *broadcastJobs) Get(name string, options v1.GetOptions) (result *v1alpha1.BroadcastJob, err error) {
+func (c *broadcastJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.BroadcastJob, err error) {
 	result = &v1alpha1.BroadcastJob{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("broadcastjobs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of BroadcastJobs that match those selectors.
-func (c *broadcastJobs) List(opts v1.ListOptions) (result *v1alpha1.BroadcastJobList, err error) {
+func (c *broadcastJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.BroadcastJobList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -87,13 +88,13 @@ func (c *broadcastJobs) List(opts v1.ListOptions) (result *v1alpha1.BroadcastJob
 		Resource("broadcastjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested broadcastJobs.
-func (c *broadcastJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *broadcastJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -104,87 +105,90 @@ func (c *broadcastJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("broadcastjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a broadcastJob and creates it.  Returns the server's representation of the broadcastJob, and an error, if there is any.
-func (c *broadcastJobs) Create(broadcastJob *v1alpha1.BroadcastJob) (result *v1alpha1.BroadcastJob, err error) {
+func (c *broadcastJobs) Create(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.CreateOptions) (result *v1alpha1.BroadcastJob, err error) {
 	result = &v1alpha1.BroadcastJob{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("broadcastjobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(broadcastJob).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a broadcastJob and updates it. Returns the server's representation of the broadcastJob, and an error, if there is any.
-func (c *broadcastJobs) Update(broadcastJob *v1alpha1.BroadcastJob) (result *v1alpha1.BroadcastJob, err error) {
+func (c *broadcastJobs) Update(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (result *v1alpha1.BroadcastJob, err error) {
 	result = &v1alpha1.BroadcastJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("broadcastjobs").
 		Name(broadcastJob.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(broadcastJob).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *broadcastJobs) UpdateStatus(broadcastJob *v1alpha1.BroadcastJob) (result *v1alpha1.BroadcastJob, err error) {
+func (c *broadcastJobs) UpdateStatus(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (result *v1alpha1.BroadcastJob, err error) {
 	result = &v1alpha1.BroadcastJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("broadcastjobs").
 		Name(broadcastJob.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(broadcastJob).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the broadcastJob and deletes it. Returns an error if one occurs.
-func (c *broadcastJobs) Delete(name string, options *v1.DeleteOptions) error {
+func (c *broadcastJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("broadcastjobs").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *broadcastJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *broadcastJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("broadcastjobs").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched broadcastJob.
-func (c *broadcastJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.BroadcastJob, err error) {
+func (c *broadcastJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.BroadcastJob, err error) {
 	result = &v1alpha1.BroadcastJob{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("broadcastjobs").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

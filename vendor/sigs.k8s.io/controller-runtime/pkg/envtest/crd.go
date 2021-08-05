@@ -340,7 +340,7 @@ func readCRDs(basePath string, files []os.FileInfo) ([]*unstructured.Unstructure
 	crdExts := sets.NewString(".json", ".yaml", ".yml")
 
 	for _, file := range files {
-		// Only parse whitelisted file types
+		// Only parse allowlisted file types
 		if !crdExts.Has(filepath.Ext(file.Name())) {
 			continue
 		}
