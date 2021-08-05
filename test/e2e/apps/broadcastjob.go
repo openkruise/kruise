@@ -93,7 +93,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				job, err = tester.GetBroadcastJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Desired
-			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			}, 10*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
 
 			gomega.Eventually(func() int {
 				pods, err := tester.GetPodsOfJob(job)
