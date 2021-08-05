@@ -85,7 +85,8 @@ func Add(mgr manager.Manager) error {
 	if !utildiscovery.DiscoverGVK(controllerKind) {
 		return nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetGate) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetDeleteGate) &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
 		return nil
 	}
 	return add(mgr, newReconciler(mgr))
