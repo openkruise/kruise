@@ -60,7 +60,12 @@ const (
 	ResourcesDeletionProtection featuregate.Feature = "ResourcesDeletionProtection"
 
 	// Whether to enable pub capability, default: false
-	PodUnavailableBudgetGate featuregate.Feature = "PodUnavailableBudgetGate"
+	// Protection only pod deletion and eviction request
+	PodUnavailableBudgetDeleteGate featuregate.Feature = "PodUnavailableBudgetDeleteGate"
+
+	// Whether to enable pub capability, default: false
+	// Protection only pod update request
+	PodUnavailableBudgetUpdateGate featuregate.Feature = "PodUnavailableBudgetUpdateGate"
 
 	// DaemonWatchingPod enables kruise-daemon to list watch pods that belong to the same node.
 	DaemonWatchingPod featuregate.Feature = "DaemonWatchingPod"
@@ -76,7 +81,8 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetPartitionRollback:        {Default: false, PreRelease: featuregate.Alpha},
 	ResourcesDeletionProtection:      {Default: false, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetGate:         {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetDeleteGate:   {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetUpdateGate:   {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
