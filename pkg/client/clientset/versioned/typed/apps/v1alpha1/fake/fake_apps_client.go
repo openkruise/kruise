@@ -67,6 +67,10 @@ func (c *FakeAppsV1alpha1) UnitedDeployments(namespace string) v1alpha1.UnitedDe
 	return &FakeUnitedDeployments{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) WorkloadSpreads(namespace string) v1alpha1.WorkloadSpreadInterface {
+	return &FakeWorkloadSpreads{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1alpha1) RESTClient() rest.Interface {

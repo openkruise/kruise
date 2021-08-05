@@ -43,6 +43,8 @@ type Interface interface {
 	StatefulSets() StatefulSetInformer
 	// UnitedDeployments returns a UnitedDeploymentInformer.
 	UnitedDeployments() UnitedDeploymentInformer
+	// WorkloadSpreads returns a WorkloadSpreadInformer.
+	WorkloadSpreads() WorkloadSpreadInformer
 }
 
 type version struct {
@@ -104,4 +106,9 @@ func (v *version) StatefulSets() StatefulSetInformer {
 // UnitedDeployments returns a UnitedDeploymentInformer.
 func (v *version) UnitedDeployments() UnitedDeploymentInformer {
 	return &unitedDeploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// WorkloadSpreads returns a WorkloadSpreadInformer.
+func (v *version) WorkloadSpreads() WorkloadSpreadInformer {
+	return &workloadSpreadInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

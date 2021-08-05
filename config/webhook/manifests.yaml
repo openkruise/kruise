@@ -517,3 +517,21 @@ webhooks:
     - DELETE
     resources:
     - uniteddeployments
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-workloadspread
+  failurePolicy: Fail
+  name: vworkloadspread.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - workloadspreads
