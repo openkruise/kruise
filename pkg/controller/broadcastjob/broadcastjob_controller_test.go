@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -58,7 +58,7 @@ func TestGetNodeToPodMap(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "p02"},
 			Spec: v1.PodSpec{Affinity: &v1.Affinity{NodeAffinity: &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
-					MatchFields: []v1.NodeSelectorRequirement{{Key: schedulerapi.NodeFieldSelectorKeyNodeName, Operator: v1.NodeSelectorOpIn, Values: []string{"n02"}}},
+					MatchFields: []v1.NodeSelectorRequirement{{Key: core.ObjectNameField, Operator: v1.NodeSelectorOpIn, Values: []string{"n02"}}},
 				}}},
 			}}},
 		},
@@ -70,7 +70,7 @@ func TestGetNodeToPodMap(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "p04"},
 			Spec: v1.PodSpec{Affinity: &v1.Affinity{NodeAffinity: &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{{
-					MatchFields: []v1.NodeSelectorRequirement{{Key: schedulerapi.NodeFieldSelectorKeyNodeName, Operator: v1.NodeSelectorOpIn, Values: []string{"n04"}}},
+					MatchFields: []v1.NodeSelectorRequirement{{Key: core.ObjectNameField, Operator: v1.NodeSelectorOpIn, Values: []string{"n04"}}},
 				}}},
 			}}},
 		},

@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -69,18 +70,18 @@ func (t *ContainerRecreateTester) CreateTestCloneSetAndGetPods(randStr string, r
 	}
 
 	var err error
-	if _, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Create(set); err != nil {
+	if _, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Create(context.TODO(), set, metav1.CreateOptions{}); err != nil {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}
 
 	// Wait for 60s
 	gomega.Eventually(func() int32 {
-		set, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Get(set.Name, metav1.GetOptions{})
+		set, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Get(context.TODO(), set.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		return set.Status.ReadyReplicas
-	}, 60*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
+	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
 
-	podList, err := t.c.CoreV1().Pods(t.ns).List(metav1.ListOptions{LabelSelector: "rand=" + randStr})
+	podList, err := t.c.CoreV1().Pods(t.ns).List(context.TODO(), metav1.ListOptions{LabelSelector: "rand=" + randStr})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	for i := range podList.Items {
 		p := &podList.Items[i]
@@ -90,23 +91,23 @@ func (t *ContainerRecreateTester) CreateTestCloneSetAndGetPods(randStr string, r
 }
 
 func (t *ContainerRecreateTester) CleanAllTestResources() error {
-	if err := t.kc.AppsV1alpha1().ContainerRecreateRequests(t.ns).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+	if err := t.kc.AppsV1alpha1().ContainerRecreateRequests(t.ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
 		return err
 	}
-	if err := t.kc.AppsV1alpha1().CloneSets(t.ns).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+	if err := t.kc.AppsV1alpha1().CloneSets(t.ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (t *ContainerRecreateTester) CreateCRR(crr *appsv1alpha1.ContainerRecreateRequest) (*appsv1alpha1.ContainerRecreateRequest, error) {
-	return t.kc.AppsV1alpha1().ContainerRecreateRequests(crr.Namespace).Create(crr)
+	return t.kc.AppsV1alpha1().ContainerRecreateRequests(crr.Namespace).Create(context.TODO(), crr, metav1.CreateOptions{})
 }
 
 func (t *ContainerRecreateTester) GetCRR(name string) (*appsv1alpha1.ContainerRecreateRequest, error) {
-	return t.kc.AppsV1alpha1().ContainerRecreateRequests(t.ns).Get(name, metav1.GetOptions{})
+	return t.kc.AppsV1alpha1().ContainerRecreateRequests(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (t *ContainerRecreateTester) GetPod(name string) (*v1.Pod, error) {
-	return t.c.CoreV1().Pods(t.ns).Get(name, metav1.GetOptions{})
+	return t.c.CoreV1().Pods(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }

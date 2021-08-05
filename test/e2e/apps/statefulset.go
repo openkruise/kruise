@@ -84,7 +84,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
-			_, err := c.CoreV1().Services(ns).Create(headlessService)
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
@@ -104,7 +104,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.PauseNewPods(ss)
 
-			_, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			_, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
@@ -146,7 +146,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ss.Kind = kind
 
@@ -228,7 +228,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.PauseNewPods(ss)
 
-			_, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			_, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			time.Sleep(time.Minute)
@@ -296,7 +296,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}()}
 				}(),
 			}
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -500,7 +500,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -589,7 +589,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				},
 			}
 			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -677,7 +677,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			ginkgo.By("Initializing watcher for selector " + psLabels.String())
-			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -686,7 +686,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss, err = kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			ss, err = kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -721,7 +721,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Scale down will halt with unhealthy stateful pod")
-			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -767,7 +767,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -826,7 +826,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					NodeName: node.Name,
 				},
 			}
-			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
@@ -834,7 +834,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = kc.AppsV1alpha1().StatefulSets(f.Namespace.Name).Create(ss)
+			_, err = kc.AppsV1alpha1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -844,7 +844,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			ginkgo.By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.StatefulPodTimeout)
 			defer cancel()
@@ -869,13 +869,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			ginkgo.By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
-			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
 			// we may catch delete event, that's why we are waiting for running phase like this, and not with watchtools.UntilWithoutRetry
 			gomega.Eventually(func() error {
-				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(statefulPodName, metav1.GetOptions{})
+				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), statefulPodName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -900,13 +900,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 
 			ginkgo.By("getting scale subresource")
-			scale, err := kc.AppsV1alpha1().StatefulSets(ns).GetScale(ssName, metav1.GetOptions{})
+			scale, err := kc.AppsV1alpha1().StatefulSets(ns).GetScale(context.TODO(), ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
@@ -916,14 +916,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("updating a scale subresource")
 			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = 2
-			scaleResult, err := kc.AppsV1alpha1().StatefulSets(ns).UpdateScale(ssName, scale)
+			scaleResult, err := kc.AppsV1alpha1().StatefulSets(ns).UpdateScale(context.TODO(), ssName, scale, metav1.UpdateOptions{})
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
 			framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
 
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
-			ss, err = kc.AppsV1alpha1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
+			ss, err = kc.AppsV1alpha1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
@@ -1196,7 +1196,7 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string, ss *appsv1alpha1.StatefulSet) {
 	sst := framework.NewStatefulSetTester(c, kc)
 	sst.SetHTTPProbe(ss)
-	ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(ss)
+	ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	ss = sst.WaitForStatus(ss)

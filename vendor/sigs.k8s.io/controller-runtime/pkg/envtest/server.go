@@ -95,7 +95,7 @@ type Environment struct {
 	// CRDInstallOptions are the options for installing CRDs.
 	CRDInstallOptions CRDInstallOptions
 
-	// CRDInstallOptions are the options for installing webhooks.
+	// WebhookInstallOptions are the options for installing webhooks.
 	WebhookInstallOptions WebhookInstallOptions
 
 	// ErrorIfCRDPathMissing provides an interface for the underlying

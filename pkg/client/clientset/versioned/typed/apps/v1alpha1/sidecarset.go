@@ -18,6 +18,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -36,15 +37,15 @@ type SidecarSetsGetter interface {
 
 // SidecarSetInterface has methods to work with SidecarSet resources.
 type SidecarSetInterface interface {
-	Create(*v1alpha1.SidecarSet) (*v1alpha1.SidecarSet, error)
-	Update(*v1alpha1.SidecarSet) (*v1alpha1.SidecarSet, error)
-	UpdateStatus(*v1alpha1.SidecarSet) (*v1alpha1.SidecarSet, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.SidecarSet, error)
-	List(opts v1.ListOptions) (*v1alpha1.SidecarSetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.SidecarSet, err error)
+	Create(ctx context.Context, sidecarSet *v1alpha1.SidecarSet, opts v1.CreateOptions) (*v1alpha1.SidecarSet, error)
+	Update(ctx context.Context, sidecarSet *v1alpha1.SidecarSet, opts v1.UpdateOptions) (*v1alpha1.SidecarSet, error)
+	UpdateStatus(ctx context.Context, sidecarSet *v1alpha1.SidecarSet, opts v1.UpdateOptions) (*v1alpha1.SidecarSet, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.SidecarSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.SidecarSetList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.SidecarSet, err error)
 	SidecarSetExpansion
 }
 
@@ -61,19 +62,19 @@ func newSidecarSets(c *AppsV1alpha1Client) *sidecarSets {
 }
 
 // Get takes name of the sidecarSet, and returns the corresponding sidecarSet object, and an error if there is any.
-func (c *sidecarSets) Get(name string, options v1.GetOptions) (result *v1alpha1.SidecarSet, err error) {
+func (c *sidecarSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Get().
 		Resource("sidecarsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of SidecarSets that match those selectors.
-func (c *sidecarSets) List(opts v1.ListOptions) (result *v1alpha1.SidecarSetList, err error) {
+func (c *sidecarSets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.SidecarSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -83,13 +84,13 @@ func (c *sidecarSets) List(opts v1.ListOptions) (result *v1alpha1.SidecarSetList
 		Resource("sidecarsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested sidecarSets.
-func (c *sidecarSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *sidecarSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -99,81 +100,84 @@ func (c *sidecarSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("sidecarsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a sidecarSet and creates it.  Returns the server's representation of the sidecarSet, and an error, if there is any.
-func (c *sidecarSets) Create(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.SidecarSet, err error) {
+func (c *sidecarSets) Create(ctx context.Context, sidecarSet *v1alpha1.SidecarSet, opts v1.CreateOptions) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Post().
 		Resource("sidecarsets").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(sidecarSet).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a sidecarSet and updates it. Returns the server's representation of the sidecarSet, and an error, if there is any.
-func (c *sidecarSets) Update(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.SidecarSet, err error) {
+func (c *sidecarSets) Update(ctx context.Context, sidecarSet *v1alpha1.SidecarSet, opts v1.UpdateOptions) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Put().
 		Resource("sidecarsets").
 		Name(sidecarSet.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(sidecarSet).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *sidecarSets) UpdateStatus(sidecarSet *v1alpha1.SidecarSet) (result *v1alpha1.SidecarSet, err error) {
+func (c *sidecarSets) UpdateStatus(ctx context.Context, sidecarSet *v1alpha1.SidecarSet, opts v1.UpdateOptions) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Put().
 		Resource("sidecarsets").
 		Name(sidecarSet.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(sidecarSet).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the sidecarSet and deletes it. Returns an error if one occurs.
-func (c *sidecarSets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *sidecarSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("sidecarsets").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *sidecarSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *sidecarSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("sidecarsets").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched sidecarSet.
-func (c *sidecarSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.SidecarSet, err error) {
+func (c *sidecarSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.SidecarSet, err error) {
 	result = &v1alpha1.SidecarSet{}
 	err = c.client.Patch(pt).
 		Resource("sidecarsets").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

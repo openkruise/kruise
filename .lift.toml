@@ -1,0 +1,4 @@
+# Ignore go vendor directories
+ignoreFiles = """
+vendor/
+"""

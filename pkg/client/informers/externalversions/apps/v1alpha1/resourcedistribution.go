@@ -18,6 +18,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -59,13 +60,13 @@ func NewFilteredResourceDistributionInformer(client versioned.Interface, resyncP
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().ResourceDistributions().List(options)
+				return client.AppsV1alpha1().ResourceDistributions().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().ResourceDistributions().Watch(options)
+				return client.AppsV1alpha1().ResourceDistributions().Watch(context.TODO(), options)
 			},
 		},
 		&appsv1alpha1.ResourceDistribution{},

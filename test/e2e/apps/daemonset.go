@@ -1,7 +1,9 @@
 package apps
 
 import (
+	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -65,7 +67,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			gomega.Expect(len(podList.Items)).To(gomega.BeNumerically(">", 0))
 			pod := podList.Items[0]
 
-			err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
+			err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckRunningOnAllNodes(ds))
@@ -145,7 +147,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			pod := podList.Items[0]
 			pod.ResourceVersion = ""
 			pod.Status.Phase = v1.PodFailed
-			_, err = c.CoreV1().Pods(ns).UpdateStatus(&pod)
+			_, err = c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), &pod, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error failing a daemon pod")
 			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckRunningOnAllNodes(ds))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to revive")

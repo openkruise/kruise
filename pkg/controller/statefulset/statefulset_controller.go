@@ -18,6 +18,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"time"
@@ -107,19 +108,19 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	cacher := mgr.GetCache()
-	statefulSetInformer, err := cacher.GetInformerForKind(controllerKind)
+	statefulSetInformer, err := cacher.GetInformerForKind(context.TODO(), controllerKind)
 	if err != nil {
 		return nil, err
 	}
-	podInformer, err := cacher.GetInformerForKind(v1.SchemeGroupVersion.WithKind("Pod"))
+	podInformer, err := cacher.GetInformerForKind(context.TODO(), v1.SchemeGroupVersion.WithKind("Pod"))
 	if err != nil {
 		return nil, err
 	}
-	pvcInformer, err := cacher.GetInformerForKind(v1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"))
+	pvcInformer, err := cacher.GetInformerForKind(context.TODO(), v1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"))
 	if err != nil {
 		return nil, err
 	}
-	revInformer, err := cacher.GetInformerForKind(appsv1.SchemeGroupVersion.WithKind("ControllerRevision"))
+	revInformer, err := cacher.GetInformerForKind(context.TODO(), appsv1.SchemeGroupVersion.WithKind("ControllerRevision"))
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +288,7 @@ func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1beta1.StatefulS
 		}
 	}
 	if len(orphanRevisions) > 0 {
-		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(context.TODO(), set.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -320,7 +321,7 @@ func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1beta1.Stateful
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(context.TODO(), set.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

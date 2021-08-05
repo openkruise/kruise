@@ -244,7 +244,7 @@ func (e *nodeEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitin
 	node := evt.Object.(*v1.Node)
 	klog.V(6).Infof("add new node: %v", node.Name)
 	for index, ds := range dsList.Items {
-		_, shouldSchedule, _, err := NodeShouldRunDaemonPod(e.reader, node, &dsList.Items[index])
+		shouldSchedule, _, err := NodeShouldRunDaemonPod(node, &dsList.Items[index])
 		if err != nil {
 			continue
 		}
@@ -274,11 +274,11 @@ func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitin
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
 	for index, ds := range dsList.Items {
-		_, oldShouldSchedule, oldShouldContinueRunning, err := NodeShouldRunDaemonPod(e.reader, oldNode, &dsList.Items[index])
+		oldShouldSchedule, oldShouldContinueRunning, err := NodeShouldRunDaemonPod(oldNode, &dsList.Items[index])
 		if err != nil {
 			continue
 		}
-		_, currentShouldSchedule, currentShouldContinueRunning, err := NodeShouldRunDaemonPod(e.reader, curNode, &dsList.Items[index])
+		currentShouldSchedule, currentShouldContinueRunning, err := NodeShouldRunDaemonPod(curNode, &dsList.Items[index])
 		if err != nil {
 			continue
 		}

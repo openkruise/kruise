@@ -64,6 +64,9 @@ type WebhookInstallOptions struct {
 	// it will be automatically populated by the local temp dir
 	LocalServingCertDir string
 
+	// CAData is the CA that can be used to trust the serving certificates in LocalServingCertDir.
+	LocalServingCAData []byte
+
 	// MaxTime is the max time to wait
 	MaxTime time.Duration
 
@@ -143,8 +146,12 @@ func (o *WebhookInstallOptions) generateHostPort() (string, error) {
 	return net.JoinHostPort(host, fmt.Sprintf("%d", port)), nil
 }
 
-// Install installs specified webhooks to the API server
-func (o *WebhookInstallOptions) Install(config *rest.Config) error {
+// PrepWithoutInstalling does the setup parts of Install (populating host-port,
+// setting up CAs, etc), without actually truing to do anything with webhook
+// definitions.  This is largely useful for internal testing of
+// controller-runtime, where we need a random host-port & caData for webhook
+// tests, but may be useful in similar scenarios.
+func (o *WebhookInstallOptions) PrepWithoutInstalling() error {
 	hookCA, err := o.setupCA()
 	if err != nil {
 		return err
@@ -155,6 +162,15 @@ func (o *WebhookInstallOptions) Install(config *rest.Config) error {
 
 	err = o.ModifyWebhookDefinitions(hookCA)
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Install installs specified webhooks to the API server
+func (o *WebhookInstallOptions) Install(config *rest.Config) error {
+	if err := o.PrepWithoutInstalling(); err != nil {
 		return err
 	}
 
@@ -273,6 +289,7 @@ func (o *WebhookInstallOptions) setupCA() ([]byte, error) {
 		return nil, fmt.Errorf("unable to write webhook serving key to disk: %v", err)
 	}
 
+	o.LocalServingCAData = certData
 	return certData, nil
 }
 
@@ -358,7 +375,7 @@ func readWebhooks(path string) ([]runtime.Object, []runtime.Object, error) {
 	var mutHooks []runtime.Object
 	var valHooks []runtime.Object
 	for _, file := range files {
-		// Only parse whitelisted file types
+		// Only parse allowlisted file types
 		if !resourceExtensions.Has(filepath.Ext(file.Name())) {
 			continue
 		}

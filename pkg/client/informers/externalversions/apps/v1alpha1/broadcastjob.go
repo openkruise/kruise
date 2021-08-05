@@ -18,6 +18,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -60,13 +61,13 @@ func NewFilteredBroadcastJobInformer(client versioned.Interface, namespace strin
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().BroadcastJobs(namespace).List(options)
+				return client.AppsV1alpha1().BroadcastJobs(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().BroadcastJobs(namespace).Watch(options)
+				return client.AppsV1alpha1().BroadcastJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&appsv1alpha1.BroadcastJob{},

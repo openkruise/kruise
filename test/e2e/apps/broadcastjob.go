@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -109,7 +110,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				if fakePod != nil && fakePod.Status.Phase != v1.PodSucceeded {
 					ginkgo.By("Try to update Pod " + fakePod.Name + " to Succeeded")
 					fakePod.Status.Phase = v1.PodSucceeded
-					_, err = c.CoreV1().Pods(ns).UpdateStatus(fakePod)
+					_, err = c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), fakePod, metav1.UpdateOptions{})
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				}
 

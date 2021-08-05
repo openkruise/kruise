@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
@@ -59,7 +60,7 @@ func (c *cacheBasedSecretManager) GetSecrets(secrets []appsv1alpha1.ReferenceObj
 		if item, ok := c.cache[secret]; ok && !item.isExpired() {
 			ret = append(ret, *item.secret)
 		} else {
-			s, err := c.client.CoreV1().Secrets(secret.Namespace).Get(secret.Name, metav1.GetOptions{ResourceVersion: "0"})
+			s, err := c.client.CoreV1().Secrets(secret.Namespace).Get(context.TODO(), secret.Name, metav1.GetOptions{ResourceVersion: "0"})
 			if err != nil {
 				klog.Errorf("failed to get secret %s, err %v", secret, err)
 			} else {

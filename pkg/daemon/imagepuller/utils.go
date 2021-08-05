@@ -17,6 +17,7 @@ limitations under the License.
 package imagepuller
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -26,6 +27,7 @@ import (
 	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	"golang.org/x/time/rate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
 
@@ -116,7 +118,7 @@ func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStat
 	newNodeImage := nodeImage.DeepCopy()
 	newNodeImage.Status = *newStatus
 
-	_, err = su.imagePullNodeClient.UpdateStatus(newNodeImage)
+	_, err = su.imagePullNodeClient.UpdateStatus(context.TODO(), newNodeImage, metav1.UpdateOptions{})
 	if err == nil {
 		su.previousStatus = newStatus
 	}

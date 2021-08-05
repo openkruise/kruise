@@ -135,11 +135,11 @@ func newCRRInformer(client kruiseclient.Interface, nodeName string) cache.Shared
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).List(options)
+				return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).Watch(options)
+				return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).Watch(context.TODO(), options)
 			},
 		},
 		&appsv1alpha1.ContainerRecreateRequest{},
