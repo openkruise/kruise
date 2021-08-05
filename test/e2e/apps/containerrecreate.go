@@ -95,13 +95,12 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
 				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestFailurePolicyFail))
 				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(pod.Status.ContainerStatuses[0].ContainerID))
-
 				ginkgo.By("Wait CRR recreate completion")
 				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 70*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded}}))

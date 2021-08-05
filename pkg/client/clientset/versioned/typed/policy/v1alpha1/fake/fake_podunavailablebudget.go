@@ -18,6 +18,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -38,7 +40,7 @@ var podunavailablebudgetsResource = schema.GroupVersionResource{Group: "policy.k
 var podunavailablebudgetsKind = schema.GroupVersionKind{Group: "policy.kruise.io", Version: "v1alpha1", Kind: "PodUnavailableBudget"}
 
 // Get takes name of the podUnavailableBudget, and returns the corresponding podUnavailableBudget object, and an error if there is any.
-func (c *FakePodUnavailableBudgets) Get(name string, options v1.GetOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *FakePodUnavailableBudgets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podunavailablebudgetsResource, c.ns, name), &v1alpha1.PodUnavailableBudget{})
 
@@ -49,7 +51,7 @@ func (c *FakePodUnavailableBudgets) Get(name string, options v1.GetOptions) (res
 }
 
 // List takes label and field selectors, and returns the list of PodUnavailableBudgets that match those selectors.
-func (c *FakePodUnavailableBudgets) List(opts v1.ListOptions) (result *v1alpha1.PodUnavailableBudgetList, err error) {
+func (c *FakePodUnavailableBudgets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PodUnavailableBudgetList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(podunavailablebudgetsResource, podunavailablebudgetsKind, c.ns, opts), &v1alpha1.PodUnavailableBudgetList{})
 
@@ -71,14 +73,14 @@ func (c *FakePodUnavailableBudgets) List(opts v1.ListOptions) (result *v1alpha1.
 }
 
 // Watch returns a watch.Interface that watches the requested podUnavailableBudgets.
-func (c *FakePodUnavailableBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakePodUnavailableBudgets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podunavailablebudgetsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a podUnavailableBudget and creates it.  Returns the server's representation of the podUnavailableBudget, and an error, if there is any.
-func (c *FakePodUnavailableBudgets) Create(podUnavailableBudget *v1alpha1.PodUnavailableBudget) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *FakePodUnavailableBudgets) Create(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.CreateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podunavailablebudgetsResource, c.ns, podUnavailableBudget), &v1alpha1.PodUnavailableBudget{})
 
@@ -89,7 +91,7 @@ func (c *FakePodUnavailableBudgets) Create(podUnavailableBudget *v1alpha1.PodUna
 }
 
 // Update takes the representation of a podUnavailableBudget and updates it. Returns the server's representation of the podUnavailableBudget, and an error, if there is any.
-func (c *FakePodUnavailableBudgets) Update(podUnavailableBudget *v1alpha1.PodUnavailableBudget) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *FakePodUnavailableBudgets) Update(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(podunavailablebudgetsResource, c.ns, podUnavailableBudget), &v1alpha1.PodUnavailableBudget{})
 
@@ -101,7 +103,7 @@ func (c *FakePodUnavailableBudgets) Update(podUnavailableBudget *v1alpha1.PodUna
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePodUnavailableBudgets) UpdateStatus(podUnavailableBudget *v1alpha1.PodUnavailableBudget) (*v1alpha1.PodUnavailableBudget, error) {
+func (c *FakePodUnavailableBudgets) UpdateStatus(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (*v1alpha1.PodUnavailableBudget, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(podunavailablebudgetsResource, "status", c.ns, podUnavailableBudget), &v1alpha1.PodUnavailableBudget{})
 
@@ -112,7 +114,7 @@ func (c *FakePodUnavailableBudgets) UpdateStatus(podUnavailableBudget *v1alpha1.
 }
 
 // Delete takes name of the podUnavailableBudget and deletes it. Returns an error if one occurs.
-func (c *FakePodUnavailableBudgets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakePodUnavailableBudgets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(podunavailablebudgetsResource, c.ns, name), &v1alpha1.PodUnavailableBudget{})
 
@@ -120,15 +122,15 @@ func (c *FakePodUnavailableBudgets) Delete(name string, options *v1.DeleteOption
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePodUnavailableBudgets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podunavailablebudgetsResource, c.ns, listOptions)
+func (c *FakePodUnavailableBudgets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(podunavailablebudgetsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.PodUnavailableBudgetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched podUnavailableBudget.
-func (c *FakePodUnavailableBudgets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *FakePodUnavailableBudgets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(podunavailablebudgetsResource, c.ns, name, pt, data, subresources...), &v1alpha1.PodUnavailableBudget{})
 

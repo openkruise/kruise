@@ -17,13 +17,9 @@ limitations under the License.
 package policy
 
 import (
+	"context"
 	"fmt"
 	"time"
-
-	apps "k8s.io/api/apps/v1"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -31,13 +27,16 @@ import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -72,11 +71,11 @@ var _ = SIGDescribe("DeletionProtection", func() {
 				Labels: map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
 			}}
 			ginkgo.By("Create test namespace " + ns.Name + " with Always")
-			_, err := c.CoreV1().Namespaces().Create(ns)
+			_, err := c.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the namespace should be rejected")
-			err = c.CoreV1().Namespaces().Delete(ns.Name, &metav1.DeleteOptions{})
+			err = c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
@@ -92,12 +91,12 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(1)))
 
 			ginkgo.By("Patch the namespace deletion to Cascading")
-			_, err = c.CoreV1().Namespaces().Patch(ns.Name, types.StrategicMergePatchType,
-				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading)))
+			_, err = c.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType,
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading)), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the namespace should be rejected")
-			err = c.CoreV1().Namespaces().Delete(ns.Name, &metav1.DeleteOptions{})
+			err = c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
@@ -114,7 +113,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			time.Sleep(time.Second)
 			ginkgo.By("Delete the namespace successfully")
-			err = c.CoreV1().Namespaces().Delete(ns.Name, &metav1.DeleteOptions{})
+			err = c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
@@ -146,11 +145,11 @@ var _ = SIGDescribe("DeletionProtection", func() {
 				},
 			}
 			ginkgo.By("Create test CRD " + crd.Name + " with Always")
-			_, err := ec.ApiextensionsV1().CustomResourceDefinitions().Create(crd)
+			_, err := ec.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the CRD should be rejected")
-			err = ec.ApiextensionsV1().CustomResourceDefinitions().Delete(crd.Name, &metav1.DeleteOptions{})
+			err = ec.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
@@ -161,25 +160,25 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			obj.SetKind("TestDeletionCase")
 			obj.SetNamespace(ns)
 			obj.SetName("test-cr-" + randStr)
-			obj, err = dc.Resource(schema.GroupVersionResource{Group: "e2e.kruise.io", Version: "v1beta1", Resource: "testdeletioncases"}).Namespace(ns).Create(obj, metav1.CreateOptions{})
+			obj, err = dc.Resource(schema.GroupVersionResource{Group: "e2e.kruise.io", Version: "v1beta1", Resource: "testdeletioncases"}).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Patch the CRD deletion to Cascading")
-			_, err = ec.ApiextensionsV1().CustomResourceDefinitions().Patch(crd.Name, types.StrategicMergePatchType,
-				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading)))
+			_, err = ec.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.StrategicMergePatchType,
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading)), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the CRD should be rejected")
-			err = ec.ApiextensionsV1().CustomResourceDefinitions().Delete(crd.Name, &metav1.DeleteOptions{})
+			err = ec.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
 			ginkgo.By("Delete the test CR")
-			err = dc.Resource(schema.GroupVersionResource{Group: "e2e.kruise.io", Version: "v1beta1", Resource: "testdeletioncases"}).Namespace(ns).Delete(obj.GetName(), &metav1.DeleteOptions{})
+			err = dc.Resource(schema.GroupVersionResource{Group: "e2e.kruise.io", Version: "v1beta1", Resource: "testdeletioncases"}).Namespace(ns).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the CRD should be successful")
-			err = ec.ApiextensionsV1().CustomResourceDefinitions().Delete(crd.Name, &metav1.DeleteOptions{})
+			err = ec.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
@@ -261,41 +260,41 @@ var _ = SIGDescribe("DeletionProtection", func() {
 					},
 				},
 			}
-			deploy, err = c.AppsV1().Deployments(ns).Create(deploy)
+			deploy, err = c.AppsV1().Deployments(ns).Create(context.TODO(), deploy, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the Deployment should be rejected")
-			err = c.AppsV1().Deployments(ns).Delete(deploy.Name, &metav1.DeleteOptions{})
+			err = c.AppsV1().Deployments(ns).Delete(context.TODO(), deploy.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
 			ginkgo.By("Scale Deployment replicas to 2 and protection to Cascading")
-			deploy, err = c.AppsV1().Deployments(ns).Patch(deploy.Name, types.StrategicMergePatchType,
-				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}},"spec":{"replicas":%d}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading, 2)))
+			deploy, err = c.AppsV1().Deployments(ns).Patch(context.TODO(), deploy.Name, types.StrategicMergePatchType,
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}},"spec":{"replicas":%d}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading, 2)), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() int32 {
-				deploy, err = c.AppsV1().Deployments(ns).Get(deploy.Name, metav1.GetOptions{})
+				deploy, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deploy.Name, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return deploy.Status.Replicas
 			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(2)))
 
 			ginkgo.By("Delete the Deployment should be rejected")
-			err = c.AppsV1().Deployments(ns).Delete(deploy.Name, &metav1.DeleteOptions{})
+			err = c.AppsV1().Deployments(ns).Delete(context.TODO(), deploy.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
 			ginkgo.By("Scale Deployment replicas to 0")
-			deploy, err = c.AppsV1().Deployments(ns).Patch(deploy.Name, types.StrategicMergePatchType,
-				[]byte(fmt.Sprintf(`{"spec":{"replicas":%d}}`, 0)))
+			deploy, err = c.AppsV1().Deployments(ns).Patch(context.TODO(), deploy.Name, types.StrategicMergePatchType,
+				[]byte(fmt.Sprintf(`{"spec":{"replicas":%d}}`, 0)), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() int32 {
-				deploy, err = c.AppsV1().Deployments(ns).Get(deploy.Name, metav1.GetOptions{})
+				deploy, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deploy.Name, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return deploy.Status.Replicas
 			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(0)))
 
 			ginkgo.By("Delete the Deployment should successful")
-			err = c.AppsV1().Deployments(ns).Delete(deploy.Name, &metav1.DeleteOptions{})
+			err = c.AppsV1().Deployments(ns).Delete(context.TODO(), deploy.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})

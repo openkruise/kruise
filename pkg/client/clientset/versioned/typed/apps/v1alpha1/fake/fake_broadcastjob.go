@@ -18,6 +18,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -38,7 +40,7 @@ var broadcastjobsResource = schema.GroupVersionResource{Group: "apps.kruise.io",
 var broadcastjobsKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "BroadcastJob"}
 
 // Get takes name of the broadcastJob, and returns the corresponding broadcastJob object, and an error if there is any.
-func (c *FakeBroadcastJobs) Get(name string, options v1.GetOptions) (result *v1alpha1.BroadcastJob, err error) {
+func (c *FakeBroadcastJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.BroadcastJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(broadcastjobsResource, c.ns, name), &v1alpha1.BroadcastJob{})
 
@@ -49,7 +51,7 @@ func (c *FakeBroadcastJobs) Get(name string, options v1.GetOptions) (result *v1a
 }
 
 // List takes label and field selectors, and returns the list of BroadcastJobs that match those selectors.
-func (c *FakeBroadcastJobs) List(opts v1.ListOptions) (result *v1alpha1.BroadcastJobList, err error) {
+func (c *FakeBroadcastJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.BroadcastJobList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(broadcastjobsResource, broadcastjobsKind, c.ns, opts), &v1alpha1.BroadcastJobList{})
 
@@ -71,14 +73,14 @@ func (c *FakeBroadcastJobs) List(opts v1.ListOptions) (result *v1alpha1.Broadcas
 }
 
 // Watch returns a watch.Interface that watches the requested broadcastJobs.
-func (c *FakeBroadcastJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeBroadcastJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(broadcastjobsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a broadcastJob and creates it.  Returns the server's representation of the broadcastJob, and an error, if there is any.
-func (c *FakeBroadcastJobs) Create(broadcastJob *v1alpha1.BroadcastJob) (result *v1alpha1.BroadcastJob, err error) {
+func (c *FakeBroadcastJobs) Create(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.CreateOptions) (result *v1alpha1.BroadcastJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(broadcastjobsResource, c.ns, broadcastJob), &v1alpha1.BroadcastJob{})
 
@@ -89,7 +91,7 @@ func (c *FakeBroadcastJobs) Create(broadcastJob *v1alpha1.BroadcastJob) (result 
 }
 
 // Update takes the representation of a broadcastJob and updates it. Returns the server's representation of the broadcastJob, and an error, if there is any.
-func (c *FakeBroadcastJobs) Update(broadcastJob *v1alpha1.BroadcastJob) (result *v1alpha1.BroadcastJob, err error) {
+func (c *FakeBroadcastJobs) Update(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (result *v1alpha1.BroadcastJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(broadcastjobsResource, c.ns, broadcastJob), &v1alpha1.BroadcastJob{})
 
@@ -101,7 +103,7 @@ func (c *FakeBroadcastJobs) Update(broadcastJob *v1alpha1.BroadcastJob) (result 
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeBroadcastJobs) UpdateStatus(broadcastJob *v1alpha1.BroadcastJob) (*v1alpha1.BroadcastJob, error) {
+func (c *FakeBroadcastJobs) UpdateStatus(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (*v1alpha1.BroadcastJob, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(broadcastjobsResource, "status", c.ns, broadcastJob), &v1alpha1.BroadcastJob{})
 
@@ -112,7 +114,7 @@ func (c *FakeBroadcastJobs) UpdateStatus(broadcastJob *v1alpha1.BroadcastJob) (*
 }
 
 // Delete takes name of the broadcastJob and deletes it. Returns an error if one occurs.
-func (c *FakeBroadcastJobs) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeBroadcastJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(broadcastjobsResource, c.ns, name), &v1alpha1.BroadcastJob{})
 
@@ -120,15 +122,15 @@ func (c *FakeBroadcastJobs) Delete(name string, options *v1.DeleteOptions) error
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeBroadcastJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(broadcastjobsResource, c.ns, listOptions)
+func (c *FakeBroadcastJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(broadcastjobsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.BroadcastJobList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched broadcastJob.
-func (c *FakeBroadcastJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.BroadcastJob, err error) {
+func (c *FakeBroadcastJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.BroadcastJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(broadcastjobsResource, c.ns, name, pt, data, subresources...), &v1alpha1.BroadcastJob{})
 

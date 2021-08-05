@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -49,9 +49,10 @@ type NodeInfo struct {
 	// Overall node information.
 	node *v1.Node
 
-	pods             []*v1.Pod
-	podsWithAffinity []*v1.Pod
-	usedPorts        HostPortInfo
+	pods                         []*v1.Pod
+	podsWithAffinity             []*v1.Pod
+	podsWithRequiredAntiAffinity []*v1.Pod
+	usedPorts                    HostPortInfo
 
 	// Total requested resources of all pods on this node. This includes assumed
 	// pods, which scheduler has sent for binding, but may not be scheduled yet.
@@ -173,7 +174,10 @@ func (r *Resource) Add(rl v1.ResourceList) {
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
 		case v1.ResourceEphemeralStorage:
-			r.EphemeralStorage += rQuant.Value()
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				// if the local storage capacity isolation feature gate is disabled, pods request 0 disk.
+				r.EphemeralStorage += rQuant.Value()
+			}
 		default:
 			if v1helper.IsScalarResourceName(rName) {
 				r.AddScalar(rName, rQuant.Value())
@@ -248,8 +252,10 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 				r.MilliCPU = cpu
 			}
 		case v1.ResourceEphemeralStorage:
-			if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
-				r.EphemeralStorage = ephemeralStorage
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
+					r.EphemeralStorage = ephemeralStorage
+				}
 			}
 		default:
 			if v1helper.IsScalarResourceName(rName) {
@@ -336,6 +342,14 @@ func (n *NodeInfo) PodsWithAffinity() []*v1.Pod {
 	return n.podsWithAffinity
 }
 
+// PodsWithRequiredAntiAffinity return all pods with required anti-affinity constraints on this node.
+func (n *NodeInfo) PodsWithRequiredAntiAffinity() []*v1.Pod {
+	if n == nil {
+		return nil
+	}
+	return n.podsWithRequiredAntiAffinity
+}
+
 // AllowedPodNumber returns the number of the allowed pods on this node.
 func (n *NodeInfo) AllowedPodNumber() int {
 	if n == nil || n.allocatableResource == nil {
@@ -355,30 +369,6 @@ func (n *NodeInfo) Taints() ([]v1.Taint, error) {
 // SetTaints sets the taints list on this node.
 func (n *NodeInfo) SetTaints(newTaints []v1.Taint) {
 	n.taints = newTaints
-}
-
-// MemoryPressureCondition returns the memory pressure condition status on this node.
-func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.memoryPressureCondition
-}
-
-// DiskPressureCondition returns the disk pressure condition status on this node.
-func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.diskPressureCondition
-}
-
-// PIDPressureCondition returns the pid pressure condition status on this node.
-func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.pidPressureCondition
 }
 
 // RequestedResource returns aggregated resource request of pods on this node.
@@ -466,6 +456,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	if len(n.podsWithAffinity) > 0 {
 		clone.podsWithAffinity = append([]*v1.Pod(nil), n.podsWithAffinity...)
 	}
+	if len(n.podsWithRequiredAntiAffinity) > 0 {
+		clone.podsWithRequiredAntiAffinity = append([]*v1.Pod(nil), n.podsWithRequiredAntiAffinity...)
+	}
 	if len(n.taints) > 0 {
 		clone.taints = append([]v1.Taint(nil), n.taints...)
 	}
@@ -498,6 +491,11 @@ func hasPodAffinityConstraints(pod *v1.Pod) bool {
 	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
 }
 
+func hasRequiredPodAntiAffinityConstraints(pod *v1.Pod) bool {
+	affinity := pod.Spec.Affinity
+	return affinity != nil && affinity.PodAntiAffinity != nil && len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
+}
+
 // AddPod adds pod information to this NodeInfo.
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	res, non0CPU, non0Mem := calculateResource(pod)
@@ -516,6 +514,9 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	if hasPodAffinityConstraints(pod) {
 		n.podsWithAffinity = append(n.podsWithAffinity, pod)
 	}
+	if hasRequiredPodAntiAffinityConstraints(pod) {
+		n.podsWithRequiredAntiAffinity = append(n.podsWithRequiredAntiAffinity, pod)
+	}
 
 	// Consume ports when pods added.
 	n.UpdateUsedPorts(pod, true)
@@ -523,33 +524,45 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	n.generation = nextGeneration()
 }
 
-// RemovePod subtracts pod information from this NodeInfo.
-func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
-	k1, err := GetPodKey(pod)
-	if err != nil {
-		return err
-	}
-
-	for i := range n.podsWithAffinity {
-		k2, err := GetPodKey(n.podsWithAffinity[i])
+func removeFromSlice(s []*v1.Pod, k string) []*v1.Pod {
+	for i := range s {
+		k2, err := GetPodKey(s[i])
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
 		}
-		if k1 == k2 {
+		if k == k2 {
 			// delete the element
-			n.podsWithAffinity[i] = n.podsWithAffinity[len(n.podsWithAffinity)-1]
-			n.podsWithAffinity = n.podsWithAffinity[:len(n.podsWithAffinity)-1]
+			s[i] = s[len(s)-1]
+			s = s[:len(s)-1]
 			break
 		}
 	}
+	return s
+
+}
+
+// RemovePod subtracts pod information from this NodeInfo.
+func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
+	k, err := GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	if hasPodAffinityConstraints(pod) {
+		n.podsWithAffinity = removeFromSlice(n.podsWithAffinity, k)
+	}
+	if hasRequiredPodAntiAffinityConstraints(pod) {
+		n.podsWithRequiredAntiAffinity = removeFromSlice(n.podsWithRequiredAntiAffinity, k)
+	}
+
 	for i := range n.pods {
 		k2, err := GetPodKey(n.pods[i])
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
 		}
-		if k1 == k2 {
+		if k == k2 {
 			// delete the element
 			n.pods[i] = n.pods[len(n.pods)-1]
 			n.pods = n.pods[:len(n.pods)-1]
@@ -572,28 +585,52 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.UpdateUsedPorts(pod, false)
 
 			n.generation = nextGeneration()
-
+			n.resetSlicesIfEmpty()
 			return nil
 		}
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
+// resets the slices to nil so that we can do DeepEqual in unit tests.
+func (n *NodeInfo) resetSlicesIfEmpty() {
+	if len(n.podsWithAffinity) == 0 {
+		n.podsWithAffinity = nil
+	}
+	if len(n.podsWithRequiredAntiAffinity) == 0 {
+		n.podsWithRequiredAntiAffinity = nil
+	}
+	if len(n.pods) == 0 {
+		n.pods = nil
+	}
+}
+
+// resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
 		resPtr.Add(c.Resources.Requests)
-
-		non0CPUReq, non0MemReq := priorityutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.
 	}
 
+	for _, ic := range pod.Spec.InitContainers {
+		resPtr.SetMaxResource(ic.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
+		if non0CPU < non0CPUReq {
+			non0CPU = non0CPUReq
+		}
+
+		if non0Mem < non0MemReq {
+			non0Mem = non0MemReq
+		}
+	}
+
 	// If Overhead is being utilized, add to the total requests for the pod
 	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
 		resPtr.Add(pod.Spec.Overhead)
-
 		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
 			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
 		}
@@ -646,21 +683,10 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 	return nil
 }
 
-// RemoveNode removes the overall information about the node.
-func (n *NodeInfo) RemoveNode(node *v1.Node) error {
-	// We don't remove NodeInfo for because there can still be some pods on this node -
-	// this is because notifications about pods are delivered in a different watch,
-	// and thus can potentially be observed later, even though they happened before
-	// node removal. This is handled correctly in cache.go file.
+// RemoveNode removes the node object, leaving all other tracking information.
+func (n *NodeInfo) RemoveNode() {
 	n.node = nil
-	n.allocatableResource = &Resource{}
-	n.taints, n.taintsErr = nil, nil
-	n.memoryPressureCondition = v1.ConditionUnknown
-	n.diskPressureCondition = v1.ConditionUnknown
-	n.pidPressureCondition = v1.ConditionUnknown
-	n.imageStates = make(map[string]*ImageStateSummary)
 	n.generation = nextGeneration()
-	return nil
 }
 
 // FilterOutPods receives a list of pods and filters out those whose node names

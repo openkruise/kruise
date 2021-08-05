@@ -17,6 +17,7 @@ limitations under the License.
 package imagepuller
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -123,11 +124,11 @@ func newNodeImageInformer(client kruiseclient.Interface, nodeName string) cache.
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().NodeImages().List(options)
+				return client.AppsV1alpha1().NodeImages().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().NodeImages().Watch(options)
+				return client.AppsV1alpha1().NodeImages().Watch(context.TODO(), options)
 			},
 		},
 		&appsv1alpha1.NodeImage{},

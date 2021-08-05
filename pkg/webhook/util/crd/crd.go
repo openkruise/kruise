@@ -17,15 +17,16 @@ limitations under the License.
 package crd
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters.CustomResourceDefinitionLister, caBundle []byte) error {
@@ -62,7 +63,7 @@ func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters
 		if !reflect.DeepEqual(crd.Spec.Conversion.WebhookClientConfig, webhookConfig) {
 			newCRD := crd.DeepCopy()
 			newCRD.Spec.Conversion.WebhookClientConfig = webhookConfig.DeepCopy()
-			if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(newCRD); err != nil {
+			if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), newCRD, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("failed to update CRD %s: %v", newCRD.Name, err)
 			}
 		}

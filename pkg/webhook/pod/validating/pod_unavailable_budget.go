@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
-
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

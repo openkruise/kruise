@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -134,26 +135,25 @@ func (s *SidecarSetTester) NewBaseDeployment(namespace string) *apps.Deployment 
 
 func (s *SidecarSetTester) CreateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) *appsv1alpha1.SidecarSet {
 	Logf("create sidecarSet(%s)", sidecarSet.Name)
-	_, err := s.kc.AppsV1alpha1().SidecarSets().Create(sidecarSet)
+	_, err := s.kc.AppsV1alpha1().SidecarSets().Create(context.TODO(), sidecarSet, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	s.WaitForSidecarSetCreated(sidecarSet)
-	sidecarSet, _ = s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
-	time.Sleep(time.Second)
+	sidecarSet, _ = s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 	return sidecarSet
 }
 
 func (s *SidecarSetTester) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) {
 	Logf("update sidecarSet(%s)", sidecarSet.Name)
-	sidecarSetClone, _ := s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
+	sidecarSetClone, _ := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		sidecarSetClone.Spec = sidecarSet.Spec
 		sidecarSetClone.Annotations = sidecarSet.Annotations
 		sidecarSetClone.Labels = sidecarSet.Labels
-		_, updateErr := s.kc.AppsV1alpha1().SidecarSets().Update(sidecarSetClone)
+		_, updateErr := s.kc.AppsV1alpha1().SidecarSets().Update(context.TODO(), sidecarSetClone, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil
 		}
-		sidecarSetClone, _ = s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSetClone.Name, metav1.GetOptions{})
+		sidecarSetClone, _ = s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetClone.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -166,11 +166,11 @@ func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
 		podClone.Annotations = pod.Annotations
 		podClone.Labels = pod.Labels
 		podClone.Spec = pod.Spec
-		_, updateErr := s.c.CoreV1().Pods(podClone.Namespace).Update(podClone)
+		_, updateErr := s.c.CoreV1().Pods(podClone.Namespace).Update(context.TODO(), podClone, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil
 		}
-		podClone, _ = s.c.CoreV1().Pods(podClone.Namespace).Update(podClone)
+		podClone, _ = s.c.CoreV1().Pods(podClone.Namespace).Update(context.TODO(), podClone, metav1.UpdateOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -179,7 +179,7 @@ func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
 func (s *SidecarSetTester) WaitForSidecarSetUpgradeComplete(sidecarSet *appsv1alpha1.SidecarSet, exceptStatus *appsv1alpha1.SidecarSetStatus) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
 		func() (bool, error) {
-			inner, err := s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
+			inner, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -192,20 +192,20 @@ func (s *SidecarSetTester) WaitForSidecarSetUpgradeComplete(sidecarSet *appsv1al
 			return false, nil
 		})
 	if pollErr != nil {
-		inner, _ := s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
+		inner, _ := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 		Failf("Failed waiting for sidecarSet to upgrade complete: %v status(%v)", pollErr, inner.Status)
 	}
 }
 
 func (s *SidecarSetTester) CreateDeployment(deployment *apps.Deployment) {
 	Logf("create deployment(%s.%s)", deployment.Namespace, deployment.Name)
-	_, err := s.c.AppsV1().Deployments(deployment.Namespace).Create(deployment)
+	_, err := s.c.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	s.WaitForDeploymentRunning(deployment)
 }
 
 func (s *SidecarSetTester) DeleteSidecarSets() {
-	sidecarSetList, err := s.kc.AppsV1alpha1().SidecarSets().List(metav1.ListOptions{})
+	sidecarSetList, err := s.kc.AppsV1alpha1().SidecarSets().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Logf("List sidecarSets failed: %s", err.Error())
 		return
@@ -217,7 +217,7 @@ func (s *SidecarSetTester) DeleteSidecarSets() {
 }
 
 func (s *SidecarSetTester) DeleteSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) {
-	err := s.kc.AppsV1alpha1().SidecarSets().Delete(sidecarSet.Name, &metav1.DeleteOptions{})
+	err := s.kc.AppsV1alpha1().SidecarSets().Delete(context.TODO(), sidecarSet.Name, metav1.DeleteOptions{})
 	if err != nil {
 		Logf("delete sidecarSet(%s) failed: %s", sidecarSet.Name, err.Error())
 	}
@@ -225,7 +225,7 @@ func (s *SidecarSetTester) DeleteSidecarSet(sidecarSet *appsv1alpha1.SidecarSet)
 }
 
 func (s *SidecarSetTester) DeleteDeployments(namespace string) {
-	deploymentList, err := s.c.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
+	deploymentList, err := s.c.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Logf("List Deployments failed: %s", err.Error())
 		return
@@ -237,7 +237,7 @@ func (s *SidecarSetTester) DeleteDeployments(namespace string) {
 }
 
 func (s *SidecarSetTester) DeleteDeployment(deployment *apps.Deployment) {
-	err := s.c.AppsV1().Deployments(deployment.Namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
+	err := s.c.AppsV1().Deployments(deployment.Namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 	if err != nil {
 		Logf("delete deployment(%s.%s) failed: %s", deployment.Namespace, deployment.Name, err.Error())
 		return
@@ -248,7 +248,7 @@ func (s *SidecarSetTester) DeleteDeployment(deployment *apps.Deployment) {
 func (s *SidecarSetTester) WaitForSidecarSetCreated(sidecarSet *appsv1alpha1.SidecarSet) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
+			_, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -262,7 +262,7 @@ func (s *SidecarSetTester) WaitForSidecarSetCreated(sidecarSet *appsv1alpha1.Sid
 func (s *SidecarSetTester) WaitForDeploymentRunning(deployment *apps.Deployment) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
 		func() (bool, error) {
-			inner, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(deployment.Name, metav1.GetOptions{})
+			inner, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -279,7 +279,7 @@ func (s *SidecarSetTester) WaitForDeploymentRunning(deployment *apps.Deployment)
 func (s *SidecarSetTester) WaitForDeploymentDeleted(deployment *apps.Deployment) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(deployment.Name, metav1.GetOptions{})
+			_, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true, nil
@@ -296,7 +296,7 @@ func (s *SidecarSetTester) WaitForDeploymentDeleted(deployment *apps.Deployment)
 func (s *SidecarSetTester) WaitForSidecarSetDeleted(sidecarSet *appsv1alpha1.SidecarSet) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := s.kc.AppsV1alpha1().SidecarSets().Get(sidecarSet.Name, metav1.GetOptions{})
+			_, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true, nil
@@ -315,7 +315,7 @@ func (s *SidecarSetTester) GetSelectorPods(namespace string, selector *metav1.La
 	if err != nil {
 		return nil, err
 	}
-	podList, err := s.c.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: faster.String()})
+	podList, err := s.c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: faster.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -372,18 +372,18 @@ func (s *SidecarSetTester) NewBaseCloneSet(namespace string) *appsv1alpha1.Clone
 
 func (t *SidecarSetTester) CreateCloneSet(cloneset *appsv1alpha1.CloneSet) *appsv1alpha1.CloneSet {
 	Logf("create CloneSet(%s.%s)", cloneset.Namespace, cloneset.Name)
-	_, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Create(cloneset)
+	_, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Create(context.TODO(), cloneset, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	t.WaitForCloneSetRunning(cloneset)
 	Logf("create cloneset(%s.%s) done", cloneset.Namespace, cloneset.Name)
-	cloneset, _ = t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(cloneset.Name, metav1.GetOptions{})
+	cloneset, _ = t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 	return cloneset
 }
 
 func (t *SidecarSetTester) WaitForCloneSetRunning(cloneset *appsv1alpha1.CloneSet) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
 		func() (bool, error) {
-			inner, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(cloneset.Name, metav1.GetOptions{})
+			inner, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
