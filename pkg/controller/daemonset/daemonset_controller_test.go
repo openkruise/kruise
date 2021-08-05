@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/informers"
@@ -262,10 +261,9 @@ func NewDaemonSetController(
 			crControl: kubecontroller.RealControllerRevisionControl{
 				KubeClient: kubeClient,
 			},
-			historyLister:       revInformer.Lister(),
-			podLister:           podInformer.Lister(),
-			nodeLister:          nodeInformer.Lister(),
-			suspendedDaemonPods: map[string]sets.String{},
+			historyLister: revInformer.Lister(),
+			podLister:     podInformer.Lister(),
+			nodeLister:    nodeInformer.Lister(),
 		},
 		podListerSynced: podInformer.Informer().HasSynced,
 		setListerSynced: setInformer.Informer().HasSynced,

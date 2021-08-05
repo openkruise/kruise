@@ -18,6 +18,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
@@ -36,15 +37,15 @@ type PodUnavailableBudgetsGetter interface {
 
 // PodUnavailableBudgetInterface has methods to work with PodUnavailableBudget resources.
 type PodUnavailableBudgetInterface interface {
-	Create(*v1alpha1.PodUnavailableBudget) (*v1alpha1.PodUnavailableBudget, error)
-	Update(*v1alpha1.PodUnavailableBudget) (*v1alpha1.PodUnavailableBudget, error)
-	UpdateStatus(*v1alpha1.PodUnavailableBudget) (*v1alpha1.PodUnavailableBudget, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.PodUnavailableBudget, error)
-	List(opts v1.ListOptions) (*v1alpha1.PodUnavailableBudgetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error)
+	Create(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.CreateOptions) (*v1alpha1.PodUnavailableBudget, error)
+	Update(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (*v1alpha1.PodUnavailableBudget, error)
+	UpdateStatus(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (*v1alpha1.PodUnavailableBudget, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PodUnavailableBudget, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PodUnavailableBudgetList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error)
 	PodUnavailableBudgetExpansion
 }
 
@@ -63,20 +64,20 @@ func newPodUnavailableBudgets(c *PolicyV1alpha1Client, namespace string) *podUna
 }
 
 // Get takes name of the podUnavailableBudget, and returns the corresponding podUnavailableBudget object, and an error if there is any.
-func (c *podUnavailableBudgets) Get(name string, options v1.GetOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *podUnavailableBudgets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
 	result = &v1alpha1.PodUnavailableBudget{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podunavailablebudgets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PodUnavailableBudgets that match those selectors.
-func (c *podUnavailableBudgets) List(opts v1.ListOptions) (result *v1alpha1.PodUnavailableBudgetList, err error) {
+func (c *podUnavailableBudgets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PodUnavailableBudgetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -87,13 +88,13 @@ func (c *podUnavailableBudgets) List(opts v1.ListOptions) (result *v1alpha1.PodU
 		Resource("podunavailablebudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested podUnavailableBudgets.
-func (c *podUnavailableBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *podUnavailableBudgets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -104,87 +105,90 @@ func (c *podUnavailableBudgets) Watch(opts v1.ListOptions) (watch.Interface, err
 		Resource("podunavailablebudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a podUnavailableBudget and creates it.  Returns the server's representation of the podUnavailableBudget, and an error, if there is any.
-func (c *podUnavailableBudgets) Create(podUnavailableBudget *v1alpha1.PodUnavailableBudget) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *podUnavailableBudgets) Create(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.CreateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
 	result = &v1alpha1.PodUnavailableBudget{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("podunavailablebudgets").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podUnavailableBudget).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a podUnavailableBudget and updates it. Returns the server's representation of the podUnavailableBudget, and an error, if there is any.
-func (c *podUnavailableBudgets) Update(podUnavailableBudget *v1alpha1.PodUnavailableBudget) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *podUnavailableBudgets) Update(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
 	result = &v1alpha1.PodUnavailableBudget{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("podunavailablebudgets").
 		Name(podUnavailableBudget.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podUnavailableBudget).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *podUnavailableBudgets) UpdateStatus(podUnavailableBudget *v1alpha1.PodUnavailableBudget) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *podUnavailableBudgets) UpdateStatus(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
 	result = &v1alpha1.PodUnavailableBudget{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("podunavailablebudgets").
 		Name(podUnavailableBudget.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podUnavailableBudget).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the podUnavailableBudget and deletes it. Returns an error if one occurs.
-func (c *podUnavailableBudgets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *podUnavailableBudgets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podunavailablebudgets").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podUnavailableBudgets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *podUnavailableBudgets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podunavailablebudgets").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched podUnavailableBudget.
-func (c *podUnavailableBudgets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error) {
+func (c *podUnavailableBudgets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error) {
 	result = &v1alpha1.PodUnavailableBudget{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("podunavailablebudgets").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

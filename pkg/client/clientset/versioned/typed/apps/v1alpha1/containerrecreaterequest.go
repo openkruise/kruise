@@ -18,6 +18,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -36,15 +37,15 @@ type ContainerRecreateRequestsGetter interface {
 
 // ContainerRecreateRequestInterface has methods to work with ContainerRecreateRequest resources.
 type ContainerRecreateRequestInterface interface {
-	Create(*v1alpha1.ContainerRecreateRequest) (*v1alpha1.ContainerRecreateRequest, error)
-	Update(*v1alpha1.ContainerRecreateRequest) (*v1alpha1.ContainerRecreateRequest, error)
-	UpdateStatus(*v1alpha1.ContainerRecreateRequest) (*v1alpha1.ContainerRecreateRequest, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.ContainerRecreateRequest, error)
-	List(opts v1.ListOptions) (*v1alpha1.ContainerRecreateRequestList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ContainerRecreateRequest, err error)
+	Create(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.CreateOptions) (*v1alpha1.ContainerRecreateRequest, error)
+	Update(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.UpdateOptions) (*v1alpha1.ContainerRecreateRequest, error)
+	UpdateStatus(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.UpdateOptions) (*v1alpha1.ContainerRecreateRequest, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ContainerRecreateRequest, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ContainerRecreateRequestList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ContainerRecreateRequest, err error)
 	ContainerRecreateRequestExpansion
 }
 
@@ -63,20 +64,20 @@ func newContainerRecreateRequests(c *AppsV1alpha1Client, namespace string) *cont
 }
 
 // Get takes name of the containerRecreateRequest, and returns the corresponding containerRecreateRequest object, and an error if there is any.
-func (c *containerRecreateRequests) Get(name string, options v1.GetOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *containerRecreateRequests) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	result = &v1alpha1.ContainerRecreateRequest{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("containerrecreaterequests").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ContainerRecreateRequests that match those selectors.
-func (c *containerRecreateRequests) List(opts v1.ListOptions) (result *v1alpha1.ContainerRecreateRequestList, err error) {
+func (c *containerRecreateRequests) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ContainerRecreateRequestList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -87,13 +88,13 @@ func (c *containerRecreateRequests) List(opts v1.ListOptions) (result *v1alpha1.
 		Resource("containerrecreaterequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested containerRecreateRequests.
-func (c *containerRecreateRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *containerRecreateRequests) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -104,87 +105,90 @@ func (c *containerRecreateRequests) Watch(opts v1.ListOptions) (watch.Interface,
 		Resource("containerrecreaterequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a containerRecreateRequest and creates it.  Returns the server's representation of the containerRecreateRequest, and an error, if there is any.
-func (c *containerRecreateRequests) Create(containerRecreateRequest *v1alpha1.ContainerRecreateRequest) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *containerRecreateRequests) Create(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.CreateOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	result = &v1alpha1.ContainerRecreateRequest{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("containerrecreaterequests").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(containerRecreateRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a containerRecreateRequest and updates it. Returns the server's representation of the containerRecreateRequest, and an error, if there is any.
-func (c *containerRecreateRequests) Update(containerRecreateRequest *v1alpha1.ContainerRecreateRequest) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *containerRecreateRequests) Update(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.UpdateOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	result = &v1alpha1.ContainerRecreateRequest{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("containerrecreaterequests").
 		Name(containerRecreateRequest.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(containerRecreateRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *containerRecreateRequests) UpdateStatus(containerRecreateRequest *v1alpha1.ContainerRecreateRequest) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *containerRecreateRequests) UpdateStatus(ctx context.Context, containerRecreateRequest *v1alpha1.ContainerRecreateRequest, opts v1.UpdateOptions) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	result = &v1alpha1.ContainerRecreateRequest{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("containerrecreaterequests").
 		Name(containerRecreateRequest.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(containerRecreateRequest).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the containerRecreateRequest and deletes it. Returns an error if one occurs.
-func (c *containerRecreateRequests) Delete(name string, options *v1.DeleteOptions) error {
+func (c *containerRecreateRequests) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("containerrecreaterequests").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *containerRecreateRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *containerRecreateRequests) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("containerrecreaterequests").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched containerRecreateRequest.
-func (c *containerRecreateRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ContainerRecreateRequest, err error) {
+func (c *containerRecreateRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ContainerRecreateRequest, err error) {
 	result = &v1alpha1.ContainerRecreateRequest{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("containerrecreaterequests").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

@@ -65,16 +65,16 @@ type AdapterTypedClient struct {
 }
 
 func (c *AdapterTypedClient) GetPod(namespace, name string) (*v1.Pod, error) {
-	return c.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+	return c.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (c *AdapterTypedClient) UpdatePod(pod *v1.Pod) error {
-	_, err := c.Client.CoreV1().Pods(pod.Namespace).Update(pod)
+	_, err := c.Client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 	return err
 }
 
 func (c *AdapterTypedClient) UpdatePodStatus(pod *v1.Pod) error {
-	_, err := c.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
+	_, err := c.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 	return err
 }
 
@@ -83,7 +83,7 @@ func (c *AdapterTypedClient) PatchPod(pod *v1.Pod, patch client.Patch) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.Client.CoreV1().Pods(pod.Namespace).Patch(pod.Name, patch.Type(), patchData)
+	_, err = c.Client.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, patch.Type(), patchData, metav1.PatchOptions{})
 	return err
 }
 

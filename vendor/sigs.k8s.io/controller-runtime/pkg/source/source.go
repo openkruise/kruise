@@ -17,6 +17,7 @@ limitations under the License.
 package source
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -110,7 +111,7 @@ func (ks *Kind) Start(handler handler.EventHandler, queue workqueue.RateLimiting
 	}
 
 	// Lookup the Informer from the Cache and add an EventHandler which populates the Queue
-	i, err := ks.cache.GetInformer(ks.Type)
+	i, err := ks.cache.GetInformer(context.TODO(), ks.Type)
 	if err != nil {
 		if kindMatchErr, ok := err.(*meta.NoKindMatchError); ok {
 			log.Error(err, "if kind is a CRD, it should be installed before calling Start",

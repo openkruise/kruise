@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -80,11 +81,11 @@ func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, ima
 }
 
 func (t *DaemonSetTester) CreateDaemonSet(ds *appsv1alpha1.DaemonSet) (*appsv1alpha1.DaemonSet, error) {
-	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Create(ds)
+	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Create(context.TODO(), ds, metav1.CreateOptions{})
 }
 
 func (t *DaemonSetTester) GetDaemonSet(name string) (*appsv1alpha1.DaemonSet, error) {
-	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Get(name, metav1.GetOptions{})
+	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (t *DaemonSetTester) UpdateDaemonSet(name string, fn func(ds *appsv1alpha1.DaemonSet)) error {
@@ -95,13 +96,13 @@ func (t *DaemonSetTester) UpdateDaemonSet(name string, fn func(ds *appsv1alpha1.
 		}
 
 		fn(ds)
-		_, err = t.kc.AppsV1alpha1().DaemonSets(t.ns).Update(ds)
+		_, err = t.kc.AppsV1alpha1().DaemonSets(t.ns).Update(context.TODO(), ds, metav1.UpdateOptions{})
 		return err
 	})
 }
 
 func (t *DaemonSetTester) DeleteDaemonSet(namespace, name string) {
-	err := t.kc.AppsV1alpha1().DaemonSets(namespace).Delete(name, &metav1.DeleteOptions{})
+	err := t.kc.AppsV1alpha1().DaemonSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		Logf("delete daemonset(%s.%s) failed: %s", t.ns, name, err.Error())
 		return
@@ -109,13 +110,13 @@ func (t *DaemonSetTester) DeleteDaemonSet(namespace, name string) {
 }
 
 func (t *DaemonSetTester) PatchDaemonSet(name string, patchType types.PatchType, patch []byte) (*appsv1alpha1.DaemonSet, error) {
-	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Patch(name, patchType, patch)
+	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Patch(context.TODO(), name, patchType, patch, metav1.PatchOptions{})
 }
 
 func (t *DaemonSetTester) WaitForDaemonSetDeleted(namespace, name string) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := t.kc.AppsV1alpha1().DaemonSets(namespace).Get(name, metav1.GetOptions{})
+			_, err := t.kc.AppsV1alpha1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
@@ -170,7 +171,7 @@ func (t *DaemonSetTester) SetDaemonSetNodeLabels(nodeName string, labels map[str
 	var newNode *v1.Node
 	var newLabels map[string]string
 	err := wait.PollImmediate(DaemonSetRetryPeriod, DaemonSetRetryTimeout, func() (bool, error) {
-		node, err := nodeClient.Get(nodeName, metav1.GetOptions{})
+		node, err := nodeClient.Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -185,7 +186,7 @@ func (t *DaemonSetTester) SetDaemonSetNodeLabels(nodeName string, labels map[str
 		for k, v := range labels {
 			node.Labels[k] = v
 		}
-		newNode, err = nodeClient.Update(node)
+		newNode, err = nodeClient.Update(context.TODO(), node, metav1.UpdateOptions{})
 		if err == nil {
 			newLabels, _ = t.SeparateDaemonSetNodeLabels(newNode.Labels)
 			return true, err
@@ -217,7 +218,7 @@ func (t *DaemonSetTester) CheckRunningOnNoNodes(ds *appsv1alpha1.DaemonSet) func
 }
 
 func (t *DaemonSetTester) SchedulableNodes(ds *appsv1alpha1.DaemonSet) []string {
-	nodeList, err := t.c.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := t.c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	ExpectNoError(err)
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
@@ -232,7 +233,7 @@ func (t *DaemonSetTester) SchedulableNodes(ds *appsv1alpha1.DaemonSet) []string 
 
 func (t *DaemonSetTester) CheckDaemonPodOnNodes(ds *appsv1alpha1.DaemonSet, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := t.c.CoreV1().Pods(t.ns).List(metav1.ListOptions{})
+		podList, err := t.c.CoreV1().Pods(t.ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			Logf("could not get the pod list: %v", err)
 			return false, nil
@@ -271,7 +272,7 @@ func (t *DaemonSetTester) CheckDaemonPodOnNodes(ds *appsv1alpha1.DaemonSet, node
 
 func (t *DaemonSetTester) WaitFailedDaemonPodDeleted(pod *v1.Pod) func() (bool, error) {
 	return func() (bool, error) {
-		if _, err := t.c.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+		if _, err := t.c.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
@@ -285,16 +286,25 @@ func (t *DaemonSetTester) CanScheduleOnNode(node v1.Node, ds *appsv1alpha1.Daemo
 	newPod := daemonset.NewPod(ds, node.Name)
 	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(&node)
-	fit, _, err := daemonset.Predicates(newPod, nodeInfo)
+	taints, err := nodeInfo.Taints()
+	if err != nil {
+		Failf("failed to get node %q taints: %v", node.Name, err)
+		return false
+	}
+	fitsNodeName, fitsNodeAffinity, fitsTaints := daemonset.Predicates(newPod, &node, taints)
 	if err != nil {
 		Failf("Can't test DaemonSet predicates for node %s: %v", node.Name, err)
 		return false
 	}
-	return fit
+	if !fitsNodeName || !fitsNodeAffinity || !fitsTaints {
+		return false
+	}
+
+	return true
 }
 
 func (t *DaemonSetTester) ListDaemonPods(label map[string]string) (*v1.PodList, error) {
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	return t.c.CoreV1().Pods(t.ns).List(options)
+	return t.c.CoreV1().Pods(t.ns).List(context.TODO(), options)
 }

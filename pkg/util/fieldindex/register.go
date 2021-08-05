@@ -17,6 +17,7 @@ limitations under the License.
 package fieldindex
 
 import (
+	"context"
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -57,11 +58,11 @@ func RegisterFieldIndexes(c cache.Cache) error {
 	registerOnce.Do(func() {
 
 		// pod ownerReference
-		if err = c.IndexField(&v1.Pod{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+		if err = c.IndexField(context.TODO(), &v1.Pod{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
 		// pvc ownerReference
-		if err = c.IndexField(&v1.PersistentVolumeClaim{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+		if err = c.IndexField(context.TODO(), &v1.PersistentVolumeClaim{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
 		// pod name
@@ -89,7 +90,7 @@ func RegisterFieldIndexes(c cache.Cache) error {
 }
 
 func indexPodNodeName(c cache.Cache) error {
-	return c.IndexField(&v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
 			return []string{}
@@ -102,7 +103,7 @@ func indexPodNodeName(c cache.Cache) error {
 }
 
 func indexJob(c cache.Cache) error {
-	return c.IndexField(&batchv1.Job{}, IndexNameForController, func(rawObj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &batchv1.Job{}, IndexNameForController, func(rawObj runtime.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*batchv1.Job)
 		owner := metav1.GetControllerOf(job)
@@ -121,7 +122,7 @@ func indexJob(c cache.Cache) error {
 }
 
 func indexBroadcastCronJob(c cache.Cache) error {
-	return c.IndexField(&appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj runtime.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1alpha1.BroadcastJob)
 		owner := metav1.GetControllerOf(job)
@@ -140,7 +141,7 @@ func indexBroadcastCronJob(c cache.Cache) error {
 }
 
 func indexImagePullJobActive(c cache.Cache) error {
-	return c.IndexField(&appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj runtime.Object) []string {
 		obj := rawObj.(*appsv1alpha1.ImagePullJob)
 		isActive := "false"
 		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {

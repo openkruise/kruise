@@ -157,11 +157,11 @@ func newPodInformer(client clientset.Interface, nodeName string) cache.SharedInd
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptionsFunc(&options)
-				return client.CoreV1().Pods(v1.NamespaceAll).List(options)
+				return client.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptionsFunc(&options)
-				return client.CoreV1().Pods(v1.NamespaceAll).Watch(options)
+				return client.CoreV1().Pods(v1.NamespaceAll).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Pod{},

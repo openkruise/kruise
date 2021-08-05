@@ -30,6 +30,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/net/http2"
 	"k8s.io/klog"
@@ -53,6 +54,12 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 	}
 
 	return result
+}
+
+// IsTimeout returns true if the given error is a network timeout error
+func IsTimeout(err error) bool {
+	neterr, ok := err.(net.Error)
+	return ok && neterr != nil && neterr.Timeout()
 }
 
 // IsProbableEOF returns true if the given error resembles a connection termination
@@ -115,11 +122,59 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
 		klog.Infof("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
-		if err := http2.ConfigureTransport(t); err != nil {
+		if err := configureHTTP2Transport(t); err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
 	}
 	return t
+}
+
+func readIdleTimeoutSeconds() int {
+	ret := 30
+	// User can set the readIdleTimeout to 0 to disable the HTTP/2
+	// connection health check.
+	if s := os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"); len(s) > 0 {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			klog.Warningf("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS(%q): %v."+
+				" Default value %d is used", s, err, ret)
+			return ret
+		}
+		ret = i
+	}
+	return ret
+}
+
+func pingTimeoutSeconds() int {
+	ret := 15
+	if s := os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"); len(s) > 0 {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			klog.Warningf("Illegal HTTP2_PING_TIMEOUT_SECONDS(%q): %v."+
+				" Default value %d is used", s, err, ret)
+			return ret
+		}
+		ret = i
+	}
+	return ret
+}
+
+func configureHTTP2Transport(t *http.Transport) error {
+	t2, err := http2.ConfigureTransports(t)
+	if err != nil {
+		return err
+	}
+	// The following enables the HTTP/2 connection health check added in
+	// https://github.com/golang/net/pull/55. The health check detects and
+	// closes broken transport layer connections. Without the health check,
+	// a broken connection can linger too long, e.g., a broken TCP
+	// connection will be closed by the Linux kernel after 13 to 30 minutes
+	// by default, which caused
+	// https://github.com/kubernetes/client-go/issues/374 and
+	// https://github.com/kubernetes/kubernetes/issues/87615.
+	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
+	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
+	return nil
 }
 
 func allowsHTTP2(t *http.Transport) bool {
@@ -206,13 +261,17 @@ func GetHTTPClient(req *http.Request) string {
 	return "unknown"
 }
 
-// SourceIPs splits the comma separated X-Forwarded-For header or returns the X-Real-Ip header or req.RemoteAddr,
-// in that order, ignoring invalid IPs. It returns nil if all of these are empty or invalid.
+// SourceIPs splits the comma separated X-Forwarded-For header and joins it with
+// the X-Real-Ip header and/or req.RemoteAddr, ignoring invalid IPs.
+// The X-Real-Ip is omitted if it's already present in the X-Forwarded-For chain.
+// The req.RemoteAddr is always the last IP in the returned list.
+// It returns nil if all of these are empty or invalid.
 func SourceIPs(req *http.Request) []net.IP {
+	var srcIPs []net.IP
+
 	hdr := req.Header
 	// First check the X-Forwarded-For header for requests via proxy.
 	hdrForwardedFor := hdr.Get("X-Forwarded-For")
-	forwardedForIPs := []net.IP{}
 	if hdrForwardedFor != "" {
 		// X-Forwarded-For can be a csv of IPs in case of multiple proxies.
 		// Use the first valid one.
@@ -220,38 +279,49 @@ func SourceIPs(req *http.Request) []net.IP {
 		for _, part := range parts {
 			ip := net.ParseIP(strings.TrimSpace(part))
 			if ip != nil {
-				forwardedForIPs = append(forwardedForIPs, ip)
+				srcIPs = append(srcIPs, ip)
 			}
 		}
-	}
-	if len(forwardedForIPs) > 0 {
-		return forwardedForIPs
 	}
 
 	// Try the X-Real-Ip header.
 	hdrRealIp := hdr.Get("X-Real-Ip")
 	if hdrRealIp != "" {
 		ip := net.ParseIP(hdrRealIp)
-		if ip != nil {
-			return []net.IP{ip}
+		// Only append the X-Real-Ip if it's not already contained in the X-Forwarded-For chain.
+		if ip != nil && !containsIP(srcIPs, ip) {
+			srcIPs = append(srcIPs, ip)
 		}
 	}
 
-	// Fallback to Remote Address in request, which will give the correct client IP when there is no proxy.
+	// Always include the request Remote Address as it cannot be easily spoofed.
+	var remoteIP net.IP
 	// Remote Address in Go's HTTP server is in the form host:port so we need to split that first.
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err == nil {
-		if remoteIP := net.ParseIP(host); remoteIP != nil {
-			return []net.IP{remoteIP}
+		remoteIP = net.ParseIP(host)
+	}
+	// Fallback if Remote Address was just IP.
+	if remoteIP == nil {
+		remoteIP = net.ParseIP(req.RemoteAddr)
+	}
+
+	// Don't duplicate remote IP if it's already the last address in the chain.
+	if remoteIP != nil && (len(srcIPs) == 0 || !remoteIP.Equal(srcIPs[len(srcIPs)-1])) {
+		srcIPs = append(srcIPs, remoteIP)
+	}
+
+	return srcIPs
+}
+
+// Checks whether the given IP address is contained in the list of IPs.
+func containsIP(ips []net.IP, ip net.IP) bool {
+	for _, v := range ips {
+		if v.Equal(ip) {
+			return true
 		}
 	}
-
-	// Fallback if Remote Address was just IP.
-	if remoteIP := net.ParseIP(req.RemoteAddr); remoteIP != nil {
-		return []net.IP{remoteIP}
-	}
-
-	return nil
+	return false
 }
 
 // Extracts and returns the clients IP from the given request.
@@ -425,7 +495,7 @@ redirectLoop:
 
 		// Only follow redirects to the same host. Otherwise, propagate the redirect response back.
 		if requireSameHostRedirects && location.Hostname() != originalLocation.Hostname() {
-			break redirectLoop
+			return nil, nil, fmt.Errorf("hostname mismatch: expected %s, found %s", originalLocation.Hostname(), location.Hostname())
 		}
 
 		// Reset the connection.

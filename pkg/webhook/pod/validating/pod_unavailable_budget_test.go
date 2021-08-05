@@ -433,7 +433,7 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 			podRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.newPod())),
 			}
-			req := newAdmission(admissionv1beta1.Update, podRaw, oldPodRaw, cs.subresource)
+			req := newAdmission(cs.newPod().Namespace, cs.newPod().Name, admissionv1beta1.Update, podRaw, oldPodRaw, cs.subresource)
 			req.Options = runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(metav1.UpdateOptions{})),
 			}
@@ -586,7 +586,7 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			evictionRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.eviction())),
 			}
-			req := newAdmission(admissionv1beta1.Create, evictionRaw, runtime.RawExtension{}, cs.subresource)
+			req := newAdmission(cs.newPod().Namespace, cs.newPod().Name, admissionv1beta1.Create, evictionRaw, runtime.RawExtension{}, cs.subresource)
 			allow, _, err := podHandler.podUnavailableBudgetValidatingPod(context.TODO(), req)
 			if err != nil {
 				t.Errorf("Pub validate pod failed: %s", err.Error())
@@ -722,7 +722,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			podRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.newPod())),
 			}
-			req := newAdmission(admissionv1beta1.Delete, runtime.RawExtension{}, podRaw, cs.subresource)
+			req := newAdmission(cs.newPod().Namespace, cs.newPod().Name, admissionv1beta1.Delete, runtime.RawExtension{}, podRaw, cs.subresource)
 			req.AdmissionRequest.Options = deletionRaw
 			allow, _, err := podHandler.podUnavailableBudgetValidatingPod(context.TODO(), req)
 			if err != nil {
@@ -742,19 +742,17 @@ func TestValidateDeletePodForPub(t *testing.T) {
 	}
 }
 
-func newAdmission(op admissionv1beta1.Operation, object, oldObject runtime.RawExtension, subResource string) admission.Request {
+func newAdmission(ns, name string, op admissionv1beta1.Operation, object, oldObject runtime.RawExtension, subResource string) admission.Request {
 	return admission.Request{
-		AdmissionRequest: newAdmissionRequest(op, object, oldObject, subResource),
-	}
-}
-
-func newAdmissionRequest(op admissionv1beta1.Operation, object, oldObject runtime.RawExtension, subResource string) admissionv1beta1.AdmissionRequest {
-	return admissionv1beta1.AdmissionRequest{
-		Resource:    metav1.GroupVersionResource{Group: corev1.SchemeGroupVersion.Group, Version: corev1.SchemeGroupVersion.Version, Resource: "pods"},
-		Operation:   op,
-		Object:      object,
-		OldObject:   oldObject,
-		SubResource: subResource,
+		AdmissionRequest: admissionv1beta1.AdmissionRequest{
+			Resource:    metav1.GroupVersionResource{Group: corev1.SchemeGroupVersion.Group, Version: corev1.SchemeGroupVersion.Version, Resource: "pods"},
+			Operation:   op,
+			Object:      object,
+			OldObject:   oldObject,
+			SubResource: subResource,
+			Namespace:   ns,
+			Name:        name,
+		},
 	}
 }
 

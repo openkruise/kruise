@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"k8s.io/klog"
+	"go.etcd.io/etcd/clientv3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -83,11 +84,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
-	return newStore(c, pagingEnabled, codec, prefix, transformer)
+func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, pagingEnabled, codec, prefix, transformer, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
+func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -100,7 +101,7 @@ func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefi
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
 		pathPrefix:   path.Join("/", prefix),
 		watcher:      newWatcher(c, codec, versioner, transformer),
-		leaseManager: newDefaultLeaseManager(c),
+		leaseManager: newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
 }
@@ -117,6 +118,9 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
 	if err != nil {
+		return err
+	}
+	if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 		return err
 	}
 
@@ -391,11 +395,16 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		return fmt.Errorf("need ptr to slice: %v", err)
 	}
 
+	newItemFunc := getNewItemFunc(listObj, v)
+
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	if err != nil {
+		return err
+	}
+	if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 		return err
 	}
 
@@ -404,7 +413,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
-		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner); err != nil {
+		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 			return err
 		}
 	}
@@ -412,8 +421,33 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", nil)
 }
 
+func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Object {
+	// For unstructured lists with a target group/version, preserve the group/version in the instantiated list items
+	if unstructuredList, isUnstructured := listObj.(*unstructured.UnstructuredList); isUnstructured {
+		if apiVersion := unstructuredList.GetAPIVersion(); len(apiVersion) > 0 {
+			return func() runtime.Object {
+				return &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": apiVersion}}
+			}
+		}
+	}
+
+	// Otherwise just instantiate an empty item
+	elem := v.Type().Elem()
+	return func() runtime.Object {
+		return reflect.New(elem).Interface().(runtime.Object)
+	}
+}
+
 func (s *store) Count(key string) (int64, error) {
 	key = path.Join(s.pathPrefix, key)
+
+	// We need to make sure the key ended with "/" so that we only get children "directories".
+	// e.g. if we have key "/a", "/a/b", "/ab", getting keys with prefix "/a" will return all three,
+	// while with prefix "/a/" will return only "/a/b" which is the correct answer.
+	if !strings.HasSuffix(key, "/") {
+		key += "/"
+	}
+
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(context.Background(), key, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)), clientv3.WithCountOnly())
 	metrics.RecordEtcdRequestLatency("listWithCount", key, startTime)
@@ -519,7 +553,9 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithLimit(pred.Limit))
 	}
 
-	var returnedRV, continueRV int64
+	newItemFunc := getNewItemFunc(listObj, v)
+
+	var returnedRV, continueRV, withRev int64
 	var continueKey string
 	switch {
 	case s.pagingEnabled && len(pred.Continue) > 0:
@@ -540,7 +576,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		// continueRV==0 is invalid.
 		// If continueRV < 0, the request is for the latest resource version.
 		if continueRV > 0 {
-			options = append(options, clientv3.WithRev(continueRV))
+			withRev = continueRV
 			returnedRV = continueRV
 		}
 	case s.pagingEnabled && pred.Limit > 0:
@@ -550,7 +586,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 			}
 			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(int64(fromRV)))
+				withRev = int64(fromRV)
 			}
 			returnedRV = int64(fromRV)
 		}
@@ -559,18 +595,10 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithRange(rangeEnd))
 
 	default:
-		if len(resourceVersion) > 0 {
-			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
-			if err != nil {
-				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
-			}
-			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(int64(fromRV)))
-			}
-			returnedRV = int64(fromRV)
-		}
-
 		options = append(options, clientv3.WithPrefix())
+	}
+	if withRev != 0 {
+		options = append(options, clientv3.WithRev(withRev))
 	}
 
 	// loop until we have filled the requested limit from etcd or there are no more results
@@ -583,6 +611,9 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
+		}
+		if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
+			return err
 		}
 		hasMore = getResp.More
 
@@ -611,7 +642,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
-			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner); err != nil {
+			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				return err
 			}
 		}
@@ -630,6 +661,10 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 			break
 		}
 		key = string(lastKey) + "\x00"
+		if withRev == 0 {
+			withRev = returnedRV
+			options = append(options, clientv3.WithRev(withRev))
+		}
 	}
 
 	// instruct the client to begin querying from immediately after the last key we returned
@@ -798,6 +833,24 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 	return []clientv3.OpOption{clientv3.WithLease(id)}, nil
 }
 
+// ensureMinimumResourceVersion returns a 'too large resource' version error when the provided minimumResourceVersion is
+// greater than the most recent actualRevision available from storage.
+func (s *store) ensureMinimumResourceVersion(minimumResourceVersion string, actualRevision uint64) error {
+	if minimumResourceVersion == "" {
+		return nil
+	}
+	minimumRV, err := s.versioner.ParseResourceVersion(minimumResourceVersion)
+	if err != nil {
+		return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+	}
+	// Enforce the storage.Interface guarantee that the resource version of the returned data
+	// "will be at least 'resourceVersion'".
+	if minimumRV > actualRevision {
+		return storage.NewTooLargeResourceVersionError(minimumRV, actualRevision, 0)
+	}
+	return nil
+}
+
 // decode decodes value of bytes into object. It will also set the object resource version to rev.
 // On success, objPtr would be set to the object.
 func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objPtr runtime.Object, rev int64) error {
@@ -816,8 +869,8 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 }
 
 // appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
-func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner) error {
-	obj, _, err := codec.Decode(data, nil, reflect.New(v.Type().Elem()).Interface().(runtime.Object))
+func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
+	obj, _, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
 		return err
 	}
