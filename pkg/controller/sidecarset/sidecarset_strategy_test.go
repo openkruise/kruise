@@ -42,8 +42,8 @@ func factoryPodsCommon(count, upgraded int, sidecarSet *appsv1alpha1.SidecarSet)
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					sidecarcontrol.SidecarSetHashAnnotation:             `{"test-sidecarset":{"hash":"aaa"}}`,
-					sidecarcontrol.SidecarSetHashWithoutImageAnnotation: `{"test-sidecarset":{"hash":"without-aaa"}}`,
+					sidecarcontrol.SidecarSetHashAnnotation:             `{"test-sidecarset":{"hash":"aaa","sidecarList":["test-sidecar"]}}`,
+					sidecarcontrol.SidecarSetHashWithoutImageAnnotation: `{"test-sidecarset":{"hash":"without-aaa","sidecarList":["test-sidecar"]}}`,
 				},
 				Name: fmt.Sprintf("pod-%d", i),
 				Labels: map[string]string{

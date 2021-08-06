@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
@@ -143,6 +144,12 @@ type ReconcilePodUnavailableBudget struct {
 
 // pkg/controller/cloneset/cloneset_controller.go Watch for changes to CloneSet
 func (r *ReconcilePodUnavailableBudget) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			klog.Errorf("panic: %v [recovered]\n\n%s", r, debug.Stack())
+		}
+	}()
+
 	// Fetch the PodUnavailableBudget instance
 	pub := &policyv1alpha1.PodUnavailableBudget{}
 	err := r.Get(context.TODO(), req.NamespacedName, pub)

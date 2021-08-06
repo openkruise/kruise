@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"reflect"
+	"runtime/debug"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
@@ -127,6 +128,11 @@ type ReconcileSidecarSet struct {
 // Reconcile reads that state of the cluster for a SidecarSet object and makes changes based on the state read
 // and what is in the SidecarSet.Spec
 func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			klog.Errorf("panic: %v [recovered]\n\n%s", r, debug.Stack())
+		}
+	}()
 	// Fetch the SidecarSet instance
 	sidecarSet := &appsv1alpha1.SidecarSet{}
 	err := r.Get(context.TODO(), request.NamespacedName, sidecarSet)

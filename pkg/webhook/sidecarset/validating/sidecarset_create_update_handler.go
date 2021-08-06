@@ -239,6 +239,7 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 			}
 		}
 	}
+
 	return allErrs
 }
 

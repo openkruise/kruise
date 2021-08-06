@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
@@ -318,7 +320,17 @@ func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) 
 // whether this pod has been injected sidecar container based on the sidecarSet
 func isPodInjectedSidecar(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
 	// if pod annotations contain sidecarset hash, then indicates the pod has been injected in sidecar container
-	return sidecarcontrol.GetPodSidecarSetRevision(sidecarSet.Name, pod) != ""
+	upgradeSpec := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSet.Name, sidecarcontrol.SidecarSetHashAnnotation, pod)
+	if upgradeSpec.SidecarSetHash == "" {
+		return false
+	}
+	//Prevent sidecar number or container name changes in sidecarSet
+	target := sets.NewString(upgradeSpec.SidecarList...)
+	origin := sets.String{}
+	for _, sidecar := range sidecarSet.Spec.Containers {
+		origin.Insert(sidecar.Name)
+	}
+	return reflect.DeepEqual(origin.List(), target.List())
 }
 
 func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
