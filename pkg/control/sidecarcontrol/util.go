@@ -60,6 +60,7 @@ type SidecarSetUpgradeSpec struct {
 	UpdateTimestamp metav1.Time `json:"updateTimestamp"`
 	SidecarSetHash  string      `json:"hash"`
 	SidecarSetName  string      `json:"sidecarSetName"`
+	SidecarList     []string    `json:"sidecarList"`
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
@@ -102,39 +103,15 @@ func GetSidecarSetWithoutImageRevision(sidecarSet *appsv1alpha1.SidecarSet) stri
 }
 
 func GetPodSidecarSetRevision(sidecarSetName string, pod metav1.Object) string {
-	annotations := pod.GetAnnotations()
-	hashKey := SidecarSetHashAnnotation
-	if annotations[hashKey] == "" {
-		return ""
-	}
-
-	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
-	if err := json.Unmarshal([]byte(annotations[hashKey]), &sidecarSetHash); err != nil {
-		klog.Warningf("parse pod(%s.%s) annotations[%s] value(%s) failed: %s", pod.GetNamespace(), pod.GetName(), hashKey,
-			annotations[hashKey], err.Error())
-		// to be compatible with older sidecarSet hash struct, map[string]string
-		olderSidecarSetHash := make(map[string]string)
-		if err = json.Unmarshal([]byte(annotations[hashKey]), &olderSidecarSetHash); err != nil {
-			return ""
-		}
-		for k, v := range olderSidecarSetHash {
-			sidecarSetHash[k] = SidecarSetUpgradeSpec{
-				SidecarSetHash: v,
-			}
-		}
-	}
-	if upgradeSpec, ok := sidecarSetHash[sidecarSetName]; ok {
-		return upgradeSpec.SidecarSetHash
-	}
-	klog.Warningf("parse pod(%s.%s) annotations[%s] sidecarSet(%s) Not Found", pod.GetNamespace(), pod.GetName(), hashKey, sidecarSetName)
-	return ""
+	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, SidecarSetHashAnnotation, pod)
+	return upgradeSpec.SidecarSetHash
 }
 
-func GetPodSidecarSetWithoutImageRevision(sidecarSetName string, pod metav1.Object) string {
+func GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, annotationKey string, pod metav1.Object) SidecarSetUpgradeSpec {
 	annotations := pod.GetAnnotations()
-	hashKey := SidecarSetHashWithoutImageAnnotation
+	hashKey := annotationKey
 	if annotations[hashKey] == "" {
-		return ""
+		return SidecarSetUpgradeSpec{}
 	}
 
 	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
@@ -144,7 +121,7 @@ func GetPodSidecarSetWithoutImageRevision(sidecarSetName string, pod metav1.Obje
 		// to be compatible with older sidecarSet hash struct, map[string]string
 		olderSidecarSetHash := make(map[string]string)
 		if err = json.Unmarshal([]byte(annotations[hashKey]), &olderSidecarSetHash); err != nil {
-			return ""
+			return SidecarSetUpgradeSpec{}
 		}
 		for k, v := range olderSidecarSetHash {
 			sidecarSetHash[k] = SidecarSetUpgradeSpec{
@@ -152,11 +129,13 @@ func GetPodSidecarSetWithoutImageRevision(sidecarSetName string, pod metav1.Obje
 			}
 		}
 	}
-	if upgradeSpec, ok := sidecarSetHash[sidecarSetName]; ok {
-		return upgradeSpec.SidecarSetHash
-	}
-	klog.Warningf("parse pod(%s.%s) annotations[%s] sidecarSet(%s) Not Found", pod.GetNamespace(), pod.GetName(), hashKey, sidecarSetName)
-	return ""
+
+	return sidecarSetHash[sidecarSetName]
+}
+
+func GetPodSidecarSetWithoutImageRevision(sidecarSetName string, pod metav1.Object) string {
+	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, SidecarSetHashWithoutImageAnnotation, pod)
+	return upgradeSpec.SidecarSetHash
 }
 
 // whether this pod has been updated based on the latest sidecarSet
@@ -196,10 +175,16 @@ func updatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 		// compatible done
 	}
 
+	sidecarList := sets.NewString()
+	for _, sidecar := range sidecarSet.Spec.Containers {
+		sidecarList.Insert(sidecar.Name)
+	}
+
 	sidecarSetHash[sidecarSet.Name] = SidecarSetUpgradeSpec{
 		UpdateTimestamp: metav1.Now(),
 		SidecarSetHash:  GetSidecarSetRevision(sidecarSet),
 		SidecarSetName:  sidecarSet.Name,
+		SidecarList:     sidecarList.List(),
 	}
 	newHash, _ := json.Marshal(sidecarSetHash)
 	pod.Annotations[hashKey] = string(newHash)
