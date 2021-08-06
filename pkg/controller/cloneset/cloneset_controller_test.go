@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
@@ -116,7 +117,7 @@ func TestReconcile(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
 	// Create the CloneSet object and expect the Reconcile
-	appsv1alpha1.SetDefaultsCloneSet(instance)
+	defaults.SetDefaultsCloneSet(instance, true)
 	err = c.Create(context.TODO(), instance)
 	// The instance object may not be a valid object because it might be missing some required fields.
 	// Please modify the instance object by adding required fields and then remove the following if statement.
@@ -162,7 +163,7 @@ func TestClaimPods(t *testing.T) {
 			Selector: &metav1.LabelSelector{MatchLabels: productionLabel},
 		},
 	}
-	appsv1alpha1.SetDefaultsCloneSet(instance)
+	defaults.SetDefaultsCloneSet(instance, true)
 
 	type test struct {
 		name    string

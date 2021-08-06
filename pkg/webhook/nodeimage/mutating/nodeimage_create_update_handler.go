@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
@@ -47,7 +48,7 @@ func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission
 	}
 	var copy runtime.Object = obj.DeepCopy()
 	// Set defaults
-	appsv1alpha1.SetDefaultsNodeImage(obj)
+	defaults.SetDefaultsNodeImage(obj)
 
 	// Sort image tags
 	for name, imageSpec := range obj.Spec.Images {

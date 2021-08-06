@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
@@ -76,7 +77,7 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req admission.Requ
 	var copy runtime.Object = obj.DeepCopy()
 	switch req.AdmissionRequest.Operation {
 	case v1beta1.Create, v1beta1.Update:
-		appsv1alpha1.SetDefaultsSidecarSet(obj)
+		defaults.SetDefaultsSidecarSet(obj)
 		if err := setHashSidecarSet(obj); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}

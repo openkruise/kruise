@@ -19,6 +19,7 @@ package convertor
 import (
 	"strconv"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -28,6 +29,7 @@ import (
 
 func ConvertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
 	coreTemplate := &core.PodTemplateSpec{}
+	defaults.SetDefaultPodSpec(&template.Spec)
 	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template.DeepCopy(), coreTemplate, nil); err != nil {
 		return nil, err
 	}

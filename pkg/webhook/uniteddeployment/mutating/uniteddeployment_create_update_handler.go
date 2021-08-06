@@ -22,8 +22,12 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -52,7 +56,22 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	var copy runtime.Object = obj.DeepCopy()
-	appsv1alpha1.SetDefaultsUnitedDeployment(obj)
+
+	injectPodTemplateDefaults := false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodTemplateNoDefaults) {
+		if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+			oldObj := &appsv1alpha1.UnitedDeployment{}
+			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+				injectPodTemplateDefaults = true
+			}
+		} else {
+			injectPodTemplateDefaults = true
+		}
+	}
+	defaults.SetDefaultsUnitedDeployment(obj, injectPodTemplateDefaults)
 	obj.Status = appsv1alpha1.UnitedDeploymentStatus{}
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
