@@ -1,0 +1,22 @@
+# permissions for end users to edit resourcedistributions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: resourcedistribution-editor-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - resourcedistributions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - resourcedistributions/status
+  verbs:
+  - get
+  - update
+  - patch
