@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -133,7 +134,7 @@ func (t *NodeTester) CreateFakeNode(randStr string) (node *v1.Node, err error) {
 }
 
 func (t *NodeTester) DeleteFakeNode(randStr string) error {
-	name := "fake-node-" + randStr
+	name := fakeNodeNamePrefix + randStr
 	err := t.c.CoreV1().Nodes().Delete(name, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
@@ -141,7 +142,7 @@ func (t *NodeTester) DeleteFakeNode(randStr string) error {
 	return nil
 }
 
-func (t *NodeTester) ListRealNodesWithFake(randStr string) ([]*v1.Node, error) {
+func (t *NodeTester) ListRealNodesWithFake(tolerations []v1.Toleration) ([]*v1.Node, error) {
 	nodeList, err := t.c.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -149,12 +150,9 @@ func (t *NodeTester) ListRealNodesWithFake(randStr string) ([]*v1.Node, error) {
 	var nodes []*v1.Node
 	for i := range nodeList.Items {
 		node := &nodeList.Items[i]
-		if len(node.Spec.Taints) > 1 {
-			continue
-		} else if len(node.Spec.Taints) == 1 && (node.Spec.Taints[0].Key != E2eFakeKey || node.Spec.Taints[0].Value != randStr) {
-			continue
+		if helper.TolerationsTolerateTaintsWithFilter(tolerations, node.Spec.Taints, nil) {
+			nodes = append(nodes, node)
 		}
-		nodes = append(nodes, node)
 	}
 	return nodes, nil
 }
