@@ -17,10 +17,14 @@ limitations under the License.
 package framework
 
 import (
+	"time"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -39,7 +43,9 @@ func NewBroadcastJobTester(c clientset.Interface, kc kruiseclientset.Interface, 
 }
 
 func (t *BroadcastJobTester) CreateBroadcastJob(job *appsv1alpha1.BroadcastJob) (*appsv1alpha1.BroadcastJob, error) {
-	return t.kc.AppsV1alpha1().BroadcastJobs(t.ns).Create(job)
+	job, err := t.kc.AppsV1alpha1().BroadcastJobs(t.ns).Create(job)
+	t.WaitForBroadcastJobCreated(job)
+	return job, err
 }
 
 func (t *BroadcastJobTester) GetBroadcastJob(name string) (*appsv1alpha1.BroadcastJob, error) {
@@ -59,4 +65,18 @@ func (t *BroadcastJobTester) GetPodsOfJob(job *appsv1alpha1.BroadcastJob) (pods 
 		}
 	}
 	return pods, nil
+}
+
+func (t *BroadcastJobTester) WaitForBroadcastJobCreated(job *appsv1alpha1.BroadcastJob) {
+	pollErr := wait.PollImmediate(time.Second, time.Minute,
+		func() (bool, error) {
+			_, err := t.kc.AppsV1alpha1().BroadcastJobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for BroadcastJob to enter running: %v", pollErr)
+	}
 }
