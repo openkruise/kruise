@@ -22,7 +22,11 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -39,11 +43,6 @@ type AdvancedCronJobCreateUpdateHandler struct {
 	Decoder *admission.Decoder
 }
 
-func (h *AdvancedCronJobCreateUpdateHandler) mutatingAdvancedCronJobFn(ctx context.Context, obj *appsv1alpha1.AdvancedCronJob) error {
-	appsv1alpha1.SetDefaultsAdvancedCronJob(obj)
-	return nil
-}
-
 var _ admission.Handler = &AdvancedCronJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
@@ -56,10 +55,21 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 	}
 
 	var copy runtime.Object = obj.DeepCopy()
-	err = h.mutatingAdvancedCronJobFn(ctx, obj)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
+	injectPodTemplateDefaults := false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodTemplateNoDefaults) {
+		if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+			oldObj := &appsv1alpha1.AdvancedCronJob{}
+			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+				injectPodTemplateDefaults = true
+			}
+		} else {
+			injectPodTemplateDefaults = true
+		}
 	}
+	defaults.SetDefaultsAdvancedCronJob(obj, injectPodTemplateDefaults)
 
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")

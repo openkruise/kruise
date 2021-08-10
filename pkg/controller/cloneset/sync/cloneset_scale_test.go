@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -253,7 +252,6 @@ func TestCreatePods(t *testing.T) {
 	}
 
 	for i := range expectedPods {
-		appsv1alpha1.SetDefaultPod(&expectedPods[i])
 		if v, ok := pods.Items[i].Annotations[appspub.LifecycleTimestampKey]; ok {
 			if expectedPods[i].Annotations == nil {
 				expectedPods[i].Annotations = make(map[string]string)
@@ -328,9 +326,7 @@ func TestCreatePods(t *testing.T) {
 			},
 		},
 	}
-	for i := range expectedPVCs {
-		corev1.SetDefaults_PersistentVolumeClaim(&expectedPVCs[i])
-	}
+
 	sort.Slice(pvcs.Items, func(i, j int) bool { return pvcs.Items[i].Name < pvcs.Items[j].Name })
 	if !reflect.DeepEqual(expectedPVCs, pvcs.Items) {
 		t.Fatalf("expected pvcs \n%s\ngot pvcs\n%s", util.DumpJSON(expectedPVCs), util.DumpJSON(pvcs.Items))
