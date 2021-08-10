@@ -23,9 +23,13 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -66,7 +70,33 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 	}
 	var copy runtime.Object = obj.DeepCopy()
 
-	appsv1beta1.SetDefaultsStatefulSet(obj)
+	injectPodTemplateDefaults := false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodTemplateNoDefaults) {
+		if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+			oldObj := &appsv1beta1.StatefulSet{}
+			var oldObjv1alpha1 *appsv1alpha1.StatefulSet
+			switch req.AdmissionRequest.Resource.Version {
+			case appsv1beta1.GroupVersion.Version:
+				if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+			case appsv1alpha1.GroupVersion.Version:
+				oldObjv1alpha1 = &appsv1alpha1.StatefulSet{}
+				if err := h.Decoder.DecodeRaw(req.OldObject, oldObjv1alpha1); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				if err := oldObjv1alpha1.ConvertTo(oldObj); err != nil {
+					return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err))
+				}
+			}
+			if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+				injectPodTemplateDefaults = true
+			}
+		} else {
+			injectPodTemplateDefaults = true
+		}
+	}
+	defaults.SetDefaultsStatefulSet(obj, injectPodTemplateDefaults)
 	obj.Status = appsv1beta1.StatefulSetStatus{}
 
 	var err error

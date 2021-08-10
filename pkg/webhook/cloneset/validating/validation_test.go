@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -228,6 +229,9 @@ func TestValidate(t *testing.T) {
 
 	for i, successCase := range successCases {
 		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
+			if i == 5 {
+				fmt.Println("------")
+			}
 			obj := appsv1alpha1.CloneSet{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%d", i), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "2"},
 				Spec:       *successCase.spec,
@@ -242,6 +246,8 @@ func TestValidate(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%d", i), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "1"},
 					Spec:       *successCase.oldSpec,
 				}
+				defaults.SetDefaultPodSpec(&oldObj.Spec.Template.Spec)
+				defaults.SetDefaultPodSpec(&obj.Spec.Template.Spec)
 				if errs := h.validateCloneSetUpdate(&obj, &oldObj); len(errs) != 0 {
 					t.Errorf("expected success: %v", errs)
 				}

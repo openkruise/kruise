@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,7 +53,7 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	var copy runtime.Object = obj.DeepCopy()
-	appsv1alpha1.SetDefaultsDaemonSet(obj)
+	defaults.SetDefaultsDaemonSet(obj)
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}

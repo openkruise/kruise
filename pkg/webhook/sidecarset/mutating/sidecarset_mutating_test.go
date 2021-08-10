@@ -3,6 +3,7 @@ package mutating
 import (
 	"testing"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
@@ -28,7 +29,7 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 			},
 		},
 	}
-	appsv1alpha1.SetDefaultsSidecarSet(sidecarSet)
+	defaults.SetDefaultsSidecarSet(sidecarSet)
 	_ = setHashSidecarSet(sidecarSet)
 	if sidecarSet.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateSidecarSetStrategyType {
 		t.Fatalf("update strategy not initialized")

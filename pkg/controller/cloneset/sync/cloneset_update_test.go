@@ -591,7 +591,6 @@ func TestUpdate(t *testing.T) {
 		for _, p := range mc.expectedPods {
 			p.APIVersion = "v1"
 			p.Kind = "Pod"
-			appsv1alpha1.SetDefaultPod(p)
 
 			gotPod := &v1.Pod{}
 			if err := ctrl.Client.Get(context.TODO(), types.NamespacedName{Namespace: p.Namespace, Name: p.Name}, gotPod); err != nil {
