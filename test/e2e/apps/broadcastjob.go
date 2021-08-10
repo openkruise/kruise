@@ -61,9 +61,6 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			fakeNode, err := nodeTester.CreateFakeNode(randStr)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			nodes, err := nodeTester.ListRealNodesWithFake(randStr)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 			ginkgo.By("Create BroadcastJob job-" + randStr)
 			parallelism := intstr.FromInt(1)
 			job := &appsv1alpha1.BroadcastJob{
@@ -86,6 +83,9 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			}
 
 			job, err = tester.CreateBroadcastJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check the status of job")
