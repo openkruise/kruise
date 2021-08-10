@@ -13,6 +13,7 @@ resources:
 - bases/apps.kruise.io_advancedcronjobs.yaml
 - bases/apps.kruise.io_containerrecreaterequests.yaml
 - bases/policy.kruise.io_podunavailablebudgets.yaml
+- bases/apps.kruise.io_resourcedistributions.yaml
 - bases/apps.kruise.io_workloadspreads.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
@@ -29,6 +30,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_imagepulljobs.yaml
 #- patches/webhook_in_advancedcronjobs.yaml
 #- patches/webhook_in_containerrecreaterequests.yaml
+#- patches/webhook_in_resourcedistributions.yaml
 #- patches/webhook_in_workloadspreads.yaml
 # +kubebuilder:scaffold:crdkustomizewebhookpatch
 
@@ -44,6 +46,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_imagepulljobs.yaml
 #- patches/cainjection_in_advancedcronjobs.yaml
 #- patches/cainjection_in_containerrecreaterequests.yaml
+#- patches/cainjection_in_resourcedistributions.yaml
 #- patches/cainjection_in_workloadspreads.yaml
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
