@@ -30,6 +30,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -236,12 +237,12 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		// pre-process volumes only in sidecar
 		volumesMap := getVolumesMapInSidecarSet(sidecarSet)
 		// process sidecarset hash
-		sidecarSetHash[sidecarSet.Name] = sidecarcontrol.SidecarSetUpgradeSpec{
+		setUpgrade1 := sidecarcontrol.SidecarSetUpgradeSpec{
 			UpdateTimestamp: metav1.Now(),
 			SidecarSetHash:  sidecarcontrol.GetSidecarSetRevision(sidecarSet),
 			SidecarSetName:  sidecarSet.Name,
 		}
-		sidecarSetHashWithoutImage[sidecarSet.Name] = sidecarcontrol.SidecarSetUpgradeSpec{
+		setUpgrade2 := sidecarcontrol.SidecarSetUpgradeSpec{
 			UpdateTimestamp: metav1.Now(),
 			SidecarSetHash:  sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSet),
 			SidecarSetName:  sidecarSet.Name,
@@ -261,9 +262,11 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			sidecarSecrets = append(sidecarSecrets, sidecarSet.Spec.ImagePullSecrets...)
 		}
 
+		sidecarList := sets.NewString()
 		//process containers
 		for i := range sidecarSet.Spec.Containers {
 			sidecarContainer := &sidecarSet.Spec.Containers[i]
+			sidecarList.Insert(sidecarContainer.Name)
 			// volumeMounts that injected into sidecar container
 			// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
 			injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, sidecarContainer, pod)
@@ -313,6 +316,11 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				sidecarContainers = append(sidecarContainers, sidecarContainer)
 			}
 		}
+
+		setUpgrade1.SidecarList = sidecarList.List()
+		setUpgrade2.SidecarList = sidecarList.List()
+		sidecarSetHash[sidecarSet.Name] = setUpgrade1
+		sidecarSetHashWithoutImage[sidecarSet.Name] = setUpgrade2
 	}
 
 	// store sidecarset hash in pod annotations

@@ -57,7 +57,8 @@ var (
 	podDemo = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				sidecarcontrol.SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"aaa"}}`,
+				sidecarcontrol.SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"aaa","sidecarList":["test-sidecar"]}}`,
+				sidecarcontrol.SidecarSetListAnnotation: "test-sidecarset",
 			},
 			Name:            "test-pod-1",
 			Namespace:       "default",
@@ -260,7 +261,7 @@ func testUpdateWhenMaxUnavailableNotZero(t *testing.T, sidecarSetInput *appsv1al
 		t.Errorf("get latest pod failed, err: %v", err)
 	}
 	if !isSidecarImageUpdated(podOutput, "test-sidecar", "test-image:v2") {
-		t.Errorf("should update sidecar with unavailable number not zero")
+		t.Errorf("sidecarset upgrade image failed")
 	}
 }
 
