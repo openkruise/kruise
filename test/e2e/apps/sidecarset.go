@@ -18,6 +18,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -32,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -471,6 +473,31 @@ var _ = SIGDescribe("sidecarset", func() {
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
+
+			sidecarSetIn, err := kc.AppsV1alpha1().SidecarSets().Get(sidecarSetIn.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			//check pod sidecar upgrade spec annotations
+			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				origin := sets.String{}
+				for _, sidecar := range sidecarSetIn.Spec.Containers {
+					origin.Insert(sidecar.Name)
+				}
+				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
+				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, &pod)
+				gomega.Expect(upgradeSpec1.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
+				gomega.Expect(upgradeSpec1.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetRevision(sidecarSetIn)))
+				target1 := sets.NewString(upgradeSpec1.SidecarList...)
+				gomega.Expect(reflect.DeepEqual(origin.List(), target1.List())).To(gomega.Equal(true))
+				// SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
+				upgradeSpec2 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, &pod)
+				gomega.Expect(upgradeSpec2.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
+				gomega.Expect(upgradeSpec2.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSetIn)))
+				target2 := sets.NewString(upgradeSpec2.SidecarList...)
+				gomega.Expect(reflect.DeepEqual(origin.List(), target2.List())).To(gomega.Equal(true))
+			}
+
 			// update sidecarSet sidecar container failed image
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:failed"
 			tester.UpdateSidecarSet(sidecarSetIn)
@@ -494,6 +521,30 @@ var _ = SIGDescribe("sidecarset", func() {
 				ReadyPods:        2,
 			}
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
+
+			sidecarSetIn, err = kc.AppsV1alpha1().SidecarSets().Get(sidecarSetIn.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			//check pod sidecar upgrade spec annotations
+			pods, err = tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				origin := sets.String{}
+				for _, sidecar := range sidecarSetIn.Spec.Containers {
+					origin.Insert(sidecar.Name)
+				}
+				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
+				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, &pod)
+				gomega.Expect(upgradeSpec1.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
+				gomega.Expect(upgradeSpec1.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetRevision(sidecarSetIn)))
+				target1 := sets.NewString(upgradeSpec1.SidecarList...)
+				gomega.Expect(reflect.DeepEqual(origin.List(), target1.List())).To(gomega.Equal(true))
+				// SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
+				upgradeSpec2 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, &pod)
+				gomega.Expect(upgradeSpec2.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
+				gomega.Expect(upgradeSpec2.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSetIn)))
+				target2 := sets.NewString(upgradeSpec2.SidecarList...)
+				gomega.Expect(reflect.DeepEqual(origin.List(), target2.List())).To(gomega.Equal(true))
+			}
 
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container failed image, and only update one pod done"))
 		})

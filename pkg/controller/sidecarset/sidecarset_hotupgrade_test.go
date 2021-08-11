@@ -69,7 +69,7 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				//hash
-				sidecarcontrol.SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"aaa"}}`,
+				sidecarcontrol.SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"aaa","sidecarList":["test-sidecar"]}}`,
 				//111111111
 				sidecarcontrol.SidecarSetHashWithoutImageAnnotation: `{"test-sidecarset":{"hash":"111111111"}}`,
 				//sidecar version
