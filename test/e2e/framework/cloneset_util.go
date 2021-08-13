@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
@@ -89,6 +90,20 @@ func (t *CloneSetTester) UpdateCloneSet(name string, fn func(cs *appsv1alpha1.Cl
 		_, err = t.kc.AppsV1alpha1().CloneSets(t.ns).Update(context.TODO(), cs, metav1.UpdateOptions{})
 		return err
 	})
+}
+
+func (t *CloneSetTester) ListPodsForCloneSet(name string) (pods []*v1.Pod, err error) {
+	podList, err := t.c.CoreV1().Pods(t.ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if owner := metav1.GetControllerOf(pod); owner != nil && owner.Name == name {
+			pods = append(pods, pod)
+		}
+	}
+	return
 }
 
 func (t *CloneSetTester) ListImagePullJobsForCloneSet(name string) (jobs []*appsv1alpha1.ImagePullJob, err error) {

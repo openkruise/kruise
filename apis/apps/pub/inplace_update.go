@@ -17,6 +17,8 @@ limitations under the License.
 package pub
 
 import (
+	"encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -39,6 +41,10 @@ const (
 	InPlaceUpdateGraceKey string = "apps.kruise.io/inplace-update-grace"
 	// TODO: will be removed since v1.0.0
 	InPlaceUpdateGraceKeyOld string = "inplace-update-grace"
+
+	// RuntimeContainerMetaKey is a key in pod annotations. Kruise-daemon should report the
+	// states of runtime containers into its value, which is a structure JSON of RuntimeContainerMetaSet type.
+	RuntimeContainerMetaKey = "apps.kruise.io/runtime-containers-meta"
 )
 
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
@@ -86,4 +92,38 @@ func GetInPlaceUpdateGrace(obj metav1.Object) (string, bool) {
 func RemoveInPlaceUpdateGrace(obj metav1.Object) {
 	delete(obj.GetAnnotations(), InPlaceUpdateGraceKey)
 	delete(obj.GetAnnotations(), InPlaceUpdateGraceKeyOld)
+}
+
+// RuntimeContainerMetaSet contains all the containers' meta of the Pod.
+type RuntimeContainerMetaSet struct {
+	Containers []RuntimeContainerMeta `json:"containers"`
+}
+
+// RuntimeContainerMeta contains the meta data of a runtime container.
+type RuntimeContainerMeta struct {
+	Name         string                 `json:"name"`
+	ContainerID  string                 `json:"containerID"`
+	RestartCount int32                  `json:"restartCount"`
+	Hashes       RuntimeContainerHashes `json:"hashes"`
+}
+
+// RuntimeContainerHashes contains the hashes of such container.
+type RuntimeContainerHashes struct {
+	// PlainHash is the hash that directly calculated from pod.spec.container[x].
+	// Usually it is calculated by Kubelet and will be in annotation of each runtime container.
+	PlainHash uint64 `json:"plainHash"`
+	// TODO: add ConvertEnvHash here to support inplace update for env from annotation/label
+}
+
+func GetRuntimeContainerMetaSet(obj metav1.Object) (*RuntimeContainerMetaSet, error) {
+	str, ok := obj.GetAnnotations()[RuntimeContainerMetaKey]
+	if !ok {
+		return nil, nil
+	}
+
+	s := RuntimeContainerMetaSet{}
+	if err := json.Unmarshal([]byte(str), &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
 }

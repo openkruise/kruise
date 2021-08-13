@@ -51,6 +51,16 @@ type UpdateResult struct {
 	DelayDuration time.Duration
 }
 
+type UpdateOptions struct {
+	GracePeriodSeconds int32
+	AdditionalFuncs    []func(*v1.Pod)
+
+	CalculateSpec        func(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec
+	PatchSpecToPod       func(pod *v1.Pod, spec *UpdateSpec) (*v1.Pod, error)
+	CheckUpdateCompleted func(pod *v1.Pod) error
+	GetRevision          func(rev *apps.ControllerRevision) string
+}
+
 // Interface for managing pods in-place update.
 type Interface interface {
 	Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult

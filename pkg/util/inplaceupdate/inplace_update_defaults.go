@@ -27,17 +27,9 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/klog/v2"
+	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
-
-type UpdateOptions struct {
-	GracePeriodSeconds int32
-	AdditionalFuncs    []func(*v1.Pod)
-
-	CalculateSpec        func(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec
-	PatchSpecToPod       func(pod *v1.Pod, spec *UpdateSpec) (*v1.Pod, error)
-	CheckUpdateCompleted func(pod *v1.Pod) error
-	GetRevision          func(rev *apps.ControllerRevision) string
-}
 
 func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 	if opts == nil {
@@ -149,18 +141,28 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated
 // containers in Pod.
 func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
+	if _, isInGraceState := appspub.GetInPlaceUpdateGrace(pod); isInGraceState {
+		return fmt.Errorf("still in grace period of in-place update")
+	}
+
+	runtimeContainerMetaSet, err := appspub.GetRuntimeContainerMetaSet(pod)
+	if err != nil {
+		return err
+	}
+	if runtimeContainerMetaSet != nil {
+		if checkAllContainersHashConsistent(pod, runtimeContainerMetaSet) {
+			klog.V(5).Infof("Check Pod %s/%s in-place update completed for all container hash consistent", pod.Namespace, pod.Name)
+			return nil
+		}
+		// Do not return error here, in case kruise-daemon has broken for some reason and runtime-container-meta is still in an old version.
+	}
+
 	inPlaceUpdateState := appspub.InPlaceUpdateState{}
 	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); !ok {
 		return nil
 	} else if err := json.Unmarshal([]byte(stateStr), &inPlaceUpdateState); err != nil {
 		return err
 	}
-
-	// this should not happen, unless someone modified pod revision label
-	//if inPlaceUpdateState.Revision != pod.Labels[apps.StatefulSetRevisionLabel] {
-	//	return fmt.Errorf("currently revision %s not equal to in-place update revision %s",
-	//		pod.Labels[apps.StatefulSetRevisionLabel], inPlaceUpdateState.Revision)
-	//}
 
 	containerImages := make(map[string]string, len(pod.Spec.Containers))
 	for i := range pod.Spec.Containers {
@@ -171,12 +173,11 @@ func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 		}
 	}
 
-	_, isInGraceState := appspub.GetInPlaceUpdateGrace(pod)
 	for _, cs := range pod.Status.ContainerStatuses {
 		if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
 			// TODO: we assume that users should not update workload template with new image which actually has the same imageID as the old image
 			if oldStatus.ImageID == cs.ImageID {
-				if containerImages[cs.Name] != cs.Image || isInGraceState {
+				if containerImages[cs.Name] != cs.Image {
 					return fmt.Errorf("container %s imageID not changed", cs.Name)
 				}
 			}
@@ -189,4 +190,52 @@ func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	}
 
 	return nil
+}
+
+// The requirements for hash consistent:
+// 1. all containers in spec.containers should also be in status.containerStatuses and runtime-container-meta
+// 2. all containers in status.containerStatuses and runtime-container-meta should have the same containerID
+// 3. all containers in spec.containers and runtime-container-meta should have the same hashes
+func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *appspub.RuntimeContainerMetaSet) bool {
+	for i := range pod.Spec.Containers {
+		containerSpec := &pod.Spec.Containers[i]
+
+		var containerStatus *v1.ContainerStatus
+		for j := range pod.Status.ContainerStatuses {
+			if pod.Status.ContainerStatuses[j].Name == containerSpec.Name {
+				containerStatus = &pod.Status.ContainerStatuses[j]
+				break
+			}
+		}
+		if containerStatus == nil {
+			klog.Warningf("Find no container %s in status for Pod %s/%s", containerSpec.Name, pod.Namespace, pod.Name)
+			return false
+		}
+
+		var containerMeta *appspub.RuntimeContainerMeta
+		for i := range runtimeContainerMetaSet.Containers {
+			if runtimeContainerMetaSet.Containers[i].Name == containerSpec.Name {
+				containerMeta = &runtimeContainerMetaSet.Containers[i]
+				continue
+			}
+		}
+		if containerMeta == nil {
+			klog.Warningf("Find no container %s in runtime-container-meta for Pod %s/%s", containerSpec.Name, pod.Namespace, pod.Name)
+			return false
+		}
+
+		if containerMeta.ContainerID != containerStatus.ContainerID {
+			klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different containerID with status %s != %s",
+				containerSpec.Name, pod.Namespace, pod.Name, containerMeta.ContainerID, containerStatus.ContainerID)
+			return false
+		}
+
+		if containerMeta.Hashes.PlainHash != kubeletcontainer.HashContainer(containerSpec) {
+			klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different plain hash with spec %s != %s",
+				containerSpec.Name, pod.Namespace, pod.Name, containerMeta.ContainerID, containerStatus.ContainerID)
+			return false
+		}
+	}
+
+	return true
 }
