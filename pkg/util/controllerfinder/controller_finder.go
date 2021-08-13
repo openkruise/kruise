@@ -19,9 +19,6 @@ package controllerfinder
 import (
 	"context"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // ScaleAndSelector is used to return (controller, scale, selector) fields from the
@@ -69,25 +69,29 @@ func NewControllerFinder(c client.Client) *ControllerFinder {
 }
 
 func (r *ControllerFinder) GetScaleAndSelectorForRef(apiVersion, kind, ns, name string, uid types.UID) (*ScaleAndSelector, error) {
-	var scaleNSelector *ScaleAndSelector
-	var err error
 	targetRef := ControllerReference{
 		APIVersion: apiVersion,
 		Kind:       kind,
 		Name:       name,
 		UID:        uid,
 	}
-	for _, finder := range r.Finders() {
-		scaleNSelector, err = finder(targetRef, ns)
-		if err != nil {
-			return nil, err
-		}
-		if scaleNSelector != nil {
-			break
-		}
-	}
 
-	return scaleNSelector, nil
+	switch targetRef.Kind {
+	case controllerKindRS.Kind:
+		return r.getPodReplicaSet(targetRef, ns)
+	case controllerKindDep.Kind:
+		return r.getPodDeployment(targetRef, ns)
+	case controllerKindRC.Kind:
+		return r.getPodReplicationController(targetRef, ns)
+	case controllerKindSS.Kind:
+		return r.getPodStatefulSet(targetRef, ns)
+	case controllerKruiseKindCS.Kind:
+		return r.getPodKruiseCloneSet(targetRef, ns)
+	case controllerKruiseKindSS.Kind:
+		return r.getPodKruiseStatefulSet(targetRef, ns)
+	default:
+		return nil, nil
+	}
 }
 
 func (r *ControllerFinder) Finders() []PodControllerFinder {
