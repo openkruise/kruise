@@ -45,6 +45,9 @@ type SidecarSetSpec struct {
 	// The sidecarset updateStrategy to use to replace existing pods with new ones.
 	UpdateStrategy SidecarSetUpdateStrategy `json:"updateStrategy,omitempty"`
 
+	// InjectionStrategy describe the strategy when sidecarset is injected into pods
+	InjectionStrategy SidecarSetInjectionStrategy `json:"injectionStrategy,omitempty"`
+
 	// List of the names of secrets required by pulling sidecar container images
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
@@ -113,6 +116,15 @@ type SidecarContainerUpgradeStrategy struct {
 	// HotUpgradeEmptyImage is consistent of sidecar container in Command, Args, Liveness probe, etc.
 	// but it does no actual work.
 	HotUpgradeEmptyImage string `json:"hotUpgradeEmptyImage,omitempty"`
+}
+
+// SidecarSetInjectionStrategy indicates the injection strategy of SidecarSet.
+type SidecarSetInjectionStrategy struct {
+	// Paused indicates that SidecarSet will suspend injection into Pods
+	// If Paused is true, the sidecarSet will not be injected to newly created Pods,
+	// but the injected sidecar container remains updating and running.
+	// default is false
+	Paused bool `json:"paused,omitempty"`
 }
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet

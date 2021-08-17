@@ -424,6 +424,27 @@ func doMergeSidecarSecretsTest(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	}
 }
 
+func TestInjectionStrategyPaused(t *testing.T) {
+	sidecarSetIn := sidecarSet1.DeepCopy()
+	testInjectionStrategyPaused(t, sidecarSetIn)
+}
+
+func testInjectionStrategyPaused(t *testing.T, sidecarIn *appsv1alpha1.SidecarSet) {
+	podIn := pod1.DeepCopy()
+	podOut := podIn.DeepCopy()
+	sidecarPaused := sidecarIn
+	sidecarPaused.Spec.InjectionStrategy.Paused = true
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewFakeClient(sidecarPaused)
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+
+	if len(podOut.Spec.Containers) != len(podIn.Spec.Containers) {
+		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers), len(podOut.Spec.Containers))
+	}
+}
+
 func TestSidecarSetPodInjectPolicy(t *testing.T) {
 	sidecarSetIn := sidecarSet1.DeepCopy()
 	testSidecarSetPodInjectPolicy(t, sidecarSetIn)

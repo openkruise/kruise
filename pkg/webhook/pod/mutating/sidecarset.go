@@ -71,6 +71,9 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 
 	matchedSidecarSets := make([]sidecarcontrol.SidecarControl, 0)
 	for _, sidecarSet := range sidecarsetList.Items {
+		if sidecarSet.Spec.InjectionStrategy.Paused {
+			continue
+		}
 		if matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); err != nil {
 			return err
 		} else if !matched {
