@@ -124,7 +124,9 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 			return false, "", err
 		}
 		// if dry run
-		dryRun = dryrun.IsDryRun(eviction.DeleteOptions.DryRun)
+		if eviction.DeleteOptions != nil {
+			dryRun = dryrun.IsDryRun(eviction.DeleteOptions.DryRun)
+		}
 		key := types.NamespacedName{
 			Namespace: req.AdmissionRequest.Namespace,
 			Name:      req.AdmissionRequest.Name,
