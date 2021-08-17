@@ -169,6 +169,17 @@ spec:
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               type: array
+            injectionStrategy:
+              description: InjectionStrategy describe the strategy when sidecarset
+                is injected into pods
+              properties:
+                paused:
+                  description: Paused indicates that SidecarSet will suspend injection
+                    into Pods If Paused is true, the sidecarSet will not be injected
+                    to newly created Pods, but the injected sidecar container remains
+                    updating and running. default is false
+                  type: boolean
+              type: object
             namespace:
               description: Namespace sidecarSet will only match the pods in the namespace
                 otherwise, match pods in all namespaces(in cluster)
