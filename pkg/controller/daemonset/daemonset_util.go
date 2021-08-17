@@ -282,7 +282,7 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 	klog.V(6).Infof("toUpdate is %v", ds)
 
 	var updateErr, getErr error
-	for i := 0; i < StatusUpdateRetries; i++ {
+	for i := 0; ; i++ {
 		if updateObservedGen {
 			ds.Status.ObservedGeneration = ds.Generation
 		}
@@ -302,9 +302,12 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 
 		klog.Errorf("update DaemonSet status %v failed: %v", ds.Status, updateErr)
 
+		//Stop retrying if we exceed statusUpdateRetries - the DaemonSet will be requeued with a rate limit.
+		if i >= StatusUpdateRetries {
+			break
+		}
 		// Update the set with the latest resource version for the next poll
-		newDs := &appsv1alpha1.DaemonSet{}
-		if getErr = dsClient.Get(context.TODO(), key, newDs); getErr != nil {
+		if getErr = dsClient.Get(context.TODO(), key, ds); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			klog.Errorf("get DaemonSet %v failed: %v", ds.Name, getErr)
