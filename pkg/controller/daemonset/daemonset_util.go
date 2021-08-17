@@ -301,7 +301,6 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 		}
 
 		klog.Errorf("update DaemonSet status %v failed: %v", ds.Status, updateErr)
-
 		//Stop retrying if we exceed statusUpdateRetries - the DaemonSet will be requeued with a rate limit.
 		if i >= StatusUpdateRetries {
 			break
