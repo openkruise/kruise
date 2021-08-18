@@ -238,11 +238,11 @@ func (t *DaemonSetTester) CheckPodStayInNode(oldNodeList *v1.NodeList, newNodeLi
 		for i, _ := range oldNodeList.Items {
 			mp[oldNodeList.Items[i].Name] = struct{}{}
 		}
-		for i, _ := range newNodeList.Items {
-			if _, ok := mp[newNodeList.Items[i].Name]; ok {
-				delete(mp, newNodeList.Items[i].Name)
+		for _, item := range newNodeList.Items {
+			if _, ok := mp[item.Name]; ok {
+				delete(mp, item.Name)
 			} else {
-				Logf("mp not contain %s key and mp is %v", newNodeList.Items[i].Name, mp)
+				Logf("mp not contain %s key and mp is %v", item.Name, mp)
 				return false, nil
 			}
 		}
