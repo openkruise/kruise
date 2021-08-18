@@ -19,23 +19,25 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // nodeInSameCondition returns true if all effective types ("Status" is true) equals;
@@ -281,8 +283,15 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 
 	klog.V(6).Infof("toUpdate is %v", ds)
 
-	var updateErr, getErr error
-	for i := 0; i < StatusUpdateRetries; i++ {
+	try := wait.Backoff{
+		Steps:    StatusUpdateRetries,
+		Duration: 10 * time.Millisecond,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}
+
+	return retry.RetryOnConflict(try, func() error {
+		var updateErr, getErr error
 		if updateObservedGen {
 			ds.Status.ObservedGeneration = ds.Generation
 		}
@@ -301,17 +310,15 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 		}
 
 		klog.Errorf("update DaemonSet status %v failed: %v", ds.Status, updateErr)
-
 		// Update the set with the latest resource version for the next poll
-		newDs := &appsv1alpha1.DaemonSet{}
-		if getErr = dsClient.Get(context.TODO(), key, newDs); getErr != nil {
+		if getErr = dsClient.Get(context.TODO(), key, ds); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			klog.Errorf("get DaemonSet %v failed: %v", ds.Name, getErr)
 			return getErr
 		}
-	}
-	return updateErr
+		return updateErr
+	})
 }
 
 // GetPodRevision returns revision hash of this pod.
