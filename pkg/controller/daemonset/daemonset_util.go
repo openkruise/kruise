@@ -19,26 +19,25 @@ package daemonset
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // nodeInSameCondition returns true if all effective types ("Status" is true) equals;
