@@ -19,6 +19,9 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
@@ -281,8 +284,15 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 
 	klog.V(6).Infof("toUpdate is %v", ds)
 
-	var updateErr, getErr error
-	for i := 0; ; i++ {
+	try := wait.Backoff{
+		Steps:    StatusUpdateRetries,
+		Duration: 10 * time.Millisecond,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}
+
+	return retry.RetryOnConflict(try, func() error {
+		var updateErr, getErr error
 		if updateObservedGen {
 			ds.Status.ObservedGeneration = ds.Generation
 		}
@@ -301,10 +311,6 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 		}
 
 		klog.Errorf("update DaemonSet status %v failed: %v", ds.Status, updateErr)
-		//Stop retrying if we exceed statusUpdateRetries - the DaemonSet will be requeued with a rate limit.
-		if i >= StatusUpdateRetries {
-			break
-		}
 		// Update the set with the latest resource version for the next poll
 		if getErr = dsClient.Get(context.TODO(), key, ds); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
@@ -312,8 +318,8 @@ func storeDaemonSetStatus(dsClient kubeClient.Client, ds *appsv1alpha1.DaemonSet
 			klog.Errorf("get DaemonSet %v failed: %v", ds.Name, getErr)
 			return getErr
 		}
-	}
-	return updateErr
+		return updateErr
+	})
 }
 
 // GetPodRevision returns revision hash of this pod.
