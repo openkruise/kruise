@@ -117,12 +117,12 @@ var _ = SIGDescribe("PullImage", func() {
 				return job.Status.Desired
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
 
-			ginkgo.By("Wait completed in 60s")
+			ginkgo.By("Wait completed in 180s")
 			gomega.Eventually(func() bool {
 				job, err = testerForImagePullJob.GetJob(job)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.CompletionTime != nil
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(true))
+			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(true))
 			gomega.Expect(job.Status.Succeeded).To(gomega.Equal(int32(len(nodes))))
 
 			ginkgo.By("Wait clean in 25s")
@@ -161,12 +161,12 @@ var _ = SIGDescribe("PullImage", func() {
 				return job.Status.Desired
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
 
-			ginkgo.By("Wait completed in 60s")
+			ginkgo.By("Wait completed in 180s")
 			gomega.Eventually(func() bool {
 				job, err = testerForImagePullJob.GetJob(job)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.CompletionTime != nil
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(true))
+			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(true))
 			gomega.Expect(job.Status.Succeeded).To(gomega.Equal(int32(1)))
 
 			ginkgo.By("Delete job")
@@ -204,17 +204,21 @@ var _ = SIGDescribe("PullImage", func() {
 				return job.Status.Desired
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes) + 1)))
 
-			ginkgo.By("Wait failed in 65s")
+			ginkgo.By(fmt.Sprintf("Wait %d succeeded", len(nodes)))
+			gomega.Eventually(func() int32 {
+				job, err = testerForImagePullJob.GetJob(job)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Succeeded
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(len(nodes))))
+			gomega.Expect(job.Status.CompletionTime == nil).To(gomega.Equal(true))
+
+			ginkgo.By("Wait 1 failed in 80s")
 			gomega.Eventually(func() int32 {
 				job, err = testerForImagePullJob.GetJob(job)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Failed
-			}, 65*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+			}, 80*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 			gomega.Expect(len(job.Status.FailedNodes)).To(gomega.Equal(1))
-
-			ginkgo.By(fmt.Sprintf("Expect %d succeeded", len(nodes)))
-			gomega.Expect(job.Status.Succeeded).To(gomega.Equal(int32(len(nodes))))
-			gomega.Expect(job.Status.CompletionTime == nil).To(gomega.Equal(true))
 		})
 
 		ginkgo.It("create two jobs to pull a same image", func() {

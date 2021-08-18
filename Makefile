@@ -49,11 +49,11 @@ manifests: controller-gen
 
 # Run go fmt against code
 fmt: go_check
-	go fmt ./...
+	go fmt $(shell go list ./... | grep -v /vendor/)
 
 # Run go vet against code
 vet:
-	go vet ./...
+	go vet $(shell go list ./... | grep -v /vendor/)
 
 # Generate code
 generate: controller-gen
