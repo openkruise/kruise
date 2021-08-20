@@ -20,6 +20,7 @@ import (
 	"context"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -107,4 +108,16 @@ func (t *CloneSetTester) ListImagePullJobsForCloneSet(name string) (jobs []*apps
 
 func (t *CloneSetTester) DeleteCloneSet(name string) error {
 	return t.kc.AppsV1alpha1().CloneSets(t.ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (s *CloneSetTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]v1.Pod, error) {
+	faster, err := util.GetFastLabelSelector(selector)
+	if err != nil {
+		return nil, err
+	}
+	podList, err := s.c.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: faster.String()})
+	if err != nil {
+		return nil, err
+	}
+	return podList.Items, nil
 }

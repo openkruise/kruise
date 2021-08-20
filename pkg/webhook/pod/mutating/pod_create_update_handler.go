@@ -63,6 +63,12 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
+
+	err = h.orderedContainerInitialization(ctx, req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}
