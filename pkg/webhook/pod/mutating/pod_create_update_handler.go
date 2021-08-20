@@ -53,7 +53,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	clone := obj.DeepCopy()
+	copy := obj.DeepCopy()
 	// when pod.namespace is empty, using req.namespace
 	if obj.Namespace == "" {
 		obj.Namespace = req.Namespace
@@ -73,7 +73,12 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	if reflect.DeepEqual(obj, clone) {
+	err = h.orderedContainerInitialization(ctx, req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}
 	marshalled, err := json.Marshal(obj)
