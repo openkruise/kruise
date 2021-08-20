@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -954,6 +956,71 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// hash not changed
 			gomega.Expect(hash1).To(gomega.Equal(hash2))
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade init sidecar container, and don't upgrade done"))
+		})
+
+		ginkgo.It("sidecarSet history revision checker", func() {
+			// check function
+			revisionChecker := func(s *appsv1alpha1.SidecarSet, expectedCount int, expectedOrder []int64) {
+				list := tester.ListControllerRevisions(s)
+				// check the number of revisions
+				gomega.Expect(list).To(gomega.HaveLen(expectedCount))
+				for _, revision := range list {
+					// check fields of revision
+					mice := make(map[string]interface{})
+					err := json.Unmarshal(revision.Data.Raw, &mice)
+					gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+					spec := mice["spec"].(map[string]interface{})
+					_, ok1 := spec["volumes"]
+					_, ok2 := spec["containers"]
+					_, ok3 := spec["initContainers"]
+					_, ok4 := spec["imagePullSecrets"]
+					gomega.Expect(ok1 && ok2 && ok3 && ok4).To(gomega.BeTrue())
+				}
+				if expectedOrder == nil {
+					return
+				}
+				gomega.Expect(list).To(gomega.HaveLen(len(expectedOrder)))
+				history.SortControllerRevisions(list)
+				for i := range list {
+					gomega.Expect(list[i].Revision).To(gomega.Equal(expectedOrder[i]))
+				}
+			}
+
+			waitingForSidecarSetReconcile := func(name string) {
+				gomega.Eventually(func() bool {
+					sidecarSet, err := kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), name, metav1.GetOptions{})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return sidecarSet.Status.ObservedGeneration == sidecarSet.Generation
+				}, 10*time.Second, time.Second).Should(gomega.BeTrue())
+			}
+
+			ginkgo.By("check after sidecarset creating...")
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn.SetName("e2e-test-for-history-revisions")
+			sidecarSetIn.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "secret-1"}}
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			sidecarSetIn = tester.CreateSidecarSet(sidecarSetIn)
+			waitingForSidecarSetReconcile(sidecarSetIn.Name)
+			revisionChecker(sidecarSetIn, 1, nil)
+
+			// update sidecarSet and stored revisions
+			ginkgo.By("check after sidecarset updating 15 times...")
+			for i := 2; i <= 15; i++ {
+				sidecarSetIn.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: fmt.Sprintf("secret-%d", i)}}
+				tester.UpdateSidecarSet(sidecarSetIn)
+				waitingForSidecarSetReconcile(sidecarSetIn.Name)
+			}
+			// expected order after update
+			expectedOrder := []int64{6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+			revisionChecker(sidecarSetIn, 10, expectedOrder)
+
+			ginkgo.By("check after sidecarset updating by using old revision...")
+			sidecarSetIn.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: fmt.Sprintf("secret-%d", 12)}}
+			tester.UpdateSidecarSet(sidecarSetIn)
+			waitingForSidecarSetReconcile(sidecarSetIn.Name)
+			expectedOrder = []int64{6, 7, 8, 9, 10, 11, 13, 14, 15, 16}
+			revisionChecker(sidecarSetIn, 10, expectedOrder)
+			ginkgo.By(fmt.Sprintf("sidecarSet history revision check done"))
 		})
 	})
 })
