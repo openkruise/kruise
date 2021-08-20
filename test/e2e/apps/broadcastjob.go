@@ -62,11 +62,9 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Create BroadcastJob job-" + randStr)
-			parallelism := intstr.FromInt(1)
 			job := &appsv1alpha1.BroadcastJob{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + randStr},
 				Spec: appsv1alpha1.BroadcastJobSpec{
-					Parallelism: &parallelism,
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Tolerations: []v1.Toleration{{Key: framework.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
@@ -82,10 +80,12 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				},
 			}
 
-			job, err = tester.CreateBroadcastJob(job)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			parallelism := intstr.FromInt(len(nodes) - 1)
+			job.Spec.Parallelism = &parallelism
+
+			job, err = tester.CreateBroadcastJob(job)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check the status of job")
@@ -114,7 +114,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				}
 
 				return len(pods)
-			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(len(nodes)))
+			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(len(nodes)))
 
 			gomega.Eventually(func() int32 {
 				job, err = tester.GetBroadcastJob(job.Name)
