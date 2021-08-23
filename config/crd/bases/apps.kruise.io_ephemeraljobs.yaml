@@ -19,13 +19,13 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: The status of ephemeral job
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
     - description: Number of ephemeral container matched by this job
       jsonPath: .status.match
       name: MATCH
-      type: integer
-    - description: Number of target pods
-      jsonPath: .status.replicas
-      name: TARGET
       type: integer
     - description: Number of succeed ephemeral containers
       jsonPath: .status.succeeded
@@ -63,6 +63,10 @@ spec:
           spec:
             description: EphemeralJobSpec defines the desired state of EphemeralJob
             properties:
+              activeDeadlineSeconds:
+                description: ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer. Only works for Always type.
+                format: int64
+                type: integer
               parallelism:
                 description: Parallelism specifies the maximum desired number of pods which matches running ephemeral containers.
                 format: int32
@@ -108,6 +112,7 @@ spec:
                 description: Template describes the ephemeral container that will be created.
                 properties:
                   ephemeralContainers:
+                    description: EphemeralContainers defines ephemeral container list in match pods.
                     items:
                       description: An EphemeralContainer is a container that may be added temporarily to an existing pod for user-initiated activities such as debugging. Ephemeral containers have no resource or scheduling guarantees, and they will not be restarted when they exit or when a pod is removed or restarted. If an ephemeral container causes a pod to exceed its resource allocation, the pod may be evicted. Ephemeral containers may not be added by directly updating the pod spec. They must be added via the pod's ephemeralcontainers subresource, and they will appear in the pod spec once added. This is an alpha feature enabled by the EphemeralContainers feature flag.
                       type: object
@@ -116,8 +121,8 @@ spec:
                 required:
                 - ephemeralContainers
                 type: object
-              ttlSecondsAfterCreated:
-                description: ttlSecondsAfterCreated is the TTL duration after ephemeral job has created. default value is 300. if the dua If the the existing time of an ephemeral job after be created exceeds TTLSecondsAfterCreated seconds, the ephemeral job and all matched ephemeral containers will be deleted.
+              ttlSecondsAfterFinished:
+                description: ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the eJob finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, default value is 1800 If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes.
                 format: int32
                 type: integer
             required:
@@ -127,10 +132,6 @@ spec:
           status:
             description: EphemeralJobStatus defines the observed state of EphemeralJob
             properties:
-              completed:
-                description: The number of pods which reached phase Completed.
-                format: int32
-                type: integer
               completionTime:
                 description: Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.
                 format: date-time
@@ -181,9 +182,13 @@ spec:
                 format: int32
                 type: integer
               startTime:
-                description: Represents time when the job was started. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.
+                description: Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.
                 format: date-time
                 type: string
+              succeeded:
+                description: The number of pods which reached phase Succeeded.
+                format: int32
+                type: integer
               waiting:
                 description: The number of waiting pods.
                 format: int32

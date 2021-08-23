@@ -241,6 +241,25 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - ephemeraljobs
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - ephemeraljobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - imagepulljobs
   verbs:
   - create
@@ -448,6 +467,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/ephemeralcontainers
+  verbs:
+  - get
+  - update
 - apiGroups:
   - ""
   resources:
