@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -51,11 +52,11 @@ func TestGetSecretsFromCache(t *testing.T) {
 		},
 	}
 
-	if _, err := fakeClient.CoreV1().Secrets(secretFoo.Namespace).Create(&secretFoo); err != nil {
+	if _, err := fakeClient.CoreV1().Secrets(secretFoo.Namespace).Create(context.TODO(), &secretFoo, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("failed to create fake secret: %v", err)
 	}
 
-	if _, err := fakeClient.CoreV1().Secrets(secretBar.Namespace).Create(&secretBar); err != nil {
+	if _, err := fakeClient.CoreV1().Secrets(secretBar.Namespace).Create(context.TODO(), &secretBar, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("failed to create fake secret: %v", err)
 	}
 
@@ -71,7 +72,7 @@ func TestGetSecretsFromCache(t *testing.T) {
 	secretDataOld := secrets[0].Data
 
 	secretFoo.Data = nil
-	if _, err := fakeClient.CoreV1().Secrets(secretFoo.Namespace).Update(&secretFoo); err != nil {
+	if _, err := fakeClient.CoreV1().Secrets(secretFoo.Namespace).Update(context.TODO(), &secretFoo, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("failed to update fake secret: %v", err)
 	}
 	secrets, err = secretManager.GetSecrets([]appsv1alpha1.ReferenceObject{{Namespace: "ns-foo", Name: "foo"}})

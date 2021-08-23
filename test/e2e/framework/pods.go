@@ -18,6 +18,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -49,12 +50,12 @@ type PodClient struct {
 // pod object.
 func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
-		pod, err := c.PodInterface.Get(name, metav1.GetOptions{})
+		pod, err := c.PodInterface.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
 		}
 		updateFn(pod)
-		_, err = c.PodInterface.Update(pod)
+		_, err = c.PodInterface.Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if err == nil {
 			Logf("Successfully updated pod %q", name)
 			return true, nil

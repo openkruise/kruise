@@ -25,8 +25,6 @@ import (
 	"sync"
 	"time"
 
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -44,12 +41,11 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/utils/integer"
 	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -64,9 +60,11 @@ import (
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
 func init() {
@@ -139,17 +137,17 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "daemonset-controller"})
 	cacher := mgr.GetCache()
 
-	podInformer, err := cacher.GetInformerForKind(corev1.SchemeGroupVersion.WithKind("Pod"))
+	podInformer, err := cacher.GetInformerForKind(context.TODO(), corev1.SchemeGroupVersion.WithKind("Pod"))
 	if err != nil {
 		return nil, err
 	}
 
-	nodeInformer, err := cacher.GetInformerForKind(corev1.SchemeGroupVersion.WithKind("Node"))
+	nodeInformer, err := cacher.GetInformerForKind(context.TODO(), corev1.SchemeGroupVersion.WithKind("Node"))
 	if err != nil {
 		return nil, err
 	}
 
-	revInformer, err := cacher.GetInformerForKind(apps.SchemeGroupVersion.WithKind("ControllerRevision"))
+	revInformer, err := cacher.GetInformerForKind(context.TODO(), apps.SchemeGroupVersion.WithKind("ControllerRevision"))
 	if err != nil {
 		return nil, err
 	}
@@ -166,13 +164,12 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		crControl: kubecontroller.RealControllerRevisionControl{
 			KubeClient: genericClient.KubeClient,
 		},
-		historyLister:       historyLister,
-		podLister:           podLister,
-		nodeLister:          nodeLister,
-		suspendedDaemonPods: map[string]sets.String{},
-		failedPodsBackoff:   failedPodsBackoff,
-		inplaceControl:      inplaceupdate.New(cli, revisionadapter.NewDefaultImpl()),
-		updateExp:           updateExpectations,
+		historyLister:     historyLister,
+		podLister:         podLister,
+		nodeLister:        nodeLister,
+		failedPodsBackoff: failedPodsBackoff,
+		inplaceControl:    inplaceupdate.New(cli, revisionadapter.NewDefaultImpl()),
+		updateExp:         updateExpectations,
 	}
 	dsc.podNodeIndex = podInformer.(cache.SharedIndexInformer).GetIndexer()
 	return dsc, err
@@ -253,11 +250,6 @@ type ReconcileDaemonSet struct {
 
 	// nodeLister can list/get nodes from the shared informer's store
 	nodeLister corelisters.NodeLister
-
-	// The DaemonSet that has suspended pods on nodes; the key is node name, the value
-	// is DaemonSet set that want to run pods but can't schedule in latest syncup cycle.
-	suspendedDaemonPodsMutex sync.Mutex
-	suspendedDaemonPods      map[string]sets.String
 
 	failedPodsBackoff *flowcontrol.Backoff
 
@@ -412,83 +404,15 @@ func (dsc *ReconcileDaemonSet) getDaemonSetsForPod(pod *corev1.Pod) []*appsv1alp
 	return sets
 }
 
-// Predicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
-// and PodToleratesNodeTaints predicate
-func Predicates(pod *corev1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	var predicateFails []predicates.PredicateFailureReason
-
-	// If ScheduleDaemonSetPods is enabled, only check nodeSelector, nodeAffinity and toleration/taint match.
-	// https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
-	if scheduleDaemonSetPods {
-		fit, reasons, err := checkNodeFitness(pod, nil, nodeInfo)
-		if err != nil {
-			return false, predicateFails, err
-		}
-		if !fit {
-			predicateFails = append(predicateFails, reasons...)
-		}
-
-		return len(predicateFails) == 0, predicateFails, nil
-	}
-
-	critical := kubelettypes.IsCriticalPod(pod)
-
-	fit, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	if critical {
-		// If the pod is marked as critical and support for critical pod annotations is enabled,
-		// check predicates for critical pods only.
-		fit, reasons, err = predicates.EssentialPredicates(pod, nil, nodeInfo)
-	} else {
-		fit, reasons, err = predicates.GeneralPredicates(pod, nil, nodeInfo)
-	}
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// checkNodeFitness runs a set of predicates that select candidate nodes for the DaemonSet;
-// the predicates include:
-//   - PodFitsHost: checks pod's NodeName against node
-//   - PodMatchNodeSelector: checks pod's ImagePullJobNodeSelector and NodeAffinity against node
-//   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
-func checkNodeFitness(pod *corev1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	var predicateFails []predicates.PredicateFailureReason
-	fit, reasons, err := predicates.PodFitsHost(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	fit, reasons, err = predicates.PodMatchNodeSelector(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-	return len(predicateFails) == 0, predicateFails, nil
+// Predicates checks if a DaemonSet's pod can run on a node.
+func Predicates(pod *corev1.Pod, node *corev1.Node, taints []corev1.Taint) (fitsNodeName, fitsNodeAffinity, fitsTaints bool) {
+	fitsNodeName = len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == node.Name
+	fitsNodeAffinity = pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node)
+	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(taints, pod.Spec.Tolerations, func(t *corev1.Taint) bool {
+		return t.Effect == corev1.TaintEffectNoExecute || t.Effect == corev1.TaintEffectNoSchedule
+	})
+	fitsTaints = !isUntolerated
+	return
 }
 
 func isControlledByDaemonSet(p *corev1.Pod, uuid types.UID) bool {
@@ -523,14 +447,14 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet,
 		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
-		wantToRun, _, _, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
+		shouldRun, _, err := NodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
 		scheduled := len(nodeToDaemonPods[node.Name]) > 0
 
-		if wantToRun {
+		if shouldRun {
 			if CanNodeBeDeployed(node, ds) {
 				desiredNumberScheduled++
 			}
@@ -568,7 +492,7 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet,
 	if err != nil {
 		return reconcile.Result{
 			Requeue: true,
-		}, fmt.Errorf("error storing status for daemon set %#v: %v", ds, err)
+		}, fmt.Errorf("error storing status for daemon set %v: %v", ds.Name, err)
 	}
 
 	// Resync the DaemonSet after MinReadySeconds as a last line of defense to guard against clock-skew.
@@ -796,26 +720,20 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 	hash string,
 ) (delay time.Duration, shouldRunDaemonPod bool, nodesNeedingDaemonPods, podsToDelete []string, err error) {
 
-	wantToRun, shouldSchedule, shouldContinueRunning, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
+	shouldRun, shouldContinueRunning, err := NodeShouldRunDaemonPod(node, ds)
 	if err != nil {
 		return
 	}
 
-	shouldRunDaemonPod = shouldSchedule
+	shouldRunDaemonPod = shouldRun
 	daemonPods, exists := nodeToDaemonPods[node.Name]
-	dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
-
-	dsc.removeSuspendedDaemonPods(node.Name, dsKey)
 
 	// Ignore the pods that belong to previous generations
 	// Only applies when the rollingUpdate type is SurgingRollingUpdateType
 	daemonPods = dsc.pruneSurgingDaemonPods(ds, daemonPods, hash)
 
 	switch {
-	case wantToRun && !shouldSchedule:
-		// If daemon pod is supposed to run, but can not be scheduled, add to suspended list.
-		dsc.addSuspendedDaemonPods(node.Name, dsKey)
-	case shouldSchedule && !exists:
+	case shouldRun && !exists:
 		// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
 	case shouldContinueRunning:
@@ -870,34 +788,6 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 		}
 	}
 	return
-}
-
-// removeSuspendedDaemonPods removes DaemonSet which has pods that 'want to run,
-// but should not schedule' for the node from suspended queue.
-func (dsc *ReconcileDaemonSet) removeSuspendedDaemonPods(node, ds string) {
-	dsc.suspendedDaemonPodsMutex.Lock()
-	defer dsc.suspendedDaemonPodsMutex.Unlock()
-
-	if _, found := dsc.suspendedDaemonPods[node]; !found {
-		return
-	}
-	dsc.suspendedDaemonPods[node].Delete(ds)
-
-	if len(dsc.suspendedDaemonPods[node]) == 0 {
-		delete(dsc.suspendedDaemonPods, node)
-	}
-}
-
-// addSuspendedDaemonPods adds DaemonSet which has pods that 'want to run,
-// but should not schedule' for the node to the suspended queue.
-func (dsc *ReconcileDaemonSet) addSuspendedDaemonPods(node, ds string) {
-	dsc.suspendedDaemonPodsMutex.Lock()
-	defer dsc.suspendedDaemonPodsMutex.Unlock()
-
-	if _, found := dsc.suspendedDaemonPods[node]; !found {
-		dsc.suspendedDaemonPods[node] = sets.NewString()
-	}
-	dsc.suspendedDaemonPods[node].Insert(ds)
 }
 
 // getNodesToDaemonPods returns a map from nodes to daemon pods (corresponding to ds) created for the nodes.

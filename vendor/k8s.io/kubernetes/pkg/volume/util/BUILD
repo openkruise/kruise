@@ -23,7 +23,6 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/util/resizefs:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",
@@ -44,6 +43,8 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
@@ -54,6 +55,7 @@ go_test(
         "atomic_writer_test.go",
         "attach_limit_test.go",
         "device_util_linux_test.go",
+        "metrics_test.go",
         "nested_volumes_test.go",
         "resize_util_test.go",
         "util_test.go",
@@ -94,7 +96,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
         "//pkg/volume/util/fsquota:all-srcs",
         "//pkg/volume/util/hostutil:all-srcs",

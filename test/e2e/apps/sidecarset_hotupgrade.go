@@ -33,7 +33,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-var _ = SIGDescribe("sidecarset", func() {
+var _ = SIGDescribe("SidecarSet", func() {
 	f := framework.NewDefaultFramework("sidecarset")
 	var ns string
 	var c clientset.Interface
