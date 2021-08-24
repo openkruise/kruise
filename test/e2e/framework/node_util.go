@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -99,6 +100,18 @@ func (t *NodeTester) CreateFakeNode(randStr string) (node *v1.Node, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// wait for not-ready taint to be removed
+	gomega.Eventually(func() bool {
+		node, err = t.c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		for _, t := range node.Spec.Taints {
+			if t.Key == v1.TaintNodeNotReady {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, time.Second).Should(gomega.Equal(true))
 
 	// start a goroutine to keep updating ready condition
 	go func() {

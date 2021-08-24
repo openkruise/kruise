@@ -357,7 +357,7 @@ jobs:
           export KUBECONFIG=/home/runner/.kube/config
           go install github.com/onsi/ginkgo/ginkgo
           ./scripts/generate_bindata.sh
-          ginkgo -timeout 60m -v --focus='\[apps\] sidecarset' test/e2e
+          ginkgo -timeout 60m -v --focus='\[apps\] SidecarSet' test/e2e
 
   e2e-tests-for-other:
     runs-on: ubuntu-18.04
@@ -419,7 +419,7 @@ jobs:
           go install github.com/onsi/ginkgo/ginkgo
           ./scripts/generate_bindata.sh
           set +e
-          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|sidecarset)' test/e2e
+          ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|SidecarSet)' test/e2e
 #          retVal=$?
 #          if [ $retVal -ne 0 ]; then
 #            kubectl get pod -n kruise-system -o wide
