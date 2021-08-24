@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +55,26 @@ var _ = SIGDescribe("BroadcastJob", func() {
 		err := nodeTester.DeleteFakeNode(randStr)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
+
+	f.AfterEachActions = []func(){
+		func() {
+			// Print debug info if it fails
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				allNodes, err := nodeTester.ListNodesWithFake()
+				if err != nil {
+					framework.Logf("[FAILURE_DEBUG] List Nodes error: %v", err)
+				} else {
+					framework.Logf("[FAILURE_DEBUG] List Nodes: %v", allNodes)
+				}
+				job, err := tester.GetBroadcastJob("job-" + randStr)
+				if err != nil {
+					framework.Logf("[FAILURE_DEBUG] Get BroadcastJob %s error: %v", "job-"+randStr, err)
+				} else {
+					framework.Logf("[FAILURE_DEBUG] Get BroadcastJob: %v", util.DumpJSON(job))
+				}
+			}
+		},
+	}
 
 	framework.KruiseDescribe("BroadcastJob dispatching", func() {
 

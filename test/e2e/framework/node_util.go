@@ -143,7 +143,7 @@ func (t *NodeTester) DeleteFakeNode(randStr string) error {
 	return nil
 }
 
-func (t *NodeTester) ListRealNodesWithFake(tolerations []v1.Toleration) ([]*v1.Node, error) {
+func (t *NodeTester) ListNodesWithFake() ([]*v1.Node, error) {
 	nodeList, err := t.c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -151,9 +151,26 @@ func (t *NodeTester) ListRealNodesWithFake(tolerations []v1.Toleration) ([]*v1.N
 	var nodes []*v1.Node
 	for i := range nodeList.Items {
 		node := &nodeList.Items[i]
-		_, isUntolerated := helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil)
+		nodes = append(nodes, node)
+	}
+	return nodes, nil
+}
+
+func (t *NodeTester) ListRealNodesWithFake(tolerations []v1.Toleration) ([]*v1.Node, error) {
+	nodeList, err := t.c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	Logf("ListRealNodesWithFake starts check tolerations %v with nodes (%v)", tolerations, len(nodeList.Items))
+	var nodes []*v1.Node
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		taint, isUntolerated := helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil)
 		if !isUntolerated {
 			nodes = append(nodes, node)
+			Logf("ListRealNodesWithFake check node %s matched", node.Name)
+		} else {
+			Logf("ListRealNodesWithFake check node %s not matched because of %v", node.Name, taint)
 		}
 	}
 	return nodes, nil
