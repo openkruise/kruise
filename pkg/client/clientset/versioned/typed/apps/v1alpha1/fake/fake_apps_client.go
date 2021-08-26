@@ -59,6 +59,10 @@ func (c *FakeAppsV1alpha1) NodeImages() v1alpha1.NodeImageInterface {
 	return &FakeNodeImages{c}
 }
 
+func (c *FakeAppsV1alpha1) PodMarkers(namespace string) v1alpha1.PodMarkerInterface {
+	return &FakePodMarkers{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) ResourceDistributions() v1alpha1.ResourceDistributionInterface {
 	return &FakeResourceDistributions{c}
 }

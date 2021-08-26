@@ -1,0 +1,7 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: PodMarker
+metadata:
+  name: podmarker-sample
+spec:
+  # Add fields here
+  foo: bar

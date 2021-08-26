@@ -1,0 +1,20 @@
+# permissions for end users to view podmarkers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: podmarker-viewer-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - podmarkers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - podmarkers/status
+  verbs:
+  - get

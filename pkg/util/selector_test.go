@@ -167,7 +167,7 @@ func TestSelectorConflict(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		output := IsSelectorOverlapping(&testCase.Input[0], &testCase.Input[1])
+		output := !IsDefinitelyNeverOverlapped(&testCase.Input[0], &testCase.Input[1])
 		if output != testCase.Output {
 			t.Errorf("%v: expect %v but got %v", i, testCase.Output, output)
 		}

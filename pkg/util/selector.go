@@ -30,8 +30,8 @@ import (
 //   * a=b,c=d,e=f and a=x,c=d,e=f
 // then others is overlap：
 //   * a=b and c=d
-func IsSelectorOverlapping(selector1, selector2 *metav1.LabelSelector) bool {
-	return !(isDisjoint(selector1, selector2) || isDisjoint(selector2, selector1))
+func IsDefinitelyNeverOverlapped(selector1, selector2 *metav1.LabelSelector) bool {
+	return isDisjoint(selector1, selector2) || isDisjoint(selector2, selector1)
 }
 
 func isDisjoint(selector1, selector2 *metav1.LabelSelector) bool {

@@ -278,8 +278,8 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 			if isSidecarSetNamespaceDiff(sidecarSet, other) {
 				continue
 			}
-			// if the two sidecarset will selector same pod, then judge conflict
-			if util.IsSelectorOverlapping(sidecarSet.Spec.Selector, other.Spec.Selector) {
+			// if the two sidecarset may selector same pod, then judge conflict
+			if !util.IsDefinitelyNeverOverlapped(sidecarSet.Spec.Selector, other.Spec.Selector) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("containers"), container.Name, fmt.Sprintf(
 					"container %v already exist in %v", container.Name, other.Name)))
 			}
@@ -293,8 +293,8 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 			if isSidecarSetNamespaceDiff(sidecarSet, other) {
 				continue
 			}
-			// if the two sidecarset will selector same pod, then judge conflict
-			if util.IsSelectorOverlapping(sidecarSet.Spec.Selector, other.Spec.Selector) {
+			// if the two sidecarset may selector same pod, then judge conflict
+			if !util.IsDefinitelyNeverOverlapped(sidecarSet.Spec.Selector, other.Spec.Selector) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("containers"), container.Name, fmt.Sprintf(
 					"container %v already exist in %v", container.Name, other.Name)))
 			}
@@ -308,8 +308,8 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 			if isSidecarSetNamespaceDiff(sidecarSet, other) {
 				continue
 			}
-			// if the two sidecarset will selector same pod, then judge conflict
-			if util.IsSelectorOverlapping(sidecarSet.Spec.Selector, other.Spec.Selector) {
+			// if the two sidecarset may selector same pod, then judge conflict
+			if !util.IsDefinitelyNeverOverlapped(sidecarSet.Spec.Selector, other.Spec.Selector) {
 				if !reflect.DeepEqual(&volume, getSidecarsetVolume(volume.Name, other)) {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("volumes"), volume.Name, fmt.Sprintf(
 						"volume %s is in conflict with sidecarset %s", volume.Name, other.Name)))

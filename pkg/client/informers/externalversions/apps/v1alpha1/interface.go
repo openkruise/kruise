@@ -39,6 +39,8 @@ type Interface interface {
 	ImagePullJobs() ImagePullJobInformer
 	// NodeImages returns a NodeImageInformer.
 	NodeImages() NodeImageInformer
+	// PodMarkers returns a PodMarkerInformer.
+	PodMarkers() PodMarkerInformer
 	// ResourceDistributions returns a ResourceDistributionInformer.
 	ResourceDistributions() ResourceDistributionInformer
 	// SidecarSets returns a SidecarSetInformer.
@@ -100,6 +102,11 @@ func (v *version) ImagePullJobs() ImagePullJobInformer {
 // NodeImages returns a NodeImageInformer.
 func (v *version) NodeImages() NodeImageInformer {
 	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// PodMarkers returns a PodMarkerInformer.
+func (v *version) PodMarkers() PodMarkerInformer {
+	return &podMarkerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourceDistributions returns a ResourceDistributionInformer.

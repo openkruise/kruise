@@ -77,6 +77,14 @@ type ImagePullJobNamespaceListerExpansion interface{}
 // NodeImageLister.
 type NodeImageListerExpansion interface{}
 
+// PodMarkerListerExpansion allows custom methods to be added to
+// PodMarkerLister.
+type PodMarkerListerExpansion interface{}
+
+// PodMarkerNamespaceListerExpansion allows custom methods to be added to
+// PodMarkerNamespaceLister.
+type PodMarkerNamespaceListerExpansion interface{}
+
 // ResourceDistributionListerExpansion allows custom methods to be added to
 // ResourceDistributionLister.
 type ResourceDistributionListerExpansion interface{}

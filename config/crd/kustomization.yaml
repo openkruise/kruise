@@ -15,6 +15,7 @@ resources:
 - bases/policy.kruise.io_podunavailablebudgets.yaml
 - bases/apps.kruise.io_resourcedistributions.yaml
 - bases/apps.kruise.io_workloadspreads.yaml
+- bases/apps.kruise.io_podmarkers.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -32,6 +33,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_containerrecreaterequests.yaml
 #- patches/webhook_in_resourcedistributions.yaml
 #- patches/webhook_in_workloadspreads.yaml
+#- patches/webhook_in_podmarkers.yaml
 # +kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable webhook, uncomment all the sections with [CERTMANAGER] prefix.
@@ -48,6 +50,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_containerrecreaterequests.yaml
 #- patches/cainjection_in_resourcedistributions.yaml
 #- patches/cainjection_in_workloadspreads.yaml
+#- patches/cainjection_in_podmarkers.yaml
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

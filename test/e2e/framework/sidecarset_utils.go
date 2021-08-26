@@ -170,7 +170,7 @@ func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
 		if updateErr == nil {
 			return nil
 		}
-		podClone, _ = s.c.CoreV1().Pods(podClone.Namespace).Update(context.TODO(), podClone, metav1.UpdateOptions{})
+		podClone, _ = s.c.CoreV1().Pods(podClone.Namespace).Get(context.TODO(), podClone.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())

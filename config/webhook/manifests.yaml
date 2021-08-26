@@ -542,6 +542,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-podmarker
+  failurePolicy: Fail
+  name: podmarker.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - podmarkers
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-policy-kruise-io-podunavailablebudget
   failurePolicy: Fail
   name: vpodunavailablebudget.kb.io

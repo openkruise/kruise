@@ -103,6 +103,14 @@ resources:
     namespaced: true
   domain: kruise.io
   group: apps
+  kind: PodMarker
+  path: github.com/openkruise/kruise/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
   kind: StatefulSet
   path: github.com/openkruise/kruise/api/v1beta1
   version: v1beta1
