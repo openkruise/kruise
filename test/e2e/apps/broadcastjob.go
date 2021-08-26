@@ -20,17 +20,19 @@ import (
 	"context"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/utils/integer"
 )
 
 var _ = SIGDescribe("BroadcastJob", func() {
@@ -91,9 +93,9 @@ var _ = SIGDescribe("BroadcastJob", func() {
 						Spec: v1.PodSpec{
 							Tolerations: []v1.Toleration{{Key: framework.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
 							Containers: []v1.Container{{
-								Name:    "pi",
-								Image:   "perl",
-								Command: []string{"perl", "-Mbignum=bpi", "-wle", "print bpi(1000)"},
+								Name:    "box",
+								Image:   "busybox:latest",
+								Command: []string{"/bin/sh", "-c", "sleep 5"},
 							}},
 							RestartPolicy: v1.RestartPolicyNever,
 						},
@@ -104,7 +106,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 
 			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			parallelism := intstr.FromInt(len(nodes) - 1)
+			parallelism := intstr.FromInt(integer.IntMax(len(nodes)-1, integer.IntMin(len(nodes), 1)))
 			job.Spec.Parallelism = &parallelism
 
 			job, err = tester.CreateBroadcastJob(job)
