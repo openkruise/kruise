@@ -36,6 +36,21 @@ spec:
       in RFC3339 form and is in UTC.
     name: AGE
     type: date
+  - JSONPath: .spec.template.spec.containers[*].name
+    description: The containers of currently cloneset.
+    name: CONTAINERS
+    priority: 1
+    type: string
+  - JSONPath: .spec.template.spec.containers[*].image
+    description: The images of currently cloneset.
+    name: IMAGES
+    priority: 1
+    type: string
+  - JSONPath: .status.labelSelector
+    description: The selector of currently cloneset.
+    name: SELECTOR
+    priority: 1
+    type: string
   group: apps.kruise.io
   names:
     kind: CloneSet
