@@ -309,6 +309,24 @@ rules:
   - patch
   - update
 - apiGroups:
+  - apps.kruise.io
+  resources:
+  - workloadspreads
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - workloadspreads/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - batch
   resources:
   - jobs

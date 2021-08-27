@@ -19,8 +19,6 @@ package controllerfinder
 import (
 	"context"
 
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,24 +27,35 @@ import (
 	"k8s.io/klog"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
-func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string) ([]*corev1.Pod, error) {
+// GetPodsForRef return target workload's podList and spec.replicas.
+func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, active bool) ([]*corev1.Pod, int32, error) {
 	workloadUIDs := make([]types.UID, 0)
+	var workloadReplicas int32
+
 	switch kind {
 	// ReplicaSet
 	case controllerKindRS.Kind:
 		rs, err := r.getReplicaSet(ControllerReference{APIVersion: apiVersion, Kind: kind, Name: name}, ns)
 		if err != nil || rs == nil {
-			return nil, err
+			return nil, -1, err
 		}
+		workloadReplicas = *rs.Spec.Replicas
 		workloadUIDs = append(workloadUIDs, rs.UID)
 	// Deployment, get the corresponding ReplicaSet UID
 	case controllerKindDep.Kind:
 		rss, err := r.getReplicaSetsForDeployment(apiVersion, kind, ns, name)
 		if err != nil || len(rss) == 0 {
-			return nil, err
+			return nil, -1, err
 		}
+		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
+		if err != nil || obj == nil {
+			return nil, -1, err
+		}
+		workloadReplicas = obj.Scale
 		for _, rs := range rss {
 			workloadUIDs = append(workloadUIDs, rs.UID)
 		}
@@ -54,8 +63,9 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string) ([]*
 	default:
 		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
 		if err != nil || obj == nil {
-			return nil, err
+			return nil, -1, err
 		}
+		workloadReplicas = obj.Scale
 		workloadUIDs = append(workloadUIDs, obj.UID)
 	}
 
@@ -68,17 +78,19 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string) ([]*
 			FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(uid)}),
 		}
 		if err := r.List(context.TODO(), podList, listOption); err != nil {
-			return nil, err
+			return nil, -1, err
 		}
 		for i := range podList.Items {
 			pod := &podList.Items[i]
-			if kubecontroller.IsPodActive(pod) {
-				matchedPods = append(matchedPods, pod)
+			// filter not active Pod if active is true.
+			if active && !kubecontroller.IsPodActive(pod) {
+				continue
 			}
+			matchedPods = append(matchedPods, pod)
 		}
 	}
 
-	return matchedPods, nil
+	return matchedPods, workloadReplicas, nil
 }
 
 func (r *ControllerFinder) getReplicaSetsForDeployment(apiVersion, kind, ns, name string) ([]appsv1.ReplicaSet, error) {
