@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package orderedcontainer
+package containerlauchpriority
 
 import (
 	"context"
@@ -49,17 +49,17 @@ func Add(mgr manager.Manager) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) *ReconcileOrderedContainer {
-	return &ReconcileOrderedContainer{
-		Client:   util.NewClientFromManager(mgr, "ordered-container-controller"),
-		recorder: mgr.GetEventRecorderFor("ordered-container-controller"),
+func newReconciler(mgr manager.Manager) *ReconcileContainerLaunchPriority {
+	return &ReconcileContainerLaunchPriority{
+		Client:   util.NewClientFromManager(mgr, "container-launch-priority-controller"),
+		recorder: mgr.GetEventRecorderFor("container-launch-priority-controller"),
 	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileOrderedContainer) error {
+func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 	// Create a new controller
-	c, err := controller.New("ordered-container-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
+	c, err := controller.New("container-launch-priority-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
 	if err != nil {
 		return err
 	}
@@ -87,10 +87,10 @@ func add(mgr manager.Manager, r *ReconcileOrderedContainer) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileOrderedContainer{}
+var _ reconcile.Reconciler = &ReconcileContainerLaunchPriority{}
 
-// ReconcileOrderedContainer reconciles a Pod object
-type ReconcileOrderedContainer struct {
+// ReconcileContainerLaunchPriority reconciles a Pod object
+type ReconcileContainerLaunchPriority struct {
 	client.Client
 	recorder record.EventRecorder
 }
@@ -99,7 +99,7 @@ type ReconcileOrderedContainer struct {
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 
-func (r *ReconcileOrderedContainer) Reconcile(request reconcile.Request) (res reconcile.Result, err error) {
+func (r *ReconcileContainerLaunchPriority) Reconcile(request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
 	if klog.V(3) {
 		klog.Infof("Starting to process Pod %v", request.NamespacedName)
@@ -128,8 +128,8 @@ func (r *ReconcileOrderedContainer) Reconcile(request reconcile.Request) (res re
 		barrier.Namespace = pod.GetNamespace()
 		barrier.Name = pod.Name + "-barrier"
 		barrier.OwnerReferences = append(barrier.OwnerReferences, metav1.OwnerReference{
-			APIVersion: pod.APIVersion,
-			Kind:       pod.Kind,
+			APIVersion: "v1",
+			Kind:       "Pod",
 			Name:       pod.Name,
 			UID:        pod.UID,
 		})
@@ -144,8 +144,8 @@ func (r *ReconcileOrderedContainer) Reconcile(request reconcile.Request) (res re
 
 	// set next starting pod
 	if !r.getConditionStatus(pod, v1.ContainersReady) {
-		var count = r.getNumberOfReadyContainers(pod.Status.ContainerStatuses)
-		key := "p_" + strconv.Itoa(count)
+		var patchKey = r.findNextPatchKey(pod)
+		key := "p_" + strconv.Itoa(patchKey)
 		if err = r.patchOnKeyNotExist(barrier, key); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -154,7 +154,7 @@ func (r *ReconcileOrderedContainer) Reconcile(request reconcile.Request) (res re
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileOrderedContainer) validate(pod *v1.Pod) bool {
+func (r *ReconcileContainerLaunchPriority) validate(pod *v1.Pod) bool {
 	if len(pod.Spec.Containers) == 0 {
 		return false
 	}
@@ -166,7 +166,7 @@ func (r *ReconcileOrderedContainer) validate(pod *v1.Pod) bool {
 	return false
 }
 
-func (r *ReconcileOrderedContainer) getConditionStatus(pod *v1.Pod, conditionType v1.PodConditionType) bool {
+func (r *ReconcileContainerLaunchPriority) getConditionStatus(pod *v1.Pod, conditionType v1.PodConditionType) bool {
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == conditionType {
 			return condition.Status == v1.ConditionTrue
@@ -175,17 +175,33 @@ func (r *ReconcileOrderedContainer) getConditionStatus(pod *v1.Pod, conditionTyp
 	return false
 }
 
-func (r *ReconcileOrderedContainer) getNumberOfReadyContainers(containerStatus []v1.ContainerStatus) int {
-	var count int
-	for _, status := range containerStatus {
-		if status.Ready {
-			count++
+func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) int {
+	var priority = make([]int, 1)
+	for _, status := range pod.Status.ContainerStatuses {
+		if !status.Ready {
+			containerName := status.Name
+			for _, c := range pod.Spec.Containers {
+				if c.Name == containerName {
+					for _, e := range c.Env {
+						if e.Name == priorityBarrier {
+							p, _ := strconv.Atoi(e.ValueFrom.ConfigMapKeyRef.Key[2:])
+							priority = append(priority, p)
+						}
+					}
+				}
+			}
 		}
 	}
-	return count
+	var max = priority[0]
+	for _, v := range priority {
+		if v > max {
+			max = v
+		}
+	}
+	return max
 }
 
-func (r *ReconcileOrderedContainer) patchOnKeyNotExist(barrier *v1.ConfigMap, key string) error {
+func (r *ReconcileContainerLaunchPriority) patchOnKeyNotExist(barrier *v1.ConfigMap, key string) error {
 	if _, ok := barrier.Data[key]; !ok {
 		body := fmt.Sprintf(
 			`{"data":{"%s":"true"}}`,

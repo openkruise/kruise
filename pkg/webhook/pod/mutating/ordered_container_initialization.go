@@ -2,7 +2,6 @@ package mutating
 
 import (
 	"context"
-	"sort"
 	"strconv"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -17,7 +16,7 @@ const (
 )
 
 // start containers based on priority order
-func (h *PodCreateHandler) orderedContainerInitialization(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
+func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
 	if len(req.AdmissionRequest.SubResource) > 0 ||
 		req.AdmissionRequest.Operation != admissionv1beta1.Create ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
@@ -33,22 +32,21 @@ func (h *PodCreateHandler) orderedContainerInitialization(ctx context.Context, r
 		return nil
 	}
 
-	h.sortPriorityAndSetPodEnv(priority, pod)
+	h.setPodEnv(priority, pod)
 	return nil
 }
 
-func (h *PodCreateHandler) getPriority(pod *corev1.Pod) ([][2]int, bool, error) {
+func (h *PodCreateHandler) getPriority(pod *corev1.Pod) ([]int, bool, error) {
 	var priorityFlag bool
-	var priority = make([][2]int, len(pod.Spec.Containers))
+	var priority = make([]int, len(pod.Spec.Containers))
 	for i, c := range pod.Spec.Containers {
-		priority[i] = [2]int{i, 0}
 		for _, e := range c.Env {
 			if e.Name == priorityName {
 				p, err := strconv.Atoi(e.Value)
 				if err != nil {
 					return nil, false, err
 				}
-				priority[i][1] = p
+				priority[i] = p
 				if p != 0 {
 					priorityFlag = true
 				}
@@ -59,20 +57,17 @@ func (h *PodCreateHandler) getPriority(pod *corev1.Pod) ([][2]int, bool, error) 
 	return priority, priorityFlag, nil
 }
 
-func (h *PodCreateHandler) sortPriorityAndSetPodEnv(priority [][2]int, pod *corev1.Pod) {
-	if len(priority) != 0 {
-		sort.SliceStable(priority, func(i, j int) bool { return priority[i][1] > priority[j][1] }) // reversed sort
-		for i := range priority {
-			env := corev1.EnvVar{
-				Name: priorityBarrier,
-				ValueFrom: &corev1.EnvVarSource{
-					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: pod.Name + "-barrier"},
-						Key:                  "p_" + strconv.Itoa(i),
-					},
+func (h *PodCreateHandler) setPodEnv(priority []int, pod *corev1.Pod) {
+	for i := range priority {
+		env := corev1.EnvVar{
+			Name: priorityBarrier,
+			ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: pod.Name + "-barrier"},
+					Key:                  "p_" + strconv.Itoa(priority[i]),
 				},
-			}
-			pod.Spec.Containers[priority[i][0]].Env = append(pod.Spec.Containers[priority[i][0]].Env, env)
+			},
 		}
+		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, env)
 	}
 }

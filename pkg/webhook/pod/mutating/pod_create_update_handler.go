@@ -64,7 +64,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	err = h.orderedContainerInitialization(ctx, req, obj)
+	err = h.containerLaunchPriorityInitialization(ctx, req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}

@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
@@ -115,7 +116,7 @@ func (s *CloneSetTester) GetSelectorPods(namespace string, selector *metav1.Labe
 	if err != nil {
 		return nil, err
 	}
-	podList, err := s.c.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: faster.String()})
+	podList, err := s.c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: faster.String()})
 	if err != nil {
 		return nil, err
 	}

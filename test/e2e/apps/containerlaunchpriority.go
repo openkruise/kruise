@@ -34,8 +34,8 @@ const (
 	priorityBarrier = "KRUISE_CONTAINER_BARRIER"
 )
 
-var _ = SIGDescribe("orderedcontainer", func() {
-	f := framework.NewDefaultFramework("orderedcontainer")
+var _ = SIGDescribe("containerpriority", func() {
+	f := framework.NewDefaultFramework("containerpriority")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
@@ -51,10 +51,10 @@ var _ = SIGDescribe("orderedcontainer", func() {
 		randStr = rand.String(10)
 	})
 
-	framework.KruiseDescribe("start a pod with ordered containers", func() {
+	framework.KruiseDescribe("start a pod with different container priorities", func() {
 		var err error
 
-		ginkgo.It("container order in normal case", func() {
+		ginkgo.It("container priority in normal case", func() {
 			cs = tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:  "nginx2",
@@ -79,12 +79,12 @@ var _ = SIGDescribe("orderedcontainer", func() {
 			gomega.Expect(pods[0].Spec.Containers[0].Env[1].Name).To(gomega.Equal(priorityBarrier))
 			gomega.Expect(*pods[0].Spec.Containers[0].Env[1].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
 				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
-				Key:                  "p_1",
+				Key:                  "p_0",
 			}))
 			gomega.Expect(pods[0].Spec.Containers[1].Env[2].Name).To(gomega.Equal(priorityBarrier))
 			gomega.Expect(*pods[0].Spec.Containers[1].Env[2].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
 				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
-				Key:                  "p_0",
+				Key:                  "p_10",
 			}))
 			var containerStatus1 v1.ContainerStatus
 			var containerStatus2 v1.ContainerStatus
@@ -100,7 +100,7 @@ var _ = SIGDescribe("orderedcontainer", func() {
 			gomega.Expect(earlierThan).To(gomega.Equal(true))
 		})
 
-		ginkgo.It("run with no containre order", func() {
+		ginkgo.It("run with no container priority", func() {
 			cs = tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:  "nginx2",
