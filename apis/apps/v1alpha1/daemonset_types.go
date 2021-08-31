@@ -48,7 +48,7 @@ const (
 	StandardRollingUpdateType RollingUpdateType = "Standard"
 
 	// Replace container image without killing the pod.
-	InplaceRollingUpdateType RollingUpdateType = "Inplace"
+	//InplaceRollingUpdateType RollingUpdateType = "Inplace"
 
 	// SurgingRollingUpdateType replaces the old daemons by new ones using rolling update i.e replace them on each node one
 	// after the other, creating the new pod and then killing the old one.

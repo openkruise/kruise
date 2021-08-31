@@ -25,7 +25,6 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
@@ -41,7 +40,6 @@ import (
 
 var (
 	inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
-	UpdateExpectations     = expectations.NewUpdateExpectations(&revisionAdapterImpl{})
 )
 
 type RefreshResult struct {
