@@ -3,6 +3,7 @@ package apps
 import (
 	"context"
 	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -162,7 +163,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 		  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod InplaceUpdate. In this case only image change,Others
 		  remain Unchanged.
 		*/
-		framework.ConformanceIt("should only inplace image", func() {
+		/*framework.ConformanceIt("should only inplace image", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
@@ -203,6 +204,6 @@ var _ = SIGDescribe("DaemonSet", func() {
 			ginkgo.By("Compare Node info")
 			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckPodStayInNode(oldNodeList, newNodeList))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for node info")
-		})
+		})*/
 	})
 })
