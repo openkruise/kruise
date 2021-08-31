@@ -32,6 +32,16 @@ spec:
       in RFC3339 form and is in UTC.
     name: AGE
     type: date
+  - JSONPath: .spec.template.spec.containers[*].name
+    description: The containers of currently advanced statefulset.
+    name: CONTAINERS
+    priority: 1
+    type: string
+  - JSONPath: .spec.template.spec.containers[*].image
+    description: The images of currently advanced statefulset.
+    name: IMAGES
+    priority: 1
+    type: string
   group: apps.kruise.io
   names:
     kind: StatefulSet
