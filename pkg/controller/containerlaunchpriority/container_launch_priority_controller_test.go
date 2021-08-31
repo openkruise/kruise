@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package orderedcontainer
+package containerlauchpriority
 
 import (
 	"context"
@@ -31,18 +31,19 @@ import (
 func TestReconcile(t *testing.T) {
 	pod0 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "pod0"},
-		Status: v1.PodStatus{
-			Conditions: []v1.PodCondition{{
-				Type:   v1.PodInitialized,
-				Status: v1.ConditionFalse,
-			}},
-			ContainerStatuses: []v1.ContainerStatus{{
-				Ready: true,
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "testContainer1",
+				Env: []v1.EnvVar{{
+					Name: priorityBarrier,
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							Key: "p_100",
+						},
+					},
+				}},
 			}},
 		},
-	}
-	pod1 := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "pod1"},
 		Status: v1.PodStatus{
 			Conditions: []v1.PodCondition{{
 				Type:   v1.PodInitialized,
@@ -52,9 +53,50 @@ func TestReconcile(t *testing.T) {
 				Status: v1.ConditionFalse,
 			}},
 			ContainerStatuses: []v1.ContainerStatus{{
-				Ready: true,
+				Name:  "testContainer1",
+				Ready: false,
+			}},
+		},
+	}
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "pod1"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "testContainer1",
+				Env: []v1.EnvVar{{
+					Name: priorityBarrier,
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							Key: "p_100",
+						},
+					},
+				}},
 			}, {
-				Ready: true,
+				Name: "testContainer2",
+				Env: []v1.EnvVar{{
+					Name: priorityBarrier,
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							Key: "p_1000",
+						},
+					},
+				}},
+			}},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{{
+				Type:   v1.PodInitialized,
+				Status: v1.ConditionTrue,
+			}, {
+				Type:   v1.ContainersReady,
+				Status: v1.ConditionFalse,
+			}},
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name:  "testContainer2",
+				Ready: false,
+			}, {
+				Name:  "testContainer1",
+				Ready: false,
 			}},
 		},
 	}
@@ -67,13 +109,13 @@ func TestReconcile(t *testing.T) {
 	}
 
 	fakeClient := fake.NewFakeClientWithScheme(clientgoscheme.Scheme, pod0, pod1, barrier0, barrier1)
-	reconciler := &ReconcileOrderedContainer{Client: fakeClient}
+	reconciler := &ReconcileContainerLaunchPriority{Client: fakeClient}
 
-	_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: pod0.Namespace, Name: pod0.Name}})
+	_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{Namespace: pod0.Namespace, Name: pod0.Name}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = reconciler.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: pod1.Namespace, Name: pod1.Name}})
+	_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{Namespace: pod1.Namespace, Name: pod1.Name}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,19 +124,19 @@ func TestReconcile(t *testing.T) {
 	if err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: barrier0.Namespace, Name: barrier0.Name}, newBarrier0); err != nil {
 		t.Fatal(err)
 	}
-	if v, ok := newBarrier0.Data["p_1"]; !ok {
+	if v, ok := newBarrier0.Data["p_100"]; !ok {
 		t.Fatalf("expect barrier0 env set, but not")
 	} else if v != "true" {
-		t.Fatalf("expect barrier0 i_1 to be true, but get %s", v)
+		t.Fatalf("expect barrier0 p_100 to be true, but get %s", v)
 	}
 
 	newBarrier1 := &v1.ConfigMap{}
 	if err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: barrier1.Namespace, Name: barrier1.Name}, newBarrier1); err != nil {
 		t.Fatal(err)
 	}
-	if v, ok := newBarrier1.Data["p_2"]; !ok {
+	if v, ok := newBarrier1.Data["p_1000"]; !ok {
 		t.Fatalf("expect barrier1 env set, but not")
 	} else if v != "true" {
-		t.Fatalf("expect barrier1 p_2 to be true, but get %s", v)
+		t.Fatalf("expect barrier1 p_1000 to be true, but get %s", v)
 	}
 }

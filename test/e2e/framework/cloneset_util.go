@@ -130,7 +130,7 @@ func (s *CloneSetTester) GetSelectorPods(namespace string, selector *metav1.Labe
 	if err != nil {
 		return nil, err
 	}
-	podList, err := s.c.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: faster.String()})
+	podList, err := s.c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: faster.String()})
 	if err != nil {
 		return nil, err
 	}

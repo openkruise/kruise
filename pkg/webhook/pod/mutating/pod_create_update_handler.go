@@ -53,7 +53,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	copy := obj.DeepCopy()
+	clone := obj.DeepCopy()
 	// when pod.namespace is empty, using req.namespace
 	if obj.Namespace == "" {
 		obj.Namespace = req.Namespace
@@ -73,12 +73,13 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	err = h.orderedContainerInitialization(ctx, req, obj)
+	// "the order matters and sidecarsetMutatingPod must precede containerLaunchPriorityInitialization"
+	err = h.containerLaunchPriorityInitialization(ctx, req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	if reflect.DeepEqual(obj, copy) {
+	if reflect.DeepEqual(obj, clone) {
 		return admission.Allowed("")
 	}
 	marshalled, err := json.Marshal(obj)
