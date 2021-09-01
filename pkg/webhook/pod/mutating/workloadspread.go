@@ -19,14 +19,13 @@ package mutating
 import (
 	"context"
 
+	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
 func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req admission.Request,

@@ -75,7 +75,6 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
-
 }
 
 var _ inject.Client = &PodCreateHandler{}
