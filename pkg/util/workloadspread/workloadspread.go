@@ -311,7 +311,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 			}
 		}
 
-		suitableSubset, err = h.getSuitableSubset(ws, pod)
+		suitableSubset, err = h.getSuitableSubset(ws)
 		if err != nil {
 			return false, false, nil, "", err
 		}
@@ -320,11 +320,9 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 				ws.Namespace, ws.Name, pod.Name)
 			return false, false, nil, "", nil
 		}
-
 		if suitableSubset.CreatingPods == nil {
 			suitableSubset.CreatingPods = map[string]metav1.Time{}
 		}
-
 		if pod.Name != "" {
 			suitableSubset.CreatingPods[pod.Name] = metav1.Time{Time: time.Now()}
 		} else {
@@ -333,7 +331,6 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 			generatedUID = string(uuid.NewUUID())
 			suitableSubset.CreatingPods[generatedUID] = metav1.Time{Time: time.Now()}
 		}
-
 		if suitableSubset.MissingReplicas > 0 {
 			suitableSubset.MissingReplicas--
 		}
@@ -348,13 +345,13 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s)", ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
 			return false, false, nil, "", nil
 		}
-		if suitableSubset.MissingReplicas >= 0 {
-			suitableSubset.MissingReplicas++
-		}
 		if suitableSubset.DeletingPods == nil {
 			suitableSubset.DeletingPods = map[string]metav1.Time{}
 		}
 		suitableSubset.DeletingPods[pod.Name] = metav1.Time{Time: time.Now()}
+		if suitableSubset.MissingReplicas >= 0 {
+			suitableSubset.MissingReplicas++
+		}
 	default:
 		return false, false, nil, "", nil
 	}
@@ -466,15 +463,9 @@ func getSpecificSubset(ws *appsv1alpha1.WorkloadSpread, specifySubset string) *a
 	return nil
 }
 
-func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) (
-	*appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
-	simulationSchedule := false
-	if ws.Spec.ScheduleStrategy.Type == appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType &&
-		ws.Spec.ScheduleStrategy.Adaptive != nil && !ws.Spec.ScheduleStrategy.Adaptive.DisableSimulationSchedule {
-		simulationSchedule = true
-	}
-
-	for _, subset := range ws.Status.SubsetStatuses {
+func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) (*appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
+	for i := range ws.Status.SubsetStatuses {
+		subset := &ws.Status.SubsetStatuses[i]
 		canSchedule := true
 		for _, condition := range subset.Conditions {
 			if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
@@ -484,24 +475,13 @@ func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread, pod *corev1
 		}
 
 		if canSchedule && (subset.MissingReplicas > 0 || subset.MissingReplicas == -1) {
+			// TODO simulation schedule
 			// scheduleStrategy.Type = Adaptive
 			// Webhook will simulate a schedule in order to check whether Pod can run in this subset,
 			// which does a generic predicates by the cache of nodes and pods in kruise manager.
 			// There may be some errors between simulation schedule and kubernetes scheduler with small probability.
-			if simulationSchedule {
-				schedulable, err := h.canScheduleOnSubset(ws, pod, subset.Name)
-				if err != nil {
-					return nil, err
-				}
-				// If the simulated schedule failed we will consider the next subset to be scheduled.
-				if !schedulable {
-					klog.V(3).Infof("can't schedule Pod (%s/%s) into Subset (%s) of WorkloadSpread (%s/%s)",
-						pod.Namespace, pod.Name, subset.Name, ws.Namespace, ws.Name)
-					continue
-				}
-			}
 
-			return &subset, nil
+			return subset, nil
 		}
 	}
 
