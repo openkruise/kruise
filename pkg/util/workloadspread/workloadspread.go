@@ -256,8 +256,8 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 		// check whether WorkloadSpread has suitable subset for the pod
 		// 1. changed indicates whether workloadSpread status changed
 		// 2. suitableSubset is matched subset for the pod
-		changed, suitableSubset, generatedUID, injectErr = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
-		if injectErr != nil || !changed {
+		changed, suitableSubset, generatedUID = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
+		if !changed {
 			return nil
 		}
 
@@ -286,8 +286,8 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 			pod.Namespace, pod.Name, suitableSubset.Name, matchedWS.Namespace, matchedWS.Name)
 	}
 
-	klog.V(3).Infof("handler Pod(%s/%s) generatedUID(%s) operation(%s) for workloadSpread(%s/%s) done",
-		pod.Namespace, podName, generatedUID, operation, matchedWS.Namespace, matchedWS.Name)
+	klog.V(3).Infof("handler operation[%s] Pod(%s/%s) generatedUID(%s) for workloadSpread(%s/%s) done",
+		operation, pod.Namespace, podName, generatedUID, matchedWS.Namespace, matchedWS.Name)
 
 	return injectErr
 }
@@ -298,7 +298,7 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 // 3. generatedUID(types.UID) indicates which workloadSpread generate a UID for identifying Pod without a full name.
 func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 	pod *corev1.Pod, injectWS *InjectWorkloadSpread, operation Operation) (
-	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string, error) {
+	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string) {
 	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
 	var generatedUID string
 
@@ -307,15 +307,15 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		if pod.Name != "" {
 			// pod is already in CreatingPods/DeletingPods List, then return
 			if isRecord, subset := isPodRecordedInSubset(ws, pod.Name); isRecord {
-				return false, subset, "", nil
+				return false, subset, ""
 			}
 		}
 
 		suitableSubset = h.getSuitableSubset(ws)
 		if suitableSubset == nil {
-			klog.V(5).Infof("WorkloadSpread (%s/%s) don't have suitable subset for Pod (%s)",
+			klog.V(5).Infof("WorkloadSpread (%s/%s) don't have a suitable subset for Pod (%s)",
 				ws.Namespace, ws.Name, pod.Name)
-			return false, nil, "", nil
+			return false, nil, ""
 		}
 		if suitableSubset.CreatingPods == nil {
 			suitableSubset.CreatingPods = map[string]metav1.Time{}
@@ -334,13 +334,13 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 	case DeleteOperation, EvictionOperation:
 		// pod is already in DeletingPods/CreatingPods List, then return
 		if isRecord, _ := isPodRecordedInSubset(ws, pod.Name); isRecord {
-			return false, nil, "", nil
+			return false, nil, ""
 		}
 
 		suitableSubset = getSpecificSubset(ws, injectWS.Subset)
 		if suitableSubset == nil {
 			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s)", ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
-			return false, nil, "", nil
+			return false, nil, ""
 		}
 		if suitableSubset.DeletingPods == nil {
 			suitableSubset.DeletingPods = map[string]metav1.Time{}
@@ -350,7 +350,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 			suitableSubset.MissingReplicas++
 		}
 	default:
-		return false, nil, "", nil
+		return false, nil, ""
 	}
 
 	// update subset status
@@ -361,7 +361,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		}
 	}
 
-	return true, suitableSubset, generatedUID, nil
+	return true, suitableSubset, generatedUID
 }
 
 // return two parameters
