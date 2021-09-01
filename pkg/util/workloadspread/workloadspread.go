@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"time"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -55,6 +54,14 @@ var (
 	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
 )
 
+type Operation string
+
+const (
+	CreateOperation   Operation = "Create"
+	DeleteOperation   Operation = "Delete"
+	EvictionOperation Operation = "Eviction"
+)
+
 type workload struct {
 	Kind   string
 	Groups []string
@@ -83,7 +90,7 @@ type InjectWorkloadSpread struct {
 	Name string `json:"name"`
 	// Subset.Name
 	Subset string `json:"subset"`
-	// generate id if the Pod' name is nil.
+	// generate id if the Pod's name is nil.
 	UID string `json:"uid,omitempty"`
 }
 
@@ -141,42 +148,7 @@ func matchReference(ref *metav1.OwnerReference) (bool, error) {
 	return false, nil
 }
 
-func (h *Handler) HandlePodUpdate(oldPod, newPod *corev1.Pod) error {
-	str := newPod.Annotations[MatchedWorkloadSpreadSubsetAnnotations]
-	if str == "" {
-		return nil
-	}
-
-	// Pod has been terminated its lifecycle
-	if oldPod.Status.Phase != newPod.Status.Phase &&
-		(newPod.Status.Phase == corev1.PodFailed || newPod.Status.Phase == corev1.PodSucceeded) {
-		var injectWS *InjectWorkloadSpread
-		err := json.Unmarshal([]byte(str), &injectWS)
-		if err != nil {
-			klog.Errorf("parse Pod (%s/%s) annotations[%s]=%s failed: %s", newPod.Namespace, newPod.Name,
-				MatchedWorkloadSpreadSubsetAnnotations, str, err.Error())
-			return nil
-		}
-		if injectWS == nil || metav1.GetControllerOf(newPod) == nil {
-			return nil
-		}
-
-		matchedWS := &appsv1alpha1.WorkloadSpread{}
-		err = h.Client.Get(context.TODO(), client.ObjectKey{Namespace: newPod.Namespace, Name: injectWS.Name}, matchedWS)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				klog.Warningf("Pod(%s/%s) matched WorkloadSpread(%s) Not Found", newPod.Namespace, newPod.Name, injectWS.Name)
-				return nil
-			}
-			klog.Errorf("get Pod(%s/%s) matched workloadSpread(%s) failed: %s", newPod.Namespace, newPod.Name, injectWS.Name, err.Error())
-			return err
-		}
-
-		return h.mutatingPod(matchedWS, newPod, injectWS, admissionv1beta1.Update)
-	}
-
-	return nil
-}
+// TODO consider pod/status update operation
 
 func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 	// filter out pods, include the following:
@@ -214,10 +186,10 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 		return nil
 	}
 
-	return h.mutatingPod(matchedWS, pod, nil, admissionv1beta1.Create)
+	return h.mutatingPod(matchedWS, pod, nil, CreateOperation)
 }
 
-func (h *Handler) HandlePodDeletion(pod *corev1.Pod) error {
+func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error {
 	var injectWS *InjectWorkloadSpread
 	str, ok := pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations]
 	if !ok || str == "" {
@@ -231,11 +203,10 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod) error {
 	}
 
 	// filter out pods, include the following:
-	// 1. Deletion pod
+	// 1. DeletionTimestamp is not nil
 	// 2. Pod.Status.Phase = Succeeded or Failed
 	// 3. Pod.OwnerReference is nil
-	ref := metav1.GetControllerOf(pod)
-	if injectWS == nil || !kubecontroller.IsPodActive(pod) || ref == nil {
+	if injectWS == nil || !kubecontroller.IsPodActive(pod) || metav1.GetControllerOf(pod) == nil {
 		return nil
 	}
 
@@ -250,19 +221,19 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod) error {
 		return err
 	}
 
-	return h.mutatingPod(matchedWS, pod, injectWS, admissionv1beta1.Delete)
+	return h.mutatingPod(matchedWS, pod, injectWS, operation)
 }
 
 func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 	pod *corev1.Pod,
 	injectWS *InjectWorkloadSpread,
-	operation admissionv1beta1.Operation) error {
+	operation Operation) error {
 	podName := pod.Name
 	if podName == "" {
 		podName = pod.GetGenerateName()
 	}
 
-	klog.V(3).Infof("Operation(%s) Pod(%s/%s) matched WorkloadSpread(%s/%s)", operation, pod.Namespace, podName, matchedWS.Namespace, matchedWS.Name)
+	klog.V(3).Infof("Operation[%s] Pod(%s/%s) matched WorkloadSpread(%s/%s)", operation, pod.Namespace, podName, matchedWS.Namespace, matchedWS.Name)
 
 	wsClone := matchedWS.DeepCopy()
 	var refresh, changed, isInject bool
@@ -283,7 +254,7 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 		// 1. changed indicates whether workloadSpread status changed
 		// 2. isInject indicates whether to inject workloadSpread subset in pod
 		// 3. suitableSubset is matched subset for the pod
-		changed, isInject, suitableSubset, generatedUID, injectErr = h.checkDone(wsClone, pod, injectWS, operation)
+		changed, isInject, suitableSubset, generatedUID, injectErr = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
 		if injectErr != nil || !changed {
 			return nil
 		}
@@ -324,15 +295,15 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 // 2. inject(bool) indicates whether to inject workloadSpread subset
 // 3. suitableSubset(*struct{}) indicates which workloadSpread.Subset does this pod match
 // 4. generatedUID(types.UID) indicates which workloadSpread generate a UID for identifying Pod without a full name.
-func (h *Handler) checkDone(ws *appsv1alpha1.WorkloadSpread,
-	pod *corev1.Pod, injectWS *InjectWorkloadSpread, operation admissionv1beta1.Operation) (
+func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
+	pod *corev1.Pod, injectWS *InjectWorkloadSpread, operation Operation) (
 	bool, bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string, error) {
 	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
 	var generatedUID string
 	var err error
 
 	switch operation {
-	case admissionv1beta1.Create:
+	case CreateOperation:
 		if pod.Name != "" {
 			// pod is already in CreatingPods/DeletingPods List, then return
 			if isRecord, subset := isPodRecordedInSubset(ws, pod.Name); isRecord {
@@ -366,7 +337,7 @@ func (h *Handler) checkDone(ws *appsv1alpha1.WorkloadSpread,
 		if suitableSubset.MissingReplicas > 0 {
 			suitableSubset.MissingReplicas--
 		}
-	case admissionv1beta1.Delete, admissionv1beta1.Update:
+	case DeleteOperation, EvictionOperation:
 		// pod is already in DeletingPods/CreatingPods List, then return
 		if isRecord, _ := isPodRecordedInSubset(ws, pod.Name); isRecord {
 			return false, false, nil, "", nil
@@ -396,7 +367,7 @@ func (h *Handler) checkDone(ws *appsv1alpha1.WorkloadSpread,
 		}
 	}
 
-	return true, operation == admissionv1beta1.Create, suitableSubset, generatedUID, nil
+	return true, operation == CreateOperation, suitableSubset, generatedUID, nil
 }
 
 // return two parameters
@@ -451,10 +422,7 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 		}
 		if len(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
 			pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = []corev1.NodeSelectorTerm{
-				{
-					MatchExpressions: subset.RequiredNodeSelectorTerm.MatchExpressions,
-					MatchFields:      subset.RequiredNodeSelectorTerm.MatchFields,
-				},
+				*subset.RequiredNodeSelectorTerm,
 			}
 		} else {
 			for i := range pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
@@ -471,10 +439,12 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 			klog.Errorf("failed to merge patch raw %s", subset.Patch.Raw)
 			return false, err
 		}
-		if err = json.Unmarshal(modified, pod); err != nil {
+		newPod := &corev1.Pod{}
+		if err = json.Unmarshal(modified, newPod); err != nil {
 			klog.Errorf("failed to unmarshal %s to Pod", modified)
 			return false, err
 		}
+		*pod = *newPod
 	}
 
 	injectWS := &InjectWorkloadSpread{

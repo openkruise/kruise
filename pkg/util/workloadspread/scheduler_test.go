@@ -17,19 +17,12 @@ limitations under the License.
 package workloadspread
 
 import (
-	"context"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func newResourcePod(usage ...schedulernodeinfo.Resource) *v1.Pod {
@@ -42,15 +35,6 @@ func newResourcePod(usage ...schedulernodeinfo.Resource) *v1.Pod {
 	return &v1.Pod{
 		Spec: v1.PodSpec{
 			Containers: containers,
-		},
-	}
-}
-
-func newNode(nodeName string, labels map[string]string) *v1.Node {
-	return &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   nodeName,
-			Labels: labels,
 		},
 	}
 }
@@ -70,220 +54,6 @@ func makeAllocatableResources(milliCPU, memory, pods int64) v1.ResourceList {
 		v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 		v1.ResourcePods:   *resource.NewQuantity(pods, resource.DecimalSI),
-	}
-}
-
-func TestGetNodesForSubset(t *testing.T) {
-	cases := []struct {
-		name        string
-		pod         *v1.Pod
-		getNodes    func() []*v1.Node
-		expectNodes sets.String
-		expectWS    *appsv1alpha1.WorkloadSpread
-	}{
-		{
-			name: "match node_1, node_2",
-			expectWS: &appsv1alpha1.WorkloadSpread{
-				Spec: appsv1alpha1.WorkloadSpreadSpec{
-					Subsets: []appsv1alpha1.WorkloadSpreadSubset{
-						{
-							Name: "subset-a",
-							RequiredNodeSelectorTerm: &v1.NodeSelectorTerm{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"bar"},
-									},
-								},
-							},
-							Tolerations: []v1.Toleration{
-								{
-									Key:      "node.kubernetes.io/not-ready",
-									Operator: v1.TolerationOpExists,
-									Effect:   v1.TaintEffectNoExecute,
-								},
-							},
-							Patch: runtime.RawExtension{
-								Raw: []byte(`{"metadata":{"labels":{"subset":"subset-a"},"annotations":{"subset":"subset-a"}}}`),
-							},
-							MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
-						},
-					},
-				},
-			},
-			pod: &v1.Pod{},
-			getNodes: func() []*v1.Node {
-				node1 := newNode("node_1", map[string]string{
-					"foo": "bar",
-				})
-				node2 := newNode("node_2", map[string]string{
-					"foo": "bar",
-				})
-				node3 := newNode("node_3", map[string]string{})
-				return []*v1.Node{node1, node2, node3}
-			},
-			expectNodes: sets.String{"node_1": sets.Empty{}, "node_2": sets.Empty{}},
-		},
-		{
-			name: "match node_2, node_3",
-			expectWS: &appsv1alpha1.WorkloadSpread{
-				Spec: appsv1alpha1.WorkloadSpreadSpec{
-					Subsets: []appsv1alpha1.WorkloadSpreadSubset{
-						{
-							Name: "subset-a",
-							RequiredNodeSelectorTerm: &v1.NodeSelectorTerm{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"bar"},
-									},
-								},
-							},
-							Tolerations: []v1.Toleration{
-								{
-									Key:      "node.kubernetes.io/not-ready",
-									Operator: v1.TolerationOpExists,
-									Effect:   v1.TaintEffectNoExecute,
-								},
-							},
-							Patch: runtime.RawExtension{
-								Raw: []byte(`{"metadata":{"labels":{"subset":"subset-a"},"annotations":{"subset":"subset-a"}}}`),
-							},
-							MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
-						},
-					},
-				},
-			},
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"bar"},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			getNodes: func() []*v1.Node {
-				node1 := newNode("node_1", map[string]string{
-					"foo": "not_bar",
-				})
-				node2 := newNode("node_2", map[string]string{
-					"foo": "bar",
-				})
-				node3 := newNode("node_3", map[string]string{
-					"foo": "bar",
-				})
-				return []*v1.Node{node1, node2, node3}
-			},
-			expectNodes: sets.String{"node_2": sets.Empty{}, "node_3": sets.Empty{}},
-		},
-		{
-			name: "no match node",
-			expectWS: &appsv1alpha1.WorkloadSpread{
-				Spec: appsv1alpha1.WorkloadSpreadSpec{
-					Subsets: []appsv1alpha1.WorkloadSpreadSubset{
-						{
-							Name: "subset-a",
-							RequiredNodeSelectorTerm: &v1.NodeSelectorTerm{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"bar"},
-									},
-								},
-							},
-							Tolerations: []v1.Toleration{
-								{
-									Key:      "node.kubernetes.io/not-ready",
-									Operator: v1.TolerationOpExists,
-									Effect:   v1.TaintEffectNoExecute,
-								},
-							},
-							Patch: runtime.RawExtension{
-								Raw: []byte(`{"metadata":{"labels":{"subset":"subset-a"},"annotations":{"subset":"subset-a"}}}`),
-							},
-							MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
-						},
-					},
-				},
-			},
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{
-									{
-										MatchExpressions: []v1.NodeSelectorRequirement{
-											{
-												Key:      "foo",
-												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"bar"},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			getNodes: func() []*v1.Node {
-				node1 := newNode("node_1", map[string]string{
-					"foo": "not_bar",
-				})
-				node2 := newNode("node_2", map[string]string{
-					"foo": "not_bar",
-				})
-				node3 := newNode("node_3", map[string]string{
-					"foo": "not_bar",
-				})
-				return []*v1.Node{node1, node2, node3}
-			},
-			expectNodes: sets.String{},
-		},
-	}
-
-	for _, cs := range cases {
-		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme)
-			for _, node := range cs.getNodes() {
-				err := fakeClient.Create(context.TODO(), node)
-				if err != nil {
-					t.Errorf("failed to create node")
-				}
-			}
-
-			handler := Handler{Client: fakeClient}
-
-			clone := cs.pod.DeepCopy()
-			injectWorkloadSpreadIntoPod(cs.expectWS, clone, "subset-a", "")
-			nodes, err := handler.getNodesForSubset(clone)
-			if err != nil {
-				t.Errorf("failed to get nodes")
-			}
-
-			for _, node := range nodes {
-				if !cs.expectNodes.Has(node.Name) {
-					t.Errorf("match node failed")
-				}
-			}
-		})
 	}
 }
 
@@ -372,7 +142,7 @@ func TestPredicates(t *testing.T) {
 				Allocatable: makeAllocatableResources(10, 20, 32)}
 			nodeInfo := test.nodeInfo()
 			_ = nodeInfo.SetNode(node)
-			fits, err := Predicates(test.pod(), nodeInfo)
+			fits, err := predicates(test.pod(), nodeInfo)
 			if err != nil {
 				t.Logf("unexpected error: %v", err)
 			}

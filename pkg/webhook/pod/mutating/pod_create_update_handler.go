@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"reflect"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -46,49 +45,37 @@ var _ admission.Handler = &PodCreateHandler{}
 // Handle handles admission requests.
 func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	obj := &corev1.Pod{}
-	var err error
 
-	switch req.AdmissionRequest.Operation {
-	case admissionv1beta1.Create, admissionv1beta1.Update:
-		err = h.Decoder.Decode(req, obj)
-		if err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
-		}
-		clone := obj.DeepCopy()
-		// when pod.namespace is empty, using req.namespace
-		if obj.Namespace == "" {
-			obj.Namespace = req.Namespace
-		}
+	err := h.Decoder.Decode(req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+	clone := obj.DeepCopy()
+	// when pod.namespace is empty, using req.namespace
+	if obj.Namespace == "" {
+		obj.Namespace = req.Namespace
+	}
 
-		injectPodReadinessGate(req, obj)
+	injectPodReadinessGate(req, obj)
 
-		err = h.workloadSpreadMutatingPod(ctx, req, obj)
-		if err != nil {
-			return admission.Errored(http.StatusInternalServerError, err)
-		}
-		err = h.sidecarsetMutatingPod(ctx, req, obj)
-		if err != nil {
-			return admission.Errored(http.StatusInternalServerError, err)
-		}
+	err = h.workloadSpreadMutatingPod(ctx, req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+	err = h.sidecarsetMutatingPod(ctx, req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
 
-		if reflect.DeepEqual(obj, clone) {
-			return admission.Allowed("")
-		}
-
-		marshalled, err := json.Marshal(obj)
-		if err != nil {
-			return admission.Errored(http.StatusInternalServerError, err)
-		}
-		return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
-	case admissionv1beta1.Delete:
-		err = h.workloadSpreadMutatingPod(ctx, req, obj)
-		if err != nil {
-			return admission.Errored(http.StatusInternalServerError, err)
-		}
-		return admission.Allowed("")
-	default:
+	if reflect.DeepEqual(obj, clone) {
 		return admission.Allowed("")
 	}
+	marshalled, err := json.Marshal(obj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+
 }
 
 var _ inject.Client = &PodCreateHandler{}

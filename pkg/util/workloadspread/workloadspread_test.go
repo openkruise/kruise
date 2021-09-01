@@ -678,86 +678,6 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				return workloadSpread
 			},
 		},
-		{
-			name: "operation = update, matched workloadSpread, MissingReplicas = 0",
-			getPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
-				return demo
-			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				demo := workloadSpreadDemo.DeepCopy()
-				demo.Status.SubsetStatuses[0].MissingReplicas = 0
-				return demo
-			},
-			getOperation: func() admissionv1beta1.Operation {
-				return admissionv1beta1.Update
-			},
-			expectPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
-				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
-				return pod
-			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
-				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
-				return workloadSpread
-			},
-		},
-		{
-			name: "operation = update, not matched workloadSpread, MissingReplicas = 0",
-			getPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				//demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
-				return demo
-			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				demo := workloadSpreadDemo.DeepCopy()
-				demo.Status.SubsetStatuses[0].MissingReplicas = 0
-				return demo
-			},
-			getOperation: func() admissionv1beta1.Operation {
-				return admissionv1beta1.Update
-			},
-			expectPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
-				//pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
-				return pod
-			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
-				return workloadSpread
-			},
-		},
-		{
-			name: "operation = update, matched workloadSpread, MissingReplicas = -1",
-			getPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
-				return demo
-			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				demo := workloadSpreadDemo.DeepCopy()
-				demo.Status.SubsetStatuses[0].MissingReplicas = -1
-				return demo
-			},
-			getOperation: func() admissionv1beta1.Operation {
-				return admissionv1beta1.Update
-			},
-			expectPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
-				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
-				return pod
-			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = -1
-				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
-				return workloadSpread
-			},
-		},
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
@@ -771,13 +691,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			case admissionv1beta1.Create:
 				err = handler.HandlePodCreation(podIn)
 			case admissionv1beta1.Delete:
-				err = handler.HandlePodDeletion(podIn)
-			case admissionv1beta1.Update:
-				oldPod := podIn.DeepCopy()
-				newPod := podIn.DeepCopy()
-				oldPod.Status.Phase = corev1.PodPending
-				newPod.Status.Phase = corev1.PodFailed
-				err = handler.HandlePodUpdate(oldPod, newPod)
+				err = handler.HandlePodDeletion(podIn, DeleteOperation)
 			}
 			//err := handler.WorkloadSpreadMutatingPod(cs.getOperation(), podIn)
 			if err != nil {
