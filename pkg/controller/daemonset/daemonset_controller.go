@@ -84,7 +84,7 @@ var (
 
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations       = kubecontroller.NewControllerExpectations()
-	updateExpectations = kruiseExpectations.NewUpdateExpectations(&revisionAdapterImpl{})
+	updateExpectations = kruiseExpectations.NewUpdateExpectations(revisionadapter.NewDefaultImpl())
 )
 
 const (
