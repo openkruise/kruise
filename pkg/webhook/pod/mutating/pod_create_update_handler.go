@@ -22,6 +22,9 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -58,10 +61,13 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 
 	injectPodReadinessGate(req, obj)
 
-	err = h.workloadSpreadMutatingPod(ctx, req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpreadGate) {
+		err = h.workloadSpreadMutatingPod(ctx, req, obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
 	}
+
 	err = h.sidecarsetMutatingPod(ctx, req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
