@@ -36,8 +36,7 @@ import (
 // 2. reason(string)
 // 3. err(error)
 func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req admission.Request) (bool, string, error) {
-	oldPod := &corev1.Pod{}
-	newPod := &corev1.Pod{}
+	pod := &corev1.Pod{}
 	var dryRun bool
 	var err error
 	workloadSpreadHandler := wsutil.NewWorkloadSpreadHandler(p.Client)
@@ -51,7 +50,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 			return true, "", nil
 		}
 
-		err = p.Decoder.DecodeRaw(req.OldObject, oldPod)
+		err = p.Decoder.DecodeRaw(req.OldObject, pod)
 		if err != nil {
 			return false, "", err
 		}
@@ -64,11 +63,11 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 		}
 		dryRun = dryrun.IsDryRun(deletion.DryRun)
 		if dryRun {
-			klog.V(5).Infof("Operation[%s] Pod (%s/%s) is a dry run, then admit", req.AdmissionRequest.Operation, oldPod.Namespace, oldPod.Name)
+			klog.V(5).Infof("Operation[%s] Pod (%s/%s) is a dry run, then admit", req.AdmissionRequest.Operation, pod.Namespace, pod.Name)
 			return true, "", err
 		}
 
-		err = workloadSpreadHandler.HandlePodDeletion(oldPod, wsutil.DeleteOperation)
+		err = workloadSpreadHandler.HandlePodDeletion(pod, wsutil.DeleteOperation)
 		if err != nil {
 			return false, "", err
 		}
@@ -97,12 +96,12 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 			Namespace: req.AdmissionRequest.Namespace,
 			Name:      req.AdmissionRequest.Name,
 		}
-		err = p.Client.Get(ctx, key, newPod)
+		err = p.Client.Get(ctx, key, pod)
 		if err != nil {
 			return false, "", err
 		}
 
-		err = workloadSpreadHandler.HandlePodDeletion(oldPod, wsutil.EvictionOperation)
+		err = workloadSpreadHandler.HandlePodDeletion(pod, wsutil.EvictionOperation)
 		if err != nil {
 			return false, "", err
 		}
