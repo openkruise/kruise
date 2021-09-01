@@ -312,10 +312,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 			}
 		}
 
-		suitableSubset, err = h.getSuitableSubset(ws)
-		if err != nil {
-			return false, nil, "", err
-		}
+		suitableSubset = h.getSuitableSubset(ws)
 		if suitableSubset == nil {
 			klog.V(5).Infof("WorkloadSpread (%s/%s) don't have suitable subset for Pod (%s)",
 				ws.Namespace, ws.Name, pod.Name)
@@ -464,7 +461,7 @@ func getSpecificSubset(ws *appsv1alpha1.WorkloadSpread, specifySubset string) *a
 	return nil
 }
 
-func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) (*appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
+func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpreadSubsetStatus {
 	for i := range ws.Status.SubsetStatuses {
 		subset := &ws.Status.SubsetStatuses[i]
 		canSchedule := true
@@ -482,11 +479,11 @@ func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) (*appsv1alp
 			// which does a generic predicates by the cache of nodes and pods in kruise manager.
 			// There may be some errors between simulation schedule and kubernetes scheduler with small probability.
 
-			return subset, nil
+			return subset
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) bool {
