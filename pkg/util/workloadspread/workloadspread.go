@@ -278,15 +278,15 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 	// if create pod, inject affinity、toleration、metadata in pod object
 	if operation == CreateOperation && suitableSubset != nil {
 		if _, injectErr = injectWorkloadSpreadIntoPod(matchedWS, pod, suitableSubset.Name, generatedUID); injectErr != nil {
-			klog.Errorf("failed to inject Pod(%s/%s) subset(%s) data for workloadSpread(%s/%s)",
-				pod.Namespace, pod.Name, suitableSubset.Name, matchedWS.Namespace, matchedWS.Name)
+			klog.Errorf("failed to inject Pod(%s/%s) subset(%s) data for WorkloadSpread(%s/%s)",
+				pod.Namespace, podName, suitableSubset.Name, matchedWS.Namespace, matchedWS.Name)
 			return injectErr
 		}
-		klog.V(3).Infof("inject Pod(%s/%s) subset(%s) data for workloadSpread(%s/%s)",
-			pod.Namespace, pod.Name, suitableSubset.Name, matchedWS.Namespace, matchedWS.Name)
+		klog.V(3).Infof("inject Pod(%s/%s) subset(%s) data for WorkloadSpread(%s/%s)",
+			pod.Namespace, podName, suitableSubset.Name, matchedWS.Namespace, matchedWS.Name)
 	}
 
-	klog.V(3).Infof("handler operation[%s] Pod(%s/%s) generatedUID(%s) for workloadSpread(%s/%s) done",
+	klog.V(3).Infof("handler operation[%s] Pod(%s/%s) generatedUID(%s) for WorkloadSpread(%s/%s) done",
 		operation, pod.Namespace, podName, generatedUID, matchedWS.Namespace, matchedWS.Name)
 
 	return injectErr
