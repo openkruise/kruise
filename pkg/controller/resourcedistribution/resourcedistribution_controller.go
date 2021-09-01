@@ -307,11 +307,17 @@ func (r *ReconcileResourceDistribution) handleErrors(distributorName string, err
 	// 2. build error list
 	errList := field.ErrorList{}
 	for i := range conditions {
+<<<<<<< HEAD
 		if len(conditions[i].FailedNamespaces) == 0 {
 			continue
 		}
 		switch conditions[i].Type {
 		case appsv1alpha1.ResourceDistributionConflictOccurred, appsv1alpha1.ResourceDistributionNamespaceNotExists:
+=======
+		switch conditions[i].Type {
+		case appsv1alpha1.ResourceDistributionConflictOccurred, appsv1alpha1.ResourceDistributionNamespaceNotExists:
+			continue // no need to retry
+>>>>>>> 9d9b1bd0 (optimize error message for resourcedistribution controller)
 		default:
 			errList = append(errList, field.InternalError(field.NewPath(string(conditions[i].Type)), fmt.Errorf(conditions[i].Reason)))
 		}
