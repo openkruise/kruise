@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	// supportedGVKList is a list that contains all supported resource group, and kind
+	// supportedGKList is a list that contains all supported resource group, and kind
 	// Support CustomResourceDefinition
 	/* ADD NEW RESOURCE TYPE HERE*/
 	supportedGKList = []schema.GroupKind{

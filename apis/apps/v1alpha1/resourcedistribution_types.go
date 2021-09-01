@@ -121,20 +121,23 @@ type ResourceDistributionConditionType string
 
 // These are valid conditions of a ResourceDistribution.
 const (
-	// ResourceDistributionNoConflictOccurred means no conflict with existing resources when reconciling.
-	ResourceDistributionNoConflictOccurred ResourceDistributionConditionType = "NoConflictOccurred"
+	// ResourceDistributionConflictOccurred means there are conflict with existing resources when reconciling.
+	ResourceDistributionConflictOccurred ResourceDistributionConditionType = "ConflictOccurred"
 
-	// ResourceDistributionResourceGetSuccessfully means all getting operation about Resource are totally completed.
-	ResourceDistributionResourceGetSuccessfully ResourceDistributionConditionType = "ResourceGetSuccessfully"
+	// ResourceDistributionNamespaceNotExists means some target namespaces not exist.
+	ResourceDistributionNamespaceNotExists ResourceDistributionConditionType = "NamespaceNotExists"
 
-	// ResourceDistributionResourceCreateSuccessfully means creating Resource totally completed.
-	ResourceDistributionResourceCreateSuccessfully ResourceDistributionConditionType = "ResourceCreateSuccessfully"
+	// ResourceDistributionGetResourceFailed means some get operations about Resource are failed.
+	ResourceDistributionGetResourceFailed ResourceDistributionConditionType = "GetResourceFailed"
 
-	// ResourceDistributionResourceUpdateSuccessfully means updating Resource totally completed.
-	ResourceDistributionResourceUpdateSuccessfully ResourceDistributionConditionType = "ResourceUpdateSuccessfully"
+	// ResourceDistributionCreateResourceFailed means some create operations about Resource are failed.
+	ResourceDistributionCreateResourceFailed ResourceDistributionConditionType = "CreateResourceFailed"
 
-	// ResourceDistributionResourceDeleteSuccessfully means deleting Resource totally completed.
-	ResourceDistributionResourceDeleteSuccessfully ResourceDistributionConditionType = "ResourceDeleteSuccessfully"
+	// ResourceDistributionUpdateResourceFailed means some update operations about Resource are failed.
+	ResourceDistributionUpdateResourceFailed ResourceDistributionConditionType = "UpdateResourceFailed"
+
+	// ResourceDistributionDeleteResourceFailed means some delete operations about Resource are failed.
+	ResourceDistributionDeleteResourceFailed ResourceDistributionConditionType = "DeleteResourceFailed"
 )
 
 type ResourceDistributionConditionStatus string

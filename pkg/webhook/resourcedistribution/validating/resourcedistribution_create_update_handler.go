@@ -83,7 +83,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionRe
 	mice := resource.DeepCopyObject()
 	ConvertToUnstructured(mice).SetNamespace(DefaultNamespace)
 	if err := h.Client.Create(context.TODO(), mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
-		return append(allErrs, field.InternalError(fldPath, fmt.Errorf("creating namespaces failed, err: %v", err)))
+		return append(allErrs, field.InternalError(fldPath, fmt.Errorf("dry-run to validate resource failed, err: %v", err)))
 	}
 	return
 }
