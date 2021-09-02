@@ -73,9 +73,10 @@ const (
 	// DaemonWatchingPod enables kruise-daemon to list watch pods that belong to the same node.
 	DaemonWatchingPod featuregate.Feature = "DaemonWatchingPod"
 
-	// PodTemplateNoDefaults to control whether webhook should inject pod default fields into pod template.
-	// If PodTemplateNoDefaults is false, webhook should inject default fields only when the template changed.
-	PodTemplateNoDefaults featuregate.Feature = "PodTemplateNoDefaults"
+	// TemplateNoDefaults to control whether webhook should inject pod default fields into pod template
+	// and pvc default fields into pvc template.
+	// If TemplateNoDefaults is false, webhook should inject default fields only when the template changed.
+	TemplateNoDefaults featuregate.Feature = "TemplateNoDefaults"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -91,7 +92,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ResourcesDeletionProtection:      {Default: false, PreRelease: featuregate.Alpha},
 	PodUnavailableBudgetDeleteGate:   {Default: false, PreRelease: featuregate.Alpha},
 	PodUnavailableBudgetUpdateGate:   {Default: false, PreRelease: featuregate.Alpha},
-	PodTemplateNoDefaults:            {Default: false, PreRelease: featuregate.Alpha},
+	TemplateNoDefaults:               {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

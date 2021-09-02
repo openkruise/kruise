@@ -25,7 +25,7 @@ import (
 )
 
 // SetDefaults_StatefulSet set default values for StatefulSet.
-func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectPodTemplateDefaults bool) {
+func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults bool) {
 	if len(obj.Spec.PodManagementPolicy) == 0 {
 		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 	}
@@ -63,15 +63,14 @@ func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectPodTemplateDefaults 
 		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
 	}
 
-	if injectPodTemplateDefaults {
+	if injectTemplateDefaults {
 		SetDefaultPodSpec(&obj.Spec.Template.Spec)
-	}
-
-	for i := range obj.Spec.VolumeClaimTemplates {
-		a := &obj.Spec.VolumeClaimTemplates[i]
-		v1.SetDefaults_PersistentVolumeClaim(a)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
-		v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		for i := range obj.Spec.VolumeClaimTemplates {
+			a := &obj.Spec.VolumeClaimTemplates[i]
+			v1.SetDefaults_PersistentVolumeClaim(a)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+			v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		}
 	}
 }
