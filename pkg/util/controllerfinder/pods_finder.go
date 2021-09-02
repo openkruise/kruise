@@ -40,20 +40,29 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, acti
 	// ReplicaSet
 	case controllerKindRS.Kind:
 		rs, err := r.getReplicaSet(ControllerReference{APIVersion: apiVersion, Kind: kind, Name: name}, ns)
-		if err != nil || rs == nil {
+		if err != nil {
 			return nil, -1, err
+		}
+		if rs == nil {
+			return nil, 0, nil
 		}
 		workloadReplicas = *rs.Spec.Replicas
 		workloadUIDs = append(workloadUIDs, rs.UID)
 	// Deployment, get the corresponding ReplicaSet UID
 	case controllerKindDep.Kind:
 		rss, err := r.getReplicaSetsForDeployment(apiVersion, kind, ns, name)
-		if err != nil || len(rss) == 0 {
+		if err != nil {
 			return nil, -1, err
 		}
+		if len(rss) == 0 {
+			return nil, 0, nil
+		}
 		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
-		if err != nil || obj == nil {
+		if err != nil {
 			return nil, -1, err
+		}
+		if obj == nil {
+			return nil, 0, nil
 		}
 		workloadReplicas = obj.Scale
 		for _, rs := range rss {
@@ -62,8 +71,11 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, acti
 	// others, e.g. rc, cloneset, statefulset...
 	default:
 		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
-		if err != nil || obj == nil {
+		if err != nil {
 			return nil, -1, err
+		}
+		if obj == nil {
+			return nil, 0, nil
 		}
 		workloadReplicas = obj.Scale
 		workloadUIDs = append(workloadUIDs, obj.UID)

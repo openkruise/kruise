@@ -52,6 +52,13 @@ func (h *PodCreateHandler) validatingPodFn(ctx context.Context, req admission.Re
 			allowed, reason, err = h.podUnavailableBudgetValidatingPod(ctx, req)
 		}
 	case admissionv1beta1.Delete, admissionv1beta1.Create:
+		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpreadGate) {
+			allowed, reason, err = h.workloadSpreadValidatingPod(ctx, req)
+			if !allowed || err != nil {
+				return
+			}
+		}
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetDeleteGate) {
 			allowed, reason, err = h.podUnavailableBudgetValidatingPod(ctx, req)
 		}

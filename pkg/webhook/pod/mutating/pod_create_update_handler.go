@@ -22,8 +22,10 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -51,7 +53,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var copy runtime.Object = obj.DeepCopy()
+	clone := obj.DeepCopy()
 	// when pod.namespace is empty, using req.namespace
 	if obj.Namespace == "" {
 		obj.Namespace = req.Namespace
@@ -59,11 +61,19 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 
 	injectPodReadinessGate(req, obj)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpreadGate) {
+		err = h.workloadSpreadMutatingPod(ctx, req, obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+	}
+
 	err = h.sidecarsetMutatingPod(ctx, req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	if reflect.DeepEqual(obj, copy) {
+
+	if reflect.DeepEqual(obj, clone) {
 		return admission.Allowed("")
 	}
 	marshalled, err := json.Marshal(obj)

@@ -67,6 +67,9 @@ const (
 	// Protection only pod update request
 	PodUnavailableBudgetUpdateGate featuregate.Feature = "PodUnavailableBudgetUpdateGate"
 
+	// WorkloadSpreadGate enable WorkloadSpread to constrain the spread of the workload.
+	WorkloadSpreadGate featuregate.Feature = "WorkloadSpreadGate"
+
 	// DaemonWatchingPod enables kruise-daemon to list watch pods that belong to the same node.
 	DaemonWatchingPod featuregate.Feature = "DaemonWatchingPod"
 
@@ -76,9 +79,10 @@ const (
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	PodWebhook:        {Default: true, PreRelease: featuregate.Beta},
-	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
-	DaemonWatchingPod: {Default: true, PreRelease: featuregate.Beta},
+	PodWebhook:         {Default: true, PreRelease: featuregate.Beta},
+	KruiseDaemon:       {Default: true, PreRelease: featuregate.Beta},
+	DaemonWatchingPod:  {Default: true, PreRelease: featuregate.Beta},
+	WorkloadSpreadGate: {Default: true, PreRelease: featuregate.Beta},
 
 	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
 	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
@@ -111,6 +115,7 @@ func SetDefaultFeatureGates() {
 	if !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", KruisePodReadinessGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ResourcesDeletionProtection))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", WorkloadSpreadGate))
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
