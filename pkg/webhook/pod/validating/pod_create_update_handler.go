@@ -25,6 +25,7 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -46,13 +47,18 @@ type PodCreateHandler struct {
 
 func (h *PodCreateHandler) validatingPodFn(ctx context.Context, req admission.Request) (allowed bool, reason string, err error) {
 	allowed = true
+	if req.Operation == admissionv1beta1.Delete && len(req.OldObject.Raw) == 0 {
+		klog.Warningf("Skip to validate pod %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Namespace, req.Name)
+		return
+	}
+
 	switch req.Operation {
 	case admissionv1beta1.Update:
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
 			allowed, reason, err = h.podUnavailableBudgetValidatingPod(ctx, req)
 		}
 	case admissionv1beta1.Delete, admissionv1beta1.Create:
-		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpreadGate) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpread) {
 			allowed, reason, err = h.workloadSpreadValidatingPod(ctx, req)
 			if !allowed || err != nil {
 				return

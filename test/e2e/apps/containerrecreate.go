@@ -102,7 +102,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					return crr.Status.Phase
 				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal(""))
+				gomega.Eventually(func() string {
+					crr, err = tester.GetCRR(crr.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded}}))
 
 				ginkgo.By("Check Pod containers recreated and started for minStartedSeconds")
@@ -145,7 +149,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					return crr.Status.Phase
 				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal(""))
+				gomega.Eventually(func() string {
+					crr, err = tester.GetCRR(crr.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded},
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded},
@@ -256,7 +264,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					return crr.Status.Phase
 				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal(""))
+				gomega.Eventually(func() string {
+					crr, err = tester.GetCRR(crr.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded},
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded},
@@ -320,7 +332,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					return crr.Status.Phase
 				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal(""))
+				gomega.Eventually(func() string {
+					crr, err = tester.GetCRR(crr.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded},
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded},
@@ -366,7 +382,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					return crr.Status.Phase
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal(""))
+				gomega.Eventually(func() string {
+					crr, err = tester.GetCRR(crr.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestPending},
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestPending},

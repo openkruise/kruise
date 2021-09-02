@@ -68,14 +68,12 @@ type workload struct {
 }
 
 var (
-	workloads []workload
+	workloads = []workload{
+		{Kind: controllerKruiseKindCS.Kind, Groups: []string{controllerKruiseKindCS.Group}},
+		{Kind: controllerKindRS.Kind, Groups: []string{controllerKindRS.Group}},
+		{Kind: controllerKindJob.Kind, Groups: []string{controllerKindJob.Group}},
+	}
 )
-
-func init() {
-	workloads = append(workloads, workload{Kind: controllerKruiseKindCS.Kind, Groups: []string{controllerKruiseKindCS.Group}})
-	workloads = append(workloads, workload{Kind: controllerKindRS.Kind, Groups: []string{controllerKindRS.Group}})
-	workloads = append(workloads, workload{Kind: controllerKindJob.Kind, Groups: []string{controllerKindJob.Group}})
-}
 
 type Handler struct {
 	client.Client
