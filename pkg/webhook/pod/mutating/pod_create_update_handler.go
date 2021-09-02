@@ -61,7 +61,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 
 	injectPodReadinessGate(req, obj)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpreadGate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpread) {
 		err = h.workloadSpreadMutatingPod(ctx, req, obj)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
