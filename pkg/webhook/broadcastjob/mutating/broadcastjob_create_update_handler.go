@@ -54,21 +54,21 @@ func (h *BroadcastJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	var copy runtime.Object = obj.DeepCopy()
-	injectPodTemplateDefaults := false
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodTemplateNoDefaults) {
+	injectTemplateDefaults := false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
 		if req.AdmissionRequest.Operation == admissionv1beta1.Update {
 			oldObj := &appsv1alpha1.BroadcastJob{}
 			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
-				injectPodTemplateDefaults = true
+				injectTemplateDefaults = true
 			}
 		} else {
-			injectPodTemplateDefaults = true
+			injectTemplateDefaults = true
 		}
 	}
-	defaults.SetDefaultsBroadcastJob(obj, injectPodTemplateDefaults)
+	defaults.SetDefaultsBroadcastJob(obj, injectTemplateDefaults)
 
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")

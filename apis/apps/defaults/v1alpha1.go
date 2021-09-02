@@ -114,12 +114,12 @@ func setSidecarDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 }
 
 // SetDefaults_AdvancedCronJob set default values for BroadcastJob.
-func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectPodTemplateDefaults bool) {
-	if obj.Spec.Template.JobTemplate != nil && injectPodTemplateDefaults {
+func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectTemplateDefaults bool) {
+	if obj.Spec.Template.JobTemplate != nil && injectTemplateDefaults {
 		SetDefaultPodSpec(&obj.Spec.Template.JobTemplate.Spec.Template.Spec)
 	}
 
-	if obj.Spec.Template.BroadcastJobTemplate != nil && injectPodTemplateDefaults {
+	if obj.Spec.Template.BroadcastJobTemplate != nil && injectTemplateDefaults {
 		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
 	}
 
@@ -141,8 +141,8 @@ func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectPodTemplate
 }
 
 // SetDefaults_BroadcastJob set default values for BroadcastJob.
-func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectPodTemplateDefaults bool) {
-	if injectPodTemplateDefaults {
+func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectTemplateDefaults bool) {
+	if injectTemplateDefaults {
 		SetDefaultPodSpec(&obj.Spec.Template.Spec)
 	}
 	if obj.Spec.CompletionPolicy.Type == "" {
@@ -161,7 +161,7 @@ func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectPodTemplateDefaul
 }
 
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
-func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectPodTemplateDefaults bool) {
+func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateDefaults bool) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
 	}
@@ -178,21 +178,21 @@ func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectPodTempla
 	}
 
 	if obj.Spec.Template.StatefulSetTemplate != nil {
-		if injectPodTemplateDefaults {
+		if injectTemplateDefaults {
 			SetDefaultPodSpec(&obj.Spec.Template.StatefulSetTemplate.Spec.Template.Spec)
-		}
-		for i := range obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates {
-			a := &obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates[i]
-			v1.SetDefaults_PersistentVolumeClaim(a)
-			v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
-			v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
-			v1.SetDefaults_ResourceList(&a.Status.Capacity)
+			for i := range obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates {
+				a := &obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates[i]
+				v1.SetDefaults_PersistentVolumeClaim(a)
+				v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+				v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+				v1.SetDefaults_ResourceList(&a.Status.Capacity)
+			}
 		}
 	}
 }
 
 // SetDefaults_CloneSet set default values for CloneSet.
-func SetDefaultsCloneSet(obj *v1alpha1.CloneSet, injectPodTemplateDefaults bool) {
+func SetDefaultsCloneSet(obj *v1alpha1.CloneSet, injectTemplateDefaults bool) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
 	}
@@ -200,16 +200,15 @@ func SetDefaultsCloneSet(obj *v1alpha1.CloneSet, injectPodTemplateDefaults bool)
 		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
 	}
 
-	if injectPodTemplateDefaults {
+	if injectTemplateDefaults {
 		SetDefaultPodSpec(&obj.Spec.Template.Spec)
-	}
-
-	for i := range obj.Spec.VolumeClaimTemplates {
-		a := &obj.Spec.VolumeClaimTemplates[i]
-		v1.SetDefaults_PersistentVolumeClaim(a)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
-		v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		for i := range obj.Spec.VolumeClaimTemplates {
+			a := &obj.Spec.VolumeClaimTemplates[i]
+			v1.SetDefaults_PersistentVolumeClaim(a)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+			v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		}
 	}
 
 	switch obj.Spec.UpdateStrategy.Type {

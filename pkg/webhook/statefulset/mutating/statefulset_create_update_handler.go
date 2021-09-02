@@ -70,8 +70,8 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 	}
 	var copy runtime.Object = obj.DeepCopy()
 
-	injectPodTemplateDefaults := false
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodTemplateNoDefaults) {
+	injectTemplateDefaults := false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
 		if req.AdmissionRequest.Operation == admissionv1beta1.Update {
 			oldObj := &appsv1beta1.StatefulSet{}
 			var oldObjv1alpha1 *appsv1alpha1.StatefulSet
@@ -90,13 +90,13 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 				}
 			}
 			if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
-				injectPodTemplateDefaults = true
+				injectTemplateDefaults = true
 			}
 		} else {
-			injectPodTemplateDefaults = true
+			injectTemplateDefaults = true
 		}
 	}
-	defaults.SetDefaultsStatefulSet(obj, injectPodTemplateDefaults)
+	defaults.SetDefaultsStatefulSet(obj, injectTemplateDefaults)
 	obj.Status = appsv1beta1.StatefulSetStatus{}
 
 	var err error
