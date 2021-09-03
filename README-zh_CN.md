@@ -1,4 +1,4 @@
-# OpenKruise/Kruise
+# Kruise
 
 [![License](https://img.shields.io/badge/license-Apache%202-4EB1BA.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Go Report Card](https://goreportcard.com/badge/github.com/openkruise/kruise)](https://goreportcard.com/report/github.com/openkruise/kruise)
@@ -12,9 +12,9 @@
 
 |![notification](docs/img/bell-outline-badge.svg) 最新进展：|
 |------------------|
+|Sep 6th, 2021. Kruise v0.10.0 发布! 新增 WorkloadSpread、PodUnavailableBudget 控制器以及一系列新功能, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |May 20th, 2021. Kruise v0.9.0 发布! 新增了多种重大功能如 容器重建/重启、删除安全防护等，详情参见 [CHANGELOG](CHANGELOG.md).|
 |Mar 4th, 2021. Kruise v0.8.0 发布! 提供了重构版本的 SidecarSet、UnitedDeployment 支持管理 Deployment，以及一个新的 kruise-daemon 组件目前支持镜像预热，详情参见 [CHANGELOG](CHANGELOG.md).|
-|Dec 16th, 2020. Kruise v0.7.0 发布! 提供一个新的 AdvancedCronJob CRD、将 Advanced StatefulSet 升级 v1beta1 版本、以及其他控制器一些新增能力，详情参见 [CHANGELOG](CHANGELOG.md).|
 
 ## 介绍
 
@@ -43,6 +43,10 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 - [Deletion Protection](https://openkruise.io/zh-cn/docs/deletion_protection.html): 该功能提供了删除安全策略，用来在 Kubernetes 级联删除的机制下保护用户的资源和应用可用性。
 
+- [PodUnavailableBudget](https://openkruise.io/zh-cn/docs/podunavailablebudget.html): In voluntary disruption scenarios, PodUnavailableBudget can achieve the effect of preventing application disruption or SLA degradation, which greatly improves the high availability of application services.
+
+- [WorkloadSpread](https://openkruise.io/zh-cn/docs/workloadspread.html): Constrain the spread of stateless workload, which empower single workload the abilities for multi-domain deploy and elastic deploy.
+
 ## 核心功能
 
 - **原地升级**
@@ -69,20 +73,15 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 ## 快速开始
 
-想要快速使用 OpenKruise 非常简单！
-对于版本高于 v1.13+ 的 Kubernetes 集群来说，只要使用 helm v3.1.0+ 执行安装即可：
+我们强烈建议在 **Kubernetes >= 1.16** 以上版本的集群中使用 Kruise，使用 helm v3.1.0+ 执行安装即可：
 
 ```bash
-# Kubernetes 版本 1.13 或 1.14
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz --disable-openapi-validation
-
-# Kubernetes 版本大于等于 1.15
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.10.0/kruise-chart.tgz
 ```
 
-注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者配置 feature-gates。
+> 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者配置 feature-gates。
 
-更多细节可以查看 [安装手册](https://openkruise.io/zh-cn/docs/installation.html)
+更多的安装/升级细节、或者更老版本的 Kubernetes 集群，可以查看 [这个文档](https://openkruise.io/zh-cn/docs/installation.html)。
 
 ## 文档
 
@@ -99,7 +98,7 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.
 - Lyft, 携程, 享住智慧, VIPKID, 掌门1对1
 - 小红书, 比心, 永辉科技中心, 跟谁学, 哈啰出行
 - Spectro Cloud, 艾佳生活, Arkane Systems, 滴普科技, 火花思维
-- OPPO, 苏宁
+- OPPO, 苏宁, 欢聚时代, 汇量科技, 深圳凤凰木网络有限公司
 
 ## 贡献
 
@@ -109,12 +108,13 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.
 
 活跃的社区途径：
 
-- Slack: [Channel in Kubernetes Slack](https://kubernetes.slack.com/channels/openkruise)
-- 钉钉讨论群
-
-<div>
-  <img src="docs/img/openkruise-dev-group.JPG" width="280" title="dingtalk">
-</div>
+- Slack: [OpenKruise channel](https://kubernetes.slack.com/channels/openkruise) (*English*)
+- 钉钉：搜索群ID `23330762` (*Chinese*)
+- 社区双周会 (APAC, *Chinese*):
+  - 周四 19:00 GMT+8 (Asia/Shanghai)
+  - [进入会议(zoom)](https://us02web.zoom.us/j/87059136652?pwd=NlI4UThFWXVRZkxIU0dtR1NINncrQT09)
+  - [会议纪要](https://shimo.im/docs/gXqmeQOYBehZ4vqo)
+- Bi-weekly Community Meeting (*English*): TODO
 
 ## License
 
