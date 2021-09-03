@@ -1,5 +1,51 @@
 # Change Log
 
+## v0.10.0
+
+### New feature: PodUnavailableBudget
+
+Kubernetes offers [Pod Disruption Budget (PDB)](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) to help you run highly available applications even when you introduce frequent voluntary disruptions.
+PDB limits the number of Pods of a replicated application that are down simultaneously from voluntary disruptions.
+However, it can only constrain the voluntary disruption triggered by the Eviction API.
+For example, when you run kubectl drain, the tool tries to evict all of the Pods on the Node you're taking out of service.
+
+PodUnavailableBudget can achieve the effect of preventing ALL application disruption or SLA degradation, including pod eviction, deletion, inplace-update, ...
+
+[doc](https://openkruise.io/en-us/docs/podunavailablebudget.html)
+
+### New feature: WorkloadSpread
+
+WorkloadSpread supports to constrain the spread of stateless workload, which empowers single workload the abilities for multi-domain and elastic deployment.
+
+It can be used with those stateless workloads, such as CloneSet, Deployment, ReplicaSet and even Job.
+
+[doc](https://openkruise.io/en-us/docs/workloadspread.html)
+
+### CloneSet
+
+- Scale-down supports topology spread constraints. [doc](https://openkruise.io/en-us/docs/cloneset.html#deletion-by-spread-constraints)
+- Fix in-place update pods in Updated state.
+
+### SidecarSet
+
+- Add imagePullSecrets field to support pull secrets for the sidecar images. [doc](https://openkruise.io/en-us/docs/sidecarset.html#imagepullsecrets)
+- Add injectionStrategy.paused to stop injection temporarily. [doc](https://openkruise.io/en-us/docs/sidecarset.html#injection-pause)
+
+### Advanced StatefulSet
+
+- Support image pre-download for in-place update, which can accelerate the progress of applications upgrade. [doc](https://openkruise.io/en-us/docs/advanced_statefulset.html#pre-download-image-for-in-place-update)
+- Support scaling with rate limit. [doc](https://openkruise.io/en-us/docs/advanced_statefulset.html#scaling-with-rate-limiting)
+
+### Advanced DaemonSet
+
+- Fix rolling update stuck caused by deleting terminating pods.
+
+### Other
+
+- Bump to Kubernetes dependency to 1.18
+- Add pod informer for kruise-daemon
+- More `kubectl ... -o wide` fields for kruise resources
+
 ## v0.9.0
 
 ### New feature: ContainerRecreateRequest

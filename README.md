@@ -1,4 +1,4 @@
-# OpenKruise/Kruise
+# Kruise
 
 [![License](https://img.shields.io/badge/license-Apache%202-4EB1BA.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Go Report Card](https://goreportcard.com/badge/github.com/openkruise/kruise)](https://goreportcard.com/report/github.com/openkruise/kruise)
@@ -12,9 +12,9 @@ English | [简体中文](./README-zh_CN.md)
 
 |![notification](docs/img/bell-outline-badge.svg) What is NEW!|
 |------------------|
+|Sep 6th, 2021. Kruise v0.10.0 is **RELEASED**! It provides new controllers like WorkloadSpread and PodUnavailableBudget, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |May 20th, 2021. Kruise v0.9.0 is **RELEASED**! It provides great features such as ContainerRecreate and DeletionProtection, please check the [CHANGELOG](CHANGELOG.md) for details.|
 |Mar 4th, 2021. Kruise v0.8.0 is **RELEASED**! It provides refactoring SidecarSet, Deployment hosted by UnitedDeployment, and a new kruise-daemon component which supports image pre-download, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|Dec 16th, 2020. Kruise v0.7.0 is **RELEASED**! It provides a new CRD named AdvancedCronJob, promotes AdvancedStatefulSet to v1beta1 and a few features in other controllers, please check the [CHANGELOG](CHANGELOG.md) for details.|
 
 ## Introduction
 
@@ -43,6 +43,10 @@ As of now, Kruise mainly offers these controllers:
 
 - [Deletion Protection](https://openkruise.io/en-us/docs/deletion_protection.html): Provides a safety policy which could help users protect Kubernetes resources and applications' availability from the cascading deletion mechanism.
 
+- [PodUnavailableBudget](https://openkruise.io/en-us/docs/podunavailablebudget.html): In voluntary disruption scenarios, PodUnavailableBudget can achieve the effect of preventing application disruption or SLA degradation, which greatly improves the high availability of application services.
+
+- [WorkloadSpread](https://openkruise.io/en-us/docs/workloadspread.html): Constrain the spread of stateless workload, which empowers single workload the abilities for multi-domain and elastic deployment.
+
 ## Key Features
 
 - **In-place update**
@@ -69,20 +73,17 @@ As of now, Kruise mainly offers these controllers:
 
 ## Quick Start
 
-For a Kubernetes cluster with its version higher than v1.13, you can simply install Kruise with helm v3.1.0+:
+We strongly recommend you to use Kruise with **Kubernetes version >= 1.16**.
+For these clusters, you can simply install Kruise with helm v3.1.0+:
 
 ```bash
-# Kubernetes 1.13 and 1.14
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz --disable-openapi-validation
-
-# Kubernetes 1.15 and newer versions
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.9.0/kruise-chart.tgz
+helm install kruise https://github.com/openkruise/kruise/releases/download/v0.10.0/kruise-chart.tgz
 ```
 
-Note that installing this chart directly means it will use the default template values for the kruise-manager.
+> Note that installing this chart directly means it will use the default template values for the kruise-manager.
 You may have to set your specific configurations when it is deployed into a production cluster or you want to configure feature-gates.
 
-For more details, see [installation doc](https://openkruise.io/en-us/docs/installation.html).
+For more install/upgrade details or older Kubernetes versions, please read [this doc](https://openkruise.io/en-us/docs/installation.html).
 
 ## Documentation
 
@@ -99,7 +100,7 @@ Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/
 - Lyft, Ctrip, 享住智慧, VIPKID, zhangmen
 - xiaohongshu, bixin, 永辉科技中心, 跟谁学, 哈啰出行
 - Spectro Cloud, ihomefnt, Arkane Systems, Deepexi, 火花思维
-- OPPO, Suning.cn
+- OPPO, Suning.cn, joyy, Mobvista
 
 ## Contributing
 
@@ -109,13 +110,13 @@ You are warmly welcome to hack on Kruise. We have prepared a detailed guide [CON
 
 Active communication channels:
 
-- Slack: [Channel in Kubernetes Slack](https://kubernetes.slack.com/channels/openkruise)
-- Mailing List: todo
-- Dingtalk Group(钉钉讨论群)
-
-<div>
-  <img src="docs/img/openkruise-dev-group.JPG" width="280" title="dingtalk">
-</div>
+- Slack: [OpenKruise channel](https://kubernetes.slack.com/channels/openkruise) (*English*)
+- DingTalk：Search Group ID `23330762` (*Chinese*)
+- Bi-weekly Community Meeting (APAC, *Chinese*):
+  - Thursday 19:00 GMT+8 (Asia/Shanghai), [Calendar](https://calendar.google.com/calendar/u/2?cid=MjdtbDZucXA2bjVpNTFyYTNpazV2dW8ybHNAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)
+  - [Meeting Link(zoom)](https://us02web.zoom.us/j/87059136652?pwd=NlI4UThFWXVRZkxIU0dtR1NINncrQT09)
+  - [Notes and agenda](https://shimo.im/docs/gXqmeQOYBehZ4vqo)
+- Bi-weekly Community Meeting (*English*): TODO
 
 ## License
 

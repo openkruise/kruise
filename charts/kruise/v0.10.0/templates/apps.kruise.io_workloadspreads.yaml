@@ -1,0 +1,213 @@
+{{- if .Values.crds.managed }}
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.9
+  creationTimestamp: null
+  name: workloadspreads.apps.kruise.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.targetRef.name
+    name: WorkloadName
+    type: string
+  - JSONPath: .spec.targetRef.kind
+    name: WorkloadKind
+    type: string
+  - JSONPath: .spec.scheduleStrategy.type[?(@ == "Adaptive")]
+    description: Whether use the adaptive reschedule strategy
+    name: Adaptive
+    type: boolean
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
+  group: apps.kruise.io
+  names:
+    kind: WorkloadSpread
+    listKind: WorkloadSpreadList
+    plural: workloadspreads
+    shortNames:
+    - ws
+    singular: workloadspread
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: WorkloadSpread is the Schema for the WorkloadSpread API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: WorkloadSpreadSpec defines the desired state of WorkloadSpread.
+          properties:
+            scheduleStrategy:
+              description: ScheduleStrategy indicates the strategy the WorkloadSpread used to preform the schedule between each of subsets.
+              properties:
+                adaptive:
+                  description: Adaptive is used to communicate parameters when Type is AdaptiveWorkloadSpreadScheduleStrategyType.
+                  properties:
+                    disableSimulationSchedule:
+                      description: DisableSimulationSchedule indicates whether to disable the feature of simulation schedule. Default is false. Webhook can take a simple general predicates to check whether Pod can be scheduled into this subset, but it just considers the Node resource and cannot replace scheduler to do richer predicates practically.
+                      type: boolean
+                    rescheduleCriticalSeconds:
+                      description: RescheduleCriticalSeconds indicates how long controller will reschedule a schedule failed Pod to the subset that has redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in a unschedulabe status over RescheduleCriticalSeconds duration, the controller will reschedule it to a suitable subset.
+                      format: int32
+                      type: integer
+                  type: object
+                type:
+                  description: Type indicates the type of the WorkloadSpreadScheduleStrategy. Default is Fixed
+                  enum:
+                  - Adaptive
+                  - Fixed
+                  - ""
+                  type: string
+              type: object
+            subsets:
+              description: Subsets describes the pods distribution details between each of subsets.
+              items:
+                description: WorkloadSpreadSubset defines the details of a subset.
+                properties:
+                  maxReplicas:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: MaxReplicas indicates the desired max replicas of this subset.
+                    x-kubernetes-int-or-string: true
+                  name:
+                    description: Name should be unique between all of the subsets under one WorkloadSpread.
+                    type: string
+                  patch:
+                    description: Patch indicates patching podTemplate to the Pod.
+                    type: object
+                  preferredNodeSelectorTerms:
+                    description: Indicates the node preferred selector to form the subset.
+                    items:
+                      description: An empty preferred scheduling term matches all objects with implicit weight 0 (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    type: array
+                  requiredNodeSelectorTerm:
+                    description: Indicates the node required selector to form the subset.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  tolerations:
+                    description: Indicates the tolerations the pods under this subset have.
+                    items:
+                      description: The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    type: array
+                required:
+                - name
+                type: object
+              type: array
+            targetRef:
+              description: TargetReference is the target workload that WorkloadSpread want to control.
+              properties:
+                apiVersion:
+                  description: API version of the referent.
+                  type: string
+                kind:
+                  description: Kind of the referent.
+                  type: string
+                name:
+                  description: Name of the referent.
+                  type: string
+              required:
+              - apiVersion
+              - kind
+              - name
+              type: object
+          required:
+          - subsets
+          - targetRef
+          type: object
+        status:
+          description: WorkloadSpreadStatus defines the observed state of WorkloadSpread.
+          properties:
+            observedGeneration:
+              description: ObservedGeneration is the most recent generation observed for this WorkloadSpread. It corresponds to the WorkloadSpread's generation, which is updated on mutation by the API Server.
+              format: int64
+              type: integer
+            subsetStatuses:
+              description: Contains the status of each subset. Each element in this array represents one subset
+              items:
+                description: WorkloadSpreadSubsetStatus defines the observed state of subset
+                properties:
+                  conditions:
+                    description: Conditions is an array of current observed subset conditions.
+                    items:
+                      properties:
+                        lastTransitionTime:
+                          description: Last time the condition transitioned from one status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: A human readable message indicating details about the transition.
+                          type: string
+                        reason:
+                          description: The reason for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status of the condition, one of True, False, Unknown.
+                          type: string
+                        type:
+                          description: Type of in place set condition.
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
+                  creatingPods:
+                    additionalProperties:
+                      format: date-time
+                      type: string
+                    description: CreatingPods contains information about pods whose creation was processed by the webhook handler but not yet been observed by the WorkloadSpread controller. A pod will be in this map from the time when the webhook handler processed the creation request to the time when the pod is seen by controller. The key in the map is the name of the pod and the value is the time when the webhook handler process the creation request. If the real creation didn't happen and a pod is still in this map, it will be removed from the list automatically by WorkloadSpread controller after some time. If everything goes smooth this map should be empty for the most of the time. Large number of entries in the map may indicate problems with pod creations.
+                    type: object
+                  deletingPods:
+                    additionalProperties:
+                      format: date-time
+                      type: string
+                    description: DeletingPods is similar with CreatingPods and it contains information about pod deletion.
+                    type: object
+                  missingReplicas:
+                    description: MissingReplicas is the number of replicas belong to this subset not be found. MissingReplicas > 0 indicates the subset is still missing MissingReplicas pods to create MissingReplicas = 0 indicates the subset already has enough pods, there is no need to create MissingReplicas = -1 indicates the subset's MaxReplicas not set, then there is no limit for pods number
+                    format: int32
+                    type: integer
+                  name:
+                    description: Name should be unique between all of the subsets under one WorkloadSpread.
+                    type: string
+                  replicas:
+                    description: Replicas is the most recently observed number of replicas for subset.
+                    format: int32
+                    type: integer
+                required:
+                - missingReplicas
+                - name
+                - replicas
+                type: object
+              type: array
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

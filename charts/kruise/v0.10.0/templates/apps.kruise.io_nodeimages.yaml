@@ -1,0 +1,218 @@
+{{- if .Values.crds.managed }}
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.9
+  creationTimestamp: null
+  name: nodeimages.apps.kruise.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.desired
+    description: Number of all images on this node
+    name: DESIRED
+    type: integer
+  - JSONPath: .status.pulling
+    description: Number of image pull task active
+    name: PULLING
+    type: integer
+  - JSONPath: .status.succeeded
+    description: Number of image pull task succeeded
+    name: SUCCEED
+    type: integer
+  - JSONPath: .status.failed
+    description: Number of image pull tasks failed
+    name: FAILED
+    type: integer
+  - JSONPath: .metadata.creationTimestamp
+    description: CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+    name: AGE
+    type: date
+  group: apps.kruise.io
+  names:
+    kind: NodeImage
+    listKind: NodeImageList
+    plural: nodeimages
+    singular: nodeimage
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: NodeImage is the Schema for the nodeimages API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: NodeImageSpec defines the desired state of NodeImage
+          properties:
+            images:
+              additionalProperties:
+                description: ImageSpec defines the pulling spec of an image
+                properties:
+                  pullSecrets:
+                    description: PullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image. If specified, these secrets will be passed to individual puller implementations for them to use.  For example, in the case of docker, only DockerConfig type secrets are honored.
+                    items:
+                      description: ReferenceObject comprises a resource name, with a mandatory namespace, rendered as "<namespace>/<name>".
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      type: object
+                    type: array
+                  tags:
+                    description: Tags is a list of versions of this image
+                    items:
+                      description: ImageTagSpec defines the pulling spec of an image tag
+                      properties:
+                        createdAt:
+                          description: Specifies the create time of this tag
+                          format: date-time
+                          type: string
+                        ownerReferences:
+                          description: List of objects depended by this object. If this image is managed by a controller, then an entry in this list will point to this controller.
+                          items:
+                            description: 'ObjectReference contains enough information to let you inspect or modify the referred object. --- New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.  1. Ignored fields.  It includes many fields which are not generally honored.  For instance, ResourceVersion and FieldPath are both very rarely valid in actual usage.  2. Invalid usage help.  It is impossible to add specific help for individual usage.  In most embedded usages, there are particular     restrictions like, "must refer only to types A and B" or "UID not honored" or "name must be restricted".     Those cannot be well described when embedded.  3. Inconsistent validation.  Because the usages are different, the validation rules are different by usage, which makes it hard for users to predict what will happen.  4. The fields are both imprecise and overly precise.  Kind is not a precise mapping to a URL. This can produce ambiguity     during interpretation and require a REST mapping.  In most cases, the dependency is on the group,resource tuple     and the version of the actual struct is irrelevant.  5. We cannot easily change it.  Because this type is embedded in many locations, updates to this type     will affect numerous schemas.  Don''t make new APIs embed an underspecified API type they do not control. Instead of using this type, create a locally provided and used type that is well-focused on your reference. For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .'
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                          type: array
+                        pullPolicy:
+                          description: PullPolicy is an optional field to set parameters of the pulling task. If not specified, the system will use the default values.
+                          properties:
+                            activeDeadlineSeconds:
+                              description: ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the task may be active before the system tries to terminate it; value must be positive integer. if not specified, the system will never terminate it.
+                              format: int64
+                              type: integer
+                            backoffLimit:
+                              description: Specifies the number of retries before marking the pulling task failed. Defaults to 3
+                              format: int32
+                              type: integer
+                            timeoutSeconds:
+                              description: Specifies the timeout of the pulling task. Defaults to 600
+                              format: int32
+                              type: integer
+                            ttlSecondsAfterFinished:
+                              description: TTLSecondsAfterFinished limits the lifetime of a pulling task that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the task finishes, it is eligible to be automatically deleted. If this field is unset, the task won't be automatically deleted. If this field is set to zero, the task becomes eligible to be deleted immediately after it finishes.
+                              format: int32
+                              type: integer
+                          type: object
+                        tag:
+                          description: Specifies the image tag
+                          type: string
+                        version:
+                          description: "An opaque value that represents the internal version of this tag that can be used by clients to determine when objects have changed. May be used for optimistic concurrency, change detection, and the watch operation on a resource or set of resources. Clients must treat these values as opaque and passed unmodified back to the server. \n Populated by the system. Read-only. Value must be treated as opaque by clients and ."
+                          format: int64
+                          type: integer
+                      required:
+                      - tag
+                      type: object
+                    type: array
+                required:
+                - tags
+                type: object
+              description: Specifies images to be pulled on this node It can not be more than 256 for each NodeImage
+              type: object
+          type: object
+        status:
+          description: NodeImageStatus defines the observed state of NodeImage
+          properties:
+            desired:
+              description: The desired number of pulling tasks, this is typically equal to the number of images in spec.
+              format: int32
+              type: integer
+            failed:
+              description: The number of pulling tasks  which reached phase Failed.
+              format: int32
+              type: integer
+            firstSyncStatus:
+              description: The first of all job has finished on this node. When a node is added to the cluster, we want to know the time when the node's image pulling is completed, and use it to trigger the operation of the upper system.
+              properties:
+                message:
+                  type: string
+                status:
+                  description: SyncStatusPhase defines the node status
+                  type: string
+                syncAt:
+                  format: date-time
+                  type: string
+              type: object
+            imageStatuses:
+              additionalProperties:
+                description: ImageStatus defines the pulling status of an image
+                properties:
+                  tags:
+                    description: Represents statuses of pulling tasks on this node
+                    items:
+                      description: ImageTagStatus defines the pulling status of an image tag
+                      properties:
+                        completionTime:
+                          description: Represents time when the pulling task was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.
+                          format: date-time
+                          type: string
+                        imageID:
+                          description: Represents the ID of this image.
+                          type: string
+                        message:
+                          description: Represents the summary informations of this node
+                          type: string
+                        phase:
+                          description: Represents the image pulling task phase.
+                          type: string
+                        progress:
+                          description: Represents the pulling progress of this tag, which is beetween 0-100. There is no guarantee of monotonic consistency, and it may be a rollback due to retry during pulling.
+                          format: int32
+                          type: integer
+                        startTime:
+                          description: Represents time when the pulling task was acknowledged by the image puller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.
+                          format: date-time
+                          type: string
+                        tag:
+                          description: Represents the image tag.
+                          type: string
+                        version:
+                          description: Represents the internal version of this tag that the daemon handled.
+                          format: int64
+                          type: integer
+                      required:
+                      - phase
+                      - tag
+                      type: object
+                    type: array
+                required:
+                - tags
+                type: object
+              description: all statuses of active image pulling tasks
+              type: object
+            pulling:
+              description: The number of pulling tasks which are not finished.
+              format: int32
+              type: integer
+            succeeded:
+              description: The number of pulling tasks which reached phase Succeeded.
+              format: int32
+              type: integer
+          required:
+          - desired
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+{{- end }}

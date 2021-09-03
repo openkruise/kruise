@@ -59,12 +59,10 @@ const (
 	// 2. ClusterRole for reading all resource types, because CRD validation needs to list the CRs of this CRD.
 	ResourcesDeletionProtection featuregate.Feature = "ResourcesDeletionProtection"
 
-	// Whether to enable pub capability, default: false
-	// Protection only pod deletion and eviction request
+	// PodUnavailableBudgetDeleteGate enables PUB capability to protect pod from deletion and eviction
 	PodUnavailableBudgetDeleteGate featuregate.Feature = "PodUnavailableBudgetDeleteGate"
 
-	// Whether to enable pub capability, default: false
-	// Protection only pod update request
+	// PodUnavailableBudgetUpdateGate enables PUB capability to protect pod from in-place update
 	PodUnavailableBudgetUpdateGate featuregate.Feature = "PodUnavailableBudgetUpdateGate"
 
 	// WorkloadSpread enable WorkloadSpread to constrain the spread of the workload.
@@ -116,6 +114,8 @@ func SetDefaultFeatureGates() {
 	if !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", KruisePodReadinessGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ResourcesDeletionProtection))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetDeleteGate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetUpdateGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", WorkloadSpread))
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
