@@ -144,8 +144,12 @@ In this story, users define a probe to judge the health of `Pods`. This `PodMark
 - `Strategy.ConflictPolicy`:
   - If `ConflictPolicy` is `"Overwrite"`, the labels or annotations, which have the same keys but different values as `spec.MarkItems`,  will be over-written.
   - If `ConflictPolicy` is `"Ignore"`, the PodMarker will treat these conflicting Pods as unmatched Pods.
+- Special Cases：
+  - **If users directly modified the labels/annotations marked by a PodMarker, this PodMarker will not clean these modified labels/annotations even if its conflictPolicy is "Overwrite".**
 
 #### About Spec.MatchRequirements
+- If `Spec.MatchRequirements.XXXSelector == nil`, we will think it has no requirements for Pods;
+- If `Spec.MatchRequirements.XXXSelector != nil` but it's empty, PodMarker will not match any Pod;
 - **A `Pods` is matched iff it satisfies all the listed `MatchRequirements`.**
 - `MatchRequirements.PodProbes`:
   - `PodProbes[x].Probe` is a user-defined probe, PodMarker will execute this probe and get a result(`succeeded` or `failed`).
@@ -164,16 +168,34 @@ In this story, users define a probe to judge the health of `Pods`. This `PodMark
 1. Validate `.Metadata`
 2. Validate `.Spec.Strategy`:
 - check whether `Replicas` is a number or percentage;
-- check two Policies.
+- check whether `ConflictPolicy` is "Ignore" or "Overwrite".
 3. Validate `.Spec.MatchRequirements`
-- check `PodSelector` and `NodeSelector;
-- check `PodProbes[x].Probe`;
-- check container names;
-- check whether `.PodProbes[x].Expectation` is succeeded or failed.
+- check `PodSelector` and `NodeSelector`;
+  - `PodSelector` and `NodeSelector` cannot be empty at the same time;
+- check `PodProbes[x]`;
+  - check container names;
+  - check probe
+  - check whether `.PodProbes[x].Expectation` is succeeded or failed.
 4. Validate `.Spec.MatchPreferences`
+  - check all `PodSelector` and `NodeSelector`;
 5. Validate `.Spec.PodMarkerMarkItems`
+  - check `Labels` and `Annotations`
+
+**PodMarker WebHook only allow to modify `Spec.Strategy` when updating a PodMaker.**
 
 #### Controller
+
+**Event Watch**
+1. Watch Pod:
+- for Pod create event, enqueue matched PodMarkers;
+- for Pod update event, enqueue matched PodMarkers in cases of:
+  - `newPod.ResourceVersion != oldPod.ResourceVersion`
+- for Pod delete event, enqueue matched PodMarkers;
+
+2. Watch Node:
+- for Pod Node event, enqueue matched PodMarkers in cases of:
+  - `!reflect.DeepEqual(oldNode.Labels, newNode.Labels)`;
+
 **Recognize the Pods Marked by PodMarker**
 
 PodMarker will mark an extra annotation `kruise.io/marked-by-podmarker=<podmarker-name>` on Pods.
