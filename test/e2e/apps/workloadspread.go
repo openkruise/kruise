@@ -20,8 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,13 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
-	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util/workloadspread"
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
+
+const TopologyLabelKey = "fake-zone"
 
 var (
 	KruiseKindCloneSet = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
@@ -46,16 +49,40 @@ var (
 var _ = SIGDescribe("workloadspread", func() {
 	f := framework.NewDefaultFramework("workloadspread")
 	workloadSpreadName := "test-workload-spread"
-	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
+	var ns string
 	var tester *framework.WorkloadSpreadTester
 
 	ginkgo.BeforeEach(func() {
+		ns = f.Namespace.Name
 		c = f.ClientSet
 		kc = f.KruiseClientSet
-		ns = f.Namespace.Name
 		tester = framework.NewWorkloadSpreadTester(c, kc)
+
+		// label nodes
+
+		nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(nodeList.Items) > 2).Should(gomega.Equal(true))
+
+		workers := make([]*corev1.Node, 0)
+		for i := range nodeList.Items {
+			node := nodeList.Items[i]
+			if _, exist := node.GetLabels()["node-role.kubernetes.io/master"]; exist {
+				continue
+			}
+			workers = append(workers, &node)
+		}
+		gomega.Expect(len(workers) >= 2).Should(gomega.Equal(true))
+		// subset-a
+		worker0 := workers[0]
+		tester.SetNodeLabel(c, worker0, TopologyLabelKey, "zone-a")
+		// subset-b
+		worker1 := workers[1]
+		tester.SetNodeLabel(c, worker1, TopologyLabelKey, "zone-b")
+		worker2 := workers[2]
+		tester.SetNodeLabel(c, worker2, TopologyLabelKey, "zone-b")
 	})
 
 	framework.KruiseDescribe("WorkloadSpread functionality", func() {
@@ -74,35 +101,35 @@ var _ = SIGDescribe("workloadspread", func() {
 				Name:       cloneSet.Name,
 			}
 			subset1 := appsv1alpha1.WorkloadSpreadSubset{
-				Name: "ack",
+				Name: "zone-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
-							Key:      "topology.kubernetes.io/zone",
+							Key:      TopologyLabelKey,
 							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"ack"},
+							Values:   []string{"zone-a"},
 						},
 					},
 				},
 				MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
 				Patch: runtime.RawExtension{
-					Raw: []byte(`{"metadata":{"annotations":{"subset":"ack"}}}`),
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 				},
 			}
 			subset2 := appsv1alpha1.WorkloadSpreadSubset{
-				Name: "eci",
+				Name: "zone-b",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
-							Key:      "topology.kubernetes.io/zone",
+							Key:      TopologyLabelKey,
 							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"eci"},
+							Values:   []string{"zone-b"},
 						},
 					},
 				},
 				MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
 				Patch: runtime.RawExtension{
-					Raw: []byte(`{"metadata":{"annotations":{"subset":"eci"}}}`),
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 				},
 			}
 			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
@@ -320,7 +347,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("deploy in two zone, the type of maxReplicas is Integer, done")
 		})
 
-		ginkgo.It("elastic deployment, ack=2, eci=nil", func() {
+		ginkgo.It("elastic deployment, zone-a=2, zone-b=nil", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -329,35 +356,35 @@ var _ = SIGDescribe("workloadspread", func() {
 				Name:       cloneSet.Name,
 			}
 			subset1 := appsv1alpha1.WorkloadSpreadSubset{
-				Name: "ack",
+				Name: "zone-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
-							Key:      "topology.kubernetes.io/zone",
+							Key:      TopologyLabelKey,
 							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"ack"},
+							Values:   []string{"zone-a"},
 						},
 					},
 				},
 				MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
 				Patch: runtime.RawExtension{
-					Raw: []byte(`{"metadata":{"annotations":{"subset":"ack"}}}`),
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 				},
 			}
 			subset2 := appsv1alpha1.WorkloadSpreadSubset{
-				Name: "eci",
+				Name: "zone-b",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
-							Key:      "topology.kubernetes.io/zone",
+							Key:      TopologyLabelKey,
 							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"eci"},
+							Values:   []string{"zone-b"},
 						},
 					},
 				},
 				MaxReplicas: nil,
 				Patch: runtime.RawExtension{
-					Raw: []byte(`{"metadata":{"annotations":{"subset":"eci"}}}`),
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 				},
 			}
 			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
@@ -566,7 +593,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[1].CreatingPods)).To(gomega.Equal(0))
 			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[1].DeletingPods)).To(gomega.Equal(0))
 
-			ginkgo.By("elastic deployment, ack=2, eci=nil, done")
+			ginkgo.By("elastic deployment, zone-a=2, zone-b=nil, done")
 		})
 
 		ginkgo.It("reschedule subset-a", func() {
@@ -582,10 +609,10 @@ var _ = SIGDescribe("workloadspread", func() {
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
-							Key:      "topology.kubernetes.io/zone",
+							Key:      TopologyLabelKey,
 							Operator: corev1.NodeSelectorOpIn,
 							// Pod is not schedulable due to incorrect configuration
-							Values: []string{"asi"},
+							Values: []string{"zone-x"},
 						},
 					},
 				},
@@ -599,9 +626,9 @@ var _ = SIGDescribe("workloadspread", func() {
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
-							Key:      "topology.kubernetes.io/zone",
+							Key:      TopologyLabelKey,
 							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"eci"},
+							Values:   []string{"zone-b"},
 						},
 					},
 				},
@@ -760,35 +787,35 @@ var _ = SIGDescribe("workloadspread", func() {
 		//		Name:       cloneSet.Name,
 		//	}
 		//	subset1 := appsv1alpha1.WorkloadSpreadSubset{
-		//		Name: "ack",
+		//		Name: "zone-a",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
 		//				{
-		//					Key:      "topology.kubernetes.io/zone",
+		//					Key:      TopologyLabelKey,
 		//					Operator: corev1.NodeSelectorOpIn,
-		//					Values:   []string{"ack"},
+		//					Values:   []string{"zone-a"},
 		//				},
 		//			},
 		//		},
 		//		MaxReplicas: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
 		//		Patch: runtime.RawExtension{
-		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"ack"}}}`),
+		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 		//		},
 		//	}
 		//	subset2 := appsv1alpha1.WorkloadSpreadSubset{
-		//		Name: "eci",
+		//		Name: "zone-b",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
 		//				{
-		//					Key:      "topology.kubernetes.io/zone",
+		//					Key:      TopologyLabelKey,
 		//					Operator: corev1.NodeSelectorOpIn,
-		//					Values:   []string{"eci"},
+		//					Values:   []string{"zone-b"},
 		//				},
 		//			},
 		//		},
 		//		MaxReplicas: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
 		//		Patch: runtime.RawExtension{
-		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"eci"}}}`),
+		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 		//		},
 		//	}
 		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
@@ -953,7 +980,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//})
 
 		// test k8s cluster version >= 1.21
-		//ginkgo.It("elastic deploy for deployment, ack=2, eci=nil", func() {
+		//ginkgo.It("elastic deploy for deployment, zone-a=2, zone-b=nil", func() {
 		//	deployment := tester.NewBaseDeployment(ns)
 		//	// create workloadSpread
 		//	targetRef := appsv1alpha1.TargetReference{
@@ -962,35 +989,35 @@ var _ = SIGDescribe("workloadspread", func() {
 		//		Name:       deployment.Name,
 		//	}
 		//	subset1 := appsv1alpha1.WorkloadSpreadSubset{
-		//		Name: "ack",
+		//		Name: "zone-a",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
 		//				{
-		//					Key:      "topology.kubernetes.io/zone",
+		//					Key:      TopologyLabelKey,
 		//					Operator: corev1.NodeSelectorOpIn,
-		//					Values:   []string{"ack"},
+		//					Values:   []string{"zone-a"},
 		//				},
 		//			},
 		//		},
 		//		MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
 		//		Patch: runtime.RawExtension{
-		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"ack"}}}`),
+		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 		//		},
 		//	}
 		//	subset2 := appsv1alpha1.WorkloadSpreadSubset{
-		//		Name: "eci",
+		//		Name: "zone-b",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
 		//				{
-		//					Key:      "topology.kubernetes.io/zone",
+		//					Key:      TopologyLabelKey,
 		//					Operator: corev1.NodeSelectorOpIn,
-		//					Values:   []string{"eci"},
+		//					Values:   []string{"zone-b"},
 		//				},
 		//			},
 		//		},
 		//		MaxReplicas: nil,
 		//		Patch: runtime.RawExtension{
-		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"eci"}}}`),
+		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 		//		},
 		//	}
 		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
@@ -1153,10 +1180,10 @@ var _ = SIGDescribe("workloadspread", func() {
 		//	gomega.Expect(subset1Pods).To(gomega.Equal(2))
 		//	gomega.Expect(subset2Pods).To(gomega.Equal(0))
 		//
-		//	ginkgo.By("elastic deploy for deployment, ack=2, eci=nil, done")
+		//	ginkgo.By("elastic deploy for deployment, zone-a=2, zone-b=nil, done")
 		//})
 
-		//ginkgo.It("deploy for job, ack=1, eci=nil", func() {
+		//ginkgo.It("deploy for job, zone-a=1, zone-b=nil", func() {
 		//	job := tester.NewBaseJob(ns)
 		//	// create workloadSpread
 		//	targetRef := appsv1alpha1.TargetReference{
@@ -1165,34 +1192,34 @@ var _ = SIGDescribe("workloadspread", func() {
 		//		Name:       job.Name,
 		//	}
 		//	subset1 := appsv1alpha1.WorkloadSpreadSubset{
-		//		Name: "ack",
+		//		Name: "zone-a",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
 		//				{
-		//					Key:      "topology.kubernetes.io/zone",
+		//					Key:      TopologyLabelKey,
 		//					Operator: corev1.NodeSelectorOpIn,
-		//					Values:   []string{"ack"},
+		//					Values:   []string{"zone-a"},
 		//				},
 		//			},
 		//		},
 		//		MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
 		//		Patch: runtime.RawExtension{
-		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"ack"}}}`),
+		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 		//		},
 		//	}
 		//	subset2 := appsv1alpha1.WorkloadSpreadSubset{
-		//		Name: "eci",
+		//		Name: "zone-b",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
 		//				{
-		//					Key:      "topology.kubernetes.io/zone",
+		//					Key:      TopologyLabelKey,
 		//					Operator: corev1.NodeSelectorOpIn,
-		//					Values:   []string{"eci"},
+		//					Values:   []string{"zone-b"},
 		//				},
 		//			},
 		//		},
 		//		Patch: runtime.RawExtension{
-		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"eci"}}}`),
+		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 		//		},
 		//	}
 		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})

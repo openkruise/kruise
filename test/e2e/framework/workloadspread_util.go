@@ -168,6 +168,17 @@ func (t *WorkloadSpreadTester) NewBaseDeployment(namespace string) *appsv1.Deplo
 	}
 }
 
+func (t *WorkloadSpreadTester) SetNodeLabel(c clientset.Interface, node *corev1.Node, key, value string) {
+	labels := node.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[key] = value
+	node.SetLabels(labels)
+	_, err := c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+}
+
 func (t *WorkloadSpreadTester) CreateWorkloadSpread(workloadSpread *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpread {
 	Logf("create WorkloadSpread (%s/%s)", workloadSpread.Namespace, workloadSpread.Name)
 	_, err := t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Create(context.TODO(), workloadSpread, metav1.CreateOptions{})
