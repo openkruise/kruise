@@ -164,14 +164,14 @@ type WorkloadSpreadSubsetStatus struct {
 	// Name should be unique between all of the subsets under one WorkloadSpread.
 	Name string `json:"name"`
 
-	// Replicas is the most recently observed number of replicas for subset.
+	// Replicas is the most recently observed number of active replicas for subset.
 	Replicas int32 `json:"replicas"`
 
 	// Conditions is an array of current observed subset conditions.
 	// +optional
 	Conditions []WorkloadSpreadSubsetCondition `json:"conditions,omitempty"`
 
-	// MissingReplicas is the number of replicas belong to this subset not be found.
+	// MissingReplicas is the number of active replicas belong to this subset not be found.
 	// MissingReplicas > 0 indicates the subset is still missing MissingReplicas pods to create
 	// MissingReplicas = 0 indicates the subset already has enough pods, there is no need to create
 	// MissingReplicas = -1 indicates the subset's MaxReplicas not set, then there is no limit for pods number

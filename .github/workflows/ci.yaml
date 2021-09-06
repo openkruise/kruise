@@ -415,6 +415,9 @@ jobs:
           fi
       - name: Run E2E Tests
         run: |
+          kubectl label nodes ${KIND_CLUSTER_NAME}-worker topology.kubernetes.io/zone=ack
+          kubectl label nodes ${KIND_CLUSTER_NAME}-worker2 topology.kubernetes.io/zone=eci
+          kubectl label nodes ${KIND_CLUSTER_NAME}-worker3 topology.kubernetes.io/zone=eci
           export KUBECONFIG=/home/runner/.kube/config
           go install github.com/onsi/ginkgo/ginkgo
           ./scripts/generate_bindata.sh

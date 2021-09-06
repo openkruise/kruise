@@ -406,7 +406,6 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 	// current subsetStatus in this reconcile
 	subsetStatus := &appsv1alpha1.WorkloadSpreadSubsetStatus{}
 	subsetStatus.Name = subset.Name
-	subsetStatus.Replicas = int32(len(pods))
 	subsetStatus.CreatingPods = make(map[string]metav1.Time)
 	subsetStatus.DeletingPods = make(map[string]metav1.Time)
 
@@ -437,6 +436,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 		}
 		oldDeletingPods = oldSubsetStatus.DeletingPods
 	}
+	var active int32 = 0
 
 	for _, pod := range pods {
 		// remove this Pod from creatingPods map because this Pod has been created.
@@ -454,6 +454,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 		if !kubecontroller.IsPodActive(pod) {
 			continue
 		}
+		active++
 
 		// count missingReplicas
 		if subsetStatus.MissingReplicas > 0 {
@@ -481,6 +482,9 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 			}
 		}
 	}
+
+	// record active replicas number
+	subsetStatus.Replicas = active
 
 	// oldCreatingPods has remaining Pods that not be found by controller.
 	for podID, createTime := range oldCreatingPods {
