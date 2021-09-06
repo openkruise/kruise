@@ -43,9 +43,9 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 - [Deletion Protection](https://openkruise.io/zh-cn/docs/deletion_protection.html): 该功能提供了删除安全策略，用来在 Kubernetes 级联删除的机制下保护用户的资源和应用可用性。
 
-- [PodUnavailableBudget](https://openkruise.io/zh-cn/docs/podunavailablebudget.html): In voluntary disruption scenarios, PodUnavailableBudget can achieve the effect of preventing application disruption or SLA degradation, which greatly improves the high availability of application services.
+- [PodUnavailableBudget](https://openkruise.io/zh-cn/docs/podunavailablebudget.html): 从 Pod 驱逐/删除/原地升级等全方位场景下保护应用的存活 SLA，提升服务的高可用性。
 
-- [WorkloadSpread](https://openkruise.io/zh-cn/docs/workloadspread.html): Constrain the spread of stateless workload, which empower single workload the abilities for multi-domain deploy and elastic deploy.
+- [WorkloadSpread](https://openkruise.io/zh-cn/docs/workloadspread.html): 约束无状态 workload 的区域分布，赋予单一 workload 的多区域和弹性部署的能力。
 
 ## 核心功能
 
