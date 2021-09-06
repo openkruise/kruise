@@ -74,7 +74,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			workers = append(workers, &node)
 		}
-		gomega.Expect(len(workers) >= 2).Should(gomega.Equal(true))
+		gomega.Expect(len(workers) > 2).Should(gomega.Equal(true))
 		// subset-a
 		worker0 := workers[0]
 		tester.SetNodeLabel(c, worker0, TopologyLabelKey, "zone-a")

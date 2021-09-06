@@ -454,8 +454,8 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 		if !kubecontroller.IsPodActive(pod) {
 			continue
 		}
-		active++
 
+		active++
 		// count missingReplicas
 		if subsetStatus.MissingReplicas > 0 {
 			subsetStatus.MissingReplicas--
