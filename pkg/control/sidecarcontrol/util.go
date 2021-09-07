@@ -88,10 +88,7 @@ func IsActivePod(pod *corev1.Pod) bool {
 			return false
 		}
 	}
-	if pod.ObjectMeta.GetDeletionTimestamp() != nil {
-		return false
-	}
-	return true
+	return kubecontroller.IsPodActive(pod)
 }
 
 func GetSidecarSetRevision(sidecarSet *appsv1alpha1.SidecarSet) string {
