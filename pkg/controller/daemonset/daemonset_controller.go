@@ -268,7 +268,7 @@ type ReconcileDaemonSet struct {
 
 // Reconcile reads that state of the cluster for a DaemonSet object and makes changes based on the state read
 // and what is in the DaemonSet.Spec
-func (dsc *ReconcileDaemonSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (dsc *ReconcileDaemonSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing DaemonSet %q (%v)", request.String(), time.Since(startTime))

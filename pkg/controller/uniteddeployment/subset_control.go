@@ -117,7 +117,7 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 
 // DeleteSubset is called to delete the subset. The target Subset workload can be found with the input subset.
 func (m *SubsetControl) DeleteSubset(subSet *Subset) error {
-	set := subSet.Spec.SubsetRef.Resources[0].(runtime.Object)
+	set := subSet.Spec.SubsetRef.Resources[0].(client.Object)
 	return m.Delete(context.TODO(), set, client.PropagationPolicy(metav1.DeletePropagationBackground))
 }
 

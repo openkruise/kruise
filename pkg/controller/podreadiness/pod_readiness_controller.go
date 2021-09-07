@@ -94,7 +94,7 @@ type ReconcilePodReadiness struct {
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 
-func (r *ReconcilePodReadiness) Reconcile(request reconcile.Request) (res reconcile.Result, err error) {
+func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
 	klog.V(3).Infof("Starting to process Pod %v", request.NamespacedName)
 	defer func() {

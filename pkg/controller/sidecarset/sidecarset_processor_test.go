@@ -172,7 +172,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 		t.Run(cs.name, func(t *testing.T) {
 			pods := cs.getPods()
 			sidecarset := cs.getSidecarset()
-			fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarset, pods[0], pods[1])
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pods[0], pods[1]).Build()
 			processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
 			_, err := processor.UpdateSidecarSet(sidecarset)
 			if err != nil {
@@ -239,7 +239,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 func TestScopeNamespacePods(t *testing.T) {
 	sidecarSet := sidecarSetDemo.DeepCopy()
 	sidecarSet.Spec.Namespace = "test-ns"
-	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSet)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).Build()
 	for i := 0; i < 100; i++ {
 		pod := podDemo.DeepCopy()
 		pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -268,7 +268,7 @@ func TestCanUpgradePods(t *testing.T) {
 		Type:   intstr.String,
 		StrVal: "50%",
 	}
-	fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarSet)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).Build()
 	pods := factoryPodsCommon(100, 0, sidecarSet)
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	for i := range pods {

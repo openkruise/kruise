@@ -20,7 +20,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +82,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionRe
 	// 3. dry run to check resource
 	mice := resource.DeepCopyObject()
 	ConvertToUnstructured(mice).SetNamespace(DefaultNamespace)
-	if err := h.Client.Create(context.TODO(), mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
+	if err := h.Client.Create(context.TODO(), mice.(client.Object), &client.CreateOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
 		return append(allErrs, field.InternalError(fldPath, fmt.Errorf("dry-run to validate resource failed, err: %v", err)))
 	}
 	return
@@ -149,7 +149,7 @@ func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, re
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	var oldObj *appsv1alpha1.ResourceDistribution
-	if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+	if req.AdmissionRequest.Operation == admissionv1.Update {
 		oldObj = &appsv1alpha1.ResourceDistribution{}
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)

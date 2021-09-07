@@ -17,15 +17,17 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"fmt"
 	"time"
+
+	"k8s.io/client-go/rest"
 
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
 	"github.com/openkruise/kruise/pkg/webhook/util/health"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -107,19 +109,13 @@ func SetupWithManager(mgr manager.Manager) error {
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;update;patch
 
-func Initialize(mgr manager.Manager, stopCh <-chan struct{}) error {
-	cli := &client.DelegatingClient{
-		Reader:       mgr.GetAPIReader(),
-		Writer:       mgr.GetClient(),
-		StatusClient: mgr.GetClient(),
-	}
-
-	c, err := webhookcontroller.New(mgr.GetConfig(), cli, HandlerMap)
+func Initialize(ctx context.Context, cfg *rest.Config) error {
+	c, err := webhookcontroller.New(cfg, HandlerMap)
 	if err != nil {
 		return err
 	}
 	go func() {
-		c.Start(stopCh)
+		c.Start(ctx)
 	}()
 
 	timer := time.NewTimer(time.Second * 20)

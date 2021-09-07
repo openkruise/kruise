@@ -126,7 +126,7 @@ type ReconcileSidecarSet struct {
 
 // Reconcile reads that state of the cluster for a SidecarSet object and makes changes based on the state read
 // and what is in the SidecarSet.Spec
-func (r *ReconcileSidecarSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileSidecarSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the SidecarSet instance
 	sidecarSet := &appsv1alpha1.SidecarSet{}
 	err := r.Get(context.TODO(), request.NamespacedName, sidecarSet)

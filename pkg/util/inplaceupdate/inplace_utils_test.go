@@ -433,7 +433,7 @@ func TestRefresh(t *testing.T) {
 		testCase.expectedPod.APIVersion = "v1"
 		testCase.expectedPod.Kind = "Pod"
 
-		cli := fake.NewFakeClient(testCase.pod)
+		cli := fake.NewClientBuilder().WithObjects(testCase.pod).Build()
 		ctrl := NewForTest(cli, revisionadapter.NewDefaultImpl(), func() metav1.Time { return aHourAgo })
 		if res := ctrl.Refresh(testCase.pod, nil); res.RefreshErr != nil {
 			t.Fatalf("failed to update condition: %v", res.RefreshErr)
@@ -444,6 +444,7 @@ func TestRefresh(t *testing.T) {
 			t.Fatalf("failed to get pod: %v", err)
 		}
 
+		testCase.expectedPod.ResourceVersion = got.ResourceVersion
 		if !reflect.DeepEqual(testCase.expectedPod, got) {
 			t.Fatalf("case %s failed, expected \n%v got \n%v", testCase.name, util.DumpJSON(testCase.expectedPod), util.DumpJSON(got))
 		}

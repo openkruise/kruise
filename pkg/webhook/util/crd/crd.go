@@ -21,13 +21,24 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/openkruise/kruise/apis"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+var (
+	kruiseScheme = runtime.NewScheme()
+)
+
+func init() {
+	_ = apis.AddToScheme(kruiseScheme)
+}
 
 func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters.CustomResourceDefinitionLister, caBundle []byte) error {
 	crdList, err := lister.List(labels.Everything())
@@ -35,7 +46,7 @@ func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters
 		return fmt.Errorf("failed to list crds: %v", err)
 	}
 
-	webhookConfig := apiextensionsv1beta1.WebhookClientConfig{
+	webhookConfig := apiextensionsv1.WebhookClientConfig{
 		CABundle: caBundle,
 	}
 	path := "/convert"
@@ -44,7 +55,7 @@ func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters
 		webhookConfig.URL = &url
 	} else {
 		var port int32 = 443
-		webhookConfig.Service = &apiextensionsv1beta1.ServiceReference{
+		webhookConfig.Service = &apiextensionsv1.ServiceReference{
 			Namespace: webhookutil.GetNamespace(),
 			Name:      webhookutil.GetServiceName(),
 			Port:      &port,
@@ -53,17 +64,20 @@ func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters
 	}
 
 	for _, crd := range crdList {
-		if crd.Spec.Group != "apps.kruise.io" {
+		if len(crd.Spec.Versions) == 0 || crd.Spec.Conversion == nil || crd.Spec.Conversion.Strategy != apiextensionsv1.WebhookConverter {
 			continue
 		}
-		if crd.Spec.Conversion == nil || crd.Spec.Conversion.Strategy != apiextensionsv1beta1.WebhookConverter {
+		if !kruiseScheme.Recognizes(schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Kind: crd.Spec.Names.Kind}) {
 			continue
 		}
 
-		if !reflect.DeepEqual(crd.Spec.Conversion.WebhookClientConfig, webhookConfig) {
+		if crd.Spec.Conversion.Webhook == nil || !reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig, webhookConfig) {
 			newCRD := crd.DeepCopy()
-			newCRD.Spec.Conversion.WebhookClientConfig = webhookConfig.DeepCopy()
-			if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), newCRD, metav1.UpdateOptions{}); err != nil {
+			newCRD.Spec.Conversion.Webhook = &apiextensionsv1.WebhookConversion{
+				ClientConfig:             webhookConfig.DeepCopy(),
+				ConversionReviewVersions: []string{"v1", "v1beta1"},
+			}
+			if _, err := client.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), newCRD, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("failed to update CRD %s: %v", newCRD.Name, err)
 			}
 		}

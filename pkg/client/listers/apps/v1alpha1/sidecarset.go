@@ -25,10 +25,13 @@ import (
 )
 
 // SidecarSetLister helps list SidecarSets.
+// All objects returned here must be treated as read-only.
 type SidecarSetLister interface {
 	// List lists all SidecarSets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.SidecarSet, err error)
 	// Get retrieves the SidecarSet from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.SidecarSet, error)
 	SidecarSetListerExpansion
 }

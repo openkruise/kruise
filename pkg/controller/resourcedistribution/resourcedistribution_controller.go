@@ -132,7 +132,7 @@ type ReconcileResourceDistribution struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.6.4/pkg/reconcile
-func (r *ReconcileResourceDistribution) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ReconcileResourceDistribution) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	klog.V(3).Infof("ResourceDistribution(%s) begin to reconcile", req.NamespacedName.Name)
 	// fetch resourcedistribution instance as distributor
 	distributor := &appsv1alpha1.ResourceDistribution{}
@@ -202,7 +202,7 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1al
 		}
 
 		// 2. if resource doesn't exist, create resource;
-		newResource := makeResourceObject(distributor, namespace, resource, newResourceHashCode)
+		newResource := makeResourceObject(distributor, namespace, resource, newResourceHashCode).(client.Object)
 		if getErr != nil && errors.IsNotFound(getErr) {
 			if createErr := r.Client.Create(context.TODO(), newResource); createErr != nil {
 				klog.Errorf("Error occurred when creating resource in namespace %s, err： %v, name: %s", namespace, createErr, distributor.Name)

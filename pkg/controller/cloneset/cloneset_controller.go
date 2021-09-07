@@ -174,7 +174,7 @@ type ReconcileCloneSet struct {
 
 // Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
 // and what is in the CloneSet.Spec
-func (r *ReconcileCloneSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileCloneSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	return r.reconcileFunc(request)
 }
 

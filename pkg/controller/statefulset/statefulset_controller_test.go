@@ -18,6 +18,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -894,7 +895,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 	if err != nil {
 		return err
 	}
-	_, err = ssc.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{
+	_, err = ssc.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}})

@@ -70,7 +70,7 @@ func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.AdvancedCronJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -109,7 +109,7 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.AdvancedCronJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -122,8 +122,8 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createReconcileJob(scheme *runtime.Scheme, initObjs ...runtime.Object) ReconcileAdvancedCronJob {
-	fakeClient := fake.NewFakeClientWithScheme(scheme, initObjs...)
+func createReconcileJob(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileAdvancedCronJob {
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjs...).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "advancedcronjob-controller"})
 	reconcileJob := ReconcileAdvancedCronJob{

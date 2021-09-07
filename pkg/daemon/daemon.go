@@ -62,7 +62,7 @@ func init() {
 
 // Daemon is interface for process to run every node
 type Daemon interface {
-	Run(stop <-chan struct{}) error
+	Run(ctx context.Context) error
 }
 
 type daemon struct {
@@ -170,20 +170,20 @@ func newPodInformer(client clientset.Interface, nodeName string) cache.SharedInd
 	)
 }
 
-func (d *daemon) Run(stop <-chan struct{}) error {
+func (d *daemon) Run(ctx context.Context) error {
 	if d.podInformer != nil {
-		go d.podInformer.Run(stop)
-		if !cache.WaitForCacheSync(stop, d.podInformer.HasSynced) {
+		go d.podInformer.Run(ctx.Done())
+		if !cache.WaitForCacheSync(ctx.Done(), d.podInformer.HasSynced) {
 			return fmt.Errorf("error waiting for pod informer synced")
 		}
 	}
 
-	go d.serve(stop)
-	go d.pullerController.Run(stop)
-	go d.crrController.Run(stop)
+	go d.serve(ctx)
+	go d.pullerController.Run(ctx.Done())
+	go d.crrController.Run(ctx.Done())
 
 	select {
-	case <-stop:
+	case <-ctx.Done():
 		// We are done
 		return nil
 	case <-d.errSignal.GotError():
@@ -192,7 +192,7 @@ func (d *daemon) Run(stop <-chan struct{}) error {
 	}
 }
 
-func (d *daemon) serve(stop <-chan struct{}) {
+func (d *daemon) serve(ctx context.Context) {
 	handler := promhttp.HandlerFor(metrics.Registry, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.HTTPErrorOnError,
 	})
@@ -210,7 +210,7 @@ func (d *daemon) serve(stop <-chan struct{}) {
 	}()
 
 	// Shutdown the server when stop is closed
-	<-stop
+	<-ctx.Done()
 	if err := server.Shutdown(context.Background()); err != nil {
 		d.errSignal.SignalError(err)
 	}

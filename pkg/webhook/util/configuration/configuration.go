@@ -21,12 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	"k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apimachinery/pkg/types"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -35,15 +37,17 @@ const (
 	validatingWebhookConfigurationName = "kruise-validating-webhook-configuration"
 )
 
-func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []byte) error {
-	mutatingConfig := &v1beta1.MutatingWebhookConfiguration{}
-	if err := c.Get(context.TODO(), types.NamespacedName{Name: mutatingWebhookConfigurationName}, mutatingConfig); err != nil {
+func Ensure(kubeClient clientset.Interface, handlers map[string]admission.Handler, caBundle []byte) error {
+	mutatingConfig, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), mutatingWebhookConfigurationName, metav1.GetOptions{})
+	if err != nil {
 		return fmt.Errorf("not found MutatingWebhookConfiguration %s", mutatingWebhookConfigurationName)
 	}
-	validatingConfig := &v1beta1.ValidatingWebhookConfiguration{}
-	if err := c.Get(context.TODO(), types.NamespacedName{Name: validatingWebhookConfigurationName}, validatingConfig); err != nil {
+	validatingConfig, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.TODO(), validatingWebhookConfigurationName, metav1.GetOptions{})
+	if err != nil {
 		return fmt.Errorf("not found ValidatingWebhookConfiguration %s", validatingWebhookConfigurationName)
 	}
+	oldMutatingConfig := mutatingConfig.DeepCopy()
+	oldValidatingConfig := validatingConfig.DeepCopy()
 
 	mutatingTemplate, err := parseMutatingTemplate(mutatingConfig)
 	if err != nil {
@@ -54,7 +58,7 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 		return err
 	}
 
-	var mutatingWHs []v1beta1.MutatingWebhook
+	var mutatingWHs []admissionregistrationv1.MutatingWebhook
 	for i := range mutatingTemplate {
 		wh := &mutatingTemplate[i]
 		wh.ClientConfig.CABundle = caBundle
@@ -77,7 +81,7 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 	}
 	mutatingConfig.Webhooks = mutatingWHs
 
-	var validatingWHs []v1beta1.ValidatingWebhook
+	var validatingWHs []admissionregistrationv1.ValidatingWebhook
 	for i := range validatingTemplate {
 		wh := &validatingTemplate[i]
 		wh.ClientConfig.CABundle = caBundle
@@ -100,17 +104,22 @@ func Ensure(c client.Client, handlers map[string]admission.Handler, caBundle []b
 	}
 	validatingConfig.Webhooks = validatingWHs
 
-	if err := c.Update(context.TODO(), validatingConfig); err != nil {
-		return fmt.Errorf("failed to update %s: %v", validatingWebhookConfigurationName, err)
+	if !reflect.DeepEqual(mutatingConfig, oldMutatingConfig) {
+		if _, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.TODO(), mutatingConfig, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to update %s: %v", mutatingWebhookConfigurationName, err)
+		}
 	}
-	if err := c.Update(context.TODO(), mutatingConfig); err != nil {
-		return fmt.Errorf("failed to update %s: %v", mutatingWebhookConfigurationName, err)
+
+	if !reflect.DeepEqual(validatingConfig, oldValidatingConfig) {
+		if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.TODO(), validatingConfig, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to update %s: %v", validatingWebhookConfigurationName, err)
+		}
 	}
 
 	return nil
 }
 
-func getPath(clientConfig *v1beta1.WebhookClientConfig) (string, error) {
+func getPath(clientConfig *admissionregistrationv1.WebhookClientConfig) (string, error) {
 	if clientConfig.Service != nil {
 		return *clientConfig.Service.Path, nil
 	} else if clientConfig.URL != nil {
@@ -123,15 +132,15 @@ func getPath(clientConfig *v1beta1.WebhookClientConfig) (string, error) {
 	return "", fmt.Errorf("invalid clientConfig: %+v", clientConfig)
 }
 
-func convertClientConfig(clientConfig *v1beta1.WebhookClientConfig, host string, port int) {
+func convertClientConfig(clientConfig *admissionregistrationv1.WebhookClientConfig, host string, port int) {
 	url := fmt.Sprintf("https://%s:%d%s", host, port, *clientConfig.Service.Path)
 	clientConfig.URL = &url
 	clientConfig.Service = nil
 }
 
-func parseMutatingTemplate(mutatingConfig *v1beta1.MutatingWebhookConfiguration) ([]v1beta1.MutatingWebhook, error) {
+func parseMutatingTemplate(mutatingConfig *admissionregistrationv1.MutatingWebhookConfiguration) ([]admissionregistrationv1.MutatingWebhook, error) {
 	if templateStr := mutatingConfig.Annotations["template"]; len(templateStr) > 0 {
-		var mutatingWHs []v1beta1.MutatingWebhook
+		var mutatingWHs []admissionregistrationv1.MutatingWebhook
 		if err := json.Unmarshal([]byte(templateStr), &mutatingWHs); err != nil {
 			return nil, err
 		}
@@ -149,9 +158,9 @@ func parseMutatingTemplate(mutatingConfig *v1beta1.MutatingWebhookConfiguration)
 	return mutatingConfig.Webhooks, nil
 }
 
-func parseValidatingTemplate(validatingConfig *v1beta1.ValidatingWebhookConfiguration) ([]v1beta1.ValidatingWebhook, error) {
+func parseValidatingTemplate(validatingConfig *admissionregistrationv1.ValidatingWebhookConfiguration) ([]admissionregistrationv1.ValidatingWebhook, error) {
 	if templateStr := validatingConfig.Annotations["template"]; len(templateStr) > 0 {
-		var validatingWHs []v1beta1.ValidatingWebhook
+		var validatingWHs []admissionregistrationv1.ValidatingWebhook
 		if err := json.Unmarshal([]byte(templateStr), &validatingWHs); err != nil {
 			return nil, err
 		}

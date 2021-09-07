@@ -18,7 +18,7 @@ package validating
 
 import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-// +kubebuilder:webhook:path=/validate-namespace,mutating=false,failurePolicy=fail,groups="",resources=namespaces,verbs=delete,versions=v1,name=vnamespace.kb.io
+// +kubebuilder:webhook:path=/validate-namespace,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups="",resources=namespaces,verbs=delete,versions=v1,name=vnamespace.kb.io
 
 var (
 	// HandlerMap contains admission webhook handlers

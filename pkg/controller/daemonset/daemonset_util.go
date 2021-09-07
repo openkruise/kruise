@@ -26,7 +26,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -99,22 +97,6 @@ func NodeShouldRunDaemonPod(node *corev1.Node, ds *appsv1alpha1.DaemonSet) (bool
 	}
 
 	return true, true, nil
-}
-
-func newSchedulerNodeInfo(node *corev1.Node) *schedulernodeinfo.NodeInfo {
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
-	if extraAllowedPodNumber > 0 {
-		rQuant, ok := node.Status.Allocatable[corev1.ResourcePods]
-		if ok {
-			rQuant.Add(*resource.NewQuantity(extraAllowedPodNumber, resource.DecimalSI))
-			nodeCopy := node.DeepCopy()
-			nodeCopy.Status.Allocatable[corev1.ResourcePods] = rQuant
-			nodeInfo.SetNode(nodeCopy)
-			return nodeInfo
-		}
-	}
-	nodeInfo.SetNode(node)
-	return nodeInfo
 }
 
 func ShouldIgnoreNodeUpdate(oldNode, curNode corev1.Node) bool {

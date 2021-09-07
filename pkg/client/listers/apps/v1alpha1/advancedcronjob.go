@@ -25,8 +25,10 @@ import (
 )
 
 // AdvancedCronJobLister helps list AdvancedCronJobs.
+// All objects returned here must be treated as read-only.
 type AdvancedCronJobLister interface {
 	// List lists all AdvancedCronJobs in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.AdvancedCronJob, err error)
 	// AdvancedCronJobs returns an object that can list and get AdvancedCronJobs.
 	AdvancedCronJobs(namespace string) AdvancedCronJobNamespaceLister
@@ -57,10 +59,13 @@ func (s *advancedCronJobLister) AdvancedCronJobs(namespace string) AdvancedCronJ
 }
 
 // AdvancedCronJobNamespaceLister helps list and get AdvancedCronJobs.
+// All objects returned here must be treated as read-only.
 type AdvancedCronJobNamespaceLister interface {
 	// List lists all AdvancedCronJobs in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.AdvancedCronJob, err error)
 	// Get retrieves the AdvancedCronJob from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.AdvancedCronJob, error)
 	AdvancedCronJobNamespaceListerExpansion
 }

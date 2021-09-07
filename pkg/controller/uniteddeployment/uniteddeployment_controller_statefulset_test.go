@@ -50,10 +50,10 @@ var (
 )
 
 func TestStsReconcile(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -131,10 +131,10 @@ func TestStsReconcile(t *testing.T) {
 }
 
 func TestStsSubsetProvision(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -329,10 +329,10 @@ func TestStsSubsetProvision(t *testing.T) {
 }
 
 func TestStsSubsetProvisionWithToleration(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -435,10 +435,10 @@ func TestStsSubsetProvisionWithToleration(t *testing.T) {
 }
 
 func TestStsDupSubset(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -525,10 +525,10 @@ func TestStsDupSubset(t *testing.T) {
 }
 
 func TestStsScale(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -668,10 +668,10 @@ func TestStsScale(t *testing.T) {
 }
 
 func TestStsUpdate(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -787,10 +787,10 @@ func TestStsUpdate(t *testing.T) {
 }
 
 func TestStsRollingUpdatePartition(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -969,10 +969,10 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 }
 
 func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -1100,10 +1100,10 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 }
 
 func TestStsOnDelete(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -1251,10 +1251,10 @@ func TestStsOnDelete(t *testing.T) {
 }
 
 func TestStsSubsetCount(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -1603,7 +1603,7 @@ func expectedStsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, 
 	return stsList
 }
 
-func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, chan struct{}, *sync.WaitGroup) {
+func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, context.CancelFunc, *sync.WaitGroup) {
 	g := gomega.NewGomegaWithT(t)
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
@@ -1612,9 +1612,10 @@ func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, chan stru
 	c = util.NewClientFromManager(mgr, "test-uniteddeployment-controller")
 	recFn, requests := SetupTestReconcile(newReconciler(mgr))
 	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
-	stopMgr, mgrStopped := StartTestManager(mgr, g)
+	ctx, cancel := context.WithCancel(context.Background())
+	mgrStopped := StartTestManager(ctx, mgr, g)
 
-	return g, requests, stopMgr, mgrStopped
+	return g, requests, cancel, mgrStopped
 }
 
 // clean can be shared amongst all subset workload tests (i.e. statefulsets, deployments, advancedStatefulsets, etc.).
@@ -1727,3 +1728,5 @@ func clean(g *gomega.GomegaWithT, c client.Client) {
 		return nil
 	}, timeout, time.Second).Should(gomega.Succeed())
 }
+
+type TestCaseFunc func(t *testing.T, g *gomega.GomegaWithT, namespace string, requests chan reconcile.Request)

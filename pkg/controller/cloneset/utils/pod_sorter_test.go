@@ -24,9 +24,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -148,7 +148,7 @@ func TestSameNodeRanker(t *testing.T) {
 }
 
 func TestSpreadConstraintsRanker(t *testing.T) {
-	nodes := []runtime.Object{
+	nodes := []client.Object{
 		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "a", Labels: map[string]string{}}},
 		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "b", Labels: map[string]string{v1.LabelHostname: "b", v1.LabelZoneFailureDomain: "z1"}}},
 		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "c", Labels: map[string]string{v1.LabelHostname: "c", v1.LabelZoneFailureDomain: "z1"}}},
@@ -175,7 +175,7 @@ func TestSpreadConstraintsRanker(t *testing.T) {
 	pods = append(pods, genPods(3, "f")...)
 	pods = append(pods, genPods(5, "i")...)
 
-	fakeClient := fake.NewFakeClientWithScheme(clientgoscheme.Scheme, nodes...)
+	fakeClient := fake.NewClientBuilder().WithScheme(clientgoscheme.Scheme).WithObjects(nodes...).Build()
 
 	// z1: 10 pods (b: 2, c: 3, d: 5)
 	// z2: 8  pods (e: 5, f: 3)

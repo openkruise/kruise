@@ -19,15 +19,16 @@ package adapter
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 type Adapter interface {
 	// NewResourceObject creates a empty subset object.
-	NewResourceObject() runtime.Object
+	NewResourceObject() client.Object
 	// NewResourceListObject creates a empty subset list object.
-	NewResourceListObject() runtime.Object
+	NewResourceListObject() client.ObjectList
 	// GetStatusObservedGeneration returns the observed generation of the subset.
 	GetStatusObservedGeneration(subset metav1.Object) int64
 	// GetReplicaDetails returns the replicas information of the subset status.

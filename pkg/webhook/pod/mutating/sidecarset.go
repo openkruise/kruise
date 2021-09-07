@@ -27,7 +27,7 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,7 +39,7 @@ import (
 // mutate pod based on SidecarSet Object
 func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
 	if len(req.AdmissionRequest.SubResource) > 0 ||
-		(req.AdmissionRequest.Operation != admissionv1beta1.Create && req.AdmissionRequest.Operation != admissionv1beta1.Update) ||
+		(req.AdmissionRequest.Operation != admissionv1.Create && req.AdmissionRequest.Operation != admissionv1.Update) ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
 		return nil
 	}
@@ -53,11 +53,11 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	var oldPod *corev1.Pod
 	var isUpdated bool
 	//when Operation is update, decode older object
-	if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+	if req.AdmissionRequest.Operation == admissionv1.Update {
 		isUpdated = true
 		oldPod = new(corev1.Pod)
 		if err := h.Decoder.Decode(
-			admission.Request{AdmissionRequest: admissionv1beta1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
+			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			oldPod); err != nil {
 			return err
 		}

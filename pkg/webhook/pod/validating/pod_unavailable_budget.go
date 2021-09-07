@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +57,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	newPod = &corev1.Pod{}
 	switch req.AdmissionRequest.Operation {
 	// filter out invalid Update operation, we only validate update Pod.MetaData, Pod.Spec
-	case admissionv1beta1.Update:
+	case admissionv1.Update:
 		//decode new pod
 		err := p.Decoder.Decode(req, newPod)
 		if err != nil {
@@ -65,7 +65,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		oldPod = &corev1.Pod{}
 		if err = p.Decoder.Decode(
-			admission.Request{AdmissionRequest: admissionv1beta1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
+			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			oldPod); err != nil {
 			return false, "", err
 		}
@@ -79,7 +79,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		dryRun = dryrun.IsDryRun(options.DryRun)
 
 	// filter out invalid Delete operation, only validate delete pods resources
-	case admissionv1beta1.Delete:
+	case admissionv1.Delete:
 		if req.AdmissionRequest.SubResource != "" {
 			klog.V(6).Infof("pod(%s.%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
 			return true, "", nil
@@ -110,7 +110,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 
 	// filter out invalid Create operation, only validate create pod eviction subresource
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		// ignore create operation other than subresource eviction
 		if req.AdmissionRequest.SubResource != "eviction" {
 			klog.V(6).Infof("pod(%s.%s) AdmissionRequest operation(CREATE) Resource(%s) subResource(%s), then admit", req.Namespace, req.Name, req.Resource, req.SubResource)
@@ -154,7 +154,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	klog.V(3).Infof("validating pod(%s.%s) operation(%s) for pub(%s.%s)", newPod.Namespace, newPod.Name, req.Operation, pub.Namespace, pub.Name)
 
 	// the change will not cause pod unavailability, then pass
-	if req.Operation == admissionv1beta1.Update && !control.IsPodUnavailableChanged(oldPod, newPod) {
+	if req.Operation == admissionv1.Update && !control.IsPodUnavailableChanged(oldPod, newPod) {
 		klog.V(3).Infof("validate pod(%s.%s) changed cannot cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
 		return true, "", nil
 	}

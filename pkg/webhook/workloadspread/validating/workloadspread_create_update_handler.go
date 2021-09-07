@@ -20,7 +20,7 @@ import (
 	"context"
 	"net/http"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -48,14 +48,14 @@ func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admi
 	oldObj := &appsv1alpha1.WorkloadSpread{}
 
 	switch req.AdmissionRequest.Operation {
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		if allErrs := h.validatingWorkloadSpreadFn(obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 		}
-	case admissionv1beta1.Update:
+	case admissionv1.Update:
 		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}

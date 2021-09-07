@@ -23,7 +23,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -92,7 +91,7 @@ type workloadEventHandler struct {
 }
 
 func (w workloadEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	w.handleWorkload(q, evt.Object, evt.Meta, CreateEventAction)
+	w.handleWorkload(q, evt.Object, CreateEventAction)
 }
 
 func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
@@ -124,8 +123,8 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 	// workload replicas changed, and reconcile corresponding WorkloadSpread
 	if oldReplicas != newReplicas {
 		workloadNsn := types.NamespacedName{
-			Namespace: evt.MetaNew.GetNamespace(),
-			Name:      evt.MetaNew.GetName(),
+			Namespace: evt.ObjectNew.GetNamespace(),
+			Name:      evt.ObjectNew.GetName(),
 		}
 		ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk)
 		if err != nil {
@@ -143,14 +142,14 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 }
 
 func (w workloadEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	w.handleWorkload(q, evt.Object, evt.Meta, DeleteEventAction)
+	w.handleWorkload(q, evt.Object, DeleteEventAction)
 }
 
 func (w workloadEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
 func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
-	obj runtime.Object, meta metav1.Object, action EventAction) {
+	obj client.Object, action EventAction) {
 	var gvk schema.GroupVersionKind
 	switch obj.(type) {
 	case *appsalphav1.CloneSet:
@@ -166,8 +165,8 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 	}
 
 	workloadNsn := types.NamespacedName{
-		Namespace: meta.GetNamespace(),
-		Name:      meta.GetName(),
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
 	}
 	ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk)
 	if err != nil {

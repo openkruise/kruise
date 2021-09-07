@@ -25,8 +25,10 @@ import (
 )
 
 // WorkloadSpreadLister helps list WorkloadSpreads.
+// All objects returned here must be treated as read-only.
 type WorkloadSpreadLister interface {
 	// List lists all WorkloadSpreads in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.WorkloadSpread, err error)
 	// WorkloadSpreads returns an object that can list and get WorkloadSpreads.
 	WorkloadSpreads(namespace string) WorkloadSpreadNamespaceLister
@@ -57,10 +59,13 @@ func (s *workloadSpreadLister) WorkloadSpreads(namespace string) WorkloadSpreadN
 }
 
 // WorkloadSpreadNamespaceLister helps list and get WorkloadSpreads.
+// All objects returned here must be treated as read-only.
 type WorkloadSpreadNamespaceLister interface {
 	// List lists all WorkloadSpreads in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.WorkloadSpread, err error)
 	// Get retrieves the WorkloadSpread from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.WorkloadSpread, error)
 	WorkloadSpreadNamespaceListerExpansion
 }

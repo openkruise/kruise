@@ -5,7 +5,8 @@
 *.dll
 *.so
 *.dylib
-bin
+bin/
+testbin/
 .temp
 
 # Test binary, build with `go test -c`

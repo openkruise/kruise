@@ -25,7 +25,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -187,7 +187,7 @@ type $.type|public$ map[$.type|raw$]Empty
 
 // New$.type|public$ creates a $.type|public$ from a list of values.
 func New$.type|public$(items ...$.type|raw$) $.type|public$ {
-	ss := $.type|public${}
+	ss := make($.type|public$, len(items))
 	ss.Insert(items...)
 	return ss
 }

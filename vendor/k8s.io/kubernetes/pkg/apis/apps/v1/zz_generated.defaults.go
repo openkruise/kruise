@@ -21,6 +21,8 @@ limitations under the License.
 package v1
 
 import (
+	"reflect"
+
 	v1 "k8s.io/api/apps/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -94,13 +96,22 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 		if a.VolumeSource.ScaleIO != nil {
 			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Ephemeral != nil {
+			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+			}
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -148,7 +159,9 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -193,9 +206,12 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -301,13 +317,22 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 		if a.VolumeSource.ScaleIO != nil {
 			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Ephemeral != nil {
+			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+			}
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -355,7 +380,9 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -400,9 +427,12 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -508,13 +538,22 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 		if a.VolumeSource.ScaleIO != nil {
 			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Ephemeral != nil {
+			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+			}
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -562,7 +601,9 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -607,9 +648,12 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -715,13 +759,22 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 		if a.VolumeSource.ScaleIO != nil {
 			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Ephemeral != nil {
+			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
+				corev1.SetDefaults_PersistentVolumeClaimSpec(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests)
+			}
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -769,7 +822,9 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -814,9 +869,12 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -863,6 +921,7 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		corev1.SetDefaults_PersistentVolumeClaim(a)
+		corev1.SetDefaults_PersistentVolumeClaimSpec(&a.Spec)
 		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
 		corev1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
 		corev1.SetDefaults_ResourceList(&a.Status.Capacity)

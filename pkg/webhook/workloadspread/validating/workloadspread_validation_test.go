@@ -378,7 +378,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 	}
 	for i, successCase := range successCases {
 		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme, workloadSpreadDemo)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadDemo).Build()
 			handler.Client = fakeClient
 			if errs := handler.validatingWorkloadSpreadFn(&successCase); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
@@ -698,7 +698,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 
 	for _, errorCase := range errorCases {
 		t.Run(errorCase.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme, workloadSpreadDemo)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadDemo).Build()
 			handler.Client = fakeClient
 			errs := handler.validatingWorkloadSpreadFn(errorCase.getWorkloadSpread())
 			if len(errs) == 0 {

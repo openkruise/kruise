@@ -54,8 +54,8 @@ type manageCase struct {
 	expectedPVCs   []*v1.PersistentVolumeClaim
 }
 
-func (mc *manageCase) initial() []runtime.Object {
-	var initialObjs []runtime.Object
+func (mc *manageCase) initial() []client.Object {
+	var initialObjs []client.Object
 	mc.cs.Name = "clone-test"
 	initialObjs = append(initialObjs, mc.cs)
 
@@ -567,7 +567,7 @@ func TestUpdate(t *testing.T) {
 
 	for _, mc := range cases {
 		initialObjs := mc.initial()
-		fakeClient := fake.NewFakeClient(initialObjs...)
+		fakeClient := fake.NewClientBuilder().WithObjects(initialObjs...).Build()
 		ctrl := &realControl{
 			fakeClient,
 			lifecycle.NewForTest(fakeClient),
@@ -603,6 +603,7 @@ func TestUpdate(t *testing.T) {
 				}
 				p.Annotations[appspub.LifecycleTimestampKey] = v
 			}
+			p.ResourceVersion = gotPod.ResourceVersion
 
 			if !reflect.DeepEqual(gotPod, p) {
 				t.Fatalf("Failed to test %s, unexpected pod %s, expected \n%v\n got \n%v", mc.name, p.Name, util.DumpJSON(p), util.DumpJSON(gotPod))

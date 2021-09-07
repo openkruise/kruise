@@ -38,20 +38,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -150,7 +148,7 @@ type ReconcileBroadcastJob struct {
 
 // Reconcile reads that state of the cluster for a BroadcastJob object and makes changes based on the state read
 // and what is in the BroadcastJob.Spec
-func (r *ReconcileBroadcastJob) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the BroadcastJob instance
 	job := &appsv1alpha1.BroadcastJob{}
 	err := r.Get(context.TODO(), request.NamespacedName, job)
@@ -594,7 +592,7 @@ func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
 //   - CheckNodeUnschedulablePredicate: check if the pod can tolerate node unschedulable
 //   - PodFitsResources: checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
-	nodeInfo := nodeinfo.NewNodeInfo()
+	nodeInfo := framework.NewNodeInfo()
 	_ = nodeInfo.SetNode(node)
 
 	if !nodename.Fits(pod, nodeInfo) {
@@ -602,7 +600,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	}
 
 	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
-		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReason))
+		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod))
 	}
 
 	filterPredicate := func(t *corev1.Taint) bool {
@@ -625,7 +623,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable))
 	}
 
-	insufficientResources := noderesources.Fits(pod, nodeInfo, sets.String{})
+	insufficientResources := noderesources.Fits(pod, nodeInfo)
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))

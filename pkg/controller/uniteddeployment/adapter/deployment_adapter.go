@@ -39,12 +39,12 @@ type DeploymentAdapter struct {
 }
 
 // NewResourceObject creates a empty Deployment object.
-func (a *DeploymentAdapter) NewResourceObject() runtime.Object {
+func (a *DeploymentAdapter) NewResourceObject() client.Object {
 	return &appsv1.Deployment{}
 }
 
 // NewResourceListObject creates a empty DeploymentList object.
-func (a *DeploymentAdapter) NewResourceListObject() runtime.Object {
+func (a *DeploymentAdapter) NewResourceListObject() client.ObjectList {
 	return &appsv1.DeploymentList{}
 }
 

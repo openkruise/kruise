@@ -236,7 +236,7 @@ func TestValidate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%d", i), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "2"},
 				Spec:       *successCase.spec,
 			}
-			h := CloneSetCreateUpdateHandler{Client: fake.NewFakeClient(&p0)}
+			h := CloneSetCreateUpdateHandler{Client: fake.NewClientBuilder().WithObjects(&p0).Build()}
 			if successCase.oldSpec == nil {
 				if errs := h.validateCloneSet(&obj, nil); len(errs) != 0 {
 					t.Errorf("expected success: %v", errs)
@@ -417,7 +417,7 @@ func TestValidate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%v", k), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "2"},
 				Spec:       *v.spec,
 			}
-			h := CloneSetCreateUpdateHandler{Client: fake.NewFakeClient(&p0)}
+			h := CloneSetCreateUpdateHandler{Client: fake.NewClientBuilder().WithObjects(&p0).Build()}
 			if v.oldSpec == nil {
 				if errs := h.validateCloneSet(&obj, nil); len(errs) == 0 {
 					t.Errorf("expected failure for %v", k)

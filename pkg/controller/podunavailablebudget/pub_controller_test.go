@@ -758,7 +758,7 @@ func TestPubReconcile(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			pub := cs.getPub()
-			fakeClient := fake.NewFakeClientWithScheme(scheme, cs.getDeployment(), cs.getReplicaSet(), pub)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), cs.getReplicaSet(), pub).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
 				err := fakeClient.Create(context.TODO(), podIn)

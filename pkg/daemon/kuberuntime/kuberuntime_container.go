@@ -60,7 +60,7 @@ func (m *genericRuntimeManager) recordContainerEvent(pod *v1.Pod, container *v1.
 }
 
 // getPodContainerStatuses gets all containers' statuses for the pod.
-func (m *genericRuntimeManager) getPodContainerStatuses(uid types.UID, name, namespace string) ([]*kubeletcontainer.ContainerStatus, error) {
+func (m *genericRuntimeManager) getPodContainerStatuses(uid types.UID, name, namespace string) ([]*kubeletcontainer.Status, error) {
 	// Select all containers of the given pod.
 	containers, err := m.runtimeService.ListContainers(&runtimeapi.ContainerFilter{
 		LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: string(uid)},
@@ -68,7 +68,7 @@ func (m *genericRuntimeManager) getPodContainerStatuses(uid types.UID, name, nam
 	if err != nil {
 		return nil, fmt.Errorf("run ListContainers error: %v", err)
 	}
-	statuses := make([]*kubeletcontainer.ContainerStatus, len(containers))
+	statuses := make([]*kubeletcontainer.Status, len(containers))
 	for i, c := range containers {
 		status, err := m.runtimeService.ContainerStatus(c.Id)
 		if err != nil {
@@ -83,10 +83,10 @@ func (m *genericRuntimeManager) getPodContainerStatuses(uid types.UID, name, nam
 	return statuses, nil
 }
 
-func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubeletcontainer.ContainerStatus {
+func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubeletcontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	cStatus := &kubeletcontainer.ContainerStatus{
+	cStatus := &kubeletcontainer.Status{
 		ID: kubeletcontainer.ContainerID{
 			Type: runtimeName,
 			ID:   status.Id,

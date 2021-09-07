@@ -38,7 +38,7 @@ func isBroadcastJobController(controllerRef *metav1.OwnerReference) bool {
 func (p *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	pod := evt.Object.(*v1.Pod)
 	if pod.DeletionTimestamp != nil {
-		p.Delete(event.DeleteEvent{Meta: evt.Meta, Object: evt.Object}, q)
+		p.Delete(event.DeleteEvent{Object: evt.Object}, q)
 		return
 	}
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {

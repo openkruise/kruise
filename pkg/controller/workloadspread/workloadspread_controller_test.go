@@ -678,7 +678,7 @@ func TestSubsetPodDeletionCost(t *testing.T) {
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
 				err := fakeClient.Create(context.TODO(), podIn)
@@ -1390,7 +1390,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			currentTime = time.Now()
 			workloadSpread := cs.getWorkloadSpread()
-			fakeClient := fake.NewFakeClientWithScheme(scheme, workloadSpread)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpread).Build()
 			if cs.getCloneSet() != nil {
 				err := fakeClient.Create(context.TODO(), cs.getCloneSet())
 				if err != nil {
@@ -1594,7 +1594,7 @@ func TestDelayReconcile(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			currentTime = time.Now()
 			workloadSpread := cs.getWorkloadSpread()
-			fakeClient := fake.NewFakeClientWithScheme(scheme, cs.getCloneSet(), workloadSpread)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getCloneSet(), workloadSpread).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
 				err := fakeClient.Create(context.TODO(), podIn)
@@ -1612,7 +1612,7 @@ func TestDelayReconcile(t *testing.T) {
 			durationStore = requeueduration.DurationStore{}
 
 			nsn := types.NamespacedName{Namespace: workloadSpread.Namespace, Name: workloadSpread.Name}
-			result, _ := reconciler.Reconcile(reconcile.Request{NamespacedName: nsn})
+			result, _ := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsn})
 			if (cs.expectRequeueAfter - result.RequeueAfter) > 1*time.Second {
 				t.Fatalf("requeue key failed")
 			}

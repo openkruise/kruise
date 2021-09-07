@@ -31,10 +31,10 @@ import (
 )
 
 func TestRevisionManage(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 

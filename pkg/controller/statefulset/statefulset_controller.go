@@ -226,7 +226,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 // Reconcile reads that state of the cluster for a StatefulSet object and makes changes based on the state read
 // and what is in the StatefulSet.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write Pods
-func (ssc *ReconcileStatefulSet) Reconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
+func (ssc *ReconcileStatefulSet) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, retErr error) {
 	key := request.NamespacedName.String()
 	namespace := request.Namespace
 	name := request.Name

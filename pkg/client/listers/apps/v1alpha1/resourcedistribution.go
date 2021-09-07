@@ -25,10 +25,13 @@ import (
 )
 
 // ResourceDistributionLister helps list ResourceDistributions.
+// All objects returned here must be treated as read-only.
 type ResourceDistributionLister interface {
 	// List lists all ResourceDistributions in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ResourceDistribution, err error)
 	// Get retrieves the ResourceDistribution from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.ResourceDistribution, error)
 	ResourceDistributionListerExpansion
 }

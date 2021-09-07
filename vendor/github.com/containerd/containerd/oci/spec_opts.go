@@ -17,6 +17,7 @@
 package oci
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -37,7 +38,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/syndtr/gocapability/capability"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec
@@ -76,6 +76,35 @@ func setLinux(s *Spec) {
 	}
 }
 
+// nolint
+func setResources(s *Spec) {
+	if s.Linux != nil {
+		if s.Linux.Resources == nil {
+			s.Linux.Resources = &specs.LinuxResources{}
+		}
+	}
+	if s.Windows != nil {
+		if s.Windows.Resources == nil {
+			s.Windows.Resources = &specs.WindowsResources{}
+		}
+	}
+}
+
+// nolint
+func setCPU(s *Spec) {
+	setResources(s)
+	if s.Linux != nil {
+		if s.Linux.Resources.CPU == nil {
+			s.Linux.Resources.CPU = &specs.LinuxCPU{}
+		}
+	}
+	if s.Windows != nil {
+		if s.Windows.Resources.CPU == nil {
+			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
+		}
+	}
+}
+
 // setCapabilities sets Linux Capabilities to empty if unset
 func setCapabilities(s *Spec) {
 	setProcess(s)
@@ -104,7 +133,7 @@ func WithDefaultSpecForPlatform(platform string) SpecOpts {
 	}
 }
 
-// WithSpecFromBytes loads the the spec from the provided byte slice.
+// WithSpecFromBytes loads the spec from the provided byte slice.
 func WithSpecFromBytes(p []byte) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		*s = Spec{} // make sure spec is cleared.
@@ -244,6 +273,28 @@ func WithMounts(mounts []specs.Mount) SpecOpts {
 	}
 }
 
+// WithoutMounts removes mounts
+func WithoutMounts(dests ...string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		var (
+			mounts  []specs.Mount
+			current = s.Mounts
+		)
+	mLoop:
+		for _, m := range current {
+			mDestination := filepath.Clean(m.Destination)
+			for _, dest := range dests {
+				if mDestination == dest {
+					continue mLoop
+				}
+			}
+			mounts = append(mounts, m)
+		}
+		s.Mounts = mounts
+		return nil
+	}
+}
+
 // WithHostNamespace allows a task to run inside the host's linux namespace
 func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
@@ -265,10 +316,7 @@ func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
 			if n.Type == ns.Type {
-				before := s.Linux.Namespaces[:i]
-				after := s.Linux.Namespaces[i+1:]
-				s.Linux.Namespaces = append(before, ns)
-				s.Linux.Namespaces = append(s.Linux.Namespaces, after...)
+				s.Linux.Namespaces[i] = ns
 				return nil
 			}
 		}
@@ -424,7 +472,7 @@ func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *
 
 // WithUserNamespace sets the uid and gid mappings for the task
 // this can be called multiple times to add more mappings to the generated spec
-func WithUserNamespace(container, host, size uint32) SpecOpts {
+func WithUserNamespace(uidMap, gidMap []specs.LinuxIDMapping) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		var hasUserns bool
 		setLinux(s)
@@ -439,13 +487,8 @@ func WithUserNamespace(container, host, size uint32) SpecOpts {
 				Type: specs.UserNamespace,
 			})
 		}
-		mapping := specs.LinuxIDMapping{
-			ContainerID: container,
-			HostID:      host,
-			Size:        size,
-		}
-		s.Linux.UIDMappings = append(s.Linux.UIDMappings, mapping)
-		s.Linux.GIDMappings = append(s.Linux.GIDMappings, mapping)
+		s.Linux.UIDMappings = append(s.Linux.UIDMappings, uidMap...)
+		s.Linux.GIDMappings = append(s.Linux.GIDMappings, gidMap...)
 		return nil
 	}
 }
@@ -511,7 +554,7 @@ func WithUser(userstr string) SpecOpts {
 			}
 			f := func(root string) error {
 				if username != "" {
-					user, err := getUserFromPath(root, func(u user.User) bool {
+					user, err := UserFromPath(root, func(u user.User) bool {
 						return u.Name == username
 					})
 					if err != nil {
@@ -520,7 +563,7 @@ func WithUser(userstr string) SpecOpts {
 					uid = uint32(user.Uid)
 				}
 				if groupname != "" {
-					gid, err = getGIDFromPath(root, func(g user.Group) bool {
+					gid, err = GIDFromPath(root, func(g user.Group) bool {
 						return g.Name == groupname
 					})
 					if err != nil {
@@ -575,11 +618,11 @@ func WithUserID(uid uint32) SpecOpts {
 			if !isRootfsAbs(s.Root.Path) {
 				return errors.Errorf("rootfs absolute path is required")
 			}
-			user, err := getUserFromPath(s.Root.Path, func(u user.User) bool {
+			user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
-				if os.IsNotExist(err) || err == errNoUsersFound {
+				if os.IsNotExist(err) || err == ErrNoUsersFound {
 					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
@@ -601,11 +644,11 @@ func WithUserID(uid uint32) SpecOpts {
 			return err
 		}
 		return mount.WithTempMount(ctx, mounts, func(root string) error {
-			user, err := getUserFromPath(root, func(u user.User) bool {
+			user, err := UserFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
-				if os.IsNotExist(err) || err == errNoUsersFound {
+				if os.IsNotExist(err) || err == ErrNoUsersFound {
 					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
@@ -618,7 +661,7 @@ func WithUserID(uid uint32) SpecOpts {
 }
 
 // WithUsername sets the correct UID and GID for the container
-// based on the the image's /etc/passwd contents. If /etc/passwd
+// based on the image's /etc/passwd contents. If /etc/passwd
 // does not exist, or the username is not found in /etc/passwd,
 // it returns error.
 func WithUsername(username string) SpecOpts {
@@ -629,7 +672,7 @@ func WithUsername(username string) SpecOpts {
 				if !isRootfsAbs(s.Root.Path) {
 					return errors.Errorf("rootfs absolute path is required")
 				}
-				user, err := getUserFromPath(s.Root.Path, func(u user.User) bool {
+				user, err := UserFromPath(s.Root.Path, func(u user.User) bool {
 					return u.Name == username
 				})
 				if err != nil {
@@ -650,7 +693,7 @@ func WithUsername(username string) SpecOpts {
 				return err
 			}
 			return mount.WithTempMount(ctx, mounts, func(root string) error {
-				user, err := getUserFromPath(root, func(u user.User) bool {
+				user, err := UserFromPath(root, func(u user.User) bool {
 					return u.Name == username
 				})
 				if err != nil {
@@ -682,11 +725,11 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 			var username string
 			uid, err := strconv.Atoi(userstr)
 			if err == nil {
-				user, err := getUserFromPath(root, func(u user.User) bool {
+				user, err := UserFromPath(root, func(u user.User) bool {
 					return u.Uid == uid
 				})
 				if err != nil {
-					if os.IsNotExist(err) || err == errNoUsersFound {
+					if os.IsNotExist(err) || err == ErrNoUsersFound {
 						return nil
 					}
 					return err
@@ -751,25 +794,62 @@ func WithCapabilities(caps []string) SpecOpts {
 	}
 }
 
-// WithAllCapabilities sets all linux capabilities for the process
-var WithAllCapabilities = func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
-	return WithCapabilities(getAllCapabilities())(ctx, client, c, s)
+func capsContain(caps []string, s string) bool {
+	for _, c := range caps {
+		if c == s {
+			return true
+		}
+	}
+	return false
 }
 
-func getAllCapabilities() []string {
-	last := capability.CAP_LAST_CAP
-	// hack for RHEL6 which has no /proc/sys/kernel/cap_last_cap
-	if last == capability.Cap(63) {
-		last = capability.CAP_BLOCK_SUSPEND
-	}
-	var caps []string
-	for _, cap := range capability.List() {
-		if cap > last {
+func removeCap(caps *[]string, s string) {
+	var newcaps []string
+	for _, c := range *caps {
+		if c == s {
 			continue
 		}
-		caps = append(caps, "CAP_"+strings.ToUpper(cap.String()))
+		newcaps = append(newcaps, c)
 	}
-	return caps
+	*caps = newcaps
+}
+
+// WithAddedCapabilities adds the provided capabilities
+func WithAddedCapabilities(caps []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCapabilities(s)
+		for _, c := range caps {
+			for _, cl := range []*[]string{
+				&s.Process.Capabilities.Bounding,
+				&s.Process.Capabilities.Effective,
+				&s.Process.Capabilities.Permitted,
+				&s.Process.Capabilities.Inheritable,
+			} {
+				if !capsContain(*cl, c) {
+					*cl = append(*cl, c)
+				}
+			}
+		}
+		return nil
+	}
+}
+
+// WithDroppedCapabilities removes the provided capabilities
+func WithDroppedCapabilities(caps []string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCapabilities(s)
+		for _, c := range caps {
+			for _, cl := range []*[]string{
+				&s.Process.Capabilities.Bounding,
+				&s.Process.Capabilities.Effective,
+				&s.Process.Capabilities.Permitted,
+				&s.Process.Capabilities.Inheritable,
+			} {
+				removeCap(cl, c)
+			}
+		}
+		return nil
+	}
 }
 
 // WithAmbientCapabilities set the Linux ambient capabilities for the process
@@ -784,9 +864,12 @@ func WithAmbientCapabilities(caps []string) SpecOpts {
 	}
 }
 
-var errNoUsersFound = errors.New("no users found")
+// ErrNoUsersFound can be returned from UserFromPath
+var ErrNoUsersFound = errors.New("no users found")
 
-func getUserFromPath(root string, filter func(user.User) bool) (user.User, error) {
+// UserFromPath inspects the user object using /etc/passwd in the specified rootfs.
+// filter can be nil.
+func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
 	ppath, err := fs.RootPath(root, "/etc/passwd")
 	if err != nil {
 		return user.User{}, err
@@ -796,14 +879,17 @@ func getUserFromPath(root string, filter func(user.User) bool) (user.User, error
 		return user.User{}, err
 	}
 	if len(users) == 0 {
-		return user.User{}, errNoUsersFound
+		return user.User{}, ErrNoUsersFound
 	}
 	return users[0], nil
 }
 
-var errNoGroupsFound = errors.New("no groups found")
+// ErrNoGroupsFound can be returned from GIDFromPath
+var ErrNoGroupsFound = errors.New("no groups found")
 
-func getGIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err error) {
+// GIDFromPath inspects the GID using /etc/passwd in the specified rootfs.
+// filter can be nil.
+func GIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err error) {
 	gpath, err := fs.RootPath(root, "/etc/group")
 	if err != nil {
 		return 0, err
@@ -813,7 +899,7 @@ func getGIDFromPath(root string, filter func(user.Group) bool) (gid uint32, err 
 		return 0, err
 	}
 	if len(groups) == 0 {
-		return 0, errNoGroupsFound
+		return 0, ErrNoGroupsFound
 	}
 	g := groups[0]
 	return uint32(g.Gid), nil
@@ -863,16 +949,13 @@ func WithReadonlyPaths(paths []string) SpecOpts {
 
 // WithWriteableSysfs makes any sysfs mounts writeable
 func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-	for i, m := range s.Mounts {
+	for _, m := range s.Mounts {
 		if m.Type == "sysfs" {
-			var options []string
-			for _, o := range m.Options {
+			for i, o := range m.Options {
 				if o == "ro" {
-					o = "rw"
+					m.Options[i] = "rw"
 				}
-				options = append(options, o)
 			}
-			s.Mounts[i].Options = options
 		}
 	}
 	return nil
@@ -880,16 +963,13 @@ func WithWriteableSysfs(_ context.Context, _ Client, _ *containers.Container, s 
 
 // WithWriteableCgroupfs makes any cgroup mounts writeable
 func WithWriteableCgroupfs(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-	for i, m := range s.Mounts {
+	for _, m := range s.Mounts {
 		if m.Type == "cgroup" {
-			var options []string
-			for _, o := range m.Options {
+			for i, o := range m.Options {
 				if o == "ro" {
-					o = "rw"
+					m.Options[i] = "rw"
 				}
-				options = append(options, o)
 			}
-			s.Mounts[i].Options = options
 		}
 	}
 	return nil
@@ -928,6 +1008,21 @@ func WithParentCgroupDevices(_ context.Context, _ Client, _ *containers.Containe
 		s.Linux.Resources = &specs.LinuxResources{}
 	}
 	s.Linux.Resources.Devices = nil
+	return nil
+}
+
+// WithAllDevicesAllowed permits READ WRITE MKNOD on all devices nodes for the container
+func WithAllDevicesAllowed(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	setLinux(s)
+	if s.Linux.Resources == nil {
+		s.Linux.Resources = &specs.LinuxResources{}
+	}
+	s.Linux.Resources.Devices = []specs.LinuxDeviceCgroup{
+		{
+			Allow:  true,
+			Access: rwm,
+		},
+	}
 	return nil
 }
 
@@ -1025,9 +1120,8 @@ func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container
 }
 
 // WithPrivileged sets up options for a privileged container
-// TODO(justincormack) device handling
 var WithPrivileged = Compose(
-	WithAllCapabilities,
+	WithAllCurrentCapabilities,
 	WithMaskedPaths(nil),
 	WithReadonlyPaths(nil),
 	WithWriteableSysfs,
@@ -1046,4 +1140,127 @@ func WithWindowsHyperV(_ context.Context, _ Client, _ *containers.Container, s *
 		s.Windows.HyperV = &specs.WindowsHyperV{}
 	}
 	return nil
+}
+
+// WithMemoryLimit sets the `Linux.LinuxResources.Memory.Limit` section to the
+// `limit` specified if the `Linux` section is not `nil`. Additionally sets the
+// `Windows.WindowsResources.Memory.Limit` section if the `Windows` section is
+// not `nil`.
+func WithMemoryLimit(limit uint64) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Linux != nil {
+			if s.Linux.Resources == nil {
+				s.Linux.Resources = &specs.LinuxResources{}
+			}
+			if s.Linux.Resources.Memory == nil {
+				s.Linux.Resources.Memory = &specs.LinuxMemory{}
+			}
+			l := int64(limit)
+			s.Linux.Resources.Memory.Limit = &l
+		}
+		if s.Windows != nil {
+			if s.Windows.Resources == nil {
+				s.Windows.Resources = &specs.WindowsResources{}
+			}
+			if s.Windows.Resources.Memory == nil {
+				s.Windows.Resources.Memory = &specs.WindowsMemoryResources{}
+			}
+			s.Windows.Resources.Memory.Limit = &limit
+		}
+		return nil
+	}
+}
+
+// WithAnnotations appends or replaces the annotations on the spec with the
+// provided annotations
+func WithAnnotations(annotations map[string]string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Annotations == nil {
+			s.Annotations = make(map[string]string)
+		}
+		for k, v := range annotations {
+			s.Annotations[k] = v
+		}
+		return nil
+	}
+}
+
+// WithLinuxDevices adds the provided linux devices to the spec
+func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setLinux(s)
+		s.Linux.Devices = append(s.Linux.Devices, devices...)
+		return nil
+	}
+}
+
+// WithLinuxDevice adds the device specified by path to the spec
+func WithLinuxDevice(path, permissions string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setLinux(s)
+		setResources(s)
+
+		dev, err := deviceFromPath(path)
+		if err != nil {
+			return err
+		}
+
+		s.Linux.Devices = append(s.Linux.Devices, *dev)
+
+		s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, specs.LinuxDeviceCgroup{
+			Type:   dev.Type,
+			Allow:  true,
+			Major:  &dev.Major,
+			Minor:  &dev.Minor,
+			Access: permissions,
+		})
+
+		return nil
+	}
+}
+
+// WithEnvFile adds environment variables from a file to the container's spec
+func WithEnvFile(path string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		var vars []string
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		sc := bufio.NewScanner(f)
+		for sc.Scan() {
+			vars = append(vars, sc.Text())
+		}
+		if err = sc.Err(); err != nil {
+			return err
+		}
+		return WithEnv(vars)(nil, nil, nil, s)
+	}
+}
+
+// ErrNoShmMount is returned when there is no /dev/shm mount specified in the config
+// and an Opts was trying to set a configuration value on the mount.
+var ErrNoShmMount = errors.New("no /dev/shm mount specified")
+
+// WithDevShmSize sets the size of the /dev/shm mount for the container.
+//
+// The size value is specified in kb, kilobytes.
+func WithDevShmSize(kb int64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		for _, m := range s.Mounts {
+			if m.Source == "shm" && m.Type == "tmpfs" {
+				for i, o := range m.Options {
+					if strings.HasPrefix(o, "size=") {
+						m.Options[i] = fmt.Sprintf("size=%dk", kb)
+						return nil
+					}
+				}
+				m.Options = append(m.Options, fmt.Sprintf("size=%dk", kb))
+				return nil
+			}
+		}
+		return ErrNoShmMount
+	}
 }

@@ -26,7 +26,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -57,7 +57,7 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 	var copy runtime.Object = obj.DeepCopy()
 	injectTemplateDefaults := false
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
-		if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+		if req.AdmissionRequest.Operation == admissionv1.Update {
 			oldObj := &appsv1alpha1.AdvancedCronJob{}
 			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)

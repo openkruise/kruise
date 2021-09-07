@@ -21,11 +21,11 @@ type CloneSetAdapter struct {
 	Scheme *runtime.Scheme
 }
 
-func (a *CloneSetAdapter) NewResourceObject() runtime.Object {
+func (a *CloneSetAdapter) NewResourceObject() client.Object {
 	return &alpha1.CloneSet{}
 }
 
-func (a *CloneSetAdapter) NewResourceListObject() runtime.Object {
+func (a *CloneSetAdapter) NewResourceListObject() client.ObjectList {
 	return &alpha1.CloneSetList{}
 }
 

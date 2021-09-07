@@ -65,7 +65,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -188,17 +188,17 @@ type LeaderElector struct {
 	clock clock.Clock
 
 	metrics leaderMetricsAdapter
-
-	// name is the name of the resource lock for debugging
-	name string
 }
 
-// Run starts the leader election loop
+// Run starts the leader election loop. Run will not return
+// before leader election loop is stopped by ctx or it has
+// stopped holding the leader lease
 func (le *LeaderElector) Run(ctx context.Context) {
+	defer runtime.HandleCrash()
 	defer func() {
-		runtime.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
+
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
@@ -209,7 +209,8 @@ func (le *LeaderElector) Run(ctx context.Context) {
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
-// fails to validate.
+// fails to validate. RunOrDie blocks until leader election loop is
+// stopped by ctx or it has stopped holding the leader lease
 func RunOrDie(ctx context.Context, lec LeaderElectionConfig) {
 	le, err := NewLeaderElector(lec)
 	if err != nil {
@@ -239,7 +240,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	defer cancel()
 	succeeded := false
 	desc := le.config.Lock.Describe()
-	klog.Infof("attempting to acquire leader lease  %v...", desc)
+	klog.Infof("attempting to acquire leader lease %v...", desc)
 	wait.JitterUntil(func() {
 		succeeded = le.tryAcquireOrRenew(ctx)
 		le.maybeReportTransition()

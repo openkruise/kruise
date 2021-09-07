@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// +kubebuilder:webhook:path=/validate-pod,mutating=false,failurePolicy=fail,groups="",resources=pods,verbs=update;delete,versions=v1,name=vpod.kb.io
-// +kubebuilder:webhook:path=/validate-pod,mutating=false,failurePolicy=fail,groups="",resources=pods/eviction,verbs=create,versions=v1,name=vpodeviction.kb.io
+// +kubebuilder:webhook:path=/validate-pod,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups="",resources=pods,verbs=update;delete,versions=v1,name=vpod.kb.io
+// +kubebuilder:webhook:path=/validate-pod,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups="",resources=pods/eviction,verbs=create,versions=v1,name=vpodeviction.kb.io
 
 var (
 	// HandlerMap contains admission webhook handlers

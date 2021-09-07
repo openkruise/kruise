@@ -30,7 +30,7 @@ import (
 )
 
 func TestPodEventHandler(t *testing.T) {
-	fakeClient := fake.NewFakeClientWithScheme(scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	handler := enqueueRequestForPod{client: fakeClient}
 
 	err := fakeClient.Create(context.TODO(), pubDemo.DeepCopy())

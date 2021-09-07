@@ -33,11 +33,11 @@ type RegistryList struct {
 	E2eRegistry             string `yaml:"e2eRegistry"`
 	E2eVolumeRegistry       string `yaml:"e2eVolumeRegistry"`
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
+	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
-	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 }
@@ -71,13 +71,12 @@ func initReg() RegistryList {
 		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
-		// TODO: After the domain flip, this should instead be k8s.gcr.io/k8s-artifacts-prod/e2e-test-images
-		PromoterE2eRegistry:     "us.gcr.io/k8s-artifacts-prod/e2e-test-images",
+		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
+		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
 		GcRegistry:              "k8s.gcr.io",
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
 		GcrReleaseRegistry:      "gcr.io/gke-release",
-		GoogleContainerRegistry: "gcr.io/google-containers",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 	}
@@ -105,11 +104,11 @@ var (
 	e2eRegistry             = registry.E2eRegistry
 	e2eVolumeRegistry       = registry.E2eVolumeRegistry
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
+	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
-	googleContainerRegistry = registry.GoogleContainerRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
@@ -120,8 +119,10 @@ var (
 )
 
 const (
+	// None is to be used for unset/default images
+	None = iota
 	// Agnhost image
-	Agnhost = iota
+	Agnhost
 	// AgnhostPrivate image
 	AgnhostPrivate
 	// APIServer image
@@ -140,6 +141,8 @@ const (
 	CudaVectorAdd
 	// CudaVectorAdd2 image
 	CudaVectorAdd2
+	// DebianIptables Image
+	DebianIptables
 	// EchoServer image
 	EchoServer
 	// Etcd image
@@ -158,10 +161,6 @@ const (
 	JessieDnsutils
 	// Kitten image
 	Kitten
-	// Mounttest image
-	Mounttest
-	// MounttestUser image
-	MounttestUser
 	// Nautilus image
 	Nautilus
 	// NFSProvisioner image
@@ -191,8 +190,6 @@ const (
 	ResourceConsumer
 	// SdDummyExporter image
 	SdDummyExporter
-	// StartupScript image
-	StartupScript
 	// VolumeNFSServer image
 	VolumeNFSServer
 	// VolumeISCSIServer image
@@ -205,18 +202,19 @@ const (
 
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.12"}
+	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.21"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.17"}
 	configs[AppArmorLoader] = Config{e2eRegistry, "apparmor-loader", "1.0"}
 	configs[BusyBox] = Config{dockerLibraryRegistry, "busybox", "1.29"}
-	configs[CheckMetadataConcealment] = Config{promoterE2eRegistry, "metadata-concealment", "1.6"}
+	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
+	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.3.0"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
-	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.3"}
+	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
@@ -224,8 +222,6 @@ func initImageConfigs() map[int]Config {
 	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
 	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
 	configs[Kitten] = Config{e2eRegistry, "kitten", "1.0"}
-	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
-	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
 	configs[NFSProvisioner] = Config{sigStorageRegistry, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
@@ -241,7 +237,6 @@ func initImageConfigs() map[int]Config {
 	configs[RegressionIssue74839] = Config{e2eRegistry, "regression-issue-74839-amd64", "1.0"}
 	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
-	configs[StartupScript] = Config{googleContainerRegistry, "startup-script", "v1"}
 	configs[VolumeNFSServer] = Config{e2eVolumeRegistry, "nfs", "1.0"}
 	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}

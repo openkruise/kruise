@@ -20,12 +20,13 @@ import (
 	"context"
 	"sync"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 )
 
@@ -41,13 +42,9 @@ var (
 	apiGVStr     = appsv1alpha1.GroupVersion.String()
 )
 
-var ownerIndexFunc = func(obj runtime.Object) []string {
-	metaObj, ok := obj.(metav1.Object)
-	if !ok {
-		return []string{}
-	}
+var ownerIndexFunc = func(obj client.Object) []string {
 	var owners []string
-	for _, ref := range metaObj.GetOwnerReferences() {
+	for _, ref := range obj.GetOwnerReferences() {
 		owners = append(owners, string(ref.UID))
 	}
 	return owners
@@ -90,7 +87,7 @@ func RegisterFieldIndexes(c cache.Cache) error {
 }
 
 func indexPodNodeName(c cache.Cache) error {
-	return c.IndexField(context.TODO(), &v1.Pod{}, IndexNameForPodNodeName, func(obj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &v1.Pod{}, IndexNameForPodNodeName, func(obj client.Object) []string {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
 			return []string{}
@@ -103,7 +100,7 @@ func indexPodNodeName(c cache.Cache) error {
 }
 
 func indexJob(c cache.Cache) error {
-	return c.IndexField(context.TODO(), &batchv1.Job{}, IndexNameForController, func(rawObj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &batchv1.Job{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*batchv1.Job)
 		owner := metav1.GetControllerOf(job)
@@ -122,7 +119,7 @@ func indexJob(c cache.Cache) error {
 }
 
 func indexBroadcastCronJob(c cache.Cache) error {
-	return c.IndexField(context.TODO(), &appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1alpha1.BroadcastJob)
 		owner := metav1.GetControllerOf(job)
@@ -141,7 +138,7 @@ func indexBroadcastCronJob(c cache.Cache) error {
 }
 
 func indexImagePullJobActive(c cache.Cache) error {
-	return c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj runtime.Object) []string {
+	return c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
 		obj := rawObj.(*appsv1alpha1.ImagePullJob)
 		isActive := "false"
 		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {

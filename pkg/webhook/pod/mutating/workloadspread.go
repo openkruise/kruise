@@ -20,7 +20,7 @@ import (
 	"context"
 
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/dryrun"
@@ -39,7 +39,7 @@ func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req ad
 	var dryRun bool
 
 	switch req.AdmissionRequest.Operation {
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		options := &metav1.CreateOptions{}
 		err := h.Decoder.DecodeRaw(req.Options, options)
 		if err != nil {

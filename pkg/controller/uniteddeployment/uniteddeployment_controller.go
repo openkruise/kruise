@@ -172,7 +172,7 @@ type ReconcileUnitedDeployment struct {
 
 // Reconcile reads that state of the cluster for a UnitedDeployment object and makes changes based on the state read
 // and what is in the UnitedDeployment.Spec
-func (r *ReconcileUnitedDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.V(4).Infof("Reconcile UnitedDeployment %s/%s", request.Namespace, request.Name)
 	// Fetch the UnitedDeployment instance
 	instance := &appsv1alpha1.UnitedDeployment{}

@@ -18,7 +18,7 @@ package validating
 
 import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-// +kubebuilder:webhook:path=/validate-customresourcedefinition,mutating=false,failurePolicy=fail,groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=delete,versions=v1;v1beta1,name=vcustomresourcedefinition.kb.io
+// +kubebuilder:webhook:path=/validate-customresourcedefinition,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=delete,versions=v1;v1beta1,name=vcustomresourcedefinition.kb.io
 
 // +kubebuilder:rbac:groups="*",resources="*",verbs=list
 

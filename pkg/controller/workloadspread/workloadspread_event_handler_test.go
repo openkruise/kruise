@@ -324,7 +324,7 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			for _, ws := range cs.getWorkloadSpreads() {
 				newWorkloadSpread := ws.DeepCopy()
 				err := fakeClient.Create(context.TODO(), newWorkloadSpread)
@@ -450,7 +450,7 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			for _, ws := range cs.getWorkloadSpreads() {
 				newWorkloadSpread := ws.DeepCopy()
 				err := fakeClient.Create(context.TODO(), newWorkloadSpread)
@@ -552,7 +552,7 @@ func TestGetWorkloadSpreadForJob(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			for _, ws := range cs.getWorkloadSpreads() {
 				newWorkloadSpread := ws.DeepCopy()
 				err := fakeClient.Create(context.TODO(), newWorkloadSpread)
@@ -678,7 +678,7 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 			for _, ws := range cs.getWorkloadSpreads() {
 				newWorkloadSpread := ws.DeepCopy()
 				err := fakeClient.Create(context.TODO(), newWorkloadSpread)
@@ -709,14 +709,13 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 }
 
 func TestWorkloadEventHandlerForCreate(t *testing.T) {
-	fakeClient := fake.NewFakeClientWithScheme(scheme, workloadSpreadDemo.DeepCopy())
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadDemo.DeepCopy()).Build()
 	handler := &workloadEventHandler{Reader: fakeClient}
 
 	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	createCloneSet := cloneSetDemo.DeepCopy()
 	createEvt := event.CreateEvent{
 		Object: createCloneSet,
-		Meta:   &createCloneSet.ObjectMeta,
 	}
 	handler.Create(createEvt, createQ)
 	if createQ.Len() != 1 {
@@ -739,14 +738,13 @@ func TestWorkloadEventHandlerForDelete(t *testing.T) {
 	ws := workloadSpreadDemo.DeepCopy()
 	ws.Spec.TargetReference = &targetRef
 
-	fakeClient := fake.NewFakeClientWithScheme(scheme, ws.DeepCopy())
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ws.DeepCopy()).Build()
 	handler := &workloadEventHandler{Reader: fakeClient}
 
 	deleteQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	deleteDeployment := deploymentDemo.DeepCopy()
 	deleteEvt := event.DeleteEvent{
 		Object: deleteDeployment,
-		Meta:   &deleteDeployment.ObjectMeta,
 	}
 	handler.Delete(deleteEvt, deleteQ)
 	if deleteQ.Len() != 1 {
@@ -769,7 +767,7 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 	ws := workloadSpreadDemo.DeepCopy()
 	ws.Spec.TargetReference = &targetRef
 
-	fakeClient := fake.NewFakeClientWithScheme(scheme, ws.DeepCopy())
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ws.DeepCopy()).Build()
 	handler := &workloadEventHandler{Reader: fakeClient}
 
 	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
@@ -780,8 +778,6 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 	updateEvt := event.UpdateEvent{
 		ObjectOld: oldReplicaSet,
 		ObjectNew: newReplicaSet,
-		MetaOld:   &oldReplicaSet.ObjectMeta,
-		MetaNew:   &newReplicaSet.ObjectMeta,
 	}
 	handler.Update(updateEvt, updateQ)
 	if updateQ.Len() != 1 {

@@ -33,7 +33,7 @@ import (
 )
 
 func TestPodEventHandler(t *testing.T) {
-	fakeClient := fake.NewFakeClientWithScheme(scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	handler := enqueueRequestForPod{reader: fakeClient}
 
 	err := fakeClient.Create(context.TODO(), sidecarSetDemo.DeepCopy())
@@ -158,7 +158,7 @@ func TestGetPodMatchedSidecarSets(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			pod := cs.getPod()
-			fakeClient := fake.NewFakeClientWithScheme(scheme, pod)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod).Build()
 			sidecarSets := cs.getSidecarSets()
 			for _, sidecarSet := range sidecarSets {
 				fakeClient.Create(context.TODO(), sidecarSet)
