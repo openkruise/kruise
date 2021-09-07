@@ -36,7 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+var (
+	inPlaceUpdatePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+)
 
 type RefreshResult struct {
 	RefreshErr    error

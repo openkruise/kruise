@@ -108,7 +108,8 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, hash st
 	} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.SurgingRollingUpdateType {
 		return dsc.surgingRollingUpdate(ds, hash)
 		//} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
-		//	return dsc.inplaceRollingUpdate(ds, hash)
+		//	res, err := dsc.inplaceRollingUpdate(ds, hash)
+		//	return res.RequeueAfter, err
 	} else {
 		klog.Errorf("no matched RollingUpdate type")
 	}
