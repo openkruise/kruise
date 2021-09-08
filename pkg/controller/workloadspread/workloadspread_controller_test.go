@@ -1126,7 +1126,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
-				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 2
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
@@ -1226,7 +1226,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
-				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 4
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
