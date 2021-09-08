@@ -229,9 +229,9 @@ spec:
                       contains information about pod deletion.
                     type: object
                   missingReplicas:
-                    description: MissingReplicas is the number of replicas belong
-                      to this subset not be found. MissingReplicas > 0 indicates the
-                      subset is still missing MissingReplicas pods to create MissingReplicas
+                    description: MissingReplicas is the number of active replicas
+                      belong to this subset not be found. MissingReplicas > 0 indicates
+                      the subset is still missing MissingReplicas pods to create MissingReplicas
                       = 0 indicates the subset already has enough pods, there is no
                       need to create MissingReplicas = -1 indicates the subset's MaxReplicas
                       not set, then there is no limit for pods number
@@ -243,7 +243,7 @@ spec:
                     type: string
                   replicas:
                     description: Replicas is the most recently observed number of
-                      replicas for subset.
+                      active replicas for subset.
                     format: int32
                     type: integer
                 required:

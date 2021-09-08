@@ -61,7 +61,6 @@ func (p *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 
 	if kubecontroller.IsPodActive(oldPod) && !kubecontroller.IsPodActive(newPod) {
 		p.handlePod(q, newPod, UpdateEventAction)
-		return
 	}
 }
 
