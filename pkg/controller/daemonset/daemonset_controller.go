@@ -370,9 +370,6 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconci
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	if delay != 0 {
-		return reconcile.Result{RequeueAfter: delay}, nil
-	}
 
 	// Process rolling updates if we're ready.
 	if expectations.SatisfiedExpectations(dsKey) {
@@ -595,22 +592,23 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 	}
 
 	var nodesNeedingDaemonPods, podsToDelete []string
-	nodesDesireScheduled := 0
+	nodesDesireScheduled, nodesDeleteOnFail := 0, 0
 
 	for _, node := range nodeList {
 		if !CanNodeBeDeployed(node, ds) {
 			continue
 		}
-		delay, nodeShouldSchedulePod, nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(node, nodeToDaemonPods, ds, hash)
+		nodeShouldSchedulePod, nodeDeleteOnFail, nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(node, nodeToDaemonPods, ds, hash)
 		if err != nil {
 			continue
-		}
-		if delay != 0 {
-			return delay, nil
 		}
 
 		if nodeShouldSchedulePod {
 			nodesDesireScheduled++
+		}
+
+		if nodeDeleteOnFail {
+			nodesDeleteOnFail++
 		}
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)
 		podsToDelete = append(podsToDelete, podsToDeleteOnNode...)
@@ -630,10 +628,17 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 				}
 			}
 
-			maxUpdate := nodesDesireScheduled - int(partition) - len(newPods)
+			if partition > int32(nodesDesireScheduled) {
+				partition = int32(nodesDesireScheduled)
+			}
+
+			// Keeps some pods in old version and creates daemon pod on other nodes. If a failed pod
+			// has been deleted in podsShouldBeOnNode, create a new pod on its node directly.
+			maxUpdate := nodesDesireScheduled - len(newPods) - int(partition) + nodesDeleteOnFail
 			if maxUpdate > len(nodesNeedingDaemonPods) {
 				maxUpdate = len(nodesNeedingDaemonPods)
 			}
+			klog.V(4).Infof("Pods to create in manage phase for daemon %v/%v is %v", ds.Namespace, ds.Name, maxUpdate)
 
 			if maxUpdate > 0 {
 				sort.Strings(nodesNeedingDaemonPods)
@@ -784,7 +789,6 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 }
 
 // podsShouldBeOnNode figures out the DaemonSet pods to be created and deleted on the given node:
-//   - delay: backoff time when failed to run DaemonSet pods on the node
 //   - shouldRunDaemonPod: whether to run DaemonSet pod on the node
 //   - nodesNeedingDaemonPods: the pods need to start on the node
 //   - podsToDelete: the Pods need to be deleted on the node
@@ -794,7 +798,7 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 	nodeToDaemonPods map[string][]*corev1.Pod,
 	ds *appsv1alpha1.DaemonSet,
 	hash string,
-) (delay time.Duration, shouldRunDaemonPod bool, nodesNeedingDaemonPods, podsToDelete []string, err error) {
+) (shouldRunDaemonPod bool, deleteOnFail bool, nodesNeedingDaemonPods, podsToDelete []string, err error) {
 
 	wantToRun, shouldSchedule, shouldContinueRunning, err := NodeShouldRunDaemonPod(dsc.client, node, ds)
 	if err != nil {
@@ -834,7 +838,7 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 				now := dsc.failedPodsBackoff.Clock.Now()
 				inBackoff := dsc.failedPodsBackoff.IsInBackOffSinceUpdate(backoffKey, now)
 				if inBackoff {
-					delay = dsc.failedPodsBackoff.Get(backoffKey)
+					delay := dsc.failedPodsBackoff.Get(backoffKey)
 					klog.V(4).Infof("Deleting failed pod %s/%s on node %s has been limited by backoff - %v remaining",
 						pod.Namespace, pod.Name, node.Name, delay)
 					continue
@@ -847,6 +851,7 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 				// Emit an event so that it's discoverable to users.
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, FailedDaemonPodReason, msg)
 				podsToDelete = append(podsToDelete, pod.Name)
+				deleteOnFail = true
 			} else {
 				daemonPodsRunning = append(daemonPodsRunning, pod)
 			}
