@@ -479,7 +479,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				i, replicas)
 		}
 		// If we find a Pod that has not been created we create the Pod
-		if !isCreated(replicas[i]) {
+		// 1. If `condemned` has item represent the reverseOrdinals has changed
+		// 2. If `status.Replicas` is not equal `set.Spec.Replicas` represent has failed pod in the set
+		// One of the two conditions is established, we can create the Pod.
+		if !isCreated(replicas[i]) && (len(condemned) > 0 || status.Replicas != *set.Spec.Replicas) {
 			lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(replicas[i])
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
 				msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
