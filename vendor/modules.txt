@@ -1008,7 +1008,7 @@ k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/sets
 # k8s.io/kube-scheduler v0.0.0 => k8s.io/kube-scheduler v0.20.2
 k8s.io/kube-scheduler/extender/v1
-# k8s.io/kubernetes v1.20.2
+# k8s.io/kubernetes v1.20.7
 ## explicit
 k8s.io/kubernetes/pkg/api/legacyscheme
 k8s.io/kubernetes/pkg/api/service

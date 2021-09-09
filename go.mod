@@ -39,7 +39,7 @@ require (
 	k8s.io/cri-api v0.20.6
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
-	k8s.io/kubernetes v1.20.2
+	k8s.io/kubernetes v1.20.7
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
 	sigs.k8s.io/controller-runtime v0.8.3
 )
