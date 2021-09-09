@@ -74,8 +74,8 @@ linters:
     # TODO Enforce the below linters later
     - deadcode
     - gofmt
+    - govet
     - goimports
-    - golint
     - ineffassign
     - misspell
     - vet

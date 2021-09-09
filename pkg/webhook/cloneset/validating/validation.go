@@ -73,7 +73,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 				},
 			})
 		}
-		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"))...)
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), apivalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
 	}
 
 	if spec.Template.Spec.RestartPolicy != "" && spec.Template.Spec.RestartPolicy != v1.RestartPolicyAlways {

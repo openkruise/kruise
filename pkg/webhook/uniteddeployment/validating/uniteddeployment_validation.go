@@ -263,7 +263,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
 		}
-		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForReplicaSet(coreTemplate, selector, 0, fldPath.Child("deploymentTemplate", "spec", "template"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForReplicaSet(coreTemplate, selector, 0, fldPath.Child("deploymentTemplate", "spec", "template"), apivalidation.PodValidationOptions{AllowMultipleHugePageResources: true, AllowDownwardAPIHugePages: true})...)
 	}
 
 	return allErrs

@@ -167,7 +167,7 @@ type ReconcileWorkloadSpread struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch;delete
 
-func (r *ReconcileWorkloadSpread) Reconcile(req reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Request) (reconcile.Result, error) {
 	ws := &appsv1alpha1.WorkloadSpread{}
 	err := r.Get(context.TODO(), req.NamespacedName, ws)
 	if err != nil {

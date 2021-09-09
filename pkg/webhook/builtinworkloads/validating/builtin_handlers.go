@@ -21,7 +21,7 @@ import (
 	"net/http"
 
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
@@ -41,7 +41,7 @@ func (h *WorkloadHandler) InjectDecoder(d *admission.Decoder) error {
 
 // Handle handles admission requests.
 func (h *WorkloadHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	if req.Operation != admissionv1beta1.Delete || req.SubResource != "" {
+	if req.Operation != admissionv1.Delete || req.SubResource != "" {
 		return admission.ValidationResponse(true, "")
 	}
 	if len(req.OldObject.Raw) == 0 {

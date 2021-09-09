@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -226,8 +227,8 @@ func buildResourceDistribution(resourceYaml string) *appsv1alpha1.ResourceDistri
 	}
 }
 
-func makeEnvironment(addition ...runtime.Object) {
-	env := []runtime.Object{
+func makeEnvironment(addition ...client.Object) {
+	env := []client.Object{
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ns-1",
@@ -281,6 +282,6 @@ func makeEnvironment(addition ...runtime.Object) {
 		},
 	}
 	env = append(env, addition...)
-	fakeClient := fake.NewFakeClientWithScheme(testScheme, env...)
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(env...).Build()
 	handler.Client = fakeClient
 }

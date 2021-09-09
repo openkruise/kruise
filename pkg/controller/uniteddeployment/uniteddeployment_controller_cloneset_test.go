@@ -13,22 +13,51 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func TestCsReconcile(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+func TestCloneSetAll(t *testing.T) {
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
+	cases := []TestCaseFunc{
+		testCsReconcile,
+		testTemplateTypeSwtichToCS,
+	}
+
+	for _, f := range cases {
+		// clear requests
+		for {
+			var empty bool
+			select {
+			case <-requests:
+			default:
+				empty = true
+			}
+			if empty {
+				break
+			}
+		}
+		ns := fmt.Sprintf("ut-uniteddeployment-%s", rand.String(5))
+		if err := c.Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}); err != nil {
+			t.Fatalf("create namespace %s error: %v", ns, err)
+		}
+		f(t, g, ns, requests)
+	}
+}
+
+func testCsReconcile(t *testing.T, g *gomega.GomegaWithT, namespace string, requests chan reconcile.Request) {
 	caseName := "asts-reconcile"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
-			Namespace: "default",
+			Namespace: namespace,
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &one,
@@ -102,19 +131,12 @@ func TestCsReconcile(t *testing.T) {
 	expectedCsCount(g, instance, 1)
 }
 
-func TestTemplateTypeSwtichToCS(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
-	defer func() {
-		clean(g, c)
-		close(stopMgr)
-		mgrStopped.Wait()
-	}()
-
+func testTemplateTypeSwtichToCS(t *testing.T, g *gomega.GomegaWithT, namespace string, requests chan reconcile.Request) {
 	caseName := "test-template-type-switch-to-cs"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
-			Namespace: "default",
+			Namespace: namespace,
 		},
 		Spec: appsv1alpha1.UnitedDeploymentSpec{
 			Replicas: &one,
@@ -231,14 +253,13 @@ func TestTemplateTypeSwtichToCS(t *testing.T) {
 
 	expectedAstsCount(g, instance, 0)
 	expectedCsCount(g, instance, 1)
-
 }
 
 func TestCsSubsetProvision(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -438,10 +459,10 @@ func TestCsSubsetProvision(t *testing.T) {
 }
 
 func TestCsSubsetProvisionWithToleration(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -549,10 +570,10 @@ func TestCsSubsetProvisionWithToleration(t *testing.T) {
 }
 
 func TestCsDupSubset(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -644,10 +665,10 @@ func TestCsDupSubset(t *testing.T) {
 }
 
 func TestCsScale(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -792,10 +813,10 @@ func TestCsScale(t *testing.T) {
 }
 
 func TestCsUpdate(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -916,10 +937,10 @@ func TestCsUpdate(t *testing.T) {
 }
 
 func TestCsRollingUpdatePartition(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -1103,10 +1124,10 @@ func TestCsRollingUpdatePartition(t *testing.T) {
 }
 
 func TestCsOnDelete(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -1257,10 +1278,10 @@ func TestCsOnDelete(t *testing.T) {
 }
 
 func TestCsSubsetCount(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 

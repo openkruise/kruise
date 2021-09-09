@@ -160,7 +160,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		fakeClient := fake.NewFakeClient()
+		fakeClient := fake.NewClientBuilder().Build()
 		for _, ds := range testCase.dss {
 			fakeClient.Create(context.TODO(), ds)
 		}
@@ -643,7 +643,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		fakeClient := fake.NewFakeClient()
+		fakeClient := fake.NewClientBuilder().Build()
 		for _, ds := range testCase.dss {
 			fakeClient.Create(context.TODO(), ds)
 		}
@@ -765,7 +765,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		fakeClient := fake.NewFakeClient()
+		fakeClient := fake.NewClientBuilder().Build()
 		for _, ds := range testCase.dss {
 			fakeClient.Create(context.TODO(), ds)
 		}
@@ -890,7 +890,7 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		fakeClient := fake.NewFakeClient()
+		fakeClient := fake.NewClientBuilder().Build()
 		for _, ds := range testCase.dss {
 			fakeClient.Create(context.TODO(), ds)
 		}

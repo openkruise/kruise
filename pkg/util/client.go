@@ -32,13 +32,9 @@ func NewClientFromManager(mgr manager.Manager, name string) client.Client {
 		panic(err)
 	}
 
-	cache := mgr.GetCache()
-	return &client.DelegatingClient{
-		Reader: &client.DelegatingReader{
-			CacheReader:  cache,
-			ClientReader: c,
-		},
-		Writer:       c,
-		StatusClient: c,
-	}
+	delegatingClient, _ := client.NewDelegatingClient(client.NewDelegatingClientInput{
+		CacheReader: mgr.GetCache(),
+		Client:      c,
+	})
+	return delegatingClient
 }

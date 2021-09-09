@@ -52,12 +52,12 @@ func main() {
 		klog.Fatalf("Failed to init clientset registry: %v", err)
 	}
 
-	stop := signals.SetupSignalHandler()
+	ctx := signals.SetupSignalHandler()
 	d, err := daemon.NewDaemon(cfg, *bindAddr)
 	if err != nil {
 		klog.Fatalf("Failed to new daemon: %v", err)
 	}
-	if err := d.Run(stop); err != nil {
+	if err := d.Run(ctx); err != nil {
 		klog.Fatalf("Failed to start daemon: %v", err)
 	}
 }

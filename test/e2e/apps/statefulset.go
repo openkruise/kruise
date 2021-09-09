@@ -20,6 +20,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,11 +61,19 @@ var _ = SIGDescribe("StatefulSet", func() {
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
+	var serverMinorVersion int
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
+		if v, err := c.Discovery().ServerVersion(); err != nil {
+			framework.Logf("Failed to discovery server version: %v", err)
+		} else {
+			if serverMinorVersion, err = strconv.Atoi(v.Minor); err != nil {
+				framework.Logf("Failed to convert server version %+v: %v", v, err)
+			}
+		}
 	})
 
 	framework.KruiseDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
@@ -914,7 +923,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectEqual(scale.Status.Replicas, int32(1))
 
 			ginkgo.By("updating a scale subresource")
-			scale.ResourceVersion = "" // indicate the scale update should be unconditional
+			if serverMinorVersion >= 18 {
+				scale.ResourceVersion = "" // indicate the scale update should be unconditional
+			}
 			scale.Spec.Replicas = 2
 			scaleResult, err := kc.AppsV1alpha1().StatefulSets(ns).UpdateScale(context.TODO(), ssName, scale, metav1.UpdateOptions{})
 			if err != nil {

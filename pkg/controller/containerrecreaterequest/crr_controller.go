@@ -112,7 +112,7 @@ type ReconcileContainerRecreateRequest struct {
 
 // Reconcile reads that state of the cluster for a ContainerRecreateRequest object and makes changes based on the state read
 // and what is in the ContainerRecreateRequest.Spec
-func (r *ReconcileContainerRecreateRequest) Reconcile(request reconcile.Request) (res reconcile.Result, err error) {
+func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
 	klog.V(3).Infof("Starting to process CRR %v", request.NamespacedName)
 	defer func() {

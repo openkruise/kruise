@@ -328,7 +328,7 @@ $ kubectl describe pods test-pod
 ### Practical sample usage in service mesh
 AliYun ASM has realized lossless upgrade of Data Plane based on the hot upgrade capability of SidecarSet.
 
-For details, please refer to: [AliYun ASM](https://help.aliyun.com/document_detail/193804.html?spm=a2c4g.11174283.6.647.63a35d68DEVH1S)
+For details, please refer to: AliYun ASM (help.aliyun.com/document_detail/193804.html).
 
 ## Implementation History
 

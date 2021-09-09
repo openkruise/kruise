@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-containerrecreaterequest,mutating=true,failurePolicy=fail,groups=apps.kruise.io,resources=containerrecreaterequests,verbs=create;update,versions=v1alpha1,name=mcontainerrecreaterequest.kb.io
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-containerrecreaterequest,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=containerrecreaterequests,verbs=create;update,versions=v1alpha1,name=mcontainerrecreaterequest.kb.io
 
 var (
 	// HandlerMap contains admission webhook handlers

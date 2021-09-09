@@ -245,7 +245,7 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 		t.Run(cs.name, func(t *testing.T) {
 			pod := cs.getPods()[0]
 			sidecarset := cs.getSidecarset()
-			fakeClient := fake.NewFakeClientWithScheme(scheme, sidecarset, pod)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pod).Build()
 			processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
 			_, err := processor.UpdateSidecarSet(sidecarset)
 			if err != nil {

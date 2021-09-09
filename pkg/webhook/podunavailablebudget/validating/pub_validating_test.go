@@ -138,7 +138,7 @@ func TestValidatingPub(t *testing.T) {
 	}
 
 	decoder, _ := admission.NewDecoder(scheme)
-	client := fake.NewFakeClientWithScheme(scheme)
+	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	pubHandler := PodUnavailableBudgetCreateUpdateHandler{
 		Client:  client,
 		Decoder: decoder,
@@ -307,7 +307,7 @@ func TestPubConflictWithOthers(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			decoder, _ := admission.NewDecoder(scheme)
-			client := fake.NewFakeClientWithScheme(scheme)
+			client := fake.NewClientBuilder().WithScheme(scheme).Build()
 			for _, pub := range cs.otherPubs() {
 				client.Create(context.TODO(), pub)
 			}
@@ -391,7 +391,7 @@ func TestValidatingUpdatePub(t *testing.T) {
 	}
 
 	decoder, _ := admission.NewDecoder(scheme)
-	client := fake.NewFakeClientWithScheme(scheme)
+	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	pubHandler := PodUnavailableBudgetCreateUpdateHandler{
 		Client:  client,
 		Decoder: decoder,

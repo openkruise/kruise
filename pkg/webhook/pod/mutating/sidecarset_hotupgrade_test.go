@@ -23,7 +23,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -41,10 +41,10 @@ func TestInjectHotUpgradeSidecar(t *testing.T) {
 func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewFakeClient(sidecarSetIn)
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	req := newAdmission(admissionv1beta1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
 	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)

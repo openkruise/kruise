@@ -25,8 +25,10 @@ import (
 )
 
 // CloneSetLister helps list CloneSets.
+// All objects returned here must be treated as read-only.
 type CloneSetLister interface {
 	// List lists all CloneSets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.CloneSet, err error)
 	// CloneSets returns an object that can list and get CloneSets.
 	CloneSets(namespace string) CloneSetNamespaceLister
@@ -57,10 +59,13 @@ func (s *cloneSetLister) CloneSets(namespace string) CloneSetNamespaceLister {
 }
 
 // CloneSetNamespaceLister helps list and get CloneSets.
+// All objects returned here must be treated as read-only.
 type CloneSetNamespaceLister interface {
 	// List lists all CloneSets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.CloneSet, err error)
 	// Get retrieves the CloneSet from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.CloneSet, error)
 	CloneSetNamespaceListerExpansion
 }

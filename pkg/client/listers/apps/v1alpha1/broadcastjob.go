@@ -25,8 +25,10 @@ import (
 )
 
 // BroadcastJobLister helps list BroadcastJobs.
+// All objects returned here must be treated as read-only.
 type BroadcastJobLister interface {
 	// List lists all BroadcastJobs in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.BroadcastJob, err error)
 	// BroadcastJobs returns an object that can list and get BroadcastJobs.
 	BroadcastJobs(namespace string) BroadcastJobNamespaceLister
@@ -57,10 +59,13 @@ func (s *broadcastJobLister) BroadcastJobs(namespace string) BroadcastJobNamespa
 }
 
 // BroadcastJobNamespaceLister helps list and get BroadcastJobs.
+// All objects returned here must be treated as read-only.
 type BroadcastJobNamespaceLister interface {
 	// List lists all BroadcastJobs in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.BroadcastJob, err error)
 	// Get retrieves the BroadcastJob from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.BroadcastJob, error)
 	BroadcastJobNamespaceListerExpansion
 }

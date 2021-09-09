@@ -9,34 +9,32 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "bootime_util_linux_test.go",
+        "util_test.go",
         "util_unix_test.go",
         "util_windows_test.go",
     ],
     embed = [":go_default_library"],
-    deps = select({
+    deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
-            "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
-            "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:ios": [
-            "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Microsoft/go-winio:go_default_library",
-            "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
         ],
         "//conditions:default": [],
@@ -49,6 +47,7 @@ go_library(
         "boottime_util_darwin.go",
         "boottime_util_linux.go",
         "doc.go",
+        "nodelease.go",
         "util.go",
         "util_unix.go",
         "util_unsupported.go",
@@ -56,27 +55,26 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/util",
     deps = [
+        "//staging/src/k8s.io/api/coordination/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Microsoft/go-winio:go_default_library",
@@ -99,7 +97,6 @@ filegroup(
         "//pkg/kubelet/util/cache:all-srcs",
         "//pkg/kubelet/util/format:all-srcs",
         "//pkg/kubelet/util/ioutils:all-srcs",
-        "//pkg/kubelet/util/logreduction:all-srcs",
         "//pkg/kubelet/util/manager:all-srcs",
         "//pkg/kubelet/util/queue:all-srcs",
         "//pkg/kubelet/util/sliceutils:all-srcs",

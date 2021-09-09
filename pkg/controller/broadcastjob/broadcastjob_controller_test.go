@@ -117,7 +117,7 @@ func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -177,7 +177,7 @@ func TestReconcileJobCreatePodPercentage(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -227,7 +227,7 @@ func TestPodsOnUnschedulableNodes(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	// assert Job exists
@@ -258,7 +258,7 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 	// A job
 	job := createJob("job4", p)
 
-	var objList []runtime.Object
+	var objList []client.Object
 	objList = append(objList, job)
 	for i := 0; i < 10; i++ {
 		objList = append(objList, createNode(fmt.Sprintf("node-%d", i)))
@@ -271,7 +271,7 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -326,7 +326,7 @@ func TestJobFailed(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -377,7 +377,7 @@ func TestJobFailurePolicyTypeContinue(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -424,7 +424,7 @@ func TestJobFailurePolicyTypeFailFast(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -471,7 +471,7 @@ func TestJobFailurePolicyPause(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -498,7 +498,7 @@ func TestJobSetPaused(t *testing.T) {
 	job := createJob("job9", p)
 	job.Spec.Paused = true
 
-	var objList []runtime.Object
+	var objList []client.Object
 	objList = append(objList, job)
 	for i := 0; i < 10; i++ {
 		objList = append(objList, createNode(fmt.Sprintf("node-%d", i)))
@@ -516,7 +516,7 @@ func TestJobSetPaused(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -578,7 +578,7 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 		},
 	}
 
-	_, err := reconcileJob.Reconcile(request)
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1alpha1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
@@ -599,8 +599,8 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 	assert.Equal(t, 0, len(podList.Items))
 }
 
-func createReconcileJob(scheme *runtime.Scheme, initObjs ...runtime.Object) ReconcileBroadcastJob {
-	fakeClient := fake.NewFakeClientWithScheme(scheme, initObjs...)
+func createReconcileJob(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileBroadcastJob {
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjs...).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "broadcast-controller"})
 	reconcileJob := ReconcileBroadcastJob{

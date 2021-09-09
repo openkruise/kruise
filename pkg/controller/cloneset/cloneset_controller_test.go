@@ -95,10 +95,11 @@ func TestReconcile(t *testing.T) {
 	//recFn, requests := SetupTestReconcile(newReconciler(mgr))
 	g.Expect(add(mgr, newReconciler(mgr))).NotTo(gomega.HaveOccurred())
 
-	stopMgr, mgrStopped := StartTestManager(mgr, g)
+	ctx, cancel := context.WithCancel(context.Background())
+	mgrStopped := StartTestManager(ctx, mgr, g)
 
 	defer func() {
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -184,11 +185,11 @@ func TestClaimPods(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		initObjs := []runtime.Object{instance}
+		initObjs := []client.Object{instance}
 		for i := range test.pods {
 			initObjs = append(initObjs, test.pods[i])
 		}
-		fakeClient := fake.NewFakeClientWithScheme(scheme, initObjs...)
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjs...).Build()
 
 		reconciler := &ReconcileCloneSet{
 			Client: fakeClient,

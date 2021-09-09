@@ -38,12 +38,12 @@ type AdvancedStatefulSetAdapter struct {
 }
 
 // NewResourceObject creates a empty AdvancedStatefulSet object.
-func (a *AdvancedStatefulSetAdapter) NewResourceObject() runtime.Object {
+func (a *AdvancedStatefulSetAdapter) NewResourceObject() client.Object {
 	return &alpha1.StatefulSet{}
 }
 
 // NewResourceListObject creates a empty AdvancedStatefulSet object.
-func (a *AdvancedStatefulSetAdapter) NewResourceListObject() runtime.Object {
+func (a *AdvancedStatefulSetAdapter) NewResourceListObject() client.ObjectList {
 	return &alpha1.StatefulSetList{}
 }
 

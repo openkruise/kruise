@@ -22,14 +22,14 @@ import (
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-type containerStatusByCreated []*kubeletcontainer.ContainerStatus
+type containerStatusByCreated []*kubeletcontainer.Status
 
 func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
 
 // toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.ContainerState.
-func toKubeContainerState(state runtimeapi.ContainerState) kubeletcontainer.ContainerState {
+func toKubeContainerState(state runtimeapi.ContainerState) kubeletcontainer.State {
 	switch state {
 	case runtimeapi.ContainerState_CONTAINER_CREATED:
 		return kubeletcontainer.ContainerStateCreated

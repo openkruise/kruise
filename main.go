@@ -30,6 +30,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -120,13 +121,14 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                  scheme,
-		MetricsBindAddress:      metricsAddr,
-		HealthProbeBindAddress:  healthProbeAddr,
-		LeaderElection:          enableLeaderElection,
-		LeaderElectionID:        "kruise-manager",
-		LeaderElectionNamespace: leaderElectionNamespace,
-		Namespace:               namespace,
+		Scheme:                     scheme,
+		MetricsBindAddress:         metricsAddr,
+		HealthProbeBindAddress:     healthProbeAddr,
+		LeaderElection:             enableLeaderElection,
+		LeaderElectionID:           "kruise-manager",
+		LeaderElectionNamespace:    leaderElectionNamespace,
+		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
+		Namespace:                  namespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -147,9 +149,9 @@ func main() {
 
 	// +kubebuilder:scaffold:builder
 
-	stopCh := ctrl.SetupSignalHandler()
+	ctx := ctrl.SetupSignalHandler()
 	setupLog.Info("initialize webhook")
-	if err := webhook.Initialize(mgr, stopCh); err != nil {
+	if err := webhook.Initialize(ctx, cfg); err != nil {
 		setupLog.Error(err, "unable to initialize webhook")
 		os.Exit(1)
 	}
@@ -174,7 +176,7 @@ func main() {
 	}()
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(stopCh); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

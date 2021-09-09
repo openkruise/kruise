@@ -48,7 +48,7 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
-		e.Delete(event.DeleteEvent{Meta: evt.Meta, Object: evt.Object}, q)
+		e.Delete(event.DeleteEvent{Object: evt.Object}, q)
 		return
 	}
 
@@ -97,10 +97,10 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rs never initiates a phase change, and so is never asleep waiting for the same.
-		e.Delete(event.DeleteEvent{Meta: evt.MetaNew, Object: evt.ObjectNew}, q)
+		e.Delete(event.DeleteEvent{Object: evt.ObjectNew}, q)
 		if labelChanged {
 			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
-			e.Delete(event.DeleteEvent{Meta: evt.MetaOld, Object: evt.ObjectOld}, q)
+			e.Delete(event.DeleteEvent{Object: evt.ObjectOld}, q)
 		}
 		return
 	}
@@ -236,7 +236,7 @@ var _ handler.EventHandler = &pvcEventHandler{}
 func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	pvc := evt.Object.(*v1.PersistentVolumeClaim)
 	if pvc.DeletionTimestamp != nil {
-		e.Delete(event.DeleteEvent{Meta: evt.Meta, Object: evt.Object}, q)
+		e.Delete(event.DeleteEvent{Object: evt.Object}, q)
 		return
 	}
 
@@ -251,7 +251,7 @@ func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 func (e *pvcEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	pvc := evt.ObjectNew.(*v1.PersistentVolumeClaim)
 	if pvc.DeletionTimestamp != nil {
-		e.Delete(event.DeleteEvent{Meta: evt.MetaNew, Object: evt.ObjectNew}, q)
+		e.Delete(event.DeleteEvent{Object: evt.ObjectNew}, q)
 	}
 }
 

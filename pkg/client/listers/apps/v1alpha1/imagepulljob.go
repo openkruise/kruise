@@ -25,8 +25,10 @@ import (
 )
 
 // ImagePullJobLister helps list ImagePullJobs.
+// All objects returned here must be treated as read-only.
 type ImagePullJobLister interface {
 	// List lists all ImagePullJobs in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ImagePullJob, err error)
 	// ImagePullJobs returns an object that can list and get ImagePullJobs.
 	ImagePullJobs(namespace string) ImagePullJobNamespaceLister
@@ -57,10 +59,13 @@ func (s *imagePullJobLister) ImagePullJobs(namespace string) ImagePullJobNamespa
 }
 
 // ImagePullJobNamespaceLister helps list and get ImagePullJobs.
+// All objects returned here must be treated as read-only.
 type ImagePullJobNamespaceLister interface {
 	// List lists all ImagePullJobs in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ImagePullJob, err error)
 	// Get retrieves the ImagePullJob from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.ImagePullJob, error)
 	ImagePullJobNamespaceListerExpansion
 }

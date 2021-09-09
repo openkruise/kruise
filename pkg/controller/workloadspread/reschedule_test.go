@@ -258,7 +258,7 @@ func TestRescheduleSubset(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			currentTime = time.Now()
 			workloadSpread := cs.getWorkloadSpread()
-			fakeClient := fake.NewFakeClientWithScheme(scheme, cs.getCloneSet(), workloadSpread)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getCloneSet(), workloadSpread).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
 				err := fakeClient.Create(context.TODO(), podIn)

@@ -142,7 +142,7 @@ type ReconcilePodUnavailableBudget struct {
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets/status,verbs=get;update;patch
 
 // pkg/controller/cloneset/cloneset_controller.go Watch for changes to CloneSet
-func (r *ReconcilePodUnavailableBudget) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Fetch the PodUnavailableBudget instance
 	pub := &policyv1alpha1.PodUnavailableBudget{}
 	err := r.Get(context.TODO(), req.NamespacedName, pub)

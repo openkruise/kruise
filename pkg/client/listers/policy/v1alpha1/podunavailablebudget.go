@@ -25,8 +25,10 @@ import (
 )
 
 // PodUnavailableBudgetLister helps list PodUnavailableBudgets.
+// All objects returned here must be treated as read-only.
 type PodUnavailableBudgetLister interface {
 	// List lists all PodUnavailableBudgets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.PodUnavailableBudget, err error)
 	// PodUnavailableBudgets returns an object that can list and get PodUnavailableBudgets.
 	PodUnavailableBudgets(namespace string) PodUnavailableBudgetNamespaceLister
@@ -57,10 +59,13 @@ func (s *podUnavailableBudgetLister) PodUnavailableBudgets(namespace string) Pod
 }
 
 // PodUnavailableBudgetNamespaceLister helps list and get PodUnavailableBudgets.
+// All objects returned here must be treated as read-only.
 type PodUnavailableBudgetNamespaceLister interface {
 	// List lists all PodUnavailableBudgets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.PodUnavailableBudget, err error)
 	// Get retrieves the PodUnavailableBudget from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.PodUnavailableBudget, error)
 	PodUnavailableBudgetNamespaceListerExpansion
 }

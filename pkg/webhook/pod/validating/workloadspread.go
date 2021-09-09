@@ -20,7 +20,7 @@ import (
 	"context"
 
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +44,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 	klog.V(6).Infof("workloadSpread validate Operation[%s] Pod(%s/%s)", req.Operation, req.Namespace, req.Name)
 
 	switch req.AdmissionRequest.Operation {
-	case admissionv1beta1.Delete:
+	case admissionv1.Delete:
 		if req.AdmissionRequest.SubResource != "" {
 			klog.V(6).Infof("Pod(%s/%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
 			return true, "", nil
@@ -71,7 +71,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 		if err != nil {
 			return false, "", err
 		}
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		// ignore create operation other than subresource eviction
 		if req.AdmissionRequest.SubResource != "eviction" {
 			klog.V(6).Infof("Pod(%s/%s) AdmissionRequest operation(CREATE) Resource(%s) subResource(%s), then admit", req.Namespace, req.Name, req.Resource, req.SubResource)

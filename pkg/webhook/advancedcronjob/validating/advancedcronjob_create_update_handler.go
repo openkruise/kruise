@@ -24,7 +24,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/robfig/cron"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -122,7 +122,7 @@ func validateJobTemplateSpec(jobSpec *batchv1beta1.JobTemplateSpec, fldPath *fie
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), jobSpec.Spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
 	}
-	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"))...)
+	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), corevalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
 }
 
 func validateBroadcastJobTemplateSpec(brJobSpec *appsv1alpha1.BroadcastJobTemplateSpec, fldPath *field.Path) field.ErrorList {
@@ -132,7 +132,7 @@ func validateBroadcastJobTemplateSpec(brJobSpec *appsv1alpha1.BroadcastJobTempla
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), brJobSpec.Spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
 	}
-	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"))...)
+	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), corevalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
 }
 
 func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
@@ -181,11 +181,11 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	switch req.AdmissionRequest.Operation {
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		if allErrs := h.validateAdvancedCronJob(obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
-	case admissionv1beta1.Update:
+	case admissionv1.Update:
 		oldObj := &appsv1alpha1.AdvancedCronJob{}
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)

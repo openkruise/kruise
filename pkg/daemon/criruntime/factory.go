@@ -29,7 +29,7 @@ import (
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
-	kubeletremote "k8s.io/kubernetes/pkg/kubelet/remote"
+	criremote "k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 )
 
@@ -135,7 +135,7 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 			continue
 		}
 
-		runtimeService, err = kubeletremote.NewRemoteRuntimeService(cfg.runtimeRemoteURI, time.Second*5)
+		runtimeService, err = criremote.NewRemoteRuntimeService(cfg.runtimeRemoteURI, time.Second*5)
 		if err != nil {
 			klog.Warningf("Failed to new runtime service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 			continue

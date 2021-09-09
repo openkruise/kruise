@@ -25,8 +25,10 @@ import (
 )
 
 // UnitedDeploymentLister helps list UnitedDeployments.
+// All objects returned here must be treated as read-only.
 type UnitedDeploymentLister interface {
 	// List lists all UnitedDeployments in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.UnitedDeployment, err error)
 	// UnitedDeployments returns an object that can list and get UnitedDeployments.
 	UnitedDeployments(namespace string) UnitedDeploymentNamespaceLister
@@ -57,10 +59,13 @@ func (s *unitedDeploymentLister) UnitedDeployments(namespace string) UnitedDeplo
 }
 
 // UnitedDeploymentNamespaceLister helps list and get UnitedDeployments.
+// All objects returned here must be treated as read-only.
 type UnitedDeploymentNamespaceLister interface {
 	// List lists all UnitedDeployments in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.UnitedDeployment, err error)
 	// Get retrieves the UnitedDeployment from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.UnitedDeployment, error)
 	UnitedDeploymentNamespaceListerExpansion
 }

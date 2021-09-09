@@ -107,7 +107,7 @@ func validateBroadcastJobSpec(spec *appsv1alpha1.BroadcastJobSpec, fldPath *fiel
 				fmt.Sprintf("\"%s\" and \"%s\" are not allowed to preset in pod labels", broadcastjob.JobNameLabelKey, broadcastjob.ControllerUIDLabelKey)))
 		}
 	}
-	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"))...)
+	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), corevalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
 }
 
 func validateBroadcastJobName(name string, prefix bool) (allErrs []string) {

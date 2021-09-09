@@ -26,8 +26,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -45,7 +45,7 @@ type secretCertWriter struct {
 // SecretCertWriterOptions is options for constructing a secretCertWriter.
 type SecretCertWriterOptions struct {
 	// client talks to a kubernetes cluster for creating the secret.
-	Client client.Client
+	Clientset clientset.Interface
 	// certGenerator generates the certificates.
 	CertGenerator generator.CertGenerator
 	// secret points the secret that contains certificates that written by the CertWriter.
@@ -61,7 +61,7 @@ func (ops *SecretCertWriterOptions) setDefaults() {
 }
 
 func (ops *SecretCertWriterOptions) validate() error {
-	if ops.Client == nil {
+	if ops.Clientset == nil {
 		return errors.New("client must be set in SecretCertWriterOptions")
 	}
 	if ops.Secret == nil {
@@ -105,7 +105,7 @@ func (s *secretCertWriter) write() (*generator.Artifacts, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = s.Client.Create(context.TODO(), secret)
+	_, err = s.Clientset.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil, alreadyExistError{err}
 	}
@@ -119,20 +119,24 @@ func (s *secretCertWriter) overwrite(resourceVersion string) (
 		return nil, err
 	}
 	secret.ResourceVersion = resourceVersion
-	err = s.Client.Update(context.TODO(), secret)
+	secret, err = s.Clientset.CoreV1().Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	if err != nil {
+		klog.Infof("Cert writer update secret failed: %v", err)
+		return certs, err
+	}
 	klog.Infof("Cert writer update secret %s resourceVersion from %s to %s",
 		secret.Name, resourceVersion, secret.ResourceVersion)
 	return certs, err
 }
 
 func (s *secretCertWriter) read() (*generator.Artifacts, error) {
-	secret := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-	}
-	err := s.Client.Get(context.TODO(), *s.Secret, secret)
+	//secret := &corev1.Secret{
+	//	TypeMeta: metav1.TypeMeta{
+	//		APIVersion: "v1",
+	//		Kind:       "Secret",
+	//	},
+	//}
+	secret, err := s.Clientset.CoreV1().Secrets(s.Secret.Namespace).Get(context.TODO(), s.Secret.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, notFoundError{err}
 	} else if err != nil {

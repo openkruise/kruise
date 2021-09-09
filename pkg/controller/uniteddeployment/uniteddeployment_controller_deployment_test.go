@@ -34,10 +34,10 @@ import (
 )
 
 func TestDeploymentReconcile(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -115,10 +115,10 @@ func TestDeploymentReconcile(t *testing.T) {
 }
 
 func TestDeploymentSubsetProvision(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -313,10 +313,10 @@ func TestDeploymentSubsetProvision(t *testing.T) {
 }
 
 func TestDeploymentSubsetProvisionWithToleration(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -419,10 +419,10 @@ func TestDeploymentSubsetProvisionWithToleration(t *testing.T) {
 }
 
 func TestDeploymentDupSubset(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -509,10 +509,10 @@ func TestDeploymentDupSubset(t *testing.T) {
 }
 
 func TestDeploymentScale(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -652,10 +652,10 @@ func TestDeploymentScale(t *testing.T) {
 }
 
 func TestDeploymentUpdate(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -771,10 +771,10 @@ func TestDeploymentUpdate(t *testing.T) {
 }
 
 func TestDeploymentOnDelete(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -912,10 +912,10 @@ func TestDeploymentOnDelete(t *testing.T) {
 }
 
 func TestDeploymentSubsetCount(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 

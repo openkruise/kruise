@@ -40,7 +40,7 @@ import (
 
 func newFakeControl() *realControl {
 	return &realControl{
-		Client:   fake.NewFakeClient(),
+		Client:   fake.NewClientBuilder().Build(),
 		recorder: record.NewFakeRecorder(10),
 	}
 }

@@ -34,10 +34,10 @@ import (
 )
 
 func TestAstsReconcile(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -120,10 +120,10 @@ func TestAstsReconcile(t *testing.T) {
 }
 
 func TestTemplateTypeSwtich(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -250,10 +250,10 @@ func TestTemplateTypeSwtich(t *testing.T) {
 }
 
 func TestAstsSubsetProvision(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -453,10 +453,10 @@ func TestAstsSubsetProvision(t *testing.T) {
 }
 
 func TestAstsSubsetProvisionWithToleration(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -564,10 +564,10 @@ func TestAstsSubsetProvisionWithToleration(t *testing.T) {
 }
 
 func TestAstsDupSubset(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -659,10 +659,10 @@ func TestAstsDupSubset(t *testing.T) {
 }
 
 func TestAstsScale(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -807,10 +807,10 @@ func TestAstsScale(t *testing.T) {
 }
 
 func TestAstsUpdate(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -931,10 +931,10 @@ func TestAstsUpdate(t *testing.T) {
 }
 
 func TestAstsRollingUpdatePartition(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -1118,10 +1118,10 @@ func TestAstsRollingUpdatePartition(t *testing.T) {
 }
 
 func TestAstsOnDelete(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 
@@ -1274,10 +1274,10 @@ func TestAstsOnDelete(t *testing.T) {
 }
 
 func TestAstsSubsetCount(t *testing.T) {
-	g, requests, stopMgr, mgrStopped := setUp(t)
+	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
-		close(stopMgr)
+		cancel()
 		mgrStopped.Wait()
 	}()
 

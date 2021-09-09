@@ -162,7 +162,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		fakeClient := fake.NewFakeClient()
+		fakeClient := fake.NewClientBuilder().Build()
 		for _, cs := range testCase.css {
 			fakeClient.Create(context.TODO(), cs)
 		}
@@ -644,7 +644,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		fakeClient := fake.NewFakeClient()
+		fakeClient := fake.NewClientBuilder().Build()
 		for _, cs := range testCase.css {
 			fakeClient.Create(context.TODO(), cs)
 		}
@@ -709,7 +709,7 @@ func TestGetPodCloneSets(t *testing.T) {
 	}
 
 	for _, c := range testCases {
-		fakeClient := fake.NewFakeClient()
+		fakeClient := fake.NewClientBuilder().Build()
 		enqueueHandler := newTestPodEventHandler(fakeClient)
 		for _, r := range c.inRSs {
 			_ = fakeClient.Create(context.TODO(), r)

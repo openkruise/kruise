@@ -26,7 +26,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -76,7 +76,7 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req admission.Requ
 	}
 	var copy runtime.Object = obj.DeepCopy()
 	switch req.AdmissionRequest.Operation {
-	case v1beta1.Create, v1beta1.Update:
+	case admissionv1.Create, admissionv1.Update:
 		defaults.SetDefaultsSidecarSet(obj)
 		if err := setHashSidecarSet(obj); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)

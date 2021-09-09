@@ -23,7 +23,7 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +44,7 @@ var _ admission.Handler = &CRDHandler{}
 
 // Handle handles admission requests.
 func (h *CRDHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	if req.AdmissionRequest.Operation != admissionv1beta1.Delete || req.AdmissionRequest.SubResource != "" {
+	if req.AdmissionRequest.Operation != admissionv1.Delete || req.AdmissionRequest.SubResource != "" {
 		return admission.ValidationResponse(true, "")
 	}
 	if len(req.OldObject.Raw) == 0 {

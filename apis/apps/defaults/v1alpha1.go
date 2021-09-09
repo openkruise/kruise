@@ -75,7 +75,9 @@ func setSidecarDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 	v1.SetDefaults_Container(container)
 	for i := range container.Ports {
 		p := &container.Ports[i]
-		v1.SetDefaults_ContainerPort(p)
+		if p.Protocol == "" {
+			p.Protocol = "TCP"
+		}
 	}
 	for i := range container.Env {
 		e := &container.Env[i]

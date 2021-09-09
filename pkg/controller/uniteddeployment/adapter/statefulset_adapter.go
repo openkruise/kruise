@@ -41,12 +41,12 @@ type StatefulSetAdapter struct {
 }
 
 // NewResourceObject creates a empty StatefulSet object.
-func (a *StatefulSetAdapter) NewResourceObject() runtime.Object {
+func (a *StatefulSetAdapter) NewResourceObject() client.Object {
 	return &appsv1.StatefulSet{}
 }
 
 // NewResourceListObject creates a empty StatefulSetList object.
-func (a *StatefulSetAdapter) NewResourceListObject() runtime.Object {
+func (a *StatefulSetAdapter) NewResourceListObject() client.ObjectList {
 	return &appsv1.StatefulSetList{}
 }
 

@@ -41,7 +41,7 @@ func TestPodReadiness(t *testing.T) {
 			ReadinessGates: []v1.PodReadinessGate{},
 		},
 	}
-	fakeClient := fake.NewFakeClientWithScheme(clientgoscheme.Scheme, pod0, pod1)
+	fakeClient := fake.NewClientBuilder().WithScheme(clientgoscheme.Scheme).WithObjects(pod0, pod1).Build()
 
 	msg0 := Message{UserAgent: "ua1", Key: "foo"}
 	msg1 := Message{UserAgent: "ua1", Key: "bar"}

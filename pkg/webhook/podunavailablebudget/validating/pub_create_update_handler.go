@@ -27,7 +27,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -66,10 +66,10 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 	}
 	var old *policyv1alpha1.PodUnavailableBudget
 	//when Operation is update, decode older object
-	if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+	if req.AdmissionRequest.Operation == admissionv1.Update {
 		old = new(policyv1alpha1.PodUnavailableBudget)
 		if err := h.Decoder.Decode(
-			admission.Request{AdmissionRequest: admissionv1beta1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
+			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			old); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}

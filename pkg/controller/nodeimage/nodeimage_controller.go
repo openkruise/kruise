@@ -141,7 +141,7 @@ type ReconcileNodeImage struct {
 // Reconcile reads that state of the cluster for a NodeImage object and makes changes based on the state read
 // and what is in the NodeImage.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write nodes
-func (r *ReconcileNodeImage) Reconcile(request reconcile.Request) (res reconcile.Result, err error) {
+func (r *ReconcileNodeImage) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
 	klog.V(5).Infof("Starting to process NodeImage %v", request.Name)
 	var requeueMsg string

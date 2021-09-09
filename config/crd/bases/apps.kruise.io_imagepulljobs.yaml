@@ -1,41 +1,13 @@
 
 ---
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.2.9
+    controller-gen.kubebuilder.io/version: v0.5.0
   creationTimestamp: null
   name: imagepulljobs.apps.kruise.io
 spec:
-  additionalPrinterColumns:
-  - JSONPath: .status.desired
-    description: Number of all nodes matched by this job
-    name: TOTAL
-    type: integer
-  - JSONPath: .status.active
-    description: Number of image pull task active
-    name: ACTIVE
-    type: integer
-  - JSONPath: .status.succeeded
-    description: Number of image pull task succeeded
-    name: SUCCEED
-    type: integer
-  - JSONPath: .status.failed
-    description: Number of image pull tasks failed
-    name: FAILED
-    type: integer
-  - JSONPath: .metadata.creationTimestamp
-    description: CreationTimestamp is a timestamp representing the server time when
-      this object was created. It is not guaranteed to be set in happens-before order
-      across separate operations. Clients may not set this value. It is represented
-      in RFC3339 form and is in UTC.
-    name: AGE
-    type: date
-  - JSONPath: .status.message
-    description: Summary of status when job is failed
-    name: MESSAGE
-    type: string
   group: apps.kruise.io
   names:
     kind: ImagePullJob
@@ -43,239 +15,201 @@ spec:
     plural: imagepulljobs
     singular: imagepulljob
   scope: Namespaced
-  subresources:
-    status: {}
-  validation:
-    openAPIV3Schema:
-      description: ImagePullJob is the Schema for the imagepulljobs API
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: ImagePullJobSpec defines the desired state of ImagePullJob
-          properties:
-            completionPolicy:
-              description: CompletionPolicy indicates the completion policy of the
-                job. Default is Always CompletionPolicyType.
-              properties:
-                activeDeadlineSeconds:
-                  description: ActiveDeadlineSeconds specifies the duration in seconds
-                    relative to the startTime that the job may be active before the
-                    system tries to terminate it; value must be positive integer.
-                    Only works for Always type.
-                  format: int64
-                  type: integer
-                ttlSecondsAfterFinished:
-                  description: ttlSecondsAfterFinished limits the lifetime of a Job
-                    that has finished execution (either Complete or Failed). If this
-                    field is set, ttlSecondsAfterFinished after the Job finishes,
-                    it is eligible to be automatically deleted. When the Job is being
-                    deleted, its lifecycle guarantees (e.g. finalizers) will be honored.
-                    If this field is unset, the Job won't be automatically deleted.
-                    If this field is set to zero, the Job becomes eligible to be deleted
-                    immediately after it finishes. This field is alpha-level and is
-                    only honored by servers that enable the TTLAfterFinished feature.
-                    Only works for Always type
-                  format: int32
-                  type: integer
-                type:
-                  description: Type indicates the type of the CompletionPolicy Default
-                    is Always
-                  type: string
-              type: object
-            image:
-              description: Image is the image to be pulled by the job
-              type: string
-            parallelism:
-              anyOf:
-              - type: integer
-              - type: string
-              description: Parallelism is the requested parallelism, it can be set
-                to any non-negative value. If it is unspecified, it defaults to 1.
-                If it is specified as 0, then the Job is effectively paused until
-                it is increased.
-              x-kubernetes-int-or-string: true
-            podSelector:
-              description: PodSelector is a query over pods that should pull image
-                on nodes of these pods. Mutually exclusive with Selector.
-              properties:
-                matchExpressions:
-                  description: matchExpressions is a list of label selector requirements.
-                    The requirements are ANDed.
-                  items:
-                    description: A label selector requirement is a selector that contains
-                      values, a key, and an operator that relates the key and values.
-                    properties:
-                      key:
-                        description: key is the label key that the selector applies
-                          to.
-                        type: string
-                      operator:
-                        description: operator represents a key's relationship to a
-                          set of values. Valid operators are In, NotIn, Exists and
-                          DoesNotExist.
-                        type: string
-                      values:
-                        description: values is an array of string values. If the operator
-                          is In or NotIn, the values array must be non-empty. If the
-                          operator is Exists or DoesNotExist, the values array must
-                          be empty. This array is replaced during a strategic merge
-                          patch.
-                        items:
-                          type: string
-                        type: array
-                    required:
-                    - key
-                    - operator
-                    type: object
-                  type: array
-                matchLabels:
-                  additionalProperties:
-                    type: string
-                  description: matchLabels is a map of {key,value} pairs. A single
-                    {key,value} in the matchLabels map is equivalent to an element
-                    of matchExpressions, whose key field is "key", the operator is
-                    "In", and the values array contains only "value". The requirements
-                    are ANDed.
-                  type: object
-              type: object
-            pullPolicy:
-              description: PullPolicy is an optional field to set parameters of the
-                pulling task. If not specified, the system will use the default values.
-              properties:
-                backoffLimit:
-                  description: Specifies the number of retries before marking the
-                    pulling task failed. Defaults to 3
-                  format: int32
-                  type: integer
-                timeoutSeconds:
-                  description: Specifies the timeout of the pulling task. Defaults
-                    to 600
-                  format: int32
-                  type: integer
-              type: object
-            pullSecrets:
-              description: ImagePullSecrets is an optional list of references to secrets
-                in the same namespace to use for pulling the image. If specified,
-                these secrets will be passed to individual puller implementations
-                for them to use.  For example, in the case of docker, only DockerConfig
-                type secrets are honored.
-              items:
-                type: string
-              type: array
-            selector:
-              description: Selector is a query over nodes that should match the job.
-                nil to match all nodes.
-              properties:
-                matchExpressions:
-                  description: matchExpressions is a list of label selector requirements.
-                    The requirements are ANDed.
-                  items:
-                    description: A label selector requirement is a selector that contains
-                      values, a key, and an operator that relates the key and values.
-                    properties:
-                      key:
-                        description: key is the label key that the selector applies
-                          to.
-                        type: string
-                      operator:
-                        description: operator represents a key's relationship to a
-                          set of values. Valid operators are In, NotIn, Exists and
-                          DoesNotExist.
-                        type: string
-                      values:
-                        description: values is an array of string values. If the operator
-                          is In or NotIn, the values array must be non-empty. If the
-                          operator is Exists or DoesNotExist, the values array must
-                          be empty. This array is replaced during a strategic merge
-                          patch.
-                        items:
-                          type: string
-                        type: array
-                    required:
-                    - key
-                    - operator
-                    type: object
-                  type: array
-                matchLabels:
-                  additionalProperties:
-                    type: string
-                  description: matchLabels is a map of {key,value} pairs. A single
-                    {key,value} in the matchLabels map is equivalent to an element
-                    of matchExpressions, whose key field is "key", the operator is
-                    "In", and the values array contains only "value". The requirements
-                    are ANDed.
-                  type: object
-                names:
-                  description: Names specify a set of nodes to execute the job.
-                  items:
-                    type: string
-                  type: array
-              type: object
-          required:
-          - completionPolicy
-          - image
-          type: object
-        status:
-          description: ImagePullJobStatus defines the observed state of ImagePullJob
-          properties:
-            active:
-              description: The number of actively running pulling tasks.
-              format: int32
-              type: integer
-            completionTime:
-              description: Represents time when the job was completed. It is not guaranteed
-                to be set in happens-before order across separate operations. It is
-                represented in RFC3339 form and is in UTC.
-              format: date-time
-              type: string
-            desired:
-              description: The desired number of pulling tasks, this is typically
-                equal to the number of nodes satisfied.
-              format: int32
-              type: integer
-            failed:
-              description: The number of pulling tasks  which reached phase Failed.
-              format: int32
-              type: integer
-            failedNodes:
-              description: The nodes that failed to pull the image.
-              items:
-                type: string
-              type: array
-            message:
-              description: The text prompt for job running status.
-              type: string
-            startTime:
-              description: Represents time when the job was acknowledged by the job
-                controller. It is not guaranteed to be set in happens-before order
-                across separate operations. It is represented in RFC3339 form and
-                is in UTC.
-              format: date-time
-              type: string
-            succeeded:
-              description: The number of pulling tasks which reached phase Succeeded.
-              format: int32
-              type: integer
-          required:
-          - desired
-          type: object
-      type: object
-  version: v1alpha1
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Number of all nodes matched by this job
+      jsonPath: .status.desired
+      name: TOTAL
+      type: integer
+    - description: Number of image pull task active
+      jsonPath: .status.active
+      name: ACTIVE
+      type: integer
+    - description: Number of image pull task succeeded
+      jsonPath: .status.succeeded
+      name: SUCCEED
+      type: integer
+    - description: Number of image pull tasks failed
+      jsonPath: .status.failed
+      name: FAILED
+      type: integer
+    - description: CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+      jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - description: Summary of status when job is failed
+      jsonPath: .status.message
+      name: MESSAGE
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ImagePullJob is the Schema for the imagepulljobs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ImagePullJobSpec defines the desired state of ImagePullJob
+            properties:
+              completionPolicy:
+                description: CompletionPolicy indicates the completion policy of the job. Default is Always CompletionPolicyType.
+                properties:
+                  activeDeadlineSeconds:
+                    description: ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer. Only works for Always type.
+                    format: int64
+                    type: integer
+                  ttlSecondsAfterFinished:
+                    description: ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes. This field is alpha-level and is only honored by servers that enable the TTLAfterFinished feature. Only works for Always type
+                    format: int32
+                    type: integer
+                  type:
+                    description: Type indicates the type of the CompletionPolicy Default is Always
+                    type: string
+                type: object
+              image:
+                description: Image is the image to be pulled by the job
+                type: string
+              parallelism:
+                anyOf:
+                - type: integer
+                - type: string
+                description: Parallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified, it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.
+                x-kubernetes-int-or-string: true
+              podSelector:
+                description: PodSelector is a query over pods that should pull image on nodes of these pods. Mutually exclusive with Selector.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+              pullPolicy:
+                description: PullPolicy is an optional field to set parameters of the pulling task. If not specified, the system will use the default values.
+                properties:
+                  backoffLimit:
+                    description: Specifies the number of retries before marking the pulling task failed. Defaults to 3
+                    format: int32
+                    type: integer
+                  timeoutSeconds:
+                    description: Specifies the timeout of the pulling task. Defaults to 600
+                    format: int32
+                    type: integer
+                type: object
+              pullSecrets:
+                description: ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image. If specified, these secrets will be passed to individual puller implementations for them to use.  For example, in the case of docker, only DockerConfig type secrets are honored.
+                items:
+                  type: string
+                type: array
+              selector:
+                description: Selector is a query over nodes that should match the job. nil to match all nodes.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                  names:
+                    description: Names specify a set of nodes to execute the job.
+                    items:
+                      type: string
+                    type: array
+                type: object
+            required:
+            - completionPolicy
+            - image
+            type: object
+          status:
+            description: ImagePullJobStatus defines the observed state of ImagePullJob
+            properties:
+              active:
+                description: The number of actively running pulling tasks.
+                format: int32
+                type: integer
+              completionTime:
+                description: Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.
+                format: date-time
+                type: string
+              desired:
+                description: The desired number of pulling tasks, this is typically equal to the number of nodes satisfied.
+                format: int32
+                type: integer
+              failed:
+                description: The number of pulling tasks  which reached phase Failed.
+                format: int32
+                type: integer
+              failedNodes:
+                description: The nodes that failed to pull the image.
+                items:
+                  type: string
+                type: array
+              message:
+                description: The text prompt for job running status.
+                type: string
+              startTime:
+                description: Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.
+                format: date-time
+                type: string
+              succeeded:
+                description: The number of pulling tasks which reached phase Succeeded.
+                format: int32
+                type: integer
+            required:
+            - desired
+            type: object
+        type: object
     served: true
     storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""

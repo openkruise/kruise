@@ -21,13 +21,13 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func injectPodReadinessGate(req admission.Request, pod *v1.Pod) {
-	if req.Operation != admissionv1beta1.Create {
+	if req.Operation != admissionv1.Create {
 		return
 	}
 	if !util.IsPodOwnedByKruise(pod) && !utilfeature.DefaultFeatureGate.Enabled(features.KruisePodReadinessGate) {

@@ -27,7 +27,7 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -60,7 +60,7 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 
 	injectTemplateDefaults := false
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
-		if req.AdmissionRequest.Operation == admissionv1beta1.Update {
+		if req.AdmissionRequest.Operation == admissionv1.Update {
 			oldObj := &appsv1alpha1.CloneSet{}
 			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)

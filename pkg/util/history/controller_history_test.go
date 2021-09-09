@@ -68,7 +68,7 @@ func TestRevisionHistory(t *testing.T) {
 		t.Fatalf("Failed to new controller revision: %v", err)
 	}
 
-	fakeClient := fake.NewFakeClient()
+	fakeClient := fake.NewClientBuilder().Build()
 	historyControl := NewHistory(fakeClient)
 
 	newCR, err := historyControl.CreateControllerRevision(parent, cr, parent.Status.CollisionCount)
