@@ -22,7 +22,6 @@ import (
 	"os"
 	"time"
 
-	runtimecontainer "github.com/openkruise/kruise/pkg/daemon/criruntime/containerruntime"
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"google.golang.org/grpc"
@@ -40,7 +39,6 @@ const (
 // Factory is the interface to get container and image runtime service
 type Factory interface {
 	GetImageService() runtimeimage.ImageService
-	GetContainerService() runtimecontainer.ContainerService
 	GetRuntimeService() criapi.RuntimeService
 	GetRuntimeServiceByName(runtimeName string) criapi.RuntimeService
 }
@@ -64,11 +62,10 @@ type factory struct {
 }
 
 type runtimeImpl struct {
-	cfg              runtimeConfig
-	runtimeName      string
-	imageService     runtimeimage.ImageService
-	containerService runtimecontainer.ContainerService
-	runtimeService   criapi.RuntimeService
+	cfg            runtimeConfig
+	runtimeName    string
+	imageService   runtimeimage.ImageService
+	runtimeService criapi.RuntimeService
 }
 
 func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountManager) (Factory, error) {
@@ -84,7 +81,6 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 	for i := range cfgs {
 		cfg = cfgs[i]
 		var imageService runtimeimage.ImageService
-		var containerService runtimecontainer.ContainerService
 		var runtimeService criapi.RuntimeService
 		var typedVersion *runtimeapi.VersionResponse
 
@@ -95,20 +91,10 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue
 			}
-			containerService, err = runtimecontainer.NewDockerContainerService(cfg.runtimeURI)
-			if err != nil {
-				klog.Warningf("Failed to new container service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
 		case ContainerRuntimePouch:
 			imageService, err = runtimeimage.NewPouchImageService(cfg.runtimeURI, accountManager)
 			if err != nil {
 				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
-			containerService, err = runtimecontainer.NewPouchContainerService(cfg.runtimeURI)
-			if err != nil {
-				klog.Warningf("Failed to new container service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue
 			}
 		case ContainerRuntimeContainerd:
@@ -122,11 +108,6 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 			imageService, err = runtimeimage.NewContainerdImageService(conn, accountManager)
 			if err != nil {
 				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
-			containerService, err = runtimecontainer.NewContainerdContainerService(conn)
-			if err != nil {
-				klog.Warningf("Failed to new container service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue
 			}
 		}
@@ -148,11 +129,10 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 
 		klog.V(2).Infof("Add runtime impl %v, URI: (%s, %s)", typedVersion.RuntimeName, cfg.runtimeURI, cfg.runtimeRemoteURI)
 		f.impls = append(f.impls, &runtimeImpl{
-			cfg:              cfg,
-			runtimeName:      typedVersion.RuntimeName,
-			imageService:     imageService,
-			containerService: containerService,
-			runtimeService:   runtimeService,
+			cfg:            cfg,
+			runtimeName:    typedVersion.RuntimeName,
+			imageService:   imageService,
+			runtimeService: runtimeService,
 		})
 	}
 	if len(f.impls) == 0 {
@@ -164,10 +144,6 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 
 func (f *factory) GetImageService() runtimeimage.ImageService {
 	return f.impls[0].imageService
-}
-
-func (f *factory) GetContainerService() runtimecontainer.ContainerService {
-	return f.impls[0].containerService
 }
 
 func (f *factory) GetRuntimeService() criapi.RuntimeService {

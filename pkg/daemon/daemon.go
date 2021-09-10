@@ -23,16 +23,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-
-	kruiseapis "github.com/openkruise/kruise/apis"
-	"github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
-	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +35,17 @@ import (
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	kruiseapis "github.com/openkruise/kruise/apis"
+	"github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/daemon/containermeta"
+	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -60,16 +61,25 @@ func init() {
 	_ = kruiseapis.AddToScheme(scheme)
 }
 
+// Runnable allows a component to be started.
+// It's very important that Start blocks until
+// it's done running.
+type Runnable interface {
+	// Run starts running the component. The component will stop running
+	// when the channel is closed. Run blocks until the channel is closed or
+	// an error occurs.
+	Run(<-chan struct{})
+}
+
 // Daemon is interface for process to run every node
 type Daemon interface {
 	Run(ctx context.Context) error
 }
 
 type daemon struct {
-	runtimeFactory   daemonruntime.Factory
-	podInformer      cache.SharedIndexInformer
-	pullerController *imagepuller.Controller
-	crrController    *containerrecreate.Controller
+	runtimeFactory daemonruntime.Factory
+	podInformer    cache.SharedIndexInformer
+	runnables      []Runnable
 
 	listener  net.Listener
 	healthz   *daemonutil.Healthz
@@ -137,15 +147,26 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 		return nil, fmt.Errorf("failed to new crr daemon controller: %v", err)
 	}
 
-	return &daemon{
-		runtimeFactory:   runtimeFactory,
-		podInformer:      podInformer,
-		pullerController: puller,
-		crrController:    crrController,
+	var runnables = []Runnable{
+		puller,
+		crrController,
+	}
 
-		listener:  listener,
-		healthz:   healthz,
-		errSignal: &errSignaler{errSignal: make(chan struct{})},
+	if utilfeature.DefaultFeatureGate.Enabled(features.DaemonWatchingPod) {
+		containerMetaController, err := containermeta.NewController(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to new containermeta controller: %v", err)
+		}
+		runnables = append(runnables, containerMetaController)
+	}
+
+	return &daemon{
+		runtimeFactory: runtimeFactory,
+		podInformer:    podInformer,
+		runnables:      runnables,
+		listener:       listener,
+		healthz:        healthz,
+		errSignal:      &errSignaler{errSignal: make(chan struct{})},
 	}, nil
 }
 
@@ -179,8 +200,9 @@ func (d *daemon) Run(ctx context.Context) error {
 	}
 
 	go d.serve(ctx)
-	go d.pullerController.Run(ctx.Done())
-	go d.crrController.Run(ctx.Done())
+	for _, r := range d.runnables {
+		go r.Run(ctx.Done())
+	}
 
 	select {
 	case <-ctx.Done():
