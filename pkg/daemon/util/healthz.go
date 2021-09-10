@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // HealthCheckFunc is the interface theat a checker should impl.

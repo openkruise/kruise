@@ -50,7 +50,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	sigsclient "sigs.k8s.io/controller-runtime/pkg/client"

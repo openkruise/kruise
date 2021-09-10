@@ -43,7 +43,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type Controller struct {
@@ -227,7 +227,7 @@ func (c *Controller) sync(key string) (retErr error) {
 		newStatus.Desired += int32(len(imageSpec.Tags))
 
 		imageStatus := c.puller.GetStatus(imageName)
-		if klog.V(9) {
+		if klog.V(9).Enabled() {
 			klog.V(9).Infof("get image %v status %#v", imageName, imageStatus)
 		}
 		if imageStatus == nil {

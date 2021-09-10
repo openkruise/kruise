@@ -25,7 +25,7 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"

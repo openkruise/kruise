@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

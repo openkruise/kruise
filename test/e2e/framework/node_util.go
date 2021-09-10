@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -122,14 +121,14 @@ func (t *NodeTester) CreateFakeNode(randStr string) (node *v1.Node, err error) {
 				err = fn()
 				if err != nil {
 					if !errors.IsNotFound(err) {
-						klog.Errorf("Failed to update status of fake Node %s: %v", name, err)
+						Logf("Failed to update status of fake Node %s: %v", name, err)
 					}
 					noNode = true
 				}
 			}
 			podList, err := t.c.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.nodeName=" + name})
 			if err != nil {
-				klog.Errorf("Failed to get Pods of fake Node %s: %v", name, err)
+				Logf("Failed to get Pods of fake Node %s: %v", name, err)
 				return
 			}
 			for i := range podList.Items {
