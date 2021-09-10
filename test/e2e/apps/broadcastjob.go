@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/client-go/util/retry"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
@@ -132,8 +134,15 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				}
 				if fakePod != nil && fakePod.Status.Phase != v1.PodSucceeded {
 					ginkgo.By("Try to update Pod " + fakePod.Name + " to Succeeded")
-					fakePod.Status.Phase = v1.PodSucceeded
-					_, err = c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), fakePod, metav1.UpdateOptions{})
+					err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+						fakePod, err := c.CoreV1().Pods(job.Namespace).Get(context.TODO(), fakePod.Name, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+						fakePod.Status.Phase = v1.PodSucceeded
+						_, err = c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), fakePod, metav1.UpdateOptions{})
+						return err
+					})
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				}
 
@@ -144,7 +153,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				job, err = tester.GetBroadcastJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Succeeded
-			}, 30*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			}, 60*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
 		})
 	})
 })
