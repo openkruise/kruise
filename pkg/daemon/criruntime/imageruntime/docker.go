@@ -26,7 +26,7 @@ import (
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // NewDockerImageService create a docker runtime

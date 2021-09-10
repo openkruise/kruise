@@ -23,7 +23,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
 )
 

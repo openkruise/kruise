@@ -38,7 +38,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/updatesort"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (c *realControl) Update(cs *appsv1alpha1.CloneSet,

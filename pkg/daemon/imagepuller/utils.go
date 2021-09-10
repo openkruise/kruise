@@ -28,7 +28,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"golang.org/x/time/rate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func logNewImages(oldObj, newObj *appsv1alpha1.NodeImage) {

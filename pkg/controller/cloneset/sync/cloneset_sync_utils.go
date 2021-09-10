@@ -30,7 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 	v1 "k8s.io/api/core/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
 )
 

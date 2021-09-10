@@ -34,7 +34,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 	"github.com/openkruise/kruise/test/e2e/generated"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	// test sources

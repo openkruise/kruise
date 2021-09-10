@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/gomega"
 	"github.com/openkruise/kruise/test/e2e/framework"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"

@@ -32,7 +32,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment"
 	"github.com/openkruise/kruise/pkg/controller/workloadspread"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 

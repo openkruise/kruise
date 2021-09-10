@@ -22,7 +22,7 @@ import (
 
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"

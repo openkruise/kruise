@@ -26,7 +26,7 @@ import (
 
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	"github.com/openkruise/kruise/pkg/webhook/util/writer/atomic"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
