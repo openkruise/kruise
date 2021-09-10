@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 var (
@@ -779,6 +780,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				fmt.Println(cs.expectWorkloadSpread().Status)
 				t.Fatalf("workloadSpread DeepEqual failed")
 			}
+			util.GlobalCache.Delete(workloadSpreadIn)
 		})
 	}
 }

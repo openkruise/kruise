@@ -170,10 +170,23 @@ type ReconcileWorkloadSpread struct {
 func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Request) (reconcile.Result, error) {
 	ws := &appsv1alpha1.WorkloadSpread{}
 	err := r.Get(context.TODO(), req.NamespacedName, ws)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+
+	if (err != nil && errors.IsNotFound(err)) || (err == nil && !ws.DeletionTimestamp.IsZero()) {
+		// delete cache if this workloadSpread has been deleted
+		if cacheErr := util.GlobalCache.Delete(&appsv1alpha1.WorkloadSpread{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "WorkloadSpread",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: req.Namespace,
+				Name:      req.Name,
+			},
+		}); cacheErr != nil {
+			klog.Warningf("Failed to delete workloadSpread(%s/%s) cache after deletion, err: %v", req.Namespace, req.Name, cacheErr)
 		}
+		return reconcile.Result{}, nil
+	} else if err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
@@ -577,9 +590,17 @@ func makeStatusChangedLog(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.
 }
 
 func (r *ReconcileWorkloadSpread) writeWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread) error {
+	unlock := util.GlobalKeyedMutex.Lock(string(ws.GetUID()))
+	defer unlock()
 	// If this update fails, don't retry it. Allow the failure to get handled &
 	// retried in `processNextWorkItem()`.
-	return r.Status().Update(context.TODO(), ws)
+	err := r.Status().Update(context.TODO(), ws)
+	if err == nil {
+		if cacheErr := util.GlobalCache.Add(ws); cacheErr != nil {
+			klog.Warningf("Failed to update workloadSpread(%s/%s) cache after update status, err: %v", ws.Namespace, ws.Name, cacheErr)
+		}
+	}
+	return err
 }
 
 func getWorkloadSpreadKey(o metav1.Object) string {
