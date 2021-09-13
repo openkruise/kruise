@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -291,7 +292,10 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 	}
 
 	// group Pods by subset
-	podMap := groupPod(ws, pods)
+	podMap, err := r.groupPod(ws, pods)
+	if err != nil {
+		return err
+	}
 
 	// update deletion-cost for each subset
 	err = r.updateDeletionCost(ws, podMap, workloadReplicas)
@@ -331,23 +335,89 @@ func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSprea
 }
 
 // groupPod returns a map, the key is the name of subset and the value represents the Pods of the corresponding subset.
-func groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod) map[string][]*corev1.Pod {
+func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod) (map[string][]*corev1.Pod, error) {
 	podMap := make(map[string][]*corev1.Pod, len(ws.Spec.Subsets))
 	for _, subset := range ws.Spec.Subsets {
 		podMap[subset.Name] = []*corev1.Pod{}
 	}
 
 	for i := range pods {
-		injectWS := getInjectWorkloadSpreadFromPod(pods[i])
-		if injectWS == nil || injectWS.Name != ws.Name {
-			continue
+		subsetName, err := r.getSuitableSubsetNameForPod(ws, pods[i])
+		if err != nil {
+			return nil, err
 		}
-		if _, exist := podMap[injectWS.Subset]; exist {
-			podMap[injectWS.Subset] = append(podMap[injectWS.Subset], pods[i])
+
+		if _, exist := podMap[subsetName]; exist {
+			podMap[subsetName] = append(podMap[subsetName], pods[i])
 		}
 	}
 
-	return podMap
+	return podMap, nil
+}
+
+// getSuitableSubsetNameForPod will return ("", nil) if not found suitable subset for pod
+func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) (string, error) {
+	injectWS := getInjectWorkloadSpreadFromPod(pod)
+	if injectWS == nil || injectWS.Name != ws.Name {
+		// process the pods that were created before workloadSpread
+		matchedSubset, err := r.getSuitableSubsetForOldPod(ws, pod)
+		if err != nil {
+			return "", err
+		} else if matchedSubset == nil {
+			return "", nil
+		}
+		return matchedSubset.Name, nil
+	}
+	return injectWS.Subset, nil
+}
+
+// getSuitableSubsetForOldPod returns an suitable subset for the pod which was created before workloadSpread.
+// getSuitableSubsetForOldPod will return (nil, nil) if there is no suitable subset for the pod.
+func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) (*appsv1alpha1.WorkloadSpreadSubset, error) {
+	if len(pod.Spec.NodeName) == 0 {
+		return nil, nil
+	}
+
+	node := &corev1.Node{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: pod.Spec.NodeName}, node); err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	for i := range ws.Spec.Subsets {
+		subset := &ws.Spec.Subsets[i]
+		// in case of that this pod was scheduled to the node which matches a subset of workloadSpread
+		// TODO: check the patch of subset, one can have subset that only have patch but without any affinity or toleration changes.
+		if matched, err := matchesSubset(pod, node, subset); err != nil {
+			// requiredSelectorTerm field was validated at webhook stage, so this error should not occur
+			// this error should not be returned, because it is a non-transient error
+			klog.Errorf("unexpected error occurred when matching pod (%s/%s) with subset, please check requiredSelectorTerm field of subset (%s) in WorkloadSpread (%s/%s), err: %s",
+				pod.Namespace, pod.Name, subset.Name, ws.Namespace, ws.Name, err.Error())
+		} else if matched {
+			value, _ := json.Marshal(&wsutil.InjectWorkloadSpread{
+				Name:   ws.Name,
+				Subset: subset.Name,
+			})
+			patch, _ := json.Marshal(map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"annotations": map[string]string{
+						wsutil.MatchedWorkloadSpreadSubsetAnnotations: string(value),
+					},
+				},
+			})
+			if err = r.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, patch)); err != nil {
+				// no need to retry, this operation will be retried in the next reconcile
+				// this failure would not affect the subsequent logic
+				klog.Errorf(`Failed to patch "matched-workloadspread:{Name: %s, Subset: %s} annotation" for pod (%s/%s), but will retry in the next reconcile, err: %s`,
+					ws.Name, subset.Name, pod.Namespace, pod.Name, err.Error())
+			}
+			return subset, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // return two parameters
@@ -454,7 +524,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 	for _, pod := range pods {
 		// remove this Pod from creatingPods map because this Pod has been created.
 		injectWS := getInjectWorkloadSpreadFromPod(pod)
-		if injectWS.UID != "" {
+		if injectWS != nil && injectWS.UID != "" {
 			// Deployment or other native k8s workload has not generated the full pod.Name when webhook is mutating Pod.
 			// So webhook generates a UID to identify Pod and restore it into the creatingPods map. The generated
 			// UID and pod.Name have the same function.

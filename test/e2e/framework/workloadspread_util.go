@@ -192,6 +192,16 @@ func (t *WorkloadSpreadTester) CreateWorkloadSpread(workloadSpread *appsv1alpha1
 	return workloadSpread
 }
 
+func (t *WorkloadSpreadTester) GetWorkloadSpread(namespace, name string) (*appsv1alpha1.WorkloadSpread, error) {
+	Logf("Get WorkloadSpread (%s/%s)", namespace, name)
+	return t.kc.AppsV1alpha1().WorkloadSpreads(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+func (t *WorkloadSpreadTester) GetCloneSet(namespace, name string) (*appsv1alpha1.CloneSet, error) {
+	Logf("Get CloneSet (%s/%s)", namespace, name)
+	return t.kc.AppsV1alpha1().CloneSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
 func (t *WorkloadSpreadTester) WaitForWorkloadSpreadRunning(ws *appsv1alpha1.WorkloadSpread) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
 		func() (bool, error) {
