@@ -78,6 +78,9 @@ func (t *WorkloadSpreadTester) NewBaseCloneSet(namespace string) *appsv1alpha1.C
 					"app": namespace,
 				},
 			},
+			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+				Type: appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -240,7 +243,7 @@ func (t *WorkloadSpreadTester) WaitForCloneSetRunning(cloneSet *appsv1alpha1.Clo
 			if err != nil {
 				return false, err
 			}
-			if *inner.Spec.Replicas == inner.Status.ReadyReplicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
+			if inner.Generation == inner.Status.ObservedGeneration && *inner.Spec.Replicas == inner.Status.ReadyReplicas &&
 				*inner.Spec.Replicas == inner.Status.Replicas {
 				return true, nil
 			}
@@ -249,6 +252,7 @@ func (t *WorkloadSpreadTester) WaitForCloneSetRunning(cloneSet *appsv1alpha1.Clo
 	if pollErr != nil {
 		Failf("Failed waiting for cloneSet to enter running: %v", pollErr)
 	}
+	Logf("wait cloneSet (%s/%s) running success", cloneSet.Namespace, cloneSet.Name)
 }
 
 func (t *WorkloadSpreadTester) WaitForCloneSetRunReplicas(cloneSet *appsv1alpha1.CloneSet, replicas int32) {
@@ -258,7 +262,8 @@ func (t *WorkloadSpreadTester) WaitForCloneSetRunReplicas(cloneSet *appsv1alpha1
 			if err != nil {
 				return false, err
 			}
-			if replicas == inner.Status.ReadyReplicas && replicas == inner.Status.UpdatedReadyReplicas {
+			if inner.Generation == inner.Status.ObservedGeneration &&
+				replicas == inner.Status.ReadyReplicas && replicas == inner.Status.UpdatedReadyReplicas {
 				return true, nil
 			}
 			return false, nil
@@ -275,7 +280,7 @@ func (t *WorkloadSpreadTester) WaitForDeploymentRunning(deployment *appsv1.Deplo
 			if err != nil {
 				return false, err
 			}
-			if *inner.Spec.Replicas == inner.Status.ReadyReplicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
+			if inner.Generation == inner.Status.ObservedGeneration && *inner.Spec.Replicas == inner.Status.ReadyReplicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
 				*inner.Spec.Replicas == inner.Status.Replicas {
 				return true, nil
 			}
@@ -331,7 +336,6 @@ func (t *WorkloadSpreadTester) UpdateCloneSet(cloneSet *appsv1alpha1.CloneSet) {
 		if updateErr == nil {
 			return nil
 		}
-		clone, _ = t.kc.AppsV1alpha1().CloneSets(clone.Namespace).Get(context.TODO(), clone.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -360,7 +364,9 @@ func (t *WorkloadSpreadTester) WaiteCloneSetUpdate(cloneSet *appsv1alpha1.CloneS
 				return false, err
 			}
 
-			if *inner.Spec.Replicas == inner.Status.ReadyReplicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
+			if inner.Generation == inner.Status.ObservedGeneration &&
+				*inner.Spec.Replicas == inner.Status.ReadyReplicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
+				*inner.Spec.Replicas == inner.Status.UpdatedReadyReplicas &&
 				*inner.Spec.Replicas == inner.Status.Replicas {
 				return true, nil
 			}
@@ -369,6 +375,7 @@ func (t *WorkloadSpreadTester) WaiteCloneSetUpdate(cloneSet *appsv1alpha1.CloneS
 	if pollErr != nil {
 		Failf("Failed waiting for cloneSet to enter running: %v", pollErr)
 	}
+	Logf("wait cloneSet (%s/%s) updated success", cloneSet.Namespace, cloneSet.Name)
 }
 
 func (t *WorkloadSpreadTester) WaiteDeploymentUpdate(deployment *appsv1.Deployment) {
@@ -378,8 +385,9 @@ func (t *WorkloadSpreadTester) WaiteDeploymentUpdate(deployment *appsv1.Deployme
 			if err != nil {
 				return false, err
 			}
-
-			if *inner.Spec.Replicas == inner.Status.ReadyReplicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
+			if inner.Generation == inner.Status.ObservedGeneration &&
+				*inner.Spec.Replicas == inner.Status.ReadyReplicas &&
+				*inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
 				*inner.Spec.Replicas == inner.Status.Replicas {
 				return true, nil
 			}
@@ -403,4 +411,14 @@ func (t *WorkloadSpreadTester) UpdateWorkloadSpread(workloadSpread *appsv1alpha1
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	pollErr := wait.PollImmediate(time.Second, time.Minute*2, func() (bool, error) {
+		clone, err = t.kc.AppsV1alpha1().WorkloadSpreads(clone.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+		if clone.Generation == clone.Status.ObservedGeneration {
+			return true, nil
+		}
+		return false, err
+	})
+	if pollErr != nil {
+		Failf("Failed waiting for workloadSpread to enter ready: %v", pollErr)
+	}
 }
