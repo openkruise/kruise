@@ -24,7 +24,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util/workloadspread"
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
@@ -61,7 +61,6 @@ var _ = SIGDescribe("workloadspread", func() {
 		tester = framework.NewWorkloadSpreadTester(c, kc)
 
 		// label nodes
-
 		nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(len(nodeList.Items) > 2).Should(gomega.Equal(true))
@@ -189,7 +188,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By(fmt.Sprintf("update cloneSet(%s/%s) image=%s", cloneSet.Namespace, cloneSet.Name, "nginx:alpine"))
 			cloneSet.Spec.Template.Spec.Containers[0].Image = "nginx:alpine"
 			tester.UpdateCloneSet(cloneSet)
-			tester.WaitForCloneSetRunning(cloneSet)
+			tester.WaiteCloneSetUpdate(cloneSet)
 
 			// get pods, and check workloadSpread
 			ginkgo.By(fmt.Sprintf("get cloneSet(%s/%s) pods, and check workloadSpread(%s/%s) status", cloneSet.Namespace, cloneSet.Name, workloadSpread.Namespace, workloadSpread.Name))
@@ -236,11 +235,10 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[1].DeletingPods)).To(gomega.Equal(0))
 
 			//scale down cloneSet.replicas = 4, maxReplicas = 2.
-			ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=4", cloneSet.Namespace, cloneSet.Name))
+			ginkgo.By(fmt.Sprintf("scale down cloneSet(%s/%s) replicas=4", cloneSet.Namespace, cloneSet.Name))
 			workloadSpread.Spec.Subsets[0].MaxReplicas.IntVal = 2
 			workloadSpread.Spec.Subsets[1].MaxReplicas.IntVal = 2
 			tester.UpdateWorkloadSpread(workloadSpread)
-
 			cloneSet.Spec.Replicas = pointer.Int32Ptr(4)
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
