@@ -79,6 +79,7 @@ linters:
     - ineffassign
     - misspell
     - vet
+    - unconvert
 issues:
   exclude:
     # staticcheck
