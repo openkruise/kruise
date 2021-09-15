@@ -33,6 +33,8 @@ type Interface interface {
 	ContainerRecreateRequests() ContainerRecreateRequestInformer
 	// DaemonSets returns a DaemonSetInformer.
 	DaemonSets() DaemonSetInformer
+	// EphemeralJobs returns a EphemeralJobInformer.
+	EphemeralJobs() EphemeralJobInformer
 	// ImagePullJobs returns a ImagePullJobInformer.
 	ImagePullJobs() ImagePullJobInformer
 	// NodeImages returns a NodeImageInformer.
@@ -83,6 +85,11 @@ func (v *version) ContainerRecreateRequests() ContainerRecreateRequestInformer {
 // DaemonSets returns a DaemonSetInformer.
 func (v *version) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// EphemeralJobs returns a EphemeralJobInformer.
+func (v *version) EphemeralJobs() EphemeralJobInformer {
+	return &ephemeralJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ImagePullJobs returns a ImagePullJobInformer.

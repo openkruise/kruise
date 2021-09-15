@@ -30,6 +30,7 @@ type AppsV1alpha1Interface interface {
 	CloneSetsGetter
 	ContainerRecreateRequestsGetter
 	DaemonSetsGetter
+	EphemeralJobsGetter
 	ImagePullJobsGetter
 	NodeImagesGetter
 	ResourceDistributionsGetter
@@ -62,6 +63,10 @@ func (c *AppsV1alpha1Client) ContainerRecreateRequests(namespace string) Contain
 
 func (c *AppsV1alpha1Client) DaemonSets(namespace string) DaemonSetInterface {
 	return newDaemonSets(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) EphemeralJobs(namespace string) EphemeralJobInterface {
+	return newEphemeralJobs(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) ImagePullJobs(namespace string) ImagePullJobInterface {

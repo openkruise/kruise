@@ -47,6 +47,10 @@ func (c *FakeAppsV1alpha1) DaemonSets(namespace string) v1alpha1.DaemonSetInterf
 	return &FakeDaemonSets{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) EphemeralJobs(namespace string) v1alpha1.EphemeralJobInterface {
+	return &FakeEphemeralJobs{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) ImagePullJobs(namespace string) v1alpha1.ImagePullJobInterface {
 	return &FakeImagePullJobs{c, namespace}
 }
