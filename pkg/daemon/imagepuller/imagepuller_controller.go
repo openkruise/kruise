@@ -260,8 +260,8 @@ func (c *Controller) sync(key string) (retErr error) {
 		// 3~5s
 		c.queue.AddAfter(key, 3*time.Second+time.Millisecond*time.Duration(rand.Intn(2000)))
 	} else {
-		// 3~5m
-		c.queue.AddAfter(key, 3*time.Minute+time.Millisecond*time.Duration(rand.Intn(120000)))
+		// 20~30m
+		c.queue.AddAfter(key, 20*time.Minute+time.Millisecond*time.Duration(rand.Intn(600000)))
 	}
 	return nil
 }

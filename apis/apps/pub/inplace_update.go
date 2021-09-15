@@ -58,6 +58,9 @@ type InPlaceUpdateState struct {
 	// LastContainerStatuses records the before-in-place-update container statuses. It is a map from ContainerName
 	// to InPlaceUpdateContainerStatus
 	LastContainerStatuses map[string]InPlaceUpdateContainerStatus `json:"lastContainerStatuses"`
+
+	// UpdateEnvFromMetadata indicates there are envs from annotations/labels that should be in-place update.
+	UpdateEnvFromMetadata bool `json:"updateEnvFromMetadata,omitempty"`
 }
 
 // InPlaceUpdateContainerStatus records the statuses of the container that are mainly used
@@ -112,7 +115,9 @@ type RuntimeContainerHashes struct {
 	// PlainHash is the hash that directly calculated from pod.spec.container[x].
 	// Usually it is calculated by Kubelet and will be in annotation of each runtime container.
 	PlainHash uint64 `json:"plainHash"`
-	// TODO: add ConvertEnvHash here to support inplace update for env from annotation/label
+	// ExtractedEnvFromMetadataHash is the hash that calculated from pod.spec.container[x],
+	// whose envs from annotations/labels have already been extracted to the real values.
+	ExtractedEnvFromMetadataHash uint64 `json:"extractedEnvFromMetadataHash,omitempty"`
 }
 
 func GetRuntimeContainerMetaSet(obj metav1.Object) (*RuntimeContainerMetaSet, error) {

@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"sort"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -103,6 +104,9 @@ func (t *CloneSetTester) ListPodsForCloneSet(name string) (pods []*v1.Pod, err e
 			pods = append(pods, pod)
 		}
 	}
+	sort.SliceStable(pods, func(i, j int) bool {
+		return pods[i].Name < pods[j].Name
+	})
 	return
 }
 

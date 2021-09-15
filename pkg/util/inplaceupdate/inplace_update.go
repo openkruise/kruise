@@ -73,9 +73,10 @@ type UpdateSpec struct {
 	Revision    string            `json:"revision"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	ContainerImages map[string]string `json:"containerImages,omitempty"`
-	MetaDataPatch   []byte            `json:"metaDataPatch,omitempty"`
-	GraceSeconds    int32             `json:"graceSeconds,omitempty"`
+	ContainerImages       map[string]string `json:"containerImages,omitempty"`
+	MetaDataPatch         []byte            `json:"metaDataPatch,omitempty"`
+	UpdateEnvFromMetadata bool              `json:"updateEnvFromMetadata,omitempty"`
+	GraceSeconds          int32             `json:"graceSeconds,omitempty"`
 
 	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
 	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
@@ -274,6 +275,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			Revision:              spec.Revision,
 			UpdateTimestamp:       c.now(),
 			LastContainerStatuses: make(map[string]appspub.InPlaceUpdateContainerStatus, len(spec.ContainerImages)),
+			UpdateEnvFromMetadata: spec.UpdateEnvFromMetadata,
 		}
 		for _, c := range clone.Status.ContainerStatuses {
 			if _, ok := spec.ContainerImages[c.Name]; ok {
