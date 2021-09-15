@@ -57,6 +57,14 @@ type DaemonSetListerExpansion interface{}
 // DaemonSetNamespaceLister.
 type DaemonSetNamespaceListerExpansion interface{}
 
+// EphemeralJobListerExpansion allows custom methods to be added to
+// EphemeralJobLister.
+type EphemeralJobListerExpansion interface{}
+
+// EphemeralJobNamespaceListerExpansion allows custom methods to be added to
+// EphemeralJobNamespaceLister.
+type EphemeralJobNamespaceListerExpansion interface{}
+
 // ImagePullJobListerExpansion allows custom methods to be added to
 // ImagePullJobLister.
 type ImagePullJobListerExpansion interface{}

@@ -27,6 +27,8 @@ type ContainerRecreateRequestExpansion interface{}
 
 type DaemonSetExpansion interface{}
 
+type EphemeralJobExpansion interface{}
+
 type ImagePullJobExpansion interface{}
 
 type NodeImageExpansion interface{}
