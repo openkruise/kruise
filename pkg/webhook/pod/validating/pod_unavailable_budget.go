@@ -150,7 +150,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	if pub == nil {
 		return true, "", nil
 	}
-	control := pubcontrol.NewPubControl(pub)
+	control := pubcontrol.NewPubControl(pub, p.finders, p.Client)
 	klog.V(3).Infof("validating pod(%s.%s) operation(%s) for pub(%s.%s)", newPod.Namespace, newPod.Name, req.Operation, pub.Namespace, pub.Name)
 
 	// the change will not cause pod unavailability, then pass

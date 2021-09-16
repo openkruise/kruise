@@ -181,7 +181,8 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 }
 
 func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1alpha1.PodUnavailableBudget) (*time.Time, error) {
-	pods, err := r.getPodsForPub(pub)
+	control := pubcontrol.NewPubControl(pub, r.controllerFinder, r.Client)
+	pods, expectedCount, err := control.GetPodsForPub()
 	if err != nil {
 		return nil, err
 	}
@@ -189,8 +190,8 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 		r.recorder.Eventf(pub, corev1.EventTypeNormal, "NoPods", "No matching pods found")
 	}
 
-	klog.V(3).Infof("pub(%s.%s) controller len(%d) pods", pub.Namespace, pub.Name, len(pods))
-	expectedCount, desiredAvailable, err := r.getExpectedPodCount(pub, pods)
+	klog.V(3).Infof("pub(%s.%s) controller pods(%d) expectedCount(%d)", pub.Namespace, pub.Name, len(pods), expectedCount)
+	desiredAvailable, err := r.getDesiredAvailableForPub(pub, expectedCount)
 	if err != nil {
 		r.recorder.Eventf(pub, corev1.EventTypeWarning, "CalculateExpectedPodCountFailed", "Failed to calculate the number of expected pods: %v", err)
 		return nil, err
@@ -200,7 +201,6 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	var conflictTimes int
 	var costOfGet, costOfUpdate time.Duration
 
-	control := pubcontrol.NewPubControl(pub)
 	currentTime := time.Now()
 	var pubClone *policyv1alpha1.PodUnavailableBudget
 	refresh := false
@@ -328,14 +328,10 @@ func (r *ReconcilePodUnavailableBudget) getPodsForPub(pub *policyv1alpha1.PodUna
 	return matchedPods, nil
 }
 
-func (r *ReconcilePodUnavailableBudget) getExpectedPodCount(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) (expectedCount, desiredAvailable int32, err error) {
+func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1alpha1.PodUnavailableBudget, expectedCount int32) (desiredAvailable int32, err error) {
 	if pub.Spec.MaxUnavailable != nil {
-		expectedCount, err = r.getExpectedScale(pub, pods)
-		if err != nil {
-			return
-		}
 		var maxUnavailable int
-		maxUnavailable, err = intstr.GetValueFromIntOrPercent(pub.Spec.MaxUnavailable, int(expectedCount), false)
+		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(pub.Spec.MaxUnavailable, int(expectedCount), false)
 		if err != nil {
 			return
 		}
@@ -347,15 +343,9 @@ func (r *ReconcilePodUnavailableBudget) getExpectedPodCount(pub *policyv1alpha1.
 	} else if pub.Spec.MinAvailable != nil {
 		if pub.Spec.MinAvailable.Type == intstr.Int {
 			desiredAvailable = pub.Spec.MinAvailable.IntVal
-			expectedCount = int32(len(pods))
 		} else if pub.Spec.MinAvailable.Type == intstr.String {
-			expectedCount, err = r.getExpectedScale(pub, pods)
-			if err != nil {
-				return
-			}
-
 			var minAvailable int
-			minAvailable, err = intstr.GetValueFromIntOrPercent(pub.Spec.MinAvailable, int(expectedCount), true)
+			minAvailable, err = intstr.GetScaledValueFromIntOrPercent(pub.Spec.MinAvailable, int(expectedCount), true)
 			if err != nil {
 				return
 			}
@@ -457,7 +447,7 @@ func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []
 		// handle unavailable pods which have been in-updated specification
 		unavailableTime, found := unavailablePods[pod.Name]
 		if found {
-			// in case of informer cache latency, after 5 seconds to remove it
+			// in case of informer cache latency, after 10 seconds to remove it
 			expectedUpdate := unavailableTime.Time.Add(UpdatedDelayCheckTime)
 			if expectedUpdate.Before(currentTime) {
 				continue

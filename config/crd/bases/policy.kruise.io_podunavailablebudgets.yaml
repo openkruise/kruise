@@ -129,7 +129,7 @@ spec:
                 format: int64
                 type: integer
               totalReplicas:
-                description: TotalReplicas total number of pods counted by this budget
+                description: TotalReplicas total number of pods counted by this unavailable budget
                 format: int32
                 type: integer
               unavailableAllowed:

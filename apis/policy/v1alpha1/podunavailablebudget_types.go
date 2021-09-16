@@ -79,7 +79,7 @@ type PodUnavailableBudgetStatus struct {
 	// DesiredAvailable minimum desired number of available pods
 	DesiredAvailable int32 `json:"desiredAvailable"`
 
-	// TotalReplicas total number of pods counted by this budget
+	// TotalReplicas total number of pods counted by this unavailable budget
 	TotalReplicas int32 `json:"totalReplicas"`
 }
 

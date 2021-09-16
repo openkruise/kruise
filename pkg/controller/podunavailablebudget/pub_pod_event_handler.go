@@ -87,7 +87,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		oldPub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, oldPod)
 		newPub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, newPod)
 		if oldPub != nil && newPub != nil && oldPub.Name == newPub.Name {
-			control := pubcontrol.NewPubControl(newPub)
+			control := pubcontrol.NewPubControl(newPub, p.controllerFinder, p.client)
 			if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, newPub, control); isReconcile {
 				q.AddAfter(reconcile.Request{
 					NamespacedName: types.NamespacedName{
@@ -124,7 +124,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 	if pub == nil {
 		return
 	}
-	control := pubcontrol.NewPubControl(pub)
+	control := pubcontrol.NewPubControl(pub, p.controllerFinder, p.client)
 	if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, pub, control); isReconcile {
 		q.AddAfter(reconcile.Request{
 			NamespacedName: types.NamespacedName{

@@ -310,7 +310,7 @@ func (s *SidecarSetTester) WaitForSidecarSetDeleted(sidecarSet *appsv1alpha1.Sid
 	}
 }
 
-func (s *SidecarSetTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
+func (s *SidecarSetTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]*corev1.Pod, error) {
 	faster, err := util.GetFastLabelSelector(selector)
 	if err != nil {
 		return nil, err
@@ -319,7 +319,14 @@ func (s *SidecarSetTester) GetSelectorPods(namespace string, selector *metav1.La
 	if err != nil {
 		return nil, err
 	}
-	return podList.Items, nil
+	pods := make([]*corev1.Pod, 0)
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.DeletionTimestamp.IsZero() {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
 }
 
 func (s *SidecarSetTester) NewBaseCloneSet(namespace string) *appsv1alpha1.CloneSet {

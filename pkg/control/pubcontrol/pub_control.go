@@ -17,21 +17,26 @@ limitations under the License.
 package pubcontrol
 
 import (
+	"context"
 	"reflect"
 	"strings"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type commonControl struct {
+	client.Client
 	*policyv1alpha1.PodUnavailableBudget
+	controllerFinder *controllerfinder.ControllerFinder
 }
 
 func (c *commonControl) GetPodUnavailableBudget() *policyv1alpha1.PodUnavailableBudget {
@@ -56,6 +61,49 @@ func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 	}
 	// pod other changes will not cause unavailability situation, then return false
 	return false
+}
+
+// GetPodsForPub returns Pods protected by the pub object.
+// return two parameters
+// 1. podList
+// 2. expectedCount, the default is workload.Replicas
+func (c *commonControl) GetPodsForPub() ([]*corev1.Pod, int32, error) {
+	pub := c.GetPodUnavailableBudget()
+	// if targetReference isn't nil, priority to take effect
+	var listOptions *client.ListOptions
+	if pub.Spec.TargetReference != nil {
+		ref := pub.Spec.TargetReference
+		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
+		return matchedPods, expectedCount, err
+	} else if pub.Spec.Selector == nil {
+		klog.Warningf("pub(%s/%s) spec.Selector cannot be empty", pub.Namespace, pub.Name)
+		return nil, 0, nil
+	}
+	// get pods for selector
+	labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+	if err != nil {
+		klog.Warningf("pub(%s/%s) GetFastLabelSelector failed: %s", pub.Namespace, pub.Name, err.Error())
+		return nil, 0, nil
+	}
+	listOptions = &client.ListOptions{Namespace: pub.Namespace, LabelSelector: labelSelector}
+	podList := &corev1.PodList{}
+	if err := c.List(context.TODO(), podList, listOptions); err != nil {
+		return nil, 0, err
+	}
+
+	matchedPods := make([]*corev1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if kubecontroller.IsPodActive(pod) {
+			matchedPods = append(matchedPods, pod)
+		}
+	}
+	expectedCount, err := c.controllerFinder.GetExpectedScaleForPods(matchedPods)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return matchedPods, expectedCount, nil
 }
 
 func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
