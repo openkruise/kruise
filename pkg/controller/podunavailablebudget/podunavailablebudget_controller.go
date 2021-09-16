@@ -23,6 +23,7 @@ import (
 	"time"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -146,13 +147,24 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 	// Fetch the PodUnavailableBudget instance
 	pub := &policyv1alpha1.PodUnavailableBudget{}
 	err := r.Get(context.TODO(), req.NamespacedName, pub)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			klog.V(3).Infof("pub(%s.%s) is Deletion in this time", req.Namespace, req.Name)
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
-			return reconcile.Result{}, nil
+	if (err != nil && errors.IsNotFound(err)) || (err == nil && !pub.DeletionTimestamp.IsZero()) {
+		klog.V(3).Infof("pub(%s.%s) is Deletion in this time", req.Namespace, req.Name)
+		if cacheErr := util.GlobalCache.Delete(&policyv1alpha1.PodUnavailableBudget{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "policy.kruise.io/v1alpha1",
+				Kind:       "PodUnavailableBudget",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      req.Name,
+				Namespace: req.Namespace,
+			},
+		}); cacheErr != nil {
+			klog.Errorf("Delete cache failed for PodUnavailableBudget(%s/%s): %s", req.Namespace, req.Name, err.Error())
 		}
+		// Object not found, return.  Created objects are automatically garbage collected.
+		// For additional cleanup logic use finalizers.
+		return reconcile.Result{}, nil
+	} else if err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
@@ -184,31 +196,72 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 		return nil, err
 	}
 
+	// for debug
+	var conflictTimes int
+	var costOfGet, costOfUpdate time.Duration
+
 	control := pubcontrol.NewPubControl(pub)
 	currentTime := time.Now()
-	pubClone := pub.DeepCopy()
+	var pubClone *policyv1alpha1.PodUnavailableBudget
 	refresh := false
 	var recheckTime *time.Time
 	err = retry.RetryOnConflict(ConflictRetry, func() error {
+		unlock := util.GlobalKeyedMutex.Lock(string(pub.UID))
+		defer unlock()
+
+		start := time.Now()
 		if refresh {
-			if err := r.Get(context.TODO(), types.NamespacedName{Name: pub.Name, Namespace: pub.Namespace}, pubClone); err != nil {
-				klog.Errorf("getting updated pobUnavailableBudget(%s.%s) failed: %s", pubClone.Namespace, pubClone.Name, err.Error())
+			// fetch pub from etcd
+			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1alpha1().
+				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+			if err != nil {
+				klog.Errorf("Get PodUnavailableBudget(%s/%s) failed from etcd: %s", pub.Namespace, pub.Name, err.Error())
 				return err
 			}
+		} else {
+			// compare local cache and informer cache, then get the newer one
+			item, _, err := util.GlobalCache.Get(pub)
+			if err != nil {
+				klog.Errorf("Get PodUnavailableBudget(%s/%s) cache failed: %s", pub.Namespace, pub.Name, err.Error())
+			}
+			if localCached, ok := item.(*policyv1alpha1.PodUnavailableBudget); ok {
+				pubClone = localCached.DeepCopy()
+			} else {
+				pubClone = pub.DeepCopy()
+			}
+
+			informerCached := &policyv1alpha1.PodUnavailableBudget{}
+			if err := r.Get(context.TODO(), types.NamespacedName{Namespace: pub.Namespace,
+				Name: pub.Name}, informerCached); err == nil {
+				var localRV, informerRV int64
+				_ = runtime.Convert_string_To_int64(&pubClone.ResourceVersion, &localRV, nil)
+				_ = runtime.Convert_string_To_int64(&informerCached.ResourceVersion, &informerRV, nil)
+				if informerRV > localRV {
+					pubClone = informerCached
+				}
+			}
 		}
+		costOfGet += time.Since(start)
+
 		// disruptedPods contains information about pods whose eviction or deletion was processed by the API handler but has not yet been observed by the PodUnavailableBudget.
 		// unavailablePods contains information about pods whose specification changed(in-place update), in case of informer cache latency, after 5 seconds to remove it.
 		var disruptedPods, unavailablePods map[string]metav1.Time
 		disruptedPods, unavailablePods, recheckTime = r.buildDisruptedAndUnavailablePods(pods, pubClone, currentTime)
 		currentAvailable := countAvailablePods(pods, disruptedPods, unavailablePods, control)
+
+		start = time.Now()
 		updateErr := r.updatePubStatus(pubClone, currentAvailable, desiredAvailable, expectedCount, disruptedPods, unavailablePods)
+		costOfUpdate += time.Since(start)
 		if updateErr == nil {
 			return nil
 		}
 		// update failed, and retry
 		refresh = true
+		conflictTimes++
 		return updateErr
 	})
+	klog.V(3).Infof("Controller cost of pub(%s/%s): conflict times %v, cost of Get %v, cost of Update %v",
+		pub.Namespace, pub.Name, conflictTimes, costOfGet, costOfUpdate)
 	if err != nil {
 		klog.Errorf("update pub(%s.%s) status failed: %s", pub.Namespace, pub.Name, err.Error())
 	}
@@ -392,7 +445,7 @@ func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []
 			expectedDeletion := disruptionTime.Time.Add(DeletionTimeout)
 			if expectedDeletion.Before(currentTime) {
 				r.recorder.Eventf(pod, corev1.EventTypeWarning, "NotDeleted", "Pod was expected by PUB %s/%s to be deleted but it wasn't",
-					pub.Namespace, pub.Namespace)
+					pub.Namespace, pub.Name)
 			} else {
 				resultDisruptedPods[pod.Name] = disruptionTime
 				if recheckTime == nil || expectedDeletion.Before(*recheckTime) {
@@ -450,6 +503,9 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 	err := r.Client.Status().Update(context.TODO(), pub)
 	if err != nil {
 		return err
+	}
+	if err = util.GlobalCache.Add(pub); err != nil {
+		klog.Errorf("Add cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
 	}
 	klog.V(3).Infof("pub(%s.%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
 		pub.Namespace, pub.Name, len(disruptedPods), len(unavailablePods), expectedCount, desiredAvailable, currentAvailable, unavailableAllowed)
