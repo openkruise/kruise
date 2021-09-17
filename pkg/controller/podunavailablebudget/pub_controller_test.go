@@ -24,6 +24,7 @@ import (
 	"time"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 
 	apps "k8s.io/api/apps/v1"
@@ -783,6 +784,7 @@ func TestPubReconcile(t *testing.T) {
 			if !isPubStatusEqual(cs.expectPubStatus(), newPub.Status) {
 				t.Fatalf("expect pub status(%v) but get(%v)", cs.expectPubStatus(), newPub.Status)
 			}
+			_ = util.GlobalCache.Delete(pub)
 		})
 	}
 }

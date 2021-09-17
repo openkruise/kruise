@@ -22,12 +22,15 @@ import (
 	"time"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -71,19 +74,49 @@ func PodUnavailableBudgetValidatePod(client client.Client, pod *corev1.Pod, cont
 		return true, "", nil
 	}
 
-	pubClone := pub.DeepCopy()
+	// for debug
+	var conflictTimes int
+	var costOfGet, costOfUpdate time.Duration
+
 	refresh := false
+	var pubClone *policyv1alpha1.PodUnavailableBudget
 	err = retry.RetryOnConflict(ConflictRetry, func() error {
+		unlock := util.GlobalKeyedMutex.Lock(string(pub.UID))
+		defer unlock()
+
+		start := time.Now()
 		if refresh {
-			key := types.NamespacedName{
-				Name:      pubClone.Name,
-				Namespace: pubClone.Namespace,
-			}
-			if err := client.Get(context.TODO(), key, pubClone); err != nil {
-				klog.Errorf("Get PodUnavailableBudget(%s) failed: %s", key.String(), err.Error())
+			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1alpha1().
+				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+			if err != nil {
+				klog.Errorf("Get PodUnavailableBudget(%s/%s) failed form etcd: %s", pub.Namespace, pub.Name, err.Error())
 				return err
 			}
+		} else {
+			// compare local cache and informer cache, then get the newer one
+			item, _, err := util.GlobalCache.Get(pub)
+			if err != nil {
+				klog.Errorf("Get cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
+			}
+			if localCached, ok := item.(*policyv1alpha1.PodUnavailableBudget); ok {
+				pubClone = localCached.DeepCopy()
+			} else {
+				pubClone = pub.DeepCopy()
+			}
+
+			informerCached := &policyv1alpha1.PodUnavailableBudget{}
+			if err := client.Get(context.TODO(), types.NamespacedName{Namespace: pub.Namespace,
+				Name: pub.Name}, informerCached); err == nil {
+				var localRV, informerRV int64
+				_ = runtime.Convert_string_To_int64(&pubClone.ResourceVersion, &localRV, nil)
+				_ = runtime.Convert_string_To_int64(&informerCached.ResourceVersion, &informerRV, nil)
+				if informerRV > localRV {
+					pubClone = informerCached
+				}
+			}
 		}
+		costOfGet += time.Since(start)
+
 		// Try to verify-and-decrement
 		// If it was false already, or if it becomes false during the course of our retries,
 		err := checkAndDecrement(pod.Name, pubClone, operation)
@@ -99,13 +132,22 @@ func PodUnavailableBudgetValidatePod(client client.Client, pod *corev1.Pod, cont
 		klog.V(3).Infof("pub(%s.%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
 			pubClone.Namespace, pubClone.Name, len(pubClone.Status.DisruptedPods), len(pubClone.Status.UnavailablePods),
 			pubClone.Status.TotalReplicas, pubClone.Status.DesiredAvailable, pubClone.Status.CurrentAvailable, pubClone.Status.UnavailableAllowed)
-		if err = client.Status().Update(context.TODO(), pubClone); err == nil {
+		start = time.Now()
+		err = client.Status().Update(context.TODO(), pubClone)
+		costOfUpdate += time.Since(start)
+		if err == nil {
+			if err = util.GlobalCache.Add(pubClone); err != nil {
+				klog.Errorf("Add cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
+			}
 			return nil
 		}
 		// if conflict, then retry
+		conflictTimes++
 		refresh = true
 		return err
 	})
+	klog.V(3).Infof("Webhook cost of pub(%s/%s): conflict times %v, cost of Get %v, cost of Update %v",
+		pub.Namespace, pub.Name, conflictTimes, costOfGet, costOfUpdate)
 	if err != nil && err != wait.ErrWaitTimeout {
 		klog.V(3).Infof("pod(%s.%s) operation(%s) for pub(%s.%s) failed: %s", pod.Namespace, pod.Name, operation, pub.Namespace, pub.Name, err.Error())
 		return false, err.Error(), nil

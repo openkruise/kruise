@@ -451,6 +451,7 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 			if !isPubStatusEqual(&newPub.Status, cs.expectPubStatus()) {
 				t.Fatalf("expect pub status(%v) but get(%v)", cs.expectPubStatus(), newPub.Status)
 			}
+			_ = util.GlobalCache.Delete(newPub)
 		})
 	}
 }
@@ -601,6 +602,7 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			if !isPubStatusEqual(&newPub.Status, cs.expectPubStatus()) {
 				t.Fatalf("expect pub status(%v) but get(%v)", cs.expectPubStatus(), newPub.Status)
 			}
+			_ = util.GlobalCache.Delete(newPub)
 		})
 	}
 }
@@ -738,6 +740,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			if !isPubStatusEqual(&newPub.Status, cs.expectPubStatus()) {
 				t.Fatalf("expect pub status(%v) but get(%v)", cs.expectPubStatus(), newPub.Status)
 			}
+			_ = util.GlobalCache.Delete(newPub)
 		})
 	}
 }
