@@ -26,7 +26,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
@@ -35,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kubeClient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 const (
@@ -163,13 +167,18 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 		return nil
 	}
 
+	start := time.Now()
+	defer func() {
+		klog.V(3).Infof("Cost of mutating pod by WorkloadSpread is %v", time.Since(start))
+	}()
+
 	var matchedWS *appsv1alpha1.WorkloadSpread
 	workloadSpreadList := &appsv1alpha1.WorkloadSpreadList{}
 	if err = h.Client.List(context.TODO(), workloadSpreadList, &client.ListOptions{Namespace: pod.Namespace}); err != nil {
 		return err
 	}
 	for _, ws := range workloadSpreadList.Items {
-		if ws.Spec.TargetReference == nil {
+		if ws.Spec.TargetReference == nil || !ws.DeletionTimestamp.IsZero() {
 			continue
 		}
 		// determine if the reference of workloadSpread and pod is equal
@@ -233,23 +242,58 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 
 	klog.V(3).Infof("Operation[%s] Pod(%s/%s) matched WorkloadSpread(%s/%s)", operation, pod.Namespace, podName, matchedWS.Namespace, matchedWS.Name)
 
-	wsClone := matchedWS.DeepCopy()
 	var refresh, changed bool
+	var wsClone *appsv1alpha1.WorkloadSpread
 	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
 	var generatedUID string
 	var injectErr error
 
+	// for debug
+	var conflictTimes int
+	var costOfGet, costOfUpdate time.Duration
+
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		unlock := util.GlobalKeyedMutex.Lock(string(matchedWS.GetUID()))
+		defer unlock()
+
 		var err error
+		start := time.Now()
 		if refresh {
-			if err = h.Client.Get(context.TODO(), client.ObjectKey{Namespace: matchedWS.Namespace, Name: matchedWS.Name}, wsClone); err != nil {
+			// TODO: shall we set metav1.GetOptions{resourceVersion="0"} so that we get the cached object in apiServer memory instead of etcd?
+			wsClone, err = kubeClient.GetGenericClient().KruiseClient.AppsV1alpha1().
+				WorkloadSpreads(matchedWS.Namespace).Get(context.TODO(), matchedWS.Name, metav1.GetOptions{})
+			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
 				}
-				klog.Errorf("error getting updated WorkloadSpread(%s/%s) from client", matchedWS.Namespace, matchedWS.Name)
+				klog.Errorf("error getting updated WorkloadSpread(%s/%s) from APIServer, err: %v", matchedWS.Namespace, matchedWS.Name, err)
 				return err
 			}
+		} else {
+			item, _, err := util.GlobalCache.Get(matchedWS)
+			if err != nil {
+				klog.Errorf("Failed to get cached WorkloadSpread(%s/%s) from GlobalCache, err: %v", matchedWS.Namespace, matchedWS.Name, err)
+			}
+			if localCachedWS, ok := item.(*appsv1alpha1.WorkloadSpread); ok {
+				wsClone = localCachedWS.DeepCopy()
+			} else {
+				wsClone = matchedWS.DeepCopy()
+			}
+
+			// compare and use the newer version
+			informerCachedWS := &appsv1alpha1.WorkloadSpread{}
+			if err = h.Get(context.TODO(), types.NamespacedName{Namespace: matchedWS.Namespace,
+				Name: matchedWS.Name}, informerCachedWS); err == nil {
+				// TODO: shall we process the case of that the ResourceVersion exceeds MaxInt64?
+				var localRV, informerRV int64
+				_ = runtime.Convert_string_To_int64(&wsClone.ResourceVersion, &localRV, nil)
+				_ = runtime.Convert_string_To_int64(&informerCachedWS.ResourceVersion, &informerRV, nil)
+				if localRV < informerRV {
+					wsClone = informerCachedWS
+				}
+			}
 		}
+		costOfGet += time.Since(start)
 
 		// check whether WorkloadSpread has suitable subset for the pod
 		// 1. changed indicates whether workloadSpread status changed
@@ -260,18 +304,26 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 		}
 
 		// update WorkloadSpread status
+		start = time.Now()
 		if err = h.Client.Status().Update(context.TODO(), wsClone); err != nil {
 			refresh = true
+			conflictTimes++
 		} else {
 			klog.V(3).Infof("update workloadSpread(%s/%s) SubsetStatus(%s) missingReplicas(%d) creatingPods(%d) deletingPods(%d) success",
 				wsClone.Namespace, wsClone.Name, suitableSubset.Name,
 				suitableSubset.MissingReplicas, len(suitableSubset.CreatingPods), len(suitableSubset.DeletingPods))
+			if cacheErr := util.GlobalCache.Add(wsClone); cacheErr != nil {
+				klog.Warningf("Failed to update workloadSpread(%s/%s) cache after update status, err: %v", wsClone.Namespace, wsClone.Name, cacheErr)
+			}
 		}
+		costOfUpdate += time.Since(start)
 		return err
 	}); err != nil {
 		klog.Errorf("update WorkloadSpread(%s/%s) error %s", matchedWS.Namespace, matchedWS.Name, err.Error())
 		return err
 	}
+	klog.V(5).Infof("Cost of assigning suitable subset of WorkloadSpread (%s %s) for pod is: conflict times: %v, cost of Get %v, cost of Update %v",
+		matchedWS.Namespace, matchedWS.Name, conflictTimes, costOfGet, costOfUpdate)
 
 	// if create pod, inject affinity、toleration、metadata in pod object
 	if operation == CreateOperation && suitableSubset != nil {
