@@ -88,8 +88,8 @@ We encourage contributors to follow the [PR template](./.github/PULL_REQUEST_TEM
 As a contributor, if you want to make any contribution to Kruise project, we should reach an agreement on the version of tools used in the development environment.
 Here are some dependents with specific version:
 
-- Golang : v1.13+ (1.14 is best)
-- Kubernetes: v1.12+
+- Golang : v1.13+ (1.15 is best)
+- Kubernetes: v1.16+
 
 ### Developing guide
 
@@ -97,16 +97,16 @@ There's a `Makefile` in the root folder which describes the options to build and
 
 ```bash
 # Build the controller manager binary
-make manager
+make build
 
-# Run the tests
+# Run the unit tests
 make test
 
 # Generate manifests e.g. CRD, RBAC YAML files etc
 make manifests
 ```
 
-If you want to start kruise-controller-manager locally to work with a Kubernetes cluster, you should follow the [debug guide](./docs/debug/README.md).
+**If you want to start kruise-controller-manager locally to work with a Kubernetes cluster, you should follow the [debug guide](./docs/debug/README.md).**
 
 ## Engage to help anything
 
