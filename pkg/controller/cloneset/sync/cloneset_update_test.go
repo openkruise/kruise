@@ -28,6 +28,7 @@ import (
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	apps "k8s.io/api/apps/v1"
@@ -573,6 +574,7 @@ func TestUpdate(t *testing.T) {
 			lifecycle.NewForTest(fakeClient),
 			inplaceupdate.NewForTest(fakeClient, clonesetutils.RevisionAdapterImpl, func() metav1.Time { return now }),
 			record.NewFakeRecorder(10),
+			controllerfinder.NewControllerFinder(fakeClient),
 		}
 		currentRevision := mc.updateRevision
 		if len(mc.revisions) > 0 {

@@ -29,7 +29,6 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
@@ -122,7 +121,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	var pub *policyv1alpha1.PodUnavailableBudget
 	var err error
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) && len(waitUpdateIndexes) > 0 {
-		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, controllerfinder.NewControllerFinder(c.Client), pods[waitUpdateIndexes[0]])
+		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, c.controllerFinder, pods[waitUpdateIndexes[0]])
 		if err != nil {
 			return requeueDuration.Get(), err
 		}
@@ -132,7 +131,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		pod := pods[idx]
 		// Determine the pub before updating the pod
 		if pub != nil {
-			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, pod, pubcontrol.NewPubControl(pub), pubcontrol.UpdateOperation, false)
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, pod, pubcontrol.NewPubControl(pub, c.controllerFinder, c.Client), pubcontrol.UpdateOperation, false)
 			if err != nil {
 				return requeueDuration.Get(), err
 				// pub check does not pass, try again in seconds

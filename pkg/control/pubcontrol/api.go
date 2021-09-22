@@ -18,8 +18,9 @@ package pubcontrol
 
 import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type PubControl interface {
@@ -32,12 +33,17 @@ type PubControl interface {
 	IsPodReady(pod *corev1.Pod) bool
 	// IsPodStateConsistent indicates whether pod.spec and pod.status are consistent after updating containers
 	IsPodStateConsistent(pod *corev1.Pod) bool
+	// GetPodsForPub returns Pods protected by the pub object.
+	// return two parameters
+	// 1. podList
+	// 2. expectedCount, the default is workload.Replicas
+	GetPodsForPub() ([]*corev1.Pod, int32, error)
 
 	// webhook
 	// determine if this change to pod might cause unavailability
 	IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 }
 
-func NewPubControl(pub *policyv1alpha1.PodUnavailableBudget) PubControl {
-	return &commonControl{PodUnavailableBudget: pub}
+func NewPubControl(pub *policyv1alpha1.PodUnavailableBudget, controllerFinder *controllerfinder.ControllerFinder, client client.Client) PubControl {
+	return &commonControl{PodUnavailableBudget: pub, controllerFinder: controllerFinder, Client: client}
 }

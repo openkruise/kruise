@@ -26,7 +26,6 @@ import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -425,7 +424,7 @@ func TestPubReconcile(t *testing.T) {
 					UnavailableAllowed: 0,
 					CurrentAvailable:   5,
 					DesiredAvailable:   100,
-					TotalReplicas:      5,
+					TotalReplicas:      10,
 				}
 			},
 		},

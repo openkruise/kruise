@@ -217,7 +217,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// volume
 				for _, volume := range cs.exceptVolumes {
-					object := util.GetPodVolume(&pods[0], volume)
+					object := util.GetPodVolume(pods[0], volume)
 					gomega.Expect(object).ShouldNot(gomega.BeNil())
 				}
 				// volumeMounts
@@ -318,7 +318,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				// volume
 				for _, volume := range cs.exceptVolumes {
-					object := util.GetPodVolume(&pods[0], volume)
+					object := util.GetPodVolume(pods[0], volume)
 					gomega.Expect(object).ShouldNot(gomega.BeNil())
 				}
 				// volumeMounts
@@ -486,13 +486,13 @@ var _ = SIGDescribe("SidecarSet", func() {
 					origin.Insert(sidecar.Name)
 				}
 				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
-				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, &pod)
+				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, pod)
 				gomega.Expect(upgradeSpec1.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
 				gomega.Expect(upgradeSpec1.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetRevision(sidecarSetIn)))
 				target1 := sets.NewString(upgradeSpec1.SidecarList...)
 				gomega.Expect(reflect.DeepEqual(origin.List(), target1.List())).To(gomega.Equal(true))
 				// SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
-				upgradeSpec2 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, &pod)
+				upgradeSpec2 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, pod)
 				gomega.Expect(upgradeSpec2.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
 				gomega.Expect(upgradeSpec2.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSetIn)))
 				target2 := sets.NewString(upgradeSpec2.SidecarList...)
@@ -534,13 +534,13 @@ var _ = SIGDescribe("SidecarSet", func() {
 					origin.Insert(sidecar.Name)
 				}
 				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
-				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, &pod)
+				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, pod)
 				gomega.Expect(upgradeSpec1.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
 				gomega.Expect(upgradeSpec1.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetRevision(sidecarSetIn)))
 				target1 := sets.NewString(upgradeSpec1.SidecarList...)
 				gomega.Expect(reflect.DeepEqual(origin.List(), target1.List())).To(gomega.Equal(true))
 				// SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
-				upgradeSpec2 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, &pod)
+				upgradeSpec2 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, pod)
 				gomega.Expect(upgradeSpec2.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
 				gomega.Expect(upgradeSpec2.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSetIn)))
 				target2 := sets.NewString(upgradeSpec2.SidecarList...)
@@ -614,7 +614,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
 			canaryPod := pods[0]
 			canaryPod.Labels["canary.release"] = "true"
-			tester.UpdatePod(&canaryPod)
+			tester.UpdatePod(canaryPod)
 			time.Sleep(time.Second)
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.Containers[0].Image = "busybox:latest"

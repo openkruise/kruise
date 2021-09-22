@@ -89,7 +89,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				"nginx-sidecar-2": "busybox:latest",
 			}
 			for sidecar, image := range exceptContainer {
-				sidecarContainer := util.GetContainer(sidecar, &pods[0])
+				sidecarContainer := util.GetContainer(sidecar, pods[0])
 				gomega.Expect(sidecarContainer).ShouldNot(gomega.BeNil())
 				gomega.Expect(sidecarContainer.Image).To(gomega.Equal(image))
 			}
@@ -120,7 +120,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
-			podIn := &pods[0]
+			podIn := pods[0]
 			workSidecarContainer := util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
 			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal("nginx:1.18"))
@@ -150,7 +150,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			pods, err = tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
-			podIn = &pods[0]
+			podIn = pods[0]
 			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
 			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal("nginx:1.19"))
@@ -175,7 +175,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			pods, err = tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
-			podIn = &pods[0]
+			podIn = pods[0]
 			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
 			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal("nginx:1.18"))
@@ -230,7 +230,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
-			podIn := &pods[0]
+			podIn := pods[0]
 			workSidecarContainer := util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
 			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal("nginx:1.18"))
@@ -269,7 +269,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
 			// pod[0]
-			podIn1 := &pods[0]
+			podIn1 := pods[0]
 			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn1)["nginx-sidecar"], podIn1)
 			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal("nginx:1.19"))
@@ -278,7 +278,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
 			gomega.Expect(emptySidecarContainer.Image).To(gomega.Equal("busybox:latest"))
 			// pod[1]
-			podIn2 := &pods[1]
+			podIn2 := pods[1]
 			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn2)["nginx-sidecar"], podIn2)
 			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal("nginx:1.19"))

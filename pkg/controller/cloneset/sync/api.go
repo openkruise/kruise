@@ -21,6 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	apps "k8s.io/api/apps/v1"
@@ -48,6 +49,7 @@ type realControl struct {
 	lifecycleControl lifecycle.Interface
 	inplaceControl   inplaceupdate.Interface
 	recorder         record.EventRecorder
+	controllerFinder *controllerfinder.ControllerFinder
 }
 
 func New(c client.Client, recorder record.EventRecorder) Interface {
@@ -56,5 +58,6 @@ func New(c client.Client, recorder record.EventRecorder) Interface {
 		inplaceControl:   inplaceupdate.New(c, clonesetutils.RevisionAdapterImpl),
 		lifecycleControl: lifecycle.New(c),
 		recorder:         recorder,
+		controllerFinder: controllerfinder.NewControllerFinder(c),
 	}
 }
