@@ -70,10 +70,14 @@ func (r *realControl) Scale(
 	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision)
 	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
 
+	if diffRes.scaleNum > 0 && diffRes.scaleNum > diffRes.scaleUpLimit {
+		r.recorder.Event(updateCS, v1.EventTypeWarning, "ScaleUpLimited", fmt.Sprintf("scaleUp is limited because of scaleStrategy.maxUnavailable, limit: %d", diffRes.scaleUpLimit))
+	}
+
 	// 3. scale out
-	if diffRes.scaleNum > 0 {
+	if diffRes.scaleNum > 0 && diffRes.scaleUpLimit > 0 {
 		// total number of this creation
-		expectedCreations := diffRes.scaleNum
+		expectedCreations := diffRes.scaleUpLimit
 		// lack number of current version
 		expectedCurrentCreations := 0
 		if diffRes.scaleNumOldRevision > 0 {
