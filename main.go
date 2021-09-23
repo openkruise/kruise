@@ -75,6 +75,7 @@ func main() {
 	var enableLeaderElection, enablePprof, allowPrivileged bool
 	var leaderElectionNamespace string
 	var namespace string
+	var syncPeriodStr string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
 	flag.BoolVar(&allowPrivileged, "allow-privileged", true, "If true, allow privileged containers. It will only work if api-server is also"+
@@ -86,6 +87,7 @@ func main() {
 		"Namespace if specified restricts the manager's cache to watch objects in the desired namespace. Defaults to all namespaces.")
 	flag.BoolVar(&enablePprof, "enable-pprof", false, "Enable pprof for controller manager.")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":8090", "The address the pprof binds to.")
+	flag.StringVar(&syncPeriodStr, "sync-period", "", "Determines the minimum frequency at which watched resources are reconciled.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	klog.InitFlags(nil)
@@ -120,6 +122,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	var syncPeriod *time.Duration
+	if syncPeriodStr != "" {
+		d, err := time.ParseDuration(syncPeriodStr)
+		if err != nil {
+			setupLog.Error(err, "invalid sync period flag")
+		} else {
+			syncPeriod = &d
+		}
+	}
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         metricsAddr,
@@ -129,6 +140,7 @@ func main() {
 		LeaderElectionNamespace:    leaderElectionNamespace,
 		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
 		Namespace:                  namespace,
+		SyncPeriod:                 syncPeriod,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
