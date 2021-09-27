@@ -11,7 +11,7 @@ For example, when you run kubectl drain, the tool tries to evict all of the Pods
 
 PodUnavailableBudget can achieve the effect of preventing ALL application disruption or SLA degradation, including pod eviction, deletion, inplace-update, ...
 
-[doc](https://openkruise.io/en-us/docs/podunavailablebudget.html)
+[doc](https://openkruise.io/docs/user-manuals/podunavailablebudget)
 
 ### New feature: WorkloadSpread
 
@@ -19,22 +19,22 @@ WorkloadSpread supports to constrain the spread of stateless workload, which emp
 
 It can be used with those stateless workloads, such as CloneSet, Deployment, ReplicaSet and even Job.
 
-[doc](https://openkruise.io/en-us/docs/workloadspread.html)
+[doc](https://openkruise.io/docs/user-manuals/workloadspread)
 
 ### CloneSet
 
-- Scale-down supports topology spread constraints. [doc](https://openkruise.io/en-us/docs/cloneset.html#deletion-by-spread-constraints)
+- Scale-down supports topology spread constraints. [doc](https://openkruise.io/docs/user-manuals/cloneset#deletion-by-spread-constraints)
 - Fix in-place update pods in Updated state.
 
 ### SidecarSet
 
-- Add imagePullSecrets field to support pull secrets for the sidecar images. [doc](https://openkruise.io/en-us/docs/sidecarset.html#imagepullsecrets)
-- Add injectionStrategy.paused to stop injection temporarily. [doc](https://openkruise.io/en-us/docs/sidecarset.html#injection-pause)
+- Add imagePullSecrets field to support pull secrets for the sidecar images. [doc](https://openkruise.io/docs/user-manuals/sidecarset#imagepullsecrets)
+- Add injectionStrategy.paused to stop injection temporarily. [doc](https://openkruise.io/docs/user-manuals/sidecarset#injection-pause)
 
 ### Advanced StatefulSet
 
-- Support image pre-download for in-place update, which can accelerate the progress of applications upgrade. [doc](https://openkruise.io/en-us/docs/advanced_statefulset.html#pre-download-image-for-in-place-update)
-- Support scaling with rate limit. [doc](https://openkruise.io/en-us/docs/advanced_statefulset.html#scaling-with-rate-limiting)
+- Support image pre-download for in-place update, which can accelerate the progress of applications upgrade. [doc](https://openkruise.io/docs/user-manuals/advancedstatefulset#pre-download-image-for-in-place-update)
+- Support scaling with rate limit. [doc](https://openkruise.io/docs/user-manuals/advancedstatefulset#scaling-with-rate-limiting)
 
 ### Advanced DaemonSet
 
@@ -50,28 +50,28 @@ It can be used with those stateless workloads, such as CloneSet, Deployment, Rep
 
 ### New feature: ContainerRecreateRequest
 
-[[doc](https://openkruise.io/en-us/docs/containerrecreaterequest.html)]
+[[doc](https://openkruise.io/docs/user-manuals/containerrecreaterequest)]
 
 ContainerRecreateRequest provides a way to let users **restart/recreate** one or more containers in an existing Pod.
 
 ### New feature: Deletion Protection
 
-[[doc](https://openkruise.io/en-us/docs/deletion_protection.html)]
+[[doc](https://openkruise.io/docs/user-manuals/deletionprotection)]
 
 This feature provides a safety policy which could help users protect Kubernetes resources and
 applications' availability from the cascading deletion mechanism.
 
 ### CloneSet
 
-- Support `pod-deletion-cost` to let users set the priority of pods deletion. [[doc](https://openkruise.io/en-us/docs/cloneset.html#pod-deletion-cost)]
-- Support image pre-download for in-place update, which can accelerate the progress of applications upgrade. [[doc](https://openkruise.io/en-us/docs/cloneset.html#pre-download-image-for-in-place-update)]
-- Add `CloneSetShortHash` feature-gate, which solves the length limit of CloneSet name. [[doc](https://openkruise.io/en-us/docs/cloneset.html#short-hash-label)]
-- Make `maxUnavailable` and `maxSurge` effective for specified deletion. [[doc](https://openkruise.io/en-us/docs/cloneset.html#maxunavailable)]
-- Support efficient update and rollback using `partition`. [[doc](https://openkruise.io/en-us/docs/cloneset.html#rollback-by-partition)]
+- Support `pod-deletion-cost` to let users set the priority of pods deletion. [[doc](https://openkruise.io/docs/user-manuals/cloneset#pod-deletion-cost)]
+- Support image pre-download for in-place update, which can accelerate the progress of applications upgrade. [[doc](https://openkruise.io/docs/user-manuals/cloneset#pre-download-image-for-in-place-update)]
+- Add `CloneSetShortHash` feature-gate, which solves the length limit of CloneSet name. [[doc](https://openkruise.io/docs/user-manuals/cloneset#short-hash-label)]
+- Make `maxUnavailable` and `maxSurge` effective for specified deletion. [[doc](https://openkruise.io/docs/user-manuals/cloneset#maxunavailable)]
+- Support efficient update and rollback using `partition`. [[doc](https://openkruise.io/docs/user-manuals/cloneset#rollback-by-partition)]
 
 ### SidecarSet
 
-- Support sidecar container **hot upgrade**. [[doc](https://openkruise.io/en-us/docs/sidecarset.html#Hot-Upgrade-Sidecar)]
+- Support sidecar container **hot upgrade**. [[doc](https://openkruise.io/docs/user-manuals/sidecarset#hot-upgrade-sidecar)]
 
 ### ImagePullJob
 
@@ -93,7 +93,7 @@ applications' availability from the cascading deletion mechanism.
 
 1. The flags for kruise-manager must start with `--` instead of `-`. If you install Kruise with helm chart, ignore this.
 2. SidecarSet has been refactored. Make sure there is no SidecarSet being upgrading when you upgrade Kruise,
-   and read [the latest doc for SidecarSet](https://openkruise.io/en-us/docs/sidecarset.html).
+   and read [the latest doc for SidecarSet](https://openkruise.io/docs/user-manuals/sidecarset).
 3. A new component named `kruise-daemon` comes in. It is deployed in kruise-system using DaemonSet, defaults on every Node.
 
 Now Kruise includes two components:
@@ -103,7 +103,7 @@ Now Kruise includes two components:
 
 ### New CRDs: NodeImage and ImagePullJob
 
-[Official doc](https://openkruise.io/en-us/docs/imagepulljob.html)
+[Official doc](https://openkruise.io/docs/user-manuals/imagepulljob)
 
 Kruise will create a NodeImage for each Node, and its `spec` contains the images that should be downloaded on this Node.
 
@@ -129,7 +129,7 @@ spec:
 
 ### SidecarSet
 
-[Official doc](https://openkruise.io/en-us/docs/sidecarset.html)
+[Official doc](https://openkruise.io/docs/user-manuals/sidecarset)
 
 - Refactor the controller and webhook for SidecarSet:
   - For `spec`:
@@ -374,7 +374,7 @@ An enhanced version of default DaemonSet with extra functionalities such as:
 
 ### A NEW workload controller - CloneSet
 
-Mainly focuses on managing stateless applications. ([Concept for CloneSet](./docs/concepts/cloneset/README.md))
+Mainly focuses on managing stateless applications. ([Concept for CloneSet](https://openkruise.io/docs/user-manuals/cloneset))
 
 It provides full features for more efficient, deterministic and controlled deployment, such as:
 
@@ -404,7 +404,7 @@ It provides full features for more efficient, deterministic and controlled deplo
 
 #### Features
 
-- Support [priority update](./docs/concepts/astatefulset/README.md#priority-unordered-rolling-update-strategy), which allows users to configure the sequence for Pods updating.
+- Support [priority update](https://openkruise.io/docs/user-manuals/advancedstatefulset#priority-strategy), which allows users to configure the sequence for Pods updating.
 
 #### Bugs
 
@@ -449,7 +449,7 @@ It provides full features for more efficient, deterministic and controlled deplo
 
 ### Documents
 
-- Three blog posts are added in Kruise [website](http://openkruise.io/en-us/blog/index.html), titled:
+- Three blog posts are added in Kruise [website](http://openkruise.io), titled:
   1. Kruise Controller Classification Guidance.
   2. Learning Concurrent Reconciling.
   3. UnitedDeploymemt - Supporting Multi-domain Workload Management.
