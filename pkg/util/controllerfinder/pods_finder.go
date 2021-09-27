@@ -38,7 +38,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, acti
 
 	switch kind {
 	// ReplicaSet
-	case controllerKindRS.Kind:
+	case ControllerKindRS.Kind:
 		rs, err := r.getReplicaSet(ControllerReference{APIVersion: apiVersion, Kind: kind, Name: name}, ns)
 		if err != nil {
 			return nil, -1, err
@@ -49,7 +49,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, acti
 		workloadReplicas = *rs.Spec.Replicas
 		workloadUIDs = append(workloadUIDs, rs.UID)
 	// Deployment, get the corresponding ReplicaSet UID
-	case controllerKindDep.Kind:
+	case ControllerKindDep.Kind:
 		rss, err := r.getReplicaSetsForDeployment(apiVersion, kind, ns, name)
 		if err != nil {
 			return nil, -1, err

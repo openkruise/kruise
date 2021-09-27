@@ -17,21 +17,29 @@ limitations under the License.
 package podunavailablebudget
 
 import (
+	"context"
 	"reflect"
 	"time"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -161,4 +169,117 @@ func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUn
 	}
 
 	return false, enqueueDelayTime
+}
+
+var _ handler.EventHandler = &SetEnqueueRequestForPUB{}
+
+type SetEnqueueRequestForPUB struct {
+	mgr manager.Manager
+}
+
+// Create implements EventHandler
+func (e *SetEnqueueRequestForPUB) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	e.addSetRequest(evt.Object, q)
+}
+
+// Update implements EventHandler
+func (e *SetEnqueueRequestForPUB) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	e.addSetRequest(evt.ObjectNew, q)
+}
+
+// Delete implements EventHandler
+func (e *SetEnqueueRequestForPUB) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+}
+
+// Generic implements EventHandler
+func (e *SetEnqueueRequestForPUB) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
+
+func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueue.RateLimitingInterface) {
+	gvk, _ := apiutil.GVKForObject(object, e.mgr.GetScheme())
+	targetRef := &policyv1alpha1.TargetReference{
+		APIVersion: gvk.GroupVersion().String(),
+		Kind:       gvk.Kind,
+	}
+	var namespace string
+	var temLabels map[string]string
+	switch gvk.Kind {
+	// cloneSet
+	case controllerfinder.ControllerKruiseKindCS.Kind:
+		obj := object.(*appsv1alpha1.CloneSet)
+		targetRef.Name, namespace = obj.Name, obj.Namespace
+		temLabels = obj.Spec.Template.Labels
+	// deployment
+	case controllerfinder.ControllerKindDep.Kind:
+		obj := object.(*apps.Deployment)
+		targetRef.Name, namespace = obj.Name, obj.Namespace
+		temLabels = obj.Spec.Template.Labels
+
+	// statefulSet
+	case controllerfinder.ControllerKindSS.Kind:
+		// kruise advanced statefulSet
+		if gvk.Group == controllerfinder.ControllerKruiseKindSS.Group {
+			obj := object.(*appsv1beta1.StatefulSet)
+			targetRef.Name, namespace = obj.Name, obj.Namespace
+			temLabels = obj.Spec.Template.Labels
+		} else {
+			obj := object.(*apps.StatefulSet)
+			targetRef.Name, namespace = obj.Name, obj.Namespace
+			temLabels = obj.Spec.Template.Labels
+		}
+	default:
+		return
+	}
+
+	// fetch matched pub
+	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	if err := e.mgr.GetClient().List(context.TODO(), pubList, &client.ListOptions{Namespace: namespace}); err != nil {
+		klog.Errorf("SetEnqueueRequestForPUB list pub failed: %s", err.Error())
+		return
+	}
+	var matchedPubs []policyv1alpha1.PodUnavailableBudget
+	for _, pub := range pubList.Items {
+		// if targetReference isn't nil, priority to take effect
+		if pub.Spec.TargetReference != nil {
+			// belongs the same workload
+			if isReferenceEqual(targetRef, pub.Spec.TargetReference) {
+				matchedPubs = append(matchedPubs, pub)
+			}
+		} else {
+			// This error is irreversible, so continue
+			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			if err != nil {
+				continue
+			}
+			// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
+			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(temLabels)) {
+				continue
+			}
+			matchedPubs = append(matchedPubs, pub)
+		}
+	}
+
+	for _, pub := range matchedPubs {
+		q.Add(reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      pub.Name,
+				Namespace: pub.Namespace,
+			},
+		})
+		klog.V(3).Infof("workload(%s/%s) replicas changed, and reconcile pub(%s/%s)",
+			namespace, targetRef.Name, pub.Namespace, pub.Name)
+	}
+}
+
+// check APIVersion, Kind, Name
+func isReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
+	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
+	if err != nil {
+		return false
+	}
+	gv2, err := schema.ParseGroupVersion(ref2.APIVersion)
+	if err != nil {
+		return false
+	}
+	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
 }

@@ -109,22 +109,13 @@ func (r *ControllerFinder) GetScaleAndSelectorForRef(apiVersion, kind, ns, name 
 		UID:        uid,
 	}
 
-	switch targetRef.Kind {
-	case controllerKindRS.Kind:
-		return r.getPodReplicaSet(targetRef, ns)
-	case controllerKindDep.Kind:
-		return r.getPodDeployment(targetRef, ns)
-	case controllerKindRC.Kind:
-		return r.getPodReplicationController(targetRef, ns)
-	case controllerKindSS.Kind:
-		return r.getPodStatefulSet(targetRef, ns)
-	case controllerKruiseKindCS.Kind:
-		return r.getPodKruiseCloneSet(targetRef, ns)
-	case controllerKruiseKindSS.Kind:
-		return r.getPodKruiseStatefulSet(targetRef, ns)
-	default:
-		return nil, nil
+	for _, finder := range r.Finders() {
+		scale, err := finder(targetRef, ns)
+		if scale != nil || err != nil {
+			return scale, err
+		}
 	}
+	return nil, nil
 }
 
 func (r *ControllerFinder) Finders() []PodControllerFinder {
@@ -133,21 +124,18 @@ func (r *ControllerFinder) Finders() []PodControllerFinder {
 }
 
 var (
-	// kubernetes
-	controllerKindRS  = apps.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindSS  = apps.SchemeGroupVersion.WithKind("StatefulSet")
-	controllerKindRC  = corev1.SchemeGroupVersion.WithKind("ReplicationController")
-	controllerKindDep = apps.SchemeGroupVersion.WithKind("Deployment")
-
-	// kruise
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKruiseKindSS = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
+	ControllerKindRS       = apps.SchemeGroupVersion.WithKind("ReplicaSet")
+	ControllerKindSS       = apps.SchemeGroupVersion.WithKind("StatefulSet")
+	ControllerKindRC       = corev1.SchemeGroupVersion.WithKind("ReplicationController")
+	ControllerKindDep      = apps.SchemeGroupVersion.WithKind("Deployment")
+	ControllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	ControllerKruiseKindSS = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
 // getPodReplicaSet finds a replicaset which has no matching deployments.
 func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, controllerKindRS.Kind, []string{controllerKindRS.Group})
+	ok, _ := verifyGroupKind(ref, ControllerKindRS.Kind, []string{ControllerKindRS.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -159,7 +147,7 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 		return nil, nil
 	}
 	controllerRef := metav1.GetControllerOf(replicaSet)
-	if controllerRef != nil && controllerRef.Kind == controllerKindDep.Kind {
+	if controllerRef != nil && controllerRef.Kind == ControllerKindDep.Kind {
 		refSs := ControllerReference{
 			APIVersion: controllerRef.APIVersion,
 			Kind:       controllerRef.Kind,
@@ -184,7 +172,7 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 // getPodReplicaSet finds a replicaset which has no matching deployments.
 func (r *ControllerFinder) getReplicaSet(ref ControllerReference, namespace string) (*apps.ReplicaSet, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, controllerKindRS.Kind, []string{controllerKindRS.Group})
+	ok, _ := verifyGroupKind(ref, ControllerKindRS.Kind, []string{ControllerKindRS.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -206,7 +194,7 @@ func (r *ControllerFinder) getReplicaSet(ref ControllerReference, namespace stri
 // getPodStatefulSet returns the statefulset referenced by the provided controllerRef.
 func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, controllerKindSS.Kind, []string{controllerKindSS.Group})
+	ok, _ := verifyGroupKind(ref, ControllerKindSS.Kind, []string{ControllerKindSS.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -239,7 +227,7 @@ func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (r *ControllerFinder) getPodDeployment(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, controllerKindDep.Kind, []string{controllerKindDep.Group})
+	ok, _ := verifyGroupKind(ref, ControllerKindDep.Kind, []string{ControllerKindDep.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -270,7 +258,7 @@ func (r *ControllerFinder) getPodDeployment(ref ControllerReference, namespace s
 
 func (r *ControllerFinder) getPodReplicationController(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, controllerKindRC.Kind, []string{controllerKindRC.Group})
+	ok, _ := verifyGroupKind(ref, ControllerKindRC.Kind, []string{ControllerKindRC.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -302,7 +290,7 @@ func (r *ControllerFinder) getPodReplicationController(ref ControllerReference, 
 // getPodStatefulSet returns the kruise cloneSet referenced by the provided controllerRef.
 func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, controllerKruiseKindCS.Kind, []string{controllerKruiseKindCS.Group})
+	ok, _ := verifyGroupKind(ref, ControllerKruiseKindCS.Kind, []string{ControllerKruiseKindCS.Group})
 	if !ok {
 		return nil, nil
 	}
@@ -335,7 +323,7 @@ func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespa
 // getPodStatefulSet returns the kruise statefulset referenced by the provided controllerRef.
 func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, controllerKruiseKindSS.Kind, []string{controllerKruiseKindSS.Group})
+	ok, _ := verifyGroupKind(ref, ControllerKruiseKindSS.Kind, []string{ControllerKruiseKindSS.Group})
 	if !ok {
 		return nil, nil
 	}

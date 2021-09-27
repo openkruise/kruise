@@ -22,7 +22,6 @@ import (
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/util/dryrun"
@@ -95,20 +94,6 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		// if dry run
 		dryRun = dryrun.IsDryRun(deletion.DryRun)
 
-		// Get the workload corresponding to the pod, if it has been deleted then it is not protected
-		if ref := metav1.GetControllerOf(newPod); ref != nil {
-			workload, err := p.finders.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, newPod.Namespace, ref.Name, ref.UID)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					return true, "", nil
-				}
-				return false, "", err
-			}
-			if workload == nil || !workload.Metadata.DeletionTimestamp.IsZero() {
-				return true, "", nil
-			}
-		}
-
 	// filter out invalid Create operation, only validate create pod eviction subresource
 	case admissionv1.Create:
 		// ignore create operation other than subresource eviction
@@ -132,6 +117,16 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		if err = p.Client.Get(ctx, key, newPod); err != nil {
 			return false, "", err
+		}
+	}
+
+	// Get the workload corresponding to the pod, if it has been deleted then it is not protected
+	if ref := metav1.GetControllerOf(newPod); ref != nil {
+		workload, err := p.finders.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, newPod.Namespace, ref.Name, ref.UID)
+		if err != nil {
+			return false, "", err
+		} else if workload == nil || !workload.Metadata.DeletionTimestamp.IsZero() {
+			return true, "", nil
 		}
 	}
 
