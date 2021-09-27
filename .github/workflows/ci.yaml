@@ -65,18 +65,18 @@ jobs:
         run: find ./ -name "*.sh" | grep -v vendor | xargs shellcheck
       - name: Lint markdown files
         run: find  ./ -name  "*.md" | grep -v vendor | grep -v commandline |  grep -v .github |  grep -v swagger |  grep -v api |  xargs mdl -r ~MD010,~MD013,~MD022,~MD024,~MD029,~MD031,~MD032,~MD033,~MD036
-      - name: Check markdown links
-        run: |
-          set +e
-          for name in $(find . -name \*.md | grep -v vendor | grep -v CHANGELOG); do
-            if [ -f $name ]; then
-              markdown-link-check -q $name -c .github/workflows/markdown-link-check.config.json;
-              if [ $? -ne 0 ]; then
-                code=1
-              fi
-            fi
-          done
-          bash -c "exit $code";
+#      - name: Check markdown links
+#        run: |
+#          set +e
+#          for name in $(find . -name \*.md | grep -v vendor | grep -v CHANGELOG); do
+#            if [ -f $name ]; then
+#              markdown-link-check -q $name -c .github/workflows/markdown-link-check.config.json;
+#              if [ $? -ne 0 ]; then
+#                code=1
+#              fi
+#            fi
+#          done
+#          bash -c "exit $code";
 
   unit-tests:
     runs-on: ubuntu-18.04

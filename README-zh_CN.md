@@ -21,55 +21,50 @@
 OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在 [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) 下的 Sandbox 项目。
 它提供一套在 [Kubernetes核心控制器](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) 之外的扩展工作负载、应用管理能力。
 
-目前，Kruise 主要提供了以下控制器能力：
+## 核心能力
 
-- [CloneSet](https://openkruise.io/zh-cn/docs/cloneset.html): 提供了更加高效、确定可控的应用管理和部署能力，支持优雅原地升级、指定删除、发布顺序可配置、并行/灰度发布等丰富的策略，可以满足更多样化的应用场景。
+- **通用工作负载**
 
-- [Advanced StatefulSet](https://openkruise.io/zh-cn/docs/advanced_statefulset.html): 基于原生 [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) 之上的增强版本，默认行为与原生完全一致，在此之外提供了原地升级、并行发布（最大不可用）、发布暂停等功能。
+  通用工作负载能帮助你管理 stateless(无状态)、stateful(有状态)、daemon 类型的应用。
 
-- [SidecarSet](https://openkruise.io/zh-cn/docs/sidecarset.html): 对 sidecar 容器做统一管理，在满足 selector 条件的 Pod 中注入指定的 sidecar 容器。
+  它们不仅支持类似于 Kubernetes 原生 Workloads 的基础功能，还提供了如 **原地升级**、**可配置的扩缩容/发布策略**、**并发操作** 等。
 
-- [Advanced DaemonSet](https://openkruise.io/zh-cn/docs/advanced_daemonset.html): 基于原生 DaemonSet 之上的增强版本，默认行为与原生一致，在此之外提供了灰度分批、按 Node label 选择、暂停、热升级等发布策略。
+  - [**CloneSet** - 无状态应用](https://openkruise.io/zh/docs/user-manuals/cloneset/)
+  - [**Advanced StatefulSet** - 有状态应用](https://openkruise.io/zh/docs/user-manuals/advancedstatefulset)
+  - [**Advanced DaemonSet** - daemon 类型应用](https://openkruise.io/zh/docs/user-manuals/advanceddaemonset)
 
-- [UnitedDeployment](https://openkruise.io/zh-cn/docs/uniteddeployment.html): 通过多个 subset workload 将应用部署到多个可用区。
+- **任务工作负载**
 
-- [BroadcastJob](https://openkruise.io/zh-cn/docs/broadcastjob.html): 配置一个 job，在集群中所有满足条件的 Node 上都跑一个 Pod 任务。
+  - [**BroadcastJob** - 部署任务到一批特定节点上](https://openkruise.io/zh/docs/user-manuals/broadcastjob)
+  - [**AdvancedCronJob** - 周期性地创建 Job 或 BroadcastJob](https://openkruise.io/zh/docs/user-manuals/advancedcronjob)
 
-- [AdvancedCronJob](https://openkruise.io/zh-cn/docs/advancedcronjob.html): 一个扩展的 CronJob 控制器，目前 template 模板支持配置使用 Job 或 BroadcastJob。
+- **Sidecar 容器管理**
 
-- [ImagePullJob](https://openkruise.io/zh-cn/docs/imagepulljob.html): 支持用户指定在任意范围的节点上预热镜像。
+  Sidecar 容器可以很简单地通过 **SidecarSet** 来定义，然后 Kruise 会将它们注入到所有匹配的 Pod 中。
 
-- [ContainerRecreateRequest](https://openkruise.io/zh-cn/docs/containerrecreaterequest.html):  为用户提供了重建/重启存量 Pod 中一个或多个容器的能力。
+  它是通过 Kubernetes webhook 机制来实现的，和 [istio](https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/) 的注入实现方式类似，
+  但是它允许你指定管理你自己的 sidecar 容器。
 
-- [Deletion Protection](https://openkruise.io/zh-cn/docs/deletion_protection.html): 该功能提供了删除安全策略，用来在 Kubernetes 级联删除的机制下保护用户的资源和应用可用性。
+  - [**SidecarSet** - 定义和升级你的 sidecar 容器](https://openkruise.io/zh/docs/user-manuals/sidecarset)
 
-- [PodUnavailableBudget](https://openkruise.io/zh-cn/docs/podunavailablebudget.html): 从 Pod 驱逐/删除/原地升级等全方位场景下保护应用的存活 SLA，提升服务的高可用性。
+- **多区域管理**
 
-- [WorkloadSpread](https://openkruise.io/zh-cn/docs/workloadspread.html): 约束无状态 workload 的区域分布，赋予单一 workload 的多区域和弹性部署的能力。
+  它可以帮助你在一个 Kubernetes 集群中的多个区域上部署应用，比如 不同的 node 资源池、可用区、机型架构（x86 & arm）、节点类型（kubelet & virtual kubelet）等。
 
-## 核心功能
+  这里我们提供两种不同的方式：
 
-- **原地升级**
+  - [**WorkloadSpread** - 旁路地分发 workload 创建的 pods](https://openkruise.io/zh/docs/user-manuals/workloadspread)
+  - [**UnitedDeployment** - 一个新的 workload 来管理多个下属的 workloads](https://openkruise.io/zh/docs/user-manuals/uniteddeployment)
 
-    原地升级是一种可以避免删除、新建 Pod 的升级镜像能力。它比原生 Deployment/StatefulSet 的重建 Pod 升级更快、更高效，并且避免对 Pod 中其他不需要更新的容器造成干扰。
+- **增强运维能力**
 
-- **Sidecar 管理**
+  - [原地重启 pod 中的容器](https://openkruise.io/zh/docs/user-manuals/containerrecreaterequest)
+  - [指定的一批节点上拉取镜像](https://openkruise.io/zh/docs/user-manuals/imagepulljob)
 
-    支持在一个单独的 CR 中定义 sidecar 容器，OpenKruise 能够帮你把这些 Sidecar 容器注入到所有符合条件的 Pod 中。这个过程和 Istio 的注入很相似，但是你可以管理任意你关心的 Sidecar。
+- **应用安全防护**
 
-- **跨多可用区部署**
-
-    定义一个跨多个可用区的全局 workload，容器，OpenKruise 会帮你在每个可用区创建一个对应的下属 workload。你可以统一管理他们的副本数、版本、甚至针对不同可用区采用不同的发布策略。
-
-- **镜像预热**
-
-    支持用户指定在任意范围的节点上下载镜像。
-
-- **容器重建/重启**
-
-    支持用户重建/重启存量 Pod 中一个或多个容器。
-
-- **...**
+  - [保护 Kubernetes 资源及应用 pods 不被级联删除](https://openkruise.io/zh/docs/user-manuals/deletionprotection)
+  - [**PodUnavailableBudget** - 覆盖更多的 Voluntary Disruption 场景，提供应用更加强大的防护能力](https://openkruise.io/zh/docs/user-manuals/podunavailablebudget)
 
 ## 快速开始
 
@@ -81,13 +76,11 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.10
 
 > 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者配置 feature-gates。
 
-更多的安装/升级细节、或者更老版本的 Kubernetes 集群，可以查看 [这个文档](https://openkruise.io/zh-cn/docs/installation.html)。
+更多的安装/升级细节、或者更老版本的 Kubernetes 集群，可以查看 [这个文档](https://openkruise.io/docs/installation)。
 
 ## 文档
 
-你可以在 [OpenKruise website](https://openkruise.io/zh-cn/docs/what_is_openkruise.html) 查看到完整的文档集。
-
-我们也提供了 [**tutorials**](./docs/tutorial/README.md) 来示范如何使用 Kruise 控制器。
+你可以在 [OpenKruise website](https://openkruise.io/zh/docs/) 查看到完整的文档集。
 
 ## 用户
 
