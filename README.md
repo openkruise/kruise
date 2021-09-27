@@ -21,55 +21,51 @@ English | [简体中文](./README-zh_CN.md)
 OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is now hosted by the [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) as a Sandbox Level Project.
 It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload and application management.
 
-As of now, Kruise mainly offers these controllers:
-
-- [CloneSet](https://openkruise.io/en-us/docs/cloneset.html): CloneSet is a workload that mainly focuses on managing stateless applications. It provides a rich set of features for more efficient, deterministic and controlled management, such as in-place update, specified Pod deletion, configurable priority/scatter based update, preUpdate/postUpdate hooks, etc. This [post](https://thenewstack.io/introducing-cloneset-production-grade-kubernetes-deployment-crd/) provides more details about why CloneSet is useful.
-
-- [Advanced StatefulSet](https://openkruise.io/en-us/docs/advanced_statefulset.html): An enhanced version of default [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with extra functionalities such as `in-place update`, `pause` and `maxUnavailable`.
-
-- [SidecarSet](https://openkruise.io/en-us/docs/sidecarset.html): A controller that injects sidecar containers into the Pod spec based on the Pod selectors. The controller is also responsible for upgrading the sidecar containers.
-
-- [Advanced DaemonSet](https://openkruise.io/en-us/docs/advanced_daemonset.html): An enhanced version of default [DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) with extra upgrade strategies such as partition, node selector, pause and surging.
-
-- [UnitedDeployment](https://openkruise.io/en-us/docs/uniteddeployment.html): This controller manages application Pods spread in multiple fault domains by using multiple workloads.
-
-- [BroadcastJob](https://openkruise.io/en-us/docs/broadcastjob.html): A job that runs Pods to completion across all the nodes in the cluster.
-
-- [AdvancedCronJob](https://openkruise.io/en-us/docs/advancedcronjob.html): An extended CronJob controller, currently its template supports Job and BroadcastJob.
-
-- [ImagePullJob](https://openkruise.io/en-us/docs/imagepulljob.html): Help users download images on any nodes they want.
-
-- [ContainerRecreateRequest](https://openkruise.io/en-us/docs/containerrecreaterequest.html):  Provides a way to let users restart/recreate one or more containers in an existing Pod.
-
-- [Deletion Protection](https://openkruise.io/en-us/docs/deletion_protection.html): Provides a safety policy which could help users protect Kubernetes resources and applications' availability from the cascading deletion mechanism.
-
-- [PodUnavailableBudget](https://openkruise.io/en-us/docs/podunavailablebudget.html): In voluntary disruption scenarios, PodUnavailableBudget can achieve the effect of preventing application disruption or SLA degradation, which greatly improves the high availability of application services.
-
-- [WorkloadSpread](https://openkruise.io/en-us/docs/workloadspread.html): Constrain the spread of stateless workload, which empowers single workload the abilities for multi-domain and elastic deployment.
-
 ## Key Features
 
-- **In-place update**
+- **Typical Workloads**
 
-    In-place update provides an alternative to update container images without deleting and recreating the Pod. It is much faster compared to the recreate update used by the native Deployment/StatefulSet and has almost no side effects on other running containers.
+  Typical Workloads can help you manage applications of stateless, stateful and daemon.
 
-- **Sidecar containers management**
+  They all support not only the basic features which are similar to the original Workloads in Kubernetes, but also more advanced abilities like **in-place update**, **configurable scale/upgrade strategies**, **parallel operations**.
 
-    The Sidecar containers can be simply defined in the SidecarSet custom resource and the controller will inject them into all Pods matched. The implementation is done by using Kubernetes mutating webhooks, similar to what [istio](https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/) does. However, SidecarSet allows you to explicitly manage your own sidecars.
+  - [**CloneSet** for stateless applications](https://openkruise.io/docs/user-manuals/cloneset/)
+  - [**Advanced StatefulSet** for stateful applications](https://openkruise.io/docs/user-manuals/advancedstatefulset)
+  - [**Advanced DaemonSet** for daemon applications](https://openkruise.io/docs/user-manuals/advanceddaemonset)
 
-- **Multiple fault domains deployment**
+- **Job Workloads**
 
-    A global workload can be defined over multiple fault domains, and the Kruise controller will spread a sub workload in each domain. You can manage the domain replicas, sub workload template and update strategies uniformly using the global workload.
+  - [**BroadcastJob** for deploying jobs over specific nodes](https://openkruise.io/docs/user-manuals/broadcastjob)
+  - [**AdvancedCronJob** for creating Job or BroadcastJob periodically](https://openkruise.io/docs/user-manuals/advancedcronjob)
 
-- **Image pre-download**
+- **Sidecar container Management**
 
-  Help users download images on any nodes they want.
+  The Sidecar containers can be simply defined in the **SidecarSet** custom resource and Kruise will inject them into all Pods matched.
 
-- **Container recreate/restart**
+  The implementation is done by using Kubernetes mutating webhooks, similar to what [istio](https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/) does.
+  However, it allows you to explicitly manage your own sidecars.
 
-  Help users restart/recreate one or more containers in an existing Pod.
+  - [**SidecarSet** for defining and upgrading your own sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
 
-- **...**
+- **Multi-domain Management**
+
+  This can help you manage applications over nodes with multiple domains,
+  such as different node pools, available zones, architectures(x86 & arm) or node types(kubelet & virtual kubelet).
+
+  Here we provide two different ways:
+
+  - [**WorkloadSpread** for bypass distributing pods in workloads](https://openkruise.io/docs/user-manuals/workloadspread)
+  - [**UnitedDeployment**, a new workload to manage multiple sub-workloads](https://openkruise.io/docs/user-manuals/uniteddeployment)
+
+- **Enhanced Operations**
+
+  - [Restart containers in a running pod](https://openkruise.io/docs/user-manuals/containerrecreaterequest)
+  - [Download images on specific nodes](https://openkruise.io/docs/user-manuals/imagepulljob)
+
+- **Application Protection**
+
+  - [Protect Kubernetes resources and applications' availability from the cascading deletion](https://openkruise.io/docs/user-manuals/deletionprotection)
+  - [**PodUnavailableBudget** for achieving the effect of preventing application disruption or SLA degradation](https://openkruise.io/docs/user-manuals/podunavailablebudget)
 
 ## Quick Start
 
@@ -83,13 +79,11 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.10
 > Note that installing this chart directly means it will use the default template values for the kruise-manager.
 You may have to set your specific configurations when it is deployed into a production cluster or you want to configure feature-gates.
 
-For more install/upgrade details or older Kubernetes versions, please read [this doc](https://openkruise.io/en-us/docs/installation.html).
+For more install/upgrade details or older Kubernetes versions, please read [this doc](https://openkruise.io/docs/installation).
 
 ## Documentation
 
-You can view the full documentation from the [OpenKruise website](https://openkruise.io/en-us/docs/what_is_openkruise.html).
-
-We also provide [**tutorials**](./docs/tutorial/README.md) for **ALL** Kruise controllers to demonstrate how to use them.
+You can view the full documentation from the [OpenKruise website](https://openkruise.io/docs/).
 
 ## Users
 
