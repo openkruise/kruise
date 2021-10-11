@@ -19,7 +19,9 @@ package daemonset
 import (
 	"testing"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -273,6 +275,22 @@ func newNode(name string, label map[string]string) *corev1.Node {
 	}
 }
 
+func newPod(name, namespace string, readinessGates []corev1.PodReadinessGate, conditions []corev1.PodCondition) *corev1.Pod {
+	return &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: corev1.PodSpec{
+			ReadinessGates: readinessGates,
+		},
+		Status: corev1.PodStatus{
+			Conditions: conditions,
+		},
+	}
+}
+
 func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1alpha1.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
 	strategy := appsv1alpha1.DaemonSetUpdateStrategy{
@@ -336,5 +354,97 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 		if should != tt.Expected {
 			t.Errorf("NodeShouldUpdateBySelector() = %v, want %v", should, tt.Expected)
 		}
+	}
+}
+
+func TestIsDaemonPodAvailable(t *testing.T) {
+	for _, tt := range []struct {
+		Title    string
+		Pod      *corev1.Pod
+		Expected bool
+	}{
+		{
+			"daemon pod has no readiness gate and it's ready",
+			newPod("pod1",
+				"default",
+				[]corev1.PodReadinessGate{},
+				[]corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+				}),
+			true,
+		},
+		{
+			"daemon pod has no readiness gate and has no pod ready condition",
+			newPod("pod1",
+				"default",
+				[]corev1.PodReadinessGate{},
+				[]corev1.PodCondition{}),
+			false,
+		},
+		{
+			"daemon pod has no readiness gate and it's not ready",
+			newPod("pod1",
+				"default",
+				[]corev1.PodReadinessGate{},
+				[]corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionFalse},
+				}),
+			false,
+		},
+		{
+			"daemon pod has readiness gate but does not contains inplace readiness gate",
+			newPod("pod1",
+				"default",
+				[]corev1.PodReadinessGate{{ConditionType: "foo"}},
+				[]corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+				}),
+			true,
+		},
+		{
+			"has inplace readiness gate, pod ready condition is false but has no inplace condition",
+			newPod("pod1", "default",
+				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				[]corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionFalse},
+				}),
+			false,
+		},
+		{
+			"has inplace readiness gate, pod ready condition is true but has no inplace condition",
+			newPod("pod1", "default",
+				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				[]corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+				}),
+			true,
+		},
+		{
+			"has inplace readiness gate, pod ready condition is true and inplace condition is false",
+			newPod("pod1", "default",
+				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				[]corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+					{Type: appspub.InPlaceUpdateReady, Status: corev1.ConditionFalse},
+				}),
+			false,
+		},
+		{
+			"has inplace readiness gate, pod ready condition is true and inplace condition is true",
+			newPod("pod1", "default",
+				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				[]corev1.PodCondition{
+					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+					{Type: appspub.InPlaceUpdateReady, Status: corev1.ConditionTrue},
+				}),
+			true,
+		},
+	} {
+		t.Run(tt.Title, func(t *testing.T) {
+			got := IsDaemonPodAvailable(tt.Pod, 0)
+			if got != tt.Expected {
+				t.Errorf("IsDaemonPodAvailable() = %v, want %v", got, tt.Expected)
+			}
+		})
 	}
 }
