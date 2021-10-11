@@ -20,6 +20,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/advancedcronjob"
 	"github.com/openkruise/kruise/pkg/controller/broadcastjob"
 	"github.com/openkruise/kruise/pkg/controller/cloneset"
+	containerlauchpriority "github.com/openkruise/kruise/pkg/controller/containerlaunchpriority"
 	"github.com/openkruise/kruise/pkg/controller/containerrecreaterequest"
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
 	"github.com/openkruise/kruise/pkg/controller/imagepulljob"
@@ -53,6 +54,7 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, podunavailablebudget.Add)
 	controllerAddFuncs = append(controllerAddFuncs, workloadspread.Add)
 	controllerAddFuncs = append(controllerAddFuncs, resourcedistribution.Add)
+	controllerAddFuncs = append(controllerAddFuncs, containerlauchpriority.Add)
 }
 
 func SetupWithManager(m manager.Manager) error {
