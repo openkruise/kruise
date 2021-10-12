@@ -65,6 +65,13 @@ var _ = SIGDescribe("containerpriority", func() {
 					{Name: priorityName, Value: "10"},
 					{Name: "NGINX_PORT", Value: "81"},
 				},
+				Lifecycle: &v1.Lifecycle{
+					PostStart: &v1.Handler{
+						Exec: &v1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "sleep 1"},
+						},
+					},
+				},
 			})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -141,15 +148,29 @@ var _ = SIGDescribe("containerpriority", func() {
 
 		ginkgo.It("run with priorityAnnotation set", func() {
 			cs = tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+				PostStart: &v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"/bin/sh", "-c", "sleep 1"},
+					},
+				},
+			}
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:  "nginx2",
 				Image: "nginx:1.21",
 				Env: []v1.EnvVar{
 					{Name: "NGINX_PORT", Value: "81"},
 				},
+				Lifecycle: &v1.Lifecycle{
+					PostStart: &v1.Handler{
+						Exec: &v1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "sleep 1"},
+						},
+					},
+				},
 			}, v1.Container{
 				Name:  "nginx3",
-				Image: "nginx:1.19",
+				Image: "nginx:1.20",
 				Env: []v1.EnvVar{
 					{Name: "NGINX_PORT", Value: "82"},
 				},
