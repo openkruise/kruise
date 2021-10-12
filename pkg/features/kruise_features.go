@@ -75,6 +75,10 @@ const (
 	// and pvc default fields into pvc template.
 	// If TemplateNoDefaults is false, webhook should inject default fields only when the template changed.
 	TemplateNoDefaults featuregate.Feature = "TemplateNoDefaults"
+
+	// InPlaceUpdateEnvFromMetadata enables Kruise to in-place update a container in Pod
+	// when its env from labels/annotations changed and pod is in-place updating.
+	InPlaceUpdateEnvFromMetadata featuregate.Feature = "InPlaceUpdateEnvFromMetadata"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -91,6 +95,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PodUnavailableBudgetDeleteGate:   {Default: false, PreRelease: featuregate.Alpha},
 	PodUnavailableBudgetUpdateGate:   {Default: false, PreRelease: featuregate.Alpha},
 	TemplateNoDefaults:               {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceUpdateEnvFromMetadata:     {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -121,5 +126,6 @@ func SetDefaultFeatureGates() {
 	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DaemonWatchingPod))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", InPlaceUpdateEnvFromMetadata))
 	}
 }

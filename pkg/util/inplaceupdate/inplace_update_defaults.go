@@ -24,6 +24,9 @@ import (
 
 	"github.com/appscode/jsonpatch"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
+	utilcontainermeta "github.com/openkruise/kruise/pkg/util/containermeta"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -133,6 +136,19 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 			return nil
 		}
 		updateSpec.MetaDataPatch = patchBytes
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateEnvFromMetadata) {
+			hasher := utilcontainermeta.NewEnvFromMetadataHasher()
+			for i := range newTemp.Spec.Containers {
+				c := &newTemp.Spec.Containers[i]
+				oldHashWithEnvFromMetadata := hasher.GetExpectHash(c, oldTemp)
+				newHashWithEnvFromMetadata := hasher.GetExpectHash(c, newTemp)
+				if oldHashWithEnvFromMetadata != newHashWithEnvFromMetadata {
+					updateSpec.UpdateEnvFromMetadata = true
+					break
+				}
+			}
+		}
 	}
 	return updateSpec
 }
@@ -145,23 +161,34 @@ func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 		return fmt.Errorf("still in grace period of in-place update")
 	}
 
-	runtimeContainerMetaSet, err := appspub.GetRuntimeContainerMetaSet(pod)
-	if err != nil {
-		return err
-	}
-	if runtimeContainerMetaSet != nil {
-		if checkAllContainersHashConsistent(pod, runtimeContainerMetaSet) {
-			klog.V(5).Infof("Check Pod %s/%s in-place update completed for all container hash consistent", pod.Namespace, pod.Name)
-			return nil
-		}
-		// Do not return error here, in case kruise-daemon has broken for some reason and runtime-container-meta is still in an old version.
-	}
-
 	inPlaceUpdateState := appspub.InPlaceUpdateState{}
 	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); !ok {
 		return nil
 	} else if err := json.Unmarshal([]byte(stateStr), &inPlaceUpdateState); err != nil {
 		return err
+	}
+
+	runtimeContainerMetaSet, err := appspub.GetRuntimeContainerMetaSet(pod)
+	if err != nil {
+		return err
+	}
+
+	if inPlaceUpdateState.UpdateEnvFromMetadata {
+		if runtimeContainerMetaSet == nil {
+			return fmt.Errorf("waiting for all containers hash consistent, but runtime-container-meta not found")
+		}
+		if !checkAllContainersHashConsistent(pod, runtimeContainerMetaSet, extractedEnvFromMetadataHash) {
+			return fmt.Errorf("waiting for all containers hash consistent")
+		}
+	}
+
+	if runtimeContainerMetaSet != nil {
+		if checkAllContainersHashConsistent(pod, runtimeContainerMetaSet, plainHash) {
+			klog.V(5).Infof("Check Pod %s/%s in-place update completed for all container hash consistent", pod.Namespace, pod.Name)
+			return nil
+		}
+		// If it needs not to update envs from metadata, we don't have to return error here,
+		// in case kruise-daemon has broken for some reason and runtime-container-meta is still in an old version.
 	}
 
 	containerImages := make(map[string]string, len(pod.Spec.Containers))
@@ -192,11 +219,18 @@ func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	return nil
 }
 
+type hashType string
+
+const (
+	plainHash                    hashType = "PlainHash"
+	extractedEnvFromMetadataHash hashType = "ExtractedEnvFromMetadataHash"
+)
+
 // The requirements for hash consistent:
 // 1. all containers in spec.containers should also be in status.containerStatuses and runtime-container-meta
 // 2. all containers in status.containerStatuses and runtime-container-meta should have the same containerID
 // 3. all containers in spec.containers and runtime-container-meta should have the same hashes
-func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *appspub.RuntimeContainerMetaSet) bool {
+func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *appspub.RuntimeContainerMetaSet, hashType hashType) bool {
 	for i := range pod.Spec.Containers {
 		containerSpec := &pod.Spec.Containers[i]
 
@@ -230,10 +264,20 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 			return false
 		}
 
-		if containerMeta.Hashes.PlainHash != kubeletcontainer.HashContainer(containerSpec) {
-			klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different plain hash with spec %s != %s",
-				containerSpec.Name, pod.Namespace, pod.Name, containerMeta.ContainerID, containerStatus.ContainerID)
-			return false
+		switch hashType {
+		case plainHash:
+			if expectedHash := kubeletcontainer.HashContainer(containerSpec); containerMeta.Hashes.PlainHash != expectedHash {
+				klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different plain hash with spec %s != %s",
+					containerSpec.Name, pod.Namespace, pod.Name, containerMeta.Hashes.PlainHash, expectedHash)
+				return false
+			}
+		case extractedEnvFromMetadataHash:
+			hasher := utilcontainermeta.NewEnvFromMetadataHasher()
+			if expectedHash := hasher.GetExpectHash(containerSpec, pod); containerMeta.Hashes.ExtractedEnvFromMetadataHash != expectedHash {
+				klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different extractedEnvFromMetadataHash with spec %s != %s",
+					containerSpec.Name, pod.Namespace, pod.Name, containerMeta.Hashes.ExtractedEnvFromMetadataHash, expectedHash)
+				return false
+			}
 		}
 	}
 

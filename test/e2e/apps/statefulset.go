@@ -678,6 +678,94 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 		})
 
+		framework.ConformanceIt("should in-place update env from label", func() {
+			ginkgo.By("Creating a new StatefulSet")
+			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
+			sst := framework.NewStatefulSetTester(c, kc)
+			sst.SetHTTPProbe(ss)
+			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+					PodUpdatePolicy:       appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+					InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 10},
+				},
+			}
+			ss.Spec.Template.ObjectMeta.Labels = map[string]string{"test-env": "foo"}
+			for k, v := range labels {
+				ss.Spec.Template.ObjectMeta.Labels[k] = v
+			}
+			ss.Spec.Template.Spec.Containers[0].Env = append(ss.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+				Name:      "TEST_ENV",
+				ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
+			})
+			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
+			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+			ss = sst.WaitForStatus(ss)
+			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision),
+				fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+					ss.Namespace, ss.Name, updateRevision, currentRevision))
+			pods := sst.GetPodList(ss)
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
+					fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+						currentRevision))
+			}
+
+			ginkgo.By("Restoring Pods to the current revision")
+			sst.DeleteStatefulPodAtIndex(0, ss)
+			sst.DeleteStatefulPodAtIndex(1, ss)
+			sst.DeleteStatefulPodAtIndex(2, ss)
+			sst.WaitForRunningAndReady(3, ss)
+			ss = sst.GetStatefulSet(ss.Namespace, ss.Name)
+			pods = sst.GetPodList(ss)
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
+					fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+						pods.Items[i].Namespace,
+						pods.Items[i].Name,
+						pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+						currentRevision))
+			}
+
+			ginkgo.By("Updating stateful set template: update label for env")
+			var partition int32 = 3
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+				update.Spec.Template.ObjectMeta.Labels["test-env"] = "bar"
+				if update.Spec.UpdateStrategy.RollingUpdate == nil {
+					update.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateStatefulSetStrategy{}
+				}
+				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Creating a new revision")
+			ss = sst.WaitForStatus(ss)
+			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
+				"Current revision should not equal update revision during rolling update")
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+				partition = 0
+				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("InPlace update Pods at the new revision")
+			sst.WaitForPodNotReady(ss, pods.Items[0].Name)
+			sst.WaitForRunningAndReady(3, ss)
+			ss = sst.GetStatefulSet(ss.Namespace, ss.Name)
+			pods = sst.GetPodList(ss)
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(1)))
+				gomega.Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(gomega.Equal(updateRevision))
+			}
+		})
+
 		/*
 			Release : v1.9
 			Testname: StatefulSet, Scaling
