@@ -19,21 +19,20 @@ package policy
 import (
 	"context"
 	"fmt"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	utilpointer "k8s.io/utils/pointer"
 	"time"
-
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/framework"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("PodUnavailableBudget", func() {
@@ -148,6 +147,61 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(pods).To(gomega.HaveLen(0))
 
 			ginkgo.By("PodUnavailableBudget selector pods and delete deployment reject done")
+		})
+
+		ginkgo.It("PodUnavailableBudget selector pods and scale down deployment ignore", func() {
+			// create pub
+			pub := tester.NewBasePub(ns)
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			tester.CreatePub(pub)
+
+			// create deployment
+			deployment := tester.NewBaseDeployment(ns)
+			deployment.Spec.Replicas = utilpointer.Int32Ptr(4)
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			tester.CreateDeployment(deployment)
+
+			// wait 10 seconds
+			time.Sleep(time.Second * 10)
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
+				UnavailableAllowed: 1,
+				DesiredAvailable:   3,
+				CurrentAvailable:   4,
+				TotalReplicas:      4,
+			}
+			setPubStatus(expectStatus)
+			pub, err := kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			nowStatus := pub.Status.DeepCopy()
+			setPubStatus(nowStatus)
+			gomega.Expect(nowStatus).To(gomega.Equal(expectStatus))
+
+			// scale down deployment
+			ginkgo.By(fmt.Sprintf("scale down Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			deployment.Spec.Replicas = utilpointer.Int32Ptr(0)
+			_, err = c.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			// wait 30 seconds
+			time.Sleep(time.Second * 1)
+			ginkgo.By(fmt.Sprintf("waiting 1 seconds, and check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
+				DesiredAvailable: 0,
+				TotalReplicas:    0,
+			}
+			setPubStatus(expectStatus)
+			pub, err = kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			nowStatus = pub.Status.DeepCopy()
+			setPubStatus(nowStatus)
+			expectStatus.UnavailableAllowed = nowStatus.UnavailableAllowed
+			expectStatus.CurrentAvailable = nowStatus.CurrentAvailable
+			gomega.Expect(nowStatus).To(gomega.Equal(expectStatus))
+			pods, err := sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(0))
+
+			ginkgo.By("PodUnavailableBudget selector pods and scale down deployment reject done")
 		})
 
 		ginkgo.It("PodUnavailableBudget targetReference pods, update failed image and block", func() {

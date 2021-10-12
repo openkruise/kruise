@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	kruiseappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
@@ -31,7 +33,7 @@ import (
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
-
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -48,8 +50,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -122,6 +126,68 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to Pod
 	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{client: mgr.GetClient(),
 		controllerFinder: controllerfinder.NewControllerFinder(mgr.GetClient())}); err != nil {
+		return err
+	}
+
+	//In workload scaling scenario, there is a risk of interception by the pub webhook against the scaled pod.
+	//The solution for this scenario: the pub controller listens to workload replicas changes and adjusts UnavailableAllowed in time.
+	// Example for:
+	// 1. cloneSet.replicas = 100, pub.MaxUnavailable = 10%, then UnavailableAllowed=10.
+	// 2. at this time the cloneSet.replicas is scaled down to 50, the pub controller listens to the replicas change, triggering reconcile will adjust UnavailableAllowed to 55.
+	// 3. so pub webhook will not intercept the request to delete the pods
+	// deployment
+	if err = c.Watch(&source.Kind{Type: &apps.Deployment{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old := e.ObjectOld.(*apps.Deployment)
+			new := e.ObjectNew.(*apps.Deployment)
+			if *old.Spec.Replicas != *new.Spec.Replicas {
+				return true
+			}
+			return false
+		},
+	}); err != nil {
+		return err
+	}
+
+	//kruise AdvancedStatefulSet
+	if err = c.Watch(&source.Kind{Type: &kruiseappsv1beta1.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old := e.ObjectOld.(*kruiseappsv1beta1.StatefulSet)
+			new := e.ObjectNew.(*kruiseappsv1beta1.StatefulSet)
+			if *old.Spec.Replicas != *new.Spec.Replicas {
+				return true
+			}
+			return false
+		},
+	}); err != nil {
+		return err
+	}
+
+	//CloneSet
+	if err = c.Watch(&source.Kind{Type: &kruiseappsv1alpha1.CloneSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
+			new := e.ObjectNew.(*kruiseappsv1alpha1.CloneSet)
+			if *old.Spec.Replicas != *new.Spec.Replicas {
+				return true
+			}
+			return false
+		},
+	}); err != nil {
+		return err
+	}
+
+	//StatefulSet
+	if err = c.Watch(&source.Kind{Type: &apps.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old := e.ObjectOld.(*apps.StatefulSet)
+			new := e.ObjectNew.(*apps.StatefulSet)
+			if *old.Spec.Replicas != *new.Spec.Replicas {
+				return true
+			}
+			return false
+		},
+	}); err != nil {
 		return err
 	}
 
@@ -467,7 +533,7 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 	disruptedPods, unavailablePods map[string]metav1.Time) error {
 
 	unavailableAllowed := currentAvailable - desiredAvailable
-	if expectedCount <= 0 || unavailableAllowed <= 0 {
+	if unavailableAllowed <= 0 {
 		unavailableAllowed = 0
 	}
 
