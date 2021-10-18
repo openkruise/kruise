@@ -19,14 +19,14 @@ package webhook
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
-
-	"k8s.io/client-go/rest"
 
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
 	"github.com/openkruise/kruise/pkg/webhook/util/health"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -40,8 +40,6 @@ var (
 	// HandlerMap contains all admission webhook handlers.
 	HandlerMap   = map[string]admission.Handler{}
 	handlerGates = map[string]GateFunc{}
-
-	Checker = health.Checker
 )
 
 func addHandlers(m map[string]admission.Handler) {
@@ -126,6 +124,16 @@ func Initialize(ctx context.Context, cfg *rest.Config) error {
 	case <-timer.C:
 		return fmt.Errorf("failed to start webhook controller for waiting more than 20s")
 	}
+}
+
+func Checker(req *http.Request) error {
+	// Firstly wait webhook controller initialized
+	select {
+	case <-webhookcontroller.Inited():
+	default:
+		return fmt.Errorf("webhook controller has not initialized")
+	}
+	return health.Checker(req)
 }
 
 func WaitReady() error {
