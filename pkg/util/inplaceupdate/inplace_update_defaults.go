@@ -274,7 +274,7 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 		case extractedEnvFromMetadataHash:
 			hasher := utilcontainermeta.NewEnvFromMetadataHasher()
 			if expectedHash := hasher.GetExpectHash(containerSpec, pod); containerMeta.Hashes.ExtractedEnvFromMetadataHash != expectedHash {
-				klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different extractedEnvFromMetadataHash with spec %s != %s",
+				klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different extractedEnvFromMetadataHash with spec %v != %v",
 					containerSpec.Name, pod.Namespace, pod.Name, containerMeta.Hashes.ExtractedEnvFromMetadataHash, expectedHash)
 				return false
 			}

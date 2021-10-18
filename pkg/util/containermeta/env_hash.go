@@ -17,11 +17,15 @@ limitations under the License.
 package containermeta
 
 import (
+	"encoding/json"
+	"hash/fnv"
+	"sort"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 var (
@@ -45,7 +49,7 @@ func NewEnvFromMetadataHasher() EnvFromMetadataHasher {
 }
 
 func (h *envFromMetadataHasher) GetExpectHash(c *v1.Container, objMeta metav1.Object) uint64 {
-	copy := &v1.Container{Env: make([]v1.EnvVar, len(c.Env))}
+	var envs []v1.EnvVar
 	for i := range c.Env {
 		if c.Env[i].Value != "" || c.Env[i].ValueFrom == nil || c.Env[i].ValueFrom.FieldRef == nil {
 			continue
@@ -69,14 +73,17 @@ func (h *envFromMetadataHasher) GetExpectHash(c *v1.Container, objMeta metav1.Ob
 			continue
 		}
 
-		copy.Env[i] = env
+		envs = append(envs, env)
 	}
 
-	return kubeletcontainer.HashContainer(copy)
+	sort.SliceStable(envs, func(i, j int) bool {
+		return envs[i].Name < envs[j].Name
+	})
+	return hashEnvs(envs)
 }
 
 func (h *envFromMetadataHasher) GetCurrentHash(c *v1.Container, getter EnvGetter) (uint64, error) {
-	copy := &v1.Container{Env: make([]v1.EnvVar, len(c.Env))}
+	var envs []v1.EnvVar
 	for i := range c.Env {
 		if c.Env[i].Value != "" || c.Env[i].ValueFrom == nil || c.Env[i].ValueFrom.FieldRef == nil {
 			continue
@@ -102,8 +109,18 @@ func (h *envFromMetadataHasher) GetCurrentHash(c *v1.Container, getter EnvGetter
 			continue
 		}
 
-		copy.Env[i] = env
+		envs = append(envs, env)
 	}
 
-	return kubeletcontainer.HashContainer(copy), nil
+	sort.SliceStable(envs, func(i, j int) bool {
+		return envs[i].Name < envs[j].Name
+	})
+	return hashEnvs(envs), nil
+}
+
+func hashEnvs(envs []v1.EnvVar) uint64 {
+	hash := fnv.New32a()
+	envsJSON, _ := json.Marshal(envs)
+	hashutil.DeepHashObject(hash, envsJSON)
+	return uint64(hash.Sum32())
 }
