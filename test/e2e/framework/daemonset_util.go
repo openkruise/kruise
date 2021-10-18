@@ -10,11 +10,13 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -50,12 +52,14 @@ func NewDaemonSetTester(c clientset.Interface, kc kruiseclientset.Interface, ns 
 }
 
 func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, image string, updateStrategy appsv1alpha1.DaemonSetUpdateStrategy) *appsv1alpha1.DaemonSet {
+	burstReplicas := intstr.IntOrString{IntVal: int32(50)}
 	return &appsv1alpha1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.ns,
 			Name:      name,
 		},
 		Spec: appsv1alpha1.DaemonSetSpec{
+			BurstReplicas: &burstReplicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: label,
 			},
@@ -72,6 +76,7 @@ func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, ima
 						},
 					},
 					HostNetwork: true,
+					Tolerations: []v1.Toleration{{Operator: v1.TolerationOpExists}},
 				},
 			},
 			UpdateStrategy: updateStrategy,
@@ -139,6 +144,25 @@ func (t *DaemonSetTester) CheckDaemonStatus(dsName string) error {
 		return fmt.Errorf("Error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
 	}
 	return nil
+}
+
+func (t *DaemonSetTester) CheckDaemonReady(dsName string) func() (bool, error) {
+	return func() (bool, error) {
+		ds, err := t.GetDaemonSet(dsName)
+		if err != nil {
+			return true, fmt.Errorf("Could not get daemon set %v", dsName)
+		}
+		desired, updated, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.UpdatedNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
+		if desired != updated {
+			Logf("DaemonSet %v is not updated. DesiredScheduled: %d, UpdatedNumberScheduled: %d", dsName, desired, updated)
+			return false, nil
+		}
+		if desired != scheduled && desired != ready {
+			Logf("DaemonSet %v is not ready. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", dsName, desired, scheduled, ready)
+			return false, nil
+		}
+		return true, nil
+	}
 }
 
 func (t *DaemonSetTester) SeparateDaemonSetNodeLabels(labels map[string]string) (map[string]string, map[string]string) {
@@ -215,11 +239,12 @@ func (t *DaemonSetTester) GetNewPodsToCheckImage(label map[string]string, newIma
 		for _, pod := range newPods.Items {
 			for _, status := range pod.Status.ContainerStatuses {
 				substr := strings.Split(status.Image, "/")
-				if substr[len(substr)-1] != newImage {
-					Logf("newPod container image is %s,should be %s", status.Image, newImage)
+				image := substr[len(substr)-1]
+				if image != newImage {
+					Logf("container image of new pod %s is %s, should be %s", pod.Name, image, newImage)
 					return false, nil
 				} else {
-					Logf("Pod has new image %s", substr[len(substr)-1])
+					Logf("Pod %s has new image %s", pod.Name, substr[len(substr)-1])
 				}
 			}
 		}
@@ -341,4 +366,35 @@ func (t *DaemonSetTester) ListDaemonPods(label map[string]string) (*v1.PodList, 
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	return t.c.CoreV1().Pods(t.ns).List(context.TODO(), options)
+}
+
+func (t *DaemonSetTester) DaemonPodHasReadinessGate(pods []v1.Pod) bool {
+	for _, pod := range pods {
+		if !daemonset.ContainsReadinessGate(&pod) {
+			return false
+		}
+		Logf("pod %v has readiness gate", pod.Name)
+	}
+	return true
+}
+
+func (t *DaemonSetTester) CheckPodHasNotRecreate(oldPods, newPods []v1.Pod) bool {
+	oldPodMap := make(map[string]v1.Pod)
+	for _, pod := range oldPods {
+		oldPodMap[pod.Name] = pod
+	}
+
+	for _, pod := range newPods {
+		oldPod, has := oldPodMap[pod.Name]
+		if !has {
+			Logf("no old pod found for %v", pod.Name)
+			return false
+		}
+		if oldPod.Name != pod.Name {
+			Logf("old pod name is not the same %v %v", oldPod.Name, pod.Name)
+			return false
+		}
+	}
+
+	return true
 }

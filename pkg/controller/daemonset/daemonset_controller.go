@@ -56,6 +56,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
@@ -64,6 +65,7 @@ import (
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
@@ -155,6 +157,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	podLister := corelisters.NewPodLister(podInformer.(cache.SharedIndexInformer).GetIndexer())
 	nodeLister := corelisters.NewNodeLister(nodeInformer.(cache.SharedIndexInformer).GetIndexer())
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 1*time.Minute)
+	revisionAdapter := revisionadapter.NewDefaultImpl()
 
 	cli := kruiseutil.NewClientFromManager(mgr, "daemonset-controller")
 	dsc := &ReconcileDaemonSet{
@@ -168,7 +171,8 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		podLister:         podLister,
 		nodeLister:        nodeLister,
 		failedPodsBackoff: failedPodsBackoff,
-		inplaceControl:    inplaceupdate.New(cli, revisionadapter.NewDefaultImpl()),
+		inplaceControl:    inplaceupdate.New(cli, revisionAdapter),
+		revisionAdapter:   revisionAdapter,
 		updateExp:         updateExpectations,
 	}
 	dsc.podNodeIndex = podInformer.(cache.SharedIndexInformer).GetIndexer()
@@ -255,6 +259,8 @@ type ReconcileDaemonSet struct {
 
 	inplaceControl inplaceupdate.Interface
 
+	revisionAdapter revisionadapter.Interface
+
 	updateExp kruiseExpectations.UpdateExpectations
 }
 
@@ -320,6 +326,7 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ds *appsv1alpha1.DaemonSet) ([]*cor
 func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconcile.Result, error) {
 	dsKey := request.NamespacedName.String()
 	ds := &appsv1alpha1.DaemonSet{}
+	requeueDuration := requeueduration.Duration{}
 	err := dsc.client.Get(context.TODO(), request.NamespacedName, ds)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -366,8 +373,28 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconci
 		return reconcile.Result{RequeueAfter: delay}, nil
 	}
 
-	// Process rolling updates if we're ready.
-	if expectations.SatisfiedExpectations(dsKey) {
+	key, _ := kubecontroller.KeyFunc(ds)
+	klog.V(4).Infof("Refresh inplace status and update expectations for daemonset %s/%s", ds.Namespace, ds.Name)
+	delay, err = dsc.refreshPodStates(ds, hash, key)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if delay != 0 {
+		requeueDuration.Update(delay)
+	}
+
+	// Process rolling updates if we're ready. For all kinds of update should not be executed if the update
+	// expectation is not satisfied.
+	updateSatisfied, unsatisfiedDuration, updateDirtyPods := dsc.updateExp.SatisfiedExpectations(key, cur.Name)
+	if unsatisfiedDuration >= kruiseExpectations.ExpectationTimeout {
+		klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", key, updateDirtyPods, unsatisfiedDuration)
+		return reconcile.Result{}, nil
+	}
+	if !updateSatisfied && unsatisfiedDuration < kruiseExpectations.ExpectationTimeout {
+		klog.V(6).Infof("Not satisfied scale for %v, updateDirtyPods=%v", key, updateDirtyPods)
+		requeueDuration.Update(kruiseExpectations.ExpectationTimeout - unsatisfiedDuration)
+	}
+	if expectations.SatisfiedExpectations(dsKey) && updateSatisfied {
 		switch ds.Spec.UpdateStrategy.Type {
 		case appsv1alpha1.OnDeleteDaemonSetStrategyType:
 		case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
@@ -388,7 +415,15 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconci
 		return reconcile.Result{}, fmt.Errorf("failed to clean up revisions of DaemonSet: %v", err)
 	}
 
-	return dsc.updateDaemonSetStatus(ds, nodeList, hash, true)
+	res, err := dsc.updateDaemonSetStatus(ds, nodeList, hash, true)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	requeueDuration.Update(res.RequeueAfter)
+	res.RequeueAfter = requeueDuration.Get()
+
+	return res, err
 }
 
 func (dsc *ReconcileDaemonSet) getDaemonSetsForPod(pod *corev1.Pod) []*appsv1alpha1.DaemonSet {
@@ -466,7 +501,7 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet,
 				pod := daemonPods[0]
 				if podutil.IsPodReady(pod) {
 					numberReady++
-					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+					if IsDaemonPodAvailable(pod, ds.Spec.MinReadySeconds) {
 						numberAvailable++
 					}
 				}
@@ -606,14 +641,14 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 	}
 	template := util.CreatePodTemplate(ds.Spec.Template, generation, hash)
 
-	//if ds.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateDaemonSetStrategyType &&
-	//	ds.Spec.UpdateStrategy.RollingUpdate != nil &&
-	//	ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
-	//	readinessGate := corev1.PodReadinessGate{
-	//		ConditionType: appsv1alpha1.InPlaceUpdateReady,
-	//	}
-	//	template.Spec.ReadinessGates = append(template.Spec.ReadinessGates, readinessGate)
-	//}
+	if ds.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateDaemonSetStrategyType &&
+		ds.Spec.UpdateStrategy.RollingUpdate != nil &&
+		ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
+		readinessGate := corev1.PodReadinessGate{
+			ConditionType: appspub.InPlaceUpdateReady,
+		}
+		template.Spec.ReadinessGates = append(template.Spec.ReadinessGates, readinessGate)
+	}
 
 	// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 	// and double with each successful iteration in a kind of "slow start".
@@ -942,4 +977,42 @@ func (dsc *ReconcileDaemonSet) cleanupHistory(ds *appsv1alpha1.DaemonSet, old []
 		toKill--
 	}
 	return nil
+}
+
+func (dsc *ReconcileDaemonSet) refreshPodStates(ds *appsv1alpha1.DaemonSet, hash, dsKey string) (time.Duration, error) {
+	opts := &inplaceupdate.UpdateOptions{}
+	opts = inplaceupdate.SetOptionsDefaults(opts)
+
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	if err != nil {
+		return 0, fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
+
+	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, hash, nodeToDaemonPods)
+	if err != nil {
+		return 0, fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
+	}
+
+	newPods, _ := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
+	for _, pod := range newPods {
+		dsc.updateExp.ObserveUpdated(dsKey, hash, pod)
+	}
+
+	requeueDuration := requeueduration.Duration{}
+	for _, pods := range nodeToDaemonPods {
+		for _, pod := range pods {
+			res := dsc.inplaceControl.Refresh(pod, opts)
+			if res.RefreshErr != nil {
+				klog.Errorf("DaemonSet %s/%s failed to update pod %s condition for inplace: %v",
+					ds.Namespace, ds.Name, pod.Name, res.RefreshErr)
+				return 0, res.RefreshErr
+			}
+
+			if res.DelayDuration != 0 {
+				requeueDuration.Update(res.DelayDuration)
+			}
+		}
+	}
+
+	return requeueDuration.Get(), nil
 }

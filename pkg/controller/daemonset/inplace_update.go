@@ -26,11 +26,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -52,26 +50,43 @@ func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 
 	newPods, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
 
-	oldAvailablePods, oldUnavailablePods := util.SplitByAvailablePods(ds.Spec.MinReadySeconds, oldPods)
+	oldAvailablePods, oldUnavailablePods := SplitByAvailablePods(ds.Spec.MinReadySeconds, oldPods)
 
 	// for oldPods delete all not running pods
 	var oldPodsToInplaceUpdate []*corev1.Pod
+	var oldPodsToDelete []string
 	for _, pod := range oldUnavailablePods {
 		// Skip terminating pods. We won't delete them again
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		oldPodsToInplaceUpdate = append(oldPodsToInplaceUpdate, pod)
+
+		// if the pod does not contain readiness gate, delete it and recreate one in
+		// next reconcile loop.
+		if ContainsReadinessGate(pod) {
+			oldPodsToInplaceUpdate = append(oldPodsToInplaceUpdate, pod)
+		} else {
+			oldPodsToDelete = append(oldPodsToDelete, pod.Name)
+		}
 	}
 
 	for _, pod := range oldAvailablePods {
 		if numUnavailable >= maxUnavailable {
 			klog.V(6).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
+			dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "numUnavailable >= maxUnavailable", "%s/%s number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", ds.Namespace, ds.Name, numUnavailable, maxUnavailable)
 			break
 		}
 		klog.V(6).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
-		oldPodsToInplaceUpdate = append(oldPodsToInplaceUpdate, pod)
+		if ContainsReadinessGate(pod) {
+			oldPodsToInplaceUpdate = append(oldPodsToInplaceUpdate, pod)
+		} else {
+			oldPodsToDelete = append(oldPodsToDelete, pod.Name)
+		}
 		numUnavailable++
+	}
+
+	if len(oldPodsToDelete) > 0 {
+		return reconcile.Result{}, dsc.syncNodes(ds, oldPodsToDelete, []string{}, hash)
 	}
 
 	cur, old, err := dsc.constructHistory(ds)
@@ -86,23 +101,13 @@ func (dsc *ReconcileDaemonSet) inplaceRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 	key, _ := kubecontroller.KeyFunc(ds)
 	// Refresh update expectations
 	for _, pod := range newPods {
-		dsc.updateExp.ObserveUpdated(key, cur.Name, pod)
+		dsc.updateExp.ObserveUpdated(key, cur.Labels[apps.DefaultDaemonSetUniqueLabelKey], pod)
 	}
 
-	// If update expectations have not satisfied yet, just skip this reconcile.
-	if updateSatisfied, unsatisfiedDuration, updateDirtyPods := dsc.updateExp.SatisfiedExpectations(key, cur.Name); !updateSatisfied {
-		if unsatisfiedDuration >= kruiseExpectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", key, updateDirtyPods, unsatisfiedDuration)
-			return reconcile.Result{}, nil
-		}
-		klog.V(4).Infof("Not satisfied scale for %v, updateDirtyPods=%v", key, updateDirtyPods)
-		return reconcile.Result{RequeueAfter: kruiseExpectations.ExpectationTimeout - unsatisfiedDuration}, nil
-	}
-
-	return dsc.syncNodesWhenInplaceUpdate(ds, oldPodsToInplaceUpdate, hash, old[len(old)-1], cur)
+	return dsc.syncNodesWhenInplaceUpdate(ds, oldPodsToInplaceUpdate, hash, old, cur)
 }
 
-func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.DaemonSet, oldPodsToInplaceUpdate []*corev1.Pod, hash string, last, cur *apps.ControllerRevision) (reconcile.Result, error) {
+func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.DaemonSet, oldPodsToInplaceUpdate []*corev1.Pod, hash string, oldRevisions []*apps.ControllerRevision, cur *apps.ControllerRevision) (reconcile.Result, error) {
 	updateDiff := len(oldPodsToInplaceUpdate)
 
 	burstReplicas := getBurstReplicas(ds)
@@ -112,40 +117,62 @@ func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.Daemo
 
 	// error channel to communicate back failures.  make the buffer big enough to avoid any blocking
 	errCh := make(chan error, updateDiff)
+	deletePodsCh := make(chan string, updateDiff)
 
-	klog.V(4).Infof("Pods to in-place update for daemon set %s: %+v, updating %d", ds.Name, oldPodsToInplaceUpdate, updateDiff)
+	klog.V(6).Infof("Daemon set %s/%s: inplace updating %d pods", ds.Namespace, ds.Name, updateDiff)
 	updateWait := sync.WaitGroup{}
 	updateWait.Add(updateDiff)
 	for i := 0; i < updateDiff; i++ {
 		go func(ix int, ds *appsv1alpha1.DaemonSet, pod *corev1.Pod) {
 			defer updateWait.Done()
 
-			res := dsc.inplaceControl.Update(pod, last, cur, &inplaceupdate.UpdateOptions{GetRevision: func(rev *apps.ControllerRevision) string {
+			var old *apps.ControllerRevision
+			for _, r := range oldRevisions {
+				if dsc.revisionAdapter.EqualToRevisionHash("", pod, getShortHash(r.Name)) {
+					old = r
+					break
+				}
+			}
+			res := dsc.inplaceControl.Update(pod, old, cur, &inplaceupdate.UpdateOptions{GetRevision: func(rev *apps.ControllerRevision) string {
 				return rev.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 			}})
-			if res.InPlaceUpdate && res.UpdateErr == nil {
-				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
-				dsKey, err := kubecontroller.KeyFunc(ds)
-				if err != nil {
-					klog.Errorf("couldn't get key for object %#v: %v", ds, err)
+			if res.InPlaceUpdate {
+				if res.UpdateErr == nil {
+					dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
+					dsKey, err := kubecontroller.KeyFunc(ds)
+					if err != nil {
+						klog.Errorf("couldn't get key for object %#v: %v", ds, err)
+						return
+					}
+					dsc.updateExp.ExpectUpdated(dsKey, cur.Name, pod)
 					return
 				}
-				dsc.updateExp.ExpectUpdated(dsKey, cur.Name, pod)
-				refreshRes := dsc.inplaceControl.Refresh(pod, nil)
-				if refreshRes.RefreshErr != nil {
-					klog.Errorf("failed to update pod condition: %v", err)
-				}
-				return
-			}
 
-			if res.UpdateErr != nil {
 				klog.Warningf("DaemonSet %s/%s failed to in-place update Pod %s, so it will back off to ReCreate", ds.Namespace, ds.Name, pod.Name)
 				errCh <- res.UpdateErr
 				utilruntime.HandleError(res.UpdateErr)
+				return
+			} else {
+				deletePodsCh <- pod.Name
 			}
 		}(i, ds, oldPodsToInplaceUpdate[i])
 	}
 	updateWait.Wait()
+
+	// Some pods did not update, which means the upgrading contains replace operations other than container image
+	// and cannot use inplace-update. Mark these pods as deleted and delete them in syncNodes method.
+	if len(deletePodsCh) > 0 {
+		podsToDelete := make([]string, 0)
+		close(deletePodsCh)
+		for pod := range deletePodsCh {
+			podsToDelete = append(podsToDelete, pod)
+		}
+		klog.V(6).Infof("DaemonSet %s/%s found %d pods cannot use inplace update, delete and recreate them", ds.Namespace, ds.Name, len(podsToDelete))
+		if err := dsc.syncNodes(ds, podsToDelete, []string{}, hash); err != nil {
+			klog.Warningf("DaemonSet %s/%s delete pods that cannot use inplace update error: %v", ds.Namespace, ds.Name, err)
+			errCh <- err
+		}
+	}
 
 	// collect errors if any for proper reporting/retry logic in the controller
 	var errors []error
@@ -153,5 +180,6 @@ func (dsc *ReconcileDaemonSet) syncNodesWhenInplaceUpdate(ds *appsv1alpha1.Daemo
 	for err := range errCh {
 		errors = append(errors, err)
 	}
+
 	return reconcile.Result{}, utilerrors.NewAggregate(errors)
 }

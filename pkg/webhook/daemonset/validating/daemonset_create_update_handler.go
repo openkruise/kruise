@@ -107,10 +107,10 @@ func validateDaemonSetUpdateStrategy(strategy *appsv1alpha1.DaemonSetUpdateStrat
 					fldPath.Child("rollingUpdate").Child("partition"))...)
 		}
 		switch strategy.RollingUpdate.Type {
-		case appsv1alpha1.StandardRollingUpdateType, appsv1alpha1.SurgingRollingUpdateType:
+		case appsv1alpha1.StandardRollingUpdateType, appsv1alpha1.SurgingRollingUpdateType, appsv1alpha1.InplaceRollingUpdateType:
 		default:
-			validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.SurgingRollingUpdateType)}
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("rollingUpdateType"), strategy, validValues))
+			validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.SurgingRollingUpdateType), string(appsv1alpha1.InplaceRollingUpdateType)}
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("rollingUpdateType"), strategy.RollingUpdate.Type, validValues))
 		}
 		if strategy.RollingUpdate.MaxUnavailable != nil {
 			allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*strategy.RollingUpdate.MaxUnavailable, fldPath.Child("rollingUpdate").Child("maxUnavailable"))...)

@@ -19,9 +19,12 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -247,4 +251,51 @@ func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1alpha1.DaemonSet) b
 		klog.Warningf("get unknown update strategy type %s for daemonset %s", ds.Spec.UpdateStrategy.Type, ds.Name)
 		return false
 	}
+}
+
+// IsPodUpdateReady returns true if a pod is ready after update progress.
+func IsDaemonPodAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if !podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now()) {
+		return false
+	}
+
+	if ContainsReadinessGate(pod) {
+		condition := inplaceupdate.GetCondition(pod)
+		if condition != nil && condition.Status != corev1.ConditionTrue {
+			return false
+		}
+	}
+
+	return true
+}
+
+// ContainsReadinessGate returns true if pod has inplace update readiness gate.
+func ContainsReadinessGate(pod *corev1.Pod) bool {
+	for _, r := range pod.Spec.ReadinessGates {
+		if r.ConditionType == appspub.InPlaceUpdateReady {
+			return true
+		}
+	}
+	return false
+}
+
+// SplitByAvailablePods splits provided daemon set pods by availability
+func SplitByAvailablePods(minReadySeconds int32, pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod) {
+	unavailablePods := []*corev1.Pod{}
+	availablePods := []*corev1.Pod{}
+	for _, pod := range pods {
+		if IsDaemonPodAvailable(pod, minReadySeconds) {
+			availablePods = append(availablePods, pod)
+		} else {
+			unavailablePods = append(unavailablePods, pod)
+		}
+	}
+	return availablePods, unavailablePods
+}
+
+func getShortHash(hash string) string {
+	// This makes sure the real hash must be the last '-' substring of revision name
+	// vendor/k8s.io/kubernetes/pkg/controller/history/controller_history.go#82
+	list := strings.Split(hash, "-")
+	return list[len(list)-1]
 }

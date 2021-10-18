@@ -107,9 +107,12 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, hash st
 		return delay, dsc.standardRollingUpdate(ds, hash)
 	} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.SurgingRollingUpdateType {
 		return dsc.surgingRollingUpdate(ds, hash)
-		//} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
-		//	res, err := dsc.inplaceRollingUpdate(ds, hash)
-		//	return res.RequeueAfter, err
+	} else if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
+		res, err := dsc.inplaceRollingUpdate(ds, hash)
+		if err != nil {
+			return delay, err
+		}
+		return res.RequeueAfter, err
 	} else {
 		klog.Errorf("no matched RollingUpdate type")
 	}
@@ -228,7 +231,6 @@ func GetTemplateGeneration(ds *appsv1alpha1.DaemonSet) (*int64, error) {
 }
 
 func (dsc *ReconcileDaemonSet) getUnavailableNumbers(ds *appsv1alpha1.DaemonSet, nodeToDaemonPods map[string][]*corev1.Pod) (int, int, error) {
-	klog.V(6).Infof("Getting unavailable numbers")
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return -1, -1, fmt.Errorf("couldn't get list of nodes during rolling update of daemon set %#v: %v", ds, err)
@@ -256,7 +258,7 @@ func (dsc *ReconcileDaemonSet) getUnavailableNumbers(ds *appsv1alpha1.DaemonSet,
 		available := false
 		for _, pod := range daemonPods {
 			//for the purposes of update we ensure that the Pod is both available and not terminating
-			if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) && pod.DeletionTimestamp == nil {
+			if IsDaemonPodAvailable(pod, ds.Spec.MinReadySeconds) && pod.DeletionTimestamp == nil {
 				available = true
 				break
 			}
@@ -710,13 +712,13 @@ func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 				}
 				oldPod = pod
 			}
-			if !foundAvailable && podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+			if !foundAvailable && IsDaemonPodAvailable(pod, ds.Spec.MinReadySeconds) {
 				foundAvailable = true
 			}
 		}
 
 		if newPod != nil {
-			klog.Infof("newPod IsPodAvailable is %v", podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Now()))
+			klog.V(4).Infof("newPod IsPodAvailable is %v", podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Now()))
 		}
 		if newPod == nil && numSurge < maxSurge && wantToRun {
 			if !foundAvailable && len(pods) >= 2 {
@@ -726,13 +728,13 @@ func (dsc *ReconcileDaemonSet) surgingRollingUpdate(ds *appsv1alpha1.DaemonSet, 
 				numSurge++
 				nodesToSurge = append(nodesToSurge, node)
 			}
-		} else if newPod != nil && podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Now()) && oldPod != nil && oldPod.DeletionTimestamp == nil {
+		} else if newPod != nil && IsDaemonPodAvailable(newPod, ds.Spec.MinReadySeconds) && oldPod != nil && oldPod.DeletionTimestamp == nil {
 			klog.V(6).Infof("Marking pod %s/%s for deletion", ds.Name, oldPod.Name)
 			oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
 		} else {
 			if ds.Spec.MinReadySeconds > 0 {
 				if newPod != nil {
-					if podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Now()) {
+					if IsDaemonPodAvailable(newPod, ds.Spec.MinReadySeconds) {
 						if oldPod != nil && oldPod.DeletionTimestamp == nil {
 							klog.V(6).Infof("Marking pod %s/%s for deletion", ds.Name, oldPod.Name)
 							oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
