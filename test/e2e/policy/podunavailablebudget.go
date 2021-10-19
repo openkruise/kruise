@@ -26,9 +26,11 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
@@ -98,11 +100,16 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 		ginkgo.It("PodUnavailableBudget selector pods and delete deployment ignore", func() {
 			// create pub
 			pub := tester.NewBasePub(ns)
+			pub.Spec.MaxUnavailable = &intstr.IntOrString{
+				Type:   intstr.Int,
+				IntVal: 0,
+			}
 			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
+			deployment.Spec.Replicas = utilpointer.Int32Ptr(1)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
@@ -110,10 +117,10 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			time.Sleep(time.Second * 10)
 			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
-				UnavailableAllowed: 1,
+				UnavailableAllowed: 0,
 				DesiredAvailable:   1,
-				CurrentAvailable:   2,
-				TotalReplicas:      2,
+				CurrentAvailable:   1,
+				TotalReplicas:      1,
 			}
 			setPubStatus(expectStatus)
 			pub, err := kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
@@ -121,6 +128,37 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			nowStatus := pub.Status.DeepCopy()
 			setPubStatus(nowStatus)
 			gomega.Expect(nowStatus).To(gomega.Equal(expectStatus))
+
+			// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
+			// and will no longer check the pub quota
+			pods, err := sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(1))
+			err = c.CoreV1().Pods(deployment.Namespace).Evict(context.TODO(), &policy.Eviction{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pods[0].Name,
+				},
+			})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			// add annotations
+			pods, err = sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(1))
+			podIn := pods[0]
+			if podIn.Annotations == nil {
+				podIn.Annotations = map[string]string{}
+			}
+			podIn.Annotations[pubcontrol.PodPubNoProtectionAnnotation] = "true"
+			_, err = c.CoreV1().Pods(deployment.Namespace).Update(context.TODO(), podIn, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second)
+			err = c.CoreV1().Pods(deployment.Namespace).Evict(context.TODO(), &policy.Eviction{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pods[0].Name,
+				},
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 5)
 
 			// delete deployment
 			ginkgo.By(fmt.Sprintf("Deleting Deployment(%s.%s)", deployment.Namespace, deployment.Name))
@@ -142,7 +180,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			nowStatus = pub.Status.DeepCopy()
 			setPubStatus(nowStatus)
 			gomega.Expect(nowStatus).To(gomega.Equal(expectStatus))
-			pods, err := sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
+			pods, err = sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(0))
 
