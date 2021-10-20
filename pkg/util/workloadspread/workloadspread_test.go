@@ -69,6 +69,21 @@ var (
 		},
 	}
 
+	cloneSetDemo = &appsv1alpha1.CloneSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps.kruise.io/v1alpha1",
+			Kind:       "CloneSet",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "cloneset-test",
+			Namespace:  "default",
+			Generation: 7,
+		},
+		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: utilpointer.Int32Ptr(10),
+		},
+	}
+
 	workloadSpreadDemo = &appsv1alpha1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps.kruise.io/v1alpha1",
@@ -137,7 +152,8 @@ var (
 			},
 		},
 		Status: appsv1alpha1.WorkloadSpreadStatus{
-			ObservedGeneration: 10,
+			ObservedGeneration:         10,
+			ObservedWorkloadGeneration: 7,
 			SubsetStatuses: []appsv1alpha1.WorkloadSpreadSubsetStatus{
 				{
 					Name:            "subset-a",
@@ -157,7 +173,8 @@ func init() {
 }
 
 func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
-	handler := NewWorkloadSpreadHandler(nil)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cloneSetDemo.DeepCopy()).Build()
+	handler := NewWorkloadSpreadHandler(fakeClient)
 	ws := workloadSpreadDemo.DeepCopy()
 	ws.Status.SubsetStatuses[0].MissingReplicas = 0
 	subset := appsv1alpha1.WorkloadSpreadSubset{
@@ -182,7 +199,10 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 	ws.Status.SubsetStatuses = append(ws.Status.SubsetStatuses, status)
 	pod := podDemo.DeepCopy()
 	pod.Name = ""
-	_, suitableSubset, generatedUID := handler.updateSubsetForPod(ws, pod, nil, CreateOperation)
+	_, suitableSubset, generatedUID, err := handler.updateSubsetForPod(ws, pod, nil, CreateOperation)
+	if err != nil {
+		t.Fatalf("updateSubsetForPod error, %v", err)
+	}
 	if generatedUID == "" {
 		t.Fatalf("generate id failed")
 	}
@@ -196,6 +216,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 		name                 string
 		getPod               func() *corev1.Pod
 		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
+		getWorkload          func() client.Object
 		getOperation         func() Operation
 		expectPod            func() *corev1.Pod
 		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
@@ -207,6 +228,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return workloadSpreadDemo.DeepCopy()
+			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
 			},
 			getOperation: func() Operation {
 				return CreateOperation
@@ -311,6 +335,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Status.SubsetStatuses = append(demo.Status.SubsetStatuses, status)
 				return demo
 			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
 			getOperation: func() Operation {
 				return CreateOperation
 			},
@@ -377,6 +404,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
 			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
 			getOperation: func() Operation {
 				return CreateOperation
 			},
@@ -400,6 +430,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Spec.TargetReference.Name = "not found"
 				return demo
 			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
 			getOperation: func() Operation {
 				return CreateOperation
 			},
@@ -421,6 +454,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = -1
 				return demo
+			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
 			},
 			getOperation: func() Operation {
 				return CreateOperation
@@ -505,6 +541,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Status.SubsetStatuses[0].MissingReplicas = 4
 				demo.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				return demo
+			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
 			},
 			getOperation: func() Operation {
 				return CreateOperation
@@ -591,6 +630,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
 			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
 			getOperation: func() Operation {
 				return DeleteOperation
 			},
@@ -617,6 +659,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
+			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
 			},
 			getOperation: func() Operation {
 				return EvictionOperation
@@ -645,6 +690,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
 			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
 			getOperation: func() Operation {
 				return DeleteOperation
 			},
@@ -670,6 +718,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
+			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
 			},
 			getOperation: func() Operation {
 				return DeleteOperation
@@ -698,6 +749,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				return demo
 			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
 			getOperation: func() Operation {
 				return DeleteOperation
 			},
@@ -725,6 +779,9 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Status.SubsetStatuses[0].MissingReplicas = -1
 				return demo
 			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
 			getOperation: func() Operation {
 				return DeleteOperation
 			},
@@ -740,12 +797,158 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				return workloadSpread
 			},
 		},
+		{
+			name: "operation = create, simulate scaling up in percentage configuration, matched workloadSpread subset-a: " +
+				"MaxReplicas=60%, MissingReplicas=0, Replicas=2, len(CreatingPods)=4, len(DeletingPods)=1",
+			getPod: func() *corev1.Pod {
+				return podDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.Subsets[0].MaxReplicas = &intstr.IntOrString{
+					Type: intstr.String, StrVal: "60%",
+				}
+				ws.Status.SubsetStatuses[0].Replicas = 2
+				ws.Status.SubsetStatuses[0].MissingReplicas = 0
+				ws.Status.ObservedWorkloadGeneration = podDemo.Generation + 1
+				ws.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{
+					"creatingPod-1": {Time: time.Now()},
+					"creatingPod-2": {Time: time.Now()},
+					"creatingPod-3": {Time: time.Now()},
+					"creatingPod-4": {Time: time.Now()},
+				}
+				ws.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{
+					"deletingPod-1": {Time: time.Now()},
+				}
+				return ws
+			},
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
+			getOperation: func() Operation {
+				return CreateOperation
+			},
+			expectPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Labels = map[string]string{
+					"subset": "subset-a",
+				}
+				pod.Annotations = map[string]string{
+					"subset":                               "subset-a",
+					MatchedWorkloadSpreadSubsetAnnotations: `{"name":"test-ws","subset":"subset-a"}`,
+				}
+				pod.Spec.Tolerations = []corev1.Toleration{
+					{
+						Key:      "node.kubernetes.io/not-ready",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoExecute,
+					},
+				}
+				pod.Spec.Affinity = &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"ack"},
+										},
+										{
+											Key:      "sigma.ali/resource-pool",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"lark"},
+										},
+									},
+									MatchFields: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"i-8vbhlh6rte2w5d1k2sgn", "i-8vbhlh6rte2vnxlq8ztc"},
+										},
+									},
+								},
+							},
+						},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+							{
+								Weight: 5,
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"cn-zhangjiakou-a"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+
+				return pod
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.Subsets[0].MaxReplicas = &intstr.IntOrString{
+					Type: intstr.String, StrVal: "60%",
+				}
+				ws.Status.SubsetStatuses[0].Replicas = 2
+				ws.Status.SubsetStatuses[0].MissingReplicas = 0
+				ws.Status.ObservedWorkloadGeneration = podDemo.Generation + 1
+				ws.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{
+					"creatingPod-1": {Time: time.Now()},
+					"creatingPod-2": {Time: time.Now()},
+					"creatingPod-3": {Time: time.Now()},
+					"creatingPod-4": {Time: time.Now()},
+					podDemo.Name:    {Time: defaultTime},
+				}
+				ws.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{
+					"deletingPod-1": {Time: time.Now()},
+				}
+				return ws
+			},
+		},
+		{
+			name: "operation = delete, matched workloadSpread, MissingReplicas = 0, workload not exist",
+			getPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
+				return demo
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				demo := workloadSpreadDemo.DeepCopy()
+				demo.Status.SubsetStatuses[0].MissingReplicas = 0
+				return demo
+			},
+			getWorkload: func() client.Object {
+				cs := cloneSetDemo.DeepCopy()
+				cs.SetName("Not exist")
+				return cs
+			},
+			getOperation: func() Operation {
+				return DeleteOperation
+			},
+			expectPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
+				return pod
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				demo := workloadSpreadDemo.DeepCopy()
+				demo.Status.SubsetStatuses[0].MissingReplicas = 0
+				return demo
+			},
+		},
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			podIn := cs.getPod()
 			workloadSpreadIn := cs.getWorkloadSpread()
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadIn).Build()
+			workloadIn := cs.getWorkload()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadIn, workloadIn).Build()
 			handler := NewWorkloadSpreadHandler(fakeClient)
 
 			var err error

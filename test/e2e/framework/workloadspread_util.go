@@ -90,9 +90,10 @@ func (t *WorkloadSpreadTester) NewBaseCloneSet(namespace string) *appsv1alpha1.C
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "main",
-							Image:   "busybox:1.32",
-							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Name:            "main",
+							Image:           "busybox:1.32",
+							ImagePullPolicy: "IfNotPresent",
+							Command:         []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
 				},

@@ -96,32 +96,32 @@ func (w workloadEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimi
 
 func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	var gvk schema.GroupVersionKind
-	var oldReplicas int32
-	var newReplicas int32
+	var oldGeneration int64
+	var newGeneration int64
 
 	switch evt.ObjectNew.(type) {
 	case *appsalphav1.CloneSet:
-		oldReplicas = *evt.ObjectOld.(*appsalphav1.CloneSet).Spec.Replicas
-		newReplicas = *evt.ObjectNew.(*appsalphav1.CloneSet).Spec.Replicas
+		oldGeneration = evt.ObjectOld.(*appsalphav1.CloneSet).Generation
+		newGeneration = evt.ObjectNew.(*appsalphav1.CloneSet).Generation
 		gvk = controllerKruiseKindCS
 	case *appsv1.Deployment:
-		oldReplicas = *evt.ObjectOld.(*appsv1.Deployment).Spec.Replicas
-		newReplicas = *evt.ObjectNew.(*appsv1.Deployment).Spec.Replicas
+		oldGeneration = evt.ObjectOld.(*appsv1.Deployment).Generation
+		newGeneration = evt.ObjectNew.(*appsv1.Deployment).Generation
 		gvk = controllerKindDep
 	case *appsv1.ReplicaSet:
-		oldReplicas = *evt.ObjectOld.(*appsv1.ReplicaSet).Spec.Replicas
-		newReplicas = *evt.ObjectNew.(*appsv1.ReplicaSet).Spec.Replicas
+		oldGeneration = evt.ObjectOld.(*appsv1.ReplicaSet).Generation
+		newGeneration = evt.ObjectNew.(*appsv1.ReplicaSet).Generation
 		gvk = controllerKindRS
 	case *batchv1.Job:
-		oldReplicas = *evt.ObjectOld.(*batchv1.Job).Spec.Parallelism
-		newReplicas = *evt.ObjectNew.(*batchv1.Job).Spec.Parallelism
+		oldGeneration = evt.ObjectOld.(*batchv1.Job).Generation
+		newGeneration = evt.ObjectNew.(*batchv1.Job).Generation
 		gvk = controllerKindJob
 	default:
 		return
 	}
 
 	// workload replicas changed, and reconcile corresponding WorkloadSpread
-	if oldReplicas != newReplicas {
+	if oldGeneration != newGeneration {
 		workloadNsn := types.NamespacedName{
 			Namespace: evt.ObjectNew.GetNamespace(),
 			Name:      evt.ObjectNew.GetName(),
@@ -133,8 +133,8 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 			return
 		}
 		if ws != nil {
-			klog.V(3).Infof("%s (%s/%s) changed replicas from %d to %d managed by WorkloadSpread (%s/%s)",
-				gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, oldReplicas, newReplicas, ws.GetNamespace(), ws.GetName())
+			klog.V(3).Infof("%s (%s/%s) changed generation from %d to %d managed by WorkloadSpread (%s/%s)",
+				gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, oldGeneration, newGeneration, ws.GetNamespace(), ws.GetName())
 			nsn := types.NamespacedName{Namespace: ws.GetNamespace(), Name: ws.GetName()}
 			q.Add(reconcile.Request{NamespacedName: nsn})
 		}

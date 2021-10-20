@@ -1435,6 +1435,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			}
 
 			latestStatus := latestWorkloadSpread.Status
+			latestStatus.ObservedWorkloadGeneration = 0
 			by, _ := json.Marshal(latestStatus)
 			fmt.Println(string(by))
 
@@ -1484,7 +1485,7 @@ func TestUpdateSubsetSequence(t *testing.T) {
 	subsetsPods := groupPod(workloadSpread, pods)
 
 	r := ReconcileWorkloadSpread{}
-	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, 5)
+	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, nil, 5)
 	if status == nil {
 		t.Fatalf("error get WorkloadSpread status")
 	} else {

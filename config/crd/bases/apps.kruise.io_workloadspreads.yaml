@@ -138,6 +138,10 @@ spec:
                 description: ObservedGeneration is the most recent generation observed for this WorkloadSpread. It corresponds to the WorkloadSpread's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              observedWorkloadGeneration:
+                description: ObservedWorkloadGeneration is the most recent generation observed for the TargetReference Workload when reconciling. It corresponds to this Workload's generation, which is updated on mutation by the API Server.
+                format: int64
+                type: integer
               subsetStatuses:
                 description: Contains the status of each subset. Each element in this array represents one subset
                 items:

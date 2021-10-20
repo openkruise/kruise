@@ -198,10 +198,10 @@ func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Req
 	return reconcile.Result{RequeueAfter: durationStore.Pop(getWorkloadSpreadKey(ws))}, err
 }
 
-func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, namespace string) ([]*corev1.Pod, int32, error) {
+func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, namespace string) ([]*corev1.Pod, *metav1.ObjectMeta, int32, error) {
 	ok, err := wsutil.VerifyGroupKind(ref, controllerKindJob.Kind, []string{controllerKindJob.Group})
 	if err != nil || !ok {
-		return nil, -1, err
+		return nil, nil, -1, err
 	}
 
 	job := &batchv1.Job{}
@@ -210,15 +210,15 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 		// when error is NotFound, it is ok here.
 		if errors.IsNotFound(err) {
 			klog.V(3).Infof("cannot find Job (%s/%s)", namespace, ref.Name)
-			return nil, 0, nil
+			return nil, nil, 0, nil
 		}
-		return nil, -1, err
+		return nil, nil, -1, err
 	}
 
 	labelSelector, err := util.GetFastLabelSelector(job.Spec.Selector)
 	if err != nil {
 		klog.Errorf("gets labelSelector failed: %s", err.Error())
-		return nil, -1, nil
+		return nil, nil, -1, nil
 	}
 
 	podList := &corev1.PodList{}
@@ -229,47 +229,48 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 	}
 	err = r.List(context.TODO(), podList, listOption)
 	if err != nil {
-		return nil, -1, err
+		return nil, nil, -1, err
 	}
 
 	matchedPods := make([]*corev1.Pod, 0, len(podList.Items))
 	for i := range podList.Items {
 		matchedPods = append(matchedPods, &podList.Items[i])
 	}
-	return matchedPods, *(job.Spec.Parallelism), nil
+	return matchedPods, &job.ObjectMeta, *(job.Spec.Parallelism), nil
 }
 
 // getPodsForWorkloadSpread returns Pods managed by the WorkloadSpread object.
 // return two parameters
 // 1. podList for workloadSpread
 // 2. workloadReplicas
-func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) ([]*corev1.Pod, int32, error) {
+func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) ([]*corev1.Pod, *metav1.ObjectMeta, int32, error) {
 	if ws.Spec.TargetReference == nil {
-		return nil, -1, nil
+		return nil, nil, -1, nil
 	}
 
 	var pods []*corev1.Pod
 	var workloadReplicas int32
+	var workloadMetadata *metav1.ObjectMeta
 	var err error
 	targetRef := ws.Spec.TargetReference
 
 	switch targetRef.Kind {
 	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind:
-		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, targetRef.Name, ws.Namespace, false)
+		pods, workloadMetadata, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, targetRef.Name, ws.Namespace, false)
 	case controllerKindJob.Kind:
-		pods, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
+		pods, workloadMetadata, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
 	default:
 		r.recorder.Eventf(ws, corev1.EventTypeWarning,
 			"TargetReferenceError", "targetReference is not been recognized")
-		return nil, -1, nil
+		return nil, nil, -1, nil
 	}
 
 	if err != nil {
 		klog.Errorf("WorkloadSpread (%s/%s) handles targetReference failed: %s", ws.Namespace, ws.Name, err.Error())
-		return nil, -1, err
+		return nil, nil, -1, err
 	}
 
-	return pods, workloadReplicas, err
+	return pods, workloadMetadata, workloadReplicas, err
 }
 
 // syncWorkloadSpread is the main logic of the WorkloadSpread controller. Firstly, we get Pods from workload managed by
@@ -279,7 +280,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 // to maintain WorkloadSpread status together. The controller is responsible for calculating the real status, and the webhook
 // mainly counts missingReplicas and records the creation or deletion entry of Pod into map.
 func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) error {
-	pods, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)
+	pods, workloadMetadata, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)
 	if err != nil || workloadReplicas == -1 {
 		if err != nil {
 			klog.Errorf("WorkloadSpread (%s/%s) gets matched pods failed: %v", ws.Namespace, ws.Name, err)
@@ -300,7 +301,7 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 	}
 
 	// calculate status and reschedule
-	status, scheduleFailedPodMap := r.calculateWorkloadSpreadStatus(ws, podMap, workloadReplicas)
+	status, scheduleFailedPodMap := r.calculateWorkloadSpreadStatus(ws, podMap, workloadMetadata, workloadReplicas)
 	if status == nil {
 		return nil
 	}
@@ -353,11 +354,15 @@ func groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod) map[string][]
 // return two parameters
 // 1. current WorkloadSpreadStatus
 // 2. a map, the key is the subsetName, the value is the schedule failed Pods belongs to the subset.
-func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread,
-	podMap map[string][]*corev1.Pod, workloadReplicas int32) (*appsv1alpha1.WorkloadSpreadStatus, map[string][]*corev1.Pod) {
+func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread, podMap map[string][]*corev1.Pod,
+	workloadMetadata *metav1.ObjectMeta, workloadReplicas int32) (*appsv1alpha1.WorkloadSpreadStatus, map[string][]*corev1.Pod) {
 	// set the generation in the returned status
 	status := appsv1alpha1.WorkloadSpreadStatus{}
 	status.ObservedGeneration = ws.Generation
+	if workloadMetadata != nil {
+		status.ObservedWorkloadGeneration = workloadMetadata.Generation
+	}
+
 	//status.ObservedWorkloadReplicas = workloadReplicas
 	status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, len(ws.Spec.Subsets))
 	scheduleFailedPodMap := make(map[string][]*corev1.Pod)
@@ -526,6 +531,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 func (r *ReconcileWorkloadSpread) UpdateWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread,
 	status *appsv1alpha1.WorkloadSpreadStatus) error {
 	if status.ObservedGeneration == ws.Status.ObservedGeneration &&
+		status.ObservedWorkloadGeneration == ws.Status.ObservedWorkloadGeneration &&
 		//status.ObservedWorkloadReplicas == ws.Status.ObservedWorkloadReplicas &&
 		apiequality.Semantic.DeepEqual(status.SubsetStatuses, ws.Status.SubsetStatuses) {
 		return nil
@@ -549,6 +555,8 @@ func makeStatusChangedLog(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.
 	}
 
 	log := fmt.Sprintf("WorkloadSpread (%s/%s) changes Status:", ws.Namespace, ws.Name)
+
+	log += fmt.Sprintf(" <ObservedWorkloadGeneration: %v -> %v>)", ws.Status.ObservedWorkloadGeneration, status.ObservedWorkloadGeneration)
 
 	for i, subset := range ws.Spec.Subsets {
 		oldStatus, ok := oldSubsetStatusMap[subset.Name]

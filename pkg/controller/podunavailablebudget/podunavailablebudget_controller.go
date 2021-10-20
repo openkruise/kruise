@@ -366,7 +366,7 @@ func (r *ReconcilePodUnavailableBudget) getPodsForPub(pub *policyv1alpha1.PodUna
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
-		matchedPods, _, err := r.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
+		matchedPods, _, _, err := r.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
 		return matchedPods, err
 	} else if pub.Spec.Selector == nil {
 		r.recorder.Eventf(pub, corev1.EventTypeWarning, "NoSelector", "Selector cannot be empty")

@@ -773,7 +773,7 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	oldReplicaSet := replicaSetDemo.DeepCopy()
 	newReplicaSet := replicaSetDemo.DeepCopy()
-	newReplicaSet.Spec.Replicas = pointer.Int32Ptr(*(oldReplicaSet.Spec.Replicas) + 1)
+	newReplicaSet.Generation = oldReplicaSet.Generation + 1
 
 	updateEvt := event.UpdateEvent{
 		ObjectOld: oldReplicaSet,

@@ -73,7 +73,7 @@ func (c *commonControl) GetPodsForPub() ([]*corev1.Pod, int32, error) {
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
-		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
+		matchedPods, _, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
 		return matchedPods, expectedCount, err
 	} else if pub.Spec.Selector == nil {
 		klog.Warningf("pub(%s/%s) spec.Selector cannot be empty", pub.Namespace, pub.Name)
