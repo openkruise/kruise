@@ -10,6 +10,7 @@ require (
 	github.com/contiv/executor v0.0.0-20180626233236-d263f4daa3ad // indirect
 	github.com/docker/distribution v2.7.2-0.20200708230840-70e0022e42fd+incompatible
 	github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
+	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-openapi/spec v0.19.3
 	github.com/gorilla/mux v1.8.0

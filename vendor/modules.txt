@@ -181,6 +181,7 @@ github.com/emicklei/go-restful/log
 # github.com/evanphx/json-patch v4.9.0+incompatible
 github.com/evanphx/json-patch
 # github.com/fsnotify/fsnotify v1.4.9
+## explicit
 github.com/fsnotify/fsnotify
 # github.com/go-bindata/go-bindata v3.1.2+incompatible
 ## explicit
