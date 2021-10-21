@@ -17,7 +17,10 @@ limitations under the License.
 package apps
 
 import (
+	"fmt"
 	"time"
+
+	"github.com/openkruise/kruise/pkg/util"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -81,7 +84,13 @@ var _ = SIGDescribe("containerpriority", func() {
 				cs, err = tester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)), fmt.Sprintf("current cloneset: %v, pods: %v", util.DumpJSON(cs), func() string {
+				pods, err := tester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
+				if err != nil {
+					return fmt.Sprintf("failed to list pods: %v", err)
+				}
+				return util.DumpJSON(pods)
+			}()))
 
 			pods, err := tester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
