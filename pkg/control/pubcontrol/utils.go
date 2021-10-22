@@ -56,6 +56,9 @@ type Operation string
 const (
 	UpdateOperation = "UPDATE"
 	//DeleteOperation = "DELETE"
+
+	// Marked pods will not be pub-protected, solving the scenario of force pod deletion
+	PodPubNoProtectionAnnotation = "pub.kruise.io/no-protect"
 )
 
 // parameters:

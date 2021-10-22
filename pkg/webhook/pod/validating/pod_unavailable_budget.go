@@ -148,8 +148,15 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	control := pubcontrol.NewPubControl(pub, p.finders, p.Client)
 	klog.V(3).Infof("validating pod(%s.%s) operation(%s) for pub(%s.%s)", newPod.Namespace, newPod.Name, req.Operation, pub.Namespace, pub.Name)
 
+	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
+	// and will no longer check the pub quota
+	if newPod.Annotations[pubcontrol.PodPubNoProtectionAnnotation] == "true" {
+		klog.V(3).Infof("pod(%s.%s) contains annotations[%s], then don't need check pub", newPod.Namespace, newPod.Name, pubcontrol.PodPubNoProtectionAnnotation)
+		return true, "", nil
+	}
+
 	// the change will not cause pod unavailability, then pass
-	if req.Operation == admissionv1.Update && !control.IsPodUnavailableChanged(oldPod, newPod) {
+	if !control.IsPodUnavailableChanged(oldPod, newPod) {
 		klog.V(3).Infof("validate pod(%s.%s) changed cannot cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
 		return true, "", nil
 	}
