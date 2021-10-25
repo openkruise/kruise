@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"time"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +43,6 @@ import (
 
 const (
 	concurrentReconciles = 4
-	priorityBarrier      = "KRUISE_CONTAINER_BARRIER"
 
 	// priority string parse starting index
 	priorityStartIndex = 2
@@ -172,7 +172,7 @@ func (r *ReconcileContainerLaunchPriority) validate(pod *v1.Pod) bool {
 	}
 	// Since priorityBarrier env is created by webhook on a all or none basis, we only need to check first container's env.
 	for _, v := range pod.Spec.Containers[0].Env {
-		if v.Name == priorityBarrier {
+		if v.Name == appspub.ContainerLaunchBarrierEnvName {
 			return true
 		}
 	}
@@ -201,7 +201,7 @@ func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) int {
 
 func (r *ReconcileContainerLaunchPriority) getLaunchPriority(c v1.Container) int {
 	for _, e := range c.Env {
-		if e.Name == priorityBarrier {
+		if e.Name == appspub.ContainerLaunchBarrierEnvName {
 			p, _ := strconv.Atoi(e.ValueFrom.ConfigMapKeyRef.Key[priorityStartIndex:])
 			return p
 		}
