@@ -19,6 +19,8 @@ package workloadspread
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	schedulecorev1 "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
@@ -77,4 +79,38 @@ func filterOutCondition(conditions []appsv1alpha1.WorkloadSpreadSubsetCondition,
 		newConditions = append(newConditions, c)
 	}
 	return newConditions
+}
+
+func matchesSubset(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset) (bool, error) {
+	// check toleration
+	tolerations := append(pod.Spec.Tolerations, subset.Tolerations...)
+	if !helper.TolerationsTolerateTaintsWithFilter(tolerations, node.Spec.Taints, nil) {
+		return false, nil
+	}
+
+	// check nodeSelectorTerm
+	var nodeSelectorTerms []corev1.NodeSelectorTerm
+	if pod.Spec.Affinity != nil {
+		if pod.Spec.Affinity.NodeAffinity != nil {
+			if pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+				nodeSelectorTerms = append(nodeSelectorTerms, pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...)
+			}
+		}
+	}
+	if subset.RequiredNodeSelectorTerm != nil {
+		if len(nodeSelectorTerms) == 0 {
+			nodeSelectorTerms = []corev1.NodeSelectorTerm{
+				*subset.RequiredNodeSelectorTerm,
+			}
+		} else {
+			for i := range nodeSelectorTerms {
+				selectorTerm := &nodeSelectorTerms[i]
+				selectorTerm.MatchExpressions = append(selectorTerm.MatchExpressions, subset.RequiredNodeSelectorTerm.MatchExpressions...)
+				selectorTerm.MatchFields = append(selectorTerm.MatchFields, subset.RequiredNodeSelectorTerm.MatchFields...)
+			}
+		}
+	}
+	return schedulecorev1.MatchNodeSelectorTerms(node, &corev1.NodeSelector{
+		NodeSelectorTerms: nodeSelectorTerms,
+	})
 }

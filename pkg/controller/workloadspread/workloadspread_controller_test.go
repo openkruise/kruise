@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -1481,9 +1482,11 @@ func TestUpdateSubsetSequence(t *testing.T) {
 		"test-pod-1": {Time: currentTime.Add(2 * s)},
 	}
 
-	subsetsPods := groupPod(workloadSpread, pods)
-
 	r := ReconcileWorkloadSpread{}
+	subsetsPods, err := r.groupPod(workloadSpread, pods)
+	if err != nil {
+		t.Fatalf("error group pods")
+	}
 	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, 5)
 	if status == nil {
 		t.Fatalf("error get WorkloadSpread status")
@@ -1615,6 +1618,264 @@ func TestDelayReconcile(t *testing.T) {
 			result, _ := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsn})
 			if (cs.expectRequeueAfter - result.RequeueAfter) > 1*time.Second {
 				t.Fatalf("requeue key failed")
+			}
+		})
+	}
+}
+
+func TestManagerExistingPods(t *testing.T) {
+	cases := []struct {
+		name              string
+		getPods           func() []*corev1.Pod
+		getNodes          func() []*corev1.Node
+		getCloneSet       func() *appsv1alpha1.CloneSet
+		getWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+		getExpectedResult func() (map[string]int32, int, int, int)
+	}{
+		{
+			name: "manager the pods that were created before workloadSpread",
+			getPods: func() []*corev1.Pod {
+				pods := make([]*corev1.Pod, 10)
+				// pods that were created before the workloadSpread
+				// subset-a
+				for i := 0; i < 2; i++ {
+					pods[i] = podDemo.DeepCopy()
+					pods[i].Name = fmt.Sprintf("test-pod-%d", i)
+					pods[i].Spec.NodeName = "node-a"
+					pods[i].Spec.Tolerations = []corev1.Toleration{{
+						Key:    "schedule-system",
+						Value:  "unified",
+						Effect: corev1.TaintEffectNoSchedule,
+					}}
+					pods[i].Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+							MatchExpressions: []corev1.NodeSelectorRequirement{{
+								Key:      "type",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"worker"},
+							}},
+						}},
+					}}}
+				}
+				// pods that were created before the workloadSpread and injected old workloadSpread
+				// subset-a
+				for i := 2; i < 4; i++ {
+					pods[i] = podDemo.DeepCopy()
+					pods[i].Name = fmt.Sprintf("test-pod-%d", i)
+					pods[i].Spec.NodeName = "node-a"
+					pods[i].Annotations = map[string]string{
+						wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"unmatched-workloadSpread","Subset":"subset-a"}`,
+					}
+					pods[i].Spec.Tolerations = []corev1.Toleration{{
+						Key:    "schedule-system",
+						Value:  "unified",
+						Effect: corev1.TaintEffectNoSchedule,
+					}}
+					pods[i].Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+							MatchExpressions: []corev1.NodeSelectorRequirement{{
+								Key:      "type",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"worker"},
+							}},
+						}},
+					}}}
+				}
+				// pods that were created after the workloadSpread
+				// subset-a
+				for i := 4; i < 6; i++ {
+					pods[i] = podDemo.DeepCopy()
+					pods[i].Name = fmt.Sprintf("test-pod-%d", i)
+					pods[i].Annotations = map[string]string{
+						wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-a"}`,
+					}
+				}
+				// pods that were created after the workloadSpread
+				// subset-b
+				for i := 6; i < 8; i++ {
+					pods[i] = podDemo.DeepCopy()
+					pods[i].Name = fmt.Sprintf("test-pod-%d", i)
+					pods[i].Annotations = map[string]string{
+						wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-b"}`,
+					}
+				}
+				// pods that cannot match any subset
+				for i := 8; i < 10; i++ {
+					pods[i] = podDemo.DeepCopy()
+					pods[i].Name = fmt.Sprintf("test-pod-%d", i)
+					pods[i].Spec.NodeName = "node-c"
+					pods[i].Spec.Tolerations = []corev1.Toleration{{
+						Key:    "node-taint",
+						Value:  "node-c",
+						Effect: corev1.TaintEffectNoSchedule,
+					}}
+				}
+				return pods
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+					{
+						Name: "subset-a",
+						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{{
+							Key:      "name-is",
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   []string{"node-a"},
+						}}},
+						Tolerations: []corev1.Toleration{{
+							Key:    "node-taint",
+							Value:  "node-a",
+							Effect: corev1.TaintEffectNoSchedule,
+						}},
+						MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
+					},
+					{
+						Name: "subset-b",
+						RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{{
+							Key:      "name-is",
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   []string{"node-b"},
+						}}},
+					},
+				}
+				workloadSpread.Status.SubsetStatuses = append(workloadSpread.Status.SubsetStatuses, appsv1alpha1.WorkloadSpreadSubsetStatus{
+					Name:            "subset-b",
+					MissingReplicas: int32(-1),
+					CreatingPods:    map[string]metav1.Time{},
+					DeletingPods:    map[string]metav1.Time{},
+				})
+				return workloadSpread
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				cloneSet := cloneSetDemo.DeepCopy()
+				cloneSet.Spec.Replicas = utilpointer.Int32Ptr(10)
+				return cloneSet
+			},
+			getNodes: func() []*corev1.Node {
+				return []*corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "node-a",
+							Labels: map[string]string{"name-is": "node-a", "type": "worker"},
+						},
+						Spec: corev1.NodeSpec{
+							Taints: []corev1.Taint{
+								{
+									Key:       "node-taint",
+									Value:     "node-a",
+									Effect:    corev1.TaintEffectNoSchedule,
+									TimeAdded: &metav1.Time{Time: time.Now()},
+								},
+								{
+									Key:       "schedule-system",
+									Value:     "unified",
+									Effect:    corev1.TaintEffectNoSchedule,
+									TimeAdded: &metav1.Time{Time: time.Now()},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "node-c",
+							Labels: map[string]string{"name-is": "node-c"},
+						},
+						Spec: corev1.NodeSpec{
+							Taints: []corev1.Taint{{
+								Key:       "node-taint",
+								Value:     "node-c",
+								Effect:    corev1.TaintEffectNoSchedule,
+								TimeAdded: &metav1.Time{Time: time.Now()},
+							}},
+						},
+					},
+				}
+			},
+			getExpectedResult: func() (expectedSubsetReplicas map[string]int32, expectedZeroCost, expectedPositiveCost, expectedNegativeCost int) {
+				expectedSubsetReplicas = map[string]int32{
+					"subset-a": 6,
+					"subset-b": 2,
+				}
+				expectedZeroCost = 2
+				expectedPositiveCost = 7
+				expectedNegativeCost = 1
+				return
+			},
+		},
+	}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			currentTime = time.Now()
+			workloadSpread := cs.getWorkloadSpread()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getCloneSet(), workloadSpread).Build()
+			for _, pod := range cs.getPods() {
+				podIn := pod.DeepCopy()
+				err := fakeClient.Create(context.TODO(), podIn)
+				if err != nil {
+					t.Fatalf("create pod failed: %s", err.Error())
+				}
+			}
+			for _, node := range cs.getNodes() {
+				nodeIn := node.DeepCopy()
+				err := fakeClient.Create(context.TODO(), nodeIn)
+				if err != nil {
+					t.Fatalf("create node failed: %s", err.Error())
+				}
+			}
+
+			reconciler := ReconcileWorkloadSpread{
+				Client:           fakeClient,
+				recorder:         record.NewFakeRecorder(10),
+				controllerFinder: controllerfinder.NewControllerFinder(fakeClient),
+			}
+
+			durationStore = requeueduration.DurationStore{}
+
+			nsn := types.NamespacedName{Namespace: workloadSpread.Namespace, Name: workloadSpread.Name}
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsn})
+			if err != nil {
+				t.Fatalf("unexpected error when reconciling, err: %s", err.Error())
+			}
+			workloadSpread, err = getLatestWorkloadSpread(fakeClient, workloadSpread)
+			if err != nil {
+				t.Fatalf("get workloadspread failed, err: %s", err.Error())
+			}
+
+			expectedSubsetReplicas, expectedZeroCost, expectedPositiveCost, expectedNegativeCost := cs.getExpectedResult()
+
+			if workloadSpread.Status.SubsetStatuses[0].Replicas != expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[0].Name] {
+				t.Fatalf("expected %d pods in zone-a, but got %d\n",
+					expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[0].Name], workloadSpread.Status.SubsetStatuses[0].Replicas)
+			}
+			if workloadSpread.Status.SubsetStatuses[1].Replicas != expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[1].Name] {
+				t.Fatalf("expected %d pods in zone-b, but got %d\n",
+					expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[1].Name], workloadSpread.Status.SubsetStatuses[1].Replicas)
+			}
+			pods, err := getLatestPods(fakeClient, workloadSpread)
+			if err != nil {
+				t.Fatalf("get workloadspread failed, err: %s", err.Error())
+			}
+			zeroCost := 0
+			positiveCost := 0
+			negativeCost := 0
+			for _, pod := range pods {
+				cost, _ := strconv.Atoi(pod.Annotations[PodDeletionCostAnnotation])
+				if cost == 0 {
+					zeroCost++
+				} else if cost > 0 {
+					positiveCost++
+				} else {
+					negativeCost++
+				}
+			}
+			if zeroCost != expectedZeroCost {
+				t.Fatalf("unexpected %d pods marked zero deletion cost, but got %d", expectedZeroCost, zeroCost)
+			}
+			if positiveCost != expectedPositiveCost {
+				t.Fatalf("unexpected %d pods marked positive deletion cost, but got %d", expectedPositiveCost, positiveCost)
+			}
+			if negativeCost != expectedNegativeCost {
+				t.Fatalf("unexpected %d pods marked negative deletion cost, but got %d", expectedNegativeCost, negativeCost)
 			}
 		})
 	}

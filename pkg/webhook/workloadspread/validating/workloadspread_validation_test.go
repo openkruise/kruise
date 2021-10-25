@@ -436,20 +436,20 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			},
 			errorSuffix: "spec.subsets",
 		},
-		{
-			name: "one subset",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
-					{
-						Name:        "subset-a",
-						MaxReplicas: nil,
-					},
-				}
-				return workloadSpread
-			},
-			errorSuffix: "spec.subsets",
-		},
+		//{
+		//	name: "one subset",
+		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+		//		workloadSpread := workloadSpreadDemo.DeepCopy()
+		//		workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+		//			{
+		//				Name:        "subset-a",
+		//				MaxReplicas: nil,
+		//			},
+		//		}
+		//		return workloadSpread
+		//	},
+		//	errorSuffix: "spec.subsets",
+		//},
 		{
 			name: "subset[0]'name is empty",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {

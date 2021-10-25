@@ -35,6 +35,7 @@ require (
 	k8s.io/client-go v0.20.10
 	k8s.io/code-generator v0.20.10
 	k8s.io/component-base v0.20.10
+	k8s.io/component-helpers v0.20.10
 	k8s.io/cri-api v0.20.10
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd

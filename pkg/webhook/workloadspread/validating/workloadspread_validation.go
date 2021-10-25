@@ -150,8 +150,13 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(subsets) < 2 {
-		allErrs = append(allErrs, field.Required(fldPath, "subsets number must >= 2 in WorkloadSpread"))
+	//if len(subsets) < 2 {
+	//	allErrs = append(allErrs, field.Required(fldPath, "subsets number must >= 2 in WorkloadSpread"))
+	//	return allErrs
+	//}
+
+	if len(subsets) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "subsets number must >= 1 in WorkloadSpread"))
 		return allErrs
 	}
 
@@ -241,7 +246,7 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 		}
 	}
 
-	if *firstMaxReplicasType == intstr.String && maxReplicasSum < 100 && subsets[len(subsets)-1].MaxReplicas != nil {
+	if firstMaxReplicasType != nil && *firstMaxReplicasType == intstr.String && maxReplicasSum < 100 && subsets[len(subsets)-1].MaxReplicas != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Index(0).Child("maxReplicas"), subsets[0].MaxReplicas, "maxReplicas sum of all subsets must equal 100% when type is specified as percent"))
 	}
 	return allErrs
