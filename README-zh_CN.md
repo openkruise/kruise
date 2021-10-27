@@ -10,12 +10,6 @@
 
 [English](./README.md) | 简体中文
 
-|![notification](docs/img/bell-outline-badge.svg) 最新进展：|
-|------------------|
-|Sep 6th, 2021. Kruise v0.10.0 发布! 新增 WorkloadSpread、PodUnavailableBudget 控制器以及一系列新功能, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|May 20th, 2021. Kruise v0.9.0 发布! 新增了多种重大功能如 容器重建/重启、删除安全防护等，详情参见 [CHANGELOG](CHANGELOG.md).|
-|Mar 4th, 2021. Kruise v0.8.0 发布! 提供了重构版本的 SidecarSet、UnitedDeployment 支持管理 Deployment，以及一个新的 kruise-daemon 组件目前支持镜像预热，详情参见 [CHANGELOG](CHANGELOG.md).|
-
 ## 介绍
 
 OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在 [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) 下的 Sandbox 项目。
@@ -68,19 +62,10 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 ## 快速开始
 
-我们强烈建议在 **Kubernetes >= 1.16** 以上版本的集群中使用 Kruise，使用 helm v3.1.0+ 执行安装即可：
-
-```bash
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.10.0/kruise-chart.tgz
-```
-
-> 注意直接安装 chart 会使用默认的 template values，你也可以根据你的集群情况指定一些特殊配置，比如修改 resources 限制或者配置 feature-gates。
-
-更多的安装/升级细节、或者更老版本的 Kubernetes 集群，可以查看 [这个文档](https://openkruise.io/docs/installation)。
-
-## 文档
-
 你可以在 [OpenKruise website](https://openkruise.io/zh/docs/) 查看到完整的文档集。
+
+- 安装/升级 Kruise [稳定版本](https://openkruise.io/docs/installation)
+- 安装/升级 Kruise [最新版本（包括 alpha/beta/rc）](https://openkruise.io/docs/next/installation)
 
 ## 用户
 
@@ -92,6 +77,7 @@ helm install kruise https://github.com/openkruise/kruise/releases/download/v0.10
 - 小红书, 比心, 永辉科技中心, 跟谁学, 哈啰出行
 - Spectro Cloud, 艾佳生活, Arkane Systems, 滴普科技, 火花思维
 - OPPO, 苏宁, 欢聚时代, 汇量科技, 深圳凤凰木网络有限公司
+- 小米, 网易
 
 ## 贡献
 
