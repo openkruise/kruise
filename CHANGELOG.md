@@ -1,5 +1,56 @@
 # Change Log
 
+## v1.0.0-alpha.1
+
+> Change log since v0.10.0
+
+### Project
+
+- Bump CustomResourceDefinition(CRD) from v1beta1 to v1
+- Bump ValidatingWebhookConfiguration/MutatingWebhookConfiguration from v1beta1 to v1
+- Bump dependencies: k8s v1.18 -> v1.20, controller-runtime v0.6.5 -> v0.8.3
+
+**So that Kruise can install into Kubernetes 1.22 and no longer support Kubernetes < 1.16.**
+
+### New feature: in-place update with env from metadata
+
+When update `spec.template.metadata.labels/annotations` in CloneSet or Advanced StatefulSet and there exists container env from the changed labels/annotations,
+Kruise will in-place update them to renew the env value in containers.
+
+[doc](https://openkruise.io/docs/next/core-concepts/inplace-update#understand-inplaceifpossible)
+
+### New feature: ContainerLaunchPriority
+
+Container Launch Priority provides a way to help users control the sequence of containers start in a Pod.
+
+It works for Pod, no matter what kind of owner it belongs to, which means Deployment, CloneSet or any other Workloads are all supported.
+
+[doc](https://openkruise.io/docs/next/user-manuals/containerlaunchpriority)
+
+### WorkloadSpread
+
+- Manage the pods that were created before WorkloadSpread.
+- Optimize webhook update and retry during injection.
+
+### PodUnavailableBudget
+
+- Add pod no pub-protection annotation.
+- PUB controller watch workload replicas changed.
+
+### Advanced DaemonSet
+
+- Support in-place update daemon pod.
+
+### SidecarSet
+
+- Fix SidecarSet filter active pods.
+
+### Other
+
+- Kruise-daemon watch pods using protobuf.
+- Export resync seconds args.
+- Fix http checker reload ca.cert.
+
 ## v0.10.0
 
 ### New feature: PodUnavailableBudget

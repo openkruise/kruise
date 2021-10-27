@@ -10,12 +10,6 @@
 
 English | [简体中文](./README-zh_CN.md)
 
-|![notification](docs/img/bell-outline-badge.svg) What is NEW!|
-|------------------|
-|Sep 6th, 2021. Kruise v0.10.0 is **RELEASED**! It provides new controllers like WorkloadSpread and PodUnavailableBudget, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|May 20th, 2021. Kruise v0.9.0 is **RELEASED**! It provides great features such as ContainerRecreate and DeletionProtection, please check the [CHANGELOG](CHANGELOG.md) for details.|
-|Mar 4th, 2021. Kruise v0.8.0 is **RELEASED**! It provides refactoring SidecarSet, Deployment hosted by UnitedDeployment, and a new kruise-daemon component which supports image pre-download, please check the [CHANGELOG](CHANGELOG.md) for details.|
-
 ## Introduction
 
 OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is now hosted by the [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) as a Sandbox Level Project.
@@ -69,21 +63,10 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
 ## Quick Start
 
-We strongly recommend you to use Kruise with **Kubernetes version >= 1.16**.
-For these clusters, you can simply install Kruise with helm v3.1.0+:
-
-```bash
-helm install kruise https://github.com/openkruise/kruise/releases/download/v0.10.0/kruise-chart.tgz
-```
-
-> Note that installing this chart directly means it will use the default template values for the kruise-manager.
-You may have to set your specific configurations when it is deployed into a production cluster or you want to configure feature-gates.
-
-For more install/upgrade details or older Kubernetes versions, please read [this doc](https://openkruise.io/docs/installation).
-
-## Documentation
-
 You can view the full documentation from the [OpenKruise website](https://openkruise.io/docs/).
+
+- Install or upgrade Kruise with [the stable version](https://openkruise.io/docs/installation).
+- Install or upgrade Kruise with [the latest version including alpha/beta/rc](https://openkruise.io/docs/next/installation).
 
 ## Users
 
@@ -94,7 +77,8 @@ Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/
 - Lyft, Ctrip, 享住智慧, VIPKID, zhangmen
 - xiaohongshu, bixin, 永辉科技中心, 跟谁学, 哈啰出行
 - Spectro Cloud, ihomefnt, Arkane Systems, Deepexi, 火花思维
-- OPPO, Suning.cn, joyy, Mobvista
+- OPPO, Suning.cn, joyy, Mobvista, 深圳凤凰木网络有限公司
+- xiaomi, Netease
 
 ## Contributing
 
