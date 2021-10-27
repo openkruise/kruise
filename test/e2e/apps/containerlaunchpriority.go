@@ -44,7 +44,8 @@ var _ = SIGDescribe("containerpriority", func() {
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
-	var tester *framework.CloneSetTester
+	var cloneSetTester *framework.CloneSetTester
+	var deploymentTester *framework.DeploymentTester
 	var randStr string
 	var cs *appsv1alpha1.CloneSet
 
@@ -52,15 +53,16 @@ var _ = SIGDescribe("containerpriority", func() {
 		c = f.ClientSet
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
-		tester = framework.NewCloneSetTester(c, kc, ns)
+		cloneSetTester = framework.NewCloneSetTester(c, kc, ns)
+		deploymentTester = framework.NewDeploymentTester(c, ns)
 		randStr = rand.String(10)
 	})
 
 	framework.KruiseDescribe("start a pod with different container priorities", func() {
 		var err error
 
-		ginkgo.It("container priority in normal case", func() {
-			cs = tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+		ginkgo.It("container priority created by CloneSet", func() {
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:  "nginx2",
 				Image: "nginx:1.21",
@@ -76,23 +78,82 @@ var _ = SIGDescribe("containerpriority", func() {
 					},
 				},
 			})
-			cs, err = tester.CreateCloneSet(cs)
+			cs, err = cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait for the pod ready")
 			gomega.Eventually(func() int32 {
-				cs, err = tester.GetCloneSet(cs.Name)
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)), fmt.Sprintf("current cloneset: %v, pods: %v", util.DumpJSON(cs), func() string {
-				pods, err := tester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
+				pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 				if err != nil {
 					return fmt.Sprintf("failed to list pods: %v", err)
 				}
 				return util.DumpJSON(pods)
 			}()))
 
-			pods, err := tester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
+			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods[0].Spec.Containers[0].Env[1].Name).To(gomega.Equal(priorityBarrier))
+			gomega.Expect(*pods[0].Spec.Containers[0].Env[1].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
+				Key:                  "p_0",
+			}))
+			gomega.Expect(pods[0].Spec.Containers[1].Env[2].Name).To(gomega.Equal(priorityBarrier))
+			gomega.Expect(*pods[0].Spec.Containers[1].Env[2].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
+				Key:                  "p_10",
+			}))
+			var containerStatus1 v1.ContainerStatus
+			var containerStatus2 v1.ContainerStatus
+			for _, container := range pods[0].Status.ContainerStatuses {
+				if container.Name == pods[0].Spec.Containers[0].Name {
+					containerStatus1 = container
+				} else {
+					containerStatus2 = container
+				}
+
+			}
+			earlierThan := containerStatus1.State.Running.StartedAt.Time.After(containerStatus2.State.Running.StartedAt.Time)
+			gomega.Expect(earlierThan).To(gomega.Equal(true))
+		})
+
+		ginkgo.It("container priority created by Deployment", func() {
+			dp := deploymentTester.NewDeployment("deploy-"+randStr, 1)
+			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, v1.Container{
+				Name:  "nginx2",
+				Image: "nginx:1.21",
+				Env: []v1.EnvVar{
+					{Name: priorityName, Value: "10"},
+					{Name: "NGINX_PORT", Value: "81"},
+				},
+				Lifecycle: &v1.Lifecycle{
+					PostStart: &v1.Handler{
+						Exec: &v1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "sleep 1"},
+						},
+					},
+				},
+			})
+			dp, err = deploymentTester.CreateDeployment(dp)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for the pod ready")
+			gomega.Eventually(func() int32 {
+				dp, err = deploymentTester.GetDeployment(dp.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return dp.Status.ReadyReplicas
+			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)), fmt.Sprintf("current deployment: %v, pods: %v", util.DumpJSON(dp), func() string {
+				pods, err := deploymentTester.GetSelectorPods(dp.Namespace, dp.Spec.Selector)
+				if err != nil {
+					return fmt.Sprintf("failed to list pods: %v", err)
+				}
+				return util.DumpJSON(pods)
+			}()))
+
+			pods, err := deploymentTester.GetSelectorPods(dp.Namespace, dp.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods[0].Spec.Containers[0].Env[1].Name).To(gomega.Equal(priorityBarrier))
 			gomega.Expect(*pods[0].Spec.Containers[0].Env[1].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
@@ -119,7 +180,7 @@ var _ = SIGDescribe("containerpriority", func() {
 		})
 
 		ginkgo.It("run with no container priority", func() {
-			cs = tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:  "nginx2",
 				Image: "nginx:1.21",
@@ -127,17 +188,17 @@ var _ = SIGDescribe("containerpriority", func() {
 					{Name: "NGINX_PORT", Value: "81"},
 				},
 			})
-			cs, err = tester.CreateCloneSet(cs)
+			cs, err = cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait for the pod ready")
 			gomega.Eventually(func() int32 {
-				cs, err = tester.GetCloneSet(cs.Name)
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 
-			pods, err := tester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
+			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pods[0].Spec.Containers[0].Env)).To(gomega.Equal(1))
 			gomega.Expect(len(pods[0].Spec.Containers[1].Env)).To(gomega.Equal(1))
@@ -156,7 +217,7 @@ var _ = SIGDescribe("containerpriority", func() {
 		})
 
 		ginkgo.It("run with priorityAnnotation set", func() {
-			cs = tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					Exec: &v1.ExecAction{
@@ -185,17 +246,17 @@ var _ = SIGDescribe("containerpriority", func() {
 				},
 			})
 			cs.Spec.Template.Annotations = map[string]string{priorityAnnotation: priorityOrdered}
-			cs, err = tester.CreateCloneSet(cs)
+			cs, err = cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait for the pod ready")
 			gomega.Eventually(func() int32 {
-				cs, err = tester.GetCloneSet(cs.Name)
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 
-			pods, err := tester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
+			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pods[0].Spec.Containers[0].Env)).To(gomega.Equal(2))
 			gomega.Expect(len(pods[0].Spec.Containers[1].Env)).To(gomega.Equal(2))

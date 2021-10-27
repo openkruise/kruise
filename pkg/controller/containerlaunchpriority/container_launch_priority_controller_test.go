@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,7 +36,7 @@ func TestReconcile(t *testing.T) {
 			Containers: []v1.Container{{
 				Name: "testContainer1",
 				Env: []v1.EnvVar{{
-					Name: priorityBarrier,
+					Name: appspub.ContainerLaunchBarrierEnvName,
 					ValueFrom: &v1.EnvVarSource{
 						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 							Key: "p_100",
@@ -64,7 +65,7 @@ func TestReconcile(t *testing.T) {
 			Containers: []v1.Container{{
 				Name: "testContainer1",
 				Env: []v1.EnvVar{{
-					Name: priorityBarrier,
+					Name: appspub.ContainerLaunchBarrierEnvName,
 					ValueFrom: &v1.EnvVarSource{
 						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 							Key: "p_100",
@@ -74,7 +75,7 @@ func TestReconcile(t *testing.T) {
 			}, {
 				Name: "testContainer2",
 				Env: []v1.EnvVar{{
-					Name: priorityBarrier,
+					Name: appspub.ContainerLaunchBarrierEnvName,
 					ValueFrom: &v1.EnvVarSource{
 						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 							Key: "p_1000",

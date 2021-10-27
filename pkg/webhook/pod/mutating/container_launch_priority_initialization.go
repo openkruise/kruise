@@ -4,17 +4,11 @@ import (
 	"context"
 	"strconv"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-
+	storagenames "k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-)
-
-const (
-	priorityName       = "KRUISE_CONTAINER_PRIORITY"
-	priorityBarrier    = "KRUISE_CONTAINER_BARRIER"
-	priorityAnnotation = "apps.kruise.io/container-launch-priority"
-	priorityOrdered    = "Ordered"
 )
 
 // start containers based on priority order
@@ -30,7 +24,7 @@ func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Con
 	}
 
 	// if ordered flag has been set, then just process ordered logic and skip check for priority
-	if pod.Annotations[priorityAnnotation] == priorityOrdered {
+	if pod.Annotations[appspub.ContainerLaunchPriorityKey] == appspub.ContainerLaunchOrdered {
 		priority := make([]int, len(pod.Spec.Containers))
 		for i := range priority {
 			priority[i] = 0 - i
@@ -61,7 +55,7 @@ func (h *PodCreateHandler) getPriority(pod *corev1.Pod) ([]int, bool, error) {
 	var priority = make([]int, len(pod.Spec.Containers))
 	for i, c := range pod.Spec.Containers {
 		for _, e := range c.Env {
-			if e.Name == priorityName {
+			if e.Name == appspub.ContainerLaunchPriorityEnvName {
 				p, err := strconv.Atoi(e.Value)
 				if err != nil {
 					return nil, false, err
@@ -88,9 +82,13 @@ func (h *PodCreateHandler) getPriority(pod *corev1.Pod) ([]int, bool, error) {
 }
 
 func (h *PodCreateHandler) setPodEnv(priority []int, pod *corev1.Pod) {
+	// Generate name for pods that only have generateName field
+	if len(pod.Name) == 0 && len(pod.GenerateName) > 0 {
+		pod.Name = storagenames.SimpleNameGenerator.GenerateName(pod.GenerateName)
+	}
 	for i := range priority {
 		env := corev1.EnvVar{
-			Name: priorityBarrier,
+			Name: appspub.ContainerLaunchBarrierEnvName,
 			ValueFrom: &corev1.EnvVarSource{
 				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{Name: pod.Name + "-barrier"},
