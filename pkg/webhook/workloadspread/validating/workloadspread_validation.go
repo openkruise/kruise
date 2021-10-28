@@ -132,10 +132,10 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the scheduleStrategy's type must be adaptive when using adaptive scheduleStrategy"))
 		}
 
-		if len(spec.Subsets) > 1 && spec.Subsets[len(spec.Subsets)-1].MaxReplicas != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive"),
-				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the last subset must be not specified when using adaptive scheduleStrategy"))
-		}
+		//if len(spec.Subsets) > 1 && spec.Subsets[len(spec.Subsets)-1].MaxReplicas != nil {
+		//	allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive"),
+		//		spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the last subset must be not specified when using adaptive scheduleStrategy"))
+		//}
 
 		if spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil &&
 			*spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds <= 0 {

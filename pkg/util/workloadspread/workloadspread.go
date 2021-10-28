@@ -562,6 +562,7 @@ func getSpecificSubset(ws *appsv1alpha1.WorkloadSpread, specifySubset string) *a
 }
 
 func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+	var canScheduleSubsetList []*appsv1alpha1.WorkloadSpreadSubsetStatus
 	for i := range ws.Status.SubsetStatuses {
 		subset := &ws.Status.SubsetStatuses[i]
 		canSchedule := true
@@ -571,18 +572,22 @@ func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alph
 				break
 			}
 		}
-
-		if canSchedule && (subset.MissingReplicas > 0 || subset.MissingReplicas == -1) {
-			// TODO simulation schedule
-			// scheduleStrategy.Type = Adaptive
-			// Webhook will simulate a schedule in order to check whether Pod can run in this subset,
-			// which does a generic predicates by the cache of nodes and pods in kruise manager.
-			// There may be some errors between simulation schedule and kubernetes scheduler with small probability.
-
-			return subset
+		if canSchedule {
+			canScheduleSubsetList = append(canScheduleSubsetList, subset)
+			if subset.MissingReplicas > 0 || subset.MissingReplicas == -1 {
+				// TODO simulation schedule
+				// scheduleStrategy.Type = Adaptive
+				// Webhook will simulate a schedule in order to check whether Pod can run in this subset,
+				// which does a generic predicates by the cache of nodes and pods in kruise manager.
+				// There may be some errors between simulation schedule and kubernetes scheduler with small probability.
+				return subset
+			}
 		}
 	}
 
+	if len(canScheduleSubsetList) > 0 {
+		return canScheduleSubsetList[len(canScheduleSubsetList)-1]
+	}
 	return nil
 }
 

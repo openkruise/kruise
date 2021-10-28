@@ -678,22 +678,22 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			},
 			errorSuffix: "spec.scheduleStrategy.type",
 		},
-		{
-			name: "the last subset's maxReplicas is not nil when using adaptive",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
-						RescheduleCriticalSeconds: pointer.Int32Ptr(20),
-						DisableSimulationSchedule: true,
-					},
-				}
-				workloadSpread.Spec.Subsets[2].MaxReplicas = &maxReplicasDemo
-				return workloadSpread
-			},
-			errorSuffix: "spec.scheduleStrategy.adaptive",
-		},
+		//{
+		//	name: "the last subset's maxReplicas is not nil when using adaptive",
+		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+		//		workloadSpread := workloadSpreadDemo.DeepCopy()
+		//		workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
+		//			Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
+		//			Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+		//				RescheduleCriticalSeconds: pointer.Int32Ptr(20),
+		//				DisableSimulationSchedule: true,
+		//			},
+		//		}
+		//		workloadSpread.Spec.Subsets[2].MaxReplicas = &maxReplicasDemo
+		//		return workloadSpread
+		//	},
+		//	errorSuffix: "spec.scheduleStrategy.adaptive",
+		//},
 	}
 
 	for _, errorCase := range errorCases {

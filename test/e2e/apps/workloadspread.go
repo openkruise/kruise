@@ -777,6 +777,294 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("workloadSpread reschedule subset-a, done")
 		})
 
+		ginkgo.It("more reschedule situations, e,g., maxReplicas cannot be satisfied", func() {
+			cloneSet := tester.NewBaseCloneSet(ns)
+			// create workloadSpread
+			targetRef := appsv1alpha1.TargetReference{
+				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
+				Kind:       KruiseKindCloneSet.Kind,
+				Name:       cloneSet.Name,
+			}
+			subset1 := appsv1alpha1.WorkloadSpreadSubset{
+				Name: "subset-a",
+				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{
+							Key:      TopologyLabelKey,
+							Operator: corev1.NodeSelectorOpIn,
+							// Pod is not schedulable due to incorrect configuration
+							Values: []string{"zone-x"},
+						},
+					},
+				},
+				MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+				Patch: runtime.RawExtension{
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+				},
+			}
+			subset2 := appsv1alpha1.WorkloadSpreadSubset{
+				Name: "subset-b",
+				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{
+							Key:      TopologyLabelKey,
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   []string{"zone-b"},
+						},
+					},
+				},
+				MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+				Patch: runtime.RawExtension{
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+				},
+			}
+			subset3 := appsv1alpha1.WorkloadSpreadSubset{
+				Name: "subset-c",
+				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{
+							Key:      TopologyLabelKey,
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   []string{"zone-z"},
+						},
+					},
+				},
+				MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+				Patch: runtime.RawExtension{
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-c"}}}`),
+				},
+			}
+			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2, subset3})
+			workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
+				Type: appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType,
+			}
+			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
+
+			// create cloneset, replicas = 5
+			cloneSet.Spec.Replicas = pointer.Int32Ptr(5)
+			cloneSet.Spec.Template.Spec.Containers[0].Image = "busybox:latest"
+			cloneSet = tester.CreateCloneSet(cloneSet)
+			tester.WaitForCloneSetRunReplicas(cloneSet, int32(2))
+
+			// get pods, and check workloadSpread
+			ginkgo.By(fmt.Sprintf("get cloneSet(%s/%s) pods, and check workloadSpread(%s/%s) status", cloneSet.Namespace, cloneSet.Name, workloadSpread.Namespace, workloadSpread.Name))
+			pods, err := tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(5))
+			subset1Pods := 0
+			subset1RunningPods := 0
+			subset2Pods := 0
+			subset2RunningPods := 0
+			subset3Pods := 0
+			subset3RunningPods := 0
+			for _, pod := range pods {
+				if str, ok := pod.Annotations[workloadspread.MatchedWorkloadSpreadSubsetAnnotations]; ok {
+					var injectWorkloadSpread *workloadspread.InjectWorkloadSpread
+					err := json.Unmarshal([]byte(str), &injectWorkloadSpread)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					if injectWorkloadSpread.Subset == subset1.Name {
+						subset1Pods++
+						if pod.Status.Phase == corev1.PodRunning {
+							subset1RunningPods++
+						}
+						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset1.Name))
+					} else if injectWorkloadSpread.Subset == subset2.Name {
+						subset2Pods++
+						if pod.Status.Phase == corev1.PodRunning {
+							subset2RunningPods++
+						}
+						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
+						gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset2.Name))
+					} else if injectWorkloadSpread.Subset == subset3.Name {
+						subset3Pods++
+						if pod.Status.Phase == corev1.PodRunning {
+							subset3RunningPods++
+						}
+						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset3.Name))
+					}
+				} else {
+					// others PodDeletionCostAnnotation not set
+					gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal(""))
+				}
+			}
+			gomega.Expect(subset1Pods).To(gomega.Equal(2))
+			gomega.Expect(subset1RunningPods).To(gomega.Equal(0))
+			gomega.Expect(subset2Pods).To(gomega.Equal(2))
+			gomega.Expect(subset2RunningPods).To(gomega.Equal(2))
+			gomega.Expect(subset3Pods).To(gomega.Equal(1))
+			gomega.Expect(subset3RunningPods).To(gomega.Equal(0))
+
+			// check workloadSpread status
+			ginkgo.By(fmt.Sprintf("check workloadSpread(%s/%s) status", workloadSpread.Namespace, workloadSpread.Name))
+			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].MissingReplicas).To(gomega.Equal(int32(0)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Replicas).To(gomega.Equal(int32(2)))
+			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].Conditions)).To(gomega.Equal(0))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[1].Name))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].MissingReplicas).To(gomega.Equal(int32(0)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].Replicas).To(gomega.Equal(int32(2)))
+			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[1].Conditions)).To(gomega.Equal(0))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[2].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[2].Name))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[2].MissingReplicas).To(gomega.Equal(int32(2)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[2].Replicas).To(gomega.Equal(int32(1)))
+			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[2].Conditions)).To(gomega.Equal(0))
+
+			// wait for subset unschedulabe, and reschedulabe
+			ginkgo.By(fmt.Sprintf("wait workloadSpread(%s/%s) subset reschedulabe", workloadSpread.Namespace, workloadSpread.Name))
+			workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
+				Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
+				Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+					DisableSimulationSchedule: true,
+					RescheduleCriticalSeconds: pointer.Int32Ptr(5),
+				},
+			}
+			tester.UpdateWorkloadSpread(workloadSpread)
+			tester.WaitForWorkloadSpreadRunning(workloadSpread)
+			err = wait.PollImmediate(time.Second, time.Minute*6, func() (bool, error) {
+				ws, err := kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				unschedulableCount := 0
+				for _, condition := range ws.Status.SubsetStatuses[0].Conditions {
+					if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
+						unschedulableCount++
+						break
+					}
+				}
+				for _, condition := range ws.Status.SubsetStatuses[2].Conditions {
+					if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
+						unschedulableCount++
+						break
+					}
+				}
+				return unschedulableCount >= 2, nil
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// get pods, and check workloadSpread
+			ginkgo.By(fmt.Sprintf("get cloneSet(%s/%s) pods, and check workloadSpread(%s/%s) status", cloneSet.Namespace, cloneSet.Name, workloadSpread.Namespace, workloadSpread.Name))
+			tester.WaitForCloneSetRunReplicas(cloneSet, int32(5))
+			pods, err = tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(5))
+			subset1Pods = 0
+			subset2Pods = 0
+			subset3Pods = 0
+			for _, pod := range pods {
+				if str, ok := pod.Annotations[workloadspread.MatchedWorkloadSpreadSubsetAnnotations]; ok {
+					var injectWorkloadSpread *workloadspread.InjectWorkloadSpread
+					err := json.Unmarshal([]byte(str), &injectWorkloadSpread)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					if injectWorkloadSpread.Subset == subset1.Name {
+						subset1Pods++
+					} else if injectWorkloadSpread.Subset == subset2.Name {
+						subset2Pods++
+						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
+						gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset2.Name))
+					} else if injectWorkloadSpread.Subset == subset3.Name {
+						subset3Pods++
+					}
+				} else {
+					// others PodDeletionCostAnnotation not set
+					gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal(""))
+				}
+			}
+			gomega.Expect(subset1Pods).To(gomega.Equal(0))
+			gomega.Expect(subset2Pods).To(gomega.Equal(5))
+			gomega.Expect(subset3Pods).To(gomega.Equal(0))
+
+			ginkgo.By("all subsets are unavailable")
+			workloadSpread.Spec.Subsets[1].RequiredNodeSelectorTerm.MatchExpressions = []corev1.NodeSelectorRequirement{
+				{
+					Key:      TopologyLabelKey,
+					Operator: corev1.NodeSelectorOpIn,
+					// Pod is not schedulable due to incorrect configuration
+					Values: []string{"zone-y"},
+				},
+			}
+			tester.UpdateWorkloadSpread(workloadSpread)
+			tester.WaitForWorkloadSpreadRunning(workloadSpread)
+
+			// wait cloneSet scale down to 0
+			cloneSet.Spec.Replicas = pointer.Int32Ptr(0)
+			tester.UpdateCloneSet(cloneSet)
+			gomega.Eventually(func() int {
+				pods, err = tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return len(pods)
+			}, time.Minute, time.Second).Should(gomega.Equal(0))
+
+			// wait cloneSet scale up to 5
+			cloneSet.Spec.Replicas = pointer.Int32Ptr(5)
+			tester.UpdateCloneSet(cloneSet)
+			tester.WaitForCloneSetRunReplicas(cloneSet, int32(5))
+
+			// check pod schedule results
+			pods, err = tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(5))
+			otherPods := 0
+			subsetPods := 0
+			for _, pod := range pods {
+				if _, ok := pod.Annotations[workloadspread.MatchedWorkloadSpreadSubsetAnnotations]; ok {
+					subsetPods++
+				} else {
+					// others PodDeletionCostAnnotation not set
+					otherPods++
+					gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal(""))
+				}
+			}
+			gomega.Expect(subsetPods).To(gomega.Equal(0))
+			gomega.Expect(otherPods).To(gomega.Equal(5))
+
+			// check workloadSpread status
+			ginkgo.By(fmt.Sprintf("check workloadSpread(%s/%s) status", workloadSpread.Namespace, workloadSpread.Name))
+			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].MissingReplicas).To(gomega.Equal(int32(2)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Replicas).To(gomega.Equal(int32(0)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[1].Name))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].MissingReplicas).To(gomega.Equal(int32(2)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].Replicas).To(gomega.Equal(int32(0)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[2].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[2].Name))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[2].MissingReplicas).To(gomega.Equal(int32(3)))
+			gomega.Expect(workloadSpread.Status.SubsetStatuses[2].Replicas).To(gomega.Equal(int32(0)))
+
+			// wait subset to schedulable
+			ginkgo.By(fmt.Sprintf("wait subset to schedulable"))
+			err = wait.PollImmediate(time.Second, time.Minute*5, func() (bool, error) {
+				ws, err := kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				schedulableCount := 0
+				for _, condition := range ws.Status.SubsetStatuses[0].Conditions {
+					if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionTrue {
+						schedulableCount++
+						break
+					}
+				}
+				for _, condition := range ws.Status.SubsetStatuses[2].Conditions {
+					if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionTrue {
+						schedulableCount++
+						break
+					}
+				}
+				return schedulableCount >= 2, nil
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			ginkgo.By("more reschedule situations, e,g., maxReplicas cannot be satisfied, check done")
+		})
+
 		ginkgo.It("manage the pods that were created before workloadspread", func() {
 			// build cloneSet, default to schedule its pods to zone-a
 			cloneSet := tester.NewBaseCloneSet(ns)
@@ -970,6 +1258,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 			gomega.Expect(subset2Pods).To(gomega.Equal(1))
 			gomega.Expect(uninjectPods).To(gomega.Equal(0))
+			ginkgo.By("manage the pods that were created before WorkloadSpread, done")
 		})
 
 		ginkgo.It("only one subset, zone-a=nil", func() {
@@ -1116,155 +1405,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].CreatingPods)).To(gomega.Equal(0))
 			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].DeletingPods)).To(gomega.Equal(0))
 
-			ginkgo.By("elastic deployment, zone-a=2, zone-b=nil, done")
-		})
-
-		ginkgo.It("only one subset, zone-a=2", func() {
-			cloneSet := tester.NewBaseCloneSet(ns)
-			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
-				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
-				Kind:       KruiseKindCloneSet.Kind,
-				Name:       cloneSet.Name,
-			}
-			subset1 := appsv1alpha1.WorkloadSpreadSubset{
-				Name: "zone-a",
-				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
-					MatchExpressions: []corev1.NodeSelectorRequirement{
-						{
-							Key:      TopologyLabelKey,
-							Operator: corev1.NodeSelectorOpIn,
-							Values:   []string{"zone-a"},
-						},
-					},
-				},
-				MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
-				Patch: runtime.RawExtension{
-					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
-				},
-			}
-
-			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1})
-			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
-
-			// create cloneset, replicas = 2
-			cloneSet.Spec.Template.Spec.Containers[0].Image = "busybox:latest"
-			cloneSet = tester.CreateCloneSet(cloneSet)
-			tester.WaitForCloneSetRunning(cloneSet)
-
-			// get pods, and check workloadSpread
-			ginkgo.By(fmt.Sprintf("get cloneSet(%s/%s) pods, and check workloadSpread(%s/%s) status", cloneSet.Namespace, cloneSet.Name, workloadSpread.Namespace, workloadSpread.Name))
-			pods, err := tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods).To(gomega.HaveLen(2))
-			subset1Pods := 0
-			for _, pod := range pods {
-				if str, ok := pod.Annotations[workloadspread.MatchedWorkloadSpreadSubsetAnnotations]; ok {
-					var injectWorkloadSpread *workloadspread.InjectWorkloadSpread
-					err := json.Unmarshal([]byte(str), &injectWorkloadSpread)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					if injectWorkloadSpread.Subset == subset1.Name {
-						subset1Pods++
-						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
-						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
-						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
-					}
-				} else {
-					// others PodDeletionCostAnnotation not set
-					gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal(""))
-				}
-			}
-			gomega.Expect(subset1Pods).To(gomega.Equal(2))
-
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].MissingReplicas).To(gomega.Equal(int32(0)))
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Replicas).To(gomega.Equal(int32(2)))
-			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].CreatingPods)).To(gomega.Equal(0))
-			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].DeletingPods)).To(gomega.Equal(0))
-
-			//scale up cloneSet.replicas = 6
-			ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=6", cloneSet.Namespace, cloneSet.Name))
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
-			tester.UpdateCloneSet(cloneSet)
-			tester.WaitForCloneSetRunning(cloneSet)
-
-			// get pods, and check workloadSpread
-			ginkgo.By(fmt.Sprintf("get cloneSet(%s/%s) pods, and check workloadSpread(%s/%s) status", cloneSet.Namespace, cloneSet.Name, workloadSpread.Namespace, workloadSpread.Name))
-			pods, err = tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods).To(gomega.HaveLen(6))
-			subset1Pods = 0
-			for _, pod := range pods {
-				if str, ok := pod.Annotations[workloadspread.MatchedWorkloadSpreadSubsetAnnotations]; ok {
-					var injectWorkloadSpread *workloadspread.InjectWorkloadSpread
-					err := json.Unmarshal([]byte(str), &injectWorkloadSpread)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					if injectWorkloadSpread.Subset == subset1.Name {
-						subset1Pods++
-						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
-						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
-						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
-					}
-				} else {
-					// others PodDeletionCostAnnotation not set
-					gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal(""))
-				}
-			}
-			gomega.Expect(subset1Pods).To(gomega.Equal(2))
-
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].MissingReplicas).To(gomega.Equal(int32(0)))
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Replicas).To(gomega.Equal(int32(2)))
-			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].CreatingPods)).To(gomega.Equal(0))
-			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].DeletingPods)).To(gomega.Equal(0))
-
-			// scale down cloneset image
-			//scale up cloneSet.replicas = 2
-			ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=6", cloneSet.Namespace, cloneSet.Name))
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(2)
-			tester.UpdateCloneSet(cloneSet)
-			tester.WaitForCloneSetRunning(cloneSet)
-
-			// get pods, and check workloadSpread
-			ginkgo.By(fmt.Sprintf("get cloneSet(%s/%s) pods, and check workloadSpread(%s/%s) status", cloneSet.Namespace, cloneSet.Name, workloadSpread.Namespace, workloadSpread.Name))
-			pods, err = tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods).To(gomega.HaveLen(2))
-			subset1Pods = 0
-			for _, pod := range pods {
-				if str, ok := pod.Annotations[workloadspread.MatchedWorkloadSpreadSubsetAnnotations]; ok {
-					var injectWorkloadSpread *workloadspread.InjectWorkloadSpread
-					err := json.Unmarshal([]byte(str), &injectWorkloadSpread)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					if injectWorkloadSpread.Subset == subset1.Name {
-						subset1Pods++
-						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
-						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
-						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
-					}
-				} else {
-					// others PodDeletionCostAnnotation not set
-					gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal(""))
-				}
-			}
-			gomega.Expect(subset1Pods).To(gomega.Equal(2))
-
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].MissingReplicas).To(gomega.Equal(int32(0)))
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Replicas).To(gomega.Equal(int32(2)))
-			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].CreatingPods)).To(gomega.Equal(0))
-			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[0].DeletingPods)).To(gomega.Equal(0))
-
-			ginkgo.By("elastic deployment, zone-a=2, zone-b=nil, done")
+			ginkgo.By("only one subset, zone-a=nil, done")
 		})
 
 		//ginkgo.It("deploy in two zone, maxReplicas=50%", func() {

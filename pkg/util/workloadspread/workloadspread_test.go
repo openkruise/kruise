@@ -382,11 +382,71 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			},
 			expectPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
+				pod.Labels = map[string]string{
+					"subset": "subset-a",
+				}
+				pod.Annotations = map[string]string{
+					"subset":                               "subset-a",
+					MatchedWorkloadSpreadSubsetAnnotations: `{"name":"test-ws","subset":"subset-a"}`,
+				}
+				pod.Spec.Tolerations = []corev1.Toleration{
+					{
+						Key:      "node.kubernetes.io/not-ready",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoExecute,
+					},
+				}
+				pod.Spec.Affinity = &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"ack"},
+										},
+										{
+											Key:      "sigma.ali/resource-pool",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"lark"},
+										},
+									},
+									MatchFields: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"i-8vbhlh6rte2w5d1k2sgn", "i-8vbhlh6rte2vnxlq8ztc"},
+										},
+									},
+								},
+							},
+						},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+							{
+								Weight: 5,
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: corev1.NodeSelectorOpIn,
+											Values:   []string{"cn-zhangjiakou-a"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+
 				return pod
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.ResourceVersion = "1"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
+				workloadSpread.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				return workloadSpread
 			},
 		},

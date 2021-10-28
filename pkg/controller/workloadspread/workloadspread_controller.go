@@ -463,18 +463,10 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 			return nil, nil
 		}
 
-		// don't reschedule the last subset.
+		// reschedule failed-scheduled pods
 		if rescheduleCriticalSeconds > 0 {
-			if i != len(ws.Spec.Subsets)-1 {
-				pods := r.rescheduleSubset(ws, podMap[subset.Name], subsetStatus, oldSubsetStatusMap[subset.Name])
-				scheduleFailedPodMap[subset.Name] = pods
-			} else {
-				oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatusMap[subset.Name], appsv1alpha1.SubsetSchedulable)
-				if oldCondition != nil {
-					setWorkloadSpreadSubsetCondition(subsetStatus, oldCondition.DeepCopy())
-				}
-				setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""))
-			}
+			pods := r.rescheduleSubset(ws, podMap[subset.Name], subsetStatus, oldSubsetStatusMap[subset.Name])
+			scheduleFailedPodMap[subset.Name] = pods
 		} else {
 			removeWorkloadSpreadSubsetCondition(subsetStatus, appsv1alpha1.SubsetSchedulable)
 		}
