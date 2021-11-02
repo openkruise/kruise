@@ -1034,6 +1034,7 @@ k8s.io/kubernetes/pkg/cluster/ports
 k8s.io/kubernetes/pkg/controller
 k8s.io/kubernetes/pkg/controller/daemon/util
 k8s.io/kubernetes/pkg/controller/history
+k8s.io/kubernetes/pkg/controller/util/node
 k8s.io/kubernetes/pkg/credentialprovider
 k8s.io/kubernetes/pkg/credentialprovider/secrets
 k8s.io/kubernetes/pkg/features
@@ -1064,6 +1065,7 @@ k8s.io/kubernetes/pkg/security/apparmor
 k8s.io/kubernetes/pkg/securitycontext
 k8s.io/kubernetes/pkg/util/hash
 k8s.io/kubernetes/pkg/util/labels
+k8s.io/kubernetes/pkg/util/node
 k8s.io/kubernetes/pkg/util/parsers
 k8s.io/kubernetes/pkg/util/slice
 k8s.io/kubernetes/pkg/util/sysctl

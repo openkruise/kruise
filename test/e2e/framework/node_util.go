@@ -76,17 +76,19 @@ func (t *NodeTester) CreateFakeNode(randStr string) (node *v1.Node, err error) {
 			if err != nil {
 				return err
 			}
+			now := time.Now()
 			node.Status = v1.NodeStatus{
 				Phase:       v1.NodeRunning,
 				Capacity:    resources,
 				Allocatable: resources,
 				Conditions: []v1.NodeCondition{
 					{
-						Type:               v1.NodeReady,
-						Status:             v1.ConditionTrue,
-						Reason:             "FakeReady",
-						LastTransitionTime: metav1.Now(),
-						LastHeartbeatTime:  metav1.Now(),
+						Type:   v1.NodeReady,
+						Status: v1.ConditionTrue,
+						Reason: "FakeReady",
+						// Ready for 10min
+						LastTransitionTime: metav1.NewTime(now.Add(-time.Minute * 10)),
+						LastHeartbeatTime:  metav1.NewTime(now),
 					},
 				},
 			}
