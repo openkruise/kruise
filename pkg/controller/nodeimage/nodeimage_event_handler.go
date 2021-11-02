@@ -69,8 +69,21 @@ func (e *nodeHandler) nodeCreateOrUpdate(node *v1.Node, q workqueue.RateLimiting
 	nodeImage := &appsv1alpha1.NodeImage{}
 	namespacedName := types.NamespacedName{Name: node.Name}
 	if err := e.Get(context.TODO(), namespacedName, nodeImage); err != nil {
-		klog.Infof("Node create event for nodeimage %v", node.Name)
-		q.Add(reconcile.Request{NamespacedName: namespacedName})
+		if errors.IsNotFound(err) {
+			klog.Infof("Node create event for nodeimage %v", node.Name)
+			if isReady, delay := getNodeReadyAndDelayTime(node); !isReady {
+				klog.Infof("Skip to enqueue Node %s with not NodeImage, for not ready yet.", node.Name)
+				return
+			} else if delay > 0 {
+				klog.Infof("Enqueue Node %s with not NodeImage after %v.", node.Name, delay)
+				q.AddAfter(reconcile.Request{NamespacedName: namespacedName}, delay)
+				return
+			}
+			klog.Infof("Enqueue Node %s with not NodeImage.", node.Name)
+			q.Add(reconcile.Request{NamespacedName: namespacedName})
+			return
+		}
+		klog.Errorf("Failed to get NodeImage for Node %s: %v", node.Name, err)
 		return
 	}
 	if reflect.DeepEqual(node.Labels, nodeImage.Labels) {

@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -54,11 +55,14 @@ import (
 
 func init() {
 	flag.IntVar(&concurrentReconciles, "nodeimage-workers", concurrentReconciles, "Max concurrent workers for NodeImage controller.")
+	flag.DurationVar(&nodeImageCreationDelayAfterNodeReady, "nodeimage-creation-delay", nodeImageCreationDelayAfterNodeReady, "Delay duration for NodeImage creation after Node ready.")
 }
 
 var (
 	concurrentReconciles = 3
 	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("NodeImage")
+
+	nodeImageCreationDelayAfterNodeReady = time.Second * 30
 )
 
 const (
@@ -193,6 +197,14 @@ func (r *ReconcileNodeImage) Reconcile(_ context.Context, request reconcile.Requ
 
 	// If Node exists, we should create a NodeImage
 	if nodeImage == nil {
+		if isReady, delay := getNodeReadyAndDelayTime(node); !isReady {
+			klog.V(4).Infof("Skip to create NodeImage %s for Node has not ready yet.", request.Name)
+			return reconcile.Result{}, nil
+		} else if delay > 0 {
+			klog.V(4).Infof("Skip to create NodeImage %s for waiting Node ready for %s.", request.Name, delay)
+			return reconcile.Result{RequeueAfter: delay}, nil
+		}
+
 		nodeImage = &appsv1alpha1.NodeImage{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: request.Name,
@@ -483,4 +495,16 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 		klog.Errorf("Failed to update status for NodeImage %v: %v", nodeImage.Name, err)
 	}
 	return err
+}
+
+func getNodeReadyAndDelayTime(node *v1.Node) (bool, time.Duration) {
+	_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
+	if condition == nil || condition.Status != v1.ConditionTrue {
+		return false, 0
+	}
+	delay := nodeImageCreationDelayAfterNodeReady - time.Since(condition.LastTransitionTime.Time)
+	if delay > 0 {
+		return true, delay
+	}
+	return true, 0
 }
