@@ -47,7 +47,7 @@ If this proposal adds new terms, or defines some, make the changes to the book's
 
 ## Motivation
 
-If we use a CloneSet to deploy our application. At the same time, use SidecarSet to inject a container which collect application's log.
+If we use a Deployment to deploy our application. At the same time, use SidecarSet to inject a container which collect application's log.
 
 Someday, we want to update or replace our SidecarSet. We are very careful, only update 10% SidecarSet per step. It will take a long time to complete the upgrade. Suddenly, we find a big problem in our application. So, we need to fix and update application immediately.
 
@@ -105,10 +105,16 @@ If old version exists, we inject current and old container following by `updateS
 
 When we set `injectionStrategy.execUpdateStrategy` == `true`, we can not make all the properties in the `updateStrategy` take effect.
 
-* `updateStrategy.type` and `updateStrategy.maxUnavailable` will be decided by another workload, like CloneSet.
+* `updateStrategy.type` and `updateStrategy.maxUnavailable` will be decided by another workload, like CloneSet or Deployment.
 * `updateStrategy.paused` is a little conflict with `injectionStrategy.paused`, so we decided to make `injectionStrategy.paused` take effect. Because that sound more reasonable.
 
 ## Alternatives
+
+### Make the above proposal the default implementation
+
+Do not add any new field, just make the above behavior the default behavior.
+
+The problem is that it will be inconsistent with the behavior of the previous version.
 
 ### Add a new `updateStrategy.type`
 
