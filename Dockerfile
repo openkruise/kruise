@@ -10,15 +10,12 @@ COPY go.sum go.sum
 #RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
+COPY vendor/ vendor/
 COPY apis/ apis/
 COPY cmd/ cmd/
 COPY pkg/ pkg/
-COPY vendor/ vendor/
-
 # Build
-RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o manager main.go \
-  && CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o daemon ./cmd/daemon/main.go
+RUN CGO_ENABLED=0 GO111MODULE=on GOBIN=/workspace/ go install -mod=vendor -a ./cmd/...
 
 # Use Ubuntu 20.04 LTS as base image to package the manager binary
 FROM ubuntu:focal
