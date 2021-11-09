@@ -40,6 +40,8 @@ type SidecarSetSpec struct {
 	Containers []SidecarContainer `json:"containers,omitempty"`
 
 	// List of volumes that can be mounted by sidecar containers
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// The sidecarset updateStrategy to use to replace existing pods with new ones.
@@ -54,6 +56,8 @@ type SidecarSetSpec struct {
 
 // SidecarContainer defines the container of Sidecar
 type SidecarContainer struct {
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	corev1.Container `json:",inline"`
 
 	// The rules that injected SidecarContainer into Pod.spec.containers,

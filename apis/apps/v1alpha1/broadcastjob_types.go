@@ -32,6 +32,8 @@ type BroadcastJobSpec struct {
 	Parallelism *intstr.IntOrString `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Template describes the pod that will be created when executing a job.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// CompletionPolicy indicates the completion policy of the job.

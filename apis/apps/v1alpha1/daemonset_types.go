@@ -124,6 +124,8 @@ type DaemonSetSpec struct {
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// An update strategy to replace existing DaemonSet pods with new pods.
