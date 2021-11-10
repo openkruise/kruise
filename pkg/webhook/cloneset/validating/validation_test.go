@@ -8,7 +8,9 @@ import (
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -19,6 +21,8 @@ import (
 type testCase struct {
 	spec    *appsv1alpha1.CloneSetSpec
 	oldSpec *appsv1alpha1.CloneSetSpec
+
+	enableRestartPolicyOnFailure bool
 }
 
 func TestValidate(t *testing.T) {
@@ -69,6 +73,30 @@ func TestValidate(t *testing.T) {
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
+			},
+		},
+	}
+	podTemplateWithRestartPolicyOnFailure := v1.PodTemplate{
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyOnFailure,
+				DNSPolicy:     v1.DNSClusterFirst,
+				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: v1.TerminationMessageReadFile}},
+			},
+		},
+	}
+	podTemplateWithRestartPolicyNever := v1.PodTemplate{
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				DNSPolicy:     v1.DNSClusterFirst,
+				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: v1.TerminationMessageReadFile}},
 			},
 		},
 	}
@@ -225,9 +253,24 @@ func TestValidate(t *testing.T) {
 				},
 			},
 		},
+		{
+			// enable restartPolicy onFailure
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: podTemplateWithRestartPolicyOnFailure.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+			},
+			enableRestartPolicyOnFailure: true,
+		},
 	}
 
 	for i, successCase := range successCases {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", features.EnableCloneSetRestartPolicyOnFailure, successCase.enableRestartPolicyOnFailure))
 		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
 			if i == 5 {
 				fmt.Println("------")
@@ -409,9 +452,35 @@ func TestValidate(t *testing.T) {
 				},
 			},
 		},
+		"disable-restartPolicy-onFailure": {
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: podTemplateWithRestartPolicyOnFailure.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+			},
+		},
+		"disable-restartPolicy-never": {
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: podTemplateWithRestartPolicyNever.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+			},
+			enableRestartPolicyOnFailure: true,
+		},
 	}
 
 	for k, v := range errorCases {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", features.EnableCloneSetRestartPolicyOnFailure, v.enableRestartPolicyOnFailure))
 		t.Run(k, func(t *testing.T) {
 			obj := appsv1alpha1.CloneSet{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%v", k), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "2"},

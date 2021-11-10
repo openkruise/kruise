@@ -79,6 +79,9 @@ const (
 	// InPlaceUpdateEnvFromMetadata enables Kruise to in-place update a container in Pod
 	// when its env from labels/annotations changed and pod is in-place updating.
 	InPlaceUpdateEnvFromMetadata featuregate.Feature = "InPlaceUpdateEnvFromMetadata"
+
+	// EnableCloneSetRestartPolicyOnFailure enables webhook to allow CloneSet with restartPolicy onFailure.
+	EnableCloneSetRestartPolicyOnFailure featuregate.Feature = "EnableCloneSetRestartPolicyOnFailure"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -86,16 +89,17 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
 	DaemonWatchingPod: {Default: true, PreRelease: featuregate.Beta},
 
-	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
-	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
-	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
-	CloneSetPartitionRollback:        {Default: false, PreRelease: featuregate.Alpha},
-	ResourcesDeletionProtection:      {Default: false, PreRelease: featuregate.Alpha},
-	WorkloadSpread:                   {Default: false, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetDeleteGate:   {Default: false, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetUpdateGate:   {Default: false, PreRelease: featuregate.Alpha},
-	TemplateNoDefaults:               {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceUpdateEnvFromMetadata:     {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetShortHash:                    {Default: false, PreRelease: featuregate.Alpha},
+	KruisePodReadinessGate:               {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForInPlaceUpdate:     {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetPartitionRollback:            {Default: false, PreRelease: featuregate.Alpha},
+	ResourcesDeletionProtection:          {Default: false, PreRelease: featuregate.Alpha},
+	WorkloadSpread:                       {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetDeleteGate:       {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetUpdateGate:       {Default: false, PreRelease: featuregate.Alpha},
+	TemplateNoDefaults:                   {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceUpdateEnvFromMetadata:         {Default: false, PreRelease: featuregate.Alpha},
+	EnableCloneSetRestartPolicyOnFailure: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
