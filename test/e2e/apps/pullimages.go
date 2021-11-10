@@ -132,9 +132,11 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 25*time.Second, 2*time.Second).Should(gomega.Equal(true))
 
 			ginkgo.By("Check image should be cleaned in NodeImage")
-			found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(found).To(gomega.Equal(false))
+			gomega.Eventually(func() bool {
+				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return found
+			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
 		})
 
 		ginkgo.It("create an always job to pull an image on one real node", func() {
