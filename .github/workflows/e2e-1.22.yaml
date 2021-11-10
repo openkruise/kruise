@@ -300,7 +300,7 @@ jobs:
           make ginkgo
           ./scripts/generate_bindata.sh
           set +e
-          ./bin/ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|SidecarSet)' test/e2e
+          ./bin/ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' test/e2e
 #          retVal=$?
 #          if [ $retVal -ne 0 ]; then
 #            kubectl get pod -n kruise-system -o wide

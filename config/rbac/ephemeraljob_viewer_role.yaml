@@ -1,0 +1,20 @@
+# permissions for end users to view ephemeraljobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ephemeraljob-viewer-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - ephemeraljobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - ephemeraljobs/status
+  verbs:
+  - get

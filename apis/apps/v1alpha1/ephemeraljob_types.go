@@ -26,7 +26,7 @@ import (
 
 const (
 	EphemeralContainerCreateByJob = "apps.kruise.io/ephemeraljob"
-	EphemeralContainerEnvKey      = "ephemeraljob"
+	EphemeralContainerEnvKey      = "KRUISE_EJOB_ID"
 )
 
 // EphemeralJobSpec defines the desired state of EphemeralJob
@@ -52,24 +52,29 @@ type EphemeralJobSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
 
-	// ttlSecondsAfterCreated is the TTL duration after ephemeral job has created.
-	// default value is 300.
-	// if the dua
-	// If the the existing time of an ephemeral job after be created exceeds TTLSecondsAfterCreated seconds,
-	// the ephemeral job and all matched ephemeral containers will be deleted.
-	TTLSecondsAfterCreated *int32 `json:"ttlSecondsAfterCreated,omitempty"`
-
 	// ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active
 	// before the system tries to terminate it; value must be positive integer.
 	// Only works for Always type.
 	// +optional
-	// TODO:
-	// ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=activeDeadlineSeconds"`
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=activeDeadlineSeconds"`
+
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Complete or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the eJob finishes, it is eligible to be
+	// automatically deleted. When the Job is being deleted, its lifecycle
+	// guarantees (e.g. finalizers) will be honored.
+	// If this field is unset, default value is 1800
+	// If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,4,opt,name=ttlSecondsAfterFinished"`
 }
 
 // EphemeralContainerTemplateSpec describes template spec of ephemeral containers
 type EphemeralContainerTemplateSpec struct {
-	EphemeralContainers []*v1.EphemeralContainer `json:"ephemeralContainers"`
+
+	// EphemeralContainers defines ephemeral container list in match pods.
+	EphemeralContainers []v1.EphemeralContainer `json:"ephemeralContainers"`
 }
 
 // EphemeralJobStatus defines the observed state of EphemeralJob
@@ -81,8 +86,8 @@ type EphemeralJobStatus struct {
 	// +patchStrategy=merge
 	Conditions []EphemeralJobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
-	// Represents time when the job was started. It is not guaranteed to
-	// be set in happens-before order across separate operations.
+	// Represents time when the job was acknowledged by the job controller.
+	// It is not guaranteed to be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
@@ -105,9 +110,9 @@ type EphemeralJobStatus struct {
 	// +optional
 	Running int32 `json:"running" protobuf:"varint,4,opt,name=running"`
 
-	// The number of pods which reached phase Completed.
+	// The number of pods which reached phase Succeeded.
 	// +optional
-	Completed int32 `json:"completed" protobuf:"varint,5,opt,name=completed"`
+	Succeeded int32 `json:"succeeded" protobuf:"varint,5,opt,name=completed"`
 
 	// The number of waiting pods.
 	// +optional
@@ -190,8 +195,8 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=ejob
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="The status of ephemeral job"
 // +kubebuilder:printcolumn:name="MATCH",type="integer",JSONPath=".status.match",description="Number of ephemeral container matched by this job"
-// +kubebuilder:printcolumn:name="TARGET",type="integer",JSONPath=".status.replicas",description="Number of target pods"
 // +kubebuilder:printcolumn:name="SUCCEED",type="integer",JSONPath=".status.succeeded",description="Number of succeed ephemeral containers"
 // +kubebuilder:printcolumn:name="FAILED",type="integer",JSONPath=".status.failed",description="Number of failed ephemeral containers"
 // +kubebuilder:printcolumn:name="RUNNING",type="integer",JSONPath=".status.running",description="Number of running ephemeral containers"
