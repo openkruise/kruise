@@ -64,11 +64,13 @@ var _ = SIGDescribe("containerpriority", func() {
 		ginkgo.It("container priority created by CloneSet", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
-				Name:  "nginx2",
-				Image: "nginx:1.21",
+				Name:    "c2",
+				Image:   "ubuntu:latest",
+				Command: []string{"/bin/bash", "-c", "read -p wait"},
+				Stdin:   true,
 				Env: []v1.EnvVar{
 					{Name: priorityName, Value: "10"},
-					{Name: "NGINX_PORT", Value: "81"},
+					{Name: "test", Value: "foo"},
 				},
 				Lifecycle: &v1.Lifecycle{
 					PostStart: &v1.Handler{
@@ -123,11 +125,13 @@ var _ = SIGDescribe("containerpriority", func() {
 		ginkgo.It("container priority created by Deployment", func() {
 			dp := deploymentTester.NewDeployment("deploy-"+randStr, 1)
 			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, v1.Container{
-				Name:  "nginx2",
-				Image: "nginx:1.21",
+				Name:    "c2",
+				Image:   "ubuntu:latest",
+				Command: []string{"/bin/bash", "-c", "read -p wait"},
+				Stdin:   true,
 				Env: []v1.EnvVar{
 					{Name: priorityName, Value: "10"},
-					{Name: "NGINX_PORT", Value: "81"},
+					{Name: "test", Value: "foo"},
 				},
 				Lifecycle: &v1.Lifecycle{
 					PostStart: &v1.Handler{
@@ -182,10 +186,12 @@ var _ = SIGDescribe("containerpriority", func() {
 		ginkgo.It("run with no container priority", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
-				Name:  "nginx2",
-				Image: "nginx:1.21",
+				Name:    "c2",
+				Image:   "ubuntu:latest",
+				Command: []string{"/bin/bash", "-c", "read -p wait"},
+				Stdin:   true,
 				Env: []v1.EnvVar{
-					{Name: "NGINX_PORT", Value: "81"},
+					{Name: "test", Value: "foo"},
 				},
 			})
 			cs, err = cloneSetTester.CreateCloneSet(cs)
@@ -226,10 +232,12 @@ var _ = SIGDescribe("containerpriority", func() {
 				},
 			}
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
-				Name:  "nginx2",
-				Image: "nginx:1.21",
+				Name:    "c2",
+				Image:   "ubuntu:latest",
+				Command: []string{"/bin/bash", "-c", "read -p wait"},
+				Stdin:   true,
 				Env: []v1.EnvVar{
-					{Name: "NGINX_PORT", Value: "81"},
+					{Name: "test", Value: "foo"},
 				},
 				Lifecycle: &v1.Lifecycle{
 					PostStart: &v1.Handler{
@@ -239,10 +247,12 @@ var _ = SIGDescribe("containerpriority", func() {
 					},
 				},
 			}, v1.Container{
-				Name:  "nginx3",
-				Image: "nginx:1.20",
+				Name:    "c3",
+				Image:   "ubuntu:latest",
+				Command: []string{"/bin/bash", "-c", "read -p wait"},
+				Stdin:   true,
 				Env: []v1.EnvVar{
-					{Name: "NGINX_PORT", Value: "82"},
+					{Name: "test", Value: "foo"},
 				},
 			})
 			cs.Spec.Template.Annotations = map[string]string{priorityAnnotation: priorityOrdered}
