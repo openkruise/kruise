@@ -27,6 +27,8 @@ type ResourceDistributionSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Resource must be the complete yaml that users want to distribute.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:EmbeddedResource
 	Resource runtime.RawExtension `json:"resource"`
 
 	// Targets defines the namespaces that users want to distribute to.

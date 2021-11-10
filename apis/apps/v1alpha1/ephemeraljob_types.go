@@ -74,6 +74,8 @@ type EphemeralJobSpec struct {
 type EphemeralContainerTemplateSpec struct {
 
 	// EphemeralContainers defines ephemeral container list in match pods.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	EphemeralContainers []v1.EphemeralContainer `json:"ephemeralContainers"`
 }
 
