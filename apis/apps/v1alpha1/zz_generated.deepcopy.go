@@ -990,13 +990,9 @@ func (in *EphemeralContainerTemplateSpec) DeepCopyInto(out *EphemeralContainerTe
 	*out = *in
 	if in.EphemeralContainers != nil {
 		in, out := &in.EphemeralContainers, &out.EphemeralContainers
-		*out = make([]*v1.EphemeralContainer, len(*in))
+		*out = make([]v1.EphemeralContainer, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(v1.EphemeralContainer)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }
@@ -1106,8 +1102,13 @@ func (in *EphemeralJobSpec) DeepCopyInto(out *EphemeralJobSpec) {
 		**out = **in
 	}
 	in.Template.DeepCopyInto(&out.Template)
-	if in.TTLSecondsAfterCreated != nil {
-		in, out := &in.TTLSecondsAfterCreated, &out.TTLSecondsAfterCreated
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	}
+	if in.TTLSecondsAfterFinished != nil {
+		in, out := &in.TTLSecondsAfterFinished, &out.TTLSecondsAfterFinished
 		*out = new(int32)
 		**out = **in
 	}
