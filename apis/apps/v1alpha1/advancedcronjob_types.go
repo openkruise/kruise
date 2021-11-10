@@ -71,6 +71,8 @@ type AdvancedCronJobSpec struct {
 type CronJobTemplate struct {
 	// Specifies the job that will be created when executing a CronJob.
 	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	JobTemplate *batchv1beta1.JobTemplateSpec `json:"jobTemplate,omitempty" protobuf:"bytes,1,opt,name=jobTemplate"`
 
 	// Specifies the broadcastjob that will be created when executing a BroadcastCronJob.

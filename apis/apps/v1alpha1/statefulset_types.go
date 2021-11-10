@@ -128,6 +128,8 @@ type StatefulSetSpec struct {
 	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
 	// will fulfill this Template, but have a unique identity from the rest
 	// of the StatefulSet.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Template v1.PodTemplateSpec `json:"template"`
 
 	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -138,6 +140,8 @@ type StatefulSetSpec struct {
 	// any volumes in the template, with the same name.
 	// TODO: Define the behavior if a claim already exists with the same name.
 	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
 	// serviceName is the name of the service that governs this StatefulSet.

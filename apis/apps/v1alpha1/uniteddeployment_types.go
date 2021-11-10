@@ -98,29 +98,38 @@ type SubsetTemplate struct {
 
 // StatefulSetTemplateSpec defines the subset template of StatefulSet.
 type StatefulSetTemplateSpec struct {
-	// +kubebuilder:validation:XPreserveUnknownFields
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              appsv1.StatefulSetSpec `json:"spec"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
+	Spec appsv1.StatefulSetSpec `json:"spec"`
 }
 
 // AdvancedStatefulSetTemplateSpec defines the subset template of AdvancedStatefulSet.
 type AdvancedStatefulSetTemplateSpec struct {
-	// +kubebuilder:validation:XPreserveUnknownFields
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              StatefulSetSpec `json:"spec"`
 }
 
 // CloneSetTemplateSpec defines the subset template of CloneSet.
 type CloneSetTemplateSpec struct {
-	// +kubebuilder:validation:XPreserveUnknownFields
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CloneSetSpec `json:"spec"`
 }
 
 // DeploymentTemplateSpec defines the subset template of Deployment.
 type DeploymentTemplateSpec struct {
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              appsv1.DeploymentSpec `json:"spec"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
+	Spec appsv1.DeploymentSpec `json:"spec"`
 }
 
 // UnitedDeploymentUpdateStrategy defines the update performance

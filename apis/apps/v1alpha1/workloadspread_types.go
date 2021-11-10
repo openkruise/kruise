@@ -110,6 +110,8 @@ type WorkloadSpreadSubset struct {
 
 	// Patch indicates patching podTemplate to the Pod.
 	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Patch runtime.RawExtension `json:"patch,omitempty"`
 }
 
