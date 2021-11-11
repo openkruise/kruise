@@ -1,7 +1,7 @@
 # A sample workflow which checks out your Infrastructure as Code Configuration files,
 # such as Kubernetes, Helm & Terraform and scans them for any security issues.
 # The results are then uploaded to GitHub Security Code Scanning
-#
+# 
 # For more examples, including how to limit scans to only high-severity issues
 # and fail PR checks, see https://github.com/snyk/actions/
 
