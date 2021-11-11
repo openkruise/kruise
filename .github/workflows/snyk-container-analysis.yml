@@ -1,7 +1,7 @@
 # A sample workflow which checks out the code, builds a container
 # image using Docker and scans that image for vulnerabilities using
 # Snyk. The results are then uploaded to GitHub Security Code Scanning
-#
+# 
 # For more examples, including how to limit scans to only high-severity
 # issues, monitor images for newly disclosed vulnerabilities in Snyk and
 # fail PR checks for new vulnerabilities, see https://github.com/snyk/actions/
