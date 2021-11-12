@@ -1,5 +1,42 @@
 # Change Log
 
+## v1.0.0-alpha.2
+
+> Change log since v1.0.0-alpha.1
+
+### Project
+
+- Generate CRDs with original controller-tools and markers
+
+### WorkloadSpread
+
+- Add discoveryGVK for WorkloadSpread
+
+### NodeImage
+
+- Add `--nodeimage-creation-delay` flag to delay NodeImage creation after Node ready
+
+### Other
+
+- Fix E2E for WorkloadSpread, ImagePulling, ContainerLaunchPriority
+
+## v0.10.1
+
+> Change log since v0.10.0
+
+### WorkloadSpread
+
+- Add discoveryGVK for WorkloadSpread
+- Optimize webhook injection
+
+### Kruise-daemon
+
+- Setup generic kubeClient with Protobuf
+
+### Other
+
+- Fix E2E for WorkloadSpread, ImagePulling
+
 ## v1.0.0-alpha.1
 
 > Change log since v0.10.0
