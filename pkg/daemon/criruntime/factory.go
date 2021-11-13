@@ -197,7 +197,7 @@ func detectRuntime(varRunPath string) []runtimeConfig {
 		}
 	}
 
-	// containerd
+	// other implements of cri, include containerd, crio
 	{
 		if _, err = os.Stat(fmt.Sprintf("%s/containerd.sock", varRunPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
@@ -209,6 +209,12 @@ func detectRuntime(varRunPath string) []runtimeConfig {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeContainerd,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/containerd/containerd.sock", varRunPath),
+			})
+		}
+		if _, err = os.Stat(fmt.Sprintf("%s/crio.sock", varRunPath)); err == nil {
+			cfgs = append(cfgs, runtimeConfig{
+				runtimeType:      ContainerRuntimeContainerd,
+				runtimeRemoteURI: fmt.Sprintf("unix://%s/crio.sock", varRunPath),
 			})
 		}
 	}
