@@ -35,6 +35,10 @@ func getSubsetPrefix(controllerName, subsetName string) string {
 }
 
 func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
+	if len(subsetConfig.NodeSelectorTerm.MatchExpressions) == 0 {
+		return
+	}
+
 	if podSpec.Affinity == nil {
 		podSpec.Affinity = &corev1.Affinity{}
 	}
