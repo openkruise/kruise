@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -568,6 +569,104 @@ func TestCsSubsetProvisionWithToleration(t *testing.T) {
 	g.Expect(len(cs.Spec.Template.Spec.Tolerations)).Should(gomega.BeEquivalentTo(3))
 	g.Expect(reflect.DeepEqual(cs.Spec.Template.Spec.Tolerations[1], instance.Spec.Topology.Subsets[0].Tolerations[0])).Should(gomega.BeTrue())
 	g.Expect(reflect.DeepEqual(cs.Spec.Template.Spec.Tolerations[2], instance.Spec.Topology.Subsets[0].Tolerations[1])).Should(gomega.BeTrue())
+}
+
+func TestCsSubsetWithPatch(t *testing.T) {
+	g, requests, cancel, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		cancel()
+		mgrStopped.Wait()
+	}()
+
+	caseName := "test-cs-subset-with-patch"
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      caseName,
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &one,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": caseName,
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				CloneSetTemplate: &appsv1alpha1.CloneSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": caseName,
+						},
+					},
+					Spec: appsv1alpha1.CloneSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"name": caseName,
+							},
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name":           caseName,
+									"specific-label": "label-default",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "container-a",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"spec":{"template":{"metadata":{"annotations":{"extend-annotation":"annotation-a"},"labels":{"extend-label":"label-a"}}}}}`),
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+
+	// Create the UnitedDeployment object and expect the Reconcile and Deployment to be created
+	err := c.Create(context.TODO(), instance)
+	// The instance object may not be a valid object because it might be missing some required fields.
+	// Please modify the instance object by adding required fields and then remove the following if statement.
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	defer c.Delete(context.TODO(), instance)
+	waitReconcilerProcessFinished(g, requests, 3)
+
+	csList := expectedCsCount(g, instance, 1)
+	cs := &csList.Items[0]
+	g.Expect(cs.Spec.Template.Labels).Should(gomega.HaveKeyWithValue("extend-label", "label-a"))
+	g.Expect(cs.Spec.Template.Labels).Should(gomega.HaveKeyWithValue("specific-label", "label-default"))
+
+	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
+	instance.Spec.Topology.Subsets[0].Patch = runtime.RawExtension{
+		Raw: []byte(`{"spec":{"template":{"metadata":{"annotations":{"specific-annotation":"annotation-a"},"labels":{"specific-label":"label-a"}}}}}`),
+	}
+
+	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+
+	csList = expectedCsCount(g, instance, 1)
+	cs = &csList.Items[0]
+	g.Expect(cs.Spec.Template.Labels).ShouldNot(gomega.HaveKey("extend-label"))
+	g.Expect(cs.Spec.Template.Labels).Should(gomega.HaveKeyWithValue("specific-label", "label-a"))
 }
 
 func TestCsDupSubset(t *testing.T) {

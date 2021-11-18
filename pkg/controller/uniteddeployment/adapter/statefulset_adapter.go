@@ -18,12 +18,15 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -157,6 +160,35 @@ func (a *StatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, su
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
+
+	if len(subSetConfig.Patch.Raw) != 0 {
+		cloneBytes, _ := json.Marshal(set)
+		modified, err := strategicpatch.StrategicMergePatch(cloneBytes, subSetConfig.Patch.Raw, &alpha1.StatefulSet{})
+		if err != nil {
+			klog.Errorf("failed to merge patch raw %s", subSetConfig.Patch.Raw)
+			return err
+		}
+		patchedSet := &appsv1.StatefulSet{}
+		if err = json.Unmarshal(modified, patchedSet); err != nil {
+			klog.Errorf("failed to unmarshal %s to StatefulSet", modified)
+			return err
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
+		if err != nil {
+			return err
+		}
+		if !selector.Matches(labels.Set(patchedSet.GetLabels())) {
+			return fmt.Errorf("subset[%s] patch changed labels, mismatch UnitedDeployment selector ", subsetName)
+		}
+
+		patchedSet.DeepCopyInto(set)
+		klog.V(2).Infof("StatefulSet [%s/%s] has patches configure successfully: %s", set.Namespace, set.GenerateName, subSetConfig.Patch.Raw)
+	}
+	if set.Annotations == nil {
+		set.Annotations = make(map[string]string)
+	}
+	set.Annotations[alpha1.AnnotationSubsetPatchKey] = string(subSetConfig.Patch.Raw)
 
 	return nil
 }
