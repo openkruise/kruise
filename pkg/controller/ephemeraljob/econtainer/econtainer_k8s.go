@@ -56,8 +56,8 @@ func (k *k8sControl) CalculateEphemeralContainerStatus(targetPods []*v1.Pod, sta
 	return nil
 }
 
-func (k *k8sControl) GetEphemeralContainersStatus(target *v1.Pod) []v1.ContainerStatus {
-	return target.Status.EphemeralContainerStatuses
+func (k *k8sControl) GetEphemeralContainersStatus(target *v1.Pod) ([]v1.ContainerStatus, error) {
+	return target.Status.EphemeralContainerStatuses, nil
 }
 
 func parseEphemeralContainerStatus(status *v1.ContainerStatus) ephemeralContainerStatusState {
@@ -123,8 +123,8 @@ func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.Cont
 	return v1.PodUnknown, nil
 }
 
-func (k *k8sControl) GetEphemeralContainers(targetPod *v1.Pod) []v1.EphemeralContainer {
-	return targetPod.Spec.EphemeralContainers
+func (k *k8sControl) GetEphemeralContainers(targetPod *v1.Pod) ([]v1.EphemeralContainer, error) {
+	return targetPod.Spec.EphemeralContainers, nil
 }
 
 func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {

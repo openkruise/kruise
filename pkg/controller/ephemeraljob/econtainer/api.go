@@ -8,10 +8,10 @@ import (
 type EphemeralContainerInterface interface {
 	// GetEphemeralContainers will return all ephemeral container status.
 	// Maybe they are not created by current ephemeral jobs.
-	GetEphemeralContainersStatus(target *v1.Pod) []v1.ContainerStatus
+	GetEphemeralContainersStatus(target *v1.Pod) ([]v1.ContainerStatus, error)
 	// GetEphemeralContainers return all ephemeral containers which have been created in target pods.
 	// Maybe they are not created by current ephemeral jobs.
-	GetEphemeralContainers(target *v1.Pod) []v1.EphemeralContainer
+	GetEphemeralContainers(target *v1.Pod) ([]v1.EphemeralContainer, error)
 
 	UpdateEphemeralContainer(target *v1.Pod) error
 	CreateEphemeralContainer(target *v1.Pod) error

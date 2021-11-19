@@ -93,7 +93,13 @@ func getPodEphemeralContainers(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) []s
 }
 
 func existEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) bool {
-	ephemeralContainersMaps, _ := getEphemeralContainersMaps(econtainer.New(job).GetEphemeralContainers(targetPod))
+	eContainer, err := econtainer.New(job).GetEphemeralContainers(targetPod)
+	if err != nil {
+		klog.Errorf("Failed to get ephemeral container with job %s/%s and pod %s", job.Namespace, job.Name, targetPod.Name)
+		return false
+	}
+
+	ephemeralContainersMaps, _ := getEphemeralContainersMaps(eContainer)
 	for _, e := range job.Spec.Template.EphemeralContainers {
 		if targetEC, ok := ephemeralContainersMaps[e.Name]; ok && isCreatedByEJob(string(job.UID), targetEC) {
 			return true
@@ -104,7 +110,18 @@ func existEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) 
 }
 
 func existDuplicatedEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) bool {
-	ephemeralContainersMaps, _ := getEphemeralContainersMaps(econtainer.New(job).GetEphemeralContainers(targetPod))
+	eContainers, err := econtainer.New(job).GetEphemeralContainers(targetPod)
+	if err != nil {
+		klog.Errorln("Failed  to get ephemeral container create by ephemeral job %s target pod %s", job.Name, targetPod.Name)
+		return false
+	}
+
+	if len(eContainers) == 0 {
+		return false
+	}
+
+	ephemeralContainersMaps, _ := getEphemeralContainersMaps(eContainers)
+
 	for _, e := range job.Spec.Template.EphemeralContainers {
 		if targetEC, ok := ephemeralContainersMaps[e.Name]; ok && !isCreatedByEJob(string(job.UID), targetEC) {
 			return true
@@ -151,7 +168,17 @@ func getSyncPods(job *appsv1alpha1.EphemeralJob, pods []*v1.Pod) (toCreate, toUp
 func calculateEphemeralContainerStatus(job *appsv1alpha1.EphemeralJob, pods []*v1.Pod) error {
 	var success, failed, running, waiting int32
 	for _, pod := range pods {
-		state, err := parseEphemeralPodStatus(job, econtainer.New(job).GetEphemeralContainersStatus(pod))
+		eContainerStatus, err := econtainer.New(job).GetEphemeralContainersStatus(pod)
+		if err != nil {
+			klog.Errorln("Failed to get Ephemeral container status")
+			return err
+		}
+		if len(eContainerStatus) == 0 {
+			waiting++
+			continue
+		}
+
+		state, err := parseEphemeralPodStatus(job, eContainerStatus)
 		if err != nil {
 			return err
 		}
@@ -165,6 +192,7 @@ func calculateEphemeralContainerStatus(job *appsv1alpha1.EphemeralJob, pods []*v
 			running++
 		case v1.PodPending:
 			waiting++
+		default:
 		}
 	}
 
@@ -181,6 +209,10 @@ func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.Cont
 	if empty {
 		klog.Error("ephemeral job spec containers is empty")
 		return v1.PodUnknown, fmt.Errorf("ephemeral job %s/%s spec containers is empty. ", ejob.Namespace, ejob.Name)
+	}
+
+	if len(statuses) == 0 {
+		return v1.PodPending, nil
 	}
 
 	var waitingCount, runningCount, succeededCount int
