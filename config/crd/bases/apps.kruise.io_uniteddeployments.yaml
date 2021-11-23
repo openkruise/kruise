@@ -503,6 +503,18 @@ spec:
                               that will be employed to create and delete Pods in the
                               CloneSet.
                             properties:
+                              maxUnavailable:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: The maximum number of pods that can be
+                                  unavailable for scaled pods. This field can control
+                                  the changes rate of replicas for CloneSet so as
+                                  to minimize the impact for users' service. The scale
+                                  will fail if the number of unavailable pods were
+                                  greater than this MaxUnavailable at scaling up.
+                                  MaxUnavailable works only when scaling up.
+                                x-kubernetes-int-or-string: true
                               podsToDelete:
                                 description: PodsToDelete is the names of Pod should
                                   be deleted. Note that this list will be truncated

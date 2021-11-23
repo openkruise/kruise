@@ -53,7 +53,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			name:         "increase replicas to 5 (step 1/2)",
 			set:          createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
 			pods:         []*v1.Pod{},
-			expectResult: expectationDiffs{scaleNum: 5},
+			expectResult: expectationDiffs{scaleNum: 5, scaleUpLimit: 5},
 		},
 		{
 			name: "increase replicas to 5 (step 2/2)",
@@ -88,7 +88,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1},
+			expectResult: expectationDiffs{scaleNum: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "specified delete 1 pod (all ready) (step 3/3)",
@@ -123,7 +123,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1},
+			expectResult: expectationDiffs{scaleNum: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "specified delete 2 pod (all ready) (step 3/6)",
@@ -158,7 +158,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1},
+			expectResult: expectationDiffs{scaleNum: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "specified delete 2 pod (all ready) (step 6/6)",
@@ -192,7 +192,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1},
+			expectResult: expectationDiffs{scaleNum: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "specified delete 2 pod and replicas to 4 (step 3/3)",
@@ -287,7 +287,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "specified delete with maxSurge (step 2/4)",
@@ -337,7 +337,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 2, updateMaxUnavailable: 1},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 2, updateMaxUnavailable: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "update in-place partition=3 with maxSurge (step 2/4)",
@@ -388,7 +388,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 2, updateMaxUnavailable: 1},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 2, updateMaxUnavailable: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 2/7)",
@@ -426,7 +426,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 			},
-			expectResult: expectationDiffs{useSurge: 1, scaleNum: 1, updateNum: 1, updateMaxUnavailable: 1},
+			expectResult: expectationDiffs{useSurge: 1, scaleNum: 1, updateNum: 1, updateMaxUnavailable: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 5/7)",
@@ -528,7 +528,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
 			revisionConsistent: true,
-			expectResult:       expectationDiffs{scaleNum: 1, updateNum: 1, updateMaxUnavailable: 1},
+			expectResult:       expectationDiffs{scaleNum: 1, updateNum: 1, updateMaxUnavailable: 1, scaleUpLimit: 1},
 		},
 		{
 			name: "allow to update when fail to scale in normally",
@@ -556,6 +556,32 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			},
 			disableFeatureGate: true,
 			expectResult:       expectationDiffs{},
+		},
+		{
+			name:         "increase replicas 0 to 5 with scale maxUnavailable = 2",
+			set:          setScaleStrategy(createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)), intstr.FromInt(2)),
+			pods:         []*v1.Pod{},
+			expectResult: expectationDiffs{scaleNum: 5, scaleUpLimit: 2},
+		},
+		{
+			name: "increase replicas 3 to 6 with scale maxUnavailable = 2, not ready pod = 1",
+			set:  setScaleStrategy(createTestCloneSet(6, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)), intstr.FromInt(2)),
+			pods: []*v1.Pod{
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+			},
+			expectResult: expectationDiffs{scaleNum: 3, scaleUpLimit: 1},
+		},
+		{
+			name: "increase replicas 3 to 6 with scale maxUnavailable = 2, not ready pod = 2",
+			set:  setScaleStrategy(createTestCloneSet(6, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)), intstr.FromInt(2)),
+			pods: []*v1.Pod{
+				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+			},
+			expectResult: expectationDiffs{scaleNum: 3, scaleUpLimit: 0},
 		},
 	}
 
@@ -589,6 +615,13 @@ func createTestCloneSet(replicas int32, partition, maxUnavailable, maxSurge ints
 			},
 		},
 	}
+}
+
+func setScaleStrategy(cs *appsv1alpha1.CloneSet, maxUnavailable intstr.IntOrString) *appsv1alpha1.CloneSet {
+	cs.Spec.ScaleStrategy = appsv1alpha1.CloneSetScaleStrategy{
+		MaxUnavailable: &maxUnavailable,
+	}
+	return cs
 }
 
 func createTestPod(revisionHash string, lifecycleState appspub.LifecycleStateType, ready bool, specifiedDelete bool) *v1.Pod {

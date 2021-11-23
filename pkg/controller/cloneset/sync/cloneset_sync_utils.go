@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"math"
 	"reflect"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -43,8 +44,11 @@ type expectationDiffs struct {
 	// scaleNumOldRevision is part of the scaleNum number
 	// it indicates the scale number of old revision Pods
 	scaleNumOldRevision int
+	// scaleUpLimit is the limit number of creating Pods when scaling up
+	// it is limited by scaleStrategy.maxUnavailable
+	scaleUpLimit int
 	// deleteReadyLimit is the limit number of ready Pods that can be deleted
-	// it is limited by maxUnavailable
+	// it is limited by UpdateStrategy.maxUnavailable
 	deleteReadyLimit int
 	// useSurge is the number that temporarily expect to be above the desired replicas
 	useSurge int
@@ -70,7 +74,7 @@ func (e expectationDiffs) isEmpty() bool {
 func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
-	var partition, maxSurge, maxUnavailable int
+	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
 	if cs.Spec.UpdateStrategy.Partition != nil {
 		partition, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.Partition, replicas, true)
 		partition = integer.IntMin(partition, replicas)
@@ -80,9 +84,11 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	}
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), replicas, maxSurge == 0)
+	scaleMaxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+		intstrutil.ValueOrDefault(cs.Spec.ScaleStrategy.MaxUnavailable, intstrutil.FromInt(math.MaxInt32)), replicas, true)
 
 	var newRevisionCount, newRevisionActiveCount, oldRevisionCount, oldRevisionActiveCount int
-	var notReadyNewRevisionCount, notReadyOldRevisionCount int
+	var unavailableNewRevisionCount, unavailableOldRevisionCount int
 	var toDeleteNewRevisionCount, toDeleteOldRevisionCount, preDeletingCount int
 	defer func() {
 		if res.isEmpty() {
@@ -90,12 +96,12 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		}
 		klog.V(1).Infof("Calculate diffs for CloneSet %s/%s, replicas=%d, partition=%d, maxSurge=%d, maxUnavailable=%d,"+
 			" allPods=%d, newRevisionPods=%d, newRevisionActivePods=%d, oldRevisionPods=%d, oldRevisionActivePods=%d,"+
-			" notReadyNewRevisionCount=%d, notReadyOldRevisionCount=%d,"+
+			" unavailableNewRevisionCount=%d, unavailableOldRevisionCount=%d,"+
 			" preDeletingCount=%d, toDeleteNewRevisionCount=%d, toDeleteOldRevisionCount=%d."+
 			" Result: %+v",
 			cs.Namespace, cs.Name, replicas, partition, maxSurge, maxUnavailable,
 			len(pods), newRevisionCount, newRevisionActiveCount, oldRevisionCount, oldRevisionActiveCount,
-			notReadyNewRevisionCount, notReadyOldRevisionCount,
+			unavailableNewRevisionCount, unavailableOldRevisionCount,
 			preDeletingCount, toDeleteNewRevisionCount, toDeleteOldRevisionCount,
 			res)
 	}()
@@ -112,8 +118,8 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 				if isSpecifiedDelete(cs, p) {
 					toDeleteNewRevisionCount++
-				} else if !isPodReady(coreControl, p) {
-					notReadyNewRevisionCount++
+				} else if !isPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
+					unavailableNewRevisionCount++
 				}
 			}
 
@@ -128,8 +134,8 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 				if isSpecifiedDelete(cs, p) {
 					toDeleteOldRevisionCount++
-				} else if !isPodReady(coreControl, p) {
-					notReadyOldRevisionCount++
+				} else if !isPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
+					unavailableOldRevisionCount++
 				}
 			}
 		}
@@ -137,6 +143,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 	updateOldDiff := oldRevisionActiveCount - partition
 	updateNewDiff := newRevisionActiveCount - (replicas - partition)
+	totalUnavailable := preDeletingCount + unavailableNewRevisionCount + unavailableOldRevisionCount
 	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
 	// If the CloneSetPartitionRollback is not enabled, Pods can only update to the new revision
 	if updateRevision == currentRevision || !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPartitionRollback) {
@@ -150,7 +157,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		// Use surge for maxUnavailable not satisfied before scaling
 		var scaleSurge, scaleOldRevisionSurge int
 		if toDeleteCount := toDeleteNewRevisionCount + toDeleteOldRevisionCount; toDeleteCount > 0 {
-			scaleSurge = integer.IntMin(integer.IntMax((notReadyNewRevisionCount+notReadyOldRevisionCount+toDeleteCount+preDeletingCount)-maxUnavailable, 0), toDeleteCount)
+			scaleSurge = integer.IntMin(integer.IntMax((unavailableNewRevisionCount+unavailableOldRevisionCount+toDeleteCount+preDeletingCount)-maxUnavailable, 0), toDeleteCount)
 			if scaleSurge > toDeleteNewRevisionCount {
 				scaleOldRevisionSurge = scaleSurge - toDeleteNewRevisionCount
 			}
@@ -189,8 +196,13 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		res.scaleNumOldRevision = integer.IntMin(partition+res.useSurgeOldRevision-oldRevisionCount, 0)
 	}
 
+	if res.scaleNum > 0 {
+		res.scaleUpLimit = integer.IntMax(scaleMaxUnavailable-totalUnavailable, 0)
+		res.scaleUpLimit = integer.IntMin(res.scaleNum, res.scaleUpLimit)
+	}
+
 	if toDeleteNewRevisionCount > 0 || toDeleteOldRevisionCount > 0 || res.scaleNum < 0 {
-		res.deleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-preDeletingCount-notReadyNewRevisionCount-notReadyOldRevisionCount, 0)
+		res.deleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-totalUnavailable, 0)
 	}
 
 	// The consistency between scale and update will be guaranteed by syncCloneSet and expectations

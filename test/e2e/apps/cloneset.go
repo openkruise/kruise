@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"sort"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 var _ = SIGDescribe("CloneSet", func() {
@@ -70,6 +72,44 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+		})
+
+		ginkgo.It("scales with minReadySeconds and scaleStrategy", func() {
+			const replicas int32 = 4
+			const scaleMaxUnavailable int32 = 1
+			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Spec.MinReadySeconds = 10
+			cs.Spec.Template.Spec.Containers[0].ImagePullPolicy = "IfNotPresent"
+			cs.Spec.ScaleStrategy.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: scaleMaxUnavailable}
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 120*time.Second, time.Second).Should(gomega.Equal(replicas))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
+
+			ginkgo.By("check create time of pods")
+			pods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			sort.Slice(pods, func(i, j int) bool {
+				return pods[i].CreationTimestamp.Before(&pods[j].CreationTimestamp)
+			})
+			allowFluctuation := 2 * time.Second
+			for i := 1; i < int(replicas); i++ {
+				lastPodCondition := podutil.GetPodReadyCondition(pods[i-1].Status)
+				gomega.Expect(pods[i].CreationTimestamp.Sub(lastPodCondition.LastTransitionTime.Time) >= time.Duration(cs.Spec.MinReadySeconds)*time.Second).To(gomega.BeTrue())
+				gomega.Expect(pods[i].CreationTimestamp.Sub(lastPodCondition.LastTransitionTime.Time) <= time.Duration(cs.Spec.MinReadySeconds)*time.Second+allowFluctuation).To(gomega.BeTrue())
+			}
 		})
 	})
 
