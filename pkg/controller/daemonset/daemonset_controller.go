@@ -96,6 +96,10 @@ const (
 	IsIgnoreNotReady     = "daemonset.kruise.io/ignore-not-ready"
 	IsIgnoreUnscheduable = "daemonset.kruise.io/ignore-unscheduable"
 
+	// ProgressiveCreatePod indicates daemon pods created in manage phase will be controlled by partition.
+	// This annotation will be added to DaemonSet when it is created, and removed if partition is set to 0.
+	ProgressiveCreatePod = "daemonset.kruise.io/progressive-create-pod"
+
 	// BackoffGCInterval is the time that has to pass before next iteration of backoff GC is run
 	BackoffGCInterval = 1 * time.Minute
 )
@@ -370,7 +374,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 	if delay != 0 {
-		return reconcile.Result{RequeueAfter: delay}, nil
+		requeueDuration.Update(delay)
 	}
 
 	key, _ := kubecontroller.KeyFunc(ds)
@@ -541,20 +545,21 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet,
 // After figuring out which nodes should run a Pod of ds but not yet running one and
 // which nodes should not run a Pod of ds but currently running one, it calls function
 // syncNodes with a list of pods to remove and a list of nodes to run a Pod of ds.
-func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (delay time.Duration, err error) {
+func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (time.Duration, error) {
 	// Find out the pods which are created for the nodes by DaemonSets.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
-		return delay, fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %s: %v", ds.Name, err)
+		return 0, fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %s: %v", ds.Name, err)
 	}
 
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
 	if err != nil {
-		return delay, fmt.Errorf("couldn't get nodeList %v", err)
+		return 0, fmt.Errorf("couldn't get nodeList %v", err)
 	}
 
 	var nodesNeedingDaemonPods, podsToDelete []string
 	nodesDesireScheduled := 0
+	requeueDuration := requeueduration.Duration{}
 
 	for _, node := range nodeList {
 		if !CanNodeBeDeployed(node, ds) {
@@ -565,12 +570,13 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 			continue
 		}
 		if delay != 0 {
-			return delay, nil
+			requeueDuration.Update(delay)
 		}
 
 		if nodeShouldSchedulePod {
 			nodesDesireScheduled++
 		}
+
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)
 		podsToDelete = append(podsToDelete, podsToDeleteOnNode...)
 	}
@@ -589,22 +595,15 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, hash string) (
 				}
 			}
 
-			maxUpdate := nodesDesireScheduled - int(partition) - len(newPods)
-			if maxUpdate > len(nodesNeedingDaemonPods) {
-				maxUpdate = len(nodesNeedingDaemonPods)
-			}
-
-			if maxUpdate > 0 {
-				sort.Strings(nodesNeedingDaemonPods)
-				nodesNeedingDaemonPods = nodesNeedingDaemonPods[:maxUpdate]
-			} else {
-				nodesNeedingDaemonPods = []string{}
-			}
+			// Creates pods on nodes that needing daemon pod. If progressive annotation is true, the creation will controlled
+			// by partition and only some of daemon pods will be created. Otherwise daemon pods will be created on every
+			// node that need to start a daemon pod.
+			nodesNeedingDaemonPods = GetNodesNeedingPods(len(newPods), nodesDesireScheduled, int(partition), CreatePodProgressively(ds), nodesNeedingDaemonPods)
 		}
 	}
 
 	// Label new pods using the hash label value of the current history when creating them
-	return delay, dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash)
+	return requeueDuration.Get(), dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash)
 }
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
