@@ -20,16 +20,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
+
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
 const (
@@ -209,10 +214,7 @@ func GetPodsSortFunc(pods []*corev1.Pod, waitUpdateIndexes []int) func(i, j int)
 }
 
 func IsInjectedSidecarContainerInPod(container *corev1.Container) bool {
-	if util.GetContainerEnvValue(container, SidecarEnvKey) == "true" {
-		return true
-	}
-	return false
+	return util.GetContainerEnvValue(container, SidecarEnvKey) == "true"
 }
 
 func IsSharePodVolumeMounts(container *appsv1alpha1.SidecarContainer) bool {
@@ -261,6 +263,8 @@ func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *ap
 
 func GetSidecarTransferEnvs(sidecarContainer *appsv1alpha1.SidecarContainer, pod *corev1.Pod) (injectedEnvs []corev1.EnvVar) {
 	// pre-process envs in pod, format: container.name/env.name -> container.env
+	// if SourceContainerName is set, use it as source container name
+	// if SourceContainerNameFrom.FieldRef, use the fieldref value as source container name
 	envsInPod := make(map[string]corev1.EnvVar)
 	for _, container := range pod.Spec.Containers {
 		for _, env := range container.Env {
@@ -270,13 +274,80 @@ func GetSidecarTransferEnvs(sidecarContainer *appsv1alpha1.SidecarContainer, pod
 	}
 
 	for _, tEnv := range sidecarContainer.TransferEnv {
-		key := fmt.Sprintf("%v/%v", tEnv.SourceContainerName, tEnv.EnvName)
-		env, ok := envsInPod[key]
-		if !ok {
-			klog.Warningf("there is no env %v in container %v", tEnv.EnvName, tEnv.SourceContainerName)
-			continue
+		envs := sets.NewString()
+		if tEnv.EnvName != "" {
+			envs.Insert(tEnv.EnvName)
 		}
-		injectedEnvs = append(injectedEnvs, env)
+		for _, e := range tEnv.EnvNames {
+			envs.Insert(e)
+		}
+
+		sourceContainerName := tEnv.SourceContainerName
+		if tEnv.SourceContainerNameFrom != nil && tEnv.SourceContainerNameFrom.FieldRef != nil {
+			containerName, err := ExtractContainerNameFromFieldPath(tEnv.SourceContainerNameFrom.FieldRef, pod)
+			if err != nil {
+				klog.Errorf("unmarshal pod(%s.%s) annotations[%s] failed: %s", pod.Namespace, pod.Name, err.Error())
+				continue
+			}
+			sourceContainerName = containerName
+		}
+		for _, envName := range envs.List() {
+			key := fmt.Sprintf("%v/%v", sourceContainerName, envName)
+			env, ok := envsInPod[key]
+			if !ok {
+				// if sourceContainerName is empty or not found in pod.spec.containers
+				klog.Warningf("there is no env %v in container %v", tEnv.EnvName, tEnv.SourceContainerName)
+				continue
+			}
+			injectedEnvs = append(injectedEnvs, env)
+		}
 	}
 	return
+}
+
+func ExtractContainerNameFromFieldPath(fs *corev1.ObjectFieldSelector, pod *corev1.Pod) (string, error) {
+	fieldPath := fs.FieldPath
+	accessor, err := meta.Accessor(pod)
+	if err != nil {
+		return "", err
+	}
+	path, subscript, ok := fieldpath.SplitMaybeSubscriptedPath(fieldPath)
+	if ok {
+		switch path {
+		case "metadata.annotations":
+			if errs := validation.IsQualifiedName(strings.ToLower(subscript)); len(errs) != 0 {
+				return "", fmt.Errorf("invalid key subscript in %s: %s", fieldPath, strings.Join(errs, ";"))
+			}
+			return accessor.GetAnnotations()[subscript], nil
+		case "metadata.labels":
+			if errs := validation.IsQualifiedName(subscript); len(errs) != 0 {
+				return "", fmt.Errorf("invalid key subscript in %s: %s", fieldPath, strings.Join(errs, ";"))
+			}
+			return accessor.GetLabels()[subscript], nil
+		default:
+			return "", fmt.Errorf("fieldPath %q does not support subscript", fieldPath)
+		}
+	}
+	return "", fmt.Errorf("unsupported fieldPath: %v", fieldPath)
+}
+
+// code lifted from https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/core/pods/helpers.go
+// ConvertDownwardAPIFieldLabel converts the specified downward API field label
+// and its value in the pod of the specified version to the internal version,
+// and returns the converted label and value. This function returns an error if
+// the conversion fails.
+func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string, error) {
+	if version != "v1" {
+		return "", "", fmt.Errorf("unsupported pod version: %s", version)
+	}
+	path, _, ok := fieldpath.SplitMaybeSubscriptedPath(label)
+	if ok {
+		switch path {
+		case "metadata.annotations", "metadata.labels":
+			return label, value, nil
+		default:
+			return "", "", fmt.Errorf("field path not supported: %s", path)
+		}
+	}
+	return "", "", fmt.Errorf("field label not supported: %s", label)
 }

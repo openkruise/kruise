@@ -84,8 +84,30 @@ spec:
                         properties:
                           envName:
                             type: string
+                          envNames:
+                            items:
+                              type: string
+                            type: array
                           sourceContainerName:
                             type: string
+                          sourceContainerNameFrom:
+                            properties:
+                              fieldRef:
+                                description: 'Selects a field of the pod: supports
+                                  metadata.name, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,'
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                            type: object
                         type: object
                       type: array
                     upgradeStrategy:
@@ -151,8 +173,30 @@ spec:
                         properties:
                           envName:
                             type: string
+                          envNames:
+                            items:
+                              type: string
+                            type: array
                           sourceContainerName:
                             type: string
+                          sourceContainerNameFrom:
+                            properties:
+                              fieldRef:
+                                description: 'Selects a field of the pod: supports
+                                  metadata.name, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,'
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                            type: object
                         type: object
                       type: array
                     upgradeStrategy:

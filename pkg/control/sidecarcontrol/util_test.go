@@ -426,3 +426,297 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertDownwardAPIFieldLabel(t *testing.T) {
+	testCases := []struct {
+		version       string
+		label         string
+		value         string
+		expectedErr   bool
+		expectedLabel string
+		expectedValue string
+	}{
+		{
+			version:     "v2",
+			label:       "metadata.name",
+			value:       "test-pod",
+			expectedErr: true,
+		},
+		{
+			version:     "v1",
+			label:       "invalid-label",
+			value:       "value",
+			expectedErr: true,
+		},
+		{
+			version:     "v1",
+			label:       "metadata.name",
+			value:       "test-pod",
+			expectedErr: true,
+		},
+		{
+			version:     "v1",
+			label:       "metadata.annotations",
+			value:       "myAnnoValue",
+			expectedErr: true,
+		},
+		{
+			version:     "v1",
+			label:       "metadata.labels",
+			value:       "myLabelValue",
+			expectedErr: true,
+		},
+		{
+			version:       "v1",
+			label:         "metadata.annotations['myAnnoKey']",
+			value:         "myAnnoValue",
+			expectedLabel: "metadata.annotations['myAnnoKey']",
+			expectedValue: "myAnnoValue",
+		},
+		{
+			version:       "v1",
+			label:         "metadata.labels['myLabelKey']",
+			value:         "myLabelValue",
+			expectedLabel: "metadata.labels['myLabelKey']",
+			expectedValue: "myLabelValue",
+		},
+	}
+	for _, tc := range testCases {
+		label, value, err := ConvertDownwardAPIFieldLabel(tc.version, tc.label, tc.value)
+		if err != nil {
+			if tc.expectedErr {
+				continue
+			}
+			t.Errorf("ConvertDownwardAPIFieldLabel(%s, %s, %s) failed: %s",
+				tc.version, tc.label, tc.value, err)
+		}
+		if tc.expectedLabel != label || tc.expectedValue != value {
+			t.Errorf("ConvertDownwardAPIFieldLabel(%s, %s, %s) = (%s, %s, nil), expected (%s, %s, nil)",
+				tc.version, tc.label, tc.value, label, value, tc.expectedLabel, tc.expectedValue)
+		}
+	}
+}
+
+func TestExtractContainerNameFromFieldPath(t *testing.T) {
+	testCases := []struct {
+		fieldSelector *corev1.ObjectFieldSelector
+		pod           *corev1.Pod
+		expectedErr   bool
+		expectedName  string
+	}{
+		{
+			fieldSelector: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels['test-label']",
+			},
+			pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod-label",
+				Labels: map[string]string{
+					"test-label": "test-pod-label",
+				},
+			}},
+			expectedName: "test-pod-label",
+		},
+		{
+			fieldSelector: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels['test-label']",
+			},
+			pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod-label",
+			}},
+			expectedName: "",
+		},
+		{
+			fieldSelector: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.annotations['test-anno']",
+			},
+			pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod-anno",
+				Annotations: map[string]string{
+					"test-anno": "test-pod-anno",
+				},
+			}},
+			expectedName: "test-pod-anno",
+		},
+	}
+	for _, tc := range testCases {
+		containerName, err := ExtractContainerNameFromFieldPath(tc.fieldSelector, tc.pod)
+		if err != nil {
+			if tc.expectedErr {
+				continue
+			}
+			t.Errorf("ExtractContainerNameFromFieldPath(%s, %s) failed: %s",
+				tc.fieldSelector.FieldPath, tc.expectedName, err)
+		}
+		if tc.expectedName != containerName {
+			t.Errorf("ExtractContainerNameFromFieldPath (%s, %s), expected (%s)",
+				tc.fieldSelector.FieldPath, containerName, tc.expectedName)
+		}
+	}
+}
+
+func TestGetSidecarTransferEnvs(t *testing.T) {
+	testCases := []struct {
+		sidecarContainer *appsv1alpha1.SidecarContainer
+		pod              *corev1.Pod
+		expectedEnvs     []corev1.EnvVar
+	}{
+		{
+			sidecarContainer: &appsv1alpha1.SidecarContainer{
+				Container: corev1.Container{
+					Name:  "cold-sidecar",
+					Image: "cold-image:v1",
+				},
+				UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+					UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+				},
+				TransferEnv: []appsv1alpha1.TransferEnvVar{
+					{
+						EnvName:             "test-env",
+						SourceContainerName: "main",
+					},
+				},
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{},
+					Name:            "test-pod-1",
+					Namespace:       "default",
+					Labels:          map[string]string{"app": "nginx"},
+					ResourceVersion: "495711227",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "main",
+							Image: "main:v1",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "test-env",
+									Value: "test-value",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEnvs: []corev1.EnvVar{
+				{
+					Name:  "test-env",
+					Value: "test-value",
+				},
+			},
+		},
+		{
+			sidecarContainer: &appsv1alpha1.SidecarContainer{
+				Container: corev1.Container{
+					Name:  "cold-sidecar",
+					Image: "cold-image:v1",
+				},
+				UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+					UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+				},
+				TransferEnv: []appsv1alpha1.TransferEnvVar{
+					{
+						EnvName: "test-env",
+						SourceContainerNameFrom: &appsv1alpha1.SourceContainerNameSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels['app']",
+							},
+						},
+					},
+				},
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{},
+					Name:            "test-pod-1",
+					Namespace:       "default",
+					Labels:          map[string]string{"app": "main"},
+					ResourceVersion: "495711227",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "main",
+							Image: "main:v1",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "test-env",
+									Value: "test-value",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEnvs: []corev1.EnvVar{
+				{
+					Name:  "test-env",
+					Value: "test-value",
+				},
+			},
+		},
+		{
+			sidecarContainer: &appsv1alpha1.SidecarContainer{
+				Container: corev1.Container{
+					Name:  "cold-sidecar",
+					Image: "cold-image:v1",
+				},
+				UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+					UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+				},
+				TransferEnv: []appsv1alpha1.TransferEnvVar{
+					{
+						EnvName: "test-env",
+						SourceContainerNameFrom: &appsv1alpha1.SourceContainerNameSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.annotations['app']",
+							},
+						},
+					},
+				},
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{"app": "main"},
+					Name:            "test-pod-1",
+					Namespace:       "default",
+					Labels:          map[string]string{"app": "main"},
+					ResourceVersion: "495711227",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "main",
+							Image: "main:v1",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "test-env",
+									Value: "test-value",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEnvs: []corev1.EnvVar{
+				{
+					Name:  "test-env",
+					Value: "test-value",
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		injectedEnvs := GetSidecarTransferEnvs(tc.sidecarContainer, tc.pod)
+		if len(injectedEnvs) != len(tc.expectedEnvs) {
+			t.Errorf("GetSidecarTransferEnv failed, expected envs %s, got %s",
+				tc.expectedEnvs, injectedEnvs)
+		}
+	}
+}
