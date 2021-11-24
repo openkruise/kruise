@@ -19,6 +19,7 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/utils/integer"
 	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -298,4 +300,42 @@ func getShortHash(hash string) string {
 	// vendor/k8s.io/kubernetes/pkg/controller/history/controller_history.go#82
 	list := strings.Split(hash, "-")
 	return list[len(list)-1]
+}
+
+// CreatePodProgressively returns true if and only if the progressive annotation is set to true.
+func CreatePodProgressively(ds *appsv1alpha1.DaemonSet) bool {
+	if ds.Annotations == nil {
+		return false
+	}
+
+	val, ok := ds.Annotations[ProgressiveCreatePod]
+	if !ok {
+		return false
+	}
+	return val == "true"
+}
+
+// GetNodesNeedingPods finds which nodes should run daemon pod according to progressive flag and parititon.
+func GetNodesNeedingPods(newPodsNum, desire, partition int, progressive bool, nodesNeedingPods []string) []string {
+	if !progressive {
+		sort.Strings(nodesNeedingPods)
+		return nodesNeedingPods
+	}
+
+	// partition must be less than total number and greater than zero.
+	partition = integer.IntMax(integer.IntMin(partition, desire), 0)
+
+	maxCreate := integer.IntMax(desire-newPodsNum-partition, 0)
+	if maxCreate > len(nodesNeedingPods) {
+		maxCreate = len(nodesNeedingPods)
+	}
+
+	if maxCreate > 0 {
+		sort.Strings(nodesNeedingPods)
+		nodesNeedingPods = nodesNeedingPods[:maxCreate]
+	} else {
+		nodesNeedingPods = []string{}
+	}
+
+	return nodesNeedingPods
 }
