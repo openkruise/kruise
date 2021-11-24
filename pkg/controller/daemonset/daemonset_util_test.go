@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"reflect"
 	"testing"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -444,6 +445,319 @@ func TestIsDaemonPodAvailable(t *testing.T) {
 			got := IsDaemonPodAvailable(tt.Pod, 0)
 			if got != tt.Expected {
 				t.Errorf("IsDaemonPodAvailable() = %v, want %v", got, tt.Expected)
+			}
+		})
+	}
+}
+
+func TestCreatePodProgressively(t *testing.T) {
+	cases := []struct {
+		name   string
+		ds     *appsv1alpha1.DaemonSet
+		expect bool
+	}{
+		{
+			name: "ds with no annotation",
+			ds: &appsv1alpha1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "ds-with-no-annotation"},
+			},
+			expect: false,
+		},
+		{
+			name: "ds with annotation, does not contains progressive annotation",
+			ds: &appsv1alpha1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ds-with-no-annotation",
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			name: "ds with annotation, contains progressive annotation, value is not true",
+			ds: &appsv1alpha1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ds-with-no-annotation",
+					Annotations: map[string]string{
+						"foo":                "bar",
+						ProgressiveCreatePod: "false",
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			name: "ds with annotation, contains progressive annotation, value is true",
+			ds: &appsv1alpha1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ds-with-no-annotation",
+					Annotations: map[string]string{
+						"foo":                "bar",
+						ProgressiveCreatePod: "true",
+					},
+				},
+			},
+			expect: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := CreatePodProgressively(tc.ds)
+			if !reflect.DeepEqual(got, tc.expect) {
+				t.Errorf("CreatePodProgressively()=%v, expect=%v", got, tc.expect)
+			}
+		})
+	}
+}
+
+func TestGetMaxCreateNum(t *testing.T) {
+	cases := []struct {
+		name             string
+		oldPodsNum       int
+		newPodsNum       int
+		total            int
+		partition        int
+		progressively    bool
+		nodesNeedingPods []string
+		expect           []string
+	}{
+		{
+			name:             "no changes applied on daemonset, all pods are new version",
+			oldPodsNum:       0,
+			newPodsNum:       10,
+			total:            10,
+			partition:        0,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+		{
+			name:             "create daemonset step1: create a daemonset, partition=10",
+			oldPodsNum:       0,
+			newPodsNum:       0,
+			total:            10,
+			partition:        10,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-0", "node-1", "node-2", "node-3", "node-4", "node-5", "node-6", "node-7", "node-8", "node-9"},
+			expect:           []string{},
+		},
+		{
+			name:             "create daemonset step2: decrease the partition, partition=9",
+			oldPodsNum:       0,
+			newPodsNum:       0,
+			total:            10,
+			partition:        9,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-0", "node-1", "node-2", "node-3", "node-4", "node-5", "node-6", "node-7", "node-8", "node-9"},
+			expect:           []string{"node-0"},
+		},
+		{
+			name:             "create daemonset step3: decrease the partition, partition=5",
+			oldPodsNum:       0,
+			newPodsNum:       1,
+			total:            10,
+			partition:        5,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-1", "node-2", "node-3", "node-4", "node-5", "node-6", "node-7", "node-8", "node-9"},
+			expect:           []string{"node-1", "node-2", "node-3", "node-4"},
+		},
+		{
+			name:             "create daemonset step4: importing 2 new nodes(node-10, node-11), partition=5",
+			oldPodsNum:       0,
+			newPodsNum:       5,
+			total:            12,
+			partition:        5,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-5", "node-6", "node-7", "node-8", "node-9", "node-10", "node-11"},
+			expect:           []string{"node-10", "node-11"},
+		},
+		{
+			name:             "create daemonset step5: offline 3 nodes(node-4, node-8, node-11), partition=5",
+			oldPodsNum:       0,
+			newPodsNum:       4,
+			total:            9,
+			partition:        5,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-5", "node-6", "node-7", "node-9", "node-10"},
+			expect:           []string{},
+		},
+		{
+			name:             "create daemonset step6: decrease the partition, partition=0",
+			oldPodsNum:       0,
+			newPodsNum:       4,
+			total:            9,
+			partition:        0,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-5", "node-6", "node-7", "node-9", "node-10"},
+			expect:           []string{"node-10", "node-5", "node-6", "node-7", "node-9"},
+		},
+		{
+			name:             "create daemonset step7: importing 3 nodes, partition=0",
+			oldPodsNum:       0,
+			newPodsNum:       9,
+			total:            12,
+			partition:        0,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-12", "node-13", "node-14"},
+			expect:           []string{"node-12", "node-13", "node-14"},
+		},
+		{
+			name:             "update daemonset step1: update spec and set partition=10",
+			oldPodsNum:       10,
+			newPodsNum:       0,
+			total:            10,
+			partition:        10,
+			progressively:    false,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+		{
+			name:             "update daemonset step2: decrease partition and pod has not been deleted by rolling update method",
+			oldPodsNum:       10,
+			newPodsNum:       0,
+			total:            10,
+			partition:        9,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+		{
+			name:             "update daemonset step3: decrease partition and pod has been deleted by rolling update method",
+			oldPodsNum:       9,
+			newPodsNum:       0,
+			total:            10,
+			partition:        9,
+			nodesNeedingPods: []string{"node-1"},
+			expect:           []string{"node-1"},
+		},
+		{
+			name:             "update daemonset step4: keep decreasing partition and pod has not been deleted by rolling update method",
+			oldPodsNum:       9,
+			newPodsNum:       1,
+			total:            10,
+			partition:        5,
+			progressively:    false,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+		{
+			name:             "update daemonset step5: keep decreasing partition and pod has been deleted by rolling update method",
+			oldPodsNum:       5,
+			newPodsNum:       1,
+			total:            10,
+			partition:        5,
+			progressively:    false,
+			nodesNeedingPods: []string{"node-2", "node-3", "node-4", "node-5"},
+			expect:           []string{"node-2", "node-3", "node-4", "node-5"},
+		},
+		{
+			name:             "update daemonset step6: importing 2 new node",
+			oldPodsNum:       5,
+			newPodsNum:       5,
+			total:            12,
+			partition:        5,
+			progressively:    false,
+			nodesNeedingPods: []string{"node-11", "node-12"},
+			expect:           []string{"node-11", "node-12"},
+		},
+		{
+			name:             "update daemonset step7: keep decreasing partition and pod has not been deleted by rolling update method",
+			oldPodsNum:       5,
+			newPodsNum:       7,
+			total:            12,
+			partition:        0,
+			progressively:    false,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+		{
+			name:             "update daemonset step7: keep decreasing partition and pod has been deleted by rolling update method",
+			oldPodsNum:       0,
+			newPodsNum:       7,
+			total:            12,
+			partition:        0,
+			progressively:    false,
+			nodesNeedingPods: []string{"node-6", "node-7", "node-8", "node-9", "node-10"},
+			expect:           []string{"node-10", "node-6", "node-7", "node-8", "node-9"},
+		},
+		{
+			name:             "update daemonset selector step1: update node selector and desire number has changed",
+			oldPodsNum:       10,
+			newPodsNum:       0,
+			total:            20,
+			partition:        20,
+			progressively:    false,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+		{
+			name:             "update daemonset selector step2: decrease partition",
+			oldPodsNum:       10,
+			newPodsNum:       0,
+			total:            20,
+			partition:        15,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-11", "node-12", "node-13", "node-14", "node-15", "node-16", "node-17", "node-18", "node-19", "node-20"},
+			expect:           []string{"node-11", "node-12", "node-13", "node-14", "node-15"},
+		},
+		{
+			name:             "update daemonset selector step3: decrease partition",
+			oldPodsNum:       10,
+			newPodsNum:       5,
+			total:            20,
+			partition:        10,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-16", "node-17", "node-18", "node-19", "node-20"},
+			expect:           []string{"node-16", "node-17", "node-18", "node-19", "node-20"},
+		},
+		{
+			name:             "bad case 1: partition is set too large",
+			oldPodsNum:       0,
+			newPodsNum:       10,
+			total:            10,
+			partition:        100,
+			progressively:    false,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+		{
+			name:             "bad case 2: partition is set too large when create daemonset",
+			oldPodsNum:       0,
+			newPodsNum:       5,
+			total:            10,
+			partition:        100,
+			progressively:    true,
+			nodesNeedingPods: []string{"node-5", "node-6", "node-7", "node-8", "node-9", "node-10"},
+			expect:           []string{},
+		},
+		{
+			name:             "bad case 3: an old pod was deleted manually in rolling update",
+			oldPodsNum:       4,
+			newPodsNum:       5,
+			total:            10,
+			partition:        5,
+			progressively:    false,
+			nodesNeedingPods: []string{"node-6"},
+			expect:           []string{"node-6"},
+		},
+		{
+			name:             "bad case 4: an old pod was deleted manually in rolling update and new pod has created",
+			oldPodsNum:       4,
+			newPodsNum:       6,
+			total:            10,
+			partition:        5,
+			progressively:    false,
+			nodesNeedingPods: []string{},
+			expect:           []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := GetNodesNeedingPods(tc.newPodsNum, tc.total, tc.partition, tc.progressively, tc.nodesNeedingPods)
+			if !reflect.DeepEqual(got, tc.expect) {
+				t.Errorf("GetMaxCreateNum()=%v, expect=%v", got, tc.expect)
 			}
 		})
 	}
