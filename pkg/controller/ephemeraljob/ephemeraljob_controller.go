@@ -49,6 +49,8 @@ var (
 	scaleExpectations    = expectations.NewScaleExpectations()
 )
 
+const EphemeralContainerFinalizer = "apps.kruise.io/ephemeralcontainers-cleanup"
+
 // Add creates a new ImagePullJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -134,7 +136,18 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 	}
 
 	if job.DeletionTimestamp != nil {
-		return reconcile.Result{}, nil
+		if err := r.removeEphemeralContainers(job); err != nil {
+			return reconcile.Result{}, err
+		}
+		job.Finalizers = deleteEphemeralContainerFinalizer(job.Finalizers, EphemeralContainerFinalizer)
+		return reconcile.Result{}, r.Update(context, job)
+	}
+
+	if !hasEphemeralContainerFinalizer(job.Finalizers) {
+		job.Finalizers = append(job.Finalizers, EphemeralContainerFinalizer)
+		if err := r.Update(context, job); err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
 	// The Job has been finished
@@ -243,6 +256,37 @@ func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v
 		}
 
 		if len(targetPods) < int(*job.Spec.Replicas) {
+			targetPods = append(targetPods, &podList.Items[i])
+		}
+	}
+
+	return targetPods, nil
+}
+
+// filterInjectedPods will return pods which has injected ephemeral containers
+func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJob) ([]*v1.Pod, error) {
+	selector, err := util.GetFastLabelSelector(job.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := &client.ListOptions{
+		Namespace:     job.Namespace,
+		LabelSelector: selector,
+	}
+
+	podList := &v1.PodList{}
+	if err := r.List(context.TODO(), podList, opts); err != nil {
+		return nil, err
+	}
+
+	// Ignore inactive pods
+	var targetPods []*v1.Pod
+	for i := range podList.Items {
+		if !kubecontroller.IsPodActive(&podList.Items[i]) {
+			continue
+		}
+		if existEphemeralContainer(job, &podList.Items[i]) {
 			targetPods = append(targetPods, &podList.Items[i])
 		}
 	}
@@ -374,4 +418,21 @@ func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, 
 func (r *ReconcileEphemeralJob) updateJobStatus(job *appsv1alpha1.EphemeralJob) error {
 	klog.V(5).Infof("Updating job %s status %#v", job.Name, job.Status)
 	return r.Status().Update(context.TODO(), job)
+}
+
+func (r *ReconcileEphemeralJob) removeEphemeralContainers(job *appsv1alpha1.EphemeralJob) error {
+	targetPods, err := r.filterInjectedPods(job)
+	if err != nil {
+		klog.Errorf("Failed to get ephemeral job %s/%s related target pods: %v", job.Namespace, job.Name, err)
+		return err
+	}
+
+	var errors error
+	for _, pod := range targetPods {
+		if e := econtainer.New(job).RemoveEphemeralContainer(pod); e != nil {
+			errors = e
+		}
+	}
+
+	return errors
 }

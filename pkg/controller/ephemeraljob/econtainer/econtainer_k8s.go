@@ -165,10 +165,12 @@ func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
 
 // RemoveEphemeralContainer is not support before kubernetes v1.23
 func (k *k8sControl) RemoveEphemeralContainer(target *v1.Pod) error {
+	klog.Warning("RemoveEphemeralContainer is not support before kubernetes v1.23")
 	return nil
 }
 
 // UpdateEphemeralContainer is not support before kubernetes v1.23
 func (k *k8sControl) UpdateEphemeralContainer(target *v1.Pod) error {
+	klog.Warning("UpdateEphemeralContainer is not support before kubernetes v1.23")
 	return nil
 }
