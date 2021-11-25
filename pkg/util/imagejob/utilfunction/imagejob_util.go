@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -74,9 +75,11 @@ func DeleteJobsForWorkload(c client.Client, ownerObj metav1.Object) error {
 
 	for i := range jobList.Items {
 		job := &jobList.Items[i]
-		if owner := metav1.GetControllerOf(job); owner == nil || owner.UID != ownerObj.GetUID() {
+		owner := metav1.GetControllerOf(job)
+		if owner == nil || owner.UID != ownerObj.GetUID() {
 			continue
 		}
+		klog.Infof("Deleting ImagePullJob %s for workload %s %s/%s", job.Name, owner.Kind, ownerObj.GetNamespace(), ownerObj.GetName())
 		if err := c.Delete(context.TODO(), job); err != nil {
 			return err
 		}
