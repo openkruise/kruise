@@ -97,8 +97,8 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 			newStatus.UpdatedReadyReplicas++
 		}
 	}
-	if newStatus.UpdatedReplicas == newStatus.Replicas &&
-		newStatus.ReadyReplicas == newStatus.Replicas {
+	// Consider the update revision as stable if revisions of all pods are consistent to it, no need to wait all of them ready
+	if newStatus.UpdatedReplicas == newStatus.Replicas {
 		newStatus.CurrentRevision = newStatus.UpdateRevision
 	}
 }
