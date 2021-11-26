@@ -1,5 +1,33 @@
 # Change Log
 
+## v1.0.0-beta.0
+
+> Change log since v1.0.0-alpha.2
+
+### New feature: ResourceDistribution
+
+For the scenario, where the namespace-scoped resources such as Secret and ConfigMap need to be distributed or synchronized to different namespaces,
+the native k8s currently only supports manual distribution and synchronization by users one-by-one, which is very inconvenient.
+
+Therefore, in the face of these scenarios that require the resource distribution and **continuously synchronization across namespaces**, we provide a tool, namely **ResourceDistribution**, to do this automatically.
+
+Currently, ResourceDistribution supports the two kind resources --- **Secret & ConfigMap**.
+
+[doc](https://openkruise.io/docs/next/user-manuals/resourcedistribution)
+
+### CloneSet
+
+- Add `maxUnavailable` field in `scaleStrategy` to support rate limiting of scaling up.
+- Mark revision stable when all pods updated to it, won't wait all pods to be ready.
+
+### Advanced DaemonSet
+
+- Support progressive annotation to control if pods creation should be limited by partition.
+
+### UnitedDeployment
+
+- Fix pod NodeSelectorTerms length 0 when UnitedDeployment NodeSelectorTerms is nil.
+
 ## v1.0.0-alpha.2
 
 > Change log since v1.0.0-alpha.1
