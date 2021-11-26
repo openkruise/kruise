@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -34,6 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+)
+
+const (
+	MaxScheduledFailedDuration = 300 * time.Second
 )
 
 var (
@@ -140,7 +145,10 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 
 		allowedMaxSeconds := int32(math.MaxInt32)
 		if len(spec.Subsets) > 1 {
-			allowedMaxSeconds = int32(300-5) / int32(len(spec.Subsets)-1)
+			// This constraint is to avoid the scene where a pod is re-scheduled among unschedulable subsets over and over again.
+			// MaxScheduledFailedDurationSeconds is the maximum safe value in theory.
+			// Deducting 5 is out of the consideration of reconcile cost, etc.
+			allowedMaxSeconds = int32(MaxScheduledFailedDuration.Seconds()-5) / int32(len(spec.Subsets)-1)
 		}
 		if spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil &&
 			(*spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds < 0 || *spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds > allowedMaxSeconds) {

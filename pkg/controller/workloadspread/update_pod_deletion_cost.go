@@ -42,6 +42,13 @@ func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSp
 			return err
 		}
 	}
+	// update the deletion-cost annotation for such pods that do not match any real subsets.
+	// these pods will have the minimum deletion-cost, and will be deleted preferentially.
+	if len(podMap[FakeSubsetName]) > 0 {
+		if err := r.syncSubsetPodDeletionCost(ws, nil, len(ws.Spec.Subsets), podMap[FakeSubsetName], workloadReplicas); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -83,7 +90,10 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 	replicas := len(activePods)
 
 	// First we partition Pods into two lists: positive, negative list.
-	if subset.MaxReplicas == nil {
+	if subset == nil {
+		// for the scene of FakeSubsetName, where the pods don't match any subset and will be deleted preferentially.
+		negativePods = activePods
+	} else if subset.MaxReplicas == nil {
 		// maxReplicas is nil, which means there is no limit to the number of Pods in this subset.
 		positivePods = activePods
 	} else {
@@ -116,11 +126,11 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 		}
 	}
 
-	err = r.updateDeletionCostForSubsetPods(ws, subset.Name, positivePods, strconv.Itoa(wsutil.PodDeletionCostPositive*(len(ws.Spec.Subsets)-subsetIndex)))
+	err = r.updateDeletionCostForSubsetPods(ws, subset, positivePods, strconv.Itoa(wsutil.PodDeletionCostPositive*(len(ws.Spec.Subsets)-subsetIndex)))
 	if err != nil {
 		return err
 	}
-	err = r.updateDeletionCostForSubsetPods(ws, subset.Name, negativePods, strconv.Itoa(wsutil.PodDeletionCostNegative*(subsetIndex+1)))
+	err = r.updateDeletionCostForSubsetPods(ws, subset, negativePods, strconv.Itoa(wsutil.PodDeletionCostNegative*(subsetIndex+1)))
 	if err != nil {
 		return err
 	}
@@ -129,9 +139,13 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 }
 
 func (r *ReconcileWorkloadSpread) updateDeletionCostForSubsetPods(ws *appsv1alpha1.WorkloadSpread,
-	subsetName string, pods []*corev1.Pod, deletionCostStr string) error {
+	subset *appsv1alpha1.WorkloadSpreadSubset, pods []*corev1.Pod, deletionCostStr string) error {
 	for _, pod := range pods {
 		if err := r.patchPodDeletionCost(ws, pod, deletionCostStr); err != nil {
+			subsetName := FakeSubsetName
+			if subset != nil {
+				subsetName = subset.Name
+			}
 			r.recorder.Eventf(ws, corev1.EventTypeWarning,
 				"PatchPodDeletionCostFailed",
 				"WorkloadSpread %s/%s failed to patch deletion-cost annotation to %d for Pod %s/%s in subset %s",

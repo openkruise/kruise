@@ -1633,7 +1633,7 @@ func TestManagerExistingPods(t *testing.T) {
 		getExpectedResult func() (map[string]int32, int, int, int)
 	}{
 		{
-			name: "manager the pods that were created before workloadSpread",
+			name: "manage the pods that were created before workloadSpread",
 			getPods: func() []*corev1.Pod {
 				pods := make([]*corev1.Pod, 10)
 				// pods that were created before the workloadSpread
@@ -1699,8 +1699,8 @@ func TestManagerExistingPods(t *testing.T) {
 						wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-b"}`,
 					}
 				}
-				// pods that cannot match any subset
-				for i := 8; i < 10; i++ {
+				// pods that cannot match any subset, without other ws annotations
+				for i := 8; i < 9; i++ {
 					pods[i] = podDemo.DeepCopy()
 					pods[i].Name = fmt.Sprintf("test-pod-%d", i)
 					pods[i].Spec.NodeName = "node-c"
@@ -1709,6 +1709,21 @@ func TestManagerExistingPods(t *testing.T) {
 						Value:  "node-c",
 						Effect: corev1.TaintEffectNoSchedule,
 					}}
+				}
+				// pods that cannot match any subset, with other ws annotations
+				for i := 9; i < 10; i++ {
+					pods[i] = podDemo.DeepCopy()
+					pods[i].Name = fmt.Sprintf("test-pod-%d", i)
+					pods[i].Spec.NodeName = "node-a"
+					pods[i].Spec.Tolerations = []corev1.Toleration{{
+						Key:    "node-taint",
+						Value:  "node-c",
+						Effect: corev1.TaintEffectNoSchedule,
+					}}
+					pods[i].Annotations = map[string]string{
+						PodDeletionCostAnnotation:                     "200",
+						wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-c"}`,
+					}
 				}
 				return pods
 			},
@@ -1727,6 +1742,9 @@ func TestManagerExistingPods(t *testing.T) {
 							Value:  "node-a",
 							Effect: corev1.TaintEffectNoSchedule,
 						}},
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+						},
 						MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
 					},
 					{
@@ -1791,14 +1809,201 @@ func TestManagerExistingPods(t *testing.T) {
 					},
 				}
 			},
-			getExpectedResult: func() (expectedSubsetReplicas map[string]int32, expectedZeroCost, expectedPositiveCost, expectedNegativeCost int) {
+			getExpectedResult: func() (expectedSubsetReplicas map[string]int32, expectedFreePodsCount,
+				expectedWithinMaxReplicasCount, expectedBeyondMaxReplicasCount int) {
 				expectedSubsetReplicas = map[string]int32{
 					"subset-a": 6,
 					"subset-b": 2,
 				}
-				expectedZeroCost = 2
-				expectedPositiveCost = 7
-				expectedNegativeCost = 1
+				expectedFreePodsCount = 2
+				expectedWithinMaxReplicasCount = 7
+				expectedBeyondMaxReplicasCount = 1
+				return
+			},
+		},
+		{
+			name: "manage the pods that were created before workloadSpread, use preferredNodeSelectorTerms to match subset",
+			getPods: func() []*corev1.Pod {
+				pods := make([]*corev1.Pod, 3)
+				pods[0] = podDemo.DeepCopy()
+				pods[0].Name = fmt.Sprintf("test-pod-%d", 0)
+				pods[0].Spec.NodeName = "worker-1"
+
+				pods[1] = podDemo.DeepCopy()
+				pods[1].Name = fmt.Sprintf("test-pod-%d", 1)
+				pods[1].Spec.NodeName = "worker-2"
+
+				pods[2] = podDemo.DeepCopy()
+				pods[2].Name = fmt.Sprintf("test-pod-%d", 2)
+				pods[2].Spec.NodeName = "worker-3"
+				return pods
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+					{ // prefer nothing
+						Name: "subset-a",
+						Tolerations: []corev1.Toleration{{
+							Key:      "node-taint",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						}},
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+						},
+						MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+					},
+					{ // prefer worker-2
+						Name: "subset-b",
+						Tolerations: []corev1.Toleration{{
+							Key:      "node-taint",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						}},
+						PreferredNodeSelectorTerms: []corev1.PreferredSchedulingTerm{
+							{
+								Weight: 200,
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{{
+										Key:      "type",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"worker-2"},
+									}},
+								},
+							},
+							{
+								Weight: 100,
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{{
+										Key:      "type",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"worker-3"},
+									}},
+								},
+							},
+						},
+						MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+					},
+					{ // prefer worker-3
+						Name: "subset-c",
+						Tolerations: []corev1.Toleration{{
+							Key:      "node-taint",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						}},
+						PreferredNodeSelectorTerms: []corev1.PreferredSchedulingTerm{
+							{
+								Weight: 100,
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{{
+										Key:      "type",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"worker-2"},
+									}},
+								},
+							},
+							{
+								Weight: 200,
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{{
+										Key:      "type",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"worker-3"},
+									}},
+								},
+							},
+						},
+					},
+				}
+				workloadSpread.Status.SubsetStatuses = []appsv1alpha1.WorkloadSpreadSubsetStatus{
+					{
+						Name:            "subset-a",
+						MissingReplicas: int32(3),
+						CreatingPods:    map[string]metav1.Time{},
+						DeletingPods:    map[string]metav1.Time{},
+					},
+					{
+						Name:            "subset-b",
+						MissingReplicas: int32(3),
+						CreatingPods:    map[string]metav1.Time{},
+						DeletingPods:    map[string]metav1.Time{},
+					},
+					{
+						Name:            "subset-c",
+						MissingReplicas: int32(-1),
+						CreatingPods:    map[string]metav1.Time{},
+						DeletingPods:    map[string]metav1.Time{},
+					},
+				}
+				return workloadSpread
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				cloneSet := cloneSetDemo.DeepCopy()
+				cloneSet.Spec.Replicas = utilpointer.Int32Ptr(3)
+				return cloneSet
+			},
+			getNodes: func() []*corev1.Node {
+				return []*corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "worker-1",
+							Labels: map[string]string{"type": "worker-1"},
+						},
+						Spec: corev1.NodeSpec{
+							Taints: []corev1.Taint{
+								{
+									Key:       "node-taint",
+									Value:     "whatever",
+									Effect:    corev1.TaintEffectNoSchedule,
+									TimeAdded: &metav1.Time{Time: time.Now()},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "worker-2",
+							Labels: map[string]string{"type": "worker-2"},
+						},
+						Spec: corev1.NodeSpec{
+							Taints: []corev1.Taint{
+								{
+									Key:       "node-taint",
+									Value:     "whatever",
+									Effect:    corev1.TaintEffectNoSchedule,
+									TimeAdded: &metav1.Time{Time: time.Now()},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "worker-3",
+							Labels: map[string]string{"type": "worker-3"},
+						},
+						Spec: corev1.NodeSpec{
+							Taints: []corev1.Taint{
+								{
+									Key:       "node-taint",
+									Value:     "whatever",
+									Effect:    corev1.TaintEffectNoSchedule,
+									TimeAdded: &metav1.Time{Time: time.Now()},
+								},
+							},
+						},
+					},
+				}
+			},
+			getExpectedResult: func() (expectedSubsetReplicas map[string]int32, expectedFreePodsCount,
+				expectedWithinMaxReplicasCount, expectedBeyondMaxReplicasCount int) {
+				expectedSubsetReplicas = map[string]int32{
+					"subset-a": 1,
+					"subset-b": 1,
+					"subset-c": 1,
+				}
+				expectedFreePodsCount = 0
+				expectedWithinMaxReplicasCount = 3
+				expectedBeyondMaxReplicasCount = 0
 				return
 			},
 		},
@@ -1841,41 +2046,41 @@ func TestManagerExistingPods(t *testing.T) {
 				t.Fatalf("get workloadspread failed, err: %s", err.Error())
 			}
 
-			expectedSubsetReplicas, expectedZeroCost, expectedPositiveCost, expectedNegativeCost := cs.getExpectedResult()
+			expectedSubsetReplicas, expectedFreePodsCount, expectedWithinMaxReplicasCount, expectedBeyondMaxReplicasCount := cs.getExpectedResult()
 
-			if workloadSpread.Status.SubsetStatuses[0].Replicas != expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[0].Name] {
-				t.Fatalf("expected %d pods in zone-a, but got %d\n",
-					expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[0].Name], workloadSpread.Status.SubsetStatuses[0].Replicas)
+			for i := range workloadSpread.Status.SubsetStatuses {
+				subset := &workloadSpread.Status.SubsetStatuses[i]
+				if subset.Replicas != expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[i].Name] {
+					t.Fatalf("expected %d pods in %s, but got %d\n",
+						expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[i].Name], subset.Name, subset.Replicas)
+				}
 			}
-			if workloadSpread.Status.SubsetStatuses[1].Replicas != expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[1].Name] {
-				t.Fatalf("expected %d pods in zone-b, but got %d\n",
-					expectedSubsetReplicas[workloadSpread.Status.SubsetStatuses[1].Name], workloadSpread.Status.SubsetStatuses[1].Replicas)
-			}
+
 			pods, err := getLatestPods(fakeClient, workloadSpread)
 			if err != nil {
 				t.Fatalf("get workloadspread failed, err: %s", err.Error())
 			}
-			zeroCost := 0
-			positiveCost := 0
-			negativeCost := 0
+			freePodsCount := 0
+			beyondMaxReplicasCount := 0
+			withinMaxReplicasCount := 0
 			for _, pod := range pods {
 				cost, _ := strconv.Atoi(pod.Annotations[PodDeletionCostAnnotation])
-				if cost == 0 {
-					zeroCost++
-				} else if cost > 0 {
-					positiveCost++
+				if cost > 0 {
+					withinMaxReplicasCount++
+				} else if cost >= -100*len(workloadSpread.Spec.Subsets) {
+					beyondMaxReplicasCount++
 				} else {
-					negativeCost++
+					freePodsCount++
 				}
 			}
-			if zeroCost != expectedZeroCost {
-				t.Fatalf("unexpected %d pods marked zero deletion cost, but got %d", expectedZeroCost, zeroCost)
+			if freePodsCount != expectedFreePodsCount {
+				t.Fatalf("unexpected %d pods marked as minimum deletion cost, but got %d", expectedFreePodsCount, freePodsCount)
 			}
-			if positiveCost != expectedPositiveCost {
-				t.Fatalf("unexpected %d pods marked positive deletion cost, but got %d", expectedPositiveCost, positiveCost)
+			if withinMaxReplicasCount != expectedWithinMaxReplicasCount {
+				t.Fatalf("unexpected %d pods marked positive deletion cost, but got %d", expectedWithinMaxReplicasCount, withinMaxReplicasCount)
 			}
-			if negativeCost != expectedNegativeCost {
-				t.Fatalf("unexpected %d pods marked negative deletion cost, but got %d", expectedNegativeCost, negativeCost)
+			if beyondMaxReplicasCount != expectedBeyondMaxReplicasCount {
+				t.Fatalf("unexpected %d pods marked negative deletion cost, but got %d", expectedBeyondMaxReplicasCount, beyondMaxReplicasCount)
 			}
 		})
 	}
