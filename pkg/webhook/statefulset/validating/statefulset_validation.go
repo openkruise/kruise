@@ -25,10 +25,8 @@ import (
 
 var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
 
-// TODO (rz): break this giant function down further and use unit testing
-// ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
-func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
+func validatePodManagementPolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
 
 	switch spec.PodManagementPolicy {
 	case "":
@@ -37,6 +35,11 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
 	}
+	return allErrs
+}
+
+func validateReserveOrdinals(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
 
 	if spec.ReserveOrdinals != nil {
 		orders := sets.NewInt(spec.ReserveOrdinals...)
@@ -49,66 +52,99 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 			}
 		}
 	}
+	return allErrs
+}
+
+func validateScaleStrategy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
 
 	if spec.ScaleStrategy != nil {
 		if spec.ScaleStrategy.MaxUnavailable != nil {
 			allErrs = append(allErrs, validateMaxUnavailableField(spec.ScaleStrategy.MaxUnavailable, spec, fldPath.Child("scaleStrategy").Child("maxUnavailable"))...)
 		}
 	}
+	return allErrs
+}
+
+func validateOnDeleteStatefulSetStrategyType(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if spec.UpdateStrategy.RollingUpdate != nil {
+		allErrs = append(
+			allErrs,
+			field.Invalid(
+				fldPath.Child("updateStrategy").Child("rollingUpdate"),
+				spec.UpdateStrategy.RollingUpdate,
+				fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
+	}
+	return allErrs
+}
+
+func validateRollingUpdateStatefulSetStrategyTypeUnorderedUpdate(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if spec.UpdateStrategy.RollingUpdate.UnorderedUpdate != nil {
+		if apps.ParallelPodManagement != spec.PodManagementPolicy {
+			allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
+				Child("rollingUpdate").Child("unorderedUpdate"),
+				"unorderedUpdate can only work with Parallel PodManagementPolicyType"))
+		}
+		if err := spec.UpdateStrategy.RollingUpdate.UnorderedUpdate.PriorityStrategy.FieldsValidation(); err != nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
+				Child("rollingUpdate").Child("unorderedUpdate").Child("priorityStrategy"),
+				err.Error()))
+		}
+	}
+	return allErrs
+}
+func validateRollingUpdateStatefulSetStrategyType(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if spec.UpdateStrategy.RollingUpdate != nil {
+		allErrs = append(allErrs,
+			apivalidation.ValidateNonnegativeField(
+				int64(*spec.UpdateStrategy.RollingUpdate.Partition),
+				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
+		// validate `minReadySeconds` field's range
+		allErrs = append(allErrs,
+			apivalidation.ValidateNonnegativeField(
+				int64(*spec.UpdateStrategy.RollingUpdate.MinReadySeconds),
+				fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"))...)
+		if *spec.UpdateStrategy.RollingUpdate.MinReadySeconds > appsv1beta1.MaxMinReadySeconds {
+			allErrs = append(allErrs,
+				field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"),
+					*spec.UpdateStrategy.RollingUpdate.MinReadySeconds,
+					"must be no more than 300 seconds"))
+		}
+
+		// validate the `maxUnavailable` field
+		if maxUnavailable := spec.UpdateStrategy.RollingUpdate.MaxUnavailable; maxUnavailable == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"), ""))
+		} else {
+			allErrs = append(allErrs, validateMaxUnavailableField(maxUnavailable, spec, fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"))...)
+		}
+
+		// validate the `PodUpdatePolicy` related fields
+		allErrs = append(allErrs, validatePodUpdatePolicy(spec, fldPath)...)
+
+		// validate the `spec.UpdateStrategy.RollingUpdate.UnorderedUpdate` related fields
+		allErrs = append(allErrs, validateRollingUpdateStatefulSetStrategyTypeUnorderedUpdate(spec, fldPath)...)
+
+	}
+	return allErrs
+}
+
+func validateUpdateStrategyType(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
 
 	switch spec.UpdateStrategy.Type {
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
 	case apps.OnDeleteStatefulSetStrategyType:
-		if spec.UpdateStrategy.RollingUpdate != nil {
-			allErrs = append(
-				allErrs,
-				field.Invalid(
-					fldPath.Child("updateStrategy").Child("rollingUpdate"),
-					spec.UpdateStrategy.RollingUpdate,
-					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
-		}
+		allErrs = append(allErrs, validateOnDeleteStatefulSetStrategyType(spec, fldPath)...)
+
 	case apps.RollingUpdateStatefulSetStrategyType:
-		if spec.UpdateStrategy.RollingUpdate != nil {
-			allErrs = append(allErrs,
-				apivalidation.ValidateNonnegativeField(
-					int64(*spec.UpdateStrategy.RollingUpdate.Partition),
-					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
-			// validate `minReadySeconds` field's range
-			allErrs = append(allErrs,
-				apivalidation.ValidateNonnegativeField(
-					int64(*spec.UpdateStrategy.RollingUpdate.MinReadySeconds),
-					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"))...)
-			if *spec.UpdateStrategy.RollingUpdate.MinReadySeconds > appsv1beta1.MaxMinReadySeconds {
-				allErrs = append(allErrs,
-					field.Invalid(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("minReadySeconds"),
-						*spec.UpdateStrategy.RollingUpdate.MinReadySeconds,
-						"must be no more than 300 seconds"))
-			}
-
-			// validate the `maxUnavailable` field
-			if maxUnavailable := spec.UpdateStrategy.RollingUpdate.MaxUnavailable; maxUnavailable == nil {
-				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"), ""))
-			} else {
-				allErrs = append(allErrs, validateMaxUnavailableField(maxUnavailable, spec, fldPath.Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable"))...)
-			}
-
-			// validate the `PodUpdatePolicy` related fields
-			allErrs = append(allErrs, validatePodUpdatePolicy(spec, fldPath)...)
-
-			if spec.UpdateStrategy.RollingUpdate.UnorderedUpdate != nil {
-				if apps.ParallelPodManagement != spec.PodManagementPolicy {
-					allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
-						Child("rollingUpdate").Child("unorderedUpdate"),
-						"unorderedUpdate can only work with Parallel PodManagementPolicyType"))
-				}
-				if err := spec.UpdateStrategy.RollingUpdate.UnorderedUpdate.PriorityStrategy.FieldsValidation(); err != nil {
-					allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy").
-						Child("rollingUpdate").Child("unorderedUpdate").Child("priorityStrategy"),
-						err.Error()))
-				}
-			}
-		}
+		allErrs = append(allErrs, validateRollingUpdateStatefulSetStrategyType(spec, fldPath)...)
 	default:
 		allErrs = append(allErrs,
 			field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy,
@@ -116,8 +152,12 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 					apps.RollingUpdateStatefulSetStrategyType,
 					apps.OnDeleteStatefulSetStrategyType)))
 	}
+	return allErrs
+}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+func validateSpecSelector(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
@@ -138,13 +178,46 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 		}
 		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("template"))...)
 	}
+	return allErrs
+}
+
+func validateRestartPolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
 
 	if spec.Template.Spec.RestartPolicy != "" && spec.Template.Spec.RestartPolicy != v1.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(v1.RestartPolicyAlways)}))
 	}
+	return allErrs
+}
+
+func validateActiveDeadlineSeconds(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
 	if spec.Template.Spec.ActiveDeadlineSeconds != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in StatefulSet is not Supported"))
 	}
+	return allErrs
+}
+
+// ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
+func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, validatePodManagementPolicy(spec, fldPath)...)
+	allErrs = append(allErrs, validateReserveOrdinals(spec, fldPath)...)
+	allErrs = append(allErrs, validateScaleStrategy(spec, fldPath)...)
+	allErrs = append(allErrs, validateUpdateStrategyType(spec, fldPath)...)
+
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+
+	// validate `spec.Selector`
+	allErrs = append(allErrs, validateSpecSelector(spec, fldPath)...)
+
+	// validate `spec.Template.Spec.RestartPolicy`
+	allErrs = append(allErrs, validateRestartPolicy(spec, fldPath)...)
+
+	// validate `spec.Template.Spec.ActiveDeadlineSeconds`
+	allErrs = append(allErrs, validateActiveDeadlineSeconds(spec, fldPath)...)
 
 	return allErrs
 }
