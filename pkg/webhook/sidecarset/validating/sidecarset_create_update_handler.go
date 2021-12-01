@@ -22,8 +22,10 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
+	"strings"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -31,12 +33,14 @@ import (
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/fieldpath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -45,6 +49,11 @@ import (
 const (
 	sidecarSetNameMaxLen = 63
 )
+
+var validDownwardAPIFieldPathExpressions = sets.NewString(
+	"metadata.name",
+	"metadata.labels",
+	"metadata.annotations")
 
 var (
 	validateSidecarSetNameMsg   = "sidecarset name must consist of alphanumeric characters or '-'"
@@ -179,13 +188,15 @@ func validateContainersForSidecarSet(
 
 	//validating container
 	var coreContainers []core.Container
-	for _, container := range containers {
+	for i, container := range containers {
+		idxPath := fldPath.Index(i)
 		if container.PodInjectPolicy != appsv1alpha1.BeforeAppContainerType && container.PodInjectPolicy != appsv1alpha1.AfterAppContainerType {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("container").Child("podInjectPolicy"), container.PodInjectPolicy, "unsupported pod inject policy"))
 		}
 		if container.ShareVolumePolicy.Type != appsv1alpha1.ShareVolumePolicyEnabled && container.ShareVolumePolicy.Type != appsv1alpha1.ShareVolumePolicyDisabled {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("container").Child("shareVolumePolicy"), container.ShareVolumePolicy, "unsupported share volume policy"))
 		}
+		allErrs = append(allErrs, validateDownwardAPI(container.TransferEnv, idxPath.Child("transferEnv"))...)
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("container"), container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
@@ -328,6 +339,55 @@ func getSidecarsetVolume(volumeName string, sidecarset *appsv1alpha1.SidecarSet)
 		}
 	}
 	return nil
+}
+
+func validateDownwardAPI(envs []appsv1alpha1.TransferEnvVar, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, tEnv := range envs {
+		if tEnv.SourceContainerNameFrom != nil && tEnv.SourceContainerNameFrom.FieldRef != nil {
+			allErrs = append(allErrs, validateObjectFieldSelector(tEnv.SourceContainerNameFrom.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+		}
+	}
+	return allErrs
+}
+
+func validateObjectFieldSelector(fs *v1.ObjectFieldSelector, expressions *sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(fs.APIVersion) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiVersion"), ""))
+		return allErrs
+	}
+	if len(fs.FieldPath) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("fieldPath"), ""))
+		return allErrs
+	}
+
+	internalFieldPath, _, err := sidecarcontrol.ConvertDownwardAPIFieldLabel(fs.APIVersion, fs.FieldPath, "")
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), fs.FieldPath, fmt.Sprintf("error converting fieldPath: %v", err)))
+		return allErrs
+	}
+
+	if path, subscript, ok := fieldpath.SplitMaybeSubscriptedPath(internalFieldPath); ok {
+		switch path {
+		case "metadata.annotations":
+			for _, msg := range validationutil.IsQualifiedName(strings.ToLower(subscript)) {
+				allErrs = append(allErrs, field.Invalid(fldPath, subscript, msg))
+			}
+		case "metadata.labels":
+			for _, msg := range validationutil.IsQualifiedName(subscript) {
+				allErrs = append(allErrs, field.Invalid(fldPath, subscript, msg))
+			}
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, path, "does not support subscript"))
+		}
+	} else if !expressions.Has(path) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("fieldPath"), path, expressions.List()))
+		return allErrs
+	}
+
+	return allErrs
 }
 
 var _ admission.Handler = &SidecarSetCreateUpdateHandler{}
