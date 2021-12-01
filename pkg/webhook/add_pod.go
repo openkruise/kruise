@@ -45,7 +45,7 @@ func init() {
 			return false
 		}
 
-		// Currently, if SidecarSet is not installed, we can also disable pod webhook.
+		// Currently, if PodUnavailableBudget is not installed, we can also disable pod webhook.
 		if !utildiscovery.DiscoverObject(&policyv1alpha1.PodUnavailableBudget{}) {
 			return false
 		}
