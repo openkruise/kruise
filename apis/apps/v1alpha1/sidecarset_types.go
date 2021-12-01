@@ -99,7 +99,16 @@ const (
 
 type TransferEnvVar struct {
 	SourceContainerName string `json:"sourceContainerName,omitempty"`
-	EnvName             string `json:"envName,omitempty"`
+	// +optional
+	SourceContainerNameFrom *SourceContainerNameSource `json:"sourceContainerNameFrom,omitempty"`
+	EnvName                 string                     `json:"envName,omitempty"`
+	// +optional
+	EnvNames []string `json:"envNames,omitempty"`
+}
+
+type SourceContainerNameSource struct {
+	// Selects a field of the pod: supports metadata.name, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+	FieldRef *corev1.ObjectFieldSelector `json:"fieldRef,omitempty"`
 }
 
 type SidecarContainerUpgradeType string
