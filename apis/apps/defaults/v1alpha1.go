@@ -77,6 +77,12 @@ func setSidecarDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 		p := &container.Ports[i]
 		v1.SetDefaults_ContainerPort(p)
 	}
+	for i := range sidecarContainer.TransferEnv {
+		tEnv := &sidecarContainer.TransferEnv[i]
+		if tEnv.SourceContainerNameFrom != nil {
+			v1.SetDefaults_ObjectFieldSelector(tEnv.SourceContainerNameFrom.FieldRef)
+		}
+	}
 	for i := range container.Env {
 		e := &container.Env[i]
 		if e.ValueFrom != nil {

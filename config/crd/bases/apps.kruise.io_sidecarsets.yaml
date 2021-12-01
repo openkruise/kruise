@@ -84,8 +84,20 @@ spec:
                       properties:
                         envName:
                           type: string
+                        envNames:
+                          items:
+                            type: string
+                          type: array
                         sourceContainerName:
                           type: string
+                        sourceContainerNameFrom:
+                          properties:
+                            fieldRef:
+                              description: 'Selects a field of the pod: supports metadata.name,
+                                `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,'
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+                          type: object
                       type: object
                     type: array
                   upgradeStrategy:
@@ -146,8 +158,20 @@ spec:
                       properties:
                         envName:
                           type: string
+                        envNames:
+                          items:
+                            type: string
+                          type: array
                         sourceContainerName:
                           type: string
+                        sourceContainerNameFrom:
+                          properties:
+                            fieldRef:
+                              description: 'Selects a field of the pod: supports metadata.name,
+                                `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,'
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+                          type: object
                       type: object
                     type: array
                   upgradeStrategy:

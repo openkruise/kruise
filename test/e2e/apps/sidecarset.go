@@ -405,6 +405,153 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container transfer Envs done"))
 		})
+
+		ginkgo.It("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.labels", func() {
+			// create sidecarSet
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+			sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
+				{
+					Name:  "OD_NAME",
+					Value: "sidecar_name",
+				},
+				{
+					Name:  "SidecarName",
+					Value: "nginx-sidecar",
+				},
+			}
+			sidecarSetIn.Spec.Containers[0].TransferEnv = []appsv1alpha1.TransferEnvVar{
+				{
+					SourceContainerNameFrom: &appsv1alpha1.SourceContainerNameSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  "metadata.labels['biz']",
+						},
+					},
+					EnvNames: []string{
+						"POD_NAME",
+						"OD_NAME",
+						"PROXY_IP",
+					},
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			tester.CreateSidecarSet(sidecarSetIn)
+
+			// create deployment
+			deploymentIn := tester.NewBaseDeployment(ns)
+			podLabels := deploymentIn.Spec.Template.ObjectMeta.Labels
+			podLabels["biz"] = "main"
+			deploymentIn.Spec.Template.ObjectMeta.Labels = podLabels
+			deploymentIn.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "bar",
+				},
+				{
+					Name:  "OD_NAME",
+					Value: "od_name",
+				},
+				{
+					Name:  "PROXY_IP",
+					Value: "127.0.0.1",
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			tester.CreateDeployment(deploymentIn)
+			// get pods
+			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn := pods[0]
+			gomega.Expect(podIn.Spec.Containers).To(gomega.HaveLen(2))
+			// except envs
+			exceptEnvs := map[string]string{
+				"POD_NAME":    "bar",
+				"OD_NAME":     "sidecar_name",
+				"PROXY_IP":    "127.0.0.1",
+				"SidecarName": "nginx-sidecar",
+			}
+			sidecarContainer := &podIn.Spec.Containers[0]
+			// envs
+			for key, value := range exceptEnvs {
+				object := util.GetContainerEnvValue(sidecarContainer, key)
+				gomega.Expect(object).To(gomega.Equal(value))
+			}
+			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.labels done"))
+		})
+		ginkgo.It("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.annotations", func() {
+			// create sidecarSet
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+			sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
+				{
+					Name:  "OD_NAME",
+					Value: "sidecar_name",
+				},
+				{
+					Name:  "SidecarName",
+					Value: "nginx-sidecar",
+				},
+			}
+			sidecarSetIn.Spec.Containers[0].TransferEnv = []appsv1alpha1.TransferEnvVar{
+				{
+					SourceContainerNameFrom: &appsv1alpha1.SourceContainerNameSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  "metadata.annotations['biz']",
+						},
+					},
+					EnvNames: []string{
+						"POD_NAME",
+						"OD_NAME",
+						"PROXY_IP",
+					},
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			tester.CreateSidecarSet(sidecarSetIn)
+
+			// create deployment
+			deploymentIn := tester.NewBaseDeployment(ns)
+			deploymentIn.Spec.Template.ObjectMeta.Annotations = map[string]string{
+				"biz": "main",
+			}
+			deploymentIn.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "bar",
+				},
+				{
+					Name:  "OD_NAME",
+					Value: "od_name",
+				},
+				{
+					Name:  "PROXY_IP",
+					Value: "127.0.0.1",
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			tester.CreateDeployment(deploymentIn)
+			// get pods
+			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn := pods[0]
+			gomega.Expect(podIn.Spec.Containers).To(gomega.HaveLen(2))
+			// except envs
+			exceptEnvs := map[string]string{
+				"POD_NAME":    "bar",
+				"OD_NAME":     "sidecar_name",
+				"PROXY_IP":    "127.0.0.1",
+				"SidecarName": "nginx-sidecar",
+			}
+			sidecarContainer := &podIn.Spec.Containers[0]
+			// envs
+			for key, value := range exceptEnvs {
+				object := util.GetContainerEnvValue(sidecarContainer, key)
+				gomega.Expect(object).To(gomega.Equal(value))
+			}
+			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.annotations done"))
+		})
 	})
 
 	framework.KruiseDescribe("SidecarSet Upgrade functionality [SidecarSeUpgrade]", func() {
