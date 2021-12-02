@@ -78,9 +78,6 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		return
 	}
 	for _, sidecarSet := range matchedSidecarSets {
-		if sidecarSet.Spec.UpdateStrategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
-			continue
-		}
 		var isChanged bool
 		var enqueueDelayTime time.Duration
 		//check whether pod status is changed
