@@ -1267,6 +1267,144 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("elastic deployment, zone-a=2, zone-b=nil, done")
 		})
 
+		ginkgo.It("manage existing pods by only preferredNodeSelector, then deletion subset-b", func() {
+			cs := tester.NewBaseCloneSet(ns)
+			// create workloadSpread
+			targetRef := appsv1alpha1.TargetReference{
+				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
+				Kind:       KruiseKindCloneSet.Kind,
+				Name:       cs.Name,
+			}
+			subsets := []appsv1alpha1.WorkloadSpreadSubset{
+				{
+					Name: "subset-a",
+					Tolerations: []corev1.Toleration{{
+						Key:      "node-taint",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					}},
+					PreferredNodeSelectorTerms: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: 20,
+							Preference: corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{{
+									Key:      TopologyLabelKey,
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-a"},
+								}},
+							},
+						},
+						{
+							Weight: 10,
+							Preference: corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{{
+									Key:      TopologyLabelKey,
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-b"},
+								}},
+							},
+						},
+					},
+					MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+				},
+				{
+					Name: "subset-b",
+					Tolerations: []corev1.Toleration{{
+						Key:      "node-taint",
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+					}},
+					PreferredNodeSelectorTerms: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: 10,
+							Preference: corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{{
+									Key:      TopologyLabelKey,
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-a"},
+								}},
+							},
+						},
+						{
+							Weight: 20,
+							Preference: corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{{
+									Key:      TopologyLabelKey,
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-b"},
+								}},
+							},
+						},
+					},
+				},
+			}
+
+			cs.Spec.Replicas = pointer.Int32Ptr(3)
+			cs.Spec.Template.Spec.Affinity = &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: 100,
+							Preference: corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{{
+									Key:      TopologyLabelKey,
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"zone-b"},
+								}},
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Creating cloneset and waiting for pods to be ready...")
+			cs = tester.CreateCloneSet(cs)
+			tester.WaitForCloneSetRunning(cs)
+
+			ginkgo.By("Creating workloadspread and waiting for its reconcile...")
+			ws := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, subsets)
+			ws = tester.CreateWorkloadSpread(ws)
+			tester.WaitForWorkloadSpreadRunning(ws)
+			ws, err := tester.GetWorkloadSpread(ws.Namespace, ws.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check workloadspread status...")
+			var replicasForSubsetA, replicasForSubsetB int32
+			for _, subset := range ws.Status.SubsetStatuses {
+				switch subset.Name {
+				case "subset-a":
+					replicasForSubsetA += subset.Replicas
+				case "subset-b":
+					replicasForSubsetB += subset.Replicas
+				}
+			}
+			gomega.Expect(replicasForSubsetA).To(gomega.Equal(int32(0)))
+			gomega.Expect(replicasForSubsetB).To(gomega.Equal(int32(3)))
+
+			ginkgo.By("List pods of cloneset and check their deletion cost...")
+			pods, err := tester.GetSelectorPods(ns, cs.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
+			}
+
+			ginkgo.By("Deletion subset-b and waiting for workloadspread's reconcile...")
+			ws.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+				ws.Spec.Subsets[0],
+			}
+			tester.UpdateWorkloadSpread(ws)
+			tester.WaitForWorkloadSpreadRunning(ws)
+
+			ginkgo.By("List pods of cloneset and check their deletion cost again...")
+			pods, err = tester.GetSelectorPods(ns, cs.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("-200"))
+			}
+
+			ginkgo.By("manage existing pods by only preferredNodeSelector, then deletion subset-b, done")
+		})
+
 		//ginkgo.It("deploy in two zone, maxReplicas=50%", func() {
 		//	cloneSet := tester.NewBaseCloneSet(ns)
 		//	// create workloadSpread

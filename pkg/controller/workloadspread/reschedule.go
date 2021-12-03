@@ -24,9 +24,8 @@ import (
 	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	wsutil "github.com/openkruise/kruise/pkg/webhook/workloadspread/validating"
 )
-
-const ScheduledFailedDuration = 5 * time.Minute
 
 // rescheduleSubset will delete some unschedulable Pods that still in pending status. Some subsets have no
 // sufficient resource can lead to some Pods scheduled failed. WorkloadSpread has multiple subset, so these
@@ -67,7 +66,7 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpre
 	} else {
 		// consider to recover
 		if oldCondition.Status == corev1.ConditionFalse {
-			expectReschedule := oldCondition.LastTransitionTime.Add(ScheduledFailedDuration)
+			expectReschedule := oldCondition.LastTransitionTime.Add(wsutil.MaxScheduledFailedDuration)
 			currentTime := time.Now()
 			// the duration of unschedule status more than 5 minutes, recover to schedulable.
 			if expectReschedule.Before(currentTime) {
