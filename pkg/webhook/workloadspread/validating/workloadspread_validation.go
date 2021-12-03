@@ -19,6 +19,8 @@ package validating
 import (
 	"context"
 	"fmt"
+	"math"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -33,6 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+)
+
+const (
+	MaxScheduledFailedDuration = 300 * time.Second
 )
 
 var (
@@ -137,10 +143,17 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the last subset must be not specified when using adaptive scheduleStrategy"))
 		}
 
+		allowedMaxSeconds := int32(math.MaxInt32)
+		if len(spec.Subsets) > 1 {
+			// This constraint is to avoid the scene where a pod is re-scheduled among unschedulable subsets over and over again.
+			// MaxScheduledFailedDurationSeconds is the maximum safe value in theory.
+			// Deducting 5 is out of the consideration of reconcile cost, etc.
+			allowedMaxSeconds = int32(MaxScheduledFailedDuration.Seconds()-5) / int32(len(spec.Subsets)-1)
+		}
 		if spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil &&
-			*spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds <= 0 {
+			(*spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds < 0 || *spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds > allowedMaxSeconds) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive").Child("rescheduleCriticalSeconds"),
-				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "rescheduleCriticalSeconds <= 0 is not permitted"))
+				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, fmt.Sprintf("rescheduleCriticalSeconds < 0 or rescheduleCriticalSeconds > %d is not permitted", allowedMaxSeconds)))
 		}
 	}
 
@@ -177,32 +190,32 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 		}
 
 		// at least one of requiredNodeSelectorTerm, preferredNodeSelectorTerms, tolerations.
-		if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil && subset.Tolerations == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "The requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are empty that is not valid for WorkloadSpread"))
-		} else {
-			if subset.RequiredNodeSelectorTerm != nil {
-				coreNodeSelectorTerm := &core.NodeSelectorTerm{}
-				if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.RequiredNodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
-				} else {
-					allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Index(i).Child("requiredNodeSelectorTerm"))...)
-				}
-			}
-
-			if subset.PreferredNodeSelectorTerms != nil {
-				corePreferredSchedulingTerms := make([]core.PreferredSchedulingTerm, 0, len(subset.PreferredNodeSelectorTerms))
-				for i, term := range subset.PreferredNodeSelectorTerms {
-					corePreferredSchedulingTerm := &core.PreferredSchedulingTerm{}
-					if err := corev1.Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm(term.DeepCopy(), corePreferredSchedulingTerm, nil); err != nil {
-						allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredSchedulingTerms"), subset.PreferredNodeSelectorTerms, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
-					} else {
-						corePreferredSchedulingTerms = append(corePreferredSchedulingTerms, *corePreferredSchedulingTerm)
-					}
-				}
-
-				allErrs = append(allErrs, corevalidation.ValidatePreferredSchedulingTerms(corePreferredSchedulingTerms, fldPath.Index(i).Child("preferredSchedulingTerms"))...)
+		//if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil && subset.Tolerations == nil {
+		//	allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "The requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are empty that is not valid for WorkloadSpread"))
+		//} else {
+		if subset.RequiredNodeSelectorTerm != nil {
+			coreNodeSelectorTerm := &core.NodeSelectorTerm{}
+			if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.RequiredNodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
+			} else {
+				allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Index(i).Child("requiredNodeSelectorTerm"))...)
 			}
 		}
+
+		if subset.PreferredNodeSelectorTerms != nil {
+			corePreferredSchedulingTerms := make([]core.PreferredSchedulingTerm, 0, len(subset.PreferredNodeSelectorTerms))
+			for i, term := range subset.PreferredNodeSelectorTerms {
+				corePreferredSchedulingTerm := &core.PreferredSchedulingTerm{}
+				if err := corev1.Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm(term.DeepCopy(), corePreferredSchedulingTerm, nil); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredSchedulingTerms"), subset.PreferredNodeSelectorTerms, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
+				} else {
+					corePreferredSchedulingTerms = append(corePreferredSchedulingTerms, *corePreferredSchedulingTerm)
+				}
+			}
+
+			allErrs = append(allErrs, corevalidation.ValidatePreferredSchedulingTerms(corePreferredSchedulingTerms, fldPath.Index(i).Child("preferredSchedulingTerms"))...)
+		}
+		//}
 
 		if subset.Tolerations != nil {
 			var coreTolerations []core.Toleration

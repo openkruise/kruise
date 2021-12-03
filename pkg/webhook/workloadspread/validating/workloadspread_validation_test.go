@@ -477,17 +477,17 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			},
 			errorSuffix: "spec.subsets[1].name",
 		},
-		{
-			name: "subset[0]'s requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are all empty",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
-				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.Subsets[0].RequiredNodeSelectorTerm = nil
-				workloadSpread.Spec.Subsets[0].PreferredNodeSelectorTerms = nil
-				workloadSpread.Spec.Subsets[0].Tolerations = nil
-				return workloadSpread
-			},
-			errorSuffix: "spec.subsets[0].requiredNodeSelectorTerm",
-		},
+		//{
+		//	name: "subset[0]'s requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are all empty",
+		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+		//		workloadSpread := workloadSpreadDemo.DeepCopy()
+		//		workloadSpread.Spec.Subsets[0].RequiredNodeSelectorTerm = nil
+		//		workloadSpread.Spec.Subsets[0].PreferredNodeSelectorTerms = nil
+		//		workloadSpread.Spec.Subsets[0].Tolerations = nil
+		//		return workloadSpread
+		//	},
+		//	errorSuffix: "spec.subsets[0].requiredNodeSelectorTerm",
+		//},
 		{
 			name: "requiredNodeSelectorTerm are not valid",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
@@ -634,13 +634,13 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			errorSuffix: "spec.scheduleStrategy.type",
 		},
 		{
-			name: "rescheduleCriticalSeconds = 0",
+			name: "rescheduleCriticalSeconds = -1",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
 					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
 					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
-						RescheduleCriticalSeconds: pointer.Int32Ptr(0),
+						RescheduleCriticalSeconds: pointer.Int32Ptr(-1),
 						DisableSimulationSchedule: true,
 					},
 				}
