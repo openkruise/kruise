@@ -10,6 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	utilpointer "k8s.io/utils/pointer"
 	"time"
 )
 
@@ -362,4 +364,298 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			gomega.Expect(tester.CheckEphemeralJobExist(job)).Should(gomega.Equal(false))
 		})
 	})
+
+	framework.KruiseDescribe("Create Ephemeral Container", func() {
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all ephemeral container in cluster")
+			tester.DeleteEphemeralJobs(ns)
+			tester.DeleteDeployments(ns)
+		})
+
+		ginkgo.It("test ephemeral container in in-place-update", func() {
+			// create cloneset
+			ginkgo.By("Create CloneSet " + randStr)
+			cloneSetTester := framework.NewCloneSetTester(c, kc, ns)
+			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs.Spec.Template.Spec.Containers[0].Image = "nginx:alpine"
+			cs.Spec.Template.ObjectMeta.Labels["run"] = "nginx"
+			cs, err := cloneSetTester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			// create ephemeral container
+			ginkgo.By("Create EphemeralJob job-" + randStr)
+			job := tester.CreateTestEphemeralJob(randStr, 1, 1, metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"run": "nginx",
+				}}, []v1.EphemeralContainer{
+				{
+					TargetContainerName: "nginx",
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "busybox:latest",
+						Command:                  []string{"sleep", "99999"},
+						ImagePullPolicy:          v1.PullIfNotPresent,
+						TerminationMessagePolicy: v1.TerminationMessageReadFile,
+					},
+				}})
+			ginkgo.By("Check the status of container")
+
+			gomega.Eventually(func() int32 {
+				ejob, err := tester.GetEphemeralJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return ejob.Status.Running
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			pods, err := cloneSetTester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+
+			gomega.Eventually(func() int {
+				return len(pods[0].Status.EphemeralContainerStatuses)
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(1))
+
+			oldPodUID := pods[0].UID
+			oldEphemeralContainers := pods[0].Status.EphemeralContainerStatuses[0]
+
+			ginkgo.By("Update image to nginx:mainline-alpine")
+			err = cloneSetTester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				if cs.Annotations == nil {
+					cs.Annotations = map[string]string{}
+				}
+				cs.Spec.Template.Spec.Containers[0].Image = "nginx:mainline-alpine"
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for CloneSet generation consistent")
+			gomega.Eventually(func() bool {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Generation == cs.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+
+			ginkgo.By("Wait for all pods updated and ready")
+			gomega.Eventually(func() int32 {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.UpdatedReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Verify the ephemeral containerID not changed")
+			pods, err = cloneSetTester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+			newPodUID := pods[0].UID
+			newEphemeralContainers := pods[0].Status.ContainerStatuses[0]
+
+			gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
+			gomega.Expect(newEphemeralContainers.ContainerID).NotTo(gomega.Equal(oldEphemeralContainers.ContainerID))
+		})
+
+		ginkgo.It("test ephemeral container in crr", func() {
+			// create cloneset
+			ginkgo.By("Create CloneSet " + randStr)
+			cloneSetTester := framework.NewCloneSetTester(c, kc, ns)
+			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs.Spec.Template.Spec.Containers[0].Image = "nginx:alpine"
+			cs.Spec.Template.ObjectMeta.Labels["run"] = "nginx"
+			cs, err := cloneSetTester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			// create ephemeral container
+			ginkgo.By("Create EphemeralJob job-" + randStr)
+			job := tester.CreateTestEphemeralJob(randStr, 1, 1, metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"run": "nginx",
+				}}, []v1.EphemeralContainer{
+				{
+					TargetContainerName: "nginx",
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "busybox:latest",
+						Command:                  []string{"sleep", "99999"},
+						ImagePullPolicy:          v1.PullIfNotPresent,
+						TerminationMessagePolicy: v1.TerminationMessageReadFile,
+					},
+				}})
+			ginkgo.By("Check the status of container")
+
+			gomega.Eventually(func() int32 {
+				ejob, err := tester.GetEphemeralJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return ejob.Status.Running
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			pods, err := cloneSetTester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+
+			gomega.Eventually(func() int {
+				return len(pods[0].Status.EphemeralContainerStatuses)
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(1))
+
+			oldPodUID := pods[0].UID
+			oldEphemeralContainers := pods[0].Status.EphemeralContainerStatuses[0]
+
+			{
+				resetartContainerTester := framework.NewContainerRecreateTester(c, kc, ns)
+				ginkgo.By("Create CRR for pods[0], recreate container: app")
+				pod := pods[0]
+				crr := &appsv1alpha1.ContainerRecreateRequest{
+					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-0"},
+					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+						PodName: pod.Name,
+						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+							{Name: "nginx"},
+						},
+						Strategy:                &appsv1alpha1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
+						TTLSecondsAfterFinished: utilpointer.Int32Ptr(99999),
+					},
+				}
+				crr, err = resetartContainerTester.CreateCRR(crr)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				// wait webhook
+				gomega.Eventually(func() string {
+					return crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey]
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(string(pod.UID)))
+
+				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
+				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
+				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestFailurePolicyFail))
+				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(pod.Status.ContainerStatuses[0].ContainerID))
+				ginkgo.By("Wait CRR recreate completion")
+				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+					crr, err = resetartContainerTester.GetCRR(crr.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return crr.Status.Phase
+				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
+				gomega.Eventually(func() string {
+					crr, err = resetartContainerTester.GetCRR(crr.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded}}))
+
+				ginkgo.By("Check Pod containers recreated and started for minStartedSeconds")
+				pod, err = resetartContainerTester.GetPod(pod.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
+				gomega.Expect(pod.Status.ContainerStatuses[0].ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[0].StatusContext.ContainerID))
+				gomega.Expect(pod.Status.ContainerStatuses[0].RestartCount).Should(gomega.Equal(int32(1)))
+				gomega.Expect(crr.Status.CompletionTime.Sub(pod.Status.ContainerStatuses[0].State.Running.StartedAt.Time)).Should(gomega.BeNumerically(">", 4*time.Second))
+			}
+
+			ginkgo.By("Verify the ephemeral containerID not changed")
+			pods, err = cloneSetTester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+			newPodUID := pods[0].UID
+			newEphemeralContainers := pods[0].Status.ContainerStatuses[0]
+
+			gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
+			gomega.Expect(newEphemeralContainers.ContainerID).NotTo(gomega.Equal(oldEphemeralContainers.ContainerID))
+		})
+
+		ginkgo.It("test ephemeral container impact main container", func() {
+			// create cloneset
+			ginkgo.By("Create CloneSet " + randStr)
+			cloneSetTester := framework.NewCloneSetTester(c, kc, ns)
+			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs.Spec.Template.Spec.Containers[0].Image = "nginx:alpine"
+			cs.Spec.Template.ObjectMeta.Labels["run"] = "nginx"
+			cs, err := cloneSetTester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = cloneSetTester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			pods, err := cloneSetTester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+
+			oldPodUID := pods[0].UID
+			oldContainers := pods[0].Status.ContainerStatuses[0]
+
+			// create ephemeral container
+			ginkgo.By("Create EphemeralJob job-" + randStr)
+			job := tester.CreateTestEphemeralJob(randStr, 1, 1, metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"run": "nginx",
+				}}, []v1.EphemeralContainer{
+				{
+					TargetContainerName: "nginx",
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "busybox:latest",
+						Command:                  []string{"sleep", "99999"},
+						ImagePullPolicy:          v1.PullIfNotPresent,
+						TerminationMessagePolicy: v1.TerminationMessageReadFile,
+					},
+				}})
+			ginkgo.By("Check the status of container")
+
+			gomega.Eventually(func() int32 {
+				ejob, err := tester.GetEphemeralJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return ejob.Status.Running
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Verify the main containerID not changed after ephemeral inject")
+			pods, err = cloneSetTester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+			newPodUID := pods[0].UID
+			newContainers := pods[0].Status.ContainerStatuses[0]
+
+			gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
+			gomega.Expect(newContainers.ContainerID).Should(gomega.Equal(oldContainers.ContainerID))
+		})
+	})
+
 })
