@@ -39,6 +39,9 @@ func NewWorkloadSpreadSubsetCondition(condType appsv1alpha1.WorkloadSpreadSubset
 
 // GetWorkloadSpreadSubsetCondition returns the condition with the provided type.
 func GetWorkloadSpreadSubsetCondition(status *appsv1alpha1.WorkloadSpreadSubsetStatus, condType appsv1alpha1.WorkloadSpreadSubsetConditionType) *appsv1alpha1.WorkloadSpreadSubsetCondition {
+	if status == nil {
+		return nil
+	}
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
