@@ -153,7 +153,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 }
 
 func convertNodeImages(nodeImageList *appsv1alpha1.NodeImageList) []*appsv1alpha1.NodeImage {
-	var nodeImages []*appsv1alpha1.NodeImage
+	nodeImages := make([]*appsv1alpha1.NodeImage, 0, len(nodeImageList.Items))
 	for i := range nodeImageList.Items {
 		nodeImages = append(nodeImages, &nodeImageList.Items[i])
 	}
