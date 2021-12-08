@@ -248,3 +248,31 @@ func parseEphemeralContainerStatus(status *v1.ContainerStatus) ephemeralContaine
 
 	return UnknownStatus
 }
+
+func hasEphemeralContainerFinalizer(finalizers []string) bool {
+	if len(finalizers) == 0 {
+		return false
+	}
+
+	for _, f := range finalizers {
+		if f == EphemeralContainerFinalizer {
+			return true
+		}
+	}
+
+	return false
+}
+
+func deleteEphemeralContainerFinalizer(finalizers []string, finalizer string) []string {
+	if len(finalizers) == 0 {
+		return finalizers
+	}
+
+	for i, f := range finalizers {
+		if f == finalizer {
+			finalizers = append(finalizers[:i], finalizers[i+1:]...)
+		}
+	}
+
+	return finalizers
+}
