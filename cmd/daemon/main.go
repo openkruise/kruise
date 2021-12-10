@@ -19,10 +19,14 @@ package main
 import (
 	"flag"
 	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/daemon"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+
+	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/spf13/pflag"
@@ -30,11 +34,11 @@ import (
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
-	bindAddr = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
+	bindAddr  = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
+	pprofAddr = flag.String("pprof-addr", ":10222", "The address the pprof binds to.")
 )
 
 func main() {
@@ -51,7 +55,11 @@ func main() {
 	if err := client.NewRegistry(cfg); err != nil {
 		klog.Fatalf("Failed to init clientset registry: %v", err)
 	}
-
+	go func() {
+		if err := http.ListenAndServe(*pprofAddr, nil); err != nil {
+			klog.Fatal(err, "unable to start pprof")
+		}
+	}()
 	ctx := signals.SetupSignalHandler()
 	d, err := daemon.NewDaemon(cfg, *bindAddr)
 	if err != nil {

@@ -85,7 +85,7 @@ func main() {
 		"This determines the namespace in which the leader election configmap will be created, it will use in-cluster namespace if empty.")
 	flag.StringVar(&namespace, "namespace", "",
 		"Namespace if specified restricts the manager's cache to watch objects in the desired namespace. Defaults to all namespaces.")
-	flag.BoolVar(&enablePprof, "enable-pprof", false, "Enable pprof for controller manager.")
+	flag.BoolVar(&enablePprof, "enable-pprof", true, "Enable pprof for controller manager.")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":8090", "The address the pprof binds to.")
 	flag.StringVar(&syncPeriodStr, "sync-period", "", "Determines the minimum frequency at which watched resources are reconciled.")
 
