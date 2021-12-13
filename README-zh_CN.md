@@ -77,7 +77,8 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 - 小红书, 比心, 永辉科技中心, 跟谁学, 哈啰出行
 - Spectro Cloud, 艾佳生活, Arkane Systems, 滴普科技, 火花思维
 - OPPO, 苏宁, 欢聚时代, 汇量科技, 深圳凤凰木网络有限公司
-- 小米, 网易
+- 小米, 网易, 美团金融, 虾皮购物, e签宝
+- Wholee
 
 ## 贡献
 
