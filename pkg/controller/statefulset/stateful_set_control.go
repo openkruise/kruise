@@ -858,10 +858,10 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 			}
 
 			if res.UpdateErr == nil {
+				updateExpectations.ExpectUpdated(getStatefulSetKey(set), updateRevision.Name, pod)
 				ssc.recorder.Eventf(set, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place(revision %v)", pod.Name, updateRevision.Name)
 				return res.InPlaceUpdate, nil
 			}
-
 			ssc.recorder.Eventf(set, v1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place(revision %v): %v", pod.Name, updateRevision.Name, res.UpdateErr)
 			return res.InPlaceUpdate, res.UpdateErr
 		}
