@@ -234,6 +234,28 @@ spec:
                 description: Namespace sidecarSet will only match the pods in the
                   namespace otherwise, match pods in all namespaces(in cluster)
                 type: string
+              patch:
+                description: Patch can be decoded as SidecarSetPatch, and will patch
+                  these fields in SidecarSetPatch to the pod at injection stage
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  finalizer:
+                    items:
+                      type: string
+                    type: array
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  policyOnConflict:
+                    description: SidecarSetPatchFields may conflict with **Pod**,
+                      it allows users to choose their expected policy. Default is
+                      "Ignore"
+                    type: string
+                type: object
               selector:
                 description: selector is a label query over pods that should be injected
                 properties:

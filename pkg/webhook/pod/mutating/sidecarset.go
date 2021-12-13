@@ -135,8 +135,48 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	for k, v := range injectedAnnotations {
 		pod.Annotations[k] = v
 	}
+	// 6. inject spec.patch.fields to pod
+	injectSidecarSetPatchToPod(pod, matchedSidecarSets)
+
 	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
 	return nil
+}
+
+func injectSidecarSetPatchToPod(pod *corev1.Pod, sidecarSets []sidecarcontrol.SidecarControl) {
+	for _, sidecarSet := range sidecarSets {
+		s := sidecarSet.GetSidecarset()
+
+		patch := s.Spec.Patch
+		if len(patch.Labels) != 0 && pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		// patch labels
+		for k, v1 := range patch.Labels {
+			conflict := false
+			if v2, ok := pod.Labels[k]; ok && v1 != v2 {
+				conflict = true
+				klog.Warningf("[sidecar inject] Conflict occurred when injecting patch.labels of sidecarSet(%v/%v) to pod(%v, %v), conflicting key: %v",
+					s.Namespace, s.Name, pod.Namespace, pod.Name, k)
+			}
+			if !conflict || s.Spec.Patch.PolicyOnConflict == appsv1alpha1.OverwriteSidecarSetPatchConflictPolicy {
+				pod.Labels[k] = v1
+			}
+		}
+		// patch annotations
+		for k, v1 := range patch.Annotations {
+			conflict := false
+			if v2, ok := pod.Annotations[k]; ok && v1 != v2 {
+				conflict = true
+				klog.Warningf("[sidecar inject] Conflict occurred when injecting patch.annotations of sidecarSet(%v/%v) to pod(%v, %v), conflicting key: %v",
+					s.Namespace, s.Name, pod.Namespace, pod.Name, k)
+			}
+			if !conflict || s.Spec.Patch.PolicyOnConflict == appsv1alpha1.OverwriteSidecarSetPatchConflictPolicy {
+				pod.Annotations[k] = v1
+			}
+		}
+		// patch finalizers
+		pod.Finalizers = sets.NewString(pod.Finalizers...).Union(sets.NewString(patch.Finalizers...)).List()
+	}
 }
 
 func mergeSidecarSecrets(secretsInPod, secretsInSidecar []corev1.LocalObjectReference) (allSecrets []corev1.LocalObjectReference) {

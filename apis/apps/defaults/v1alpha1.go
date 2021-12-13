@@ -40,6 +40,14 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 
 	//default setting volumes
 	SetDefaultPodVolumes(obj.Spec.Volumes)
+
+	SetDefaultPatch(&obj.Spec.Patch)
+}
+
+func SetDefaultPatch(patch *v1alpha1.SidecarSetPatch) {
+	if patch.PolicyOnConflict == "" {
+		patch.PolicyOnConflict = v1alpha1.IgnoreSidecarSetPatchConflictPolicy
+	}
 }
 
 func setDefaultSidecarContainer(sidecarContainer *v1alpha1.SidecarContainer) {

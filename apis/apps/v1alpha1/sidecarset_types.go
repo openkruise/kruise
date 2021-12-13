@@ -52,6 +52,10 @@ type SidecarSetSpec struct {
 
 	// List of the names of secrets required by pulling sidecar container images
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
+	// Patch can be decoded as SidecarSetPatch, and will patch these fields in SidecarSetPatch
+	// to the pod at injection stage
+	Patch SidecarSetPatch `json:"patch,omitempty"`
 }
 
 // SidecarContainer defines the container of Sidecar
@@ -184,6 +188,32 @@ const (
 	NotUpdateSidecarSetStrategyType     SidecarSetUpdateStrategyType = "NotUpdate"
 	RollingUpdateSidecarSetStrategyType SidecarSetUpdateStrategyType = "RollingUpdate"
 )
+
+type SidecarSetPatch struct {
+	// SidecarSetPatchFields collects the fields that need to patch pod at injection stage.
+	SidecarSetPatchFields `json:",inline"`
+	// SidecarSetPatchFields may conflict with **Pod**, it allows users to choose their expected policy.
+	// Default is "Ignore"
+	PolicyOnConflict SidecarSetPatchConflictPolicyType `json:"policyOnConflict,omitempty"`
+}
+
+type SidecarSetPatchConflictPolicyType string
+
+var (
+	// OverwriteSidecarSetPatchConflictPolicy indicates if SidecarSetPatchFields conflicts with Pod,
+	// SidecarSet will apply SidecarSetPatchFields to overwrite the corresponding fields of pods.
+	// SidecarSet webhook cannot allow the conflict of SidecarSetPatchFields between SidecarSets under this policy type.
+	OverwriteSidecarSetPatchConflictPolicy SidecarSetPatchConflictPolicyType = "Overwrite"
+	// IgnoreSidecarSetPatchConflictPolicy indicates if SidecarSetPatchFields conflicts with Pod,
+	// will ignore SidecarSetPatchFields, and keep the corresponding fields of pods.
+	IgnoreSidecarSetPatchConflictPolicy SidecarSetPatchConflictPolicyType = "Ignore"
+)
+
+type SidecarSetPatchFields struct {
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Finalizers  []string          `json:"finalizer,omitempty"`
+}
 
 // SidecarSetStatus defines the observed state of SidecarSet
 type SidecarSetStatus struct {

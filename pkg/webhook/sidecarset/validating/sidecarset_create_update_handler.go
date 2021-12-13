@@ -119,17 +119,44 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 	} else {
 		allErrs = append(allErrs, validateSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
-	//validating SidecarSetUpdateStrategy
+	// validating patch
+	allErrs = append(allErrs, validateSidecarSetPatch(&spec.Patch, fldPath.Child("patch"))...)
+	// validating SidecarSetUpdateStrategy
 	allErrs = append(allErrs, validateSidecarSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("strategy"))...)
-	//validating volumes
+	// validating volumes
 	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
-	//validating sidecar container
+	// validating sidecar container
 	// if don't have any initContainers, containers
 	if len(spec.InitContainers) == 0 && len(spec.Containers) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Root(), "no initContainer or container defined for SidecarSet"))
 	} else {
 		allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, spec.Containers, vols, fldPath.Root())...)
+	}
+
+	return allErrs
+}
+
+func validateSidecarSetPatch(patch *appsv1alpha1.SidecarSetPatch, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch patch.PolicyOnConflict {
+	case "", appsv1alpha1.IgnoreSidecarSetPatchConflictPolicy,
+		appsv1alpha1.OverwriteSidecarSetPatchConflictPolicy:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("policyOnConflict"), patch.PolicyOnConflict,
+			`invalid policyOnConflict type, must be "Overwrite" or "Ignore"`))
+	}
+
+	if labelErrs := metavalidation.ValidateLabels(patch.Labels, fldPath.Child("labels")); len(labelErrs) != 0 {
+		allErrs = append(allErrs, labelErrs...)
+	}
+
+	if anntnErrs := genericvalidation.ValidateAnnotations(patch.Labels, fldPath.Child("annotations")); len(anntnErrs) != 0 {
+		allErrs = append(allErrs, anntnErrs...)
+	}
+
+	if fnlzrErrs := genericvalidation.ValidateFinalizers(patch.Finalizers, fldPath.Child("finalizers")); len(fnlzrErrs) != 0 {
+		allErrs = append(allErrs, fnlzrErrs...)
 	}
 
 	return allErrs
@@ -258,6 +285,7 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSet *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	patchInOthers := make([]*appsv1alpha1.SidecarSet, 0)
 	// record initContainer, container, volume name of other sidecarsets in cluster
 	// container name -> sidecarset
 	containerInOthers := make(map[string]*appsv1alpha1.SidecarSet)
@@ -279,6 +307,31 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 		}
 		for _, volume := range set.Spec.Volumes {
 			volumeInOthers[volume.Name] = set
+		}
+		if set.Spec.Patch.PolicyOnConflict == appsv1alpha1.OverwriteSidecarSetPatchConflictPolicy {
+			patchInOthers = append(patchInOthers, set)
+		}
+	}
+
+	// whether patch conflict
+	if sidecarSet.Spec.Patch.PolicyOnConflict == appsv1alpha1.OverwriteSidecarSetPatchConflictPolicy &&
+		len(sidecarSet.Spec.Patch.Annotations)+len(sidecarSet.Spec.Patch.Labels) > 0 {
+		for _, other := range patchInOthers {
+			if isSidecarSetNamespaceDiff(sidecarSet, other) || !util.IsSelectorOverlapping(sidecarSet.Spec.Selector, other.Spec.Selector) {
+				continue
+			}
+			for k, v1 := range other.Spec.Patch.Annotations {
+				if v2, ok := sidecarSet.Spec.Patch.Annotations[k]; ok && v1 != v2 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("patch"), "annotation",
+						fmt.Sprintf("Annotation(%v=%v) conflict with existing sidecarSet(%v)", k, v1, other.Name)))
+				}
+			}
+			for k, v1 := range other.Spec.Patch.Labels {
+				if v2, ok := sidecarSet.Spec.Patch.Labels[k]; ok && v1 != v2 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("patch"), "labels",
+						fmt.Sprintf("Labels(%v=%v) conflict with existing sidecarSet(%v)", k, v1, other.Name)))
+				}
+			}
 		}
 	}
 
