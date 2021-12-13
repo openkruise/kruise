@@ -148,9 +148,6 @@ func WaitReady() error {
 		if duration > time.Second*5 {
 			klog.Warningf("Failed to wait webhook ready over %s: %v", duration, err)
 		}
-		if duration > time.Minute {
-			return err
-		}
 		time.Sleep(time.Second * 2)
 	}
 
