@@ -78,7 +78,8 @@ Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/
 - xiaohongshu, bixin, 永辉科技中心, 跟谁学, 哈啰出行
 - Spectro Cloud, ihomefnt, Arkane Systems, Deepexi, 火花思维
 - OPPO, Suning.cn, joyy, Mobvista, 深圳凤凰木网络有限公司
-- xiaomi, Netease
+- xiaomi, Netease, MeiTuan Finance, Shopee, Esign
+- Wholee
 
 ## Contributing
 
