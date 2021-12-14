@@ -1,5 +1,83 @@
 # Change Log
 
+## v1.0.0
+
+> Change log since v0.10.1
+
+### Project
+
+- Bump CustomResourceDefinition(CRD) from v1beta1 to v1
+- Bump ValidatingWebhookConfiguration/MutatingWebhookConfiguration from v1beta1 to v1
+- Bump dependencies: k8s v1.18 -> v1.20, controller-runtime v0.6.5 -> v0.8.3
+- Generate CRDs with original controller-tools and markers
+
+**So that Kruise can install into Kubernetes 1.22 and no longer support Kubernetes < 1.16.**
+
+### New feature: in-place update with env from metadata
+
+When update `spec.template.metadata.labels/annotations` in CloneSet or Advanced StatefulSet and there exists container env from the changed labels/annotations,
+Kruise will in-place update them to renew the env value in containers.
+
+[doc](https://openkruise.io/docs/core-concepts/inplace-update#understand-inplaceifpossible)
+
+### New feature: ContainerLaunchPriority
+
+Container Launch Priority provides a way to help users control the sequence of containers start in a Pod.
+
+It works for Pod, no matter what kind of owner it belongs to, which means Deployment, CloneSet or any other Workloads are all supported.
+
+[doc](https://openkruise.io/docs/user-manuals/containerlaunchpriority)
+
+### New feature: ResourceDistribution
+
+For the scenario, where the namespace-scoped resources such as Secret and ConfigMap need to be distributed or synchronized to different namespaces,
+the native k8s currently only supports manual distribution and synchronization by users one-by-one, which is very inconvenient.
+
+Therefore, in the face of these scenarios that require the resource distribution and **continuously synchronization across namespaces**, we provide a tool, namely **ResourceDistribution**, to do this automatically.
+
+Currently, ResourceDistribution supports the two kind resources --- **Secret & ConfigMap**.
+
+[doc](https://openkruise.io/docs/user-manuals/resourcedistribution)
+
+### CloneSet
+
+- Add `maxUnavailable` field in `scaleStrategy` to support rate limiting of scaling up.
+- Mark revision stable as `currentRevision` when all pods updated to it, won't wait all pods to be ready **(Behavior Change)**.
+
+### WorkloadSpread
+
+- Manage the pods that were created before WorkloadSpread.
+- Optimize webhook update and retry during injection.
+
+### PodUnavailableBudget
+
+- Add pod no pub-protection annotation.
+- PUB controller watch workload replicas changed.
+
+### Advanced DaemonSet
+
+- Support in-place update daemon pod.
+- Support progressive annotation to control if pods creation should be limited by partition.
+
+### SidecarSet
+
+- Fix SidecarSet filter active pods.
+
+### UnitedDeployment
+
+- Fix pod NodeSelectorTerms length 0 when UnitedDeployment NodeSelectorTerms is nil.
+
+### NodeImage
+
+- Add `--nodeimage-creation-delay` flag to delay NodeImage creation after Node ready.
+
+### Other
+
+- Kruise-daemon watch pods using protobuf.
+- Export resync seconds args.
+- Fix http checker reload ca.cert.
+- Fix E2E for WorkloadSpread, ImagePulling, ContainerLaunchPriority.
+
 ## v1.0.0-beta.0
 
 > Change log since v1.0.0-alpha.2
