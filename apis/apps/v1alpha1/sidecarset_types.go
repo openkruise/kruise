@@ -31,7 +31,7 @@ type SidecarSetSpec struct {
 	// otherwise, match pods in all namespaces(in cluster)
 	Namespace string `json:"namespace,omitempty"`
 
-	// Containers is the list of init containers to be injected into the selected pod
+	// InitContainers is the list of init containers to be injected into the selected pod
 	// We will inject those containers by their name in ascending order
 	// We only inject init containers when a new pod is created, it does not apply to any existing pod
 	InitContainers []SidecarContainer `json:"initContainers,omitempty"`

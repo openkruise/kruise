@@ -115,7 +115,9 @@ func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*app
 				}
 				return nil, err
 			}
-			matchedSidecarSets = append(matchedSidecarSets, sidecarSet)
+			if sidecarcontrol.IsPodConsistentWithSidecarSet(pod, sidecarSet) {
+				matchedSidecarSets = append(matchedSidecarSets, sidecarSet)
+			}
 		}
 		return matchedSidecarSets, nil
 	}

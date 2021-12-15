@@ -259,7 +259,8 @@ func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, 
 	// 3. never be injected sidecar container
 	var filteredPods []*corev1.Pod
 	for _, pod := range selectedPods {
-		if sidecarcontrol.IsActivePod(pod) && isPodInjectedSidecar(s, pod) {
+		if sidecarcontrol.IsActivePod(pod) && sidecarcontrol.IsPodInjectedSidecarSet(pod, s) &&
+			sidecarcontrol.IsPodConsistentWithSidecarSet(pod, s) {
 			filteredPods = append(filteredPods, pod)
 		}
 	}
@@ -313,12 +314,6 @@ func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) 
 		ReadyPods:          readyPods,
 		UpdatedReadyPods:   updatedAndReady,
 	}
-}
-
-// whether this pod has been injected sidecar container based on the sidecarSet
-func isPodInjectedSidecar(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
-	// if pod annotations contain sidecarset hash, then indicates the pod has been injected in sidecar container
-	return sidecarcontrol.GetPodSidecarSetRevision(sidecarSet.Name, pod) != ""
 }
 
 func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
