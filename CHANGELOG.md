@@ -1,5 +1,25 @@
 # Change Log
 
+## v0.10.2
+
+> Change log since v0.10.1
+
+### SidecarSet
+
+- Add SourceContainerNameFrom and EnvNames in sidecarset transferenv.
+
+### Advanced StatefulSet
+
+- Fix update expectation to be increased when a pod updated.
+
+### WorkloadSpread
+
+- Fix bug: read conditions from nil old subset status.
+
+### Other
+
+- Do not set timeout for webhook ready.
+
 ## v1.0.0
 
 > Change log since v0.10.1
