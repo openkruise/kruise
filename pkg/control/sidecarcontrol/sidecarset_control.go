@@ -155,6 +155,7 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 	}
 
 	allDigestImage := true
+	cImageIDs := util.GetPodContainerImageIDs(pod)
 	for _, container := range pod.Spec.Containers {
 		// only check whether sidecar container is consistent
 		if !sidecarContainers.Has(container.Name) {
@@ -165,10 +166,14 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 		//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
 		if !util.IsImageDigest(container.Image) {
 			allDigestImage = false
-			continue
+			break
 		}
 
-		if !util.IsPodContainerDigestEqual(sets.NewString(container.Name), pod) {
+		imageID, ok := cImageIDs[container.Name]
+		if !ok {
+			return false
+		}
+		if !util.IsContainerImageEqual(container.Image, imageID) {
 			return false
 		}
 	}
