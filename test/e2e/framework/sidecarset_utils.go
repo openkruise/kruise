@@ -153,7 +153,7 @@ func (s *SidecarSetTester) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet)
 		if updateErr == nil {
 			return nil
 		}
-		sidecarSetClone, _ = s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetClone.Name, metav1.GetOptions{})
+		sidecarSetClone, _ = s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -170,7 +170,7 @@ func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
 		if updateErr == nil {
 			return nil
 		}
-		podClone, _ = s.c.CoreV1().Pods(podClone.Namespace).Update(context.TODO(), podClone, metav1.UpdateOptions{})
+		podClone, _ = s.c.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())

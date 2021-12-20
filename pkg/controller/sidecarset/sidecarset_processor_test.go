@@ -272,6 +272,7 @@ func TestCanUpgradePods(t *testing.T) {
 	pods := factoryPodsCommon(100, 0, sidecarSet)
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	for i := range pods {
+		pods[i].Annotations[sidecarcontrol.SidecarSetListAnnotation] = `test-sidecarset`
 		if i < 50 {
 			pods[i].Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = `{"test-sidecarset":{"hash":"without-aaa"}}`
 		} else {
