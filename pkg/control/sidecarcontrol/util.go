@@ -286,7 +286,7 @@ func GetSidecarTransferEnvs(sidecarContainer *appsv1alpha1.SidecarContainer, pod
 		if tEnv.SourceContainerNameFrom != nil && tEnv.SourceContainerNameFrom.FieldRef != nil {
 			containerName, err := ExtractContainerNameFromFieldPath(tEnv.SourceContainerNameFrom.FieldRef, pod)
 			if err != nil {
-				klog.Errorf("unmarshal pod(%s.%s) annotations[%s] failed: %s", pod.Namespace, pod.Name, err.Error())
+				klog.Errorf("get containerName from pod(%s.%s) annotations or labels[%s] failed: %s", pod.Namespace, pod.Name, tEnv.SourceContainerNameFrom.FieldRef, err.Error())
 				continue
 			}
 			sourceContainerName = containerName
