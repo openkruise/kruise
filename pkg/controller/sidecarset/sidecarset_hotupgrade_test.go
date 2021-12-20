@@ -68,6 +68,7 @@ var (
 	podHotUpgrade = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
+				sidecarcontrol.SidecarSetListAnnotation: `test-sidecarset`,
 				//hash
 				sidecarcontrol.SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"aaa","sidecarList":["test-sidecar"]}}`,
 				//111111111
