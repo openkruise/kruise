@@ -109,7 +109,7 @@ func TestValidateResourceDistributionTargets(t *testing.T) {
 		// error 2
 		IncludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
 			List: []appsv1alpha1.ResourceDistributionNamespace{
-				{Name: "ns-1"}, {Name: "ns-2"}, {Name: "kube-system"}, {Name: "kube-public"},
+				{Name: "ns-1"}, {Name: "ns-2"}, {Name: "kube-system"}, {Name: ""},
 			},
 		},
 		// error 3
