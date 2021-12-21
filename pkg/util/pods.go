@@ -203,8 +203,8 @@ func IsRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
 }
 
-func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
-	cStatus := make(map[string]string, len(pod.Status.ContainerStatuses))
+func GetPodContainerImageIDs(pod *v1.Pod) map[string]string {
+	cImageIDs := make(map[string]string, len(pod.Status.ContainerStatuses))
 	for i := range pod.Status.ContainerStatuses {
 		c := &pod.Status.ContainerStatuses[i]
 		//ImageID format: docker-pullable://busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
@@ -212,8 +212,13 @@ func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
 		if strings.Contains(imageID, "://") {
 			imageID = strings.Split(imageID, "://")[1]
 		}
-		cStatus[c.Name] = imageID
+		cImageIDs[c.Name] = imageID
 	}
+	return cImageIDs
+}
+
+func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
+	cImageIDs := GetPodContainerImageIDs(pod)
 
 	for _, container := range pod.Spec.Containers {
 		if !containers.Has(container.Name) {
@@ -223,7 +228,7 @@ func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
 		if !IsImageDigest(container.Image) {
 			return false
 		}
-		imageID, ok := cStatus[container.Name]
+		imageID, ok := cImageIDs[container.Name]
 		if !ok {
 			return false
 		}
