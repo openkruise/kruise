@@ -338,19 +338,6 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 
 	var changedContainers []string
 	for _, sidecarContainer := range sidecarSet.Spec.Containers {
-		//sidecarContainer := &sidecarset.Spec.Containers[i]
-		// volumeMounts that injected into sidecar container
-		// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
-		injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, &sidecarContainer, pod)
-		// merge VolumeMounts from sidecar.VolumeMounts and shared VolumeMounts
-		sidecarContainer.VolumeMounts = util.MergeVolumeMounts(sidecarContainer.VolumeMounts, injectedMounts)
-
-		// get injected env & mounts explicitly so that can be compared with old ones in pod
-		transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(&sidecarContainer, pod)
-		// append volumeMounts SubPathExpr environments
-		transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-		// merged Env from sidecar.Env and transfer envs
-		sidecarContainer.Env = util.MergeEnvVar(sidecarContainer.Env, transferEnvs)
 
 		// upgrade sidecar container to latest
 		newContainer := control.UpgradeSidecarContainer(&sidecarContainer, pod)
