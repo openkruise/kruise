@@ -21,12 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
-	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
-
-	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,7 +149,7 @@ func (s *ResourceDistributionTester) UpdateNamespace(namespace *corev1.Namespace
 		if updateErr == nil {
 			return nil
 		}
-		namespaceClone, _ = s.c.CoreV1().Namespaces().Update(context.TODO(), namespaceClone, metav1.UpdateOptions{})
+		namespaceClone, _ = s.c.CoreV1().Namespaces().Get(context.TODO(), namespace.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -195,6 +193,28 @@ func (s *ResourceDistributionTester) GetSecret(namespace, name string, mustExist
 		return nil, err
 	}
 	return secret, nil
+}
+
+func (s *ResourceDistributionTester) UpdateSecret(secret *corev1.Secret) error {
+	Logf("update secret(%s/%s)", secret.Namespace, secret.Name)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		secretClone, getErr := s.c.CoreV1().Secrets(secret.Namespace).Get(context.TODO(), secret.Name, metav1.GetOptions{})
+		if getErr != nil {
+			return getErr
+		}
+		metadata := &secretClone.ObjectMeta
+		secretClone = secret.DeepCopy()
+		secretClone.ObjectMeta = *metadata
+		_, updateErr := s.c.CoreV1().Secrets(secret.Namespace).Update(context.TODO(), secretClone, metav1.UpdateOptions{})
+		if updateErr == nil {
+			return nil
+		}
+		return updateErr
+	})
+}
+
+func (s *ResourceDistributionTester) DeleteSecret(namespace, name string) error {
+	return s.c.CoreV1().Secrets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
 func (s *ResourceDistributionTester) GetResourceDistribution(name string, mustExistAssertion bool) (*appsv1alpha1.ResourceDistribution, error) {
@@ -387,10 +407,5 @@ func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1a
 		unmatchedNamespaces.Delete(matched)
 	}
 
-	// 6. exclude forbidden namespaces
-	for _, forbiddenNamespace := range utils.ForbiddenNamespaces {
-		matchedNamespaces.Delete(forbiddenNamespace)
-		unmatchedNamespaces.Delete(forbiddenNamespace)
-	}
 	return
 }

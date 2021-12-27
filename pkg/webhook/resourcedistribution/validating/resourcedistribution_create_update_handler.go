@@ -19,11 +19,14 @@ import (
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	coreval "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -60,7 +63,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 		allErrs = append(allErrs, errs...)
 	}
 	// 1. validate resource
-	allErrs = append(allErrs, h.validateResourceDistributionResource(resource, oldResource, fldPath.Child("resource"))...)
+	allErrs = append(allErrs, h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"))...)
 	// 2. validate targets
 	allErrs = append(allErrs, h.validateResourceDistributionSpecTargets(&obj.Spec.Targets, fldPath.Child("targets"))...)
 	return
@@ -70,20 +73,21 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 // (1). check whether type of the resource is supported
 // (2). detect updating conflict, i.e., GK and name cannot be modified
 // (3). dry run to check whether resource can be created
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionResource(resource, oldResource runtime.Object, fldPath *field.Path) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(resource, oldResource runtime.Object, fldPath *field.Path) (allErrs field.ErrorList) {
 	// 1. check whether the GK of the resource is in supportedGKList
 	if !isSupportedGK(resource) {
-		return append(allErrs, field.Invalid(fldPath, resource, fmt.Sprintf("unknown or unsupported resource GroupVersionKind, only support %v", supportedGKList)))
+		return append(allErrs, field.Invalid(fldPath, resource, fmt.Sprintf("unknown or unsupported resource GroupKind, only support %v", supportedGKList)))
 	}
 	// 2. validate resource group, kind and name when updating
-	if oldResource != nil && !haveSameGKAndName(resource, oldResource) {
+	if oldResource != nil && !haveSameGVKAndName(resource, oldResource) {
 		return append(allErrs, field.Invalid(fldPath, nil, "resource apiVersion, kind, and name are immutable"))
 	}
-	// 3. dry run to check resource
-	mice := resource.DeepCopyObject()
-	ConvertToUnstructured(mice).SetNamespace(DefaultNamespace)
-	if err := h.Client.Create(context.TODO(), mice.(client.Object), &client.CreateOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
-		return append(allErrs, field.InternalError(fldPath, fmt.Errorf("dry-run to validate resource failed, err: %v", err)))
+	// 3. dry run to check the resource
+	mice := resource.DeepCopyObject().(client.Object)
+	ConvertToUnstructured(mice).SetNamespace(webhookutil.GetNamespace())
+	err := h.Client.Create(context.TODO(), mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return append(allErrs, field.InternalError(fldPath, fmt.Errorf("failed to dry-run to validate spec.resource, error: %v", err)))
 	}
 	return
 }
@@ -93,18 +97,13 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionRe
 // (2). validate conflict between existing resources
 func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecTargets(targets *appsv1alpha1.ResourceDistributionTargets, fldPath *field.Path) (allErrs field.ErrorList) {
 	// 1. validate namespace of IncludedNamespaces.List and ExcludedNamespaces.List
-	forbidden := make([]string, 0)
 	conflicted := make([]string, 0)
-	included := make(map[string]struct{})
+	includedNS := sets.NewString()
 	for _, namespace := range targets.IncludedNamespaces.List {
-		included[namespace.Name] = struct{}{}
+		includedNS.Insert(namespace.Name)
 		// validate namespace name
 		for _, msg := range coreval.ValidateNamespaceName(namespace.Name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("includedNamespaces"), targets.IncludedNamespaces, msg))
-		}
-		// validate whether namespace is forbidden
-		if isForbiddenNamespace(namespace.Name) {
-			forbidden = append(forbidden, namespace.Name)
 		}
 	}
 	for _, namespace := range targets.ExcludedNamespaces.List {
@@ -113,20 +112,17 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("excludedNamespaces"), targets.ExcludedNamespaces, msg))
 		}
 		// validate conflict between IncludedNamespaces and ExcludedNamespaces
-		if _, ok := included[namespace.Name]; ok {
+		if includedNS.Has(namespace.Name) {
 			conflicted = append(conflicted, namespace.Name)
 		}
 	}
 	if len(conflicted) != 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, targets, fmt.Sprintf("ambiguous targets because namespace %v is in both IncludedNamespaces.List and ExcludedNamesapces.List", conflicted)))
 	}
-	if len(forbidden) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("includedNamespaces"), targets.IncludedNamespaces, fmt.Sprintf("cannot distribute rsource to forbidden namespaces %v", ForbiddenNamespaces)))
-	}
 
 	// 2. validate targets.NamespaceLabelSelector
 	if _, err := metav1.LabelSelectorAsSelector(&targets.NamespaceLabelSelector); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaceLabelSelector"), targets.IncludedNamespaces, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaceLabelSelector"), targets.NamespaceLabelSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
 	}
 
 	return

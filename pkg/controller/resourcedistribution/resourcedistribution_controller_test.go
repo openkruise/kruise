@@ -79,8 +79,10 @@ func TestDoReconcile(t *testing.T) {
 			t.Fatalf("failed to get resource(%s.%s) from fake client, err %v", namespace, "test-secret-1", err)
 		}
 		// check resource source and version
-		if distributor.Name != resource.Annotations[utils.SourceResourceDistributionOfResource] ||
-			resourceVersion != resource.Annotations[utils.ResourceHashCodeAnnotation] {
+		if !isControlledByDistributor(resource, distributor) {
+			t.Fatalf("failed to sync resource(%s) for namespace (%s), owner set error", resource.Name, namespace)
+		}
+		if resourceVersion != resource.Annotations[utils.ResourceHashCodeAnnotation] {
 			t.Fatalf("failed to sync resource(%s) for namespace (%s) from %s, \nexpected version:%x \nactual version:%x", resource.Name, namespace, resource.Annotations[utils.SourceResourceDistributionOfResource], resourceVersion, resource.Annotations[utils.ResourceHashCodeAnnotation])
 		}
 	}
@@ -112,7 +114,13 @@ func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
 
 func buildResourceDistribution(raw runtime.RawExtension) *appsv1alpha1.ResourceDistribution {
 	return &appsv1alpha1.ResourceDistribution{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-resource-distribution"},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1alpha1.GroupVersion.String(),
+			Kind:       "ResourceDistribution",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-resource-distribution",
+		},
 		Spec: appsv1alpha1.ResourceDistributionSpec{
 			Resource: raw,
 			Targets: appsv1alpha1.ResourceDistributionTargets{
@@ -147,6 +155,7 @@ func buildResourceDistribution(raw runtime.RawExtension) *appsv1alpha1.ResourceD
 }
 
 func makeEnvironment() []runtime.Object {
+	distributor := buildResourceDistributionWithSecret()
 	return []runtime.Object{
 		&corev1.Namespace{ // for create
 			ObjectMeta: metav1.ObjectMeta{
@@ -193,21 +202,16 @@ func makeEnvironment() []runtime.Object {
 				},
 			},
 		},
-		&corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "kube-system",
-				Labels: map[string]string{
-					"group":       "two",
-					"environment": "test",
-				},
-			},
-		},
 		&corev1.Secret{ // for update
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-secret-1",
 				Namespace: "ns-1",
 				Annotations: map[string]string{
 					utils.SourceResourceDistributionOfResource: "test-resource-distribution",
+					utils.ResourceHashCodeAnnotation:           hashResource(distributor.Spec.Resource),
+				},
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(distributor, distributor.GroupVersionKind()),
 				},
 			},
 		},
@@ -217,6 +221,10 @@ func makeEnvironment() []runtime.Object {
 				Namespace: "ns-4",
 				Annotations: map[string]string{
 					utils.SourceResourceDistributionOfResource: "test-resource-distribution",
+					utils.ResourceHashCodeAnnotation:           hashResource(distributor.Spec.Resource),
+				},
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(distributor, distributor.GroupVersionKind()),
 				},
 			},
 		},

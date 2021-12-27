@@ -159,9 +159,12 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster,shortName=distributor
+// +kubebuilder:printcolumn:name="TOTAL",type="integer",JSONPath=".status.desired",description="The desired number of desired distribution and syncs."
+// +kubebuilder:printcolumn:name="SUCCEED",type="integer",JSONPath=".status.succeeded",description="The number of successful distribution and syncs."
+// +kubebuilder:printcolumn:name="FAILED",type="integer",JSONPath=".status.failed",description="The number of failed distributions and syncs."
 
 // ResourceDistribution is the Schema for the resourcedistributions API.
 type ResourceDistribution struct {
