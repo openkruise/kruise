@@ -13,10 +13,25 @@ spec:
     kind: ResourceDistribution
     listKind: ResourceDistributionList
     plural: resourcedistributions
+    shortNames:
+    - distributor
     singular: resourcedistribution
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The desired number of desired distribution and syncs.
+      jsonPath: .status.desired
+      name: TOTAL
+      type: integer
+    - description: The number of successful distribution and syncs.
+      jsonPath: .status.succeeded
+      name: SUCCEED
+      type: integer
+    - description: The number of failed distributions and syncs.
+      jsonPath: .status.failed
+      name: FAILED
+      type: integer
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ResourceDistribution is the Schema for the resourcedistributions

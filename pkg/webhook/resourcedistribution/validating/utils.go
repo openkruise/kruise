@@ -24,9 +24,7 @@ import (
 )
 
 const (
-	DefaultNamespace                     = "default"
 	ResourceHashCodeAnnotation           = "kruise.io/resourcedistribution.resource.hashcode"
-	ResourceDistributedTimestamp         = "kruise.io/resourcedistribution.resource.distributed.timestamp"
 	SourceResourceDistributionOfResource = "kruise.io/resourcedistribution.resource.from"
 )
 
@@ -38,15 +36,6 @@ var (
 		{Group: "", Kind: "Secret"},
 		{Group: "", Kind: "ConfigMap"},
 	}
-
-	// ForbiddenNamespaces is a list that contains all forbidden namespaces
-	// Resources will never be distributed to these namespaces
-	// reused by controller
-	/* ADD NEW FORBIDDEN NAMESPACE HERE*/
-	ForbiddenNamespaces = []string{
-		"kube-system",
-		"kube-public",
-	}
 )
 
 // isSupportedGVK check whether object is supported by ResourceDistribution
@@ -54,30 +43,20 @@ func isSupportedGK(object runtime.Object) bool {
 	if object == nil {
 		return false
 	}
-	objGVK := object.GetObjectKind().GroupVersionKind().GroupKind()
-	for _, gvk := range supportedGKList {
-		if reflect.DeepEqual(gvk, objGVK) {
+	objGK := object.GetObjectKind().GroupVersionKind().GroupKind()
+	for _, gk := range supportedGKList {
+		if reflect.DeepEqual(gk, objGK) {
 			return true
 		}
 	}
 	return false
 }
 
-// isForbiddenNamespace check whether the namespace is forbidden
-func isForbiddenNamespace(namespace string) bool {
-	for _, forbiddenNamespace := range ForbiddenNamespaces {
-		if namespace == forbiddenNamespace {
-			return true
-		}
-	}
-	return false
-}
-
-// haveSameGKAndName return true if two resources have the same group, kind and name
-func haveSameGKAndName(resource, otherResource runtime.Object) bool {
+// haveSameGVKAndName return true if two resources have the same group, version, kind and name
+func haveSameGVKAndName(resource, otherResource runtime.Object) bool {
 	Name, anotherName := ConvertToUnstructured(resource).GetName(), ConvertToUnstructured(otherResource).GetName()
-	GK, anotherGK := resource.GetObjectKind().GroupVersionKind().GroupKind(), otherResource.GetObjectKind().GroupVersionKind().GroupKind()
-	return Name == anotherName && reflect.DeepEqual(GK, anotherGK)
+	GVK, anotherGVK := resource.GetObjectKind().GroupVersionKind(), otherResource.GetObjectKind().GroupVersionKind()
+	return Name == anotherName && reflect.DeepEqual(GVK, anotherGVK)
 }
 
 // ConvertToUnstructured receive runtime.Object, return *unstructured.Unstructured

@@ -18,7 +18,6 @@ package apps
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -63,7 +62,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 		})
 
 		ginkgo.It("namespace event checker", func() {
-			prefix := "resourcedistribution-e2e-test2"
+			prefix := "resourcedistribution-e2e-test1"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)
 			tester.DeleteNamespaces(prefix)
@@ -100,7 +99,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 				matchedNamespaces, _, err := tester.GetNamespaceForDistributor(&resourceDistribution.Spec.Targets)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return matchedNamespaces.Len()
-			}, 10*time.Second, time.Second).Should(gomega.Equal(2))
+			}, time.Minute, time.Second).Should(gomega.Equal(2))
 
 			ginkgo.By("checking created secret...")
 			matchedNamespaces, _, err := tester.GetNamespaceForDistributor(&resourceDistribution.Spec.Targets)
@@ -109,7 +108,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 				gomega.Eventually(func() error {
 					_, err := tester.GetSecret(namespace, secretName, true)
 					return err
-				}, 10*time.Second, time.Second).ShouldNot(gomega.HaveOccurred())
+				}, time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
 			}
 
 			//clear all resources in cluster
@@ -118,8 +117,67 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			ginkgo.By("Done!")
 		})
 
-		ginkgo.It("resourcedistribution functionality checker", func() {
+		ginkgo.It("resource event checker", func() {
 			prefix := "resourcedistribution-e2e-test2"
+			// clean resource to avoid conflict
+			tester.DeleteResourceDistributions(prefix)
+			tester.DeleteNamespaces(prefix)
+
+			namespaces := []*corev1.Namespace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: prefix + "-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: prefix + "-2",
+					},
+				},
+			}
+			tester.CreateNamespaces(namespaces...)
+
+			// create ResourceDistribution
+			resourceDistribution := tester.NewBaseResourceDistribution(prefix)
+			tester.CreateResourceDistribution(resourceDistribution)
+
+			var err error
+			var secret *corev1.Secret
+			gomega.Eventually(func() error {
+				secret, err = tester.GetSecret(namespaces[0].Name, secretName, true)
+				return err
+			}, time.Minute, time.Second).Should(gomega.BeNil())
+
+			// If resource was modified directly, resourceDistribution should modify it back
+			ginkgo.By("update resource directly...")
+			secret.StringData = map[string]string{
+				"updated": "yes",
+			}
+			err = tester.UpdateSecret(secret)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() int {
+				secret, err = tester.GetSecret(namespaces[0].Name, secretName, true)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return len(secret.StringData)
+			}, time.Minute, time.Second).Should(gomega.Equal(0))
+
+			// If resource was deleted directly, resourceDistribution should create it again
+			ginkgo.By("delete resource directly...")
+			err = tester.DeleteSecret(secret.Namespace, secret.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() error {
+				secret, err = tester.GetSecret(namespaces[0].Name, secretName, true)
+				return err
+			}, time.Minute, time.Second).Should(gomega.BeNil())
+
+			//clear all resources in cluster
+			tester.DeleteResourceDistributions(prefix)
+			tester.DeleteNamespaces(prefix)
+			ginkgo.By("Done!")
+		})
+
+		ginkgo.It("resourcedistribution functionality checker", func() {
+			prefix := "resourcedistribution-e2e-test3"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)
 			tester.DeleteNamespaces(prefix)
@@ -128,7 +186,6 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			resourceDistribution := tester.NewBaseResourceDistribution(prefix)
 			cases := []struct {
 				name          string
-				getResources  func() []*corev1.Secret
 				getNamespaces func() []*corev1.Namespace
 			}{
 				{
@@ -182,37 +239,6 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 							},
 						}
 					},
-					getResources: func() []*corev1.Secret {
-						secretContent := []byte(base64.StdEncoding.EncodeToString([]byte("myUsername:myPassword")))
-						return []*corev1.Secret{
-							{ // for update
-								ObjectMeta: metav1.ObjectMeta{
-									Name:      secretName,
-									Namespace: prefix + "-1",
-									Annotations: map[string]string{
-										utils.SourceResourceDistributionOfResource: resourceDistribution.Name,
-									},
-								},
-								Type: "Opaque",
-								Data: map[string][]byte{
-									".dockerconfigjson": secretContent,
-								},
-							},
-							{ // for delete
-								ObjectMeta: metav1.ObjectMeta{
-									Name:      secretName,
-									Namespace: prefix + "-5",
-									Annotations: map[string]string{
-										utils.SourceResourceDistributionOfResource: resourceDistribution.Name,
-									},
-								},
-								Type: "Opaque",
-								Data: map[string][]byte{
-									".dockerconfigjson": secretContent,
-								},
-							},
-						}
-					},
 				},
 			}
 
@@ -221,10 +247,6 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 				allNamespaces := cs.getNamespaces()
 				ginkgo.By(fmt.Sprintf("creating namespaces"))
 				tester.CreateNamespaces(allNamespaces...)
-
-				resources := cs.getResources()
-				ginkgo.By("creating resources")
-				tester.CreateSecretResources(resources...)
 
 				ginkgo.By(fmt.Sprintf("Creating ResourceDistribution %s", resourceDistribution.Name))
 				tester.CreateResourceDistribution(resourceDistribution)
@@ -237,13 +259,13 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 					matchedNamespaces, unmatchedNamespaces, err = tester.GetNamespaceForDistributor(&resourceDistribution.Spec.Targets)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return matchedNamespaces.Len()
-				}, 10*time.Second, time.Second).Should(gomega.Equal(4))
+				}, time.Minute, time.Second).Should(gomega.Equal(4))
 				// ensure all desired resources have been created
 				gomega.Eventually(func() int32 {
 					resourceDistribution, err = tester.GetResourceDistribution(resourceDistribution.Name, true)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return resourceDistribution.Status.Succeeded
-				}, 20*time.Second, time.Second).Should(gomega.Equal(int32(len(matchedNamespaces))))
+				}, time.Minute, time.Second).Should(gomega.Equal(int32(len(matchedNamespaces))))
 				gomega.Expect(resourceDistribution.Status.Desired).Should(gomega.Equal(resourceDistribution.Status.Succeeded))
 
 				// checking created and updated resources
@@ -287,7 +309,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 					mice, err := tester.GetResourceDistribution(resourceDistribution.Name, true)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return len(mice.Status.Conditions[5].FailedNamespaces)
-				}, 10*time.Second, time.Second).Should(gomega.Equal(1))
+				}, time.Minute, time.Second).Should(gomega.Equal(1))
 				gomega.Expect(resourceDistribution.Status.Desired).Should(gomega.Equal(resourceDistribution.Status.Succeeded))
 
 				// checking after updating spec.targets
@@ -298,7 +320,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 					mice, err := tester.GetResourceDistribution(resourceDistribution.Name, true)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return mice.Status.Succeeded
-				}, 20*time.Second, time.Second).Should(gomega.Equal(int32(2)))
+				}, time.Minute, time.Second).Should(gomega.Equal(int32(2)))
 
 				matchedNamespaces, unmatchedNamespaces, err = tester.GetNamespaceForDistributor(&resourceDistribution.Spec.Targets)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -318,7 +340,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 					if !strings.HasPrefix(namespace, prefix) {
 						continue
 					}
-					object, err := tester.GetSecret(namespace, resources[0].Name, false)
+					object, err := tester.GetSecret(namespace, secretName, false)
 					gomega.Expect(errors.IsNotFound(err)).Should(gomega.BeTrue())
 					gomega.Expect(object).Should(gomega.BeNil())
 				}
@@ -330,9 +352,9 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 						continue
 					}
 					gomega.Eventually(func() bool {
-						_, err := tester.GetSecret(namespace, resources[0].Name, false)
+						_, err := tester.GetSecret(namespace, secretName, false)
 						return errors.IsNotFound(err)
-					}, 20*time.Second, time.Second).Should(gomega.BeTrue())
+					}, time.Minute, time.Second).Should(gomega.BeTrue())
 				}
 				ginkgo.By("Done!")
 				tester.DeleteNamespaces(prefix)

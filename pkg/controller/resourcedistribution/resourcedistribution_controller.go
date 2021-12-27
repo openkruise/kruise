@@ -106,6 +106,46 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to Secrets
+	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
+		IsController: true, OwnerType: &appsv1alpha1.ResourceDistribution{},
+	}, predicate.Funcs{
+		CreateFunc: func(createEvent event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(updateEvent event.UpdateEvent) bool {
+			oldObject, oldOK := updateEvent.ObjectOld.(*corev1.Secret)
+			newObject, newOK := updateEvent.ObjectNew.(*corev1.Secret)
+			if !oldOK || !newOK {
+				return false
+			}
+			return !reflect.DeepEqual(oldObject.Data, newObject.Data) || !reflect.DeepEqual(oldObject.StringData, newObject.StringData)
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to ConfigMap
+	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
+		IsController: true, OwnerType: &appsv1alpha1.ResourceDistribution{},
+	}, predicate.Funcs{
+		CreateFunc: func(createEvent event.CreateEvent) bool {
+			return false
+		},
+		UpdateFunc: func(updateEvent event.UpdateEvent) bool {
+			oldObject, oldOK := updateEvent.ObjectOld.(*corev1.ConfigMap)
+			newObject, newOK := updateEvent.ObjectNew.(*corev1.ConfigMap)
+			if !oldOK || !newOK {
+				return false
+			}
+			return !reflect.DeepEqual(oldObject.Data, newObject.Data) || !reflect.DeepEqual(oldObject.BinaryData, newObject.BinaryData)
+		},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -170,7 +210,7 @@ func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.Re
 	_, cleanErrList := r.cleanResource(distributor, unmatchedNamespaces, resource)
 
 	// 3. process all errors about resource distribution and cleanup
-	conditions, errList := r.handleErrors(distributor.Name, distributeErrList, cleanErrList)
+	conditions, errList := r.handleErrors(distributeErrList, cleanErrList)
 
 	// 4. update distributor status
 	newStatus := calculateNewStatus(distributor, conditions, int32(len(matchedNamespaces)), succeeded)
@@ -185,9 +225,18 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1al
 
 	resourceName := utils.ConvertToUnstructured(resource).GetName()
 	resourceKind := resource.GetObjectKind().GroupVersionKind().Kind
-	newResourceHashCode := hashResource(distributor.Spec.Resource)
-
+	resourceHashCode := hashResource(distributor.Spec.Resource)
 	return syncItSlowly(matchedNamespaces, 1, func(namespace string) *UnexpectedError {
+		ns := &corev1.Namespace{}
+		getNSErr := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns)
+		if errors.IsNotFound(getNSErr) || (getNSErr == nil && ns.DeletionTimestamp != nil) {
+			return &UnexpectedError{
+				err:         fmt.Errorf("namespace not found or is terminating"),
+				namespace:   namespace,
+				conditionID: NotExistConditionID,
+			}
+		}
+
 		// 1. try to fetch existing old resource
 		oldResource := &unstructured.Unstructured{}
 		oldResource.SetGroupVersionKind(resource.GetObjectKind().GroupVersionKind())
@@ -202,17 +251,10 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1al
 		}
 
 		// 2. if resource doesn't exist, create resource;
-		newResource := makeResourceObject(distributor, namespace, resource, newResourceHashCode).(client.Object)
 		if getErr != nil && errors.IsNotFound(getErr) {
-			if createErr := r.Client.Create(context.TODO(), newResource); createErr != nil {
+			newResource := makeResourceObject(distributor, namespace, resource, resourceHashCode, nil)
+			if createErr := r.Client.Create(context.TODO(), newResource.(client.Object)); createErr != nil {
 				klog.Errorf("Error occurred when creating resource in namespace %s, err： %v, name: %s", namespace, createErr, distributor.Name)
-				if errors.IsNotFound(createErr) {
-					return &UnexpectedError{
-						err:         fmt.Errorf("namespace not found"),
-						namespace:   namespace,
-						conditionID: NotExistConditionID,
-					}
-				}
 				return &UnexpectedError{
 					err:         createErr,
 					namespace:   namespace,
@@ -223,19 +265,20 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1al
 			return nil
 		}
 
-		// 3. if resource exits
-		annotations := oldResource.GetAnnotations()
-		if annotations == nil || annotations[utils.SourceResourceDistributionOfResource] != distributor.Name {
-			// if conflict occurred
+		// 3. check conflict
+		if !isControlledByDistributor(oldResource, distributor) {
 			klog.Errorf("Conflict with existing resource(%s/%s) in namespaces %s, name: %s", resourceKind, resourceName, namespace, distributor.Name)
 			return &UnexpectedError{
-				err:         fmt.Errorf("conflict with existing resources because of the same namespace and name"),
+				err:         fmt.Errorf("conflict with existing resources because of the same namespace, group, version, kind and name"),
 				namespace:   namespace,
 				conditionID: ConflictConditionID,
 			}
-		} else if annotations[utils.ResourceHashCodeAnnotation] != newResourceHashCode {
-			//  else if the resource needs to update
-			if updateErr := r.Client.Update(context.TODO(), newResource); updateErr != nil {
+		}
+
+		// 4. check whether resource need to update
+		if needToUpdate(oldResource, utils.ConvertToUnstructured(resource)) {
+			newResource := makeResourceObject(distributor, namespace, resource, resourceHashCode, oldResource)
+			if updateErr := r.Client.Update(context.TODO(), newResource.(client.Object)); updateErr != nil {
 				klog.Errorf("Error occurred when updating resource in namespace %s, err： %v, name: %s", namespace, updateErr, distributor.Name)
 				return &UnexpectedError{
 					err:         updateErr,
@@ -255,6 +298,12 @@ func (r *ReconcileResourceDistribution) cleanResource(distributor *appsv1alpha1.
 	resourceName := utils.ConvertToUnstructured(resource).GetName()
 	resourceKind := resource.GetObjectKind().GroupVersionKind().Kind
 	return syncItSlowly(unmatchedNamespaces, 1, func(namespace string) *UnexpectedError {
+		ns := &corev1.Namespace{}
+		getNSErr := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns)
+		if errors.IsNotFound(getNSErr) || (getNSErr == nil && ns.DeletionTimestamp != nil) {
+			return nil
+		}
+
 		// 1. try to fetch existing old resource
 		oldResource := &unstructured.Unstructured{}
 		oldResource.SetGroupVersionKind(resource.GetObjectKind().GroupVersionKind())
@@ -270,11 +319,11 @@ func (r *ReconcileResourceDistribution) cleanResource(distributor *appsv1alpha1.
 			}
 		}
 
-		// 2. just return if the owner of the oldResource is not this distributor
-		annotations := oldResource.GetAnnotations()
-		if annotations == nil || annotations[utils.SourceResourceDistributionOfResource] != distributor.Name {
+		// 2. if the owner of the oldResource is not this distributor, just return
+		if !isControlledByDistributor(oldResource, distributor) {
 			return nil
 		}
+
 		// 3. else clean the resource
 		if deleteErr := r.Client.Delete(context.TODO(), oldResource); deleteErr != nil && !errors.IsNotFound(deleteErr) {
 			klog.Errorf("Error occurred when deleting resource in namespace %s from client, err： %v, name: %s", namespace, deleteErr, distributor.Name)
@@ -290,7 +339,7 @@ func (r *ReconcileResourceDistribution) cleanResource(distributor *appsv1alpha1.
 }
 
 // handlerErrors process all errors about resource distribution and clean, and record them to conditions
-func (r *ReconcileResourceDistribution) handleErrors(distributorName string, errLists ...[]*UnexpectedError) ([]appsv1alpha1.ResourceDistributionCondition, field.ErrorList) {
+func (r *ReconcileResourceDistribution) handleErrors(errLists ...[]*UnexpectedError) ([]appsv1alpha1.ResourceDistributionCondition, field.ErrorList) {
 	// init a status.conditions
 	conditions := make([]appsv1alpha1.ResourceDistributionCondition, NumberOfConditionTypes)
 	initConditionType(conditions)

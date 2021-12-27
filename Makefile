@@ -49,7 +49,7 @@ test: generate fmt vet manifests ## Run tests
 
 ##@ Build
 
-build: manifests generate fmt vet ## Build manager binary.
+build: generate fmt vet manifests ## Build manager binary.
 	go build -o bin/manager main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.

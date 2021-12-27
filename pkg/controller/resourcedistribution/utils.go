@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"reflect"
 	"sync"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -175,17 +177,50 @@ func calculateNewStatus(distributor *appsv1alpha1.ResourceDistribution, newCondi
 	return status
 }
 
+// mergeMetadata will merge labels/annotations/finalizers
+func mergeMetadata(newResource, oldResource *unstructured.Unstructured) {
+	if newResource.GetLabels() == nil {
+		newResource.SetLabels(make(map[string]string))
+	}
+
+	if newResource.GetAnnotations() == nil {
+		newResource.SetAnnotations(make(map[string]string))
+	}
+
+	for k, v := range oldResource.GetLabels() {
+		newLabels := newResource.GetLabels()
+		if _, ok := newLabels[k]; !ok {
+			newLabels[k] = v
+		}
+		newResource.SetLabels(newLabels)
+	}
+
+	for k, v := range oldResource.GetAnnotations() {
+		newAnnotations := newResource.GetAnnotations()
+		if _, ok := newAnnotations[k]; !ok {
+			newAnnotations[k] = v
+		}
+		newResource.SetAnnotations(newAnnotations)
+	}
+
+	newResource.SetFinalizers(sets.NewString(newResource.GetFinalizers()...).
+		Union(sets.NewString(oldResource.GetFinalizers()...)).List())
+}
+
 // makeResourceObject set some necessary information for resource before updating and creating
-func makeResourceObject(distributor *appsv1alpha1.ResourceDistribution, namespace string, resource runtime.Object, hashCode string) runtime.Object {
+func makeResourceObject(distributor *appsv1alpha1.ResourceDistribution, namespace string, resource runtime.Object, hashCode string, oldResource *unstructured.Unstructured) runtime.Object {
 	// convert to unstructured
-	resource = resource.DeepCopyObject()
-	resourceOperation := utils.ConvertToUnstructured(resource)
+	newResource := utils.ConvertToUnstructured(resource.DeepCopyObject())
+	if oldResource != nil {
+		mergeMetadata(newResource, oldResource)
+	}
+
 	// 1. set namespace
-	resourceOperation.SetNamespace(namespace)
+	newResource.SetNamespace(namespace)
 
 	// 2. set ownerReference for cascading deletion
 	found := false
-	owners := resourceOperation.GetOwnerReferences()
+	owners := newResource.GetOwnerReferences()
 	for i := range owners {
 		if owners[i].UID == distributor.UID {
 			found = true
@@ -193,26 +228,19 @@ func makeResourceObject(distributor *appsv1alpha1.ResourceDistribution, namespac
 		}
 	}
 	if !found {
-		owners = append(owners, metav1.OwnerReference{
-			APIVersion: distributor.APIVersion,
-			Kind:       distributor.Kind,
-			Name:       distributor.Name,
-			UID:        distributor.UID,
-		})
-		resourceOperation.SetOwnerReferences(owners)
+		newResource.SetOwnerReferences(append(owners, *metav1.NewControllerRef(distributor, distributor.GroupVersionKind())))
 	}
 
 	// 3. set resource annotations
-	annotations := resourceOperation.GetAnnotations()
+	annotations := newResource.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
 	annotations[utils.ResourceHashCodeAnnotation] = hashCode
-	annotations[utils.ResourceDistributedTimestamp] = time.Now().String()
 	annotations[utils.SourceResourceDistributionOfResource] = distributor.Name
-	resourceOperation.SetAnnotations(annotations)
+	newResource.SetAnnotations(annotations)
 
-	return resource
+	return newResource
 }
 
 func syncItSlowly(namespaces []string, initialBatchSize int, fn func(namespace string) *UnexpectedError) (int32, []*UnexpectedError) {
@@ -255,6 +283,7 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 	if err := handlerClient.List(context.TODO(), namespacesList); err != nil {
 		return nil, nil, err
 	}
+
 	for _, namespace := range namespacesList.Items {
 		unmatchedSet.Insert(namespace.Name)
 	}
@@ -294,11 +323,26 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 		unmatchedSet.Delete(matched)
 	}
 
-	// 6. exclude forbidden namespaces
-	for _, forbiddenNamespace := range utils.ForbiddenNamespaces {
-		matchedSet.Delete(forbiddenNamespace)
-		unmatchedSet.Delete(forbiddenNamespace)
-	}
-
 	return matchedSet.List(), unmatchedSet.List(), nil
+}
+
+func needToUpdate(old, new *unstructured.Unstructured) bool {
+	oldObject := old.DeepCopy().Object
+	newObject := new.DeepCopy().Object
+	oldObject["metadata"] = nil
+	newObject["metadata"] = nil
+	oldObject["status"] = nil
+	newObject["status"] = nil
+	return !reflect.DeepEqual(oldObject, newObject)
+}
+
+func isControlledByDistributor(resource metav1.Object, distributor *appsv1alpha1.ResourceDistribution) bool {
+	controller := metav1.GetControllerOf(resource)
+	if controller != nil && distributor != nil &&
+		distributor.APIVersion == controller.APIVersion &&
+		distributor.Kind == controller.Kind &&
+		distributor.Name == controller.Name {
+		return true
+	}
+	return false
 }
