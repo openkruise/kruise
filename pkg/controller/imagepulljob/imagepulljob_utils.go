@@ -51,6 +51,44 @@ func getTTLSecondsForAlways(job *appsv1alpha1.ImagePullJob) *int32 {
 	return &ret
 }
 
+func getOwnerRef(job *appsv1alpha1.ImagePullJob) *v1.ObjectReference {
+	return &v1.ObjectReference{
+		APIVersion: controllerKind.GroupVersion().String(),
+		Kind:       controllerKind.Kind,
+		Name:       job.Name,
+		Namespace:  job.Namespace,
+		UID:        job.UID,
+	}
+}
+
+func getSecrets(job *appsv1alpha1.ImagePullJob) []appsv1alpha1.ReferenceObject {
+	var secrets []appsv1alpha1.ReferenceObject
+	for _, secret := range job.Spec.PullSecrets {
+		secrets = append(secrets,
+			appsv1alpha1.ReferenceObject{
+				Namespace: job.Namespace,
+				Name:      secret,
+			})
+	}
+	return secrets
+}
+
+func getImagePullPolicy(job *appsv1alpha1.ImagePullJob) *appsv1alpha1.ImageTagPullPolicy {
+	pullPolicy := &appsv1alpha1.ImageTagPullPolicy{}
+	if job.Spec.PullPolicy != nil {
+		pullPolicy.BackoffLimit = job.Spec.PullPolicy.BackoffLimit
+		pullPolicy.TimeoutSeconds = job.Spec.PullPolicy.TimeoutSeconds
+	}
+	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
+		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForNever()
+		pullPolicy.ActiveDeadlineSeconds = getActiveDeadlineSecondsForNever()
+	} else {
+		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForAlways(job)
+		pullPolicy.ActiveDeadlineSeconds = job.Spec.CompletionPolicy.ActiveDeadlineSeconds
+	}
+	return pullPolicy
+}
+
 func getTTLSecondsForNever() *int32 {
 	// 24h +- 10min
 	var ret = defaultTTLSecondsForNever + rand.Int31n(1200) - 600
@@ -65,15 +103,6 @@ func getActiveDeadlineSecondsForNever() *int64 {
 func containsObject(slice []appsv1alpha1.ReferenceObject, obj appsv1alpha1.ReferenceObject) bool {
 	for _, o := range slice {
 		if o.Namespace == obj.Namespace && o.Name == obj.Name {
-			return true
-		}
-	}
-	return false
-}
-
-func containsObjectRef(slice []v1.ObjectReference, obj v1.ObjectReference) bool {
-	for _, o := range slice {
-		if o.UID == obj.UID {
 			return true
 		}
 	}

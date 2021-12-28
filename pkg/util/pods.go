@@ -272,3 +272,12 @@ func InjectReadinessGateToPod(pod *v1.Pod, conditionType v1.PodConditionType) {
 	}
 	pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: conditionType})
 }
+
+func ContainsObjectRef(slice []v1.ObjectReference, obj v1.ObjectReference) bool {
+	for _, o := range slice {
+		if o.UID == obj.UID {
+			return true
+		}
+	}
+	return false
+}

@@ -249,34 +249,9 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 		parallelism = len(notSyncedNodeImages)
 	}
 
-	ownerRef := &v1.ObjectReference{
-		APIVersion: controllerKind.GroupVersion().String(),
-		Kind:       controllerKind.Kind,
-		Name:       job.Name,
-		Namespace:  job.Namespace,
-		UID:        job.UID,
-	}
-	var secrets []appsv1alpha1.ReferenceObject
-	for _, secret := range job.Spec.PullSecrets {
-		secrets = append(secrets,
-			appsv1alpha1.ReferenceObject{
-				Namespace: job.Namespace,
-				Name:      secret,
-			})
-	}
-
-	pullPolicy := appsv1alpha1.ImageTagPullPolicy{}
-	if job.Spec.PullPolicy != nil {
-		pullPolicy.BackoffLimit = job.Spec.PullPolicy.BackoffLimit
-		pullPolicy.TimeoutSeconds = job.Spec.PullPolicy.TimeoutSeconds
-	}
-	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
-		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForNever()
-		pullPolicy.ActiveDeadlineSeconds = getActiveDeadlineSecondsForNever()
-	} else {
-		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForAlways(job)
-		pullPolicy.ActiveDeadlineSeconds = job.Spec.CompletionPolicy.ActiveDeadlineSeconds
-	}
+	ownerRef := getOwnerRef(job)
+	secrets := getSecrets(job)
+	pullPolicy := getImagePullPolicy(job)
 
 	now := metav1.NewTime(r.clock.Now())
 	imageName, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(job.Spec.Image)
@@ -304,7 +279,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 				if tagSpec.Tag != imageTag {
 					continue
 				}
-				if containsObjectRef(tagSpec.OwnerReferences, *ownerRef) {
+				if util.ContainsObjectRef(tagSpec.OwnerReferences, *ownerRef) {
 					skip = true
 					return nil
 				}
@@ -330,7 +305,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 				imageSpec.Tags = append(imageSpec.Tags, appsv1alpha1.ImageTagSpec{
 					Tag:             imageTag,
 					Version:         foundVersion + 1,
-					PullPolicy:      &pullPolicy,
+					PullPolicy:      pullPolicy,
 					OwnerReferences: []v1.ObjectReference{*ownerRef},
 					CreatedAt:       &now,
 				})
