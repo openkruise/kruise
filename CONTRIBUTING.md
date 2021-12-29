@@ -88,7 +88,7 @@ We encourage contributors to follow the [PR template](./.github/PULL_REQUEST_TEM
 As a contributor, if you want to make any contribution to Kruise project, we should reach an agreement on the version of tools used in the development environment.
 Here are some dependents with specific version:
 
-- Golang : v1.13+ (1.15 is best)
+- Golang : v1.15+ (1.17 is best)
 - Kubernetes: v1.16+
 
 ### Developing guide
@@ -96,17 +96,21 @@ Here are some dependents with specific version:
 There's a `Makefile` in the root folder which describes the options to build and install. Here are some common ones:
 
 ```bash
+# Generate code and manifests e.g. CRD, RBAC YAML files etc
+make manifests
+
 # Build the controller manager binary
 make build
 
 # Run the unit tests
 make test
-
-# Generate manifests e.g. CRD, RBAC YAML files etc
-make manifests
 ```
 
-**If you want to start kruise-controller-manager locally to work with a Kubernetes cluster, you should follow the [debug guide](./docs/debug/README.md).**
+**There are some guide documents for contributors in [./docs/contributing/](./docs/contributing), such as debug guide to help you test your own branch in a Kubernetes cluster.**
+
+### Proposals
+
+If you are going to contribute a feature with new API or needs significant effort, please submit a proposal in [./docs/proposals/](./docs/proposals) first.
 
 ## Engage to help anything
 
@@ -127,20 +131,4 @@ In a word, **ANY HELP IS CONTRIBUTION**.
 ## Join Openkruise as a member
 
 It is also welcomed to join Openkruise team if you are willing to participate in Openkruise community continuously and keep active.
-
-### Requirements
-
-- Have read the [Contributing to Openkruise](./CONTRIBUTING.md) carefully
-- Have read the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md)
-- Have submitted multi PRs to the community
-- Be active in the community, may including but not limited
-  - Submitting or commenting on issues
-  - Contributing PRs to the community
-  - Reviewing PRs in the community
-
-### How to do it
-
-You can do it in either of two ways:
-
-- Submit a PR in the project repo
-- Contact via the [community](./README.md#community) channels offline
+Please read and follow the [Community Membership](https://github.com/openkruise/community/blob/master/community-membership.md).

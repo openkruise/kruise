@@ -35,28 +35,25 @@ minikube start
 ```
 
 ### Second Step: Deploy your kruise with a deployment
-The followings are the steps to debug Kruise controller manager locally using Pod. Note that the
-`WEBHOOK_HOST` env variable should be unset if you have tried [above](#way-2-debug-your-kruise-locally)
-debugging methodology before.
-#### 1.Build controller-manager and CRDs
-Make your own code changes and validate the build by running `make build` and `make manifests` in Kruise directory.
-#### 2.Deploy customized controller manager
-The deployment can be done by following steps assuming a fresh environment.
-Note that the new controller manager will be deployed via a `Deployment` to replace the default Kruise controller manager.
-- Prerequisites: create new/use existing [dock hub](https://hub.docker.com/) account ($DOCKERID), and create a `kruise` repository in it;
-- step 1: `docker login` with the $DOCKERID account;
-- step 2: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
-- step 3: `make docker-build` to build the image locally;
-- step 4: `make docker-push` to push the image to dock hub under the `kruise` repository;
-- step 5: `export KUBECONFIG=<your_k8s_config>` to specify the k8s cluster config. e.g., `export KUBECONFIG=$~/.kube/config`;
-- step 6: `make deploy IMG=${IMG}` to deploy your kruise-controller-manager to the k8s cluster;
+#### 1. Generate code and manifests in your branch
+Make your own code changes and validate the build by running `make generate manifests` in Kruise directory.
+#### 2. Deploy customized controller manager
+The deployment can be done by following steps.
+- Prerequisites: prepare a `kruise` repository in an image registry, it can be [docker hub](https://hub.docker.com/) or your private hub.
+- step 1: `export IMG=<image_name>` to specify the target image name. e.g., `export IMG=$DOCKERID/kruise:test`;
+- step 2: `make docker-build` to build the image locally and `make docker-push` to push the image to registry;
+- step 3: `export KUBECONFIG=<your_k8s_config>` to specify the k8s cluster config. e.g., `export KUBECONFIG=$~/.kube/config`;
+- step 4:
+  - 4.1: `make deploy` to deploy Kruise to the k8s cluster with the `IMG` you have packaged, if the cluster has not installed Kruise or has installed via `make deploy`;
+  - 4.2: if the cluster has installed Kruise via helm chart, we suggest you just update your `IMG` into it with `kubectl set image -n kruise-system deployment kruise-controller-manager manager=${IMG}`;
 
 Tips:
-- If you need to update `mutatingwebhookconfiguration` or `validatingwebhookconfiguration` of kruise, please run `./scripts/uninstall.sh` in Kruise directory to uninstall them `before step 6`.
+- You have to run `./scripts/uninstall.sh` to uninstall Kruise if you installed it using `make deploy`.
 
 #### 3.View logs of your kruise
 You can perform manual tests and use `kubectl logs -n kruise-system <kruise-controller-manager-pod-name>` to check controller logs for debugging, and you can see your `<kruise-controller-manager-pod-name>` by applying `kubectl get pod -n kruise-system`.
-## Way 2: Debug your kruise locally
+
+## Way 2: Debug your kruise locally (NOT Recommended)
 Kubebuilder default `make run` does not work for webhooks since its scaffolding code starts webhook server
 using kubernetes service and the service usually does not work in local dev environment.
 

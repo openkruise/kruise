@@ -20,7 +20,5 @@ assignees: FillZpp
 **Environment**:
 - Kruise version:
 - Kubernetes version (use `kubectl version`):
-- OS (e.g: `cat /etc/os-release`):
-- Kernel (e.g. `uname -a`):
-- Install tools:
+- Install details (e.g. helm install args):
 - Others:

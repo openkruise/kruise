@@ -24,7 +24,7 @@ export E2E_ROOT
 echo "$E2E_ROOT"
 
 # Install tools we need, but only from vendor/...
-go get github.com/go-bindata/go-bindata/go-bindata
+go install github.com/go-bindata/go-bindata/go-bindata
 
 # run the generation from the root directory for stable output
 pushd "${E2E_ROOT}" >/dev/null
