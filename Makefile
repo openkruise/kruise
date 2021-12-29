@@ -55,7 +55,7 @@ build: generate fmt vet manifests ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-docker-build: test ## Build docker image with the manager.
+docker-build: generate fmt vet manifests ## Build docker image with the manager.
 	docker build --pull --no-cache . -t ${IMG}
 
 docker-push: ## Push docker image with the manager.

@@ -188,6 +188,7 @@ github.com/fsnotify/fsnotify
 # github.com/go-bindata/go-bindata v3.1.2+incompatible
 ## explicit
 github.com/go-bindata/go-bindata
+github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-logr/logr v0.3.0
 github.com/go-logr/logr
 # github.com/go-openapi/analysis v0.19.5
