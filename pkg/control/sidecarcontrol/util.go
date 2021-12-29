@@ -38,6 +38,8 @@ import (
 )
 
 const (
+	SidecarSetKindName = "kruise.io/sidecarset-name"
+
 	// SidecarSetHashAnnotation represents the key of a sidecarSet hash
 	SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
 	// SidecarSetHashWithoutImageAnnotation represents the key of a sidecarset hash without images of sidecar
@@ -62,10 +64,11 @@ var (
 )
 
 type SidecarSetUpgradeSpec struct {
-	UpdateTimestamp metav1.Time `json:"updateTimestamp"`
-	SidecarSetHash  string      `json:"hash"`
-	SidecarSetName  string      `json:"sidecarSetName"`
-	SidecarList     []string    `json:"sidecarList"`
+	UpdateTimestamp              metav1.Time `json:"updateTimestamp"`
+	SidecarSetHash               string      `json:"hash"`
+	SidecarSetName               string      `json:"sidecarSetName"`
+	SidecarList                  []string    `json:"sidecarList"`        // sidecarSet container list
+	SidecarSetControllerRevision string      `json:"controllerRevision"` // sidecarSet controllerRevision name
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
@@ -107,6 +110,11 @@ func GetSidecarSetWithoutImageRevision(sidecarSet *appsv1alpha1.SidecarSet) stri
 func GetPodSidecarSetRevision(sidecarSetName string, pod metav1.Object) string {
 	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, SidecarSetHashAnnotation, pod)
 	return upgradeSpec.SidecarSetHash
+}
+
+func GetPodSidecarSetControllerRevision(sidecarSetName string, pod metav1.Object) string {
+	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, SidecarSetHashAnnotation, pod)
+	return upgradeSpec.SidecarSetControllerRevision
 }
 
 func GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, annotationKey string, pod metav1.Object) SidecarSetUpgradeSpec {
@@ -183,10 +191,11 @@ func updatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 	}
 
 	sidecarSetHash[sidecarSet.Name] = SidecarSetUpgradeSpec{
-		UpdateTimestamp: metav1.Now(),
-		SidecarSetHash:  GetSidecarSetRevision(sidecarSet),
-		SidecarSetName:  sidecarSet.Name,
-		SidecarList:     sidecarList.List(),
+		UpdateTimestamp:              metav1.Now(),
+		SidecarSetHash:               GetSidecarSetRevision(sidecarSet),
+		SidecarSetName:               sidecarSet.Name,
+		SidecarList:                  sidecarList.List(),
+		SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,
 	}
 	newHash, _ := json.Marshal(sidecarSetHash)
 	pod.Annotations[hashKey] = string(newHash)
