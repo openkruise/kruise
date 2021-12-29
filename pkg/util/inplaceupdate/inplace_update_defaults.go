@@ -267,7 +267,7 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 		switch hashType {
 		case plainHash:
 			if expectedHash := kubeletcontainer.HashContainer(containerSpec); containerMeta.Hashes.PlainHash != expectedHash {
-				klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different plain hash with spec %s != %s",
+				klog.Warningf("Find container %s in runtime-container-meta for Pod %s/%s has different plain hash with spec %v != %v",
 					containerSpec.Name, pod.Namespace, pod.Name, containerMeta.Hashes.PlainHash, expectedHash)
 				return false
 			}

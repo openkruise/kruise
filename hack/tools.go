@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 /*
@@ -20,7 +21,7 @@ limitations under the License.
 package hack
 
 import (
-	_ "github.com/go-bindata/go-bindata"
+	_ "github.com/go-bindata/go-bindata/go-bindata"
 	_ "k8s.io/code-generator"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
 )
