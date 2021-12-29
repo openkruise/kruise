@@ -18,17 +18,22 @@ package sidecarset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -302,5 +307,217 @@ func TestCanUpgradePods(t *testing.T) {
 				t.Fatalf("except pod(%d) image(test-image:v2), but get image(%s)", i, podOutput.Spec.Containers[1].Image)
 			}
 		}
+	}
+}
+
+func TestGetActiveRevisions(t *testing.T) {
+	sidecarSet := factorySidecarSet()
+	sidecarSet.SetUID("1223344")
+	kubeSysNs := &corev1.Namespace{}
+	//Note that webhookutil.GetNamespace() return "" here
+	kubeSysNs.SetName(webhookutil.GetNamespace())
+	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
+	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+
+	// case 1
+	latestRevision, _, err := processor.registerLatestRevision(sidecarSet, nil)
+	if err != nil || latestRevision == nil || latestRevision.Revision != int64(1) {
+		t.Fatalf("in case of create: get active revision failed when the latest revision = 1, err: %v, actual latestRevision: %v",
+			err, latestRevision.Revision)
+	}
+
+	// case 2
+	newSidecar := sidecarSet.DeepCopy()
+	newSidecar.Spec.InitContainers = []appsv1alpha1.SidecarContainer{
+		{Container: corev1.Container{Name: "emptyInitC"}},
+	}
+	newSidecar.Spec.Volumes = []corev1.Volume{
+		{Name: "emptyVolume"},
+	}
+	newSidecar.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+		{Name: "emptySecret"},
+	}
+	for i := 0; i < 5; i++ {
+		latestRevision, _, err = processor.registerLatestRevision(newSidecar, nil)
+		if err != nil || latestRevision == nil || latestRevision.Revision != int64(2) {
+			t.Fatalf("in case of update: get active revision failed when the latest revision = 2, err: %v, actual latestRevision: %v",
+				err, latestRevision.Revision)
+		}
+		revision := make(map[string]interface{})
+		if err := json.Unmarshal(latestRevision.Data.Raw, &revision); err != nil {
+			t.Fatalf("failed to decode revision, err: %v", err)
+		}
+		spec := revision["spec"].(map[string]interface{})
+		_, ok1 := spec["volumes"]
+		_, ok2 := spec["containers"]
+		_, ok3 := spec["initContainers"]
+		_, ok4 := spec["imagePullSecrets"]
+		if !(ok1 && ok2 && ok3 && ok4) {
+			t.Fatalf("failed to store revision, err: %v", err)
+		}
+	}
+
+	// case 3
+	for i := 0; i < 5; i++ {
+		latestRevision, _, err = processor.registerLatestRevision(sidecarSet, nil)
+		if err != nil || latestRevision == nil || latestRevision.Revision != int64(3) {
+			t.Fatalf("in case of rollback: get active revision failed when the latest revision = 3, err: %v, actual latestRevision: %v",
+				err, latestRevision.Revision)
+		}
+	}
+
+	// case 4
+	for i := 0; i < 100; i++ {
+		sidecarSet.Spec.Containers[0].Image = fmt.Sprintf("%d", i)
+		if _, _, err = processor.registerLatestRevision(sidecarSet, nil); err != nil {
+			t.Fatalf("unexpected error, err: %v", err)
+		}
+	}
+	revisionList := &apps.ControllerRevisionList{}
+	processor.Client.List(context.TODO(), revisionList)
+	if len(revisionList.Items) != int(*sidecarSet.Spec.RevisionHistoryLimit) {
+		t.Fatalf("in case of maxStoredRevisions: get wrong number of revisions, expected %d, actual %d", *sidecarSet.Spec.RevisionHistoryLimit, len(revisionList.Items))
+	}
+}
+
+func TestReplaceRevision(t *testing.T) {
+	const TotalRevisions int = 10
+	var revisions, pick []*apps.ControllerRevision
+	// init revision slice
+	for i := 1; i <= TotalRevisions; i++ {
+		rv := &apps.ControllerRevision{}
+		rv.Revision = int64(i)
+		pick = append(pick, rv)
+	}
+
+	// check whether the list is ordered
+	check := func(list []*apps.ControllerRevision) bool {
+		if len(list) != TotalRevisions {
+			return false
+		}
+		for i := 1; i < TotalRevisions; i++ {
+			if list[i].Revision < list[i-1].Revision {
+				return false
+			}
+		}
+		return true
+	}
+
+	// reset revisions
+	reset := func() {
+		revisions = make([]*apps.ControllerRevision, 0)
+		revisions = append(revisions, pick...)
+	}
+
+	newOne := &apps.ControllerRevision{}
+	newOne.Revision = int64(TotalRevisions + 1)
+	for i := 0; i < TotalRevisions; i++ {
+		reset()
+		replaceRevision(revisions, pick[i], newOne)
+		if !check(revisions) {
+			t.Fatalf("replaceRevision failed when replacing the %d-th item of %d", i, TotalRevisions)
+		}
+	}
+}
+
+func TestTruncateHistory(t *testing.T) {
+	sidecarSet := factorySidecarSet()
+	sidecarSet.SetName("sidecar")
+	sidecarSet.SetUID("1223344")
+	if sidecarSet.Spec.Selector.MatchLabels == nil {
+		sidecarSet.Spec.Selector.MatchLabels = make(map[string]string)
+	}
+	kubeSysNs := &corev1.Namespace{}
+	kubeSysNs.SetName(webhookutil.GetNamespace()) //Note that util.GetKruiseManagerNamespace() return "" here
+	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
+	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
+	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+
+	getName := func(i int) string {
+		return "sidecar-" + strconv.Itoa(i)
+	}
+	reset := func(usedCount int) ([]*corev1.Pod, []*apps.ControllerRevision) {
+		pods := factoryPodsCommon(100, 0, sidecarSet)
+		for i := range pods {
+			sidecarSetHash := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+			sidecarSetHash[sidecarSet.Name] = sidecarcontrol.SidecarSetUpgradeSpec{
+				SidecarSetControllerRevision: getName(i%usedCount + 1),
+			}
+			by, _ := json.Marshal(&sidecarSetHash)
+			pods[i].Annotations[sidecarcontrol.SidecarSetHashAnnotation] = string(by)
+		}
+		revisions := make([]*apps.ControllerRevision, 0)
+		for i := 1; i <= 15; i++ {
+			rv := &apps.ControllerRevision{}
+			rv.SetName(getName(i))
+			rv.SetNamespace(webhookutil.GetNamespace())
+			rv.Revision = int64(i)
+			revisions = append(revisions, rv)
+		}
+		return pods, revisions
+	}
+
+	stderr := func(num int) string {
+		return fmt.Sprintf("failed to limit the number of stored revisions, limited: 10, actual: %d, name: sidecar", num)
+	}
+
+	// check successful cases
+	for i := 1; i <= 9; i++ {
+		pods, revisions := reset(i)
+		err := processor.truncateHistory(revisions, sidecarSet, pods)
+		if err != nil {
+			t.Fatalf("expected revision len: %d, err: %v", 10, err)
+		}
+	}
+
+	// check failed cases
+	failedCases := []int{10, 11, 14, 15, 20}
+	expectedResults := []int{11, 12, 15, 15, 15}
+	for i := range failedCases {
+		pods, revisions := reset(failedCases[i])
+		err := processor.truncateHistory(revisions, sidecarSet, pods)
+		if err == nil || err.Error() != stderr(expectedResults[i]) {
+			t.Fatalf("expected revision len: %d, err: %v", expectedResults[i], err)
+		}
+	}
+
+	// check revisions exactly
+	pods, revisions := reset(8)
+	for _, rv := range revisions {
+		if err := processor.Client.Create(context.TODO(), rv); err != nil {
+			t.Fatalf("failed to create revisions")
+		}
+	}
+	if err := processor.truncateHistory(revisions, sidecarSet, pods); err != nil {
+		t.Fatalf("failed to truncate revisions, err %v", err)
+	}
+	list := &apps.ControllerRevisionList{}
+	if err := processor.Client.List(context.TODO(), list); err != nil {
+		t.Fatalf("failed to list revisions, err %v", err)
+	}
+	if len(list.Items) != 10 {
+		t.Fatalf("expected revision len: %d, actual: %d", 10, len(list.Items))
+	}
+	// sort history by revision field
+	rvs := make([]*apps.ControllerRevision, 0)
+	for i := range list.Items {
+		rvs = append(rvs, &list.Items[i])
+	}
+	history.SortControllerRevisions(rvs)
+
+	expected := make(map[int]int)
+	for i := 0; i < 8; i++ {
+		if rvs[i].Name != getName(i+1) {
+			t.Fatalf("expected name %s, actual : %s", getName(expected[i]), rvs[i].Name)
+		}
+	}
+	if rvs[8].Name != getName(14) {
+		t.Fatalf("expected name %s, actual : %s", getName(14), rvs[8].Name)
+	}
+	if rvs[9].Name != getName(15) {
+		t.Fatalf("expected name %s, actual : %s", getName(15), rvs[9].Name)
 	}
 }

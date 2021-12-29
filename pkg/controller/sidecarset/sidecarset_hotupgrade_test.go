@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -61,7 +62,8 @@ var (
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "nginx"},
 			},
-			UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{},
+			UpdateStrategy:       appsv1alpha1.SidecarSetUpdateStrategy{},
+			RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 		},
 	}
 

@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 type FactorySidecarSet func() *appsv1alpha1.SidecarSet
@@ -132,6 +133,7 @@ func factorySidecarSet() *appsv1alpha1.SidecarSet {
 			UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
 				//Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			},
+			RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 		},
 	}
 

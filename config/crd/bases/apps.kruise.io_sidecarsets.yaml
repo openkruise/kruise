@@ -234,6 +234,11 @@ spec:
                 description: Namespace sidecarSet will only match the pods in the
                   namespace otherwise, match pods in all namespaces(in cluster)
                 type: string
+              revisionHistoryLimit:
+                description: RevisionHistoryLimit indicates the maximum quantity of
+                  stored revisions about the SidecarSet. default value is 10
+                format: int32
+                type: integer
               selector:
                 description: selector is a label query over pods that should be injected
                 properties:
@@ -387,6 +392,17 @@ spec:
           status:
             description: SidecarSetStatus defines the observed state of SidecarSet
             properties:
+              collisionCount:
+                description: CollisionCount is the count of hash collisions for the
+                  SidecarSet. The SidecarSet controller uses this field as a collision
+                  avoidance mechanism when it needs to create the name for the newest
+                  ControllerRevision.
+                format: int32
+                type: integer
+              latestRevision:
+                description: LatestRevision, if not empty, indicates the latest controllerRevision
+                  name of the SidecarSet.
+                type: string
               matchedPods:
                 description: matchedPods is the number of Pods whose labels are matched
                   with this SidecarSet's selector and are created after sidecarset

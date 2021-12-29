@@ -22,7 +22,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
@@ -402,4 +404,18 @@ func (t *SidecarSetTester) WaitForCloneSetRunning(cloneset *appsv1alpha1.CloneSe
 	if pollErr != nil {
 		Failf("Failed waiting for cloneset to enter running: %v", pollErr)
 	}
+}
+
+func (t *SidecarSetTester) ListControllerRevisions(sidecarSet *appsv1alpha1.SidecarSet) []*apps.ControllerRevision {
+	selector, err := util.GetFastLabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{
+		sidecarcontrol.SidecarSetKindName: sidecarSet.Name,
+	}})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	revisionList, err := t.c.AppsV1().ControllerRevisions(webhookutil.GetNamespace()).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	revisions := make([]*apps.ControllerRevision, len(revisionList.Items))
+	for i := range revisionList.Items {
+		revisions[i] = &revisionList.Items[i]
+	}
+	return revisions
 }

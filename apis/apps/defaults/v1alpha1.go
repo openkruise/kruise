@@ -28,7 +28,7 @@ import (
 
 // SetDefaults_SidecarSet set default values for SidecarSet.
 func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
-	setSidecarSetUpdateStratety(&obj.Spec.UpdateStrategy)
+	setSidecarSetUpdateStrategy(&obj.Spec.UpdateStrategy)
 
 	for i := range obj.Spec.InitContainers {
 		setSidecarDefaultContainer(&obj.Spec.InitContainers[i])
@@ -40,6 +40,15 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 
 	//default setting volumes
 	SetDefaultPodVolumes(obj.Spec.Volumes)
+
+	//default setting history revision limitation
+	SetDefaultRevisionHistoryLimit(&obj.Spec.RevisionHistoryLimit)
+}
+
+func SetDefaultRevisionHistoryLimit(revisionHistoryLimit **int32) {
+	if *revisionHistoryLimit == nil {
+		*revisionHistoryLimit = utilpointer.Int32Ptr(10)
+	}
 }
 
 func setDefaultSidecarContainer(sidecarContainer *v1alpha1.SidecarContainer) {
@@ -56,7 +65,7 @@ func setDefaultSidecarContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 	setSidecarDefaultContainer(sidecarContainer)
 }
 
-func setSidecarSetUpdateStratety(strategy *v1alpha1.SidecarSetUpdateStrategy) {
+func setSidecarSetUpdateStrategy(strategy *v1alpha1.SidecarSetUpdateStrategy) {
 	if strategy.Type == "" {
 		strategy.Type = v1alpha1.RollingUpdateSidecarSetStrategyType
 	}
