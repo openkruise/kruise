@@ -7,10 +7,23 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+var (
+	testScheme *runtime.Scheme
+	handler    = &SidecarSetCreateUpdateHandler{}
+)
+
+func init() {
+	testScheme = runtime.NewScheme()
+	apps.AddToScheme(testScheme)
+}
 
 func TestValidateSidecarSet(t *testing.T) {
 	errorCases := map[string]appsv1alpha1.SidecarSet{
@@ -199,10 +212,87 @@ func TestValidateSidecarSet(t *testing.T) {
 				},
 			},
 		},
+		"wrong-name-injectionStrategy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
+					Revision: "normal-sidecarset-01234",
+				},
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+				},
+				Containers: []appsv1alpha1.SidecarContainer{
+					{
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+							Type: appsv1alpha1.ShareVolumePolicyDisabled,
+						},
+						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+						},
+						Container: corev1.Container{
+							Name:                     "test-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		"not-existing-injectionStrategy": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
+					Revision: "test-sidecarset-678235",
+				},
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+				},
+				Containers: []appsv1alpha1.SidecarContainer{
+					{
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+							Type: appsv1alpha1.ShareVolumePolicyDisabled,
+						},
+						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+						},
+						Container: corev1.Container{
+							Name:                     "test-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	SidecarSetRevisions := []runtime.Object{
+		&apps.ControllerRevision{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-sidecarset-01234",
+			},
+		},
+		&apps.ControllerRevision{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-sidecarset-56789",
+			},
+		},
 	}
 
 	for name, sidecarSet := range errorCases {
-		allErrs := validateSidecarSetSpec(&sidecarSet, field.NewPath("spec"))
+		fakeClient := fake.NewFakeClientWithScheme(testScheme, SidecarSetRevisions...)
+		handler.Client = fakeClient
+		allErrs := handler.validateSidecarSetSpec(&sidecarSet, field.NewPath("spec"))
 		if len(allErrs) != 1 {
 			t.Errorf("%v: expect errors len 1, but got: %v", name, allErrs)
 		} else {

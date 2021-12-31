@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mutating
+package sidecarcontrol
 
 import (
 	"crypto/sha256"
@@ -65,4 +65,18 @@ func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 // hash hashes `data` with sha256 and returns the hex string
 func hash(data string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
+}
+
+func RecalculateSidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) error {
+	hashCodeWithImage, err := SidecarSetHash(sidecarSet)
+	if err != nil {
+		return err
+	}
+	hashCodeWithoutImage, err := SidecarSetHashWithoutImage(sidecarSet)
+	if err != nil {
+		return err
+	}
+	sidecarSet.Annotations[SidecarSetHashAnnotation] = hashCodeWithImage
+	sidecarSet.Annotations[SidecarSetHashWithoutImageAnnotation] = hashCodeWithoutImage
+	return nil
 }

@@ -27,12 +27,15 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -85,7 +88,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 	// validating ObjectMeta
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, validateSidecarSetName, field.NewPath("metadata"))
 	// validating spec
-	allErrs = append(allErrs, validateSidecarSetSpec(obj, field.NewPath("spec"))...)
+	allErrs = append(allErrs, h.validateSidecarSetSpec(obj, field.NewPath("spec"))...)
 	// when operation is update, older isn't empty, and validating whether old and new containers conflict
 	if older != nil {
 		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec.containers"))...)
@@ -109,7 +112,7 @@ func validateSidecarSetName(name string, prefix bool) (allErrs []string) {
 	return allErrs
 }
 
-func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 
@@ -119,8 +122,10 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 	} else {
 		allErrs = append(allErrs, validateSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
+	//validating SidecarSetInjectionStrategy
+	allErrs = append(allErrs, h.validateSidecarSetInjectionStrategy(obj, fldPath.Child("InjectionStrategy"))...)
 	//validating SidecarSetUpdateStrategy
-	allErrs = append(allErrs, validateSidecarSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, validateSidecarSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
 	//validating volumes
 	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
@@ -144,6 +149,40 @@ func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field
 	_, err := metav1.LabelSelectorAsSelector(selector)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), selector, ""))
+	}
+	return allErrs
+}
+
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+	strategy := &obj.Spec.InjectionStrategy
+	if strategy.Revision == "" {
+		return nil
+	}
+
+	allErrs := field.ErrorList{}
+	// injectionStrategy.revision must has sidecarSet.Name as its prefix
+	if !strings.HasPrefix(strategy.Revision, obj.Name) {
+		return append(allErrs, field.Invalid(fldPath.Child("revision"), strategy.Revision, fmt.Sprintf("injectionStrategy.revision must be a ControllerRevision name of this sidecarSet")))
+	}
+
+	// validate injectionStrategy.revision as a ControllerRevision name
+	errs := appsvalidation.ValidateControllerRevisionName(strategy.Revision, false)
+	for i := range errs {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("revision"), strategy.Revision, errs[i]))
+	}
+	if len(allErrs) != 0 {
+		return allErrs
+	}
+
+	// try to get this revision to check whether it exists
+	key := types.NamespacedName{
+		Namespace: webhookutil.GetNamespace(),
+		Name:      strategy.Revision,
+	}
+	mice := &appsv1.ControllerRevision{}
+	if err := h.Client.Get(context.TODO(), key, mice); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("revision"), strategy.Revision, fmt.Sprintf("Failed to get ControllerRevision, please ensure %v exists in namespace %v, error: %v",
+			strategy.Revision, webhookutil.GetNamespace(), err)))
 	}
 	return allErrs
 }

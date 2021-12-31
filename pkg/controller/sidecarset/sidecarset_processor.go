@@ -396,7 +396,7 @@ func (p *Processor) truncateHistory(revisions []*apps.ControllerRevision, s *app
 	// only delete the revisions that no pods use.
 	activeRevisions := filterActiveRevisions(s, pods)
 	for i := 0; i < revisionCount-1 && deletionCount > 0; i++ {
-		if !activeRevisions.Has(revisions[i].Name) { // && revision.InjectionStrategy.ControllerRevision != revisions[i].Name
+		if !activeRevisions.Has(revisions[i].Name) && revisions[i].Name != s.Spec.InjectionStrategy.Revision {
 			if err := p.historyController.DeleteControllerRevision(revisions[i]); err != nil && !errors.IsNotFound(err) {
 				return err
 			}

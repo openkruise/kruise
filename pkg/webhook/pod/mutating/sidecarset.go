@@ -85,9 +85,13 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 			!sidecarcontrol.IsPodConsistentWithSidecarSet(pod, &sidecarSet) {
 			continue
 		}
+		injectedSidecarSet, err := h.getSpecificHistorySidecarSet(&sidecarSet)
+		if err != nil {
+			return err
+		}
 		// check whether sidecarSet is active
 		// when sidecarSet is not active, it will not perform injections and upgrades process.
-		control := sidecarcontrol.New(sidecarSet.DeepCopy())
+		control := sidecarcontrol.New(injectedSidecarSet)
 		if !control.IsActiveSidecarSet() {
 			continue
 		}
@@ -143,6 +147,22 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	}
 	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
 	return nil
+}
+
+func (h *PodCreateHandler) getSpecificHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (*appsv1alpha1.SidecarSet, error) {
+	// if .Spec.InjectionStrategy.Revision is empty, just return the latest sidecarSet
+	if sidecarSet.Spec.InjectionStrategy.Revision == "" {
+		return sidecarSet.DeepCopy(), nil
+	}
+	// else return its corresponding history revision
+	hc := sidecarcontrol.NewHistoryControl(h.Client)
+	history, err := hc.GetHistorySidecarSet(sidecarSet, sidecarSet.Spec.InjectionStrategy.Revision)
+	if err != nil || history == nil {
+		klog.Errorf("Failed to restore history revision for SidecarSet %v, ControllerRevision name %v:, error: %v",
+			sidecarSet.Name, sidecarSet.Spec.InjectionStrategy.Revision, err)
+		return sidecarSet.DeepCopy(), nil
+	}
+	return history, nil
 }
 
 func mergeSidecarSecrets(secretsInPod, secretsInSidecar []corev1.LocalObjectReference) (allSecrets []corev1.LocalObjectReference) {
@@ -247,9 +267,10 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		volumesMap := getVolumesMapInSidecarSet(sidecarSet)
 		// process sidecarset hash
 		setUpgrade1 := sidecarcontrol.SidecarSetUpgradeSpec{
-			UpdateTimestamp: metav1.Now(),
-			SidecarSetHash:  sidecarcontrol.GetSidecarSetRevision(sidecarSet),
-			SidecarSetName:  sidecarSet.Name,
+			UpdateTimestamp:              metav1.Now(),
+			SidecarSetHash:               sidecarcontrol.GetSidecarSetRevision(sidecarSet),
+			SidecarSetName:               sidecarSet.Name,
+			SidecarSetControllerRevision: sidecarSet.Spec.InjectionStrategy.Revision,
 		}
 		setUpgrade2 := sidecarcontrol.SidecarSetUpgradeSpec{
 			UpdateTimestamp: metav1.Now(),

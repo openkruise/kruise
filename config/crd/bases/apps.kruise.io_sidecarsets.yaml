@@ -229,6 +229,11 @@ spec:
                       to newly created Pods, but the injected sidecar container remains
                       updating and running. default is false
                     type: boolean
+                  revision:
+                    description: Revision indicates the ControllerRevision name of
+                      SidecarSet that users want to inject to newly-created Pods.
+                      default is "", indicating the latest revision.
+                    type: string
                 type: object
               namespace:
                 description: Namespace sidecarSet will only match the pods in the

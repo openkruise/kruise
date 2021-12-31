@@ -142,6 +142,9 @@ type SidecarSetInjectionStrategy struct {
 	// but the injected sidecar container remains updating and running.
 	// default is false
 	Paused bool `json:"paused,omitempty"`
+	// Revision indicates the ControllerRevision name of SidecarSet that users want to inject to newly-created Pods.
+	// default is "", indicating the latest revision.
+	Revision string `json:"revision,omitempty"`
 }
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet

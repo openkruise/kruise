@@ -19,6 +19,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,8 +28,10 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -442,6 +445,65 @@ func testInjectionStrategyPaused(t *testing.T, sidecarIn *appsv1alpha1.SidecarSe
 
 	if len(podOut.Spec.Containers) != len(podIn.Spec.Containers) {
 		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers), len(podOut.Spec.Containers))
+	}
+}
+
+func TestInjectionStrategyRevision(t *testing.T) {
+	spec := map[string]interface{}{
+		"spec": map[string]interface{}{
+			"initContainers": []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "init-2",
+						Image: "busybox:1.0.0",
+					},
+				},
+			},
+			"containers": []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "dns-f",
+						Image: "dns-f-image:1.0",
+					},
+					PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+					ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+						Type: appsv1alpha1.ShareVolumePolicyDisabled,
+					},
+				},
+			},
+		},
+	}
+
+	raw, _ := json.Marshal(spec)
+	revisionName := fmt.Sprintf("%s-12345", sidecarSet1.Name)
+	sidecarSetIn := sidecarSet1.DeepCopy()
+	sidecarSetIn.Spec.InjectionStrategy.Revision = revisionName
+	historyInjection := []runtime.Object{
+		sidecarSetIn,
+		&apps.ControllerRevision{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: webhookutil.GetNamespace(),
+				Name:      revisionName,
+			},
+			Data: runtime.RawExtension{
+				Raw: raw,
+			},
+		},
+	}
+	testInjectionStrategyRevision(t, historyInjection)
+}
+
+func testInjectionStrategyRevision(t *testing.T, env []runtime.Object) {
+	podIn := pod1.DeepCopy()
+	podOut := podIn.DeepCopy()
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewFakeClient(env...)
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+
+	if len(podIn.Spec.Containers)+len(podIn.Spec.InitContainers)+2 != len(podOut.Spec.Containers)+len(podOut.Spec.InitContainers) {
+		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers)+2, len(podOut.Spec.Containers))
 	}
 }
 

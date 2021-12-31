@@ -1022,5 +1022,81 @@ var _ = SIGDescribe("SidecarSet", func() {
 			revisionChecker(sidecarSetIn, 10, expectedOrder)
 			ginkgo.By(fmt.Sprintf("sidecarSet history revision check done"))
 		})
+
+		ginkgo.It("sidecarSet InjectionStrategy.Revision checker", func() {
+			// create sidecarSet
+			nginxName := func(tag string) string {
+				return fmt.Sprintf("nginx:%s", tag)
+			}
+			tags := []string{
+				"latest", "1.21.1", "1.21", "1.20.1", "1.20", "1.19.10",
+			}
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn.SetName("e2e-test-for-injection-strategy-revision")
+			sidecarSetIn.Spec.UpdateStrategy.Paused = true
+			sidecarSetIn.Spec.Containers[0].Image = nginxName(tags[0])
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			sidecarSetIn = tester.CreateSidecarSet(sidecarSetIn)
+			// update sidecarSet and stored revisions
+			time.Sleep(time.Second)
+			for i := 1; i < 6; i++ {
+				sidecarSetIn.Spec.Containers[0].Image = nginxName(tags[i])
+				tester.UpdateSidecarSet(sidecarSetIn)
+				gomega.Eventually(func() int {
+					rv := tester.ListControllerRevisions(sidecarSetIn)
+					return len(rv)
+				}, 5*time.Second, time.Second).Should(gomega.Equal(i + 1))
+			}
+
+			// pick a history revision to inject
+			pick := 3
+			list := tester.ListControllerRevisions(sidecarSetIn)
+			gomega.Expect(list).To(gomega.HaveLen(6))
+			history.SortControllerRevisions(list)
+			sidecarSetIn.Spec.InjectionStrategy.Revision = list[pick].Name
+			tester.UpdateSidecarSet(sidecarSetIn)
+			time.Sleep(time.Second)
+
+			// create deployment
+			deploymentIn := tester.NewBaseDeployment(ns)
+			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			tester.CreateDeployment(deploymentIn)
+
+			// check sidecarSet revision
+			pods, err := tester.GetSelectorPods(ns, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(1))
+			gomega.Expect(pods[0].Spec.Containers[0].Image).To(gomega.Equal(nginxName(tags[pick])))
+
+			// check pod sidecarSetHash
+			gomega.Expect(len(pods[0].Annotations[sidecarcontrol.SidecarSetHashAnnotation]) > 0).To(gomega.BeTrue())
+			hash := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+			err = json.Unmarshal([]byte(pods[0].Annotations[sidecarcontrol.SidecarSetHashAnnotation]), &hash)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(hash[sidecarSetIn.Name].SidecarSetControllerRevision).To(gomega.Equal(list[pick].Name))
+
+			// check again after sidecarSet upgrade
+			sidecarSetIn.Spec.UpdateStrategy.Paused = false
+			tester.UpdateSidecarSet(sidecarSetIn)
+			except := &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      1,
+				UpdatedPods:      1,
+				UpdatedReadyPods: 1,
+				ReadyPods:        1,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
+
+			pods, err = tester.GetSelectorPods(ns, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(1))
+			gomega.Expect(pods[0].Spec.Containers[0].Image).To(gomega.Equal(nginxName(tags[5])))
+			gomega.Expect(len(pods[0].Annotations[sidecarcontrol.SidecarSetHashAnnotation]) > 0).To(gomega.BeTrue())
+			hash = make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+			err = json.Unmarshal([]byte(pods[0].Annotations[sidecarcontrol.SidecarSetHashAnnotation]), &hash)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(hash[sidecarSetIn.Name].SidecarSetControllerRevision).To(gomega.Equal(list[5].Name))
+			ginkgo.By(fmt.Sprintf("sidecarSet InjectionStrategy.Revision check done"))
+		})
 	})
 })

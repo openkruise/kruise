@@ -23,13 +23,16 @@ import (
 	"fmt"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -43,6 +46,7 @@ type HistoryControl interface {
 	NewRevision(s *appsv1alpha1.SidecarSet, namespace string, revision int64, collisionCount *int32) (*apps.ControllerRevision, error)
 	NextRevision(revisions []*apps.ControllerRevision) int64
 	GetRevisionLabelSelector(s *appsv1alpha1.SidecarSet) *metav1.LabelSelector
+	GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, revisionName string) (*appsv1alpha1.SidecarSet, error)
 }
 
 type realControl struct {
@@ -160,6 +164,41 @@ func (r *realControl) CreateControllerRevision(parent metav1.Object, revision *a
 		}
 		return clone, err
 	}
+}
+
+func (r *realControl) GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, revisionName string) (*appsv1alpha1.SidecarSet, error) {
+	// fetch history revision
+	key := types.NamespacedName{
+		Namespace: webhookutil.GetNamespace(),
+		Name:      revisionName,
+	}
+	revision := &apps.ControllerRevision{}
+	if err := r.Client.Get(context.TODO(), key, revision); err != nil {
+		klog.Errorf("Failed to get ControllerRevision %s, err %v", revisionName, err)
+		return nil, err
+	}
+	// calculate patch
+	clone := sidecarSet.DeepCopy()
+	cloneBytes, err := runtime.Encode(patchCodec, clone)
+	if err != nil {
+		klog.Errorf("Failed to encode sidecarSet(%v), error: %v", sidecarSet.Name, err)
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(cloneBytes, revision.Data.Raw, clone)
+	if err != nil {
+		klog.Errorf("Failed to merge sidecarSet(%v) and controllerRevision(%v), error: %v", sidecarSet.Name, revisionName, err)
+		return nil, err
+	}
+	// restore history from patch
+	restoredSidecarSet := &appsv1alpha1.SidecarSet{}
+	if err := json.Unmarshal(patched, restoredSidecarSet); err != nil {
+		return nil, err
+	}
+	// re-calculate sidecarSet hash
+	if err := RecalculateSidecarSetHash(restoredSidecarSet); err != nil {
+		return nil, err
+	}
+	return restoredSidecarSet, nil
 }
 
 func copySidecarSetSpecRevision(dst, src map[string]interface{}) {
