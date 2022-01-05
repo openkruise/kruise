@@ -323,8 +323,36 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 		return err
 	}
 
+	// for observability
+	r.recordEventForPods(ws, podMap)
+
 	// clean up unschedulable Pods
 	return r.cleanupUnscheduledPods(ws, scheduleFailedPodMap)
+}
+
+func (r *ReconcileWorkloadSpread) recordEventForPods(ws *appsv1alpha1.WorkloadSpread, podMap map[string][]*corev1.Pod) {
+	lowerboundSeconds := 10 * time.Second
+	upperboundSeconds := 25 * time.Second
+	if ws.Spec.ScheduleStrategy.Adaptive != nil && ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil {
+		lowerboundSeconds = time.Duration(*ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds) * time.Second
+		upperboundSeconds = 3 * lowerboundSeconds
+	}
+	for subset, pods := range podMap {
+		for _, pod := range pods {
+			if !kubecontroller.IsPodActive(pod) || pod.Status.Phase != corev1.PodPending || pod.Spec.NodeName != "" {
+				continue
+			}
+			currentTime := time.Now()
+			lowerboundTimeStamp := pod.CreationTimestamp.Add(lowerboundSeconds)
+			upperboundTimeStamp := pod.CreationTimestamp.Add(upperboundSeconds)
+			if lowerboundTimeStamp.Before(currentTime) && upperboundTimeStamp.After(currentTime) {
+				r.recorder.Eventf(pod, corev1.EventTypeWarning, "Unscheduable", "Pod in subset(%v) "+
+					"of WorkloadSpread(%v) is unscheduable, please check schedule rules of the subset", subset, ws.Name)
+			} else {
+				durationStore.Push(getWorkloadSpreadKey(ws), lowerboundTimeStamp.Sub(currentTime))
+			}
+		}
+	}
 }
 
 func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSpread {
