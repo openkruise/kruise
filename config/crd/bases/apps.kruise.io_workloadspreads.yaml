@@ -348,6 +348,13 @@ spec:
                   generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              observedWorkloadRevision:
+                description: 'ObservedWorkloadRevision is the latest revision of PodTemplate
+                  observed by WorkloadSpread. It is designed to solve RollingUpdate
+                  problems for Deployment. This field cloud be: 1. ''pod-template-hash''
+                  of New ReplicaSet(i.e., updated revision) for Deployment; 2. Empty
+                  for the others;'
+                type: string
               subsetStatuses:
                 description: Contains the status of each subset. Each element in this
                   array represents one subset

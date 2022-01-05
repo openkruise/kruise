@@ -182,7 +182,7 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 	ws.Status.SubsetStatuses = append(ws.Status.SubsetStatuses, status)
 	pod := podDemo.DeepCopy()
 	pod.Name = ""
-	_, suitableSubset, generatedUID := handler.updateSubsetForPod(ws, pod, nil, CreateOperation)
+	_, suitableSubset, generatedUID, _ := handler.updateSubsetForPod(ws, pod, nil, CreateOperation)
 	if generatedUID == "" {
 		t.Fatalf("generate id failed")
 	}

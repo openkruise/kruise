@@ -19,6 +19,7 @@ package workloadspread
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
@@ -49,6 +51,8 @@ const (
 
 	PodDeletionCostPositive = 100
 	PodDeletionCostNegative = -100
+
+	DeploymentRevisionAnnotation = "deployment.kubernetes.io/revision"
 )
 
 var (
@@ -313,7 +317,10 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 		// check whether WorkloadSpread has suitable subset for the pod
 		// 1. changed indicates whether workloadSpread status changed
 		// 2. suitableSubset is matched subset for the pod
-		changed, suitableSubset, generatedUID = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
+		changed, suitableSubset, generatedUID, err = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
+		if err != nil {
+			return err
+		}
 		if !changed {
 			return nil
 		}
@@ -392,31 +399,174 @@ func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpr
 	return wsClone, nil
 }
 
+// handleWorkloadChange handle the update event of workload in case that webhook cannot wait for controller to be
+// done. In this function, if some errors occurred, we will regard pod as the latest, and continue to follow the
+// MissingReplicas(original) logic.
+func (h *Handler) handleWorkloadChange(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, operation Operation) (bool, int32, error) {
+	switch operation {
+	case CreateOperation, EvictionOperation, DeleteOperation:
+	default:
+		return false, -1, nil
+	}
+
+	var workloadReplicas int32 = 1
+	switch ws.Spec.TargetReference.Kind {
+	// Deployment Handler
+	case controllerKindDep.Kind:
+		// If the pod is managed by Deployment, 'pod-template-hash' label should not be empty.
+		podTemplateHash, ok := pod.Labels[appsv1.DefaultDeploymentUniqueLabelKey]
+		if !ok {
+			return false, -1, nil
+		}
+
+		// try to get the deployment from informer cache
+		// TODO: we should consider how to solve informer latency problem
+		deployment := &appsv1.Deployment{}
+		depKey := types.NamespacedName{Name: ws.Spec.TargetReference.Name, Namespace: ws.Namespace}
+		if err := h.Client.Get(context.TODO(), depKey, deployment); client.IgnoreNotFound(err) != nil {
+			return false, -1, err
+		} else if errors.IsNotFound(err) {
+			return false, -1, nil
+		}
+
+		// record workload replicas if possible
+		if deployment.Spec.Replicas != nil {
+			workloadReplicas = *deployment.Spec.Replicas
+		}
+
+		// if you are confused for why we compute updatedRevision via the following algorithm, you can refer to deployment controller codes
+		// https://github.com/kubernetes/kubernetes/blob/c9589d647373ee2901fe381e62d40b669e819fba/pkg/controller/deployment/sync.go#L189
+		updateRevision := kubecontroller.ComputeHash(&deployment.Spec.Template, deployment.Status.CollisionCount)
+		if updateRevision != podTemplateHash {
+			return false, -1, nil
+		}
+
+		// if workloadSpread doesn't observe this updatedRevision yet, then reset the workloadSpread status.
+		if ws.Status.ObservedWorkloadRevision != podTemplateHash {
+			newStatus := resetStatus(ws, int(*deployment.Spec.Replicas), podTemplateHash)
+			if newStatus == nil {
+				return true, workloadReplicas, nil
+			}
+			klog.V(3).Infof("WorkloadSpread(%v/%v) observed deployment revision changed: %v --> %v, and reset status %+v -> %+v",
+				ws.Namespace, ws.Name, ws.Status.ObservedWorkloadRevision, podTemplateHash, ws.Status, *newStatus)
+			ws.Status = *newStatus
+		}
+
+	case controllerKruiseKindCS.Kind:
+		// TODO: support CloneSet RollingUpdate & MaxSurge
+	}
+
+	return true, workloadReplicas, nil
+}
+
+// resetStatus will reset some fields of status, including:
+// 1. ObservedWorkloadRevision: latestRevision,
+// 2. Each SubsetStatus: MissingReplicas: MaxReplicas, CreatingPods: nil, DeletingPods: nil
+func resetStatus(ws *appsv1alpha1.WorkloadSpread, replicas int, latestRevision string) *appsv1alpha1.WorkloadSpreadStatus {
+	newStatus := &appsv1alpha1.WorkloadSpreadStatus{}
+	newStatus.ObservedWorkloadRevision = latestRevision
+	newStatus.ObservedGeneration = ws.Status.ObservedGeneration
+
+	for i := range ws.Spec.Subsets {
+		subset := &ws.Spec.Subsets[i]
+
+		// get the current subset status, make new one if the subset status is not initialized
+		var subsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus
+		if len(ws.Status.SubsetStatuses) < i+1 || ws.Status.SubsetStatuses[i].Name != subset.Name {
+			subsetStatus = &appsv1alpha1.WorkloadSpreadSubsetStatus{
+				Name:            subset.Name,
+				MissingReplicas: -1,
+			}
+		} else {
+			subsetStatus = ws.Status.SubsetStatuses[i].DeepCopy()
+		}
+
+		// just ignore if subset max replicas is nil, because reset an unlimited subset is meaningless
+		if subset.MaxReplicas == nil {
+			newStatus.SubsetStatuses = append(newStatus.SubsetStatuses, *subsetStatus)
+			continue
+		}
+
+		subsetMaxReplicas, err := intstr.GetValueFromIntOrPercent(subset.MaxReplicas, replicas, true)
+		if err != nil || subsetMaxReplicas < 0 {
+			klog.Errorf("Failed to parse maxReplicas value from subset (%s) of WorkloadSpread (%s/%s)",
+				subset.Name, ws.Namespace, ws.Name)
+			return nil
+		}
+
+		subsetStatus.CreatingPods = nil
+		subsetStatus.DeletingPods = nil
+		subsetStatus.MissingReplicas = int32(subsetMaxReplicas)
+		newStatus.SubsetStatuses = append(newStatus.SubsetStatuses, *subsetStatus)
+	}
+
+	return newStatus
+}
+
 // return three parameters:
 // 1. changed(bool) indicates if workloadSpread.Status has changed
 // 2. suitableSubset(*struct{}) indicates which workloadSpread.Subset does this pod match
 // 3. generatedUID(types.UID) indicates which workloadSpread generate a UID for identifying Pod without a full name.
 func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 	pod *corev1.Pod, injectWS *InjectWorkloadSpread, operation Operation) (
-	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string) {
+	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string, error) {
 	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
 	var generatedUID string
+
+	// This is for solving rollingUpdate problems in Deployment.
+	// Here, if Deployment changed, we will only care about the
+	// pods with the latest revision, otherwise we will fail to
+	// count the subset missingReplicas because the latest pods
+	// may be created before the deletion of the old pods.
+	// When Deployment revision changed, webhook cannot wait for
+	// controller to reconcile, thus, we have to reset some fields
+	// for subsetStatuses in webhook instead of controller.
+	// Due to the guarantees of the lock and etcd, we can ensure
+	// subsetStatus cannot be reset repeatedly in the concurrent
+	// scenarios. The following codes will be retried if conflict
+	// occurred.
+	isPodNewRevision, replicas, err := h.handleWorkloadChange(ws, pod, operation)
+	if err != nil {
+		klog.Errorf("Failed to handle the workload change at webhook, WorkloadSpread(%s/%s), error: %v",
+			ws.Namespace, ws.Name, err)
+		return false, nil, "", err
+	}
 
 	switch operation {
 	case CreateOperation:
 		if pod.Name != "" {
 			// pod is already in CreatingPods/DeletingPods List, then return
 			if isRecord, subset := isPodRecordedInSubset(ws, pod.Name); isRecord {
-				return false, subset, ""
+				return false, subset, "", nil
 			}
 		}
 
-		suitableSubset = h.getSuitableSubset(ws)
+		if isPodNewRevision {
+			// Use MissingReplicas to decide the suitable subsets.
+			suitableSubset = h.getSuitableSubsetForNewRevision(ws)
+		} else {
+			// Use MaxReplicas-Replicas to decide the suitable subset.
+			// Actually, we do not care about the pod if it is not the
+			// latest, because it is not the final-state pod. But,this
+			// function can make the pod distribution more uniform and
+			// reasonable.
+			// At present, only Deployment pod with old revisions will
+			// follow this logic.
+			suitableSubset = h.getSuitableSubsetForOldRevision(ws, replicas)
+		}
+
 		if suitableSubset == nil {
 			klog.V(5).Infof("WorkloadSpread (%s/%s) don't have a suitable subset for Pod (%s)",
 				ws.Namespace, ws.Name, pod.Name)
-			return false, nil, ""
+			return false, nil, "", nil
 		}
+
+		// subsetStatus will be reset if `latest` is not true,
+		// so just ignore the following calculation logic.
+		if !isPodNewRevision {
+			return true, suitableSubset, generatedUID, nil
+		}
+
 		if suitableSubset.CreatingPods == nil {
 			suitableSubset.CreatingPods = map[string]metav1.Time{}
 		}
@@ -431,17 +581,25 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		if suitableSubset.MissingReplicas > 0 {
 			suitableSubset.MissingReplicas--
 		}
+
 	case DeleteOperation, EvictionOperation:
 		// pod is already in DeletingPods/CreatingPods List, then return
 		if isRecord, _ := isPodRecordedInSubset(ws, pod.Name); isRecord {
-			return false, nil, ""
+			return false, nil, "", nil
 		}
 
 		suitableSubset = getSpecificSubset(ws, injectWS.Subset)
 		if suitableSubset == nil {
 			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s)", ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
-			return false, nil, ""
+			return false, nil, "", nil
 		}
+
+		// subsetStatus will be reset if `latest` is not true,
+		// so just ignore the following calculation logic.
+		if !isPodNewRevision {
+			return false, suitableSubset, generatedUID, nil
+		}
+
 		if suitableSubset.DeletingPods == nil {
 			suitableSubset.DeletingPods = map[string]metav1.Time{}
 		}
@@ -449,8 +607,9 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		if suitableSubset.MissingReplicas >= 0 {
 			suitableSubset.MissingReplicas++
 		}
+
 	default:
-		return false, nil, ""
+		return false, nil, "", nil
 	}
 
 	// update subset status
@@ -461,7 +620,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		}
 	}
 
-	return true, suitableSubset, generatedUID
+	return true, suitableSubset, generatedUID, nil
 }
 
 // return two parameters
@@ -561,7 +720,17 @@ func getSpecificSubset(ws *appsv1alpha1.WorkloadSpread, specifySubset string) *a
 	return nil
 }
 
-func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+func getSubsetMaxReplicas(ws *appsv1alpha1.WorkloadSpread, subsetName string) (*intstr.IntOrString, bool) {
+	for i := range ws.Spec.Subsets {
+		subset := &ws.Spec.Subsets[i]
+		if subset.Name == subsetName {
+			return subset.MaxReplicas, true
+		}
+	}
+	return nil, false
+}
+
+func (h *Handler) getSuitableSubsetForNewRevision(ws *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpreadSubsetStatus {
 	for i := range ws.Status.SubsetStatuses {
 		subset := &ws.Status.SubsetStatuses[i]
 		canSchedule := true
@@ -584,6 +753,60 @@ func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alph
 	}
 
 	return nil
+}
+
+func (h *Handler) getSuitableSubsetForOldRevision(ws *appsv1alpha1.WorkloadSpread, replicas int32) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+	subsetPriority := make([]int32, len(ws.Status.SubsetStatuses))
+
+	for i := range ws.Status.SubsetStatuses {
+		subsetStatus := &ws.Status.SubsetStatuses[i]
+		usable := true
+		for _, condition := range subsetStatus.Conditions {
+			if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
+				usable = false
+				break
+			}
+		}
+
+		var err error
+		var subsetMaxReplicas int
+		if usable {
+			maxReplicas, found := getSubsetMaxReplicas(ws, subsetStatus.Name)
+			if !found {
+				usable = false
+			}
+
+			subsetMaxReplicas, err = intstr.GetValueFromIntOrPercent(
+				intstr.ValueOrDefault(maxReplicas, intstr.FromInt(math.MaxInt32)), int(replicas), true)
+			if err != nil {
+				usable = false
+				klog.Warningf("WorkloadSpread(%v %v) subset(%v) MaxReplicas cannot be parsed, error: %v",
+					ws.Namespace, ws.Name, subsetStatus.Name, err)
+			}
+		}
+
+		// calculate subset priority
+		if usable {
+			subsetPriority[i] = int32(subsetMaxReplicas) - subsetStatus.Replicas
+		} else {
+			subsetPriority[i] = math.MinInt32
+		}
+	}
+
+	// select the subset with max priority
+	suitableSubsetIndex := 0
+	for i := range ws.Status.SubsetStatuses {
+		if subsetPriority[suitableSubsetIndex] > subsetPriority[i] {
+			suitableSubsetIndex = i
+		}
+	}
+
+	// in case that all the subsets are not usable
+	if subsetPriority[suitableSubsetIndex] == math.MinInt32 {
+		return nil
+	}
+
+	return &ws.Status.SubsetStatuses[suitableSubsetIndex]
 }
 
 func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) bool {

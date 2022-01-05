@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -25,6 +26,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -91,9 +93,9 @@ func (t *WorkloadSpreadTester) NewBaseCloneSet(namespace string) *appsv1alpha1.C
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "main",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
-							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Name:            "main",
+							Image:           imageutils.GetE2EImage(imageutils.Httpd),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -124,9 +126,10 @@ func (t *WorkloadSpreadTester) NewBaseJob(namespace string) *batchv1.Job {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "main",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"/bin/sh", "-c", "sleep 5"},
+							Name:            "main",
+							Image:           imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:         []string{"/bin/sh", "-c", "sleep 5"},
+							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -161,9 +164,9 @@ func (t *WorkloadSpreadTester) NewBaseDeployment(namespace string) *appsv1.Deplo
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "main",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
-							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Name:            "main",
+							Image:           imageutils.GetE2EImage(imageutils.Httpd),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -173,13 +176,8 @@ func (t *WorkloadSpreadTester) NewBaseDeployment(namespace string) *appsv1.Deplo
 }
 
 func (t *WorkloadSpreadTester) SetNodeLabel(c clientset.Interface, node *corev1.Node, key, value string) {
-	labels := node.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[key] = value
-	node.SetLabels(labels)
-	_, err := c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+	patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%v":"%v"}}}`, key, value))
+	_, err := c.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 

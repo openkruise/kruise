@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -76,6 +77,13 @@ const (
 
 	// FakeSubsetName is a fake subset name for such pods that do not match any subsets
 	FakeSubsetName = "kruise.io/workloadspread-fake-subset-name"
+
+	RevisionIgnored = "Ignore-Pod-Revision-Info"
+)
+
+const (
+	PodTemplateHashLabel         = "pod-template-hash"
+	DeploymentRevisionAnnotation = "deployment.kubernetes.io/revision"
 )
 
 var (
@@ -184,8 +192,8 @@ func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Req
 		// delete cache if this workloadSpread has been deleted
 		if cacheErr := util.GlobalCache.Delete(&appsv1alpha1.WorkloadSpread{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "apps.kruise.io/v1alpha1",
-				Kind:       "WorkloadSpread",
+				APIVersion: controllerKruiseKindWS.GroupVersion().String(),
+				Kind:       controllerKruiseKindWS.Kind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: req.Namespace,
@@ -207,78 +215,126 @@ func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Req
 	return reconcile.Result{RequeueAfter: durationStore.Pop(getWorkloadSpreadKey(ws))}, err
 }
 
-func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, namespace string) ([]*corev1.Pod, int32, error) {
-	ok, err := wsutil.VerifyGroupKind(ref, controllerKindJob.Kind, []string{controllerKindJob.Group})
-	if err != nil || !ok {
-		return nil, -1, err
-	}
-
-	job := &batchv1.Job{}
-	err = r.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: ref.Name}, job)
-	if err != nil {
-		// when error is NotFound, it is ok here.
-		if errors.IsNotFound(err) {
-			klog.V(3).Infof("cannot find Job (%s/%s)", namespace, ref.Name)
-			return nil, 0, nil
-		}
-		return nil, -1, err
-	}
-
-	labelSelector, err := util.GetFastLabelSelector(job.Spec.Selector)
-	if err != nil {
-		klog.Errorf("gets labelSelector failed: %s", err.Error())
-		return nil, -1, nil
-	}
-
-	podList := &corev1.PodList{}
-	listOption := &client.ListOptions{
-		Namespace:     namespace,
-		LabelSelector: labelSelector,
-		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(job.UID)}),
-	}
-	err = r.List(context.TODO(), podList, listOption)
-	if err != nil {
-		return nil, -1, err
-	}
-
-	matchedPods := make([]*corev1.Pod, 0, len(podList.Items))
-	for i := range podList.Items {
-		matchedPods = append(matchedPods, &podList.Items[i])
-	}
-	return matchedPods, *(job.Spec.Parallelism), nil
-}
-
-// getPodsForWorkloadSpread returns Pods managed by the WorkloadSpread object.
-// return two parameters
-// 1. podList for workloadSpread
-// 2. workloadReplicas
-func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) ([]*corev1.Pod, int32, error) {
-	if ws.Spec.TargetReference == nil {
-		return nil, -1, nil
-	}
-
+// listPodInfoForWorkloadSpread return a pod list, an updated pod name set, the latest workload revision id, and workload replicas.
+func (r *ReconcileWorkloadSpread) listPodInfoForWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) ([]*corev1.Pod, sets.String, string, int32, error) {
 	var pods []*corev1.Pod
+	var latestRevision string
 	var workloadReplicas int32
-	var err error
-	targetRef := ws.Spec.TargetReference
 
-	switch targetRef.Kind {
-	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind:
-		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, targetRef.Name, ws.Namespace, false)
+	updatedPods := sets.NewString()
+	workloadUIDs := make([]types.UID, 0)
+	key := types.NamespacedName{Namespace: ws.Namespace, Name: ws.Spec.TargetReference.Name}
+
+	if ws.Spec.TargetReference == nil {
+		klog.Errorf("Failed to list pods because TargetReference of WorkloadSpread(%v) is an empty pointer", key)
+		return nil, nil, "", -1, nil
+	}
+
+	switch ws.Spec.TargetReference.Kind {
+	// ReplicaSet
+	case controllerKindRS.Kind:
+		replicaSet := &appsv1.ReplicaSet{}
+		if err := r.Get(context.TODO(), key, replicaSet); client.IgnoreNotFound(err) != nil {
+			return nil, nil, "", -1, err
+		} else if errors.IsNotFound(err) {
+			return nil, nil, "", 0, nil
+		}
+
+		latestRevision = RevisionIgnored
+		workloadReplicas = *replicaSet.Spec.Replicas
+		workloadUIDs = append(workloadUIDs, replicaSet.UID)
+
+	// Job
 	case controllerKindJob.Kind:
-		pods, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
+		job := &batchv1.Job{}
+		if err := r.Get(context.TODO(), key, job); client.IgnoreNotFound(err) != nil {
+			return nil, nil, "", -1, err
+		} else if errors.IsNotFound(err) {
+			return nil, nil, "", 0, nil
+		}
+
+		latestRevision = RevisionIgnored
+		workloadReplicas = *job.Spec.Parallelism
+		workloadUIDs = append(workloadUIDs, job.UID)
+
+	// CloneSet
+	case controllerKruiseKindCS.Kind:
+		clone := &appsv1alpha1.CloneSet{}
+		if err := r.Get(context.TODO(), key, clone); client.IgnoreNotFound(err) != nil {
+			return nil, nil, "", -1, err
+		} else if errors.IsNotFound(err) {
+			return nil, nil, "", 0, nil
+		}
+
+		latestRevision = RevisionIgnored
+		workloadReplicas = *clone.Spec.Replicas
+		workloadUIDs = append(workloadUIDs, clone.UID)
+
+	// Deployment
+	case controllerKindDep.Kind:
+		deployment := &appsv1.Deployment{}
+		if err := r.Get(context.TODO(), key, deployment); client.IgnoreNotFound(err) != nil {
+			return nil, nil, "", -1, err
+		} else if errors.IsNotFound(err) {
+			return nil, nil, "", 0, nil
+		}
+
+		selector, err := util.GetFastLabelSelector(deployment.Spec.Selector)
+		if err != nil {
+			return nil, nil, "", -1, nil
+		}
+
+		rsList := &appsv1.ReplicaSetList{}
+		if err = r.List(context.TODO(), rsList, &client.ListOptions{Namespace: ws.Namespace, LabelSelector: selector}); err != nil {
+			return nil, nil, "", 0, err
+		}
+
+		for i := range rsList.Items {
+			rs := &rsList.Items[i]
+			ownerRef := metav1.GetControllerOfNoCopy(rs)
+			if ownerRef == nil || ownerRef.UID != deployment.UID {
+				continue
+			}
+			workloadUIDs = append(workloadUIDs, rs.UID)
+			if util.EqualIgnoreHash(&rs.Spec.Template, &deployment.Spec.Template) {
+				latestRevision = rs.Labels[appsv1.DefaultDeploymentUniqueLabelKey]
+			}
+		}
+
+		if len(latestRevision) == 0 {
+			klog.Warningf("WorkloadSpread(%v/%v) cannot find the latest revision for Deployment", ws.Namespace, ws.Name)
+		}
+
+		workloadReplicas = *deployment.Spec.Replicas
+
 	default:
-		r.recorder.Eventf(ws, corev1.EventTypeWarning,
-			"TargetReferenceError", "targetReference is not been recognized")
-		return nil, -1, nil
+		r.recorder.Eventf(ws, corev1.EventTypeWarning, "TargetReferenceError", "targetReference is not been recognized")
+		return nil, nil, "", 0, nil
 	}
 
-	if err != nil {
-		klog.Errorf("WorkloadSpread (%s/%s) handles targetReference failed: %s", ws.Namespace, ws.Name, err.Error())
-		return nil, -1, err
+	for _, uid := range workloadUIDs {
+		podList := &corev1.PodList{}
+		listOption := &client.ListOptions{
+			Namespace:     ws.Namespace,
+			FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(uid)}),
+		}
+		if err := r.List(context.TODO(), podList, listOption); err != nil {
+			return nil, nil, "", -1, err
+		}
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			pods = append(pods, pod)
+			switch latestRevision {
+			case RevisionIgnored,
+				pod.Labels[PodTemplateHashLabel],
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey]:
+				updatedPods.Insert(pod.Name)
+			}
+		}
 	}
 
-	return pods, workloadReplicas, err
+	klog.Infof("WorkloadSpread(%v/%v) observe the latest revision: %v", ws.Namespace, ws.Name, latestRevision)
+	return pods, updatedPods, latestRevision, workloadReplicas, nil
 }
 
 // syncWorkloadSpread is the main logic of the WorkloadSpread controller. Firstly, we get Pods from workload managed by
@@ -288,19 +344,19 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 // to maintain WorkloadSpread status together. The controller is responsible for calculating the real status, and the webhook
 // mainly counts missingReplicas and records the creation or deletion entry of Pod into map.
 func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) error {
-	pods, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)
+	allPods, updatedPods, latestRevision, workloadReplicas, err := r.listPodInfoForWorkloadSpread(ws)
 	if err != nil || workloadReplicas == -1 {
 		if err != nil {
 			klog.Errorf("WorkloadSpread (%s/%s) gets matched pods failed: %v", ws.Namespace, ws.Name, err)
 		}
 		return err
 	}
-	if len(pods) == 0 {
+	if len(allPods) == 0 {
 		klog.Warningf("WorkloadSpread (%s/%s) has no matched pods, target workload's replicas[%d]", ws.Namespace, ws.Name, workloadReplicas)
 	}
 
 	// group Pods by subset
-	podMap, err := r.groupPod(ws, pods)
+	podMap, err := r.groupPod(ws, allPods)
 	if err != nil {
 		return err
 	}
@@ -312,7 +368,7 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 	}
 
 	// calculate status and reschedule
-	status, scheduleFailedPodMap := r.calculateWorkloadSpreadStatus(ws, podMap, workloadReplicas)
+	status, scheduleFailedPodMap := r.calculateWorkloadSpreadStatus(ws, podMap, updatedPods, latestRevision, workloadReplicas)
 	if status == nil {
 		return nil
 	}
@@ -336,7 +392,7 @@ func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSprea
 	injectWS := &wsutil.InjectWorkloadSpread{}
 	err := json.Unmarshal([]byte(injectStr), injectWS)
 	if err != nil {
-		klog.Errorf("failed to unmarshal %s from Pod (%s/%s)", injectStr, pod.Namespace, pod.Name)
+		klog.Errorf("Failed to unmarshal %s from Pod (%s/%s)", injectStr, pod.Namespace, pod.Name)
 		return nil
 	}
 	return injectWS
@@ -359,7 +415,7 @@ func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods
 		if _, exist := podMap[subsetName]; exist {
 			podMap[subsetName] = append(podMap[subsetName], pods[i])
 		} else {
-			// for the scene where the original subset of the pod was deleted.
+			// for the scene where the original subset of the pod has been deleted.
 			podMap[FakeSubsetName] = append(podMap[FakeSubsetName], pods[i])
 		}
 	}
@@ -407,7 +463,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.Wo
 		if err != nil {
 			// requiredSelectorTerm field was validated at webhook stage, so this error should not occur
 			// this error should not be returned, because it is a non-transient error
-			klog.Errorf("unexpected error occurred when matching pod (%s/%s) with subset, please check requiredSelectorTerm field of subset (%s) in WorkloadSpread (%s/%s), err: %s",
+			klog.Errorf("Unexpected error occurred when matching pod (%s/%s) with subset, please check requiredSelectorTerm field of subset (%s) in WorkloadSpread (%s/%s), err: %s",
 				pod.Namespace, pod.Name, subset.Name, ws.Namespace, ws.Name, err.Error())
 		}
 		// select the most favorite subsets for the pod by subset.PreferredNodeSelectorTerms
@@ -471,10 +527,14 @@ func (r *ReconcileWorkloadSpread) patchFavoriteSubsetMetadataToPod(pod *corev1.P
 // 1. current WorkloadSpreadStatus
 // 2. a map, the key is the subsetName, the value is the schedule failed Pods belongs to the subset.
 func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread,
-	podMap map[string][]*corev1.Pod, workloadReplicas int32) (*appsv1alpha1.WorkloadSpreadStatus, map[string][]*corev1.Pod) {
+	podMap map[string][]*corev1.Pod, updatedPods sets.String, latestRevision string, workloadReplicas int32) (*appsv1alpha1.WorkloadSpreadStatus, map[string][]*corev1.Pod) {
 	// set the generation in the returned status
 	status := appsv1alpha1.WorkloadSpreadStatus{}
 	status.ObservedGeneration = ws.Generation
+	if latestRevision != RevisionIgnored {
+		status.ObservedWorkloadRevision = latestRevision
+	}
+
 	//status.ObservedWorkloadReplicas = workloadReplicas
 	status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, len(ws.Spec.Subsets))
 	scheduleFailedPodMap := make(map[string][]*corev1.Pod)
@@ -499,7 +559,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 		subset := &ws.Spec.Subsets[i]
 
 		// calculate subset status
-		subsetStatus := r.calculateWorkloadSpreadSubsetStatus(ws, podMap[subset.Name], subset,
+		subsetStatus := r.calculateWorkloadSpreadSubsetStatus(ws, podMap[subset.Name], updatedPods, subset,
 			oldSubsetStatusMap[subset.Name], workloadReplicas)
 		if subsetStatus == nil {
 			return nil, nil
@@ -530,6 +590,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 // calculateWorkloadSpreadSubsetStatus returns the current subsetStatus for subset.
 func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1alpha1.WorkloadSpread,
 	pods []*corev1.Pod,
+	updatedPods sets.String,
 	subset *appsv1alpha1.WorkloadSpreadSubset,
 	oldSubsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus,
 	workloadReplicas int32) *appsv1alpha1.WorkloadSpreadSubsetStatus {
@@ -586,6 +647,13 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 		}
 
 		active++
+		// If we don't care about the pod, just ignore the following calculation logic.
+		// For Deployment: if the pod is in updatedPods, the pod is interesting pod, otherwise, it is not.
+		// For the others: the pod is always interesting pod.
+		if !isInterestingPod(ws, pod, updatedPods) {
+			continue
+		}
+
 		// count missingReplicas
 		if subsetStatus.MissingReplicas > 0 {
 			subsetStatus.MissingReplicas--
@@ -722,4 +790,14 @@ func (r *ReconcileWorkloadSpread) writeWorkloadSpreadStatus(ws *appsv1alpha1.Wor
 
 func getWorkloadSpreadKey(o metav1.Object) string {
 	return o.GetNamespace() + "/" + o.GetName()
+}
+
+func isInterestingPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, updatedPods sets.String) bool {
+	switch ws.Spec.TargetReference.Kind {
+	case controllerKindDep.Kind:
+		return updatedPods.Has(pod.Name)
+	default:
+		// TODO: support CloneSet RollingUpdate & MaxSurge
+	}
+	return true
 }

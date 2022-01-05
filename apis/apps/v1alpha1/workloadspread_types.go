@@ -122,7 +122,13 @@ type WorkloadSpreadStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// ObservedGeneration is the most recent replicas of target workload observed for this WorkloadSpread.
+	// ObservedWorkloadRevision is the latest revision of PodTemplate observed by WorkloadSpread.
+	// It is designed to solve RollingUpdate problems for Deployment. This field cloud be:
+	// 1. 'pod-template-hash' of New ReplicaSet(i.e., updated revision) for Deployment;
+	// 2. Empty for the others;
+	ObservedWorkloadRevision string `json:"observedWorkloadRevision,omitempty"`
+
+	// ObservedWorkloadReplicas is the most recent replicas of target workload observed for this WorkloadSpread.
 	//ObservedWorkloadReplicas int32 `json:"observedWorkloadReplicas"`
 
 	// Contains the status of each subset. Each element in this array represents one subset

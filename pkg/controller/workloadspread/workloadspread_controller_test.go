@@ -25,12 +25,14 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -151,6 +153,7 @@ var (
 func init() {
 	scheme = runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
+	_ = appsv1.AddToScheme(scheme)
 	_ = appsv1alpha1.AddToScheme(scheme)
 }
 
@@ -1228,8 +1231,8 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 4
-				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
-				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
+				workloadSpread.Status.SubsetStatuses[0].CreatingPods = nil
+				workloadSpread.Status.SubsetStatuses[0].DeletingPods = nil
 				return workloadSpread
 			},
 		},
@@ -1487,7 +1490,11 @@ func TestUpdateSubsetSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error group pods")
 	}
-	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, 5)
+	updatedPods := sets.NewString()
+	for _, pod := range pods {
+		updatedPods.Insert(pod.Name)
+	}
+	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, subsetsPods, updatedPods, "", 5)
 	if status == nil {
 		t.Fatalf("error get WorkloadSpread status")
 	} else {

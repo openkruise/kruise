@@ -22,6 +22,9 @@ import (
 	"sync"
 
 	"github.com/docker/distribution/reference"
+	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
@@ -144,4 +147,14 @@ func IsContainerImageEqual(image1, image2 string) bool {
 	}
 
 	return repo1 == repo2 && tag1 == tag2
+}
+
+// EqualIgnoreHash copy from Kubernetes deployment controller, and it only works for Deployment
+func EqualIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
+	t1Copy := template1.DeepCopy()
+	t2Copy := template2.DeepCopy()
+	// Remove hash labels from template.Labels before comparing
+	delete(t1Copy.Labels, apps.DefaultDeploymentUniqueLabelKey)
+	delete(t2Copy.Labels, apps.DefaultDeploymentUniqueLabelKey)
+	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
