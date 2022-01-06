@@ -20,13 +20,17 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
+	corev1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -73,6 +77,13 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is invalid for daemonset"))
 	}
 
+	coreTemplate, err := convertor.ConvertPodTemplateSpec(&spec.Template)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+		return allErrs
+	}
+	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), corevalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
+
 	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
 	coreVolumes, err := convertor.ConvertCoreVolumes(spec.Template.Spec.Volumes)
 	if err != nil {
@@ -80,6 +91,14 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 		return allErrs
 	}
 	allErrs = append(allErrs, corevalidation.ValidateReadOnlyPersistentDisks(coreVolumes, fldPath.Child("template", "spec", "volumes"))...)
+
+	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
+	if spec.Template.Spec.RestartPolicy != corev1.RestartPolicyAlways {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(corev1.RestartPolicyAlways)}))
+	}
+	if spec.Template.Spec.ActiveDeadlineSeconds != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported"))
+	}
 	allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 
 	allErrs = append(allErrs, validateDaemonSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
@@ -100,26 +119,7 @@ func validateDaemonSetUpdateStrategy(strategy *appsv1alpha1.DaemonSetUpdateStrat
 			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
 			return allErrs
 		}
-		if strategy.RollingUpdate.Partition != nil {
-			allErrs = append(allErrs,
-				corevalidation.ValidateNonnegativeField(
-					int64(*strategy.RollingUpdate.Partition),
-					fldPath.Child("rollingUpdate").Child("partition"))...)
-		}
-		switch strategy.RollingUpdate.Type {
-		case appsv1alpha1.StandardRollingUpdateType, appsv1alpha1.SurgingRollingUpdateType, appsv1alpha1.InplaceRollingUpdateType:
-		default:
-			validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.SurgingRollingUpdateType), string(appsv1alpha1.InplaceRollingUpdateType)}
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("rollingUpdateType"), strategy.RollingUpdate.Type, validValues))
-		}
-		if strategy.RollingUpdate.MaxUnavailable != nil {
-			allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*strategy.RollingUpdate.MaxUnavailable, fldPath.Child("rollingUpdate").Child("maxUnavailable"))...)
-			allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*strategy.RollingUpdate.MaxUnavailable, fldPath.Child("rollingUpdate").Child("maxUnavailable"))...)
-			if convertor.GetIntOrPercentValue(*strategy.RollingUpdate.MaxUnavailable) == 0 {
-				// MaxUnavailable cannot be 0.
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), strategy.RollingUpdate.MaxUnavailable, "cannot be 0"))
-			}
-		}
+		allErrs = append(allErrs, validateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
 	default:
 		validValues := []string{string(appsv1alpha1.RollingUpdateDaemonSetStrategyType), string(appsv1alpha1.OnDeleteDaemonSetStrategyType)}
 		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
@@ -127,11 +127,72 @@ func validateDaemonSetUpdateStrategy(strategy *appsv1alpha1.DaemonSetUpdateStrat
 	return allErrs
 }
 
+func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	var hasUnavailable, hasSurge bool
+	if rollingUpdate.MaxUnavailable != nil && getIntOrPercentValue(*rollingUpdate.MaxUnavailable) != 0 {
+		hasUnavailable = true
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	}
+	if rollingUpdate.MaxSurge != nil && getIntOrPercentValue(*rollingUpdate.MaxSurge) != 0 {
+		hasSurge = true
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+	}
+	switch {
+	case hasUnavailable && hasSurge:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), rollingUpdate.MaxSurge, "may not be set when maxUnavailable is non-zero"))
+	case !hasUnavailable && !hasSurge:
+		allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable"), "cannot be 0 when maxSurge is 0"))
+	}
+
+	switch rollingUpdate.Type {
+	case "", appsv1alpha1.StandardRollingUpdateType:
+	case appsv1alpha1.InplaceRollingUpdateType:
+		if hasSurge {
+			allErrs = append(allErrs, field.Required(fldPath.Child("maxSurge"), "must be 0 for InPlaceIfPossible type"))
+		}
+	case appsv1alpha1.DeprecatedSurgingRollingUpdateType:
+		if hasUnavailable {
+			allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable"), "must be 0 for Surging type"))
+		}
+	default:
+		validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.DeprecatedSurgingRollingUpdateType), string(appsv1alpha1.InplaceRollingUpdateType)}
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("type"), rollingUpdate.Type, validValues))
+	}
+
+	if rollingUpdate.Partition != nil {
+		allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(*rollingUpdate.Partition), fldPath.Child("rollingUpdate").Child("partition"))...)
+	}
+
+	return allErrs
+}
+
+func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
+	value, isPercent := getPercentValue(intOrStringValue)
+	if isPercent {
+		return value
+	}
+	return intOrStringValue.IntValue()
+}
+
+func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
+	if intOrStringValue.Type != intstr.String {
+		return 0, false
+	}
+	if len(validation.IsValidPercent(intOrStringValue.StrVal)) != 0 {
+		return 0, false
+	}
+	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
+	return value, true
+}
+
 var _ admission.Handler = &DaemonSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	klog.V(4).Infof("get req %#v", req)
 	obj := &appsv1alpha1.DaemonSet{}
 
 	err := h.Decoder.Decode(req, obj)
@@ -143,7 +204,6 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 		klog.Warningf("ds %s/%s action %v fail:%s", obj.Namespace, obj.Name, req.AdmissionRequest.Operation, err.Error())
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	klog.V(4).Infof("ds %s/%s action: %v validate ok", obj.Namespace, obj.Name, req.AdmissionRequest.Operation)
 	return admission.ValidationResponse(allowed, reason)
 }
 

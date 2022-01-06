@@ -17,16 +17,21 @@ limitations under the License.
 package daemonset
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/tools/cache"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/securitycontext"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
 func Test_nodeInSameCondition(t *testing.T) {
@@ -126,7 +131,7 @@ func TestShouldIgnoreNodeUpdate(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "ShouldIgnoreNodeUpdate",
+			name: "shouldIgnoreNodeUpdate",
 			args: args{
 				oldNode: corev1.Node{
 					ObjectMeta: metav1.ObjectMeta{
@@ -194,8 +199,8 @@ func TestShouldIgnoreNodeUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ShouldIgnoreNodeUpdate(tt.args.oldNode, tt.args.curNode); got != tt.want {
-				t.Errorf("ShouldIgnoreNodeUpdate() = %v, want %v", got, tt.want)
+			if got := shouldIgnoreNodeUpdate(tt.args.oldNode, tt.args.curNode); got != tt.want {
+				t.Errorf("shouldIgnoreNodeUpdate() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -270,184 +275,67 @@ func newNode(name string, label map[string]string) *corev1.Node {
 	return &corev1.Node{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: label,
-		},
-	}
-}
-
-func newPod(name, namespace string, readinessGates []corev1.PodReadinessGate, conditions []corev1.PodCondition) *corev1.Pod {
-	return &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
-		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: namespace,
+			Labels:    label,
+			Namespace: metav1.NamespaceNone,
 		},
-		Spec: corev1.PodSpec{
-			ReadinessGates: readinessGates,
-		},
-		Status: corev1.PodStatus{
-			Conditions: conditions,
+		Status: corev1.NodeStatus{
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+			},
+			Allocatable: corev1.ResourceList{
+				corev1.ResourcePods: resource.MustParse("100"),
+			},
 		},
 	}
 }
 
-func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1alpha1.DaemonSetUpdateStrategy {
-	one := intstr.FromInt(1)
-	strategy := appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-			MaxUnavailable: &one,
-			Selector:       nil,
-			Type:           appsv1alpha1.StandardRollingUpdateType,
-		},
+func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]string) {
+	for i := startIndex; i < startIndex+numNodes; i++ {
+		nodeStore.Add(newNode(fmt.Sprintf("node-%d", i), label))
 	}
-	if len(matchLabels) > 0 {
-		strategy.RollingUpdate.Selector = &metav1.LabelSelector{MatchLabels: matchLabels}
-	}
-	return strategy
 }
 
-func TestNodeShouldUpdateBySelector(t *testing.T) {
-	for _, tt := range []struct {
-		Title    string
-		Node     *corev1.Node
-		Ds       *appsv1alpha1.DaemonSet
-		Expected bool
-	}{
-		{
-			"node with no label",
-			newNode("node1", nil),
-			newDaemonSet("ds1"),
-			false,
-		},
-		{
-			"node with label, not selected",
-			newNode("node1", map[string]string{
-				"key1": "value1",
-			}),
-			func() *appsv1alpha1.DaemonSet {
-				ds := newDaemonSet("ds1")
-				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
-					"key1": "value2",
-				})
-				return ds
-			}(),
-			false,
-		},
-		{
-			"node with label, selected",
-			newNode("node1", map[string]string{
-				"key1": "value1",
-			}),
-			func() *appsv1alpha1.DaemonSet {
-				ds := newDaemonSet("ds1")
-				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
-					"key1": "value1",
-				})
-				return ds
-			}(),
-			true,
-		},
-	} {
-		t.Logf("\t%s", tt.Title)
-		should := NodeShouldUpdateBySelector(tt.Node, tt.Ds)
-		if should != tt.Expected {
-			t.Errorf("NodeShouldUpdateBySelector() = %v, want %v", should, tt.Expected)
+func newPod(podName string, nodeName string, label map[string]string, ds *appsv1alpha1.DaemonSet) *corev1.Pod {
+	// Add hash unique label to the pod
+	newLabels := label
+	var podSpec corev1.PodSpec
+	// Copy pod spec from DaemonSet template, or use a default one if DaemonSet is nil
+	if ds != nil {
+		hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
+		newLabels = labelsutil.CloneAndAddLabel(label, apps.DefaultDaemonSetUniqueLabelKey, hash)
+		podSpec = ds.Spec.Template.Spec
+	} else {
+		podSpec = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Image:                  "foo/bar",
+					TerminationMessagePath: corev1.TerminationMessagePathDefault,
+					ImagePullPolicy:        corev1.PullIfNotPresent,
+					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+				},
+			},
 		}
 	}
-}
-
-func TestIsDaemonPodAvailable(t *testing.T) {
-	for _, tt := range []struct {
-		Title    string
-		Pod      *corev1.Pod
-		Expected bool
-	}{
-		{
-			"daemon pod has no readiness gate and it's ready",
-			newPod("pod1",
-				"default",
-				[]corev1.PodReadinessGate{},
-				[]corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
-				}),
-			true,
-		},
-		{
-			"daemon pod has no readiness gate and has no pod ready condition",
-			newPod("pod1",
-				"default",
-				[]corev1.PodReadinessGate{},
-				[]corev1.PodCondition{}),
-			false,
-		},
-		{
-			"daemon pod has no readiness gate and it's not ready",
-			newPod("pod1",
-				"default",
-				[]corev1.PodReadinessGate{},
-				[]corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionFalse},
-				}),
-			false,
-		},
-		{
-			"daemon pod has readiness gate but does not contains inplace readiness gate",
-			newPod("pod1",
-				"default",
-				[]corev1.PodReadinessGate{{ConditionType: "foo"}},
-				[]corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
-				}),
-			true,
-		},
-		{
-			"has inplace readiness gate, pod ready condition is false but has no inplace condition",
-			newPod("pod1", "default",
-				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
-				[]corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionFalse},
-				}),
-			false,
-		},
-		{
-			"has inplace readiness gate, pod ready condition is true but has no inplace condition",
-			newPod("pod1", "default",
-				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
-				[]corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
-				}),
-			true,
-		},
-		{
-			"has inplace readiness gate, pod ready condition is true and inplace condition is false",
-			newPod("pod1", "default",
-				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
-				[]corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
-					{Type: appspub.InPlaceUpdateReady, Status: corev1.ConditionFalse},
-				}),
-			false,
-		},
-		{
-			"has inplace readiness gate, pod ready condition is true and inplace condition is true",
-			newPod("pod1", "default",
-				[]corev1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
-				[]corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
-					{Type: appspub.InPlaceUpdateReady, Status: corev1.ConditionTrue},
-				}),
-			true,
-		},
-	} {
-		t.Run(tt.Title, func(t *testing.T) {
-			got := IsDaemonPodAvailable(tt.Pod, 0)
-			if got != tt.Expected {
-				t.Errorf("IsDaemonPodAvailable() = %v, want %v", got, tt.Expected)
-			}
-		})
+	// Add node name to the pod
+	if len(nodeName) > 0 {
+		podSpec.NodeName = nodeName
 	}
+
+	pod := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: podName,
+			Labels:       newLabels,
+			Namespace:    metav1.NamespaceDefault,
+		},
+		Spec: podSpec,
+	}
+	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
+	if ds != nil {
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)}
+	}
+	return pod
 }
 
 func TestCreatePodProgressively(t *testing.T) {
@@ -505,9 +393,9 @@ func TestCreatePodProgressively(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := CreatePodProgressively(tc.ds)
+			got := isDaemonSetCreationProgressively(tc.ds)
 			if !reflect.DeepEqual(got, tc.expect) {
-				t.Errorf("CreatePodProgressively()=%v, expect=%v", got, tc.expect)
+				t.Errorf("isDaemonSetCreationProgressively()=%v, expect=%v", got, tc.expect)
 			}
 		})
 	}

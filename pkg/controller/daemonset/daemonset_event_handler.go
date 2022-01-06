@@ -24,10 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -40,6 +40,14 @@ var _ handler.EventHandler = &podEventHandler{}
 
 type podEventHandler struct {
 	client.Reader
+	expectations kubecontroller.ControllerExpectationsInterface
+}
+
+func enqueueDaemonSet(q workqueue.RateLimitingInterface, ds *appsv1alpha1.DaemonSet) {
+	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
+		Name:      ds.GetName(),
+		Namespace: ds.GetNamespace(),
+	}})
 }
 
 func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -53,14 +61,13 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
-		req := resolveControllerRef(pod.Namespace, controllerRef)
-		if req == nil {
+		ds := e.resolveControllerRef(pod.Namespace, controllerRef)
+		if ds == nil {
 			return
 		}
-		klog.V(6).Infof("Pod %s/%s created, owner: %s", pod.Namespace, pod.Name, req.Name)
-		dsKey := pod.Namespace + "/" + controllerRef.Name
-		expectations.CreationObserved(dsKey)
-		q.Add(*req)
+		klog.V(4).Infof("Pod %s/%s added.", pod.Namespace, pod.Name)
+		e.expectations.CreationObserved(keyFunc(ds))
+		enqueueDaemonSet(q, ds)
 		return
 	}
 
@@ -72,16 +79,13 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	if len(dsList) == 0 {
 		return
 	}
-	klog.V(6).Infof("Orphan Pod %s/%s created, matched owner: %s", pod.Namespace, pod.Name, e.joinDaemonSetNames(dsList))
+	klog.V(4).Infof("Orphan Pod %s/%s created, matched owner: %s", pod.Namespace, pod.Name, joinDaemonSetNames(dsList))
 	for _, ds := range dsList {
-		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-			Name:      ds.GetName(),
-			Namespace: ds.GetNamespace(),
-		}})
+		enqueueDaemonSet(q, ds)
 	}
 }
 
-func (e *podEventHandler) joinDaemonSetNames(dsList []appsv1alpha1.DaemonSet) string {
+func joinDaemonSetNames(dsList []*appsv1alpha1.DaemonSet) string {
 	var names []string
 	for _, ds := range dsList {
 		names = append(names, ds.Name)
@@ -98,56 +102,47 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		return
 	}
 
-	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
-	if curPod.DeletionTimestamp != nil {
-		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
-		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
-		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
-		// an rs never initiates a phase change, and so is never asleep waiting for the same.
-		e.Delete(event.DeleteEvent{Object: evt.ObjectNew}, q)
-		if labelChanged {
-			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
-			e.Delete(event.DeleteEvent{Object: evt.ObjectOld}, q)
-		}
-		return
-	}
-
 	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
-		if req := resolveControllerRef(oldPod.Namespace, oldControllerRef); req != nil {
-			q.Add(*req)
+		if ds := e.resolveControllerRef(oldPod.Namespace, oldControllerRef); ds != nil {
+			enqueueDaemonSet(q, ds)
 		}
+	}
+
+	if curPod.DeletionTimestamp != nil {
+		// when a pod is deleted gracefully its deletion timestamp is first modified to reflect a grace period,
+		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
+		// for modification of the deletion timestamp and expect an ds to create more replicas asap, not wait
+		// until the kubelet actually deletes the pod.
+		e.Delete(event.DeleteEvent{Object: evt.ObjectNew}, q)
+		return
 	}
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
-		req := resolveControllerRef(curPod.Namespace, curControllerRef)
-		if req == nil {
+		ds := e.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if ds == nil {
 			return
 		}
-		klog.V(6).Infof("Pod %s/%s updated, owner: %s", curPod.Namespace, curPod.Name, req.Name)
-		q.Add(*req)
+		klog.V(4).Infof("Pod %s/%s updated, owner: %s", curPod.Namespace, curPod.Name, ds.Name)
+		enqueueDaemonSet(q, ds)
 		return
 	}
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
+	dsList := e.getPodDaemonSets(curPod)
+	if len(dsList) == 0 {
+		return
+	}
+	klog.V(4).Infof("Orphan Pod %s/%s updated, matched owner: %s", curPod.Namespace, curPod.Name, joinDaemonSetNames(dsList))
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
-		dsList := e.getPodDaemonSets(curPod)
-		if len(dsList) == 0 {
-			return
-		}
-		klog.V(6).Infof("Orphan Pod %s/%s updated, matched owner: %s",
-			curPod.Namespace, curPod.Name, e.joinDaemonSetNames(dsList))
 		for _, ds := range dsList {
-			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-				Name:      ds.GetName(),
-				Namespace: ds.GetNamespace(),
-			}})
+			enqueueDaemonSet(q, ds)
 		}
 	}
 }
@@ -164,52 +159,46 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 		// No controller should care about orphans being deleted.
 		return
 	}
-	req := resolveControllerRef(pod.Namespace, controllerRef)
-	if req == nil {
+	ds := e.resolveControllerRef(pod.Namespace, controllerRef)
+	if ds == nil {
 		return
 	}
 
-	klog.V(6).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, req.Name)
-	dsKey := pod.Namespace + "/" + controllerRef.Name
-	expectations.DeletionObserved(dsKey)
-	q.Add(*req)
+	klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, ds.Name)
+	e.expectations.DeletionObserved(keyFunc(ds))
+	enqueueDaemonSet(q, ds)
 }
 
 func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 
 }
 
-func resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *reconcile.Request {
-	// Parse the Group out of the OwnerReference to compare it to what was parsed out of the requested OwnerType
-	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
-	if err != nil {
-		klog.Errorf("Could not parse OwnerReference %v APIVersion: %v", controllerRef, err)
+func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1alpha1.DaemonSet {
+	if controllerRef.Kind != controllerKind.Kind || controllerRef.APIVersion != controllerKind.GroupVersion().String() {
 		return nil
 	}
 
-	// Compare the OwnerReference Group and Kind against the OwnerType Group and Kind specified by the user.
-	// If the two match, create a Request for the objected referred to by
-	// the OwnerReference.  Use the Name from the OwnerReference and the Namespace from the
-	// object in the event.
-	if controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group {
-		// Match found - add a Request for the object referred to in the OwnerReference
-		req := reconcile.Request{NamespacedName: types.NamespacedName{
-			Namespace: namespace,
-			Name:      controllerRef.Name,
-		}}
-		return &req
+	ds := &appsv1alpha1.DaemonSet{}
+	if err := e.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: controllerRef.Name}, ds); err != nil {
+		return nil
 	}
-	return nil
+	if ds.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return ds
 }
 
-func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []appsv1alpha1.DaemonSet {
+func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1alpha1.DaemonSet {
 	dsList := appsv1alpha1.DaemonSetList{}
 	if err := e.List(context.TODO(), &dsList, client.InNamespace(pod.Namespace)); err != nil {
 		return nil
 	}
 
-	var dsMatched []appsv1alpha1.DaemonSet
-	for _, ds := range dsList.Items {
+	var dsMatched []*appsv1alpha1.DaemonSet
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
 		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil || selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
@@ -221,8 +210,7 @@ func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []appsv1alpha1.DaemonSet
 	if len(dsMatched) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		klog.Warningf("Error! More than one DaemonSet is selecting pod %s/%s : %s",
-			pod.Namespace, pod.Name, e.joinDaemonSetNames(dsMatched))
+		klog.Warningf("Error! More than one DaemonSet is selecting pod %s/%s : %s", pod.Namespace, pod.Name, joinDaemonSetNames(dsMatched))
 	}
 	return dsMatched
 }
@@ -237,19 +225,14 @@ func (e *nodeEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitin
 	dsList := &appsv1alpha1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
-		klog.V(6).Infof("Error enqueueing daemon sets: %v", err)
+		klog.V(4).Infof("Error enqueueing daemon sets: %v", err)
 		return
 	}
 
 	node := evt.Object.(*v1.Node)
-	klog.V(6).Infof("add new node: %v", node.Name)
-	for index, ds := range dsList.Items {
-		shouldSchedule, _, err := NodeShouldRunDaemonPod(node, &dsList.Items[index])
-		if err != nil {
-			continue
-		}
-		if shouldSchedule {
-			klog.V(6).Infof("new node: %s triggers DaemonSet %s/%s to reconcile.", node.Name, ds.GetNamespace(), ds.GetName())
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
+		if shouldSchedule, _ := nodeShouldRunDaemonPod(node, ds); shouldSchedule {
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      ds.GetName(),
 				Namespace: ds.GetNamespace(),
@@ -261,30 +244,22 @@ func (e *nodeEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitin
 func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oldNode := evt.ObjectOld.(*v1.Node)
 	curNode := evt.ObjectNew.(*v1.Node)
-	klog.V(6).Infof("update node: %v", curNode.Name)
-	if ShouldIgnoreNodeUpdate(*oldNode, *curNode) {
+	if shouldIgnoreNodeUpdate(*oldNode, *curNode) {
 		return
 	}
 
 	dsList := &appsv1alpha1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
-		klog.V(6).Infof("Error enqueueing daemon sets: %v", err)
+		klog.V(4).Infof("Error listing daemon sets: %v", err)
 		return
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
-	for index, ds := range dsList.Items {
-		oldShouldSchedule, oldShouldContinueRunning, err := NodeShouldRunDaemonPod(oldNode, &dsList.Items[index])
-		if err != nil {
-			continue
-		}
-		currentShouldSchedule, currentShouldContinueRunning, err := NodeShouldRunDaemonPod(curNode, &dsList.Items[index])
-		if err != nil {
-			continue
-		}
-		if (CanNodeBeDeployed(oldNode, &ds) != CanNodeBeDeployed(curNode, &ds)) || (oldShouldSchedule != currentShouldSchedule) || (oldShouldContinueRunning != currentShouldContinueRunning) ||
-			(NodeShouldUpdateBySelector(oldNode, &ds) != NodeShouldUpdateBySelector(curNode, &ds)) {
-			klog.V(6).Infof("update node: %s triggers DaemonSet %s/%s to reconcile.", curNode.Name, ds.GetNamespace(), ds.GetName())
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
+		oldShouldRun, oldShouldContinueRunning := nodeShouldRunDaemonPod(oldNode, ds)
+		currentShouldRun, currentShouldContinueRunning := nodeShouldRunDaemonPod(curNode, ds)
+		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) {
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      ds.GetName(),
 				Namespace: ds.GetNamespace(),

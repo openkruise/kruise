@@ -20,22 +20,25 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
+	"github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/client"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
 	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
+	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/informers"
@@ -47,13 +50,13 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	kubeClient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -61,9 +64,9 @@ var (
 	simpleDaemonSetLabel = map[string]string{"name": "simple-daemon", "type": "production"}
 )
 
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
-
-const timeout = time.Second * 5
+func init() {
+	_ = apis.AddToScheme(scheme.Scheme)
+}
 
 func newDaemonSet(name string) *appsv1alpha1.DaemonSet {
 	two := int32(2)
@@ -102,9 +105,9 @@ func newDaemonSet(name string) *appsv1alpha1.DaemonSet {
 type fakePodControl struct {
 	sync.Mutex
 	*controller.FakePodControl
-	podStore cache.Store
-	podIDMap map[string]*corev1.Pod
-	dsc      *DaemonSetsController
+	podStore     cache.Store
+	podIDMap     map[string]*corev1.Pod
+	expectations controller.ControllerExpectationsInterface
 }
 
 func newFakePodControl() *fakePodControl {
@@ -130,20 +133,19 @@ func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *
 		},
 	}
 
-	if err := legacyscheme.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
-		return fmt.Errorf("unable to convert pod template: %v", err)
-	}
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
 	}
 	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", nodeName))
+
+	template.Spec.DeepCopyInto(&pod.Spec)
 
 	f.podStore.Update(pod)
 	f.podIDMap[pod.Name] = pod
 
 	ds := object.(*appsv1alpha1.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	expectations.CreationObserved(dsKey)
+	f.expectations.CreationObserved(dsKey)
 
 	return nil
 }
@@ -164,16 +166,14 @@ func (f *fakePodControl) CreatePodsWithControllerRef(namespace string, template 
 
 	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%p-", pod))
 
-	if err := legacyscheme.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
-		return fmt.Errorf("unable to convert pod template: %v", err)
-	}
+	template.Spec.DeepCopyInto(&pod.Spec)
 
 	f.podStore.Update(pod)
 	f.podIDMap[pod.Name] = pod
 
-	ds := object.(*apps.DaemonSet)
+	ds := object.(*appsv1alpha1.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	expectations.CreationObserved(dsKey)
+	f.expectations.CreationObserved(dsKey)
 
 	return nil
 }
@@ -191,22 +191,30 @@ func (f *fakePodControl) DeletePod(namespace string, podID string, object runtim
 	f.podStore.Delete(pod)
 	delete(f.podIDMap, podID)
 
-	ds := object.(*apps.DaemonSet)
+	ds := object.(*appsv1alpha1.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	expectations.DeletionObserved(dsKey)
+	f.expectations.DeletionObserved(dsKey)
 
 	return nil
 }
 
 // just define for test
-type DaemonSetsController struct {
-	ReconcileDaemonSet
-	// podListerSynced returns true if the pod shared informer has synced at least once
-	podListerSynced cache.InformerSynced
-	// setListerSynced returns true if the stateful set shared informer has synced at least once
-	setListerSynced cache.InformerSynced
-	// revListerSynced returns true if the rev shared informer has synced at least once
-	revListerSynced cache.InformerSynced
+type daemonSetsController struct {
+	*ReconcileDaemonSet
+	dsStore      cache.Store
+	historyStore cache.Store
+	podStore     cache.Store
+	nodeStore    cache.Store
+	fakeRecorder *record.FakeRecorder
+}
+
+func (dsc *daemonSetsController) syncHandler(key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	_, err = dsc.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{Namespace: namespace, Name: name}})
+	return err
 }
 
 func splitObjects(initialObjects []runtime.Object) ([]runtime.Object, []runtime.Object) {
@@ -222,105 +230,176 @@ func splitObjects(initialObjects []runtime.Object) ([]runtime.Object, []runtime.
 	return kubeObjects, kruiseObjects
 }
 
-func newTestController(c kubeClient.Client, initialObjects ...runtime.Object) (*DaemonSetsController, *fakePodControl, *fake.Clientset, error) {
+func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset, error) {
 	kubeObjects, kruiseObjects := splitObjects(initialObjects)
 	client := fake.NewSimpleClientset(kubeObjects...)
 	kruiseClient := kruisefake.NewSimpleClientset(kruiseObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	kruiseInformerFactory := kruiseinformers.NewSharedInformerFactory(kruiseClient, controller.NoResyncPeriodFunc())
-	newDsc := NewDaemonSetController(
+	dsc := NewDaemonSetController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		kruiseInformerFactory.Apps().V1alpha1().DaemonSets(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		client,
-		c,
+		kruiseClient,
+		flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, clock.NewFakeClock(time.Now())),
 	)
 
+	fakeRecorder := record.NewFakeRecorder(100)
+	dsc.eventRecorder = fakeRecorder
 	podControl := newFakePodControl()
+	dsc.podControl = podControl
+	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
+
+	newDsc := &daemonSetsController{
+		dsc,
+		kruiseInformerFactory.Apps().V1alpha1().DaemonSets().Informer().GetStore(),
+		informerFactory.Apps().V1().ControllerRevisions().Informer().GetStore(),
+		informerFactory.Core().V1().Pods().Informer().GetStore(),
+		informerFactory.Core().V1().Nodes().Informer().GetStore(),
+		fakeRecorder,
+	}
+
+	podControl.expectations = newDsc.expectations
+
 	return newDsc, podControl, client, nil
 }
 
 func NewDaemonSetController(
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
-	setInformer kruiseappsinformers.DaemonSetInformer,
+	dsInformer kruiseappsinformers.DaemonSetInformer,
 	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
-	client kubeClient.Client,
-) *DaemonSetsController {
+	kruiseClient kruiseclientset.Interface,
+	failedPodsBackoff *flowcontrol.Backoff,
+) *ReconcileDaemonSet {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "daemonset-controller"})
-	dsc := &DaemonSetsController{
-		ReconcileDaemonSet: ReconcileDaemonSet{
-			client:        client,
-			eventRecorder: recorder,
-			podControl:    kubecontroller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
-			crControl: kubecontroller.RealControllerRevisionControl{
-				KubeClient: kubeClient,
-			},
-			historyLister: revInformer.Lister(),
-			podLister:     podInformer.Lister(),
-			nodeLister:    nodeInformer.Lister(),
+	return &ReconcileDaemonSet{
+		kubeClient:    kubeClient,
+		kruiseClient:  kruiseClient,
+		eventRecorder: recorder,
+		podControl:    kubecontroller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		crControl: kubecontroller.RealControllerRevisionControl{
+			KubeClient: kubeClient,
 		},
-		podListerSynced: podInformer.Informer().HasSynced,
-		setListerSynced: setInformer.Informer().HasSynced,
-		revListerSynced: revInformer.Informer().HasSynced,
+		expectations:       kubecontroller.NewControllerExpectations(),
+		updateExpectations: kruiseExpectations.NewUpdateExpectations(revisionadapter.NewDefaultImpl()),
+		dsLister:           dsInformer.Lister(),
+		historyLister:      revInformer.Lister(),
+		podLister:          podInformer.Lister(),
+		nodeLister:         nodeInformer.Lister(),
+		failedPodsBackoff:  failedPodsBackoff,
 	}
-	return dsc
 }
 
-var c kubeClient.Client
+func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) error {
+	if len(fakePodControl.Templates) != expectedCreates {
+		return fmt.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
+	}
+	if len(fakePodControl.DeletePodName) != expectedDeletes {
+		return fmt.Errorf("Unexpected number of deletes.  Expected %d, got %v\n", expectedDeletes, fakePodControl.DeletePodName)
+	}
+	if len(manager.fakeRecorder.Events) != expectedEvents {
+		return fmt.Errorf("Unexpected number of events.  Expected %d, saw %d\n", expectedEvents, len(manager.fakeRecorder.Events))
+	}
+	// Every Pod created should have a ControllerRef.
+	if got, want := len(fakePodControl.ControllerRefs), expectedCreates; got != want {
+		return fmt.Errorf("len(ControllerRefs) = %v, want %v", got, want)
+	}
+	// Make sure the ControllerRefs are correct.
+	for _, controllerRef := range fakePodControl.ControllerRefs {
+		if got, want := controllerRef.APIVersion, "apps.kruise.io/v1alpha1"; got != want {
+			return fmt.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
+		}
+		if got, want := controllerRef.Kind, "DaemonSet"; got != want {
+			return fmt.Errorf("controllerRef.Kind = %q, want %q", got, want)
+		}
+		if controllerRef.Controller == nil || *controllerRef.Controller != true {
+			return fmt.Errorf("controllerRef.Controller is not set to true")
+		}
+	}
+	return nil
+}
 
-func TestReconcile(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
-	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = util.NewClientFromManager(mgr, "test-daemonset-controller")
-	err = client.NewRegistry(mgr.GetConfig())
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-
-	set := newDaemonSet("test")
-
-	_, _, _, err = newTestController(c)
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	dsc, err := newReconciler(mgr)
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-
-	recFn, requests := SetupTestReconcile(dsc)
-	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
-
-	ctx, cancel := context.WithCancel(context.Background())
-	mgrStopped := StartTestManager(ctx, mgr, g)
-
-	defer func() {
-		cancel()
-		mgrStopped.Wait()
-	}()
-
-	err = c.Create(context.TODO(), set)
+func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *appsv1alpha1.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+	t.Helper()
+	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		t.Errorf("create DaemonSet %s failed: %s", set.Name, err)
-	}
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-
-	time.Sleep(time.Second * 2)
-	foo := &appsv1alpha1.DaemonSet{}
-	if err = c.Get(context.TODO(), types.NamespacedName{Namespace: set.Namespace, Name: set.Name}, foo); err != nil {
-		g.Expect(err).NotTo(gomega.HaveOccurred())
+		t.Fatal("could not get key for daemon")
 	}
 
-	err = c.Delete(context.TODO(), set)
+	err = manager.syncHandler(key)
 	if err != nil {
-		t.Errorf("delete DaemonSet %s failed: %s", set.Name, err)
+		t.Log(err)
 	}
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	defer c.Delete(context.TODO(), set)
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+
+	err = validateSyncDaemonSets(manager, podControl, expectedCreates, expectedDeletes, expectedEvents)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func markPodsReady(store cache.Store) {
+	// mark pods as ready
+	for _, obj := range store.List() {
+		pod := obj.(*corev1.Pod)
+		markPodReady(pod)
+	}
+}
+
+func markPodReady(pod *corev1.Pod) {
+	condition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue}
+	podutil.UpdatePodCondition(&pod.Status, &condition)
+}
+
+// clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
+func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1alpha1.DaemonSet, fakePodControl *fakePodControl) {
+	fakePodControl.Clear()
+
+	key, err := controller.KeyFunc(ds)
+	if err != nil {
+		t.Errorf("Could not get key for daemon.")
+		return
+	}
+	manager.expectations.DeleteExpectations(key)
+
+	now := manager.failedPodsBackoff.Clock.Now()
+	hash, _ := currentDSHash(manager, ds)
+	// log all the pods in the store
+	var lines []string
+	for _, obj := range manager.podStore.List() {
+		pod := obj.(*corev1.Pod)
+		if pod.CreationTimestamp.IsZero() {
+			pod.CreationTimestamp.Time = now
+		}
+		var readyLast time.Time
+		ready := podutil.IsPodReady(pod)
+		if ready {
+			if c := podutil.GetPodReadyCondition(pod.Status); c != nil {
+				readyLast = c.LastTransitionTime.Time.Add(time.Duration(ds.Spec.MinReadySeconds) * time.Second)
+			}
+		}
+		nodeName, _ := util.GetTargetNodeName(pod)
+
+		lines = append(lines, fmt.Sprintf("node=%s current=%-5t ready=%-5t age=%-4d pod=%s now=%d available=%d",
+			nodeName,
+			hash == pod.Labels[apps.ControllerRevisionHashLabelKey],
+			ready,
+			now.Unix(),
+			pod.Name,
+			pod.CreationTimestamp.Unix(),
+			readyLast.Unix(),
+		))
+	}
+	sort.Strings(lines)
+	for _, line := range lines {
+		klog.Info(line)
+	}
 }
 
 func Test_isControlledByDaemonSet(t *testing.T) {
@@ -356,188 +435,6 @@ func Test_isControlledByDaemonSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isControlledByDaemonSet(tt.args.p, tt.args.uuid); got != tt.want {
 				t.Errorf("isControlledByDaemonSet() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_ignoreNotUnscheduable(t *testing.T) {
-	type args struct {
-		ds *appsv1alpha1.DaemonSet
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "not set annotation",
-			args: args{
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{},
-				},
-			},
-			want: false,
-		},
-		{
-			name: "set annotation false",
-			args: args{
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							IsIgnoreNotReady: "false",
-						},
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			name: "set annotation true",
-			args: args{
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							IsIgnoreNotReady: "true",
-						},
-					},
-				},
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := ignoreNotUnscheduable(tt.args.ds); got != tt.want {
-				t.Errorf("ignoreNotUnscheduable() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_ignoreNotReady(t *testing.T) {
-	type args struct {
-		ds *appsv1alpha1.DaemonSet
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "not set annotation",
-			args: args{
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{},
-				},
-			},
-			want: false,
-		},
-		{
-			name: "set annotation false",
-			args: args{
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							IsIgnoreUnscheduable: "false",
-						},
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			name: "set annotation true",
-			args: args{
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							IsIgnoreUnscheduable: "true",
-						},
-					},
-				},
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := ignoreNotReady(tt.args.ds); got != tt.want {
-				t.Errorf("ignoreNotReady() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestCanNodeBeDeployed(t *testing.T) {
-	type args struct {
-		node *corev1.Node
-		ds   *appsv1alpha1.DaemonSet
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "ignoreAll",
-			args: args{
-				node: &corev1.Node{
-					Spec: corev1.NodeSpec{
-						Unschedulable: true,
-					},
-					Status: corev1.NodeStatus{
-						Conditions: []corev1.NodeCondition{
-							{
-								Type:   corev1.NodeReady,
-								Status: corev1.ConditionFalse,
-							},
-						},
-					},
-				},
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							IsIgnoreUnscheduable: "true",
-							IsIgnoreNotReady:     "true",
-						},
-					},
-				},
-			},
-			want: true,
-		},
-		{
-			name: "respectAll",
-			args: args{
-				node: &corev1.Node{
-					Spec: corev1.NodeSpec{
-						Unschedulable: true,
-					},
-					Status: corev1.NodeStatus{
-						Conditions: []corev1.NodeCondition{
-							{
-								Type:   corev1.NodeReady,
-								Status: corev1.ConditionFalse,
-							},
-						},
-					},
-				},
-				ds: &appsv1alpha1.DaemonSet{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							IsIgnoreUnscheduable: "false",
-							IsIgnoreNotReady:     "false",
-						},
-					},
-				},
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := CanNodeBeDeployed(tt.args.node, tt.args.ds); got != tt.want {
-				t.Errorf("CanNodeBeDeployed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

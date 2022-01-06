@@ -25,14 +25,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-func newTestPodEventHandler(reader client.Reader) *podEventHandler {
+func newTestPodEventHandler(reader client.Reader, expectations kubecontroller.ControllerExpectationsInterface) *podEventHandler {
 	return &podEventHandler{
-		Reader: reader,
+		Reader:       reader,
+		expectations: expectations,
 	}
 }
 
@@ -63,7 +65,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			dss: []*appsv1alpha1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs01",
+						Name:      "ds01",
 						Namespace: "default",
 					},
 					Spec: appsv1alpha1.DaemonSetSpec{
@@ -79,7 +81,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 					},
 					Spec: appsv1alpha1.DaemonSetSpec{
@@ -102,7 +104,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			dss: []*appsv1alpha1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs01",
+						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
@@ -119,7 +121,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 						UID:       "002",
 					},
@@ -165,15 +167,16 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			fakeClient.Create(context.TODO(), ds)
 		}
 
-		enqueueHandler := newTestPodEventHandler(fakeClient)
+		exp := kubecontroller.NewControllerExpectations()
+		enqueueHandler := newTestPodEventHandler(fakeClient, exp)
 		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
 
 		for i := 0; i < len(testCase.alterExpectationCreationsAdds); i++ {
-			expectations.ExpectCreations(testCase.alterExpectationCreationsKey, 1)
+			exp.ExpectCreations(testCase.alterExpectationCreationsKey, 1)
 		}
 
 		if testCase.alterExpectationCreationsKey != "" {
-			if ok := expectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
+			if ok := exp.SatisfiedExpectations(testCase.alterExpectationCreationsKey); ok {
 				t.Fatalf("%s before execute, should not be satisfied", testCase.name)
 			}
 		}
@@ -184,7 +187,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		}
 
 		if testCase.alterExpectationCreationsKey != "" {
-			if ok := expectations.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
+			if ok := exp.SatisfiedExpectations(testCase.alterExpectationCreationsKey); !ok {
 				t.Fatalf("%s after execute, should be satisfied", testCase.name)
 			}
 		}
@@ -376,7 +379,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 						UID:       "002",
 					},
@@ -433,7 +436,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 			dss: []*appsv1alpha1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs01",
+						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
@@ -450,7 +453,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 						UID:       "002",
 					},
@@ -507,7 +510,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 			dss: []*appsv1alpha1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs01",
+						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
@@ -524,7 +527,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 						UID:       "002",
 					},
@@ -563,7 +566,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 			dss: []*appsv1alpha1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs01",
+						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
@@ -580,7 +583,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 						UID:       "002",
 					},
@@ -597,7 +600,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs03",
+						Name:      "ds03",
 						Namespace: "default",
 						UID:       "003",
 					},
@@ -647,7 +650,8 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		for _, ds := range testCase.dss {
 			fakeClient.Create(context.TODO(), ds)
 		}
-		enqueueHandler := newTestPodEventHandler(fakeClient)
+		exp := kubecontroller.NewControllerExpectations()
+		enqueueHandler := newTestPodEventHandler(fakeClient, exp)
 		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
 
 		enqueueHandler.Update(testCase.e, q)
@@ -692,7 +696,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 					},
 					Spec: appsv1alpha1.DaemonSetSpec{
@@ -743,7 +747,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cs02",
+						Name:      "ds02",
 						Namespace: "default",
 					},
 					Spec: appsv1alpha1.DaemonSetSpec{
@@ -787,7 +791,7 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 		expectedQueueLen int
 	}{
 		{
-			name: "ShouldIgnoreNodeUpdate",
+			name: "shouldIgnoreNodeUpdate",
 			e: event.UpdateEvent{
 				ObjectOld: &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{

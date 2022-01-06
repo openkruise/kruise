@@ -18,13 +18,13 @@ package validating
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func newDaemonset(name string) *appsv1alpha1.DaemonSet {
@@ -35,7 +35,6 @@ func newDaemonset(name string) *appsv1alpha1.DaemonSet {
 }
 
 func TestValidateDaemonSet(t *testing.T) {
-	a := assert.New(t)
 	handler := DaemonSetCreateUpdateHandler{}
 
 	for _, c := range []struct {
@@ -67,6 +66,7 @@ func TestValidateDaemonSet(t *testing.T) {
 		{
 			"selector match",
 			func() *appsv1alpha1.DaemonSet {
+				maxUnavailable := intstr.FromInt(1)
 				ds := newDaemonset("ds1")
 				ds.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -79,13 +79,14 @@ func TestValidateDaemonSet(t *testing.T) {
 							"key1": "value1",
 						},
 					},
-					Spec: corev1.PodSpec{},
+					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "a", Image: "b"}}},
 				}
 				ds.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyAlways
 				ds.Spec.UpdateStrategy = appsv1alpha1.DaemonSetUpdateStrategy{
 					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-						Type: appsv1alpha1.StandardRollingUpdateType,
+						Type:           appsv1alpha1.StandardRollingUpdateType,
+						MaxUnavailable: &maxUnavailable,
 					},
 				}
 				return ds
@@ -93,8 +94,9 @@ func TestValidateDaemonSet(t *testing.T) {
 			true,
 		},
 	} {
-		t.Logf("\t%s", c.Title)
-		result, _, _ := handler.validatingDaemonSetFn(context.TODO(), c.Ds)
-		a.Equal(c.ExpectAllowResult, result)
+		result, _, err := handler.validatingDaemonSetFn(context.TODO(), c.Ds)
+		if !reflect.DeepEqual(c.ExpectAllowResult, result) {
+			t.Fatalf("case: %s, expected result: %v, got: %v, error: %v", c.Title, c.ExpectAllowResult, result, err)
+		}
 	}
 }

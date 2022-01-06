@@ -260,33 +260,36 @@ func SetDefaultsDaemonSet(obj *v1alpha1.DaemonSet) {
 
 	if obj.Spec.UpdateStrategy.Type == "" {
 		obj.Spec.UpdateStrategy.Type = v1alpha1.RollingUpdateDaemonSetStrategyType
-
-		// UpdateStrategy.RollingUpdate will take default values below.
-		obj.Spec.UpdateStrategy.RollingUpdate = &v1alpha1.RollingUpdateDaemonSet{}
 	}
-
 	if obj.Spec.UpdateStrategy.Type == v1alpha1.RollingUpdateDaemonSetStrategyType {
 		if obj.Spec.UpdateStrategy.RollingUpdate == nil {
 			obj.Spec.UpdateStrategy.RollingUpdate = &v1alpha1.RollingUpdateDaemonSet{}
 		}
-		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+
+		// Make it compatible with the predicated Surging
+		if obj.Spec.UpdateStrategy.RollingUpdate.Type == v1alpha1.DeprecatedSurgingRollingUpdateType {
+			if obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
+				maxSurge := intstr.FromInt(1)
+				obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &maxSurge
+			}
+			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+				maxUnavailable := intstr.FromInt(0)
+				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+			}
 		}
+
+		// Default and convert to Standard
+		if obj.Spec.UpdateStrategy.RollingUpdate.Type == "" || obj.Spec.UpdateStrategy.RollingUpdate.Type == v1alpha1.DeprecatedSurgingRollingUpdateType {
+			obj.Spec.UpdateStrategy.RollingUpdate.Type = v1alpha1.StandardRollingUpdateType
+		}
+
 		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 			maxUnavailable := intstr.FromInt(1)
 			obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
-
-		if obj.Spec.UpdateStrategy.RollingUpdate.Type == "" {
-			obj.Spec.UpdateStrategy.RollingUpdate.Type = v1alpha1.StandardRollingUpdateType
-		}
-		// Only when RollingUpdate Type is SurgingRollingUpdateType, it need to initialize the MaxSurge.
-		if obj.Spec.UpdateStrategy.RollingUpdate.Type == v1alpha1.SurgingRollingUpdateType {
-			if obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
-				MaxSurge := intstr.FromInt(1)
-				obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &MaxSurge
-			}
+		if obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
+			MaxSurge := intstr.FromInt(0)
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &MaxSurge
 		}
 	}
 
