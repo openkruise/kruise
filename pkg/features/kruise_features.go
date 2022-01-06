@@ -82,7 +82,6 @@ const (
 
 	// Enables policies controlling deletion of PVCs created by a StatefulSet.
 	StatefulSetAutoDeletePVC featuregate.Feature = "StatefulSetAutoDeletePVC"
-
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
