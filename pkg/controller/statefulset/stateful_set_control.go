@@ -581,12 +581,15 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			continue
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod block
-		if !isRunningAndReady(condemned[target]) && monotonic && condemned[target] != firstUnhealthyPod {
+		if avail, waitTime := isRunningAndAvailable(condemned[target], minReadySeconds); !avail && monotonic && condemned[target] != firstUnhealthyPod {
 			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready prior to scale down",
+				"StatefulSet %s/%s is waiting for Pod %s to be Running and Available prior to scale down",
 				set.Namespace,
 				set.Name,
 				firstUnhealthyPod.Name)
+			if waitTime > 0 {
+				durationStore.Push(getStatefulSetKey(condemned[target]), waitTime)
+			}
 			return &status, nil
 		}
 		klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for scale down",
