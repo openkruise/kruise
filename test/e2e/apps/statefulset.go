@@ -19,17 +19,13 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +36,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 const (
@@ -84,7 +87,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		}
 		headlessSvcName := "test"
 		var statefulPodMounts, podMounts []v1.VolumeMount
-		var ss *appsv1alpha1.StatefulSet
+		var ss *appsv1beta1.StatefulSet
 
 		ginkgo.BeforeEach(func() {
 			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
@@ -113,7 +116,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.PauseNewPods(ss)
 
-			_, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
@@ -155,7 +158,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ss.Kind = kind
 
@@ -237,7 +240,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.PauseNewPods(ss)
 
-			_, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			time.Sleep(time.Minute)
@@ -295,17 +298,17 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
-					return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+				RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
+					return &appsv1beta1.RollingUpdateStatefulSetStrategy{
 						Partition: func() *int32 {
 							i := int32(3)
 							return &i
 						}()}
 				}(),
 			}
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -327,7 +330,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
-			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -355,21 +358,21 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			ginkgo.By("Performing a canary update")
-			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
-					return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+				RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
+					return &appsv1beta1.RollingUpdateStatefulSetStrategy{
 						Partition: func() *int32 {
 							i := int32(2)
 							return &i
 						}()}
 				}(),
 			}
-			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
-				update.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+				update.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 					Type: apps.RollingUpdateStatefulSetStrategyType,
-					RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
-						return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+					RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
+						return &appsv1beta1.RollingUpdateStatefulSetStrategy{
 							Partition: func() *int32 {
 								i := int32(2)
 								return &i
@@ -447,12 +450,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Performing a phased rolling update")
 			for i := int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) - 1; i >= 0; i-- {
-				ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
-					update.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+				ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+					update.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 						Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: func() *appsv1alpha1.RollingUpdateStatefulSetStrategy {
+						RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
 							j := int32(i)
-							return &appsv1alpha1.RollingUpdateStatefulSetStrategy{
+							return &appsv1beta1.RollingUpdateStatefulSetStrategy{
 								Partition: &j,
 							}
 						}(),
@@ -506,10 +509,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -547,7 +550,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
-			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -590,15 +593,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &appsv1alpha1.RollingUpdateStatefulSetStrategy{
-					PodUpdatePolicy:       appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+					PodUpdatePolicy:       appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
 					InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 10},
 				},
 			}
 			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -637,10 +640,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
 			var partition int32 = 3
-			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 				if update.Spec.UpdateStrategy.RollingUpdate == nil {
-					update.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateStatefulSetStrategy{}
+					update.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{}
 				}
 				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 			})
@@ -651,7 +654,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
 				"Current revision should not equal update revision during rolling update")
-			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 				partition = 0
 				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 			})
@@ -683,10 +686,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss.Spec.UpdateStrategy = appsv1alpha1.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &appsv1alpha1.RollingUpdateStatefulSetStrategy{
-					PodUpdatePolicy:       appsv1alpha1.InPlaceIfPossiblePodUpdateStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+					PodUpdatePolicy:       appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
 					InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 10},
 				},
 			}
@@ -699,7 +702,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
 			})
 			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -735,10 +738,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Updating stateful set template: update label for env")
 			var partition int32 = 3
-			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 				update.Spec.Template.ObjectMeta.Labels["test-env"] = "bar"
 				if update.Spec.UpdateStrategy.RollingUpdate == nil {
-					update.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateStatefulSetStrategy{}
+					update.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{}
 				}
 				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 			})
@@ -749,7 +752,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
 				"Current revision should not equal update revision during rolling update")
-			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 				partition = 0
 				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 			})
@@ -783,7 +786,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss, err = kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err = kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -864,7 +867,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -931,7 +934,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = kc.AppsV1alpha1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss, metav1.CreateOptions{})
+			_, err = kc.AppsV1beta1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -997,13 +1000,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
 			sst.SetHTTPProbe(ss)
-			ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 
 			ginkgo.By("getting scale subresource")
-			scale, err := kc.AppsV1alpha1().StatefulSets(ns).GetScale(context.TODO(), ssName, metav1.GetOptions{})
+			scale, err := kc.AppsV1beta1().StatefulSets(ns).GetScale(context.TODO(), ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
@@ -1015,14 +1018,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			}
 			scale.Spec.Replicas = 2
-			scaleResult, err := kc.AppsV1alpha1().StatefulSets(ns).UpdateScale(context.TODO(), ssName, scale, metav1.UpdateOptions{})
+			scaleResult, err := kc.AppsV1beta1().StatefulSets(ns).UpdateScale(context.TODO(), ssName, scale, metav1.UpdateOptions{})
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
 			framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
 
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
-			ss, err = kc.AppsV1alpha1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
+			ss, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
@@ -1030,13 +1033,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	//framework.KruiseDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
-	//	var sst *framework.StatefulSetTester
+	//ginkgo.Describe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
 	//	var appTester *clusterAppTester
 	//
 	//	ginkgo.BeforeEach(func() {
-	//		sst = framework.NewStatefulSetTester(c, kc)
-	//		appTester = &clusterAppTester{tester: sst, ns: ns}
+	//		appTester = &clusterAppTester{client: c, ns: ns}
 	//	})
 	//
 	//	ginkgo.AfterEach(func() {
@@ -1044,37 +1045,248 @@ var _ = SIGDescribe("StatefulSet", func() {
 	//			framework.DumpDebugInfo(c, ns)
 	//		}
 	//		framework.Logf("Deleting all statefulset in ns %v", ns)
-	//		framework.DeleteAllStatefulSets(c, kc, ns)
+	//		e2estatefulset.DeleteAllStatefulSets(c, ns)
 	//	})
 	//
 	//	// Do not mark this as Conformance.
 	//	// StatefulSet Conformance should not be dependent on specific applications.
 	//	ginkgo.It("should creating a working zookeeper cluster", func() {
-	//		appTester.statefulPod = &zookeeperTester{tester: sst}
+	//		e2epv.SkipIfNoDefaultStorageClass(c)
+	//		appTester.statefulPod = &zookeeperTester{client: c}
 	//		appTester.run()
 	//	})
 	//
 	//	// Do not mark this as Conformance.
 	//	// StatefulSet Conformance should not be dependent on specific applications.
 	//	ginkgo.It("should creating a working redis cluster", func() {
-	//		appTester.statefulPod = &redisTester{tester: sst}
+	//		e2epv.SkipIfNoDefaultStorageClass(c)
+	//		appTester.statefulPod = &redisTester{client: c}
 	//		appTester.run()
 	//	})
 	//
 	//	// Do not mark this as Conformance.
 	//	// StatefulSet Conformance should not be dependent on specific applications.
 	//	ginkgo.It("should creating a working mysql cluster", func() {
-	//		appTester.statefulPod = &mysqlGaleraTester{tester: sst}
+	//		e2epv.SkipIfNoDefaultStorageClass(c)
+	//		appTester.statefulPod = &mysqlGaleraTester{client: c}
 	//		appTester.run()
 	//	})
 	//
 	//	// Do not mark this as Conformance.
 	//	// StatefulSet Conformance should not be dependent on specific applications.
 	//	ginkgo.It("should creating a working CockroachDB cluster", func() {
-	//		appTester.statefulPod = &cockroachDBTester{tester: sst}
+	//		e2epv.SkipIfNoDefaultStorageClass(c)
+	//		appTester.statefulPod = &cockroachDBTester{client: c}
 	//		appTester.run()
 	//	})
 	//})
+	//
+	//// Make sure minReadySeconds is honored
+	//// Don't mark it as conformance yet
+	//ginkgo.It("MinReadySeconds should be honored when enabled", func() {
+	//	ssName := "test-ss"
+	//	headlessSvcName := "test"
+	//	// Define StatefulSet Labels
+	//	ssPodLabels := map[string]string{
+	//		"name": "sample-pod",
+	//		"pod":  WebserverImageName,
+	//	}
+	//	ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
+	//	setHTTPProbe(ss)
+	//	ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+	//	framework.ExpectNoError(err)
+	//	e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 1)
+	//})
+	//
+	//ginkgo.It("AvailableReplicas should get updated accordingly when MinReadySeconds is enabled", func() {
+	//	ssName := "test-ss"
+	//	headlessSvcName := "test"
+	//	// Define StatefulSet Labels
+	//	ssPodLabels := map[string]string{
+	//		"name": "sample-pod",
+	//		"pod":  WebserverImageName,
+	//	}
+	//	ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels)
+	//	ss.Spec.MinReadySeconds = 30
+	//	setHTTPProbe(ss)
+	//	ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+	//	framework.ExpectNoError(err)
+	//	e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 0)
+	//	// let's check that the availableReplicas have still not updated
+	//	time.Sleep(5 * time.Second)
+	//	ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ss.Name, metav1.GetOptions{})
+	//	framework.ExpectNoError(err)
+	//	if ss.Status.AvailableReplicas != 0 {
+	//		framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 0, ss.Status.AvailableReplicas)
+	//	}
+	//	e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 2)
+	//
+	//	ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+	//		update.Spec.MinReadySeconds = 3600
+	//	})
+	//	framework.ExpectNoError(err)
+	//	// We don't expect replicas to be updated till 1 hour, so the availableReplicas should be 0
+	//	e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 0)
+	//
+	//	ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+	//		update.Spec.MinReadySeconds = 0
+	//	})
+	//	framework.ExpectNoError(err)
+	//	e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 2)
+	//
+	//	ginkgo.By("check availableReplicas are shown in status")
+	//	out, err := framework.RunKubectl(ns, "get", "statefulset", ss.Name, "-o=yaml")
+	//	framework.ExpectNoError(err)
+	//	if !strings.Contains(out, "availableReplicas: 2") {
+	//		framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 2, out)
+	//	}
+	//})
+
+	ginkgo.Describe("Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC]", func() {
+		ssName := "ss"
+		labels := map[string]string{
+			"foo": "bar",
+			"baz": "blah",
+		}
+		headlessSvcName := "test"
+		var statefulPodMounts, podMounts []v1.VolumeMount
+		var ss *appsv1beta1.StatefulSet
+
+		ginkgo.BeforeEach(func() {
+			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			podMounts = []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
+			ss = framework.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+
+			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
+			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all statefulset in ns %v", ns)
+			framework.DeleteAllStatefulSets(c, kc, ns)
+		})
+
+		ginkgo.It("should delete PVCs with a WhenDeleted policy", func() {
+			if framework.SkipIfNoDefaultStorageClass(c) {
+				return
+			}
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist with their owner refs")
+			err = verifyStatefulSetPVCsExistWithOwnerRefs(c, kc, ss, []int{0, 1, 2}, true, false)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Deleting stateful set " + ss.Name)
+			err = kc.AppsV1beta1().StatefulSets(ns).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying PVCs deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should delete PVCs with a OnScaledown policy", func() {
+			if framework.SkipIfNoDefaultStorageClass(c) {
+				return
+			}
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0, 1, 2})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
+			ss, err = framework.NewStatefulSetTester(c, kc).Scale(ss, 1)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying all but one PVC deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should delete PVCs after adopting pod (WhenDeleted)", func() {
+			if framework.SkipIfNoDefaultStorageClass(c) {
+				return
+			}
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist with their owner refs")
+			err = verifyStatefulSetPVCsExistWithOwnerRefs(c, kc, ss, []int{0, 1, 2}, true, false)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Orphaning the 3rd pod")
+			patch, err := json.Marshal(metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{},
+			})
+			framework.ExpectNoError(err, "Could not Marshal JSON for patch payload")
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), fmt.Sprintf("%s-2", ss.Name), types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "")
+			framework.ExpectNoError(err, "Could not patch payload")
+
+			ginkgo.By("Deleting stateful set " + ss.Name)
+			err = kc.AppsV1beta1().StatefulSets(ns).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying PVCs deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]", func() {
+			if framework.SkipIfNoDefaultStorageClass(c) {
+				return
+			}
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0, 1, 2})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Orphaning the 3rd pod")
+			patch, err := json.Marshal(metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{},
+			})
+			framework.ExpectNoError(err, "Could not Marshal JSON for patch payload")
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), fmt.Sprintf("%s-2", ss.Name), types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "")
+			framework.ExpectNoError(err, "Could not patch payload")
+
+			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
+			ss, err = framework.NewStatefulSetTester(c, kc).Scale(ss, 1)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying all but one PVC deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0})
+			framework.ExpectNoError(err)
+		})
+	})
 })
 
 func kubectlExecWithRetries(args ...string) (out string) {
@@ -1090,7 +1302,7 @@ func kubectlExecWithRetries(args ...string) (out string) {
 }
 
 type statefulPodTester interface {
-	deploy(ns string) *appsv1alpha1.StatefulSet
+	deploy(ns string) *appsv1beta1.StatefulSet
 	write(statefulPodIndex int, kv map[string]string)
 	read(statefulPodIndex int, key string) string
 	name() string
@@ -1127,7 +1339,7 @@ type statefulPodTester interface {
 //}
 //
 //type zookeeperTester struct {
-//	ss     *appsv1alpha1.StatefulSet
+//	ss     *appsv1beta1.StatefulSet
 //	tester *framework.StatefulSetTester
 //}
 //
@@ -1135,7 +1347,7 @@ type statefulPodTester interface {
 //	return "zookeeper"
 //}
 //
-//func (z *zookeeperTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//func (z *zookeeperTester) deploy(ns string) *appsv1beta1.StatefulSet {
 //	z.ss = z.tester.CreateStatefulSet(zookeeperManifestPath, ns)
 //	return z.ss
 //}
@@ -1157,7 +1369,7 @@ type statefulPodTester interface {
 //}
 //
 //type mysqlGaleraTester struct {
-//	ss     *appsv1alpha1.StatefulSet
+//	ss     *appsv1beta1.StatefulSet
 //	tester *framework.StatefulSetTester
 //}
 //
@@ -1173,7 +1385,7 @@ type statefulPodTester interface {
 //	return kubectlExecWithRetries(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 //}
 //
-//func (m *mysqlGaleraTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//func (m *mysqlGaleraTester) deploy(ns string) *appsv1beta1.StatefulSet {
 //	m.ss = m.tester.CreateStatefulSet(mysqlGaleraManifestPath, ns)
 //
 //	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
@@ -1200,7 +1412,7 @@ type statefulPodTester interface {
 //}
 //
 //type redisTester struct {
-//	ss     *appsv1alpha1.StatefulSet
+//	ss     *appsv1beta1.StatefulSet
 //	tester *framework.StatefulSetTester
 //}
 //
@@ -1213,7 +1425,7 @@ type statefulPodTester interface {
 //	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 //}
 //
-//func (m *redisTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//func (m *redisTester) deploy(ns string) *appsv1beta1.StatefulSet {
 //	m.ss = m.tester.CreateStatefulSet(redisManifestPath, ns)
 //	return m.ss
 //}
@@ -1231,7 +1443,7 @@ type statefulPodTester interface {
 //}
 //
 //type cockroachDBTester struct {
-//	ss     *appsv1alpha1.StatefulSet
+//	ss     *appsv1beta1.StatefulSet
 //	tester *framework.StatefulSetTester
 //}
 //
@@ -1244,7 +1456,7 @@ type statefulPodTester interface {
 //	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 //}
 //
-//func (c *cockroachDBTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//func (c *cockroachDBTester) deploy(ns string) *appsv1beta1.StatefulSet {
 //	c.ss = c.tester.CreateStatefulSet(cockroachDBManifestPath, ns)
 //	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
 //	for _, cmd := range []string{
@@ -1292,10 +1504,10 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 
 // This function is used by two tests to test StatefulSet rollbacks: one using
 // PVCs and one using no storage.
-func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string, ss *appsv1alpha1.StatefulSet) {
+func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string, ss *appsv1beta1.StatefulSet) {
 	sst := framework.NewStatefulSetTester(c, kc)
 	sst.SetHTTPProbe(ss)
-	ss, err := kc.AppsV1alpha1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+	ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	ss = sst.WaitForStatus(ss)
@@ -1321,7 +1533,7 @@ func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
 	gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
-	ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+	ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1365,7 +1577,7 @@ func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 	priorRevision := currentRevision
-	ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1alpha1.StatefulSet) {
+	ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = oldImage
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1403,4 +1615,112 @@ func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string
 				pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
 				priorRevision))
 	}
+}
+
+// verifyStatefulSetPVCsExist confirms that exactly the PVCs for ss with the specified ids exist. This polls until the situation occurs, an error happens, or until timeout (in the latter case an error is also returned). Beware that this cannot tell if a PVC will be deleted at some point in the future, so if used to confirm that no PVCs are deleted, the caller should wait for some event giving the PVCs a reasonable chance to be deleted, before calling this function.
+func verifyStatefulSetPVCsExist(c clientset.Interface, ss *appsv1beta1.StatefulSet, claimIds []int) error {
+	idSet := map[int]struct{}{}
+	for _, id := range claimIds {
+		idSet[id] = struct{}{}
+	}
+	return wait.PollImmediate(framework.StatefulSetPoll, framework.StatefulSetTimeout, func() (bool, error) {
+		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
+			return false, nil
+		}
+		for _, claim := range ss.Spec.VolumeClaimTemplates {
+			pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
+			seenPVCs := map[int]struct{}{}
+			for _, pvc := range pvcList.Items {
+				matches := pvcNameRE.FindStringSubmatch(pvc.Name)
+				if len(matches) != 2 {
+					continue
+				}
+				ordinal, err := strconv.ParseInt(matches[1], 10, 32)
+				if err != nil {
+					framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
+					return false, err
+				}
+				if _, found := idSet[int(ordinal)]; !found {
+					return false, nil // Retry until the PVCs are consistent.
+				} else {
+					seenPVCs[int(ordinal)] = struct{}{}
+				}
+			}
+			if len(seenPVCs) != len(idSet) {
+				framework.Logf("Found %d of %d PVCs", len(seenPVCs), len(idSet))
+				return false, nil // Retry until the PVCs are consistent.
+			}
+		}
+		return true, nil
+	})
+}
+
+// verifyStatefulSetPVCsExistWithOwnerRefs works as verifyStatefulSetPVCsExist, but also waits for the ownerRefs to match.
+func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, kc kruiseclientset.Interface, ss *appsv1beta1.StatefulSet, claimIndicies []int, wantSetRef, wantPodRef bool) error {
+	indexSet := map[int]struct{}{}
+	for _, id := range claimIndicies {
+		indexSet[id] = struct{}{}
+	}
+	set, _ := kc.AppsV1beta1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
+	setUID := set.GetUID()
+	if setUID == "" {
+		framework.Failf("Statefulset %s mising UID", ss.Name)
+	}
+	return wait.PollImmediate(framework.StatefulSetPoll, framework.StatefulSetTimeout, func() (bool, error) {
+		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
+			return false, nil
+		}
+		for _, claim := range ss.Spec.VolumeClaimTemplates {
+			pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
+			seenPVCs := map[int]struct{}{}
+			for _, pvc := range pvcList.Items {
+				matches := pvcNameRE.FindStringSubmatch(pvc.Name)
+				if len(matches) != 2 {
+					continue
+				}
+				ordinal, err := strconv.ParseInt(matches[1], 10, 32)
+				if err != nil {
+					framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
+					return false, err
+				}
+				if _, found := indexSet[int(ordinal)]; !found {
+					framework.Logf("Unexpected, retrying")
+					return false, nil // Retry until the PVCs are consistent.
+				}
+				var foundSetRef, foundPodRef bool
+				for _, ref := range pvc.GetOwnerReferences() {
+					if ref.Kind == "StatefulSet" && ref.UID == setUID {
+						foundSetRef = true
+					}
+					if ref.Kind == "Pod" {
+						podName := fmt.Sprintf("%s-%d", ss.Name, ordinal)
+						pod, err := c.CoreV1().Pods(ss.Namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+						if err != nil {
+							framework.Logf("Pod %s not found, retrying (%v)", podName, err)
+							return false, nil
+						}
+						podUID := pod.GetUID()
+						if podUID == "" {
+							framework.Failf("Pod %s is missing UID", pod.Name)
+						}
+						if ref.UID == podUID {
+							foundPodRef = true
+						}
+					}
+				}
+				if foundSetRef == wantSetRef && foundPodRef == wantPodRef {
+					seenPVCs[int(ordinal)] = struct{}{}
+				}
+			}
+			if len(seenPVCs) != len(indexSet) {
+				framework.Logf("Only %d PVCs, retrying", len(seenPVCs))
+				return false, nil // Retry until the PVCs are consistent.
+			}
+		}
+		return true, nil
+	})
 }

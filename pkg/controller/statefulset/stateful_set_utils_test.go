@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -38,6 +40,28 @@ import (
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
+
+// noopRecorder is an EventRecorder that does nothing. record.FakeRecorder has a fixed
+// buffer size, which causes tests to hang if that buffer's exceeded.
+type noopRecorder struct{}
+
+func (r *noopRecorder) Event(object runtime.Object, eventtype, reason, message string) {}
+func (r *noopRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+}
+func (r *noopRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+}
+
+// getClaimPodName gets the name of the Pod associated with the Claim, or an empty string if this doesn't look matching.
+func getClaimPodName(set *appsv1beta1.StatefulSet, claim *v1.PersistentVolumeClaim) string {
+	podName := ""
+
+	statefulClaimRegex := regexp.MustCompile(fmt.Sprintf(".*-(%s-[0-9]+)$", set.Name))
+	matches := statefulClaimRegex.FindStringSubmatch(claim.Name)
+	if len(matches) != 2 {
+		return podName
+	}
+	return matches[1]
+}
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
 // Generally used to tie break between StatefulSets that have overlapping selectors.
@@ -67,6 +91,28 @@ func TestGetParentNameAndOrdinal(t *testing.T) {
 		t.Error("Expected empty string for non-member Pod parent")
 	} else if ordinal != -1 {
 		t.Error("Expected -1 for non member Pod ordinal")
+	}
+}
+
+func TestGetClaimPodName(t *testing.T) {
+	set := appsv1beta1.StatefulSet{}
+	set.Name = "my-set"
+	claim := v1.PersistentVolumeClaim{}
+	claim.Name = "volume-my-set-2"
+	if pod := getClaimPodName(&set, &claim); pod != "my-set-2" {
+		t.Errorf("Expected my-set-2 found %s", pod)
+	}
+	claim.Name = "long-volume-my-set-20"
+	if pod := getClaimPodName(&set, &claim); pod != "my-set-20" {
+		t.Errorf("Expected my-set-20 found %s", pod)
+	}
+	claim.Name = "volume-2-my-set"
+	if pod := getClaimPodName(&set, &claim); pod != "" {
+		t.Errorf("Expected empty string found %s", pod)
+	}
+	claim.Name = "volume-pod-2"
+	if pod := getClaimPodName(&set, &claim); pod != "" {
+		t.Errorf("Expected empty string found %s", pod)
 	}
 }
 
@@ -196,6 +242,350 @@ func TestUpdateStorage(t *testing.T) {
 	updateStorage(set, pod)
 	if !storageMatches(set, pod) {
 		t.Error("updateStorage failed to recreate volume claim names")
+	}
+}
+
+func TestGetPersistentVolumeClaimRetentionPolicy(t *testing.T) {
+	retainPolicy := appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+		WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+		WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+	}
+	scaledownPolicy := appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+		WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+		WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+	}
+
+	set := appsv1beta1.StatefulSet{}
+	set.Spec.PersistentVolumeClaimRetentionPolicy = &retainPolicy
+	got := getPersistentVolumeClaimRetentionPolicy(&set)
+	if got.WhenScaled != appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType || got.WhenDeleted != appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType {
+		t.Errorf("Expected retain policy")
+	}
+	set.Spec.PersistentVolumeClaimRetentionPolicy = &scaledownPolicy
+	got = getPersistentVolumeClaimRetentionPolicy(&set)
+	if got.WhenScaled != appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType || got.WhenDeleted != appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType {
+		t.Errorf("Expected scaledown policy")
+	}
+}
+
+func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
+	testCases := []struct {
+		name            string
+		scaleDownPolicy appsv1beta1.PersistentVolumeClaimRetentionPolicyType
+		setDeletePolicy appsv1beta1.PersistentVolumeClaimRetentionPolicyType
+		needsPodRef     bool
+		needsSetRef     bool
+		replicas        int32
+		ordinal         int
+	}{
+		{
+			name:            "retain",
+			scaleDownPolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			needsPodRef:     false,
+			needsSetRef:     false,
+		},
+		{
+			name:            "on SS delete",
+			scaleDownPolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			needsPodRef:     false,
+			needsSetRef:     true,
+		},
+		{
+			name:            "on scaledown only, condemned",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			needsPodRef:     true,
+			needsSetRef:     false,
+			replicas:        2,
+			ordinal:         2,
+		},
+		{
+			name:            "on scaledown only, remains",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			needsPodRef:     false,
+			needsSetRef:     false,
+			replicas:        2,
+			ordinal:         1,
+		},
+		{
+			name:            "on both, condemned",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			needsPodRef:     true,
+			needsSetRef:     false,
+			replicas:        2,
+			ordinal:         2,
+		},
+		{
+			name:            "on both, remains",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			needsPodRef:     false,
+			needsSetRef:     true,
+			replicas:        2,
+			ordinal:         1,
+		},
+	}
+
+	for _, tc := range testCases {
+		for _, useOtherRefs := range []bool{false, true} {
+			for _, setPodRef := range []bool{false, true} {
+				for _, setSetRef := range []bool{false, true} {
+					claim := v1.PersistentVolumeClaim{}
+					claim.Name = "target-claim"
+					pod := v1.Pod{}
+					pod.Name = fmt.Sprintf("pod-%d", tc.ordinal)
+					pod.GetObjectMeta().SetUID("pod-123")
+					set := appsv1beta1.StatefulSet{}
+					set.Name = "stateful-set"
+					set.GetObjectMeta().SetUID("ss-456")
+					set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled:  tc.scaleDownPolicy,
+						WhenDeleted: tc.setDeletePolicy,
+					}
+					set.Spec.Replicas = &tc.replicas
+					if setPodRef {
+						setOwnerRef(&claim, &pod, &pod.TypeMeta)
+					}
+					if setSetRef {
+						setOwnerRef(&claim, &set, &set.TypeMeta)
+					}
+					if useOtherRefs {
+						randomObject1 := v1.Pod{}
+						randomObject1.Name = "rand1"
+						randomObject1.GetObjectMeta().SetUID("rand1-abc")
+						randomObject2 := v1.Pod{}
+						randomObject2.Name = "rand2"
+						randomObject2.GetObjectMeta().SetUID("rand2-def")
+						setOwnerRef(&claim, &randomObject1, &randomObject1.TypeMeta)
+						setOwnerRef(&claim, &randomObject2, &randomObject2.TypeMeta)
+					}
+					shouldMatch := setPodRef == tc.needsPodRef && setSetRef == tc.needsSetRef
+					if claimOwnerMatchesSetAndPod(&claim, &set, &pod) != shouldMatch {
+						t.Errorf("Bad match for %s with pod=%v,set=%v,others=%v", tc.name, setPodRef, setSetRef, useOtherRefs)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
+	testCases := []struct {
+		name            string
+		scaleDownPolicy appsv1beta1.PersistentVolumeClaimRetentionPolicyType
+		setDeletePolicy appsv1beta1.PersistentVolumeClaimRetentionPolicyType
+		condemned       bool
+		needsPodRef     bool
+		needsSetRef     bool
+	}{
+		{
+			name:            "retain",
+			scaleDownPolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			condemned:       false,
+			needsPodRef:     false,
+			needsSetRef:     false,
+		},
+		{
+			name:            "delete with set",
+			scaleDownPolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			condemned:       false,
+			needsPodRef:     false,
+			needsSetRef:     true,
+		},
+		{
+			name:            "delete with scaledown, not condemned",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			condemned:       false,
+			needsPodRef:     false,
+			needsSetRef:     false,
+		},
+		{
+			name:            "delete on scaledown, condemned",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			condemned:       true,
+			needsPodRef:     true,
+			needsSetRef:     false,
+		},
+		{
+			name:            "delete on both, not condemned",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			condemned:       false,
+			needsPodRef:     false,
+			needsSetRef:     true,
+		},
+		{
+			name:            "delete on both, condemned",
+			scaleDownPolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			condemned:       true,
+			needsPodRef:     true,
+			needsSetRef:     false,
+		},
+	}
+	for _, tc := range testCases {
+		for _, hasPodRef := range []bool{true, false} {
+			for _, hasSetRef := range []bool{true, false} {
+				set := appsv1beta1.StatefulSet{}
+				set.Name = "ss"
+				numReplicas := int32(5)
+				set.Spec.Replicas = &numReplicas
+				set.SetUID("ss-123")
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenScaled:  tc.scaleDownPolicy,
+					WhenDeleted: tc.setDeletePolicy,
+				}
+				pod := v1.Pod{}
+				if tc.condemned {
+					pod.Name = "pod-8"
+				} else {
+					pod.Name = "pod-1"
+				}
+				pod.SetUID("pod-456")
+				claim := v1.PersistentVolumeClaim{}
+				if hasPodRef {
+					setOwnerRef(&claim, &pod, &pod.TypeMeta)
+				}
+				if hasSetRef {
+					setOwnerRef(&claim, &set, &set.TypeMeta)
+				}
+				needsUpdate := hasPodRef != tc.needsPodRef || hasSetRef != tc.needsSetRef
+				shouldUpdate := updateClaimOwnerRefForSetAndPod(&claim, &set, &pod)
+				if shouldUpdate != needsUpdate {
+					t.Errorf("Bad update for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
+				}
+				if hasOwnerRef(&claim, &pod) != tc.needsPodRef {
+					t.Errorf("Bad pod ref for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
+				}
+				if hasOwnerRef(&claim, &set) != tc.needsSetRef {
+					t.Errorf("Bad set ref for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
+				}
+			}
+		}
+	}
+}
+
+func TestHasOwnerRef(t *testing.T) {
+	target := v1.Pod{}
+	target.SetOwnerReferences([]metav1.OwnerReference{
+		{UID: "123"}, {UID: "456"}})
+	ownerA := v1.Pod{}
+	ownerA.GetObjectMeta().SetUID("123")
+	ownerB := v1.Pod{}
+	ownerB.GetObjectMeta().SetUID("789")
+	if !hasOwnerRef(&target, &ownerA) {
+		t.Error("Missing owner")
+	}
+	if hasOwnerRef(&target, &ownerB) {
+		t.Error("Unexpected owner")
+	}
+}
+
+func TestHasStaleOwnerRef(t *testing.T) {
+	target := v1.Pod{}
+	target.SetOwnerReferences([]metav1.OwnerReference{
+		{Name: "bob", UID: "123"}, {Name: "shirley", UID: "456"}})
+	ownerA := v1.Pod{}
+	ownerA.SetUID("123")
+	ownerA.Name = "bob"
+	ownerB := v1.Pod{}
+	ownerB.Name = "shirley"
+	ownerB.SetUID("789")
+	ownerC := v1.Pod{}
+	ownerC.Name = "yvonne"
+	ownerC.SetUID("345")
+	if hasStaleOwnerRef(&target, &ownerA) {
+		t.Error("ownerA should not be stale")
+	}
+	if !hasStaleOwnerRef(&target, &ownerB) {
+		t.Error("ownerB should be stale")
+	}
+	if hasStaleOwnerRef(&target, &ownerC) {
+		t.Error("ownerC should not be stale")
+	}
+}
+
+func TestSetOwnerRef(t *testing.T) {
+	target := v1.Pod{}
+	ownerA := v1.Pod{}
+	ownerA.Name = "A"
+	ownerA.GetObjectMeta().SetUID("ABC")
+	if setOwnerRef(&target, &ownerA, &ownerA.TypeMeta) != true {
+		t.Errorf("Unexpected lack of update")
+	}
+	ownerRefs := target.GetObjectMeta().GetOwnerReferences()
+	if len(ownerRefs) != 1 {
+		t.Errorf("Unexpected owner ref count: %d", len(ownerRefs))
+	}
+	if ownerRefs[0].UID != "ABC" {
+		t.Errorf("Unexpected owner UID %v", ownerRefs[0].UID)
+	}
+	if setOwnerRef(&target, &ownerA, &ownerA.TypeMeta) != false {
+		t.Errorf("Unexpected update")
+	}
+	if len(target.GetObjectMeta().GetOwnerReferences()) != 1 {
+		t.Error("Unexpected duplicate reference")
+	}
+	ownerB := v1.Pod{}
+	ownerB.Name = "B"
+	ownerB.GetObjectMeta().SetUID("BCD")
+	if setOwnerRef(&target, &ownerB, &ownerB.TypeMeta) != true {
+		t.Error("Unexpected lack of second update")
+	}
+	ownerRefs = target.GetObjectMeta().GetOwnerReferences()
+	if len(ownerRefs) != 2 {
+		t.Errorf("Unexpected owner ref count: %d", len(ownerRefs))
+	}
+	if ownerRefs[0].UID != "ABC" || ownerRefs[1].UID != "BCD" {
+		t.Errorf("Bad second ownerRefs: %v", ownerRefs)
+	}
+}
+
+func TestRemoveOwnerRef(t *testing.T) {
+	target := v1.Pod{}
+	ownerA := v1.Pod{}
+	ownerA.Name = "A"
+	ownerA.GetObjectMeta().SetUID("ABC")
+	if removeOwnerRef(&target, &ownerA) != false {
+		t.Error("Unexpected update on empty remove")
+	}
+	setOwnerRef(&target, &ownerA, &ownerA.TypeMeta)
+	if removeOwnerRef(&target, &ownerA) != true {
+		t.Error("Unexpected lack of update")
+	}
+	if len(target.GetObjectMeta().GetOwnerReferences()) != 0 {
+		t.Error("Unexpected owner reference remains")
+	}
+
+	ownerB := v1.Pod{}
+	ownerB.Name = "B"
+	ownerB.GetObjectMeta().SetUID("BCD")
+
+	setOwnerRef(&target, &ownerA, &ownerA.TypeMeta)
+	if removeOwnerRef(&target, &ownerB) != false {
+		t.Error("Unexpected update for mismatched owner")
+	}
+	if len(target.GetObjectMeta().GetOwnerReferences()) != 1 {
+		t.Error("Missing ref after no-op remove")
+	}
+	setOwnerRef(&target, &ownerB, &ownerB.TypeMeta)
+	if removeOwnerRef(&target, &ownerA) != true {
+		t.Error("Missing update for second remove")
+	}
+	ownerRefs := target.GetObjectMeta().GetOwnerReferences()
+	if len(ownerRefs) != 1 {
+		t.Error("Extra ref after second remove")
+	}
+	if ownerRefs[0].UID != "BCD" {
+		t.Error("Bad UID after second remove")
 	}
 }
 
@@ -400,7 +790,8 @@ func TestRollingUpdateApplyRevision(t *testing.T) {
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Namespace: "default",
+			Name:      name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			Resources: v1.ResourceRequirements{
@@ -465,6 +856,10 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			VolumeClaimTemplates: claims,
 			ServiceName:          "governingsvc",
 			UpdateStrategy:       appsv1beta1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
 			RevisionHistoryLimit: func() *int32 {
 				limit := int32(2)
 				return &limit
@@ -482,3 +877,77 @@ func newStatefulSet(replicas int) *appsv1beta1.StatefulSet {
 	}
 	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
 }
+
+//func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels map[string]string) *appsv1beta1.StatefulSet {
+//	// Converting all the map-only selectors to set-based selectors.
+//	var testMatchExpressions []metav1.LabelSelectorRequirement
+//	for key, value := range labels {
+//		sel := metav1.LabelSelectorRequirement{
+//			Key:      key,
+//			Operator: metav1.LabelSelectorOpIn,
+//			Values:   []string{value},
+//		}
+//		testMatchExpressions = append(testMatchExpressions, sel)
+//	}
+//	return &appsv1beta1.StatefulSet{
+//		TypeMeta: metav1.TypeMeta{
+//			Kind:       "StatefulSet",
+//			APIVersion: "apps/v1",
+//		},
+//		ObjectMeta: metav1.ObjectMeta{
+//			Name:      name,
+//			Namespace: v1.NamespaceDefault,
+//			UID:       uid,
+//		},
+//		Spec: appsv1beta1.StatefulSetSpec{
+//			Selector: &metav1.LabelSelector{
+//				// Purposely leaving MatchLabels nil, so to ensure it will break if any link
+//				// in the chain ignores the set-based MatchExpressions.
+//				MatchLabels:      nil,
+//				MatchExpressions: testMatchExpressions,
+//			},
+//			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+//			PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+//				WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+//				WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+//			},
+//			Template: v1.PodTemplateSpec{
+//				ObjectMeta: metav1.ObjectMeta{
+//					Labels: labels,
+//				},
+//				Spec: v1.PodSpec{
+//					Containers: []v1.Container{
+//						{
+//							Name:  "nginx",
+//							Image: "nginx",
+//							VolumeMounts: []v1.VolumeMount{
+//								{Name: "datadir", MountPath: "/tmp/"},
+//								{Name: "home", MountPath: "/home"},
+//							},
+//						},
+//					},
+//					Volumes: []v1.Volume{{
+//						Name: "home",
+//						VolumeSource: v1.VolumeSource{
+//							HostPath: &v1.HostPathVolumeSource{
+//								Path: fmt.Sprintf("/tmp/%v", "home"),
+//							},
+//						}}},
+//				},
+//			},
+//			VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+//				{
+//					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "datadir"},
+//					Spec: v1.PersistentVolumeClaimSpec{
+//						Resources: v1.ResourceRequirements{
+//							Requests: v1.ResourceList{
+//								v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+//							},
+//						},
+//					},
+//				},
+//			},
+//			ServiceName: "governingsvc",
+//		},
+//	}
+//}

@@ -21,12 +21,13 @@ import (
 	"context"
 	"fmt"
 
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	clientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	appslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/retry"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	clientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	appslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 )
 
 // StatusUpdaterInterface is an interface used to update the StatefulSetStatus associated with a StatefulSet.

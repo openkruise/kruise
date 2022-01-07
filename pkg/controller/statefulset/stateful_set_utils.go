@@ -189,7 +189,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv
 	updateMeta := func(tm *metav1.TypeMeta, kind string) {
 		if tm.APIVersion == "" {
 			if kind == "StatefulSet" {
-				tm.APIVersion = "apps/v1"
+				tm.APIVersion = "apps.kruise.io/v1beta1"
 			} else {
 				tm.APIVersion = "v1"
 			}

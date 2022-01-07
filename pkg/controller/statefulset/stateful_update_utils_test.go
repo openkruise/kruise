@@ -20,11 +20,12 @@ import (
 	"reflect"
 	"testing"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestSortPodsToUpdate(t *testing.T) {

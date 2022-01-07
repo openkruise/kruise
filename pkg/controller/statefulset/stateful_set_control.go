@@ -19,7 +19,6 @@ package statefulset
 
 import (
 	"fmt"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"math"
 	"sort"
 	"time"
@@ -27,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
