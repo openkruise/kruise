@@ -141,7 +141,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	return &ReconcileStatefulSet{
 		kruiseClient: genericClient.KruiseClient,
 		control: NewDefaultStatefulSetControl(
-			NewRealStatefulPodControl(
+			NewStatefulPodControl(
 				genericClient.KubeClient,
 				statefulSetLister,
 				podLister,
@@ -167,7 +167,7 @@ type ReconcileStatefulSet struct {
 	kruiseClient kruiseclientset.Interface
 	// control returns an interface capable of syncing a stateful set.
 	// Abstracted out for testing.
-	control ControlInterface
+	control StatefulSetControlInterface
 	// podControl is used for patching pods.
 	podControl kubecontroller.PodControlInterface
 	// podLister is able to list/get pods from a shared informer's store
