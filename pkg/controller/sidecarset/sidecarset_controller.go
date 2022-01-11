@@ -19,7 +19,6 @@ package sidecarset
 import (
 	"context"
 	"flag"
-	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
@@ -90,10 +89,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to SidecarSet
 	err = c.Watch(&source.Kind{Type: &appsv1alpha1.SidecarSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			old := e.ObjectOld.(*appsv1alpha1.SidecarSet)
-			new := e.ObjectNew.(*appsv1alpha1.SidecarSet)
-			if !reflect.DeepEqual(old.Spec, new.Spec) {
-				klog.V(3).Infof("Observed updated Spec for SidecarSet: %s/%s", new.Namespace, new.Name)
+			oldScS := e.ObjectOld.(*appsv1alpha1.SidecarSet)
+			newScS := e.ObjectNew.(*appsv1alpha1.SidecarSet)
+			if oldScS.GetGeneration() != newScS.GetGeneration() {
+				klog.V(3).Infof("Observed updated Spec for SidecarSet: %s/%s", newScS.GetNamespace(), newScS.GetName())
 				return true
 			}
 			return false
