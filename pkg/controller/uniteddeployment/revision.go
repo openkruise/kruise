@@ -131,6 +131,7 @@ func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsa
 	for i := range revisions {
 		if revisions[i].Name == ud.Status.CurrentRevision {
 			currentRevision = revisions[i]
+			break
 		}
 	}
 

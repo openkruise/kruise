@@ -439,6 +439,7 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 	for i := range revisions {
 		if revisions[i].Name == cs.Status.CurrentRevision {
 			currentRevision = revisions[i]
+			break
 		}
 	}
 
