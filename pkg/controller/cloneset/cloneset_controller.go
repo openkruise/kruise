@@ -86,7 +86,6 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
 	recorder := mgr.GetEventRecorderFor("cloneset-controller")
 	if cli := kruiseclient.GetGenericClientWithName("cloneset-controller"); cli != nil {
 		eventBroadcaster := record.NewBroadcaster()
