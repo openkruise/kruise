@@ -89,6 +89,7 @@ func TestReconcile(t *testing.T) {
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
 	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = util.NewClientFromManager(mgr, "test-cloneset-controller")
 
