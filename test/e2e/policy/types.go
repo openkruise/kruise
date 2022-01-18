@@ -15,10 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apps
+package policy
 
 import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
+)
+
+// NOTE(claudiub): These constants should NOT be used as Pod Container Images.
+const (
+	WebserverImageName = "httpd"
+	AgnhostImageName   = "agnhost"
 )
 
 var (
@@ -28,17 +34,11 @@ var (
 	// NewWebserverImage is the fully qualified URI to the HttpdNew image
 	NewWebserverImage = imageutils.GetE2EImage(imageutils.HttpdNew)
 
-	// AgnhostImage is the fully qualified URI to the Agnhost image
-	AgnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
-
-	// NginxImage gets a Niginx image
+	// NginxImage is the fully qualified URI to the Nginx image
 	NginxImage = imageutils.GetE2EImage(imageutils.Nginx)
 
-	// NewNginxImage gets a Niginx image
+	// NewNginxImage is the fully qualified URI to the NginxNew image
 	NewNginxImage = imageutils.GetE2EImage(imageutils.NginxNew)
-
-	// BusyboxImage gets a Busybox image
-	BusyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 	// InvalidImage is the fully qualified URI to the invalid image
 	InvalidImage = imageutils.GetE2EImage(imageutils.InvalidRegistryImage)

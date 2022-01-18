@@ -89,10 +89,10 @@ var _ = SIGDescribe("PullImage", func() {
 			baseJob = &appsv1alpha1.ImagePullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagepulljob"}}
 		})
 
-		ginkgo.It("create an always job to pull an image on all real nodes", func() {
+		framework.ConformanceIt("create an always job to pull an image on all real nodes", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image: "nginx:1.9.1",
+				Image: NginxImage,
 				Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 					{Key: framework.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
 				}}},
@@ -139,10 +139,10 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
 		})
 
-		ginkgo.It("create an always job to pull an image on one real node", func() {
+		framework.ConformanceIt("create an always job to pull an image on one real node", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image:    "nginx:1.9.2",
+				Image:    NewNginxImage,
 				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
 				PullPolicy: &appsv1alpha1.PullPolicy{
 					TimeoutSeconds: utilpointer.Int32Ptr(50),
@@ -183,10 +183,10 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 3*time.Second, time.Second).Should(gomega.Equal(false))
 		})
 
-		ginkgo.It("create a never job to pull an image on all nodes", func() {
+		framework.ConformanceIt("create a never job to pull an image on all nodes", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image: "nginx:1.9.3",
+				Image: WebserverImage,
 				PullPolicy: &appsv1alpha1.PullPolicy{
 					TimeoutSeconds: utilpointer.Int32Ptr(50),
 					BackoffLimit:   utilpointer.Int32Ptr(2),
@@ -223,12 +223,12 @@ var _ = SIGDescribe("PullImage", func() {
 			gomega.Expect(len(job.Status.FailedNodes)).To(gomega.Equal(1))
 		})
 
-		ginkgo.It("create two jobs to pull a same image", func() {
+		framework.ConformanceIt("create two jobs to pull a same image", func() {
 			ginkgo.By("Create job1")
 			job1 := baseJob.DeepCopy()
 			job1.Name = baseJob.Name + "-1"
 			job1.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image:    "nginx:1.9.4",
+				Image:    NewWebserverImage,
 				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
 				PullPolicy: &appsv1alpha1.PullPolicy{
 					TimeoutSeconds: utilpointer.Int32Ptr(50),
@@ -263,7 +263,7 @@ var _ = SIGDescribe("PullImage", func() {
 			job2 := baseJob.DeepCopy()
 			job2.Name = baseJob.Name + "-2"
 			job2.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image:    "nginx:1.9.4",
+				Image:    NewWebserverImage,
 				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
 				PullPolicy: &appsv1alpha1.PullPolicy{
 					TimeoutSeconds: utilpointer.Int32Ptr(50),

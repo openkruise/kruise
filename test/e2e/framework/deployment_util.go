@@ -20,11 +20,11 @@ import (
 	"context"
 
 	"github.com/openkruise/kruise/pkg/util"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type DeploymentTester struct {
@@ -56,7 +56,7 @@ func (t *DeploymentTester) NewDeployment(name string, replicas int32) *appsv1.De
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx:1.9.1",
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							Env: []v1.EnvVar{
 								{Name: "test", Value: "foo"},
 							},

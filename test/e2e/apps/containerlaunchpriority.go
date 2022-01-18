@@ -61,11 +61,11 @@ var _ = SIGDescribe("containerpriority", func() {
 	framework.KruiseDescribe("start a pod with different container priorities", func() {
 		var err error
 
-		ginkgo.It("container priority created by CloneSet", func() {
+		framework.ConformanceIt("container priority created by CloneSet", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
-				Image:   "ubuntu:latest",
+				Image:   WebserverImage,
 				Command: []string{"/bin/bash", "-c", "read -p wait"},
 				Stdin:   true,
 				Env: []v1.EnvVar{
@@ -122,11 +122,11 @@ var _ = SIGDescribe("containerpriority", func() {
 			gomega.Expect(earlierThan).To(gomega.Equal(true))
 		})
 
-		ginkgo.It("container priority created by Deployment", func() {
+		framework.ConformanceIt("container priority created by Deployment", func() {
 			dp := deploymentTester.NewDeployment("deploy-"+randStr, 1)
 			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
-				Image:   "ubuntu:latest",
+				Image:   WebserverImage,
 				Command: []string{"/bin/bash", "-c", "read -p wait"},
 				Stdin:   true,
 				Env: []v1.EnvVar{
@@ -183,11 +183,11 @@ var _ = SIGDescribe("containerpriority", func() {
 			gomega.Expect(earlierThan).To(gomega.Equal(true))
 		})
 
-		ginkgo.It("run with no container priority", func() {
+		framework.ConformanceIt("run with no container priority", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
-				Image:   "ubuntu:latest",
+				Image:   WebserverImage,
 				Command: []string{"/bin/bash", "-c", "read -p wait"},
 				Stdin:   true,
 				Env: []v1.EnvVar{
@@ -222,7 +222,7 @@ var _ = SIGDescribe("containerpriority", func() {
 			gomega.Expect(earlierThan).To(gomega.Equal(true))
 		})
 
-		ginkgo.It("run with priorityAnnotation set", func() {
+		framework.ConformanceIt("run with priorityAnnotation set", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
 				PostStart: &v1.Handler{
@@ -233,7 +233,7 @@ var _ = SIGDescribe("containerpriority", func() {
 			}
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
-				Image:   "ubuntu:latest",
+				Image:   WebserverImage,
 				Command: []string{"/bin/bash", "-c", "read -p wait"},
 				Stdin:   true,
 				Env: []v1.EnvVar{
@@ -248,7 +248,7 @@ var _ = SIGDescribe("containerpriority", func() {
 				},
 			}, v1.Container{
 				Name:    "c3",
-				Image:   "ubuntu:latest",
+				Image:   WebserverImage,
 				Command: []string{"/bin/bash", "-c", "read -p wait"},
 				Stdin:   true,
 				Env: []v1.EnvVar{

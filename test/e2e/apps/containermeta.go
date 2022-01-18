@@ -53,6 +53,7 @@ var _ = SIGDescribe("ContainerMeta", func() {
 	framework.KruiseDescribe("In-place update env from metadata", func() {
 		var err error
 
+		// This can't be Conformance yet.
 		ginkgo.It("should recreate container when annotations for env changed", func() {
 			ginkgo.By("Create a CloneSet with replicas=2")
 			cs := tester.NewCloneSet("clone-"+randStr, 2, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})

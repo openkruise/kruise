@@ -82,7 +82,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 
 	framework.KruiseDescribe("BroadcastJob dispatching", func() {
 
-		ginkgo.It("succeeds for parallelism < number of node", func() {
+		framework.ConformanceIt("succeeds for parallelism < number of node", func() {
 			ginkgo.By("Create Fake Node " + randStr)
 			fakeNode, err := nodeTester.CreateFakeNode(randStr)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -96,7 +96,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 							Tolerations: []v1.Toleration{{Key: framework.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
 							Containers: []v1.Container{{
 								Name:    "box",
-								Image:   "busybox:latest",
+								Image:   BusyboxImage,
 								Command: []string{"/bin/sh", "-c", "sleep 5"},
 							}},
 							RestartPolicy: v1.RestartPolicyNever,
