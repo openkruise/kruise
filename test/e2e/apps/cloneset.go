@@ -111,6 +111,29 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(pods[i].CreationTimestamp.Sub(lastPodCondition.LastTransitionTime.Time) <= time.Duration(cs.Spec.MinReadySeconds)*time.Second+allowFluctuation).To(gomega.BeTrue())
 			}
 		})
+
+		ginkgo.It("pods should be ready when paused=true", func() {
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{
+				Type:   appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+				Paused: true,
+			})
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+		})
 	})
 
 	framework.KruiseDescribe("CloneSet Updating", func() {
