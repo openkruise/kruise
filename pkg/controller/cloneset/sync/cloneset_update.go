@@ -48,10 +48,6 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	requeueDuration := requeueduration.Duration{}
 	coreControl := clonesetcore.New(cs)
 
-	if cs.Spec.UpdateStrategy.Paused {
-		return requeueDuration.Get(), nil
-	}
-
 	// 1. refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
@@ -66,6 +62,10 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		}
 	}
 	if modified {
+		return requeueDuration.Get(), nil
+	}
+
+	if cs.Spec.UpdateStrategy.Paused {
 		return requeueDuration.Get(), nil
 	}
 
