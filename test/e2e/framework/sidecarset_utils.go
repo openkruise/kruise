@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -65,7 +66,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 					Container: corev1.Container{
 						Name:    "init-sidecar",
 						Command: []string{"/bin/sh", "-c", "sleep 1"},
-						Image:   "busybox:latest",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					},
 				},
 			},
@@ -73,7 +74,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 				{
 					Container: corev1.Container{
 						Name:    "nginx-sidecar",
-						Image:   "nginx:latest",
+						Image:   imageutils.GetE2EImage(imageutils.Nginx),
 						Command: []string{"tail", "-f", "/dev/null"},
 					},
 					PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
@@ -84,7 +85,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 				{
 					Container: corev1.Container{
 						Name:    "busybox-sidecar",
-						Image:   "busybox:latest",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 					},
 					PodInjectPolicy: appsv1alpha1.AfterAppContainerType,
@@ -125,7 +126,7 @@ func (s *SidecarSetTester) NewBaseDeployment(namespace string) *apps.Deployment 
 					Containers: []corev1.Container{
 						{
 							Name:    "main",
-							Image:   "busybox:latest",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
@@ -358,7 +359,7 @@ func (s *SidecarSetTester) NewBaseCloneSet(namespace string) *appsv1alpha1.Clone
 					Containers: []corev1.Container{
 						{
 							Name:    "main",
-							Image:   "busybox:1.32",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},

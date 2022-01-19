@@ -61,7 +61,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			framework.Logf("Deleting all ResourceDistribution in cluster")
 		})
 
-		ginkgo.It("namespace event checker", func() {
+		framework.ConformanceIt("namespace event checker", func() {
 			prefix := "resourcedistribution-e2e-test1"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)
@@ -117,7 +117,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			ginkgo.By("Done!")
 		})
 
-		ginkgo.It("resource event checker", func() {
+		framework.ConformanceIt("resource event checker", func() {
 			prefix := "resourcedistribution-e2e-test2"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)
@@ -176,7 +176,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			ginkgo.By("Done!")
 		})
 
-		ginkgo.It("resourcedistribution functionality checker", func() {
+		framework.ConformanceIt("resourcedistribution functionality checker", func() {
 			prefix := "resourcedistribution-e2e-test3"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)

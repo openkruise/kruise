@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type CloneSetTester struct {
@@ -61,7 +62,7 @@ func (t *CloneSetTester) NewCloneSet(name string, replicas int32, updateStrategy
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx:1.9.1",
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							Env: []v1.EnvVar{
 								{Name: "test", Value: "foo"},
 							},

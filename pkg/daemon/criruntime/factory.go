@@ -24,7 +24,6 @@ import (
 
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"google.golang.org/grpc"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
@@ -98,14 +97,12 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 				continue
 			}
 		case ContainerRuntimeContainerd:
-			var conn *grpc.ClientConn
-			addr, _, _ := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
-			conn, err = getContainerdConn(addr)
+			addr, _, err := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
 			if err != nil {
-				klog.Warningf("Failed to get connection for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
+				klog.Warningf("Failed to get address for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue
 			}
-			imageService, err = runtimeimage.NewContainerdImageService(conn, accountManager)
+			imageService, err = runtimeimage.NewContainerdImageService(addr, accountManager)
 			if err != nil {
 				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue

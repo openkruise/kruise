@@ -54,15 +54,15 @@ const (
 
 // NewContainerdImageService returns containerd-type ImageService
 func NewContainerdImageService(
-	conn *grpc.ClientConn,
+	runtimeURI string,
 	accountManager daemonutil.ImagePullAccountManager,
 ) (ImageService, error) {
-	snapshotter, httpProxy, err := getDefaultValuesFromCRIStatus(conn)
+	client, err := containerd.New(runtimeURI)
 	if err != nil {
 		return nil, err
 	}
-
-	client, err := containerd.NewWithConn(conn)
+	conn := client.Conn()
+	snapshotter, httpProxy, err := getDefaultValuesFromCRIStatus(conn)
 	if err != nil {
 		return nil, err
 	}

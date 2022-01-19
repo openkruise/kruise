@@ -10,7 +10,7 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.16'
+  GO_VERSION: '1.17'
   KIND_IMAGE: 'kindest/node:v1.22.0'
   KIND_CLUSTER_NAME: 'ci-testing'
 
@@ -70,7 +70,6 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
-          ./scripts/generate_bindata.sh
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] StatefulSet' test/e2e
 
   pullimages-containerrecreate:
@@ -127,7 +126,6 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
-          ./scripts/generate_bindata.sh
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] (PullImage|ContainerRecreateRequest)' test/e2e
 
   advanced-daemonset:
@@ -184,7 +182,6 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
-          ./scripts/generate_bindata.sh
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] DaemonSet' test/e2e
 
   sidecarset:
@@ -241,7 +238,6 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
-          ./scripts/generate_bindata.sh
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] SidecarSet' test/e2e
 
   other:
@@ -298,7 +294,6 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
-          ./scripts/generate_bindata.sh
           set +e
           ./bin/ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' test/e2e
 #          retVal=$?

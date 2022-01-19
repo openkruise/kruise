@@ -53,7 +53,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, framework.OldImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
@@ -85,7 +85,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			complexLabel := map[string]string{framework.DaemonSetNameLabel: dsName}
 			nodeSelector := map[string]string{framework.DaemonSetColorLabel: "blue"}
 			framework.Logf("Creating daemon %q with a node selector", dsName)
-			ds := tester.NewDaemonSet(dsName, complexLabel, framework.OldImage, appsv1alpha1.DaemonSetUpdateStrategy{})
+			ds := tester.NewDaemonSet(dsName, complexLabel, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{})
 			ds.Spec.Template.Spec.NodeSelector = nodeSelector
 			ds, err := tester.CreateDaemonSet(ds)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -134,7 +134,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, framework.OldImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
@@ -164,7 +164,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
 			maxUnavailable := intstr.IntOrString{IntVal: int32(5)}
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, framework.OldImage, appsv1alpha1.DaemonSetUpdateStrategy{
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
 					Type:           appsv1alpha1.InplaceRollingUpdateType,
@@ -191,12 +191,12 @@ var _ = SIGDescribe("DaemonSet", func() {
 
 			//change pods container image
 			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1alpha1.DaemonSet) {
-				ds.Spec.Template.Spec.Containers[0].Image = framework.NewImage
+				ds.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
 
 			ginkgo.By("Compare container info")
-			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.GetNewPodsToCheckImage(label, framework.NewImage))
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.GetNewPodsToCheckImage(label, NewWebserverImage))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for pod image")
 
 			ginkgo.By("Get all New daemon node")
@@ -228,7 +228,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			}{
 				{
 					updateFn: func(ds *appsv1alpha1.DaemonSet) {
-						ds.Spec.Template.Spec.Containers[0].Image = framework.NewImage
+						ds.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
 					},
 					expectRecreate: true,
 				},
@@ -244,7 +244,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
 			maxUnavailable := intstr.IntOrString{IntVal: int32(20)}
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, framework.OldImage, appsv1alpha1.DaemonSetUpdateStrategy{
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
 					Type:           appsv1alpha1.InplaceRollingUpdateType,
@@ -279,7 +279,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 				time.Sleep(5 * time.Second)
 
 				ginkgo.By("Compare container info")
-				err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.GetNewPodsToCheckImage(label, framework.NewImage))
+				err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.GetNewPodsToCheckImage(label, NewWebserverImage))
 				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for pod image")
 
 				ginkgo.By("Get all New daemon node")

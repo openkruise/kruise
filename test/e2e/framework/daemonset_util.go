@@ -32,9 +32,6 @@ const (
 	DaemonSetLabelPrefix = "daemonset-"
 	DaemonSetNameLabel   = DaemonSetLabelPrefix + "name"
 	DaemonSetColorLabel  = DaemonSetLabelPrefix + "color"
-
-	OldImage = "busybox:1.29"
-	NewImage = "busybox:1.30"
 )
 
 type DaemonSetTester struct {
@@ -240,6 +237,8 @@ func (t *DaemonSetTester) GetNewPodsToCheckImage(label map[string]string, newIma
 			for _, status := range pod.Status.ContainerStatuses {
 				substr := strings.Split(status.Image, "/")
 				image := substr[len(substr)-1]
+				substr = strings.Split(newImage, "/")
+				newImage = substr[len(substr)-1]
 				if image != newImage {
 					Logf("container image of new pod %s is %s, should be %s", pod.Name, image, newImage)
 					return false, nil

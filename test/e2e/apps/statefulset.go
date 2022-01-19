@@ -1096,177 +1096,177 @@ type statefulPodTester interface {
 	name() string
 }
 
-type clusterAppTester struct {
-	ns          string
-	statefulPod statefulPodTester
-	tester      *framework.StatefulSetTester
-}
-
-func (c *clusterAppTester) run() {
-	ginkgo.By("Deploying " + c.statefulPod.name())
-	ss := c.statefulPod.deploy(c.ns)
-
-	ginkgo.By("Creating foo:bar in member with index 0")
-	c.statefulPod.write(0, map[string]string{"foo": "bar"})
-
-	switch c.statefulPod.(type) {
-	case *mysqlGaleraTester:
-		// Don't restart MySQL cluster since it doesn't handle restarts well
-	default:
-		if restartCluster {
-			ginkgo.By("Restarting stateful set " + ss.Name)
-			c.tester.Restart(ss)
-			c.tester.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
-		}
-	}
-
-	ginkgo.By("Reading value under foo from member with index 2")
-	if err := pollReadWithTimeout(c.statefulPod, 2, "foo", "bar"); err != nil {
-		framework.Failf("%v", err)
-	}
-}
-
-type zookeeperTester struct {
-	ss     *appsv1alpha1.StatefulSet
-	tester *framework.StatefulSetTester
-}
-
-func (z *zookeeperTester) name() string {
-	return "zookeeper"
-}
-
-func (z *zookeeperTester) deploy(ns string) *appsv1alpha1.StatefulSet {
-	z.ss = z.tester.CreateStatefulSet(zookeeperManifestPath, ns)
-	return z.ss
-}
-
-func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
-	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
-	for k, v := range kv {
-		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
-	}
-}
-
-func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
-	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
-	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-	return lastLine(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
-}
-
-type mysqlGaleraTester struct {
-	ss     *appsv1alpha1.StatefulSet
-	tester *framework.StatefulSetTester
-}
-
-func (m *mysqlGaleraTester) name() string {
-	return "mysql: galera"
-}
-
-func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/usr/bin/mysql -u root -B -e '%v'", cmd)
-	// TODO: Find a readiness probe for mysql that guarantees writes will
-	// succeed and ditch retries. Current probe only reads, so there's a window
-	// for a race.
-	return kubectlExecWithRetries(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
-}
-
-func (m *mysqlGaleraTester) deploy(ns string) *appsv1alpha1.StatefulSet {
-	m.ss = m.tester.CreateStatefulSet(mysqlGaleraManifestPath, ns)
-
-	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
-	for _, cmd := range []string{
-		"create database statefulset;",
-		"use statefulset; create table foo (k varchar(20), v varchar(20));",
-	} {
-		framework.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
-	}
-	return m.ss
-}
-
-func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	for k, v := range kv {
-		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
-		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
-	}
-}
-
-func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	return lastLine(m.mysqlExec(fmt.Sprintf("use statefulset; select v from foo where k=\"%v\";", key), m.ss.Namespace, name))
-}
-
-type redisTester struct {
-	ss     *appsv1alpha1.StatefulSet
-	tester *framework.StatefulSetTester
-}
-
-func (m *redisTester) name() string {
-	return "redis: master/slave"
-}
-
-func (m *redisTester) redisExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
-}
-
-func (m *redisTester) deploy(ns string) *appsv1alpha1.StatefulSet {
-	m.ss = m.tester.CreateStatefulSet(redisManifestPath, ns)
-	return m.ss
-}
-
-func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	for k, v := range kv {
-		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
-	}
-}
-
-func (m *redisTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ss.Namespace, name))
-}
-
-type cockroachDBTester struct {
-	ss     *appsv1alpha1.StatefulSet
-	tester *framework.StatefulSetTester
-}
-
-func (c *cockroachDBTester) name() string {
-	return "CockroachDB"
-}
-
-func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
-}
-
-func (c *cockroachDBTester) deploy(ns string) *appsv1alpha1.StatefulSet {
-	c.ss = c.tester.CreateStatefulSet(cockroachDBManifestPath, ns)
-	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
-	for _, cmd := range []string{
-		"CREATE DATABASE IF NOT EXISTS foo;",
-		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
-	} {
-		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
-	}
-	return c.ss
-}
-
-func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
-	for k, v := range kv {
-		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
-		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
-	}
-}
-func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
-	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))
-}
+//type clusterAppTester struct {
+//	ns          string
+//	statefulPod statefulPodTester
+//	tester      *framework.StatefulSetTester
+//}
+//
+//func (c *clusterAppTester) run() {
+//	ginkgo.By("Deploying " + c.statefulPod.name())
+//	ss := c.statefulPod.deploy(c.ns)
+//
+//	ginkgo.By("Creating foo:bar in member with index 0")
+//	c.statefulPod.write(0, map[string]string{"foo": "bar"})
+//
+//	switch c.statefulPod.(type) {
+//	case *mysqlGaleraTester:
+//		// Don't restart MySQL cluster since it doesn't handle restarts well
+//	default:
+//		if restartCluster {
+//			ginkgo.By("Restarting stateful set " + ss.Name)
+//			c.tester.Restart(ss)
+//			c.tester.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+//		}
+//	}
+//
+//	ginkgo.By("Reading value under foo from member with index 2")
+//	if err := pollReadWithTimeout(c.statefulPod, 2, "foo", "bar"); err != nil {
+//		framework.Failf("%v", err)
+//	}
+//}
+//
+//type zookeeperTester struct {
+//	ss     *appsv1alpha1.StatefulSet
+//	tester *framework.StatefulSetTester
+//}
+//
+//func (z *zookeeperTester) name() string {
+//	return "zookeeper"
+//}
+//
+//func (z *zookeeperTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//	z.ss = z.tester.CreateStatefulSet(zookeeperManifestPath, ns)
+//	return z.ss
+//}
+//
+//func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
+//	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
+//	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
+//	for k, v := range kv {
+//		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
+//		framework.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+//	}
+//}
+//
+//func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
+//	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
+//	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
+//	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
+//	return lastLine(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+//}
+//
+//type mysqlGaleraTester struct {
+//	ss     *appsv1alpha1.StatefulSet
+//	tester *framework.StatefulSetTester
+//}
+//
+//func (m *mysqlGaleraTester) name() string {
+//	return "mysql: galera"
+//}
+//
+//func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
+//	cmd = fmt.Sprintf("/usr/bin/mysql -u root -B -e '%v'", cmd)
+//	// TODO: Find a readiness probe for mysql that guarantees writes will
+//	// succeed and ditch retries. Current probe only reads, so there's a window
+//	// for a race.
+//	return kubectlExecWithRetries(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+//}
+//
+//func (m *mysqlGaleraTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//	m.ss = m.tester.CreateStatefulSet(mysqlGaleraManifestPath, ns)
+//
+//	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
+//	for _, cmd := range []string{
+//		"create database statefulset;",
+//		"use statefulset; create table foo (k varchar(20), v varchar(20));",
+//	} {
+//		framework.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
+//	}
+//	return m.ss
+//}
+//
+//func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
+//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
+//	for k, v := range kv {
+//		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
+//		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
+//	}
+//}
+//
+//func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
+//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
+//	return lastLine(m.mysqlExec(fmt.Sprintf("use statefulset; select v from foo where k=\"%v\";", key), m.ss.Namespace, name))
+//}
+//
+//type redisTester struct {
+//	ss     *appsv1alpha1.StatefulSet
+//	tester *framework.StatefulSetTester
+//}
+//
+//func (m *redisTester) name() string {
+//	return "redis: master/slave"
+//}
+//
+//func (m *redisTester) redisExec(cmd, ns, podName string) string {
+//	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
+//	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+//}
+//
+//func (m *redisTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//	m.ss = m.tester.CreateStatefulSet(redisManifestPath, ns)
+//	return m.ss
+//}
+//
+//func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
+//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
+//	for k, v := range kv {
+//		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
+//	}
+//}
+//
+//func (m *redisTester) read(statefulPodIndex int, key string) string {
+//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
+//	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ss.Namespace, name))
+//}
+//
+//type cockroachDBTester struct {
+//	ss     *appsv1alpha1.StatefulSet
+//	tester *framework.StatefulSetTester
+//}
+//
+//func (c *cockroachDBTester) name() string {
+//	return "CockroachDB"
+//}
+//
+//func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
+//	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
+//	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+//}
+//
+//func (c *cockroachDBTester) deploy(ns string) *appsv1alpha1.StatefulSet {
+//	c.ss = c.tester.CreateStatefulSet(cockroachDBManifestPath, ns)
+//	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
+//	for _, cmd := range []string{
+//		"CREATE DATABASE IF NOT EXISTS foo;",
+//		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
+//	} {
+//		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
+//	}
+//	return c.ss
+//}
+//
+//func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
+//	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
+//	for k, v := range kv {
+//		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
+//		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
+//	}
+//}
+//func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
+//	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
+//	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))
+//}
 
 func lastLine(out string) string {
 	outLines := strings.Split(strings.Trim(out, "\n"), "\n")

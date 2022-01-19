@@ -18,9 +18,9 @@ package imagepulljob
 
 import (
 	"reflect"
-	"strings"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -106,11 +106,13 @@ func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1alph
 	}
 	diffSet := diffJobs(newJobs, oldJobs)
 	for _, j := range newJobs {
-		for _, cImage := range changedImages.List() {
-			if j.Spec.Image == cImage || strings.HasPrefix(j.Spec.Image, cImage+":") {
-				diffSet[types.NamespacedName{Namespace: j.Namespace, Name: j.Name}] = struct{}{}
-				break
-			}
+		imageName, _, err := daemonutil.NormalizeImageRefToNameTag(j.Spec.Image)
+		if err != nil {
+			klog.Warningf("Invalid image %s in job %s/%s", j.Spec.Image, j.Namespace, j.Name)
+			continue
+		}
+		if changedImages.Has(imageName) {
+			diffSet[types.NamespacedName{Namespace: j.Namespace, Name: j.Name}] = struct{}{}
 		}
 	}
 	for name := range diffSet {
