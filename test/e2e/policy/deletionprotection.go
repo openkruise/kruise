@@ -250,7 +250,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 							Containers: []v1.Container{
 								{
 									Name:  "nginx",
-									Image: "nginx:1.9.1",
+									Image: NginxImage,
 									Env: []v1.EnvVar{
 										{Name: "test", Value: "foo"},
 									},

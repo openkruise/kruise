@@ -10,7 +10,7 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.16'
+  GO_VERSION: '1.17'
   KIND_IMAGE: 'kindest/node:v1.18.0'
   KIND_CLUSTER_NAME: 'ci-testing'
 
@@ -69,5 +69,4 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
-          ./scripts/generate_bindata.sh
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] EphemeralJob' test/e2e

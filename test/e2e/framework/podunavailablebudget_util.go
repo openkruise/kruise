@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -56,7 +57,7 @@ func (t *PodUnavailableBudgetTester) NewBasePub(namespace string) *policyv1alpha
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      "busybox-pub",
+			Name:      "webserver-pub",
 		},
 		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
@@ -79,30 +80,29 @@ func (s *PodUnavailableBudgetTester) NewBaseDeployment(namespace string) *apps.D
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "busybox",
+			Name:      "webserver",
 			Namespace: namespace,
 		},
 		Spec: apps.DeploymentSpec{
 			Replicas: utilpointer.Int32Ptr(2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app":            "busybox",
+					"app":            "webserver",
 					"pub-controller": "true",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":            "busybox",
+						"app":            "webserver",
 						"pub-controller": "true",
 					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "main",
-							Image:   "busybox:1.32",
-							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Name:  "main",
+							Image: imageutils.GetE2EImage(imageutils.Httpd),
 						},
 					},
 				},
@@ -131,30 +131,29 @@ func (s *PodUnavailableBudgetTester) NewBaseCloneSet(namespace string) *appsv1al
 			APIVersion: appsv1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "busybox",
+			Name:      "webserver",
 			Namespace: namespace,
 		},
 		Spec: appsv1alpha1.CloneSetSpec{
 			Replicas: utilpointer.Int32Ptr(2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app":            "busybox",
+					"app":            "webserver",
 					"pub-controller": "true",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":            "busybox",
+						"app":            "webserver",
 						"pub-controller": "true",
 					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "main",
-							Image:   "busybox:1.32",
-							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Name:  "main",
+							Image: imageutils.GetE2EImage(imageutils.Httpd),
 						},
 					},
 				},

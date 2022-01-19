@@ -19,13 +19,12 @@ package manifest
 
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
+	"github.com/openkruise/kruise/test/e2e/framework/testfiles"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 // StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.

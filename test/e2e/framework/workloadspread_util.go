@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -90,9 +91,9 @@ func (t *WorkloadSpreadTester) NewBaseCloneSet(namespace string) *appsv1alpha1.C
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "main",
-							Image:   "busybox:1.32",
-							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Name:  "main",
+							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
 				},
@@ -124,7 +125,7 @@ func (t *WorkloadSpreadTester) NewBaseJob(namespace string) *batchv1.Job {
 					Containers: []corev1.Container{
 						{
 							Name:    "main",
-							Image:   "busybox:1.32",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sh", "-c", "sleep 5"},
 						},
 					},
@@ -160,9 +161,9 @@ func (t *WorkloadSpreadTester) NewBaseDeployment(namespace string) *appsv1.Deplo
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "main",
-							Image:   "busybox:1.32",
-							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Name:  "main",
+							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
 				},
