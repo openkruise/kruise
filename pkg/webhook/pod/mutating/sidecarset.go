@@ -264,6 +264,8 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				initContainer := &sidecarSet.Spec.InitContainers[i]
 				//add "IS_INJECTED" env in initContainer's envs
 				initContainer.Env = append(initContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
+				transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(initContainer, pod)
+				initContainer.Env = append(initContainer.Env, transferEnvs...)
 				sidecarInitContainers = append(sidecarInitContainers, initContainer)
 			}
 

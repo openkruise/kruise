@@ -121,6 +121,24 @@ var (
 					"app": "suxing-test",
 				},
 			},
+			InitContainers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "dns-e",
+						Image: "dns-e-image:1.0",
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: "volume-1"},
+						},
+					},
+					PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+					TransferEnv: []appsv1alpha1.TransferEnvVar{
+						{
+							SourceContainerName: "nginx",
+							EnvName:             "hello2",
+						},
+					},
+				},
+			},
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
@@ -718,7 +736,12 @@ func testSidecarSetTransferEnv(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
-
+	if len(podOut.Spec.InitContainers[1].Env) != 2 {
+		t.Fatalf("expect 2 envs but got %v", len(podOut.Spec.InitContainers[0].Env))
+	}
+	if podOut.Spec.InitContainers[1].Env[1].Value != "world2" {
+		t.Fatalf("expect env with value 'world2' but got %v", podOut.Spec.Containers[0].Env[1].Value)
+	}
 	if len(podOut.Spec.Containers[0].Env) != 2 {
 		t.Fatalf("expect 2 envs but got %v", len(podOut.Spec.Containers[0].Env))
 	}
