@@ -1,5 +1,36 @@
 # Change Log
 
+## v1.0.1
+
+> Change log since v1.0.0
+
+### SidecarSet
+
+- Fix panic when SidecarSet manages Pods with sidecar containers that have different update type. ([#850](https://github.com/openkruise/kruise/pull/850), [@veophi](https://github.com/veophi))
+- Fix log error when extract container from fieldpath failed. ([#860](https://github.com/openkruise/kruise/pull/860), [@pigletfly](https://github.com/pigletfly))
+- Optimization logic of determining whether the pod state is consistent logic. ([#854](https://github.com/openkruise/kruise/pull/854), [@dafu-wu](https://github.com/dafu-wu))
+- Replace reflect with generation in event handler. ([#885](https://github.com/openkruise/kruise/pull/885), [@zouyee](https://github.com/zouyee))
+- Store history revisions for sidecarset. ([#715](https://github.com/openkruise/kruise/pull/715), [@veophi](https://github.com/veophi))
+
+### Advanced StatefulSet
+
+- Allow updating asts RevisionHistoryLimit. ([#864](https://github.com/openkruise/kruise/pull/864), [@shiyan2016](https://github.com/shiyan2016))
+- StatefulSet considers non-available pods when deleting pods. ([#880](https://github.com/openkruise/kruise/pull/880), [@hzyfox](https://github.com/hzyfox))
+
+### ResourceDistribution
+
+- Improve controller updating and watching logic. ([#861](https://github.com/openkruise/kruise/pull/861), [@veophi](https://github.com/veophi))
+
+### CloneSet
+
+- Break the loop when it finds the current revision. ([#887](https://github.com/openkruise/kruise/pull/887), [@shiyan2016](https://github.com/shiyan2016))
+- Remove duplicate register fieldindexes in cloneset controller. ([#888](https://github.com/openkruise/kruise/pull/888) & [#889](https://github.com/openkruise/kruise/pull/889), [@shiyan2016](https://github.com/shiyan2016))
+- CloneSet refresh pod states before skipping update when paused **(Behavior Change)**. ([#893](https://github.com/openkruise/kruise/pull/893), [@FillZpp](https://github.com/FillZpp))
+
+### PullImageJob
+
+- Update containerd client usage and event handler for controller. ([#894](https://github.com/openkruise/kruise/pull/894), [@FillZpp](https://github.com/FillZpp))
+
 ## v0.10.2
 
 > Change log since v0.10.1
