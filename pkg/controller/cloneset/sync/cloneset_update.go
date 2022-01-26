@@ -76,6 +76,10 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	}
 
 	// 3. find all matched pods can update
+	targetRevision := updateRevision
+	if diffRes.updateNum < 0 {
+		targetRevision = currentRevision
+	}
 	var waitUpdateIndexes []int
 	for i, pod := range pods {
 		if coreControl.IsPodUpdatePaused(pod) {
@@ -115,7 +119,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	waitUpdateIndexes = SortUpdateIndexes(coreControl, cs.Spec.UpdateStrategy, pods, waitUpdateIndexes)
 
 	// 5. limit max count of pods can update
-	waitUpdateIndexes = limitUpdateIndexes(coreControl, cs.Spec.MinReadySeconds, diffRes, waitUpdateIndexes, pods)
+	waitUpdateIndexes = limitUpdateIndexes(coreControl, cs.Spec.MinReadySeconds, diffRes, waitUpdateIndexes, pods, targetRevision.Name)
 
 	// Determine the pub before updating the pod
 	var pub *policyv1alpha1.PodUnavailableBudget
@@ -138,10 +142,6 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 			} else if !allowed {
 				return time.Second, nil
 			}
-		}
-		targetRevision := updateRevision
-		if diffRes.updateNum < 0 {
-			targetRevision = currentRevision
 		}
 		duration, err := c.updatePod(cs, coreControl, targetRevision, revisions, pod, pvcs)
 		if duration > 0 {
@@ -283,7 +283,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 	return 0, nil
 }
 
-// SortUpdateIndexes sorts the given waitUpdateIndexes of Pods to update according to the CloneSet strategy.
+// SortUpdateIndexes sorts the given oldRevisionIndexes of Pods to update according to the CloneSet strategy.
 func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {
 	// Sort Pods with default sequence
 	sort.Slice(waitUpdateIndexes, coreControl.GetPodsSortFunc(pods, waitUpdateIndexes))
@@ -308,24 +308,34 @@ func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.C
 }
 
 // limitUpdateIndexes limits all pods waiting update by the maxUnavailable policy, and returns the indexes of pods that can finally update
-func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32, diffRes expectationDiffs, waitUpdateIndexes []int, pods []*v1.Pod) []int {
+func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32, diffRes expectationDiffs, waitUpdateIndexes []int, pods []*v1.Pod, targetRevisionHash string) []int {
 	updateDiff := util.IntAbs(diffRes.updateNum)
 	if updateDiff < len(waitUpdateIndexes) {
 		waitUpdateIndexes = waitUpdateIndexes[:updateDiff]
 	}
 
-	var notReadyCount, canUpdateCount int
+	var unavailableCount, targetRevisionUnavailableCount, canUpdateCount int
 	for _, p := range pods {
 		if !isPodAvailable(coreControl, p, minReadySeconds) {
-			notReadyCount++
+			unavailableCount++
+			if clonesetutils.EqualToRevisionHash("", p, targetRevisionHash) {
+				targetRevisionUnavailableCount++
+			}
 		}
 	}
 	for _, i := range waitUpdateIndexes {
+		// Make sure unavailable pods in target revision should not be more than maxUnavailable.
+		if targetRevisionUnavailableCount+canUpdateCount >= diffRes.updateMaxUnavailable {
+			break
+		}
+
+		// Make sure unavailable pods in all revisions should not be more than maxUnavailable.
+		// Note that update an old pod that already be unavailable will not increase the unavailable number.
 		if isPodAvailable(coreControl, pods[i], minReadySeconds) {
-			if notReadyCount >= diffRes.updateMaxUnavailable {
+			if unavailableCount >= diffRes.updateMaxUnavailable {
 				break
 			}
-			notReadyCount++
+			unavailableCount++
 		}
 		canUpdateCount++
 	}
