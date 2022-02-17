@@ -905,6 +905,11 @@ spec:
                 description: updateRevision, if not empty, indicates the version of
                   the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)
                 type: string
+              updatedReadyReplicas:
+                description: updatedReadyReplicas is the number of updated Pods created
+                  by the StatefulSet controller that have a Ready Condition.
+                format: int32
+                type: integer
               updatedReplicas:
                 description: updatedReplicas is the number of Pods created by the
                   StatefulSet controller from the StatefulSet version indicated by

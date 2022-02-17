@@ -224,6 +224,9 @@ type StatefulSetStatus struct {
 	// indicated by updateRevision.
 	UpdatedReplicas int32 `json:"updatedReplicas"`
 
+	// updatedReadyReplicas is the number of updated Pods created by the StatefulSet controller that have a Ready Condition.
+	UpdatedReadyReplicas int32 `json:"updatedReadyReplicas,omitempty"`
+
 	// currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the
 	// sequence [0,currentReplicas).
 	CurrentRevision string `json:"currentRevision,omitempty"`
