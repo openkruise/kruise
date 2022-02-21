@@ -42,4 +42,7 @@ var (
 
 	// InvalidImage is the fully qualified URI to the invalid image
 	InvalidImage = imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
+
+	// RedisImage is the fully qualified URI to the Redis image
+	RedisImage = imageutils.GetE2EImage(imageutils.Redis)
 )

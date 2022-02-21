@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -294,9 +295,10 @@ func TestUpdate(t *testing.T) {
 							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-							Revision:              "rev_new",
-							UpdateTimestamp:       now,
-							LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							Revision:               "rev_new",
+							UpdateTimestamp:        now,
+							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: now, Containers: []string{"c1"}}},
 						})},
 						ResourceVersion: "2",
 					},
@@ -371,9 +373,8 @@ func TestUpdate(t *testing.T) {
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev_new",
-								UpdateTimestamp:       now,
-								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								Revision:        "rev_new",
+								UpdateTimestamp: now,
 							}),
 							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
@@ -421,9 +422,8 @@ func TestUpdate(t *testing.T) {
 						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1alpha1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev_new",
-								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
-								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								Revision:        "rev_new",
+								UpdateTimestamp: metav1.NewTime(now.Add(-time.Second * 10)),
 							}),
 							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
@@ -456,9 +456,8 @@ func TestUpdate(t *testing.T) {
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev_new",
-								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Second * 10)),
-								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								Revision:        "rev_new",
+								UpdateTimestamp: metav1.NewTime(now.Add(-time.Second * 10)),
 							}),
 							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
@@ -505,9 +504,8 @@ func TestUpdate(t *testing.T) {
 						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1alpha1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev_new",
-								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
-								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								Revision:        "rev_new",
+								UpdateTimestamp: metav1.NewTime(now.Add(-time.Minute)),
 							}),
 							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
@@ -540,9 +538,10 @@ func TestUpdate(t *testing.T) {
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-								Revision:              "rev_new",
-								UpdateTimestamp:       metav1.NewTime(now.Add(-time.Minute)),
-								LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								Revision:               "rev_new",
+								UpdateTimestamp:        metav1.NewTime(now.Add(-time.Minute)),
+								LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
+								ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: now, Containers: []string{"c1"}}},
 							}),
 						},
 						ResourceVersion: "1",
@@ -569,13 +568,14 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
+	inplaceupdate.Clock = clock.NewFakeClock(now.Time)
 	for _, mc := range cases {
 		initialObjs := mc.initial()
 		fakeClient := fake.NewClientBuilder().WithObjects(initialObjs...).Build()
 		ctrl := &realControl{
 			fakeClient,
 			lifecycle.New(fakeClient),
-			inplaceupdate.NewForTest(fakeClient, clonesetutils.RevisionAdapterImpl, func() metav1.Time { return now }),
+			inplaceupdate.New(fakeClient, clonesetutils.RevisionAdapterImpl),
 			record.NewFakeRecorder(10),
 			controllerfinder.NewControllerFinder(fakeClient),
 		}
