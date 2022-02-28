@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	ImagePreDownloadParallelismKey    = "apps.kruise.io/image-predownload-parallelism"
-	ImagePreDownloadTimeoutSecondsKey = "apps.kruise.io/image-predownload-timeout-seconds"
+	ImagePreDownloadParallelismKey      = "apps.kruise.io/image-predownload-parallelism"
+	ImagePreDownloadTimeoutSecondsKey   = "apps.kruise.io/image-predownload-timeout-seconds"
+	ImagePreDownloadMinUpdatedReadyPods = "apps.kruise.io/image-predownload-min-updated-ready-pods"
 )
 
 // ImagePullJobSpec defines the desired state of ImagePullJob
