@@ -178,8 +178,12 @@ func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRe
 			return fmt.Errorf("no containerID in %s containerStatus, maybe the container has not been initialized", c.Name)
 		}
 
-		if podContainer.Lifecycle != nil {
-			c.PreStop = podContainer.Lifecycle.PreStop
+		if podContainer.Lifecycle != nil && podContainer.Lifecycle.PreStop != nil {
+			c.PreStop = &appsv1alpha1.ProbeHandler{
+				Exec:      podContainer.Lifecycle.PreStop.Exec,
+				HTTPGet:   podContainer.Lifecycle.PreStop.HTTPGet,
+				TCPSocket: podContainer.Lifecycle.PreStop.TCPSocket,
+			}
 		}
 
 		if c.PreStop != nil && c.PreStop.HTTPGet != nil {

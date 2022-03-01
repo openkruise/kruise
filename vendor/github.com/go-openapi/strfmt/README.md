@@ -38,10 +38,24 @@ It also provides convenient extensions to go-openapi users.
   - ssn
   - uuid, uuid3, uuid4, uuid5
   - cidr (e.g. "192.0.2.1/24", "2001:db8:a0b:12f0::1/32")
+  - ulid (e.g. "00000PP9HGSBSSDZ1JTEXBJ0PW", [spec](https://github.com/ulid/spec))
 
 > NOTE: as the name stands for, this package is intended to support string formatting only.
 > It does not provide validation for numerical values with swagger format extension for JSON types "number" or
 > "integer" (e.g. float, double, int32...).
+
+## Type conversion
+
+All types defined here are stringers and may be converted to strings with `.String()`.
+Note that most types defined by this package may be converted directly to string like `string(Email{})`.
+
+`Date` and `DateTime` may be converted directly to `time.Time` like `time.Time(Time{})`.
+Similarly, you can convert `Duration` to `time.Duration` as in `time.Duration(Duration{})`
+
+## Using pointers
+
+The `conv` subpackage provides helpers to convert the types to and from pointers, just like `go-openapi/swag` does
+with primitive types.
 
 ## Format types
 Types defined in strfmt expose marshaling and validation capabilities.
@@ -71,3 +85,4 @@ List of defined types:
 - UUID3
 - UUID4
 - UUID5
+- [ULID](https://github.com/ulid/spec)

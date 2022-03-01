@@ -971,6 +971,9 @@ func autoConvert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1
 	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -981,6 +984,9 @@ func Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1.Rol
 
 func autoConvert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
 		return err
 	}
 	return nil
@@ -1162,6 +1168,7 @@ func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1.StatefulSetSp
 		return err
 	}
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
@@ -1180,6 +1187,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSet
 		return err
 	}
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
@@ -1195,6 +1203,7 @@ func autoConvert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1.StatefulS
 	out.UpdateRevision = in.UpdateRevision
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	out.Conditions = *(*[]apps.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 
@@ -1215,6 +1224,7 @@ func autoConvert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.Statefu
 	out.UpdateRevision = in.UpdateRevision
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	out.Conditions = *(*[]v1.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 

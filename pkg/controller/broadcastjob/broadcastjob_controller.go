@@ -40,12 +40,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
@@ -593,13 +593,13 @@ func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
 //   - PodFitsResources: checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	nodeInfo := framework.NewNodeInfo()
-	_ = nodeInfo.SetNode(node)
+	nodeInfo.SetNode(node)
 
-	if !nodename.Fits(pod, nodeInfo) {
+	if len(pod.Spec.NodeName) != 0 && pod.Spec.NodeName != node.Name {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason))
 	}
 
-	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
+	if fitsNodeAffinity, _ := v1affinityhelper.GetRequiredNodeAffinity(pod).Match(node); !fitsNodeAffinity {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod))
 	}
 
@@ -623,7 +623,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable))
 	}
 
-	insufficientResources := noderesources.Fits(pod, nodeInfo)
+	insufficientResources := noderesources.Fits(pod, nodeInfo, true)
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))

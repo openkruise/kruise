@@ -7,6 +7,7 @@ import (
 
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -152,7 +153,7 @@ func testTemplateTypeSwtichToCS(t *testing.T, g *gomega.GomegaWithT, namespace s
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,

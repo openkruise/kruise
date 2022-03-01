@@ -7,6 +7,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -73,7 +74,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 				},
 			})
 		}
-		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), apivalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 	}
 
 	if spec.Template.Spec.RestartPolicy != "" && spec.Template.Spec.RestartPolicy != v1.RestartPolicyAlways {

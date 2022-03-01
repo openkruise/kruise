@@ -27,6 +27,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
@@ -230,7 +231,7 @@ func validateContainersForSidecarSet(
 		},
 	}
 
-	allErrs = append(allErrs, corevalidation.ValidatePodCreate(fakePod, corevalidation.PodValidationOptions{AllowMultipleHugePageResources: true, AllowDownwardAPIHugePages: true})...)
+	allErrs = append(allErrs, corevalidation.ValidatePodCreate(fakePod, webhookutil.DefaultPodValidationOptions)...)
 
 	return allErrs
 }

@@ -24,6 +24,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/controller/broadcastjob"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 	v1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -107,7 +108,7 @@ func validateBroadcastJobSpec(spec *appsv1alpha1.BroadcastJobSpec, fldPath *fiel
 				fmt.Sprintf("\"%s\" and \"%s\" are not allowed to preset in pod labels", broadcastjob.JobNameLabelKey, broadcastjob.ControllerUIDLabelKey)))
 		}
 	}
-	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), corevalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
+	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 }
 
 func validateBroadcastJobName(name string, prefix bool) (allErrs []string) {

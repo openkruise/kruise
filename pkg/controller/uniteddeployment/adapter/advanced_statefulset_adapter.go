@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
 
@@ -39,27 +40,27 @@ type AdvancedStatefulSetAdapter struct {
 
 // NewResourceObject creates a empty AdvancedStatefulSet object.
 func (a *AdvancedStatefulSetAdapter) NewResourceObject() client.Object {
-	return &alpha1.StatefulSet{}
+	return &v1beta1.StatefulSet{}
 }
 
 // NewResourceListObject creates a empty AdvancedStatefulSet object.
 func (a *AdvancedStatefulSetAdapter) NewResourceListObject() client.ObjectList {
-	return &alpha1.StatefulSetList{}
+	return &v1beta1.StatefulSetList{}
 }
 
 // GetObjectMeta returns the ObjectMeta of the subset of AdvancedStatefulSet.
 func (a *AdvancedStatefulSetAdapter) GetObjectMeta(obj metav1.Object) *metav1.ObjectMeta {
-	return &obj.(*alpha1.StatefulSet).ObjectMeta
+	return &obj.(*v1beta1.StatefulSet).ObjectMeta
 }
 
 // GetStatusObservedGeneration returns the observed generation of the subset.
 func (a *AdvancedStatefulSetAdapter) GetStatusObservedGeneration(obj metav1.Object) int64 {
-	return obj.(*alpha1.StatefulSet).Status.ObservedGeneration
+	return obj.(*v1beta1.StatefulSet).Status.ObservedGeneration
 }
 
 // GetReplicaDetails returns the replicas detail the subset needs.
 func (a *AdvancedStatefulSetAdapter) GetReplicaDetails(obj metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error) {
-	set := obj.(*alpha1.StatefulSet)
+	set := obj.(*v1beta1.StatefulSet)
 	var pods []*corev1.Pod
 	pods, err = a.getStatefulSetPods(set)
 	if err != nil {
@@ -101,7 +102,7 @@ func (a *AdvancedStatefulSetAdapter) ConvertToResourceList(obj runtime.Object) [
 
 // ApplySubsetTemplate updates the subset to the latest revision, depending on the AdvancedStatefulSetTemplate.
 func (a *AdvancedStatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, obj runtime.Object) error {
-	set := obj.(*alpha1.StatefulSet)
+	set := obj.(*v1beta1.StatefulSet)
 
 	var subSetConfig *alpha1.Subset
 	for _, subset := range ud.Spec.Topology.Subsets {
@@ -125,7 +126,7 @@ func (a *AdvancedStatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeploy
 	for k, v := range ud.Spec.Selector.MatchLabels {
 		set.Labels[k] = v
 	}
-	set.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+	set.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
 	// record the subset name as a label
 	set.Labels[alpha1.SubSetNameLabelKey] = subsetName
 
@@ -152,7 +153,7 @@ func (a *AdvancedStatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeploy
 	} else {
 		set.Spec.UpdateStrategy.RollingUpdate = ud.Spec.Template.AdvancedStatefulSetTemplate.Spec.UpdateStrategy.RollingUpdate
 		if set.Spec.UpdateStrategy.RollingUpdate == nil {
-			set.Spec.UpdateStrategy.RollingUpdate = &alpha1.RollingUpdateStatefulSetStrategy{}
+			set.Spec.UpdateStrategy.RollingUpdate = &v1beta1.RollingUpdateStatefulSetStrategy{}
 		}
 		set.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 	}
@@ -183,10 +184,10 @@ func (a *AdvancedStatefulSetAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj
 // IsExpected checks the subset is the expected revision or not.
 // The revision label can tell the current subset revision.
 func (a *AdvancedStatefulSetAdapter) IsExpected(obj metav1.Object, revision string) bool {
-	return obj.GetLabels()[alpha1.ControllerRevisionHashLabelKey] != revision
+	return obj.GetLabels()[appsv1.ControllerRevisionHashLabelKey] != revision
 }
 
-func (a *AdvancedStatefulSetAdapter) getStatefulSetPods(set *alpha1.StatefulSet) ([]*corev1.Pod, error) {
+func (a *AdvancedStatefulSetAdapter) getStatefulSetPods(set *v1beta1.StatefulSet) ([]*corev1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err

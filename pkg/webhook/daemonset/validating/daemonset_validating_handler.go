@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 	corev1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -82,7 +83,7 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
 	}
-	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), corevalidation.PodValidationOptions{AllowDownwardAPIHugePages: true, AllowMultipleHugePageResources: true})...)
+	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 
 	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
 	coreVolumes, err := convertor.ConvertCoreVolumes(spec.Template.Spec.Volumes)

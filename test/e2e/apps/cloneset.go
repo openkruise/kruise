@@ -140,9 +140,11 @@ var _ = SIGDescribe("CloneSet", func() {
 	framework.KruiseDescribe("CloneSet Updating", func() {
 		var err error
 
-		framework.ConformanceIt("in-place update images with the same imageID", func() {
+		// This can't be Conformance yet.
+		ginkgo.It("in-place update images with the same imageID", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			imageConfig := imageutils.GetConfig(imageutils.Nginx)
+			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
 			cs, err = tester.CreateCloneSet(cs)

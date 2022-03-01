@@ -25,8 +25,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	EphemeralContainerCreateByJob = "apps.kruise.io/ephemeraljob"
-	EphemeralContainerEnvKey      = "KRUISE_EJOB_ID"
+	EphemeralContainerEnvKey = "KRUISE_EJOB_ID"
 )
 
 // EphemeralJobSpec defines the desired state of EphemeralJob

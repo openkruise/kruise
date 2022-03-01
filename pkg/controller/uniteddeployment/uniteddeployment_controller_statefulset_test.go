@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruisectlutil "github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util"
 )
@@ -1674,7 +1675,7 @@ func clean(g *gomega.GomegaWithT, c client.Client) {
 		return nil
 	}, timeout, time.Second).Should(gomega.Succeed())
 
-	astsList := &appsv1alpha1.StatefulSetList{}
+	astsList := &appsv1beta1.StatefulSetList{}
 	if err := c.List(context.TODO(), astsList); err == nil {
 		for _, asts := range astsList.Items {
 			c.Delete(context.TODO(), &asts)

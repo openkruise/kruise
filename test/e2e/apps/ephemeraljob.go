@@ -1,6 +1,7 @@
 package apps
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -31,8 +32,8 @@ var _ = SIGDescribe("EphemeralJob", func() {
 
 		if v, err := c.Discovery().ServerVersion(); err != nil {
 			framework.Logf("Failed to discovery server version: %v", err)
-		} else if v.Minor != "18" {
-			ginkgo.Skip("Skip EphemeralJob e2e for currently it can only run in K8s 1.18")
+		} else if minor, err := strconv.Atoi(v.Minor); err != nil || minor < 22 {
+			ginkgo.Skip("Skip EphemeralJob e2e for currently it can only run in K8s >= 1.22, got " + v.String())
 		}
 
 		tester = framework.NewEphemeralJobTester(c, kc, ns)
@@ -77,6 +78,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 
 			ginkgo.By("Check the status of job")
 
+			//time.Sleep(time.Second * 30)
 			gomega.Eventually(func() int32 {
 				ejob, err := tester.GetEphemeralJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())

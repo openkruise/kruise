@@ -43,13 +43,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
-	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -428,11 +428,12 @@ func (dsc *ReconcileDaemonSet) getDaemonSetsForPod(pod *corev1.Pod) []*appsv1alp
 // Predicates checks if a DaemonSet's pod can run on a node.
 func Predicates(pod *corev1.Pod, node *corev1.Node, taints []corev1.Taint) (fitsNodeName, fitsNodeAffinity, fitsTaints bool) {
 	fitsNodeName = len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == node.Name
-	fitsNodeAffinity = pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node)
-	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(taints, pod.Spec.Tolerations, func(t *corev1.Taint) bool {
+	// Ignore parsing errors for backwards compatibility.
+	fitsNodeAffinity, _ = nodeaffinity.GetRequiredNodeAffinity(pod).Match(node)
+	_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(taints, pod.Spec.Tolerations, func(t *corev1.Taint) bool {
 		return t.Effect == corev1.TaintEffectNoExecute || t.Effect == corev1.TaintEffectNoSchedule
 	})
-	fitsTaints = !isUntolerated
+	fitsTaints = !hasUntoleratedTaint
 	return
 }
 
@@ -671,16 +672,13 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 					// should be no conflicting node affinity with the target node.
 					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
-
-					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
-						ds, metav1.NewControllerRef(ds, controllerKind))
 				} else {
 					// If pod is scheduled by DaemonSetController, set its '.spec.scheduleName'.
 					podTemplate.Spec.SchedulerName = "kubernetes.io/daemonset-controller"
-
-					err = dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, podTemplate,
-						ds, metav1.NewControllerRef(ds, controllerKind))
+					podTemplate.Spec.NodeName = nodesNeedingDaemonPods[ix]
 				}
+
+				err = dsc.podControl.CreatePods(ds.Namespace, podTemplate, ds, metav1.NewControllerRef(ds, controllerKind))
 
 				if err != nil && errors.IsTimeout(err) {
 					// Pod is created but its initialization has timed out.

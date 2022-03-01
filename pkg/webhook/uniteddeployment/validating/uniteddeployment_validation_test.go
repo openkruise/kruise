@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestValidateUnitedDeployment(t *testing.T) {
@@ -478,7 +479,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validLabels,
 						},
-						Spec: appsv1alpha1.StatefulSetSpec{
+						Spec: appsv1beta1.StatefulSetSpec{
 							Template: validPodTemplate.Template,
 						},
 					},
@@ -503,7 +504,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validLabels,
 						},
-						Spec: appsv1alpha1.StatefulSetSpec{
+						Spec: appsv1beta1.StatefulSetSpec{
 							Template: validPodTemplate.Template,
 						},
 					},

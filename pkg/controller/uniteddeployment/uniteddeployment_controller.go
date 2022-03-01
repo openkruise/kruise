@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 	"github.com/openkruise/kruise/pkg/util"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
@@ -121,7 +122,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appsv1alpha1.UnitedDeployment{},
 	})

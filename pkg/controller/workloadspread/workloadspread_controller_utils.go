@@ -20,8 +20,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulecorev1 "k8s.io/component-helpers/scheduling/corev1"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
@@ -102,7 +102,7 @@ func matchesSubset(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.Work
 func matchesSubsetRequiredAndToleration(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset) (bool, error) {
 	// check toleration
 	tolerations := append(pod.Spec.Tolerations, subset.Tolerations...)
-	if !helper.TolerationsTolerateTaintsWithFilter(tolerations, node.Spec.Taints, nil) {
+	if _, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil); hasUntoleratedTaint {
 		return false, nil
 	}
 
