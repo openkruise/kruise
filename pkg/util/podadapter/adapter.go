@@ -29,13 +29,13 @@ import (
 
 type Adapter interface {
 	GetPod(namespace, name string) (*v1.Pod, error)
-	UpdatePod(pod *v1.Pod) error
+	UpdatePod(pod *v1.Pod) (*v1.Pod, error)
 	UpdatePodStatus(pod *v1.Pod) error
 }
 
 type AdapterWithPatch interface {
 	Adapter
-	PatchPod(pod *v1.Pod, patch client.Patch) error
+	PatchPod(pod *v1.Pod, patch client.Patch) (*v1.Pod, error)
 }
 
 type AdapterRuntimeClient struct {
@@ -48,16 +48,16 @@ func (c *AdapterRuntimeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	return pod, err
 }
 
-func (c *AdapterRuntimeClient) UpdatePod(pod *v1.Pod) error {
-	return c.Update(context.TODO(), pod)
+func (c *AdapterRuntimeClient) UpdatePod(pod *v1.Pod) (*v1.Pod, error) {
+	return pod, c.Update(context.TODO(), pod)
 }
 
 func (c *AdapterRuntimeClient) UpdatePodStatus(pod *v1.Pod) error {
 	return c.Status().Update(context.TODO(), pod)
 }
 
-func (c *AdapterRuntimeClient) PatchPod(pod *v1.Pod, patch client.Patch) error {
-	return c.Patch(context.TODO(), pod, patch)
+func (c *AdapterRuntimeClient) PatchPod(pod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
+	return pod, c.Patch(context.TODO(), pod, patch)
 }
 
 type AdapterTypedClient struct {
@@ -68,9 +68,8 @@ func (c *AdapterTypedClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	return c.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (c *AdapterTypedClient) UpdatePod(pod *v1.Pod) error {
-	_, err := c.Client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
-	return err
+func (c *AdapterTypedClient) UpdatePod(pod *v1.Pod) (*v1.Pod, error) {
+	return c.Client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 }
 
 func (c *AdapterTypedClient) UpdatePodStatus(pod *v1.Pod) error {
@@ -78,13 +77,12 @@ func (c *AdapterTypedClient) UpdatePodStatus(pod *v1.Pod) error {
 	return err
 }
 
-func (c *AdapterTypedClient) PatchPod(pod *v1.Pod, patch client.Patch) error {
+func (c *AdapterTypedClient) PatchPod(pod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
 	patchData, err := patch.Data(pod)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = c.Client.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, patch.Type(), patchData, metav1.PatchOptions{})
-	return err
+	return c.Client.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, patch.Type(), patchData, metav1.PatchOptions{})
 }
 
 type AdapterInformer struct {
@@ -99,8 +97,8 @@ func (c *AdapterInformer) GetPod(namespace, name string) (*v1.Pod, error) {
 	return nil, err
 }
 
-func (c *AdapterInformer) UpdatePod(pod *v1.Pod) error {
-	return c.PodInformer.Informer().GetIndexer().Update(pod)
+func (c *AdapterInformer) UpdatePod(pod *v1.Pod) (*v1.Pod, error) {
+	return pod, c.PodInformer.Informer().GetIndexer().Update(pod)
 }
 
 func (c *AdapterInformer) UpdatePodStatus(pod *v1.Pod) error {

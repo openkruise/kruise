@@ -185,10 +185,10 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	}
 
 	if state != "" {
-		if updated, err := c.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
+		if updated, gotPod, err := c.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
 			return false, 0, err
 		} else if updated {
-			clonesetutils.ResourceVersionExpectations.Expect(pod)
+			clonesetutils.ResourceVersionExpectations.Expect(gotPod)
 			klog.V(3).Infof("CloneSet %s update pod %s lifecycle to %s", clonesetutils.GetControllerKey(cs), pod.Name, state)
 			return true, res.DelayDuration, nil
 		}
@@ -217,9 +217,10 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			case "", appspub.LifecycleStateNormal:
 				var err error
 				var updated bool
+				var gotPod *v1.Pod
 				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
-					if updated, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
-						clonesetutils.ResourceVersionExpectations.Expect(pod)
+					if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
+						clonesetutils.ResourceVersionExpectations.Expect(gotPod)
 						klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
 							clonesetutils.GetControllerKey(cs), pod.Name)
 					}
@@ -228,12 +229,13 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			case appspub.LifecycleStateUpdated:
 				var err error
 				var updated bool
+				var gotPod *v1.Pod
 				var inPlaceUpdateHandler *appspub.LifecycleHook
 				if cs.Spec.Lifecycle != nil {
 					inPlaceUpdateHandler = cs.Spec.Lifecycle.InPlaceUpdate
 				}
-				if updated, err = c.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
-					clonesetutils.ResourceVersionExpectations.Expect(pod)
+				if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
+					clonesetutils.ResourceVersionExpectations.Expect(gotPod)
 					klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
 						clonesetutils.GetControllerKey(cs), pod.Name)
 				}

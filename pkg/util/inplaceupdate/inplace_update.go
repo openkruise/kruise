@@ -207,7 +207,8 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 			appspub.RemoveInPlaceUpdateGrace(clone)
 		}
 
-		return c.podAdapter.UpdatePod(clone)
+		_, err = c.podAdapter.UpdatePod(clone)
+		return err
 	})
 
 	return delayDuration, err
@@ -298,7 +299,8 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			clone.Annotations[appspub.InPlaceUpdateGraceKey] = string(inPlaceUpdateSpecJSON)
 		}
 
-		return c.podAdapter.UpdatePod(clone)
+		_, err = c.podAdapter.UpdatePod(clone)
+		return err
 	})
 }
 

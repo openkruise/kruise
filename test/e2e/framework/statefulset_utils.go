@@ -50,7 +50,7 @@ import (
 
 const (
 	// StatefulSetPoll indicates poll interval for StatefulSet tests
-	StatefulSetPoll = 10 * time.Second
+	StatefulSetPoll = 3 * time.Second
 	// StatefulSetTimeout indicates timeout interval for StatefulSet operations
 	StatefulSetTimeout = 10 * time.Minute
 	// StatefulPodTimeout indicates timeout for stateful pods to change state

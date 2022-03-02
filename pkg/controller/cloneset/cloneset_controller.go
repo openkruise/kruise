@@ -30,6 +30,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -478,7 +479,7 @@ func (r *ReconcileCloneSet) getOwnedResource(cs *appsv1alpha1.CloneSet) ([]*v1.P
 	}
 
 	pvcList := v1.PersistentVolumeClaimList{}
-	if err := r.List(context.TODO(), &pvcList, opts); err != nil {
+	if err := r.List(context.TODO(), &pvcList, opts, utilclient.DisableDeepCopy); err != nil {
 		return nil, nil, err
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim

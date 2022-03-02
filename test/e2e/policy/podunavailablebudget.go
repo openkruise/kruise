@@ -337,7 +337,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				nowStatus := &pub.Status
 				setPubStatus(nowStatus)
 				return nowStatus
-			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
+			}, 60*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
 			//check pods
 			pods, err = sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)

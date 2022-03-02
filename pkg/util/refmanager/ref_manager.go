@@ -198,12 +198,12 @@ func (mgr *RefManager) release(obj metav1.Object) error {
 		}
 	}
 	if idx > -1 {
-		clientObj, ok := obj.(client.Object)
+		clientObj, ok := obj.(runtime.Object).DeepCopyObject().(client.Object)
 		if !ok {
 			return fmt.Errorf("can't remove Pod %v/%v (%v) owner reference: fail to cast to client.Object", obj.GetNamespace(), obj.GetName(), obj.GetUID())
 		}
 
-		obj.SetOwnerReferences(append(obj.GetOwnerReferences()[:idx], obj.GetOwnerReferences()[idx+1:]...))
+		clientObj.SetOwnerReferences(append(clientObj.GetOwnerReferences()[:idx], clientObj.GetOwnerReferences()[idx+1:]...))
 		if err := mgr.updateOwner(clientObj); err != nil {
 			return fmt.Errorf("can't remove Pod %v/%v (%v) owner reference %v/%v (%v): %v",
 				obj.GetNamespace(), obj.GetName(), obj.GetUID(), obj.GetNamespace(), obj.GetName(), mgr.owner.GetUID(), err)

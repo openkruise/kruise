@@ -748,7 +748,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, pod *v1.Pod) (bool, error) {
 	if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.PreDelete, pod) {
-		if updated, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
+		if updated, _, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
 			return false, err
 		} else if updated {
 			klog.V(3).Infof("StatefulSet %s scaling update pod %s lifecycle to PreparingDelete",
@@ -800,7 +800,7 @@ func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulS
 	}
 
 	if state != "" {
-		if updated, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
+		if updated, _, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
 			return false, 0, err
 		} else if updated {
 			klog.V(3).Infof("AdvancedStatefulSet %s update pod %s lifecycle to %s",
@@ -844,7 +844,7 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 			var err error
 			var updated bool
 			if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
-				if updated, err = ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
+				if updated, _, err = ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
 					klog.V(3).Infof("StatefulSet %s updated pod %s lifecycle to PreparingUpdate",
 						getStatefulSetKey(set), pod.Name)
 				}
@@ -857,7 +857,7 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 			if set.Spec.Lifecycle != nil {
 				inPlaceUpdateHandler = set.Spec.Lifecycle.InPlaceUpdate
 			}
-			if updated, err = ssc.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
+			if updated, _, err = ssc.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
 				klog.V(3).Infof("StatefulSet %s updated pod %s lifecycle to PreparingUpdate",
 					getStatefulSetKey(set), pod.Name)
 			}
