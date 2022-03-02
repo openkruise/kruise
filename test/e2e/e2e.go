@@ -181,8 +181,8 @@ func RunE2ETests(t *testing.T) {
 
 	gomega.RegisterFailHandler(ginkgowrapper.Fail)
 	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
+	if len(config.GinkgoConfig.FocusStrings) == 0 && len(config.GinkgoConfig.SkipStrings) == 0 {
+		config.GinkgoConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
 	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins

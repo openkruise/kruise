@@ -102,8 +102,7 @@ type ReconcileEphemeralJob struct {
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=ephemeraljobs,verbs=get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=ephemeraljobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
-// +kubebuilder:rbac:groups=core,resources=pods/ephemeralcontainers,verbs=get;update
+// +kubebuilder:rbac:groups=core,resources=pods/ephemeralcontainers,verbs=get;update;patch
 
 // Reconcile reads that state of the cluster for a EphemeralJob object and makes changes based on the state read
 // and what is in the EphemeralJob.Spec
@@ -283,11 +282,16 @@ func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJo
 	// Ignore inactive pods
 	var targetPods []*v1.Pod
 	for i := range podList.Items {
-		if !kubecontroller.IsPodActive(&podList.Items[i]) {
+		pod := &podList.Items[i]
+		if !kubecontroller.IsPodActive(pod) {
 			continue
 		}
-		if existEphemeralContainer(job, &podList.Items[i]) {
-			targetPods = append(targetPods, &podList.Items[i])
+		if exists, owned := existEphemeralContainer(job, pod); exists {
+			if owned {
+				targetPods = append(targetPods, pod)
+			} else {
+				klog.Warningf("EphemeralJob %s/%s ignores Pod %s for it exists conflict ephemeral containers", job.Namespace, job.Name, pod)
+			}
 		}
 	}
 
@@ -329,7 +333,7 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 	_, err := clonesetutils.DoItSlowly(len(toCreatePods), kubecontroller.SlowStartInitialBatchSize, func() error {
 		pod := <-podsCreationChan
 
-		if existEphemeralContainer(job, pod) {
+		if exists, _ := existEphemeralContainer(job, pod); exists {
 			return nil
 		}
 

@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestAstsReconcile(t *testing.T) {
@@ -61,7 +62,7 @@ func TestAstsReconcile(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -218,7 +219,7 @@ func TestTemplateTypeSwtich(t *testing.T) {
 				"name": caseName,
 			},
 		},
-		Spec: appsv1alpha1.StatefulSetSpec{
+		Spec: appsv1beta1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
@@ -277,7 +278,7 @@ func TestAstsSubsetProvision(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -480,7 +481,7 @@ func TestAstsSubsetProvisionWithToleration(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -591,7 +592,7 @@ func TestAstsDupSubset(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -686,7 +687,7 @@ func TestAstsScale(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -834,7 +835,7 @@ func TestAstsUpdate(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -958,7 +959,7 @@ func TestAstsRollingUpdatePartition(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -1145,7 +1146,7 @@ func TestAstsOnDelete(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -1166,7 +1167,7 @@ func TestAstsOnDelete(t *testing.T) {
 								},
 							},
 						},
-						UpdateStrategy: appsv1alpha1.StatefulSetUpdateStrategy{
+						UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
 							Type: appsv1.OnDeleteStatefulSetStrategyType,
 						},
 					},
@@ -1301,7 +1302,7 @@ func TestAstsSubsetCount(t *testing.T) {
 							"name": caseName,
 						},
 					},
-					Spec: appsv1alpha1.StatefulSetSpec{
+					Spec: appsv1beta1.StatefulSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"name": caseName,
@@ -1501,8 +1502,8 @@ func TestAstsSubsetCount(t *testing.T) {
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
 }
 
-func expectedAstsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, count int) *appsv1alpha1.StatefulSetList {
-	stsList := &appsv1alpha1.StatefulSetList{}
+func expectedAstsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, count int) *appsv1beta1.StatefulSetList {
+	stsList := &appsv1beta1.StatefulSetList{}
 
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
 	g.Expect(err).Should(gomega.BeNil())
@@ -1522,7 +1523,7 @@ func expectedAstsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment,
 	return stsList
 }
 
-func getSubsetAstsByName(stsList *appsv1alpha1.StatefulSetList, name string) *appsv1alpha1.StatefulSet {
+func getSubsetAstsByName(stsList *appsv1beta1.StatefulSetList, name string) *appsv1beta1.StatefulSet {
 	for _, sts := range stsList.Items {
 		if sts.Labels[appsv1alpha1.SubSetNameLabelKey] == name {
 			return &sts

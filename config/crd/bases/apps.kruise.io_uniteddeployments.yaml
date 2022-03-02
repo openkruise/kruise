@@ -129,6 +129,37 @@ spec:
                         description: StatefulSetSpec defines the desired state of
                           StatefulSet
                         properties:
+                          lifecycle:
+                            description: Lifecycle defines the lifecycle hooks for
+                              Pods pre-delete, in-place update.
+                            properties:
+                              inPlaceUpdate:
+                                description: InPlaceUpdate is the hook before Pod
+                                  to update and after Pod has been updated.
+                                properties:
+                                  finalizersHandler:
+                                    items:
+                                      type: string
+                                    type: array
+                                  labelsHandler:
+                                    additionalProperties:
+                                      type: string
+                                    type: object
+                                type: object
+                              preDelete:
+                                description: PreDelete is the hook before Pod to be
+                                  deleted.
+                                properties:
+                                  finalizersHandler:
+                                    items:
+                                      type: string
+                                    type: array
+                                  labelsHandler:
+                                    additionalProperties:
+                                      type: string
+                                    type: object
+                                type: object
+                            type: object
                           podManagementPolicy:
                             description: podManagementPolicy controls how pods are
                               created during initial scale up, when replacing pods
@@ -150,6 +181,21 @@ spec:
                               of this field.'
                             format: int32
                             type: integer
+                          reserveOrdinals:
+                            description: 'reserveOrdinals controls the ordinal numbers
+                              that should be reserved, and the replicas will always
+                              be the expectation number of running Pods. For a sts
+                              with replicas=3 and its Pods in [0, 1, 2]: - If you
+                              want to migrate Pod-1 and reserve this ordinal, just
+                              set spec.reserveOrdinal to [1].   Then controller will
+                              delete Pod-1 and create Pod-3 (existing Pods will be
+                              [0, 2, 3]) - If you just want to delete Pod-1, you should
+                              set spec.reserveOrdinal to [1] and spec.replicas to
+                              2.   Then controller will delete Pod-1 (existing Pods
+                              will be [0, 2])'
+                            items:
+                              type: integer
+                            type: array
                           revisionHistoryLimit:
                             description: revisionHistoryLimit is the maximum number
                               of revisions that will be maintained in the StatefulSet's
@@ -158,6 +204,22 @@ spec:
                               version. The default value is 10.
                             format: int32
                             type: integer
+                          scaleStrategy:
+                            description: scaleStrategy indicates the StatefulSetScaleStrategy
+                              that will be employed to scale Pods in the StatefulSet.
+                            properties:
+                              maxUnavailable:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: 'The maximum number of pods that can
+                                  be unavailable during scaling. Value can be an absolute
+                                  number (ex: 5) or a percentage of desired pods (ex:
+                                  10%). Absolute number is calculated from percentage
+                                  by rounding down. It can just be allowed to work
+                                  with Parallel podManagementPolicy.'
+                                x-kubernetes-int-or-string: true
+                            type: object
                           selector:
                             description: 'selector is a label query over pods that
                               should match the replica count. It must match the pod

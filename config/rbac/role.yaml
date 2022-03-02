@@ -473,6 +473,7 @@ rules:
   - pods/ephemeralcontainers
   verbs:
   - get
+  - patch
   - update
 - apiGroups:
   - ""

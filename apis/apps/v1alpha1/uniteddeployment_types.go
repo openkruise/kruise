@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,7 +112,7 @@ type AdvancedStatefulSetTemplateSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              StatefulSetSpec `json:"spec"`
+	Spec              v1beta1.StatefulSetSpec `json:"spec"`
 }
 
 // CloneSetTemplateSpec defines the subset template of CloneSet.

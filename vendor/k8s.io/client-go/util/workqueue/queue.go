@@ -55,7 +55,13 @@ func newQueue(c clock.Clock, metrics queueMetrics, updatePeriod time.Duration) *
 		metrics:                    metrics,
 		unfinishedWorkUpdatePeriod: updatePeriod,
 	}
-	go t.updateUnfinishedWorkLoop()
+
+	// Don't start the goroutine for a type of noMetrics so we don't consume
+	// resources unnecessarily
+	if _, ok := metrics.(noMetrics); !ok {
+		go t.updateUnfinishedWorkLoop()
+	}
+
 	return t
 }
 
@@ -149,7 +155,10 @@ func (q *Type) Get() (item interface{}, shutdown bool) {
 		return nil, true
 	}
 
-	item, q.queue = q.queue[0], q.queue[1:]
+	item = q.queue[0]
+	// The underlying array still exists and reference this object, so the object will not be garbage collected.
+	q.queue[0] = nil
+	q.queue = q.queue[1:]
 
 	q.metrics.get(item)
 

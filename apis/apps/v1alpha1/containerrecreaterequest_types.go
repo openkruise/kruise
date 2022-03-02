@@ -63,7 +63,7 @@ type ContainerRecreateRequestContainer struct {
 	// PreStop is synced from the real container in Pod spec during this ContainerRecreateRequest creating.
 	// Populated by the system.
 	// Read-only.
-	PreStop *v1.Handler `json:"preStop,omitempty"`
+	PreStop *ProbeHandler `json:"preStop,omitempty"`
 	// Ports is synced from the real container in Pod spec during this ContainerRecreateRequest creating.
 	// Populated by the system.
 	// Read-only.
@@ -72,6 +72,23 @@ type ContainerRecreateRequestContainer struct {
 	// Populated by the system.
 	// Read-only.
 	StatusContext *ContainerRecreateRequestContainerContext `json:"statusContext,omitempty"`
+}
+
+// ProbeHandler defines a specific action that should be taken
+// TODO(FillZpp): improve the definition when openkruise/kruise updates to k8s 1.23
+type ProbeHandler struct {
+	// One and only one of the following should be specified.
+	// Exec specifies the action to take.
+	// +optional
+	Exec *v1.ExecAction `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
+	// HTTPGet specifies the http request to perform.
+	// +optional
+	HTTPGet *v1.HTTPGetAction `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
+	// TCPSocket specifies an action involving a TCP port.
+	// TCP hooks not yet supported
+	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *v1.TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 }
 
 // ContainerRecreateRequestContainerContext contains context status of the container that need to recreate.

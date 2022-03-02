@@ -141,7 +141,7 @@ func (s *SpecValidator) Validate(data interface{}) (*Result, *Result) {
 
 	errs.Merge(s.validateNonEmptyPathParamNames())
 
-	//errs.Merge(s.validateRefNoSibling()) // warning only
+	// errs.Merge(s.validateRefNoSibling()) // warning only
 	errs.Merge(s.validateReferenced()) // warning only
 
 	return errs, warnings
@@ -169,9 +169,17 @@ func (s *SpecValidator) validateNonEmptyPathParamNames() *Result {
 
 func (s *SpecValidator) validateDuplicateOperationIDs() *Result {
 	// OperationID, if specified, must be unique across the board
+	var analyzer *analysis.Spec
+	if s.expanded != nil {
+		// $ref are valid: we can analyze operations on an expanded spec
+		analyzer = analysis.New(s.expanded.Spec())
+	} else {
+		// fallback on possible incomplete picture because of previous errors
+		analyzer = s.analyzer
+	}
 	res := new(Result)
 	known := make(map[string]int)
-	for _, v := range s.analyzer.OperationIDs() {
+	for _, v := range analyzer.OperationIDs() {
 		if v != "" {
 			known[v]++
 		}
@@ -535,7 +543,7 @@ DEFINITIONS:
 	for d, schema := range s.spec.Spec().Definitions {
 		if schema.Required != nil { // Safeguard
 			for _, pn := range schema.Required {
-				red := s.validateRequiredProperties(pn, d, &schema)
+				red := s.validateRequiredProperties(pn, d, &schema) //#nosec
 				res.Merge(red)
 				if !red.IsValid() && !s.Options.ContinueOnErrors {
 					break DEFINITIONS // there is an error, let's stop that bleeding
@@ -639,7 +647,7 @@ func (s *SpecValidator) validateParameters() *Result {
 				if _, found := methodPaths[method]; !found {
 					methodPaths[method] = map[string]string{}
 				}
-				methodPaths[method][pathToAdd] = path //Original non stripped path
+				methodPaths[method][pathToAdd] = path // Original non stripped path
 
 			}
 
@@ -765,7 +773,7 @@ func (s *SpecValidator) checkUniqueParams(path, method string, op *spec.Operatio
 	if op.Parameters != nil { // Safeguard
 		for _, ppr := range op.Parameters {
 			var ok bool
-			pr, red := paramHelp.resolveParam(path, method, op.ID, &ppr, s)
+			pr, red := paramHelp.resolveParam(path, method, op.ID, &ppr, s) //#nosec
 			res.Merge(red)
 
 			if pr != nil && pr.Name != "" { // params with empty name does no participate the check

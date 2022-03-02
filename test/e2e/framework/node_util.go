@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -179,7 +179,7 @@ func (t *NodeTester) ListRealNodesWithFake(tolerations []v1.Toleration) ([]*v1.N
 	var nodes []*v1.Node
 	for i := range nodeList.Items {
 		node := &nodeList.Items[i]
-		taint, isUntolerated := helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil)
+		taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil)
 		if !isUntolerated {
 			nodes = append(nodes, node)
 			Logf("ListRealNodesWithFake check node %s matched", node.Name)
