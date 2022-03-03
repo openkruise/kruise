@@ -6,7 +6,7 @@ require (
 	github.com/alibaba/pouch v0.0.0-20190328125340-37051654f368
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
-	github.com/containerd/containerd v1.5.9
+	github.com/containerd/containerd v1.5.10
 	github.com/docker/distribution v2.8.0+incompatible
 	github.com/docker/docker v20.10.2+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
