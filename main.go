@@ -46,6 +46,7 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/controller"
+	_ "github.com/openkruise/kruise/pkg/util/metrics/leadership"
 	// +kubebuilder:scaffold:imports
 )
 
