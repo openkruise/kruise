@@ -42,6 +42,8 @@ var (
 	handlerGates = map[string]GateFunc{}
 )
 
+const waitReadyTimeout = 5 * time.Second
+
 func addHandlers(m map[string]admission.Handler) {
 	addHandlersWithGate(m, nil)
 }
@@ -145,8 +147,9 @@ func WaitReady() error {
 			return nil
 		}
 
-		if duration > time.Second*5 {
+		if duration > waitReadyTimeout {
 			klog.Warningf("Failed to wait webhook ready over %s: %v", duration, err)
+			return err
 		}
 		time.Sleep(time.Second * 2)
 	}
