@@ -305,3 +305,24 @@ func findUpdatedPodsOnNode(ds *appsv1alpha1.DaemonSet, podsOnNode []*corev1.Pod,
 	}
 	return newPod, oldPod, true
 }
+
+// NodeShouldUpdateBySelector checks if the node is selected to upgrade for ds's gray update selector.
+// This function does not check NodeShouldRunDaemonPod
+func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1alpha1.DaemonSet) bool {
+	switch ds.Spec.UpdateStrategy.Type {
+	case appsv1alpha1.OnDeleteDaemonSetStrategyType:
+		return false
+	case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
+		if ds.Spec.UpdateStrategy.RollingUpdate == nil || ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
+			return false
+		}
+		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
+		if err != nil {
+			// this should not happen if the DaemonSet passed validation
+			return false
+		}
+		return !selector.Empty() && selector.Matches(labels.Set(node.Labels))
+	default:
+		return false
+	}
+}
