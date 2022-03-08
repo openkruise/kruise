@@ -38,6 +38,7 @@ import (
 
 	extclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/features"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/webhook"
@@ -142,6 +143,7 @@ func main() {
 		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
 		Namespace:                  namespace,
 		SyncPeriod:                 syncPeriod,
+		NewClient:                  utilclient.NewClient,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

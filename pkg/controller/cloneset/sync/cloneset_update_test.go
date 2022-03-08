@@ -574,7 +574,7 @@ func TestUpdate(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithObjects(initialObjs...).Build()
 		ctrl := &realControl{
 			fakeClient,
-			lifecycle.NewForTest(fakeClient),
+			lifecycle.New(fakeClient),
 			inplaceupdate.NewForTest(fakeClient, clonesetutils.RevisionAdapterImpl, func() metav1.Time { return now }),
 			record.NewFakeRecorder(10),
 			controllerfinder.NewControllerFinder(fakeClient),

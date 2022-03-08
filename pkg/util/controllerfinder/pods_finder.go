@@ -28,6 +28,7 @@ import (
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
@@ -89,7 +90,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, acti
 			Namespace:     ns,
 			FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(uid)}),
 		}
-		if err := r.List(context.TODO(), podList, listOption); err != nil {
+		if err := r.List(context.TODO(), podList, listOption, utilclient.DisableDeepCopy); err != nil {
 			return nil, -1, err
 		}
 		for i := range podList.Items {

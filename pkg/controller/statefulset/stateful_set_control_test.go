@@ -2086,6 +2086,13 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
 	sort.Sort(ascendingOrdinal(pods))
 	if len(pods) < 3 {
 		t.Fatalf("Expected no update, actually got pods num: %v", len(pods))

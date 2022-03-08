@@ -40,6 +40,8 @@ spec:
         imagePullPolicy: Always
         name: manager
         env:
+          - name: KUBE_CACHE_MUTATION_DETECTOR
+            value: "true"
           - name: POD_NAMESPACE
             valueFrom:
               fieldRef:
@@ -97,6 +99,8 @@ spec:
         imagePullPolicy: Always
         name: daemon
         env:
+        - name: KUBE_CACHE_MUTATION_DETECTOR
+          value: "true"
         - name: NODE_NAME
           valueFrom:
             fieldRef:

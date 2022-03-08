@@ -25,6 +25,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	sortingcontrol "github.com/openkruise/kruise/pkg/control/sorting"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -77,7 +78,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 		}
 
 		podList := &v1.PodList{}
-		if err := reader.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		if err := reader.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabelsSelector{Selector: selector}, utilclient.DisableDeepCopy); err != nil {
 			return nil, err
 		}
 
@@ -122,7 +123,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 
 	nodeImageList := &appsv1alpha1.NodeImageList{}
 	if job.Spec.Selector == nil {
-		if err := reader.List(context.TODO(), nodeImageList); err != nil {
+		if err := reader.List(context.TODO(), nodeImageList, utilclient.DisableDeepCopy); err != nil {
 			return nil, err
 		}
 		return convertNodeImages(nodeImageList), err
@@ -146,7 +147,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 	if err != nil {
 		return nil, fmt.Errorf("parse selector error: %v", err)
 	}
-	if err := reader.List(context.TODO(), nodeImageList, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+	if err := reader.List(context.TODO(), nodeImageList, client.MatchingLabelsSelector{Selector: selector}, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
 	return convertNodeImages(nodeImageList), err
@@ -163,7 +164,7 @@ func convertNodeImages(nodeImageList *appsv1alpha1.NodeImageList) []*appsv1alpha
 func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *appsv1alpha1.NodeImage) (newJobs, oldJobs []*appsv1alpha1.ImagePullJob, err error) {
 	var podsOnNode []*v1.Pod
 	jobList := appsv1alpha1.ImagePullJobList{}
-	if err = reader.List(context.TODO(), &jobList, client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}); err != nil {
+	if err = reader.List(context.TODO(), &jobList, client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}, utilclient.DisableDeepCopy); err != nil {
 		return nil, nil, err
 	}
 	for i := range jobList.Items {
@@ -224,7 +225,7 @@ func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *ap
 
 func getPodsOnNode(reader client.Reader, nodeName string) (pods []*v1.Pod, err error) {
 	podList := v1.PodList{}
-	if err = reader.List(context.TODO(), &podList, client.MatchingFields{fieldindex.IndexNameForPodNodeName: nodeName}); err != nil {
+	if err = reader.List(context.TODO(), &podList, client.MatchingFields{fieldindex.IndexNameForPodNodeName: nodeName}, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
 	pods = make([]*v1.Pod, 0, len(podList.Items))
@@ -236,7 +237,7 @@ func getPodsOnNode(reader client.Reader, nodeName string) (pods []*v1.Pod, err e
 
 func GetActiveJobsForPod(reader client.Reader, pod, oldPod *v1.Pod) (newJobs, oldJobs []*appsv1alpha1.ImagePullJob, err error) {
 	jobList := appsv1alpha1.ImagePullJobList{}
-	if err = reader.List(context.TODO(), &jobList, client.InNamespace(pod.Namespace), client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}); err != nil {
+	if err = reader.List(context.TODO(), &jobList, client.InNamespace(pod.Namespace), client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}, utilclient.DisableDeepCopy); err != nil {
 		return nil, nil, err
 	}
 	for i := range jobList.Items {

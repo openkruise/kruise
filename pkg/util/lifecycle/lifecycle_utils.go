@@ -34,8 +34,8 @@ import (
 
 // Interface for managing pods lifecycle.
 type Interface interface {
-	UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType) (bool, error)
-	UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook) (bool, error)
+	UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType) (bool, *v1.Pod, error)
+	UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook) (bool, *v1.Pod, error)
 }
 
 type realControl struct {
@@ -52,10 +52,6 @@ func NewForTypedClient(c clientset.Interface) Interface {
 
 func NewForInformer(informer coreinformers.PodInformer) Interface {
 	return &realControl{adp: &podadapter.AdapterInformer{PodInformer: informer}}
-}
-
-func NewForTest(c client.Client) Interface {
-	return &realControl{adp: &podadapter.AdapterRuntimeClient{Client: c}}
 }
 
 func GetPodLifecycleState(pod *v1.Pod) appspub.LifecycleStateType {
@@ -75,12 +71,12 @@ func SetPodLifecycle(state appspub.LifecycleStateType) func(*v1.Pod) {
 	}
 }
 
-func (c *realControl) UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType) (bool, error) {
+func (c *realControl) UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType) (updated bool, gotPod *v1.Pod, err error) {
 	if GetPodLifecycleState(pod) == state {
-		return false, nil
+		return false, pod, nil
 	}
 
-	var err error
+	pod = pod.DeepCopy()
 	if adp, ok := c.adp.(podadapter.AdapterWithPatch); ok {
 		body := fmt.Sprintf(
 			`{"metadata":{"labels":{"%s":"%s"},"annotations":{"%s":"%s"}}}`,
@@ -89,25 +85,25 @@ func (c *realControl) UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleSta
 			appspub.LifecycleTimestampKey,
 			time.Now().Format(time.RFC3339),
 		)
-		err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+		gotPod, err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 	} else {
 		SetPodLifecycle(state)(pod)
-		err = c.adp.UpdatePod(pod)
+		gotPod, err = c.adp.UpdatePod(pod)
 	}
 
-	return true, err
+	return true, gotPod, err
 }
 
-func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook) (bool, error) {
+func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook) (updated bool, gotPod *v1.Pod, err error) {
 	if inPlaceUpdateHandler == nil || pod == nil {
-		return false, nil
+		return false, pod, nil
 	}
 
 	if GetPodLifecycleState(pod) == state {
-		return false, nil
+		return false, pod, nil
 	}
 
-	var err error
+	pod = pod.DeepCopy()
 	if adp, ok := c.adp.(podadapter.AdapterWithPatch); ok {
 		var labelsHandler, finalizersHandler string
 		for k, v := range inPlaceUpdateHandler.LabelsHandler {
@@ -127,7 +123,7 @@ func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.L
 			time.Now().Format(time.RFC3339),
 			finalizersHandler,
 		)
-		err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+		gotPod, err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 	} else {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
@@ -138,10 +134,10 @@ func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.L
 		pod.Finalizers = append(pod.Finalizers, inPlaceUpdateHandler.FinalizersHandler...)
 
 		SetPodLifecycle(state)(pod)
-		err = c.adp.UpdatePod(pod)
+		gotPod, err = c.adp.UpdatePod(pod)
 	}
 
-	return true, err
+	return true, gotPod, err
 }
 
 func IsPodHooked(hook *appspub.LifecycleHook, pod *v1.Pod) bool {

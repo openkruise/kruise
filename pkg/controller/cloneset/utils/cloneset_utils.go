@@ -24,6 +24,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
@@ -84,7 +85,7 @@ func GetControllerKey(cs *appsv1alpha1.CloneSet) string {
 // GetActivePods returns all active pods in this namespace.
 func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, error) {
 	podList := &v1.PodList{}
-	if err := reader.List(context.TODO(), podList, opts); err != nil {
+	if err := reader.List(context.TODO(), podList, opts, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
 

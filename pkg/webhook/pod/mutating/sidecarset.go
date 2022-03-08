@@ -26,13 +26,13 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -65,7 +65,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 
 	// DisableDeepCopy:true, indicates must be deep copy before update sidecarSet objection
 	sidecarsetList := &appsv1alpha1.SidecarSetList{}
-	if err := h.Client.List(ctx, sidecarsetList, &client.ListOptions{}); err != nil {
+	if err := h.Client.List(ctx, sidecarsetList, utilclient.DisableDeepCopy); err != nil {
 		return err
 	}
 

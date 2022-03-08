@@ -26,6 +26,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -293,7 +294,7 @@ func (p *Processor) getSelectedPods(namespaces []string, selector labels.Selecto
 	for _, ns := range namespaces {
 		allPods := &corev1.PodList{}
 		listOpts.Namespace = ns
-		if listErr := p.Client.List(context.TODO(), allPods, listOpts); listErr != nil {
+		if listErr := p.Client.List(context.TODO(), allPods, listOpts, utilclient.DisableDeepCopy); listErr != nil {
 			err = fmt.Errorf("sidecarSet list pods by ns error, ns[%s], err:%v", ns, listErr)
 			return
 		}

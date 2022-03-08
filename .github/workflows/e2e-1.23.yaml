@@ -1,4 +1,4 @@
-name: E2E-1.22
+name: E2E-1.23
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 env:
   # Common versions
   GO_VERSION: '1.17'
-  KIND_IMAGE: 'kindest/node:v1.22.0'
+  KIND_IMAGE: 'kindest/node:v1.23.3'
   KIND_CLUSTER_NAME: 'ci-testing'
 
 jobs:
@@ -70,7 +70,19 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
+          set +e
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] StatefulSet' test/e2e
+          retVal=$?
+          restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+              echo "Kruise-manager has not restarted"
+          else
+              kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers
+              echo "Kruise-manager has restarted, abort!!!"
+              kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
+              exit 1
+          fi
+          exit $retVal
 
   pullimages-containerrecreate:
     runs-on: ubuntu-18.04
@@ -126,7 +138,19 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
+          set +e
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] (PullImage|ContainerRecreateRequest)' test/e2e
+          retVal=$?
+          restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+              echo "Kruise-manager has not restarted"
+          else
+              kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers
+              echo "Kruise-manager has restarted, abort!!!"
+              kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
+              exit 1
+          fi
+          exit $retVal
 
   advanced-daemonset:
     runs-on: ubuntu-18.04
@@ -182,7 +206,19 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
+          set +e
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] DaemonSet' test/e2e
+          retVal=$?
+          restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+              echo "Kruise-manager has not restarted"
+          else
+              kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers
+              echo "Kruise-manager has restarted, abort!!!"
+              kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
+              exit 1
+          fi
+          exit $retVal
 
   sidecarset:
     runs-on: ubuntu-18.04
@@ -238,7 +274,19 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
+          set +e
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] SidecarSet' test/e2e
+          retVal=$?
+          restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+              echo "Kruise-manager has not restarted"
+          else
+              kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers
+              echo "Kruise-manager has restarted, abort!!!"
+              kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
+              exit 1
+          fi
+          exit $retVal
 
   other:
     runs-on: ubuntu-18.04
@@ -296,10 +344,14 @@ jobs:
           make ginkgo
           set +e
           ./bin/ginkgo -timeout 60m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' test/e2e
-#          retVal=$?
-#          if [ $retVal -ne 0 ]; then
-#            kubectl get pod -n kruise-system -o wide
-#            kubectl get pod -n kruise-system --no-headers | grep manager | awk '{print $1}' | xargs kubectl logs -n kruise-system
-#            kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-#          fi
-#          exit $retVal
+          retVal=$?
+          restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+              echo "Kruise-manager has not restarted"
+          else
+              kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers
+              echo "Kruise-manager has restarted, abort!!!"
+              kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
+              exit 1
+          fi
+          exit $retVal

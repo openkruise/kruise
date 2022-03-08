@@ -68,6 +68,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
 			tester.CreateSidecarSet(sidecarSetIn)
+			time.Sleep(time.Second)
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
@@ -110,6 +111,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
 			sidecarSetIn = tester.CreateSidecarSet(sidecarSetIn)
+			time.Sleep(time.Second)
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
@@ -220,6 +222,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
 			sidecarSetIn = tester.CreateSidecarSet(sidecarSetIn)
+			time.Sleep(time.Second)
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
