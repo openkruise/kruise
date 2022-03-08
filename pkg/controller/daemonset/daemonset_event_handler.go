@@ -259,7 +259,9 @@ func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitin
 		ds := &dsList.Items[i]
 		oldShouldRun, oldShouldContinueRunning := nodeShouldRunDaemonPod(oldNode, ds)
 		currentShouldRun, currentShouldContinueRunning := nodeShouldRunDaemonPod(curNode, ds)
-		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) {
+		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) ||
+			(NodeShouldUpdateBySelector(oldNode, ds) != NodeShouldUpdateBySelector(curNode, ds)) {
+			klog.V(6).Infof("update node: %s triggers DaemonSet %s/%s to reconcile.", curNode.Name, ds.GetNamespace(), ds.GetName())
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      ds.GetName(),
 				Namespace: ds.GetNamespace(),
