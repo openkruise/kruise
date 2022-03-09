@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,6 +157,11 @@ type DaemonSetSpec struct {
 	// Defaults to 10.
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+
+	// Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
+	// Currently, we only support pre-delete hook for Advanced DaemonSet.
+	// +optional
+	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
 }
 
 // DaemonSetStatus defines the observed state of DaemonSet

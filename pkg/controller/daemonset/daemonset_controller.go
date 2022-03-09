@@ -69,6 +69,7 @@ import (
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
@@ -176,15 +177,16 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		crControl: kubecontroller.RealControllerRevisionControl{
 			KubeClient: genericClient.KubeClient,
 		},
-		expectations:       kubecontroller.NewControllerExpectations(),
-		updateExpectations: kruiseExpectations.NewUpdateExpectations(revisionadapter.NewDefaultImpl()),
-		dsLister:           dsLister,
-		historyLister:      historyLister,
-		podLister:          podLister,
-		nodeLister:         nodeLister,
-		failedPodsBackoff:  failedPodsBackoff,
-		inplaceControl:     inplaceupdate.New(cli, revisionAdapter),
-		revisionAdapter:    revisionAdapter,
+		lifecycleControl:            lifecycle.New(cli),
+		expectations:                kubecontroller.NewControllerExpectations(),
+		resourceVersionExpectations: kruiseExpectations.NewResourceVersionExpectation(),
+		dsLister:                    dsLister,
+		historyLister:               historyLister,
+		podLister:                   podLister,
+		nodeLister:                  nodeLister,
+		failedPodsBackoff:           failedPodsBackoff,
+		inplaceControl:              inplaceupdate.New(cli, revisionAdapter),
+		revisionAdapter:             revisionAdapter,
 	}
 	return dsc, err
 }
@@ -213,7 +215,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			newDS := e.ObjectNew.(*appsv1alpha1.DaemonSet)
 			if oldDS.UID != newDS.UID {
 				dsc.expectations.DeleteExpectations(keyFunc(oldDS))
-				dsc.updateExpectations.DeleteExpectations(keyFunc(oldDS))
 			}
 			klog.V(4).Infof("Updating DaemonSet %s/%s", newDS.Namespace, newDS.Name)
 			return true
@@ -222,7 +223,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			ds := e.Object.(*appsv1alpha1.DaemonSet)
 			klog.V(4).Infof("Deleting DaemonSet %s/%s", ds.Namespace, ds.Name)
 			dsc.expectations.DeleteExpectations(keyFunc(ds))
-			dsc.updateExpectations.DeleteExpectations(keyFunc(ds))
 			return true
 		},
 	})
@@ -252,16 +252,17 @@ var _ reconcile.Reconciler = &ReconcileDaemonSet{}
 
 // ReconcileDaemonSet reconciles a DaemonSet object
 type ReconcileDaemonSet struct {
-	kubeClient    clientset.Interface
-	kruiseClient  kruiseclientset.Interface
-	eventRecorder record.EventRecorder
-	podControl    kubecontroller.PodControlInterface
-	crControl     kubecontroller.ControllerRevisionControlInterface
+	kubeClient       clientset.Interface
+	kruiseClient     kruiseclientset.Interface
+	eventRecorder    record.EventRecorder
+	podControl       kubecontroller.PodControlInterface
+	crControl        kubecontroller.ControllerRevisionControlInterface
+	lifecycleControl lifecycle.Interface
 
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations kubecontroller.ControllerExpectationsInterface
-	// A cache of pod revisions for in-place update
-	updateExpectations kruiseExpectations.UpdateExpectations
+	// A cache of pod resourceVersion expecatations
+	resourceVersionExpectations kruiseExpectations.ResourceVersionExpectation
 
 	// dsLister can list/get daemonsets from the shared informer's store
 	dsLister kruiseappslisters.DaemonSetLister
@@ -343,7 +344,6 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 		if errors.IsNotFound(err) {
 			klog.V(4).Infof("DaemonSet has been deleted %s", dsKey)
 			dsc.expectations.DeleteExpectations(dsKey)
-			dsc.updateExpectations.DeleteExpectations(dsKey)
 			return nil
 		}
 		return fmt.Errorf("unable to retrieve DaemonSet %s from store: %v", dsKey, err)
@@ -374,7 +374,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	if !dsc.expectations.SatisfiedExpectations(dsKey) {
+	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
 		return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
 	}
 
@@ -382,18 +382,19 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	if err != nil {
 		return err
 	}
+
 	// return and wait next reconcile if expectation changed to unsatisfied
-	if !dsc.expectations.SatisfiedExpectations(dsKey) {
+	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
 		return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
 	}
 
-	updateSatisfied, err := dsc.refreshUpdateStatesAndGetSatisfied(ds, hash)
-	if err != nil {
+	if err := dsc.refreshUpdateStates(ds); err != nil {
 		return err
 	}
+
 	// Process rolling updates if we're ready. For all kinds of update should not be executed if the update
 	// expectation is not satisfied.
-	if updateSatisfied && !isDaemonSetPaused(ds) {
+	if !isDaemonSetPaused(ds) {
 		switch ds.Spec.UpdateStrategy.Type {
 		case appsv1alpha1.OnDeleteDaemonSetStrategyType:
 		case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
@@ -611,6 +612,14 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, nodeList []*co
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with erros if any
 func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
+	if ds.Spec.Lifecycle != nil && ds.Spec.Lifecycle.PreDelete != nil {
+		var err error
+		podsToDelete, err = dsc.syncWithPreparingDelete(ds, podsToDelete)
+		if err != nil {
+			return err
+		}
+	}
+
 	dsKey := keyFunc(ds)
 	createDiff := len(nodesNeedingDaemonPods)
 	deleteDiff := len(podsToDelete)
@@ -737,6 +746,28 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 	return utilerrors.NewAggregate(errors)
 }
 
+func (dsc *ReconcileDaemonSet) syncWithPreparingDelete(ds *appsv1alpha1.DaemonSet, podsToDelete []string) (podsCanDelete []string, err error) {
+	for _, podName := range podsToDelete {
+		pod, err := dsc.podLister.Pods(ds.Namespace).Get(podName)
+		if errors.IsNotFound(err) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		if !lifecycle.IsPodHooked(ds.Spec.Lifecycle.PreDelete, pod) {
+			podsCanDelete = append(podsCanDelete, podName)
+			continue
+		}
+		if updated, gotPod, err := dsc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
+			return nil, err
+		} else if updated {
+			klog.V(3).Infof("DaemonSet %s/%s has marked Pod %s as PreparingDelete", ds.Namespace, ds.Name, podName)
+			dsc.resourceVersionExpectations.Expect(gotPod)
+		}
+	}
+	return
+}
+
 // podsShouldBeOnNode figures out the DaemonSet pods to be created and deleted on the given node:
 //   - nodesNeedingDaemonPods: the pods need to start on the node
 //   - podsToDelete: the Pods need to be deleted on the node
@@ -784,6 +815,9 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 				klog.V(2).Infof(msg)
 				// Emit an event so that it's discoverable to users.
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, FailedDaemonPodReason, msg)
+				podsToDelete = append(podsToDelete, pod.Name)
+			} else if isPodPreDeleting(pod) {
+				klog.V(3).Infof("Found daemon pod %s/%s on node %s is in PreparingDelete state, will try to kill it", pod.Namespace, pod.Name, node.Name)
 				podsToDelete = append(podsToDelete, pod.Name)
 			} else {
 				daemonPodsRunning = append(daemonPodsRunning, pod)
@@ -949,46 +983,52 @@ func (dsc *ReconcileDaemonSet) cleanupHistory(ds *appsv1alpha1.DaemonSet, old []
 	return nil
 }
 
-func (dsc *ReconcileDaemonSet) refreshUpdateStatesAndGetSatisfied(ds *appsv1alpha1.DaemonSet, hash string) (bool, error) {
+func (dsc *ReconcileDaemonSet) refreshUpdateStates(ds *appsv1alpha1.DaemonSet) error {
 	dsKey := keyFunc(ds)
+	pods, err := dsc.getDaemonPods(ds)
+	if err != nil {
+		return err
+	}
+
 	opts := &inplaceupdate.UpdateOptions{}
 	opts = inplaceupdate.SetOptionsDefaults(opts)
 
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	for _, pod := range pods {
+		if dsc.inplaceControl == nil {
+			continue
+		}
+		res := dsc.inplaceControl.Refresh(pod, opts)
+		if res.RefreshErr != nil {
+			klog.Errorf("DaemonSet %s/%s failed to update pod %s condition for inplace: %v", ds.Namespace, ds.Name, pod.Name, res.RefreshErr)
+			return res.RefreshErr
+		}
+		if res.DelayDuration != 0 {
+			durationStore.Push(dsKey, res.DelayDuration)
+		}
+	}
+
+	return nil
+}
+
+func (dsc *ReconcileDaemonSet) hasPodExpectationsSatisfied(ds *appsv1alpha1.DaemonSet) bool {
+	dsKey := keyFunc(ds)
+	pods, err := dsc.getDaemonPods(ds)
 	if err != nil {
-		return false, fmt.Errorf("couldn't get node to daemon pod mapping for DaemonSet %q: %v", ds.Name, err)
+		klog.Errorf("Failed to get pods for DaemonSet")
+		return false
 	}
 
-	for _, pods := range nodeToDaemonPods {
-		for _, pod := range pods {
-			dsc.updateExpectations.ObserveUpdated(dsKey, hash, pod)
+	for _, pod := range pods {
+		dsc.resourceVersionExpectations.Observe(pod)
+		if isSatisfied, unsatisfiedDuration := dsc.resourceVersionExpectations.IsSatisfied(pod); !isSatisfied {
+			if unsatisfiedDuration >= kruiseExpectations.ExpectationTimeout {
+				klog.Errorf("Expectation unsatisfied resourceVersion overtime for %v, wait for pod %v updating, timeout=%v", dsKey, pod.Name, unsatisfiedDuration)
+			} else {
+				klog.V(5).Infof("Not satisfied resourceVersion for %v, wait for pod %v updating", dsKey, pod.Name)
+				durationStore.Push(dsKey, kruiseExpectations.ExpectationTimeout-unsatisfiedDuration)
+			}
+			return false
 		}
 	}
-
-	for _, pods := range nodeToDaemonPods {
-		for _, pod := range pods {
-			if dsc.inplaceControl == nil {
-				continue
-			}
-			res := dsc.inplaceControl.Refresh(pod, opts)
-			if res.RefreshErr != nil {
-				klog.Errorf("DaemonSet %s/%s failed to update pod %s condition for inplace: %v", ds.Namespace, ds.Name, pod.Name, res.RefreshErr)
-				return false, res.RefreshErr
-			}
-			if res.DelayDuration != 0 {
-				durationStore.Push(dsKey, res.DelayDuration)
-			}
-		}
-	}
-
-	updateSatisfied, unsatisfiedDuration, updateDirtyPods := dsc.updateExpectations.SatisfiedExpectations(dsKey, hash)
-	if !updateSatisfied {
-		if unsatisfiedDuration >= kruiseExpectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", dsKey, updateDirtyPods, unsatisfiedDuration)
-		} else {
-			klog.V(5).Infof("Not satisfied update for %v, updateDirtyPods=%v", dsKey, updateDirtyPods)
-			durationStore.Push(dsKey, kruiseExpectations.ExpectationTimeout-unsatisfiedDuration)
-		}
-	}
-	return updateSatisfied, nil
+	return true
 }

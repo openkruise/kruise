@@ -46,9 +46,10 @@ type RefreshResult struct {
 }
 
 type UpdateResult struct {
-	InPlaceUpdate bool
-	UpdateErr     error
-	DelayDuration time.Duration
+	InPlaceUpdate      bool
+	UpdateErr          error
+	DelayDuration      time.Duration
+	NewResourceVersion string
 }
 
 type UpdateOptions struct {
@@ -244,7 +245,8 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 	}
 
 	// 3. update container images
-	if err := c.updatePodInPlace(pod, spec, opts); err != nil {
+	newResourceVersion, err := c.updatePodInPlace(pod, spec, opts)
+	if err != nil {
 		return UpdateResult{InPlaceUpdate: true, UpdateErr: err}
 	}
 
@@ -252,11 +254,12 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 	if opts.GracePeriodSeconds > 0 {
 		delayDuration = time.Second * time.Duration(opts.GracePeriodSeconds)
 	}
-	return UpdateResult{InPlaceUpdate: true, DelayDuration: delayDuration}
+	return UpdateResult{InPlaceUpdate: true, DelayDuration: delayDuration, NewResourceVersion: newResourceVersion}
 }
 
-func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *UpdateOptions) (string, error) {
+	var newResourceVersion string
+	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clone, err := c.podAdapter.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
@@ -299,9 +302,13 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			clone.Annotations[appspub.InPlaceUpdateGraceKey] = string(inPlaceUpdateSpecJSON)
 		}
 
-		_, err = c.podAdapter.UpdatePod(clone)
-		return err
+		newPod, updateErr := c.podAdapter.UpdatePod(clone)
+		if updateErr == nil {
+			newResourceVersion = newPod.ResourceVersion
+		}
+		return updateErr
 	})
+	return newResourceVersion, retryErr
 }
 
 // GetTemplateFromRevision returns the pod template parsed from ControllerRevision.

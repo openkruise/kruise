@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/framework"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 )
 
 var _ = SIGDescribe("DaemonSet", func() {
@@ -304,6 +308,104 @@ var _ = SIGDescribe("DaemonSet", func() {
 				ginkgo.By(fmt.Sprintf("No pod recreate during updating, expect %v", tc.expectRecreate))
 				gomega.Expect(tester.CheckPodHasNotRecreate(oldPodList.Items, newPodList.Items)).Should(gomega.Equal(tc.expectRecreate))
 			}
+		})
+
+		framework.ConformanceIt("should upgrade one by one on steps if there is pre-delete hook", func() {
+			label := map[string]string{framework.DaemonSetNameLabel: dsName}
+			hookKey := "my-pre-delete"
+
+			ginkgo.By(fmt.Sprintf("Creating DaemonSet %q with pre-delete hook", dsName))
+			maxUnavailable := intstr.IntOrString{IntVal: int32(1)}
+			ads := tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+					Type:           appsv1alpha1.InplaceRollingUpdateType,
+					MaxUnavailable: &maxUnavailable,
+				},
+			})
+			ads.Spec.Lifecycle = &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{LabelsHandler: map[string]string{hookKey: "true"}}}
+			ads.Spec.Template.Labels = map[string]string{framework.DaemonSetNameLabel: dsName, hookKey: "true"}
+			ads.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("100m"),
+				},
+			}
+			ds, err := tester.CreateDaemonSet(ads)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check that daemon pods launch on every node of the cluster")
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckRunningOnAllNodes(ds))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+
+			err = tester.CheckDaemonStatus(dsName)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			oldPodList, err := tester.ListDaemonPods(label)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Update daemonset resources")
+			err = tester.UpdateDaemonSet(ds.Name, func(ads *appsv1alpha1.DaemonSet) {
+				ads.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("120m"),
+					},
+				}
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
+
+			var newHash string
+			gomega.Eventually(func() int64 {
+				ads, err = tester.GetDaemonSet(dsName)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				newHash = ads.Status.DaemonSetHash
+				return ads.Status.ObservedGeneration
+			}, time.Second*30, time.Second*3).Should(gomega.Equal(int64(2)))
+
+			ginkgo.By("There should be one pod with PreparingDelete and no pods been deleted")
+			var preDeletingPod *v1.Pod
+			var podList *v1.PodList
+			gomega.Eventually(func() int {
+				podList, err = tester.ListDaemonPods(label)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				var preDeletingCount int
+				for i := range podList.Items {
+					pod := &podList.Items[i]
+					if lifecycle.GetPodLifecycleState(pod) == appspub.LifecycleStatePreparingDelete {
+						preDeletingCount++
+						preDeletingPod = pod
+					}
+				}
+				return preDeletingCount
+			}, time.Second*30, time.Second*3).Should(gomega.Equal(1))
+
+			gomega.Expect(tester.SortPodNames(podList)).To(gomega.Equal(tester.SortPodNames(oldPodList)))
+
+			ginkgo.By("Remove the hook label and wait it to be recreated")
+			patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, hookKey)
+			_, err = tester.PatchPod(preDeletingPod.Name, types.StrategicMergePatchType, []byte(patch))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			var getErr error
+			gomega.Eventually(func() bool {
+				_, getErr = tester.GetPod(preDeletingPod.Name)
+				return errors.IsNotFound(getErr)
+			}, time.Second*60, time.Second).Should(gomega.Equal(true), fmt.Sprintf("get error %v", getErr))
+
+			gomega.Eventually(func() int {
+				podList, err = tester.ListDaemonPods(label)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				var newVersionCount int
+				for i := range podList.Items {
+					pod := &podList.Items[i]
+					if daemonutil.IsPodUpdated(pod, newHash, nil) {
+						newVersionCount++
+					} else if lifecycle.GetPodLifecycleState(pod) == appspub.LifecycleStatePreparingDelete {
+						preDeletingPod = pod
+					}
+				}
+				return newVersionCount
+			}, time.Second*60, time.Second).Should(gomega.Equal(1))
+
 		})
 	})
 })

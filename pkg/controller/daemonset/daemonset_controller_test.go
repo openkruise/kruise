@@ -32,7 +32,7 @@ import (
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
 	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
-	"github.com/openkruise/kruise/pkg/util/revisionadapter"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -255,13 +255,14 @@ func NewDaemonSetController(
 		crControl: kubecontroller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
 		},
-		expectations:       kubecontroller.NewControllerExpectations(),
-		updateExpectations: kruiseExpectations.NewUpdateExpectations(revisionadapter.NewDefaultImpl()),
-		dsLister:           dsInformer.Lister(),
-		historyLister:      revInformer.Lister(),
-		podLister:          podInformer.Lister(),
-		nodeLister:         nodeInformer.Lister(),
-		failedPodsBackoff:  failedPodsBackoff,
+		lifecycleControl:            lifecycle.NewForInformer(podInformer),
+		expectations:                kubecontroller.NewControllerExpectations(),
+		resourceVersionExpectations: kruiseExpectations.NewResourceVersionExpectation(),
+		dsLister:                    dsInformer.Lister(),
+		historyLister:               revInformer.Lister(),
+		podLister:                   podInformer.Lister(),
+		nodeLister:                  nodeInformer.Lister(),
+		failedPodsBackoff:           failedPodsBackoff,
 	}
 }
 
