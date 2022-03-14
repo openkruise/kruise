@@ -81,16 +81,21 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeLis
 				continue
 			}
 			switch {
-			case oldPod == nil && newPod == nil, oldPod != nil && newPod != nil:
+			case isPodNilOrPreDeleting(oldPod) && isPodNilOrPreDeleting(newPod), !isPodNilOrPreDeleting(oldPod) && !isPodNilOrPreDeleting(newPod):
 				// the manage loop will handle creating or deleting the appropriate pod, consider this unavailable
 				numUnavailable++
-				klog.V(5).Infof("DaemonSet %s/%s find no pods on node %s ", ds.Namespace, ds.Name, nodeName)
+				klog.V(5).Infof("DaemonSet %s/%s find no pods (or pre-deleting) on node %s ", ds.Namespace, ds.Name, nodeName)
 			case newPod != nil:
 				// this pod is up to date, check its availability
 				if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 					// an unavailable new pod is counted against maxUnavailable
 					numUnavailable++
 					klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is new and unavailable", ds.Namespace, ds.Name, newPod.Name, nodeName)
+				}
+				if isPodPreDeleting(newPod) {
+					// a pre-deleting new pod is counted against maxUnavailable
+					numUnavailable++
+					klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is pre-deleting", ds.Namespace, ds.Name, newPod.Name, nodeName)
 				}
 			default:
 				// this pod is old, it is an update candidate
@@ -166,7 +171,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeLis
 			continue
 		}
 		switch {
-		case oldPod == nil:
+		case isPodNilOrPreDeleting(oldPod):
 			// we don't need to do anything to this node, the manage loop will handle it
 		case newPod == nil:
 			// this is a surge candidate
@@ -194,6 +199,10 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeLis
 			// we have already surged onto this node, determine our state
 			if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 				// we're waiting to go available here
+				numSurge++
+				continue
+			}
+			if isPodPreDeleting(newPod) {
 				numSurge++
 				continue
 			}
@@ -309,14 +318,19 @@ func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1alpha1.Dae
 	sort.Strings(allNodeNames)
 
 	var updated []string
+	var updating []string
 	var selected []string
 	var rest []string
 	for i := len(allNodeNames) - 1; i >= 0; i-- {
 		nodeName := allNodeNames[i]
 
 		newPod, oldPod, ok := findUpdatedPodsOnNode(ds, nodeToDaemonPods[nodeName], hash)
-		if !ok || newPod != nil || oldPod == nil {
+		if !ok || newPod != nil {
 			updated = append(updated, nodeName)
+			continue
+		}
+		if isPodNilOrPreDeleting(oldPod) {
+			updating = append(updating, nodeName)
 			continue
 		}
 
@@ -334,11 +348,11 @@ func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1alpha1.Dae
 		rest = append(rest, nodeName)
 	}
 
-	var sorted []string
+	sorted := append(updated, updating...)
 	if selector != nil {
-		sorted = append(updated, selected...)
+		sorted = append(sorted, selected...)
 	} else {
-		sorted = append(updated, rest...)
+		sorted = append(sorted, rest...)
 	}
 	if maxUpdate := len(allNodeNames) - int(partition); maxUpdate <= 0 {
 		return nil, nil
@@ -408,7 +422,7 @@ func (dsc *ReconcileDaemonSet) inPlaceUpdatePods(ds *appsv1alpha1.DaemonSet, pod
 			if res.InPlaceUpdate {
 				if res.UpdateErr == nil {
 					dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place", pod.Name)
-					dsc.updateExpectations.ExpectUpdated(keyFunc(ds), curRevision.Labels[apps.DefaultDaemonSetUniqueLabelKey], pod)
+					dsc.resourceVersionExpectations.Expect(&metav1.ObjectMeta{UID: pod.UID, ResourceVersion: res.NewResourceVersion})
 					return
 				}
 

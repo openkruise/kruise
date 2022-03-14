@@ -76,6 +76,37 @@ spec:
                 description: BurstReplicas is a rate limiter for booting pods on a
                   lot of pods. The default value is 250
                 x-kubernetes-int-or-string: true
+              lifecycle:
+                description: Lifecycle defines the lifecycle hooks for Pods pre-delete,
+                  in-place update. Currently, we only support pre-delete hook for
+                  Advanced DaemonSet.
+                properties:
+                  inPlaceUpdate:
+                    description: InPlaceUpdate is the hook before Pod to update and
+                      after Pod has been updated.
+                    properties:
+                      finalizersHandler:
+                        items:
+                          type: string
+                        type: array
+                      labelsHandler:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
+                  preDelete:
+                    description: PreDelete is the hook before Pod to be deleted.
+                    properties:
+                      finalizersHandler:
+                        items:
+                          type: string
+                        type: array
+                      labelsHandler:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
+                type: object
               minReadySeconds:
                 description: The minimum number of seconds for which a newly created
                   DaemonSet pod should be ready without any of its container crashing,

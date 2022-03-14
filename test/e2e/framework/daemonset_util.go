@@ -17,10 +17,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -72,8 +74,9 @@ func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, ima
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
-					HostNetwork: true,
-					Tolerations: []v1.Toleration{{Operator: v1.TolerationOpExists}},
+					HostNetwork:                   true,
+					Tolerations:                   []v1.Toleration{{Operator: v1.TolerationOpExists}},
+					TerminationGracePeriodSeconds: utilpointer.Int64(3),
 				},
 			},
 			UpdateStrategy: updateStrategy,
@@ -396,4 +399,23 @@ func (t *DaemonSetTester) CheckPodHasNotRecreate(oldPods, newPods []v1.Pod) bool
 	}
 
 	return true
+}
+
+func (t *DaemonSetTester) GetPod(name string) (*v1.Pod, error) {
+	return t.c.CoreV1().Pods(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+func (t *DaemonSetTester) PatchPod(name string, patchType types.PatchType, patch []byte) (*v1.Pod, error) {
+	return t.c.CoreV1().Pods(t.ns).Patch(context.TODO(), name, patchType, patch, metav1.PatchOptions{})
+}
+
+func (t *DaemonSetTester) SortPodNames(podList *v1.PodList) []string {
+	names := sets.NewString()
+	if podList == nil {
+		return names.List()
+	}
+	for i := range podList.Items {
+		names.Insert(podList.Items[i].Name)
+	}
+	return names.List()
 }

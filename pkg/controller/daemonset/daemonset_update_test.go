@@ -853,7 +853,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "n3", Labels: map[string]string{"node-type": "canary"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "n4"}},
 			},
-			expectNodes: []string{"n3", "n2", "n1"},
+			expectNodes: []string{"n2", "n3", "n1"},
 		},
 	}
 

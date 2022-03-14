@@ -23,6 +23,7 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -325,4 +326,12 @@ func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1alpha1.DaemonSet) b
 	default:
 		return false
 	}
+}
+
+func isPodPreDeleting(pod *corev1.Pod) bool {
+	return pod != nil && lifecycle.GetPodLifecycleState(pod) == appspub.LifecycleStatePreparingDelete
+}
+
+func isPodNilOrPreDeleting(pod *corev1.Pod) bool {
+	return pod == nil || isPodPreDeleting(pod)
 }

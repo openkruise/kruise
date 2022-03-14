@@ -107,6 +107,12 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 		// zero is a valid RevisionHistoryLimit
 		allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(*spec.RevisionHistoryLimit), fldPath.Child("revisionHistoryLimit"))...)
 	}
+
+	if spec.Lifecycle != nil {
+		if spec.Lifecycle.InPlaceUpdate != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("lifecycle", "inPlaceUpdate"), "inPlaceUpdate hook has not supported yet"))
+		}
+	}
 	return allErrs
 }
 
