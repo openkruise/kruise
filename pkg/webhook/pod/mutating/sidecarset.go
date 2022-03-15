@@ -79,12 +79,6 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		} else if !matched {
 			continue
 		}
-		// if the sidecarSet has been injected to the pod,
-		// check whether the pod is consistent with the sidecarSet.
-		if sidecarcontrol.IsPodInjectedSidecarSet(pod, &sidecarSet) &&
-			!sidecarcontrol.IsPodConsistentWithSidecarSet(pod, &sidecarSet) {
-			continue
-		}
 		// check whether sidecarSet is active
 		// when sidecarSet is not active, it will not perform injections and upgrades process.
 		control := sidecarcontrol.New(sidecarSet.DeepCopy())
