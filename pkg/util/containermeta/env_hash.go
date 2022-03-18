@@ -124,3 +124,23 @@ func hashEnvs(envs []v1.EnvVar) uint64 {
 	hashutil.DeepHashObject(hash, envsJSON)
 	return uint64(hash.Sum32())
 }
+
+func IsContainerReferenceToMeta(c *v1.Container, path, key string) bool {
+	for i := range c.Env {
+		if c.Env[i].Value != "" || c.Env[i].ValueFrom == nil || c.Env[i].ValueFrom.FieldRef == nil {
+			continue
+		} else if excludeEnvs.Has(c.Env[i].Name) {
+			continue
+		}
+
+		reqPath, subscript, ok := fieldpath.SplitMaybeSubscriptedPath(c.Env[i].ValueFrom.FieldRef.FieldPath)
+		if !ok {
+			continue
+		}
+
+		if reqPath == path && subscript == key {
+			return true
+		}
+	}
+	return false
+}

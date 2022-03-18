@@ -52,7 +52,7 @@ type InPlaceUpdateState struct {
 	// Revision is the updated revision hash.
 	Revision string `json:"revision"`
 
-	// UpdateTimestamp is the time when the in-place update happens.
+	// UpdateTimestamp is the start time when the in-place update happens.
 	UpdateTimestamp metav1.Time `json:"updateTimestamp"`
 
 	// LastContainerStatuses records the before-in-place-update container statuses. It is a map from ContainerName
@@ -61,6 +61,31 @@ type InPlaceUpdateState struct {
 
 	// UpdateEnvFromMetadata indicates there are envs from annotations/labels that should be in-place update.
 	UpdateEnvFromMetadata bool `json:"updateEnvFromMetadata,omitempty"`
+
+	// NextContainerImages is the containers with lower priority that waiting for in-place update images in next batch.
+	NextContainerImages map[string]string `json:"nextContainerImages,omitempty"`
+
+	// NextContainerRefMetadata is the containers with lower priority that waiting for in-place update labels/annotations in next batch.
+	NextContainerRefMetadata map[string]metav1.ObjectMeta `json:"nextContainerRefMetadata,omitempty"`
+
+	// PreCheckBeforeNext is the pre-check that must pass before the next containers can be in-place update.
+	PreCheckBeforeNext *InPlaceUpdatePreCheckBeforeNext `json:"preCheckBeforeNext,omitempty"`
+
+	// ContainerBatchesRecord records the update batches that have patched in this revision.
+	ContainerBatchesRecord []InPlaceUpdateContainerBatch `json:"containerBatchesRecord,omitempty"`
+}
+
+// InPlaceUpdatePreCheckBeforeNext contains the pre-check that must pass before the next containers can be in-place update.
+type InPlaceUpdatePreCheckBeforeNext struct {
+	ContainersRequiredReady []string `json:"containersRequiredReady,omitempty"`
+}
+
+// InPlaceUpdateContainerBatch indicates the timestamp and containers for a batch update
+type InPlaceUpdateContainerBatch struct {
+	// Timestamp is the time for this update batch
+	Timestamp metav1.Time `json:"timestamp"`
+	// Containers is the name list of containers for this update batch
+	Containers []string `json:"containers"`
 }
 
 // InPlaceUpdateContainerStatus records the statuses of the container that are mainly used

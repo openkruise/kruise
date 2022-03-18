@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util"
+	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,14 +43,6 @@ import (
 
 const (
 	concurrentReconciles = 4
-
-	// priority string parse starting index
-	priorityStartIndex = 2
-
-	// this design is to accept any integer value
-	MaxInt                = int(^uint(0) >> 1)
-	MinInt                = -MaxInt - 1
-	minAcceptablePriority = MinInt
 )
 
 func Add(mgr manager.Manager) error {
@@ -77,12 +69,12 @@ func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 		CreateFunc: func(e event.CreateEvent) bool {
 			pod := e.Object.(*v1.Pod)
 			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			return r.validate(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
+			return utilcontainerlaunchpriority.ExistsPriorities(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			pod := e.ObjectNew.(*v1.Pod)
 			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			return r.validate(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
+			return utilcontainerlaunchpriority.ExistsPriorities(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false
@@ -144,10 +136,12 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 			Name:       pod.Name,
 			UID:        pod.UID,
 		})
+		klog.V(4).Infof("Creating ConfigMap %s for Pod %s/%s", barrier.Name, pod.Namespace, pod.Name)
 		temErr := r.Client.Create(context.TODO(), barrier)
-		if temErr != nil {
+		if temErr != nil && !errors.IsAlreadyExists(temErr) {
 			return reconcile.Result{}, temErr
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 	if err != nil {
 		return reconcile.Result{}, err
@@ -156,8 +150,11 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 	// set next starting containers
 	_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
 	if containersReady != nil && containersReady.Status != v1.ConditionTrue {
-		var patchKey = r.findNextPatchKey(pod)
-		key := "p_" + strconv.Itoa(patchKey)
+		patchKey := r.findNextPatchKey(pod)
+		if patchKey == nil {
+			return reconcile.Result{}, nil
+		}
+		key := "p_" + strconv.Itoa(*patchKey)
 		if err = r.patchOnKeyNotExist(barrier, key); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -166,21 +163,8 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileContainerLaunchPriority) validate(pod *v1.Pod) bool {
-	if len(pod.Spec.Containers) == 0 {
-		return false
-	}
-	// Since priorityBarrier env is created by webhook on a all or none basis, we only need to check first container's env.
-	for _, v := range pod.Spec.Containers[0].Env {
-		if v.Name == appspub.ContainerLaunchBarrierEnvName {
-			return true
-		}
-	}
-	return false
-}
-
-func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) int {
-	var priority = minAcceptablePriority
+func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) *int {
+	var priority *int
 	var containerPendingSet = make(map[string]bool)
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.Ready {
@@ -190,23 +174,16 @@ func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) int {
 	}
 	for _, c := range pod.Spec.Containers {
 		if _, ok := containerPendingSet[c.Name]; ok {
-			p := r.getLaunchPriority(c)
-			if p > priority {
+			p := utilcontainerlaunchpriority.GetContainerPriority(&c)
+			if p == nil {
+				continue
+			}
+			if priority == nil || *p > *priority {
 				priority = p
 			}
 		}
 	}
 	return priority
-}
-
-func (r *ReconcileContainerLaunchPriority) getLaunchPriority(c v1.Container) int {
-	for _, e := range c.Env {
-		if e.Name == appspub.ContainerLaunchBarrierEnvName {
-			p, _ := strconv.Atoi(e.ValueFrom.ConfigMapKeyRef.Key[priorityStartIndex:])
-			return p
-		}
-	}
-	return minAcceptablePriority
 }
 
 func (r *ReconcileContainerLaunchPriority) patchOnKeyNotExist(barrier *v1.ConfigMap, key string) error {
