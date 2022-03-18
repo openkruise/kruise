@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kruise Authors.
+Copyright 2022 The Kruise Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -16,7 +16,6 @@ package imageruntime
 import (
 	"context"
 	"io"
-	"sync"
 	"time"
 
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
@@ -64,7 +63,6 @@ func NewCrioImageService(runtimeURI string, accountManager daemonutil.ImagePullA
 type crioImageService struct {
 	accountManager daemonutil.ImagePullAccountManager
 	criImageClient runtimeapi.ImageServiceClient
-	sync.Mutex
 }
 
 // PullImage implements ImageService.PullImage.
@@ -101,7 +99,6 @@ func (c *crioImageService) PullImage(ctx context.Context, imageName, tag string,
 					pipeW.CloseWithError(io.EOF)
 					return newImagePullStatusReader(pipeR), nil
 				}
-				c.handleRuntimeError(pullErr)
 				klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
 				pullErrs = append(pullErrs, pullErr)
 
@@ -131,7 +128,6 @@ func (c *crioImageService) PullImage(ctx context.Context, imageName, tag string,
 				pipeW.CloseWithError(io.EOF)
 				return newImagePullStatusReader(pipeR), nil
 			}
-			c.handleRuntimeError(err)
 			klog.Warningf("Failed to pull image %v:%v, err %v", imageName, tag, err)
 			return nil, err
 		}
@@ -144,7 +140,6 @@ func (c *crioImageService) PullImage(ctx context.Context, imageName, tag string,
 	// Anonymous pull
 	_, err = c.criImageClient.PullImage(ctx, pullImageReq)
 	if err != nil {
-		c.handleRuntimeError(err)
 		return nil, errors.Wrapf(err, "Failed to pull image reference %q", fullImageName)
 	}
 	pipeW.CloseWithError(io.EOF)
@@ -156,7 +151,6 @@ func (c *crioImageService) ListImages(ctx context.Context) ([]ImageInfo, error) 
 	listImagesReq := &runtimeapi.ListImagesRequest{}
 	listImagesResp, err := c.criImageClient.ListImages(ctx, listImagesReq)
 	if err != nil {
-		c.handleRuntimeError(err)
 		return nil, err
 	}
 	collection := make([]ImageInfo, 0, len(listImagesResp.GetImages()))
@@ -169,12 +163,4 @@ func (c *crioImageService) ListImages(ctx context.Context) ([]ImageInfo, error) 
 		})
 	}
 	return collection, nil
-}
-
-func (c *crioImageService) handleRuntimeError(err error) {
-	if daemonutil.FilterCloseErr(err) {
-		c.Lock()
-		defer c.Unlock()
-		c.criImageClient = nil
-	}
 }
