@@ -19,7 +19,6 @@ package validating
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -36,6 +35,7 @@ import (
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -93,7 +93,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 
 	if older != nil {
 		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec.containers"))...)
-		allErrs = append(allErrs, validateSidecarSetUpdate(obj, older)...)
+		allErrs = append(allErrs, validateSidecarSetContainersUpdate(obj, older)...)
 	}
 	// iterate across all containers in other sidecarsets to avoid duplication of name
 	sidecarSets := &appsv1alpha1.SidecarSetList{}
@@ -258,21 +258,82 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 
 	return allErrs
 }
-func validateSidecarSetUpdate(obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) field.ErrorList {
+
+// validate updateable fields for spec.containers and spec.initContainers:
+// 1.  spec.containers[*].image
+// 2.  spec.initContainers[*].image
+// 3.  spec.containers[*].ShareVolumePolicy
+// 4.  spec.initContainers[*].ShareVolumePolicy
+// 5.  spec.containers[*].PodInjectPolicy
+// 6.  spec.initContainers[*].PodInjectPolicy
+// 7.  spec.initContainers[*].UpgradeStrategy
+// 8.  spec.containers[*].UpgradeStrategy
+func validateSidecarSetContainersUpdate(obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) field.ErrorList {
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
+	containerErrs, stop := validateContainerUpdates(obj.Spec.Containers, older.Spec.Containers, specPath.Child("containers"))
+	allErrs = append(allErrs, containerErrs...)
+	if stop {
+		return allErrs
+	}
+	containerErrs, stop = validateContainerUpdates(obj.Spec.InitContainers, older.Spec.InitContainers, specPath.Child("initContainers"))
+	allErrs = append(allErrs, containerErrs...)
+	if stop {
+		return allErrs
+	}
 	mungedSidecarSetSpec := *obj.Spec.DeepCopy()
+	// munge spec.containers[*].image
 	var newSideCarSetContainers []appsv1alpha1.SidecarContainer
 	for ix, container := range mungedSidecarSetSpec.Containers {
 		container.Image = older.Spec.Containers[ix].Image
+		container.ShareVolumePolicy = older.Spec.Containers[ix].ShareVolumePolicy
+		container.PodInjectPolicy = older.Spec.Containers[ix].PodInjectPolicy
+		container.UpgradeStrategy = older.Spec.Containers[ix].UpgradeStrategy
 		newSideCarSetContainers = append(newSideCarSetContainers, container)
 	}
 	mungedSidecarSetSpec.Containers = newSideCarSetContainers
+
+	// munge spec.initContainers[*].image
+	var newInitContainers []appsv1alpha1.SidecarContainer
+	for ix, container := range mungedSidecarSetSpec.InitContainers {
+		container.Image = older.Spec.InitContainers[ix].Image
+		container.ShareVolumePolicy = older.Spec.InitContainers[ix].ShareVolumePolicy
+		container.PodInjectPolicy = older.Spec.InitContainers[ix].PodInjectPolicy
+		container.UpgradeStrategy = older.Spec.InitContainers[ix].UpgradeStrategy
+		newInitContainers = append(newInitContainers, container)
+	}
+	mungedSidecarSetSpec.InitContainers = newInitContainers
+
+	// containers
 	if !apiequality.Semantic.DeepEqual(mungedSidecarSetSpec.Containers, older.Spec.Containers) {
-		specDiff := diff.ObjectDiff(mungedSidecarSetSpec, older.Spec)
-		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("sidecarSet updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`\n%v", specDiff)))
+		specDiff := diff.ObjectDiff(mungedSidecarSetSpec.Containers, older.Spec.Containers)
+		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("sidecarSet updates may not change fields other than `spec.containers[*].image`,`spec.containers[*].ShareVolumePolicy`,`spec.containers[*].PodInjectPolicy`,`spec.containers[*].UpgradeStrategy`\n%v", specDiff)))
+	}
+	// iniContainers
+	if !apiequality.Semantic.DeepEqual(mungedSidecarSetSpec.InitContainers, older.Spec.InitContainers) {
+		specDiff := diff.ObjectDiff(mungedSidecarSetSpec.InitContainers, older.Spec.InitContainers)
+		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("sidecarSet updates may not change fields other than `spec.initContainers[*].image`,`spec.initContainers[*].ShareVolumePolicy`,`spec.initContainers[*].PodInjectPolicy`,`spec.initContainers[*].UpgradeStrategy`\n%v", specDiff)))
 	}
 	return allErrs
+}
+
+func validateContainerUpdates(newContainers, oldContainers []appsv1alpha1.SidecarContainer, fldPath *field.Path) (allErrs field.ErrorList, stop bool) {
+	allErrs = field.ErrorList{}
+	if len(newContainers) != len(oldContainers) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "sidecarSet updates may not add or remove containers"))
+		return allErrs, true
+	}
+
+	// validate updated container images
+	for i, ctr := range newContainers {
+		if len(ctr.Image) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("image"), ""))
+		}
+		if len(strings.TrimSpace(ctr.Image)) != len(ctr.Image) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
+		}
+	}
+	return allErrs, false
 }
 
 // validate the sidecarset spec.container.name, spec.initContainer.name, volume.name conflicts with others in cluster

@@ -58,3 +58,36 @@ func TestSidecarSetUpdateConflict(t *testing.T) {
 		fmt.Println(allErrs)
 	}
 }
+
+func TestSidecarSetContainersUpdate(t *testing.T) {
+	oldSidecarset := &appsv1alpha1.SidecarSet{
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{Name: "test"},
+					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1alpha1.SidecarContainerHotUpgrade,
+					},
+				},
+			},
+		},
+	}
+	newSidecarset := &appsv1alpha1.SidecarSet{
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{Name: "test", Env: []corev1.EnvVar{{Name: "test", Value: "test"}}},
+					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1alpha1.SidecarContainerHotUpgrade,
+					},
+				},
+			},
+		},
+	}
+	allErrs := validateSidecarSetContainersUpdate(newSidecarset, oldSidecarset)
+	if len(allErrs) != 2 {
+		t.Errorf("expect errors len 2, but got: %v", allErrs)
+	} else {
+		fmt.Println(allErrs)
+	}
+}

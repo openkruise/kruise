@@ -28,7 +28,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -188,22 +187,22 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			//update sidecarSet sidecar container others parameters, then don't upgrade
 			//sidecarSetIn.Spec.Containers[0].Image = BusyboxImage
-			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) others parameters, then don't upgrade", sidecarSetIn.Name))
-			sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
-				{
-					Name:  "PROXY",
-					Value: "127.0.0.1",
-				},
-			}
-			tester.UpdateSidecarSet(sidecarSetIn)
-			except = &appsv1alpha1.SidecarSetStatus{
-				MatchedPods:      1,
-				UpdatedPods:      0,
-				UpdatedReadyPods: 0,
-				ReadyPods:        1,
-			}
-			time.Sleep(time.Second * 30)
-			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
+			//ginkgo.By(fmt.Sprintf("update sidecarSet(%s) others parameters, then don't upgrade", sidecarSetIn.Name))
+			//sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
+			//	{
+			//		Name:  "PROXY",
+			//		Value: "127.0.0.1",
+			//	},
+			//}
+			//tester.UpdateSidecarSet(sidecarSetIn)
+			//except = &appsv1alpha1.SidecarSetStatus{
+			//	MatchedPods:      1,
+			//	UpdatedPods:      0,
+			//	UpdatedReadyPods: 0,
+			//	ReadyPods:        1,
+			//}
+			//time.Sleep(time.Second * 30)
+			//tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade hot sidecar container image done"))
 		})
