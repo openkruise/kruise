@@ -19,6 +19,7 @@ package validating
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -31,6 +32,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -88,8 +90,10 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 	// validating spec
 	allErrs = append(allErrs, validateSidecarSetSpec(obj, field.NewPath("spec"))...)
 	// when operation is update, older isn't empty, and validating whether old and new containers conflict
+
 	if older != nil {
 		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec.containers"))...)
+		allErrs = append(allErrs, validateSidecarSetUpdate(obj, older)...)
 	}
 	// iterate across all containers in other sidecarsets to avoid duplication of name
 	sidecarSets := &appsv1alpha1.SidecarSetList{}
@@ -252,6 +256,22 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 		}
 	}
 
+	return allErrs
+}
+func validateSidecarSetUpdate(obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+	mungedSidecarSetSpec := *obj.Spec.DeepCopy()
+	var newSideCarSetContainers []appsv1alpha1.SidecarContainer
+	for ix, container := range mungedSidecarSetSpec.Containers {
+		container.Image = older.Spec.Containers[ix].Image
+		newSideCarSetContainers = append(newSideCarSetContainers, container)
+	}
+	mungedSidecarSetSpec.Containers = newSideCarSetContainers
+	if !apiequality.Semantic.DeepEqual(mungedSidecarSetSpec.Containers, older.Spec.Containers) {
+		specDiff := diff.ObjectDiff(mungedSidecarSetSpec, older.Spec)
+		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("sidecarSet updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`\n%v", specDiff)))
+	}
 	return allErrs
 }
 
