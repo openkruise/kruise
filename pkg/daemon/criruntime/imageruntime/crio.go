@@ -15,17 +15,18 @@ package imageruntime
 
 import (
 	"context"
+	"io"
+	"sync"
+	"time"
+
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
-	"io"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
-	"sync"
-	"time"
 )
 
 const maxMsgSize = 1024 * 1024 * 16
@@ -84,7 +85,8 @@ func (c *crioImageService) PullImage(ctx context.Context, imageName, tag string,
 	}
 	var err error
 	if len(pullSecrets) > 0 {
-		authInfos, err := convertToRegistryAuths(pullSecrets, registry)
+		var authInfos []daemonutil.AuthInfo
+		authInfos, err = convertToRegistryAuths(pullSecrets, registry)
 		if err == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {
@@ -134,6 +136,7 @@ func (c *crioImageService) PullImage(ctx context.Context, imageName, tag string,
 			return nil, err
 		}
 	}
+
 	if err != nil {
 		return nil, err
 	}
