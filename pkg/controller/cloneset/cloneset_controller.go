@@ -191,6 +191,8 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		} else {
 			klog.Errorf("Failed syncing CloneSet %s: %v", request, retErr)
 		}
+		// clean the duration store
+		_ = clonesetutils.DurationStore.Pop(request.String())
 	}()
 
 	// Fetch the CloneSet instance
@@ -202,7 +204,6 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			// For additional cleanup logic use finalizers.
 			klog.V(3).Infof("CloneSet %s has been deleted.", request)
 			clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
-			clonesetutils.UpdateExpectations.DeleteExpectations(request.String())
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
@@ -254,20 +255,6 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	currentRevision, updateRevision, collisionCount, err := r.getActiveRevisions(instance, revisions)
 	if err != nil {
 		return reconcile.Result{}, err
-	}
-
-	// Refresh update expectations
-	for _, pod := range filteredPods {
-		clonesetutils.UpdateExpectations.ObserveUpdated(request.String(), updateRevision.Name, pod)
-	}
-	// If update expectations have not satisfied yet, just skip this reconcile.
-	if updateSatisfied, unsatisfiedDuration, updateDirtyPods := clonesetutils.UpdateExpectations.SatisfiedExpectations(request.String(), updateRevision.Name); !updateSatisfied {
-		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for %v, updateDirtyPods=%v, timeout=%v", request.String(), updateDirtyPods, unsatisfiedDuration)
-			return reconcile.Result{}, nil
-		}
-		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", request.String(), updateDirtyPods)
-		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
@@ -331,7 +318,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}
 
 	// scale and update pods
-	delayDuration, syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
+	syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 
 	// update new status
 	if err = r.statusUpdater.UpdateCloneSetStatus(instance, &newStatus, filteredPods); err != nil {
@@ -347,32 +334,28 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}
 
 	if syncErr == nil && instance.Spec.MinReadySeconds > 0 && newStatus.AvailableReplicas != newStatus.ReadyReplicas {
-		minReadyDuration := time.Second * time.Duration(instance.Spec.MinReadySeconds)
-		if delayDuration == 0 || minReadyDuration < delayDuration {
-			delayDuration = minReadyDuration
-		}
+		clonesetutils.DurationStore.Push(request.String(), time.Second*time.Duration(instance.Spec.MinReadySeconds))
 	}
-	return reconcile.Result{RequeueAfter: delayDuration}, syncErr
+	return reconcile.Result{RequeueAfter: clonesetutils.DurationStore.Pop(request.String())}, syncErr
 }
 
 func (r *ReconcileCloneSet) syncCloneSet(
 	instance *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus,
 	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	filteredPods []*v1.Pod, filteredPVCs []*v1.PersistentVolumeClaim,
-) (time.Duration, error) {
-	var delayDuration time.Duration
+) error {
 	if instance.DeletionTimestamp != nil {
-		return delayDuration, nil
+		return nil
 	}
 
 	// get the current and update revisions of the set.
 	currentSet, err := r.revisionControl.ApplyRevision(instance, currentRevision)
 	if err != nil {
-		return delayDuration, err
+		return err
 	}
 	updateSet, err := r.revisionControl.ApplyRevision(instance, updateRevision)
 	if err != nil {
-		return delayDuration, err
+		return err
 	}
 
 	var scaling bool
@@ -390,10 +373,10 @@ func (r *ReconcileCloneSet) syncCloneSet(
 		err = podsScaleErr
 	}
 	if scaling {
-		return delayDuration, podsScaleErr
+		return podsScaleErr
 	}
 
-	delayDuration, podsUpdateErr = r.syncControl.Update(updateSet, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
+	podsUpdateErr = r.syncControl.Update(updateSet, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 	if podsUpdateErr != nil {
 		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedUpdate,
@@ -401,13 +384,12 @@ func (r *ReconcileCloneSet) syncCloneSet(
 			LastTransitionTime: metav1.Now(),
 			Message:            podsUpdateErr.Error(),
 		})
-		// If these is a delay duration, need not to return error to outside
-		if err == nil && delayDuration <= 0 {
+		if err == nil {
 			err = podsUpdateErr
 		}
 	}
 
-	return delayDuration, err
+	return err
 }
 
 func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisions []*apps.ControllerRevision) (

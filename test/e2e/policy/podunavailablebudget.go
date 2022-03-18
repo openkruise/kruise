@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -746,9 +747,15 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// update success image
 			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) success image", cloneset.Namespace, cloneset.Name))
-			cloneset, _ = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
-			cloneset.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
-			cloneset, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), cloneset, metav1.UpdateOptions{})
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				cloneset, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				cloneset.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
+				cloneset, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), cloneset, metav1.UpdateOptions{})
+				return err
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForCloneSetMinReadyAndRunning([]*appsv1alpha1.CloneSet{cloneset}, 1)
 
@@ -865,14 +872,26 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// update success image
 			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) success image", cloneset.Namespace, cloneset.Name))
-			clonesetIn1, _ = kc.AppsV1alpha1().CloneSets(clonesetIn1.Namespace).Get(context.TODO(), clonesetIn1.Name, metav1.GetOptions{})
-			clonesetIn1.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
-			clonesetIn1, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), clonesetIn1, metav1.UpdateOptions{})
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				clonesetIn1, err = kc.AppsV1alpha1().CloneSets(clonesetIn1.Namespace).Get(context.TODO(), clonesetIn1.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clonesetIn1.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
+				clonesetIn1, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), clonesetIn1, metav1.UpdateOptions{})
+				return err
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			// update success image
-			clonesetIn2, _ = kc.AppsV1alpha1().CloneSets(clonesetIn2.Namespace).Get(context.TODO(), clonesetIn2.Name, metav1.GetOptions{})
-			clonesetIn2.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
-			clonesetIn2, err = kc.AppsV1alpha1().CloneSets(clonesetIn2.Namespace).Update(context.TODO(), clonesetIn2, metav1.UpdateOptions{})
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				clonesetIn2, err = kc.AppsV1alpha1().CloneSets(clonesetIn2.Namespace).Get(context.TODO(), clonesetIn2.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				clonesetIn2.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
+				clonesetIn2, err = kc.AppsV1alpha1().CloneSets(clonesetIn2.Namespace).Update(context.TODO(), clonesetIn2, metav1.UpdateOptions{})
+				return err
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForCloneSetMinReadyAndRunning([]*appsv1alpha1.CloneSet{clonesetIn1, clonesetIn2}, 7)
 
@@ -986,6 +1005,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			sidecarTester.UpdateSidecarSet(sidecarSet)
 			time.Sleep(time.Second)
 			tester.WaitForCloneSetMinReadyAndRunning([]*appsv1alpha1.CloneSet{cloneset}, 2)
+			exceptSidecarSetStatus := &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      10,
+				UpdatedPods:      10,
+				UpdatedReadyPods: 10,
+				ReadyPods:        10,
+			}
+			sidecarTester.WaitForSidecarSetMinReadyAndUpgrade(sidecarSet, exceptSidecarSetStatus, 2)
 
 			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{

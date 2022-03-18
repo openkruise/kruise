@@ -80,10 +80,11 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id1",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:     "id1",
-					apps.ControllerRevisionHashLabelKey: "revision_abc",
-					"foo":                               "bar",
-					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
+					appsv1alpha1.CloneSetInstanceID:      "id1",
+					apps.ControllerRevisionHashLabelKey:  "revision_abc",
+					apps.DefaultDeploymentUniqueLabelKey: "revision_abc",
+					"foo":                                "bar",
+					appspub.LifecycleStateKey:            string(appspub.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -136,10 +137,11 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id3",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:     "id3",
-					apps.ControllerRevisionHashLabelKey: "revision_xyz",
-					"foo":                               "bar",
-					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
+					appsv1alpha1.CloneSetInstanceID:      "id3",
+					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
+					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
+					"foo":                                "bar",
+					appspub.LifecycleStateKey:            string(appspub.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -193,10 +195,11 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id4",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:     "id4",
-					apps.ControllerRevisionHashLabelKey: "revision_xyz",
-					"foo":                               "bar",
-					appspub.LifecycleStateKey:           string(appspub.LifecycleStateNormal),
+					appsv1alpha1.CloneSetInstanceID:      "id4",
+					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
+					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
+					"foo":                                "bar",
+					appspub.LifecycleStateKey:            string(appspub.LifecycleStateNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{

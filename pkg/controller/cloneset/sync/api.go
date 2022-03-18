@@ -17,8 +17,6 @@ limitations under the License.
 package sync
 
 import (
-	"time"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -41,7 +39,7 @@ type Interface interface {
 	Update(cs *appsv1alpha1.CloneSet,
 		currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 		pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
-	) (time.Duration, error)
+	) error
 }
 
 type realControl struct {
