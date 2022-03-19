@@ -50,7 +50,6 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 
 	key := clonesetutils.GetControllerKey(cs)
 	coreControl := clonesetcore.New(cs)
-
 	// 1. refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
@@ -237,7 +236,6 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 				break
 			}
 		}
-
 		if c.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, coreControl.GetUpdateOptions()) {
 			switch state := lifecycle.GetPodLifecycleState(pod); state {
 			case "", appspub.LifecycleStateNormal:
