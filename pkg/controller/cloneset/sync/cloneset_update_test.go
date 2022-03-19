@@ -305,7 +305,12 @@ func TestUpdate(t *testing.T) {
 							UpdateTimestamp:        now,
 							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: now, Containers: []string{"c1"}}},
-						})},
+						}),
+							appspub.InPlaceUpdatePodRestartKey: "1",
+							appspub.InPlaceUpdateContainersRestartKey: util.DumpJSON(map[string]appspub.InPlaceUpdateContainerRestartCount{
+								"c1": {RestartCount: 1, Revision: "rev_new", Timestamp: now},
+							}),
+						},
 						ResourceVersion: "2",
 					},
 					Spec: v1.PodSpec{
@@ -552,6 +557,10 @@ func TestUpdate(t *testing.T) {
 								UpdateTimestamp:        metav1.NewTime(now.Add(-time.Minute)),
 								LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 								ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: now, Containers: []string{"c1"}}},
+							}),
+							appspub.InPlaceUpdatePodRestartKey: "1",
+							appspub.InPlaceUpdateContainersRestartKey: util.DumpJSON(map[string]appspub.InPlaceUpdateContainerRestartCount{
+								"c1": {RestartCount: 1, Revision: "rev_new", Timestamp: now},
 							}),
 						},
 						ResourceVersion: "1",
