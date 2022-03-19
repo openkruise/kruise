@@ -23,11 +23,6 @@ import (
 	"testing"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
 func TestCalculateInPlaceUpdateSpec(t *testing.T) {
@@ -451,6 +452,10 @@ func TestRefresh(t *testing.T) {
 							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "img01"}},
 							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"main"}}},
 						}),
+						appspub.InPlaceUpdatePodRestartKey: "1",
+						appspub.InPlaceUpdateContainersRestartKey: util.DumpJSON(map[string]appspub.InPlaceUpdateContainerRestartCount{
+							"main": {RestartCount: 1, Revision: "new-revision", Timestamp: aHourAgo},
+						}),
 					},
 					ResourceVersion: "1",
 				},
@@ -587,6 +592,10 @@ func TestRefresh(t *testing.T) {
 							UpdateTimestamp:        aHourAgo,
 							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}, "c2": {ImageID: "c2-img1-ID"}},
 							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}, {Timestamp: aHourAgo, Containers: []string{"c2"}}},
+						}),
+						appspub.InPlaceUpdatePodRestartKey: "1",
+						appspub.InPlaceUpdateContainersRestartKey: util.DumpJSON(map[string]appspub.InPlaceUpdateContainerRestartCount{
+							"c2": {RestartCount: 1, Revision: "new-revision", Timestamp: aHourAgo},
 						}),
 					},
 				},

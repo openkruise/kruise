@@ -45,6 +45,12 @@ const (
 	// RuntimeContainerMetaKey is a key in pod annotations. Kruise-daemon should report the
 	// states of runtime containers into its value, which is a structure JSON of RuntimeContainerMetaSet type.
 	RuntimeContainerMetaKey = "apps.kruise.io/runtime-containers-meta"
+
+	// InPlaceUpdatePodRestartKey records the count of pod restarts
+	InPlaceUpdatePodRestartKey = "apps.kruise.io/inplace-update-pod-restart-count"
+
+	// InPlaceUpdateContainersRestartKey records the count of containers restarts
+	InPlaceUpdateContainersRestartKey = "apps.kruise.io/inplace-update-containers-restart-count"
 )
 
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
@@ -99,6 +105,16 @@ type InPlaceUpdateStrategy struct {
 	// GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
 	// when in-place update a Pod.
 	GracePeriodSeconds int32 `json:"gracePeriodSeconds,omitempty"`
+}
+
+// InPlaceUpdateContainerRestartCount record the restart count of containers
+type InPlaceUpdateContainerRestartCount struct {
+	// Revision is the updated revision hash.
+	Revision string `json:"revision,omitempty"`
+	// RestartCount is the container restart count
+	RestartCount int `json:"restartCount,omitempty"`
+	// Timestamp is the time for this update
+	Timestamp metav1.Time `json:"timestamp"`
 }
 
 func GetInPlaceUpdateState(obj metav1.Object) (string, bool) {
