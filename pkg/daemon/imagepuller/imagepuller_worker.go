@@ -431,9 +431,36 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 		return nil
 	}
 
-	statusReader, err := w.runtime.PullImage(ctx, w.name, tag, w.secrets)
-	if err != nil {
-		return err
+	// make it asynchronous for CRI runtime will block in pulling image
+	var statusReader runtimeimage.ImagePullStatusReader
+	pullChan := make(chan struct{})
+	go func() {
+		statusReader, err = w.runtime.PullImage(ctx, w.name, tag, w.secrets)
+		close(pullChan)
+	}()
+
+	closeStatusReader := func() {
+		select {
+		case <-pullChan:
+		}
+		if statusReader != nil {
+			statusReader.Close()
+		}
+	}
+
+	select {
+	case <-w.stopCh:
+		go closeStatusReader()
+		klog.V(2).Infof("Pulling image %v:%v is stopped.", w.name, tag)
+		return fmt.Errorf("pulling image %s:%s is stopped", w.name, tag)
+	case <-ctx.Done():
+		go closeStatusReader()
+		klog.V(2).Infof("Pulling image %s:%s is canceled", w.name, tag)
+		return fmt.Errorf("pulling image %s:%s is canceled", w.name, tag)
+	case <-pullChan:
+		if err != nil {
+			return err
+		}
 	}
 	defer statusReader.Close()
 

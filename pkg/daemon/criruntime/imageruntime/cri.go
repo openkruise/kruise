@@ -30,8 +30,8 @@ import (
 
 const maxMsgSize = 1024 * 1024 * 16
 
-// NewCrioImageService create a cri-o runtime
-func NewCrioImageService(runtimeURI string, accountManager daemonutil.ImagePullAccountManager) (ImageService, error) {
+// NewCRIImageService create a common CRI runtime
+func NewCRIImageService(runtimeURI string, accountManager daemonutil.ImagePullAccountManager) (ImageService, error) {
 	klog.V(3).InfoS("Connecting to image service", "endpoint", runtimeURI)
 	addr, dialer, err := util.GetAddressAndDialer(runtimeURI)
 	if err != nil {
@@ -54,19 +54,19 @@ func NewCrioImageService(runtimeURI string, accountManager daemonutil.ImagePullA
 		klog.V(2).InfoS("Using CRI v1 image API")
 	}
 
-	return &crioImageService{
+	return &commonCRIImageService{
 		accountManager: accountManager,
 		criImageClient: imageClient,
 	}, nil
 }
 
-type crioImageService struct {
+type commonCRIImageService struct {
 	accountManager daemonutil.ImagePullAccountManager
 	criImageClient runtimeapi.ImageServiceClient
 }
 
 // PullImage implements ImageService.PullImage.
-func (c *crioImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (ImagePullStatusReader, error) {
+func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (ImagePullStatusReader, error) {
 	registry := daemonutil.ParseRegistry(imageName)
 	fullImageName := imageName + ":" + tag
 	// Reader
@@ -147,7 +147,7 @@ func (c *crioImageService) PullImage(ctx context.Context, imageName, tag string,
 }
 
 // ListImages implements ImageService.ListImages.
-func (c *crioImageService) ListImages(ctx context.Context) ([]ImageInfo, error) {
+func (c *commonCRIImageService) ListImages(ctx context.Context) ([]ImageInfo, error) {
 	listImagesReq := &runtimeapi.ListImagesRequest{}
 	listImagesResp, err := c.criImageClient.ListImages(ctx, listImagesReq)
 	if err != nil {
