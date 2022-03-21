@@ -164,7 +164,6 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 
 	klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, req.Name)
 	clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pod.Name)
-	clonesetutils.UpdateExpectations.DeleteObject(req.String(), pod)
 	q.Add(*req)
 }
 

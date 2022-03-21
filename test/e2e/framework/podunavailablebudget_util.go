@@ -290,7 +290,8 @@ func (t *PodUnavailableBudgetTester) WaitForCloneSetMinReadyAndRunning(cloneSets
 				}
 				readyReplicas += inner.Status.ReadyReplicas
 				count := *inner.Spec.Replicas
-				if inner.Status.UpdatedReplicas == count && count == inner.Status.ReadyReplicas && count == inner.Status.Replicas {
+				if inner.Generation == inner.Status.ObservedGeneration && inner.Status.UpdatedReplicas == count &&
+					count == inner.Status.ReadyReplicas && count == inner.Status.Replicas {
 					completed++
 				}
 			}

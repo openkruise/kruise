@@ -99,7 +99,7 @@ func TestUpdate(t *testing.T) {
 			},
 			expectedPods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new"}},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", apps.DefaultDeploymentUniqueLabelKey: "rev_new"}},
 					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
@@ -123,7 +123,7 @@ func TestUpdate(t *testing.T) {
 			},
 			expectedPods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new"}, ResourceVersion: "1"},
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", apps.DefaultDeploymentUniqueLabelKey: "rev_new"}, ResourceVersion: "1"},
 					Spec:       v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionTrue},
@@ -142,8 +142,9 @@ func TestUpdate(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:     "id-0",
+						apps.ControllerRevisionHashLabelKey:  "rev_old",
+						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
+						appsv1alpha1.CloneSetInstanceID:      "id-0",
 					}},
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
@@ -160,9 +161,10 @@ func TestUpdate(t *testing.T) {
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", ResourceVersion: "1", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:     "id-0",
-						appsv1alpha1.SpecifiedDeleteKey:     "true",
+						apps.ControllerRevisionHashLabelKey:  "rev_old",
+						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
+						appsv1alpha1.CloneSetInstanceID:      "id-0",
+						appsv1alpha1.SpecifiedDeleteKey:      "true",
 					}},
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
@@ -196,8 +198,9 @@ func TestUpdate(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:     "id-0",
+						apps.ControllerRevisionHashLabelKey:  "rev_old",
+						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
+						appsv1alpha1.CloneSetInstanceID:      "id-0",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -221,9 +224,10 @@ func TestUpdate(t *testing.T) {
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", ResourceVersion: "1", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:     "id-0",
-						appsv1alpha1.SpecifiedDeleteKey:     "true",
+						apps.ControllerRevisionHashLabelKey:  "rev_old",
+						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
+						appsv1alpha1.CloneSetInstanceID:      "id-0",
+						appsv1alpha1.SpecifiedDeleteKey:      "true",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -264,8 +268,9 @@ func TestUpdate(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:     "id-0",
+						apps.ControllerRevisionHashLabelKey:  "rev_old",
+						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
+						appsv1alpha1.CloneSetInstanceID:      "id-0",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -290,9 +295,10 @@ func TestUpdate(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:     "id-0",
-							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
+							apps.ControllerRevisionHashLabelKey:  "rev_new",
+							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
+							appsv1alpha1.CloneSetInstanceID:      "id-0",
+							appspub.LifecycleStateKey:            string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 							Revision:               "rev_new",
@@ -341,8 +347,9 @@ func TestUpdate(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
-						apps.ControllerRevisionHashLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:     "id-0",
+						apps.ControllerRevisionHashLabelKey:  "rev_old",
+						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
+						appsv1alpha1.CloneSetInstanceID:      "id-0",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -367,9 +374,10 @@ func TestUpdate(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:     "id-0",
-							appspub.LifecycleStateKey:           string(appspub.LifecycleStateUpdating),
+							apps.ControllerRevisionHashLabelKey:  "rev_new",
+							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
+							appsv1alpha1.CloneSetInstanceID:      "id-0",
+							appspub.LifecycleStateKey:            string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
@@ -451,8 +459,9 @@ func TestUpdate(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:     "id-0",
+							apps.ControllerRevisionHashLabelKey:  "rev_new",
+							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
+							appsv1alpha1.CloneSetInstanceID:      "id-0",
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
@@ -533,8 +542,9 @@ func TestUpdate(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
 						Labels: map[string]string{
-							apps.ControllerRevisionHashLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:     "id-0",
+							apps.ControllerRevisionHashLabelKey:  "rev_new",
+							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
+							appsv1alpha1.CloneSetInstanceID:      "id-0",
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
@@ -583,7 +593,7 @@ func TestUpdate(t *testing.T) {
 		if len(mc.revisions) > 0 {
 			currentRevision = mc.revisions[0]
 		}
-		if _, err := ctrl.Update(mc.cs, currentRevision, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
+		if err := ctrl.Update(mc.cs, currentRevision, mc.updateRevision, mc.revisions, mc.pods, mc.pvcs); err != nil {
 			t.Fatalf("Failed to test %s, manage error: %v", mc.name, err)
 		}
 		podList := v1.PodList{}

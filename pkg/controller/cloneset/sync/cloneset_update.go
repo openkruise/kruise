@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -32,48 +33,54 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
-	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 	"github.com/openkruise/kruise/pkg/util/updatesort"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
-) (time.Duration, error) {
+) error {
 
-	requeueDuration := requeueduration.Duration{}
+	key := clonesetutils.GetControllerKey(cs)
 	coreControl := clonesetcore.New(cs)
 
 	// 1. refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
-		patched, duration, err := c.refreshPodState(cs, coreControl, pod)
+		patchedState, duration, err := c.refreshPodState(cs, coreControl, pod)
 		if err != nil {
-			return 0, err
+			return err
 		} else if duration > 0 {
-			requeueDuration.Update(duration)
+			clonesetutils.DurationStore.Push(key, duration)
 		}
-		if patched {
+		// fix the pod-template-hash label for old pods before v1.1
+		patchedHash, err := c.fixPodTemplateHashLabel(cs, pod)
+		if err != nil {
+			return err
+		}
+		if patchedState || patchedHash {
 			modified = true
 		}
 	}
 	if modified {
-		return requeueDuration.Get(), nil
+		return nil
 	}
 
 	if cs.Spec.UpdateStrategy.Paused {
-		return requeueDuration.Get(), nil
+		return nil
 	}
 
 	// 2. calculate update diff and the revision to update
 	diffRes := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name)
 	if diffRes.updateNum == 0 {
-		return requeueDuration.Get(), nil
+		return nil
 	}
 
 	// 3. find all matched pods can update
@@ -128,7 +135,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) && len(waitUpdateIndexes) > 0 {
 		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, c.controllerFinder, pods[waitUpdateIndexes[0]])
 		if err != nil {
-			return requeueDuration.Get(), err
+			return err
 		}
 	}
 	// 6. update pods
@@ -138,22 +145,23 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		if pub != nil {
 			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, pod, pubcontrol.NewPubControl(pub, c.controllerFinder, c.Client), pubcontrol.UpdateOperation, false)
 			if err != nil {
-				return requeueDuration.Get(), err
+				return err
 				// pub check does not pass, try again in seconds
 			} else if !allowed {
-				return time.Second, nil
+				clonesetutils.DurationStore.Push(key, time.Second)
+				return nil
 			}
 		}
 		duration, err := c.updatePod(cs, coreControl, targetRevision, revisions, pod, pvcs)
 		if duration > 0 {
-			requeueDuration.Update(duration)
+			clonesetutils.DurationStore.Push(key, duration)
 		}
 		if err != nil {
-			return requeueDuration.Get(), err
+			return err
 		}
 	}
 
-	return requeueDuration.Get(), nil
+	return nil
 }
 
 func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod) (bool, time.Duration, error) {
@@ -196,6 +204,23 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	}
 
 	return false, res.DelayDuration, nil
+}
+
+// fix the pod-template-hash label for old pods before v1.1
+func (c *realControl) fixPodTemplateHashLabel(cs *appsv1alpha1.CloneSet, pod *v1.Pod) (bool, error) {
+	if _, exists := pod.Labels[apps.DefaultDeploymentUniqueLabelKey]; exists {
+		return false, nil
+	}
+	patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`,
+		apps.DefaultDeploymentUniqueLabelKey,
+		clonesetutils.GetShortHash(pod.Labels[apps.ControllerRevisionHashLabelKey])))
+	pod = pod.DeepCopy()
+	if err := c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, patch)); err != nil {
+		klog.Warningf("CloneSet %s/%s failed to fix pod-template-hash to Pod %s: %v", cs.Namespace, cs.Name, pod.Name, err)
+		return false, err
+	}
+	clonesetutils.ResourceVersionExpectations.Expect(pod)
+	return true, nil
 }
 
 func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control,
@@ -257,7 +282,6 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 				if res.UpdateErr == nil {
 					c.recorder.Eventf(cs, v1.EventTypeNormal, "SuccessfulUpdatePodInPlace", "successfully update pod %s in-place(revision %v)", pod.Name, updateRevision.Name)
 					clonesetutils.ResourceVersionExpectations.Expect(&metav1.ObjectMeta{UID: pod.UID, ResourceVersion: res.NewResourceVersion})
-					clonesetutils.UpdateExpectations.ExpectUpdated(clonesetutils.GetControllerKey(cs), updateRevision.Name, pod)
 					return res.DelayDuration, nil
 				}
 

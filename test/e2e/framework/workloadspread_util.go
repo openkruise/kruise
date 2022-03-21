@@ -255,7 +255,7 @@ func (t *WorkloadSpreadTester) WaitForCloneSetRunning(cloneSet *appsv1alpha1.Clo
 				return false, err
 			}
 			if inner.Generation == inner.Status.ObservedGeneration && *inner.Spec.Replicas == inner.Status.ReadyReplicas &&
-				*inner.Spec.Replicas == inner.Status.Replicas {
+				*inner.Spec.Replicas == inner.Status.Replicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas {
 				return true, nil
 			}
 			return false, nil
