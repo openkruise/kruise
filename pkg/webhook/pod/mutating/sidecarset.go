@@ -261,6 +261,10 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(initContainer, pod)
 				initContainer.Env = append(initContainer.Env, transferEnvs...)
 				sidecarInitContainers = append(sidecarInitContainers, initContainer)
+				// insert volumes that initContainers used
+				for _, mount := range initContainer.VolumeMounts {
+					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
+				}
 			}
 
 			//process imagePullSecrets
