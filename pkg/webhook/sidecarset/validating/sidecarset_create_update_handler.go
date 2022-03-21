@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -80,11 +81,6 @@ func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(ctx context.Conte
 	if len(allErrs) != 0 {
 		return false, "", allErrs.ToAggregate()
 	}
-	if older != nil {
-		if err := validateSidecarSetContainersUpdate(obj, older); err != nil {
-			return true, err.Detail, nil
-		}
-	}
 	return true, "allowed to be admitted", nil
 }
 
@@ -97,6 +93,10 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 
 	if older != nil {
 		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec.containers"))...)
+		// just record warning log
+		if err := validateSidecarSetContainersUpdate(obj, older); err != nil {
+			klog.Warning(err.Error())
+		}
 	}
 	// iterate across all containers in other sidecarsets to avoid duplication of name
 	sidecarSets := &appsv1alpha1.SidecarSetList{}
@@ -266,15 +266,17 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 // 1.  spec.containers[*].image
 // 2.  spec.initContainers[*].image
 //   warning message in webhook log
-func validateSidecarSetContainersUpdate(obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) *field.Error {
+func validateSidecarSetContainersUpdate(obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) error {
+	logSuffix := " When modifying other fields of the container, e.g. volumemounts/env,the sidecarSet will not depart to upgrade the sidecar container logic in-place, and needs to be done by rebuilding the pod"
 	specPath := field.NewPath("spec")
-	err, stop := validateContainerUpdates(obj.Spec.Containers, older.Spec.Containers, specPath.Child("containers"))
-	if stop {
-		return err
+	var errs []string
+	err := validateContainerUpdates(obj.Spec.Containers, older.Spec.Containers)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("%s %s", specPath.Child("containers"), err.Error()))
 	}
-	err, stop = validateContainerUpdates(obj.Spec.InitContainers, older.Spec.InitContainers, specPath.Child("initContainers"))
-	if stop {
-		return err
+	err = validateContainerUpdates(obj.Spec.InitContainers, older.Spec.InitContainers)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("%s %s", specPath.Child("initContainers"), err.Error()))
 	}
 	mungedSidecarSetSpec := *obj.Spec.DeepCopy()
 	// munge spec.containers[*].image
@@ -295,17 +297,19 @@ func validateSidecarSetContainersUpdate(obj *appsv1alpha1.SidecarSet, older *app
 
 	// containers and initContainers
 	if !apiequality.Semantic.DeepEqual(mungedSidecarSetSpec.Containers, older.Spec.Containers) || !apiequality.Semantic.DeepEqual(mungedSidecarSetSpec.InitContainers, older.Spec.InitContainers) {
-		err = field.Forbidden(specPath, "[Warning] Only Container Image upgrades are allowed.When modifying other fields of the container, e.g. volumemounts/env, the sidecarSet will not depart to upgrade the sidecar container logic in-place, and needs to be done by rebuilding the pod.")
+		errs = append(errs, fmt.Sprintf("In Kubernetes native scenarios,only Container Image upgrades are allowed. "))
 	}
-	return err
+	if len(errs) != 0 {
+		return fmt.Errorf("%s %s", strings.Join(errs, ","), logSuffix)
+	}
+	return nil
 }
 
-func validateContainerUpdates(newContainers, oldContainers []appsv1alpha1.SidecarContainer, fldPath *field.Path) (err *field.Error, stop bool) {
+func validateContainerUpdates(newContainers, oldContainers []appsv1alpha1.SidecarContainer) error {
 	if len(newContainers) != len(oldContainers) {
-		err = field.Forbidden(fldPath, "[Warning] Only Container Image upgrades are allowed.When modifying other fields of the container, e.g. volumemounts/env, the sidecarSet will not depart to upgrade the sidecar container logic in-place, and needs to be done by rebuilding the pod.")
-		return err, true
+		return fmt.Errorf("Remove or add containers. ")
 	}
-	return err, false
+	return nil
 }
 
 // validate the sidecarset spec.container.name, spec.initContainer.name, volume.name conflicts with others in cluster
