@@ -84,10 +84,10 @@ func TestSidecarSetContainersUpdate(t *testing.T) {
 			},
 		},
 	}
-	allErrs := validateSidecarSetContainersUpdate(newSidecarset, oldSidecarset)
-	if len(allErrs) != 2 {
-		t.Errorf("expect errors len 2, but got: %v", allErrs)
+	err := validateSidecarSetContainersUpdate(newSidecarset, oldSidecarset)
+	if err == nil {
+		t.Errorf("expect errors , but got: %v", err)
 	} else {
-		fmt.Println(allErrs)
+		fmt.Println(err)
 	}
 }
