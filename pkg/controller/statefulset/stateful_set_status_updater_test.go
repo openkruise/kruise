@@ -21,13 +21,14 @@ import (
 	"errors"
 	"testing"
 
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
+	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 )
 
 func TestStatefulSetUpdaterUpdatesSetStatus(t *testing.T) {

@@ -79,6 +79,9 @@ const (
 	// InPlaceUpdateEnvFromMetadata enables Kruise to in-place update a container in Pod
 	// when its env from labels/annotations changed and pod is in-place updating.
 	InPlaceUpdateEnvFromMetadata featuregate.Feature = "InPlaceUpdateEnvFromMetadata"
+
+	// Enables policies controlling deletion of PVCs created by a StatefulSet.
+	StatefulSetAutoDeletePVC featuregate.Feature = "StatefulSetAutoDeletePVC"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -96,6 +99,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PodUnavailableBudgetUpdateGate:   {Default: false, PreRelease: featuregate.Alpha},
 	TemplateNoDefaults:               {Default: false, PreRelease: featuregate.Alpha},
 	InPlaceUpdateEnvFromMetadata:     {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetAutoDeletePVC:         {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

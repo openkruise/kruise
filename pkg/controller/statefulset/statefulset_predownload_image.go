@@ -20,12 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +29,13 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
 func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *appsv1beta1.StatefulSet, currentRevision, updateRevision *apps.ControllerRevision) error {

@@ -25,15 +25,6 @@ import (
 	"testing"
 	"time"
 
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
-	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
-	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1beta1"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-	"github.com/openkruise/kruise/pkg/util/lifecycle"
-	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,6 +47,16 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
+	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
+	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1beta1"
+	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
 const statefulSetResyncPeriod = 30 * time.Second
@@ -142,8 +143,8 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 		t.Error("StatefulSet does not respect termination")
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	spc.DeleteStatefulPod(set, pods[3])
-	spc.DeleteStatefulPod(set, pods[4])
+	spc.DeletePod(pods[3])
+	spc.DeletePod(pods[4])
 	*set.Spec.Replicas = 0
 	if err := scaleDownStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn down StatefulSet : %s", err)
@@ -193,7 +194,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 		t.Error("StatefulSet does not block scaling")
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	spc.DeleteStatefulPod(set, pods[0])
+	spc.DeletePod(pods[0])
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -613,13 +614,14 @@ func splitObjects(initialObjects []runtime.Object) ([]runtime.Object, []runtime.
 	return kubeObjects, kruiseObjects
 }
 
-func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSetController, *fakeStatefulPodControl) {
+func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSetController, *fakeObjectManager) {
 	kubeObjects, kruiseObjects := splitObjects(initialObjects)
 	client := fake.NewSimpleClientset(kubeObjects...)
 	kruiseClient := kruisefake.NewSimpleClientset(kruiseObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	kruiseInformerFactory := kruiseinformers.NewSharedInformerFactory(kruiseClient, controller.NoResyncPeriodFunc())
-	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1beta1().StatefulSets())
+	om := newFakeObjectManager(informerFactory, kruiseInformerFactory)
+	fpc := NewStatefulPodControlFromManager(om, &noopRecorder{})
 	ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewStatefulSetController(
 		informerFactory.Core().V1().Pods(),
@@ -637,7 +639,7 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	lifecycleControl := lifecycle.NewForInformer(informerFactory.Core().V1().Pods())
 	ssc.control = NewDefaultStatefulSetControl(fpc, inplaceControl, lifecycleControl, ssu, ssh, recorder)
 
-	return ssc, fpc
+	return ssc, om
 }
 
 func fakeWorker(ssc *StatefulSetController) {
@@ -655,7 +657,7 @@ func getPodAtOrdinal(pods []*v1.Pod, ordinal int) *v1.Pod {
 	return pods[ordinal]
 }
 
-func scaleUpStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+func scaleUpStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulSetController, spc *fakeObjectManager) error {
 	spc.setsIndexer.Add(set)
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
@@ -703,7 +705,7 @@ func scaleUpStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulSet
 	return assertMonotonicInvariants(set, spc)
 }
 
-func scaleDownStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+func scaleDownStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulSetController, spc *fakeObjectManager) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
@@ -726,7 +728,7 @@ func scaleDownStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulS
 	pod = getPodAtOrdinal(pods, ord)
 	ssc.updatePod(&prev, pod)
 	fakeWorker(ssc)
-	spc.DeleteStatefulPod(set, pod)
+	spc.DeletePod(pod)
 	ssc.deletePod(pod)
 	fakeWorker(ssc)
 	for set.Status.Replicas > *set.Spec.Replicas {
@@ -743,7 +745,7 @@ func scaleDownStatefulSetController(set *appsv1beta1.StatefulSet, ssc *StatefulS
 		pod = getPodAtOrdinal(pods, ord)
 		ssc.updatePod(&prev, pod)
 		fakeWorker(ssc)
-		spc.DeleteStatefulPod(set, pod)
+		spc.DeletePod(pod)
 		ssc.deletePod(pod)
 		fakeWorker(ssc)
 		obj, _, err := spc.setsIndexer.Get(set)
@@ -787,7 +789,7 @@ func NewStatefulSetController(
 		ReconcileStatefulSet: ReconcileStatefulSet{
 			kruiseClient: kruiseClient,
 			control: NewDefaultStatefulSetControl(
-				NewRealStatefulPodControl(
+				NewStatefulPodControl(
 					kubeClient,
 					setInformer.Lister(),
 					podInformer.Lister(),

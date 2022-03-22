@@ -17,9 +17,10 @@ limitations under the License.
 package statefulset
 
 import (
+	v1 "k8s.io/api/core/v1"
+
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/updatesort"
-	v1 "k8s.io/api/core/v1"
 )
 
 func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSetStrategy, updateRevision string, totalReplicas int32, replicas []*v1.Pod) []int {

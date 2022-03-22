@@ -67,6 +67,26 @@ func validateScaleStrategy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Pat
 	return allErrs
 }
 
+func ValidatePersistentVolumeClaimRetentionPolicyType(policy appsv1beta1.PersistentVolumeClaimRetentionPolicyType, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	switch policy {
+	case appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType:
+	case appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType:
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath, policy, []string{string(appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType), string(appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType)}))
+	}
+	return allErrs
+}
+
+func ValidatePersistentVolumeClaimRetentionPolicy(policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if policy != nil {
+		allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicyType(policy.WhenDeleted, fldPath.Child("whenDeleted"))...)
+		allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicyType(policy.WhenScaled, fldPath.Child("whenScaled"))...)
+	}
+	return allErrs
+}
+
 func validateOnDeleteStatefulSetStrategyType(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -208,6 +228,7 @@ func validateStatefulSetSpec(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 	allErrs = append(allErrs, validateReserveOrdinals(spec, fldPath)...)
 	allErrs = append(allErrs, validateScaleStrategy(spec, fldPath)...)
 	allErrs = append(allErrs, validateUpdateStrategyType(spec, fldPath)...)
+	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
 
@@ -291,6 +312,9 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 	restoreStrategy := statefulSet.Spec.UpdateStrategy
 	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
+	restorePersistentVolumeClaimRetentionPolicy := statefulSet.Spec.PersistentVolumeClaimRetentionPolicy
+	statefulSet.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy
+
 	restoreScaleStrategy := statefulSet.Spec.ScaleStrategy
 	statefulSet.Spec.ScaleStrategy = oldStatefulSet.Spec.ScaleStrategy
 
@@ -300,15 +324,17 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 	statefulSet.Spec.RevisionHistoryLimit = oldStatefulSet.Spec.RevisionHistoryLimit
 
 	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'reserveOrdinals', 'lifecycle', 'revisionHistoryLimit' and 'updateStrategy' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'reserveOrdinals', 'lifecycle', 'revisionHistoryLimit', 'persistentVolumeClaimRetentionPolicy' and 'updateStrategy' are forbidden"))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template = restoreTemplate
 	statefulSet.Spec.UpdateStrategy = restoreStrategy
 	statefulSet.Spec.ScaleStrategy = restoreScaleStrategy
 	statefulSet.Spec.ReserveOrdinals = restoreReserveOrdinals
+	statefulSet.Spec.PersistentVolumeClaimRetentionPolicy = restorePersistentVolumeClaimRetentionPolicy
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
+	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(statefulSet.Spec.PersistentVolumeClaimRetentionPolicy, field.NewPath("spec", "persistentVolumeClaimRetentionPolicy"))...)
 	return allErrs
 }
 

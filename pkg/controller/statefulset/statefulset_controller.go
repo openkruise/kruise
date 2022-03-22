@@ -23,21 +23,6 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/client"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-	"github.com/openkruise/kruise/pkg/util/lifecycle"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
-	"github.com/openkruise/kruise/pkg/util/requeueduration"
-	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -61,6 +46,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/client"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+	"github.com/openkruise/kruise/pkg/util/requeueduration"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
 func init() {
@@ -141,7 +142,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	return &ReconcileStatefulSet{
 		kruiseClient: genericClient.KruiseClient,
 		control: NewDefaultStatefulSetControl(
-			NewRealStatefulPodControl(
+			NewStatefulPodControl(
 				genericClient.KubeClient,
 				statefulSetLister,
 				podLister,
@@ -167,7 +168,7 @@ type ReconcileStatefulSet struct {
 	kruiseClient kruiseclientset.Interface
 	// control returns an interface capable of syncing a stateful set.
 	// Abstracted out for testing.
-	control ControlInterface
+	control StatefulSetControlInterface
 	// podControl is used for patching pods.
 	podControl kubecontroller.PodControlInterface
 	// podLister is able to list/get pods from a shared informer's store

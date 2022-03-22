@@ -34,9 +34,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -54,19 +55,22 @@ import (
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
 	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1beta1"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
-type invariantFunc func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+type invariantFunc func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 
-func setupController(client clientset.Interface, kruiseClient kruiseclientset.Interface) (*fakeStatefulPodControl, *fakeStatefulSetStatusUpdater, ControlInterface, chan struct{}) {
+func setupController(client clientset.Interface, kruiseClient kruiseclientset.Interface) (*fakeObjectManager, *fakeStatefulSetStatusUpdater, StatefulSetControlInterface, chan struct{}) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	kruiseInformerFactory := kruiseinformers.NewSharedInformerFactory(kruiseClient, controller.NoResyncPeriodFunc())
-	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1beta1().StatefulSets())
+	om := newFakeObjectManager(informerFactory, kruiseInformerFactory)
+	spc := NewStatefulPodControlFromManager(om, &noopRecorder{})
 	ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
-	recorder := record.NewFakeRecorder(10)
+	recorder := &noopRecorder{}
 	inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), revisionadapter.NewDefaultImpl())
 	lifecycleControl := lifecycle.NewForInformer(informerFactory.Core().V1().Pods())
 	ssc := NewDefaultStatefulSetControl(spc, inplaceControl, lifecycleControl, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
@@ -81,12 +85,70 @@ func setupController(client clientset.Interface, kruiseClient kruiseclientset.In
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 	)
-	return spc, ssu, ssc, stop
+	return om, ssu, ssc, stop
 }
 
 func burst(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 	set.Spec.PodManagementPolicy = apps.ParallelPodManagement
 	return set
+}
+
+func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(*testing.T, *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy)) {
+	subtestName := "StatefulSetAutoDeletePVCDisabled"
+	if testName != "" {
+		subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
+	}
+	t.Run(subtestName, func(t *testing.T) {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		testFn(t, &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+			WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+		})
+	})
+
+	for _, policy := range []*appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+		{
+			WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+			WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+		},
+		{
+			WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+		},
+	} {
+		subtestName := pvcDeletePolicyString(policy) + "/StatefulSetAutoDeletePVCEnabled"
+		if testName != "" {
+			subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
+		}
+		t.Run(subtestName, func(t *testing.T) {
+			defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			testFn(t, policy)
+		})
+	}
+}
+
+func pvcDeletePolicyString(policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) string {
+	const retain = appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType
+	const delete = appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType
+	switch {
+	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
+		return "Retain"
+	case policy.WhenScaled == retain && policy.WhenDeleted == delete:
+		return "SetDeleteOnly"
+	case policy.WhenScaled == delete && policy.WhenDeleted == retain:
+		return "ScaleDownOnly"
+	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
+		return "Delete"
+	}
+	return "invalid"
 }
 
 func TestStatefulSetControl(t *testing.T) {
@@ -114,17 +176,24 @@ func TestStatefulSetControl(t *testing.T) {
 		if i := strings.LastIndex(fnName, "."); i != -1 {
 			fnName = fnName[i+1:]
 		}
-		t.Run(
+		testObj := testCase.obj
+		testFn := testCase.fn
+		runTestOverPVCRetentionPolicies(
+			t,
 			fmt.Sprintf("%s/Monotonic", fnName),
-			func(t *testing.T) {
-				testCase.fn(t, testCase.obj(), assertMonotonicInvariants)
+			func(t *testing.T, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+				set := testObj()
+				set.Spec.PersistentVolumeClaimRetentionPolicy = policy
+				testFn(t, set, assertMonotonicInvariants)
 			},
 		)
-		t.Run(
+		runTestOverPVCRetentionPolicies(
+			t,
 			fmt.Sprintf("%s/Burst", fnName),
-			func(t *testing.T) {
-				set := burst(testCase.obj())
-				testCase.fn(t, set, assertBurstInvariants)
+			func(t *testing.T, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+				set := burst(testObj())
+				set.Spec.PersistentVolumeClaimRetentionPolicy = policy
+				testFn(t, set, assertBurstInvariants)
 			},
 		)
 	}
@@ -133,14 +202,14 @@ func TestStatefulSetControl(t *testing.T) {
 func CreatesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
@@ -161,18 +230,18 @@ func CreatesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invarian
 func ScalesUp(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	*set.Spec.Replicas = 4
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to scale StatefulSet : %s", err)
 	}
 	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
@@ -193,15 +262,26 @@ func ScalesUp(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFu
 func ScalesDown(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
 	*set.Spec.Replicas = 0
-	if err := scaleDownStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	if err := scaleDownStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to scale StatefulSet : %s", err)
+	}
+
+	// Check updated set.
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
 	if set.Status.Replicas != 0 {
 		t.Error("Failed to scale statefulset to 0 replicas")
@@ -220,14 +300,14 @@ func ScalesDown(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariant
 func ReplacesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
@@ -238,49 +318,64 @@ func ReplacesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invaria
 	if err != nil {
 		t.Error(err)
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	claims, err := om.claimsLister.PersistentVolumeClaims(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
 
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, pod := range pods {
+		podClaims := getPersistentVolumeClaims(set, pod)
+		for _, claim := range claims {
+			if _, found := podClaims[claim.Name]; found {
+				if hasOwnerRef(claim, pod) {
+					t.Errorf("Unexpected ownerRef on %s", claim.Name)
+				}
+			}
+		}
+	}
+
 	sort.Sort(ascendingOrdinal(pods))
-	spc.podsIndexer.Delete(pods[0])
-	spc.podsIndexer.Delete(pods[2])
-	spc.podsIndexer.Delete(pods[4])
+	om.podsIndexer.Delete(pods[0])
+	om.podsIndexer.Delete(pods[2])
+	om.podsIndexer.Delete(pods[4])
 	for i := 0; i < 5; i += 2 {
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Error(err)
 		}
 		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 			t.Errorf("Failed to update StatefulSet : %s", err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("Error getting updated StatefulSet: %v", err)
 		}
-		if pods, err = spc.setPodRunning(set, i); err != nil {
+		if pods, err = om.setPodRunning(set, i); err != nil {
 			t.Error(err)
 		}
 		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 			t.Errorf("Failed to update StatefulSet : %s", err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("Error getting updated StatefulSet: %v", err)
 		}
-		if _, err = spc.setPodReady(set, i); err != nil {
+		if _, err = om.setPodReady(set, i); err != nil {
 			t.Error(err)
 		}
 	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
 	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Errorf("Failed to update StatefulSet : %s", err)
 	}
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
@@ -292,35 +387,35 @@ func ReplacesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invaria
 func RecreatesFailedPod(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset()
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
 	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
-	if err := invariants(set, spc); err != nil {
+	if err := invariants(set, om); err != nil {
 		t.Error(err)
 	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
 	pods[0].Status.Phase = v1.PodFailed
-	spc.podsIndexer.Update(pods[0])
+	om.podsIndexer.Update(pods[0])
 	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
-	if err := invariants(set, spc); err != nil {
+	if err := invariants(set, om); err != nil {
 		t.Error(err)
 	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -332,18 +427,23 @@ func RecreatesFailedPod(t *testing.T, set *appsv1beta1.StatefulSet, invariants i
 func CreatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
-	spc.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	om.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); !apierrors.IsInternalError(err) {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil && isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
 	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	// Update so set.Status is set for the next scaleUpStatefulSetControl call.
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
-	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
@@ -364,16 +464,16 @@ func CreatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants inv
 func UpdatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
-	spc.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
+	om.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
 
 	// have to have 1 successful loop first
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
@@ -391,7 +491,7 @@ func UpdatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants inv
 	}
 
 	// now mutate a pod's identity
-	pods, err := spc.podsLister.List(labels.Everything())
+	pods, err := om.podsLister.List(labels.Everything())
 	if err != nil {
 		t.Fatalf("Error listing pods: %v", err)
 	}
@@ -400,7 +500,7 @@ func UpdatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants inv
 	}
 	sort.Sort(ascendingOrdinal(pods))
 	pods[0].Name = "goo-0"
-	spc.podsIndexer.Update(pods[0])
+	om.podsIndexer.Update(pods[0])
 
 	// now it should fail
 	if err := ssc.UpdateStatefulSet(set, pods); !apierrors.IsInternalError(err) {
@@ -411,18 +511,23 @@ func UpdatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants inv
 func UpdateSetStatusFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, ssu, ssc, stop := setupController(client, kruiseClient)
+	om, ssu, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
 	ssu.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); !apierrors.IsInternalError(err) {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); !apierrors.IsInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
 	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+	// Update so set.Status is set for the next scaleUpStatefulSetControl call.
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
-	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
@@ -443,43 +548,43 @@ func UpdateSetStatusFailure(t *testing.T, set *appsv1beta1.StatefulSet, invarian
 func PodRecreateDeleteFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
 	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
+	om, _, ssc, stop := setupController(client, kruiseClient)
 	defer close(stop)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
 	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
-	if err := invariants(set, spc); err != nil {
+	if err := invariants(set, om); err != nil {
 		t.Error(err)
 	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
 	pods[0].Status.Phase = v1.PodFailed
-	spc.podsIndexer.Update(pods[0])
-	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
-	if err := ssc.UpdateStatefulSet(set, pods); !apierrors.IsInternalError(err) {
+	om.podsIndexer.Update(pods[0])
+	om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil && isOrHasInternalError(err) {
 		t.Errorf("StatefulSet failed to %s", err)
 	}
-	if err := invariants(set, spc); err != nil {
+	if err := invariants(set, om); err != nil {
 		t.Error(err)
 	}
 	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
-	if err := invariants(set, spc); err != nil {
+	if err := invariants(set, om); err != nil {
 		t.Error(err)
 	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Error(err)
 	}
@@ -489,45 +594,50 @@ func PodRecreateDeleteFailure(t *testing.T, set *appsv1beta1.StatefulSet, invari
 }
 
 func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
-	invariants := assertMonotonicInvariants
-	set := newStatefulSet(3)
-	client := fake.NewSimpleClientset()
-	kruiseClient := kruisefake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client, kruiseClient)
-	defer close(stop)
+	runTestOverPVCRetentionPolicies(
+		t, "", func(t *testing.T, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+			set := newStatefulSet(3)
+			set.Spec.PersistentVolumeClaimRetentionPolicy = policy
+			invariants := assertMonotonicInvariants
+			client := fake.NewSimpleClientset()
+			kruiseClient := kruisefake.NewSimpleClientset(set)
+			om, _, ssc, stop := setupController(client, kruiseClient)
+			defer close(stop)
 
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	var err error
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-	if err != nil {
-		t.Fatalf("Error getting updated StatefulSet: %v", err)
-	}
-	*set.Spec.Replicas = 0
-	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
-	if err := scaleDownStatefulSetControl(set, ssc, spc, invariants); !apierrors.IsInternalError(err) {
-		t.Errorf("StatefulSetControl failed to throw error on delete %s", err)
-	}
-	if err := scaleDownStatefulSetControl(set, ssc, spc, invariants); err != nil {
-		t.Errorf("Failed to turn down StatefulSet %s", err)
-	}
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-	if err != nil {
-		t.Fatalf("Error getting updated StatefulSet: %v", err)
-	}
-	if set.Status.Replicas != 0 {
-		t.Error("Failed to scale statefulset to 0 replicas")
-	}
-	if set.Status.ReadyReplicas != 0 {
-		t.Error("Failed to set readyReplicas to 0")
-	}
-	if set.Status.AvailableReplicas != 0 {
-		t.Error("Failed to set readyReplicas to 0")
-	}
-	if set.Status.UpdatedReplicas != 0 {
-		t.Error("Failed to set updatedReplicas to 0")
-	}
+			if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+				t.Errorf("Failed to turn up StatefulSet : %s", err)
+			}
+			var err error
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("Error getting updated StatefulSet: %v", err)
+			}
+			*set.Spec.Replicas = 0
+			om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+			if err := scaleDownStatefulSetControl(set, ssc, om, invariants); err != nil && isOrHasInternalError(err) {
+				t.Errorf("StatefulSetControl failed to throw error on delete %s", err)
+			}
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("Error getting updated StatefulSet: %v", err)
+			}
+			if err := scaleDownStatefulSetControl(set, ssc, om, invariants); err != nil {
+				t.Errorf("Failed to turn down StatefulSet %s", err)
+			}
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("Error getting updated StatefulSet: %v", err)
+			}
+			if set.Status.Replicas != 0 {
+				t.Error("Failed to scale statefulset to 0 replicas")
+			}
+			if set.Status.ReadyReplicas != 0 {
+				t.Error("Failed to set readyReplicas to 0")
+			}
+			if set.Status.UpdatedReplicas != 0 {
+				t.Error("Failed to set updatedReplicas to 0")
+			}
+		})
 }
 
 func TestStatefulSetControl_getSetRevisions(t *testing.T) {
@@ -546,7 +656,8 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		kruiseClient := kruisefake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		kruiseInformerFactory := kruiseinformers.NewSharedInformerFactory(kruiseClient, controller.NoResyncPeriodFunc())
-		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), kruiseInformerFactory.Apps().V1beta1().StatefulSets())
+		om := newFakeObjectManager(informerFactory, kruiseInformerFactory)
+		spc := NewStatefulPodControlFromManager(om, &noopRecorder{})
 		ssu := newFakeStatefulSetStatusUpdater(kruiseInformerFactory.Apps().V1beta1().StatefulSets())
 		recorder := record.NewFakeRecorder(10)
 		inplaceControl := inplaceupdate.NewForInformer(informerFactory.Core().V1().Pods(), revisionadapter.NewDefaultImpl())
@@ -606,66 +717,70 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		return clone
 	}
 
-	set := newStatefulSet(3)
-	set.Status.CollisionCount = new(int32)
-	rev0 := newRevisionOrDie(set, 1)
-	set1 := set.DeepCopy()
-	set1.Spec.Template.Spec.Containers[0].Image = "foo"
-	set1.Status.CurrentRevision = rev0.Name
-	set1.Status.CollisionCount = new(int32)
-	rev1 := newRevisionOrDie(set1, 2)
-	set2 := set1.DeepCopy()
-	set2.Spec.Template.Labels["new"] = "label"
-	set2.Status.CurrentRevision = rev0.Name
-	set2.Status.CollisionCount = new(int32)
-	rev2 := newRevisionOrDie(set2, 3)
-	tests := []testcase{
-		{
-			name:            "creates initial revision",
-			existing:        nil,
-			set:             set,
-			expectedCount:   1,
-			expectedCurrent: rev0,
-			expectedUpdate:  rev0,
-			err:             false,
-		},
-		{
-			name:            "creates revision on update",
-			existing:        []*apps.ControllerRevision{rev0},
-			set:             set1,
-			expectedCount:   2,
-			expectedCurrent: rev0,
-			expectedUpdate:  rev1,
-			err:             false,
-		},
-		{
-			name:            "must not recreate a new revision of same set",
-			existing:        []*apps.ControllerRevision{rev0, rev1},
-			set:             set1,
-			expectedCount:   2,
-			expectedCurrent: rev0,
-			expectedUpdate:  rev1,
-			err:             false,
-		},
-		{
-			name:            "must rollback to a previous revision",
-			existing:        []*apps.ControllerRevision{rev0, rev1, rev2},
-			set:             set1,
-			expectedCount:   3,
-			expectedCurrent: rev0,
-			expectedUpdate:  updateRevision(rev1, 4),
-			err:             false,
-		},
-	}
-	for i := range tests {
-		testFn(&tests[i], t)
-	}
+	runTestOverPVCRetentionPolicies(
+		t, "", func(t *testing.T, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+			set := newStatefulSet(3)
+			set.Spec.PersistentVolumeClaimRetentionPolicy = policy
+			set.Status.CollisionCount = new(int32)
+			rev0 := newRevisionOrDie(set, 1)
+			set1 := set.DeepCopy()
+			set1.Spec.Template.Spec.Containers[0].Image = "foo"
+			set1.Status.CurrentRevision = rev0.Name
+			set1.Status.CollisionCount = new(int32)
+			rev1 := newRevisionOrDie(set1, 2)
+			set2 := set1.DeepCopy()
+			set2.Spec.Template.Labels["new"] = "label"
+			set2.Status.CurrentRevision = rev0.Name
+			set2.Status.CollisionCount = new(int32)
+			rev2 := newRevisionOrDie(set2, 3)
+			tests := []testcase{
+				{
+					name:            "creates initial revision",
+					existing:        nil,
+					set:             set,
+					expectedCount:   1,
+					expectedCurrent: rev0,
+					expectedUpdate:  rev0,
+					err:             false,
+				},
+				{
+					name:            "creates revision on update",
+					existing:        []*apps.ControllerRevision{rev0},
+					set:             set1,
+					expectedCount:   2,
+					expectedCurrent: rev0,
+					expectedUpdate:  rev1,
+					err:             false,
+				},
+				{
+					name:            "must not recreate a new revision of same set",
+					existing:        []*apps.ControllerRevision{rev0, rev1},
+					set:             set1,
+					expectedCount:   2,
+					expectedCurrent: rev0,
+					expectedUpdate:  rev1,
+					err:             false,
+				},
+				{
+					name:            "must rollback to a previous revision",
+					existing:        []*apps.ControllerRevision{rev0, rev1, rev2},
+					set:             set1,
+					expectedCount:   3,
+					expectedCurrent: rev0,
+					expectedUpdate:  updateRevision(rev1, 4),
+					err:             false,
+				},
+			}
+			for i := range tests {
+				testFn(&tests[i], t)
+			}
+		})
 }
 
 func TestStatefulSetControlRollingUpdate(t *testing.T) {
 	type testcase struct {
 		name       string
-		invariants func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+		invariants func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 		initial    func() *appsv1beta1.StatefulSet
 		update     func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet
 		validate   func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
@@ -675,28 +790,28 @@ func TestStatefulSetControlRollingUpdate(t *testing.T) {
 		set := test.initial()
 		client := fake.NewSimpleClientset()
 		kruiseClient := kruisefake.NewSimpleClientset(set)
-		spc, _, ssc, stop := setupController(client, kruiseClient)
+		om, _, ssc, stop := setupController(client, kruiseClient)
 		defer close(stop)
-		if err := scaleUpStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set = test.update(set)
-		if err := updateStatefulSetControl(set, ssc, spc, assertUpdateInvariants); err != nil {
+		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -839,7 +954,7 @@ func TestStatefulSetControlRollingUpdate(t *testing.T) {
 func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 	type testcase struct {
 		name            string
-		invariants      func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+		invariants      func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 		initial         func() *appsv1beta1.StatefulSet
 		update          func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet
 		validateUpdate  func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
@@ -848,34 +963,48 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 
 	originalImage := newStatefulSet(3).Spec.Template.Spec.Containers[0].Image
 
-	testFn := func(test *testcase, t *testing.T) {
+	testFn := func(t *testing.T, test *testcase, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
 		set := test.initial()
 		set.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType}
 		client := fake.NewSimpleClientset()
 		kruiseClient := kruisefake.NewSimpleClientset(set)
-		spc, _, ssc, stop := setupController(client, kruiseClient)
+		om, _, ssc, stop := setupController(client, kruiseClient)
 		defer close(stop)
-		if err := scaleUpStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set = test.update(set)
-		if err := updateStatefulSetControl(set, ssc, spc, assertUpdateInvariants); err != nil {
+		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 
+		// Pods may have been deleted in the update. Delete any claims with a pod ownerRef.
 		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		claims, err := om.claimsLister.PersistentVolumeClaims(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		for _, claim := range claims {
+			for _, ref := range claim.GetOwnerReferences() {
+				if strings.HasPrefix(ref.Name, "foo-") {
+					om.claimsIndexer.Delete(claim)
+					break
+				}
+			}
+		}
+
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -886,24 +1015,49 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 			t.Fatalf("%s: %s", test.name, err)
 
 		}
-		replicas := *set.Spec.Replicas
-		*set.Spec.Replicas = 0
-		if err := scaleDownStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
+		claims, err = om.claimsLister.PersistentVolumeClaims(set.Namespace).List(selector)
+		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		for _, claim := range claims {
+			for _, ref := range claim.GetOwnerReferences() {
+				if strings.HasPrefix(ref.Name, "foo-") {
+					t.Fatalf("Unexpected pod reference on %s: %v", claim.Name, claim.GetOwnerReferences())
+				}
+			}
+		}
+
+		replicas := *set.Spec.Replicas
+		*set.Spec.Replicas = 0
+		if err := scaleDownStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		*set.Spec.Replicas = replicas
-		if err := scaleUpStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
-			t.Fatalf("%s: %s", test.name, err)
-		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+
+		claims, err = om.claimsLister.PersistentVolumeClaims(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		for _, claim := range claims {
+			for _, ref := range claim.GetOwnerReferences() {
+				if strings.HasPrefix(ref.Name, "foo-") {
+					t.Fatalf("Unexpected pod reference on %s: %v", claim.Name, claim.GetOwnerReferences())
+				}
+			}
+		}
+
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1098,24 +1252,27 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 			},
 		},
 	}
-	for i := range tests {
-		testFn(&tests[i], t)
-	}
+	runTestOverPVCRetentionPolicies(t, "", func(t *testing.T, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+		for i := range tests {
+			testFn(t, &tests[i], policy)
+		}
+	})
 }
 
 func TestStatefulSetControlRollingUpdateWithPaused(t *testing.T) {
 	type testcase struct {
 		name       string
 		paused     bool
-		invariants func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+		invariants func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 		initial    func() *appsv1beta1.StatefulSet
 		update     func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet
 		validate   func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 	}
 
-	testFn := func(test *testcase, t *testing.T) {
+	testFn := func(t *testing.T, test *testcase, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
 		set := test.initial()
 		var partition int32
+		set.Spec.PersistentVolumeClaimRetentionPolicy = policy
 		set.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
 			Type: apps.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
@@ -1127,28 +1284,28 @@ func TestStatefulSetControlRollingUpdateWithPaused(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset()
 		kruiseClient := kruisefake.NewSimpleClientset(set)
-		spc, _, ssc, stop := setupController(client, kruiseClient)
+		om, _, ssc, stop := setupController(client, kruiseClient)
 		defer close(stop)
-		if err := scaleUpStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set = test.update(set)
-		if err := updateStatefulSetControl(set, ssc, spc, assertUpdateInvariants); err != nil {
+		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1295,24 +1452,26 @@ func TestStatefulSetControlRollingUpdateWithPaused(t *testing.T) {
 			},
 		},
 	}
-	for i := range tests {
-		testFn(&tests[i], t)
-	}
+	runTestOverPVCRetentionPolicies(t, "", func(t *testing.T, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+		for i := range tests {
+			testFn(t, &tests[i], policy)
+		}
+	})
 }
 
 func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 	type testcase struct {
 		name            string
 		minReadySeconds int32
-		invariants      func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+		invariants      func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 		initial         func() *appsv1beta1.StatefulSet
-		updatePod       func(spc *fakeStatefulPodControl, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
+		updatePod       func(om *fakeObjectManager, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 		validate        func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 	}
 
-	readyPods := func(partition, pauseSecond int) func(spc *fakeStatefulPodControl, set *appsv1beta1.StatefulSet,
+	readyPods := func(partition, pauseSecond int) func(om *fakeObjectManager, set *appsv1beta1.StatefulSet,
 		pods []*v1.Pod) error {
-		return func(spc *fakeStatefulPodControl, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
+		return func(om *fakeObjectManager, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
 			sort.Sort(ascendingOrdinal(pods))
 			for i := 0; i < partition; i++ {
 				pod := pods[i].DeepCopy()
@@ -1320,7 +1479,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 				condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 				podutil.UpdatePodCondition(&pod.Status, &condition)
 				fakeResourceVersion(pod)
-				if err := spc.podsIndexer.Update(pod); err != nil {
+				if err := om.podsIndexer.Update(pod); err != nil {
 					return err
 				}
 			}
@@ -1495,16 +1654,16 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		minReadySeconds int32
 		maxUnavailable  intstr.IntOrString
 		partition       int
-		updatePod       func(spc *fakeStatefulPodControl, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
+		updatePod       func(om *fakeObjectManager, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 		validate        func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 	}
 	const setSize = 5
 	//originalImage := newStatefulSet(1).Spec.Template.Spec.Containers[0].Image
 	newImage := "foo"
 
-	readyPods := func(partition, pauseSecond int) func(spc *fakeStatefulPodControl, set *appsv1beta1.StatefulSet,
+	readyPods := func(partition, pauseSecond int) func(om *fakeObjectManager, set *appsv1beta1.StatefulSet,
 		pods []*v1.Pod) error {
-		return func(spc *fakeStatefulPodControl, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
+		return func(om *fakeObjectManager, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
 			sort.Sort(ascendingOrdinal(pods))
 			for i := setSize - 1; i >= partition; i-- {
 				pod := pods[i].DeepCopy()
@@ -1512,7 +1671,7 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 				condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 				podutil.UpdatePodCondition(&pod.Status, &condition)
 				fakeResourceVersion(pod)
-				if err := spc.podsIndexer.Update(pod); err != nil {
+				if err := om.podsIndexer.Update(pod); err != nil {
 					return err
 				}
 			}
@@ -1678,7 +1837,7 @@ func TestStatefulSetControlRollingUpdateWithPartition(t *testing.T) {
 	type testcase struct {
 		name       string
 		partition  int32
-		invariants func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+		invariants func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 		initial    func() *appsv1beta1.StatefulSet
 		update     func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet
 		validate   func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
@@ -2245,40 +2404,80 @@ func TestStatefulSetControlLifecycleHook(t *testing.T) {
 	}
 }
 
+func TestStatefulSetHonorRevisionHistoryLimit(t *testing.T) {
+	runTestOverPVCRetentionPolicies(t, "", func(t *testing.T, policy *appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy) {
+		invariants := assertMonotonicInvariants
+		set := newStatefulSet(3)
+		set.Spec.PersistentVolumeClaimRetentionPolicy = policy
+		client := fake.NewSimpleClientset()
+		kruiseClient := kruisefake.NewSimpleClientset(set)
+		om, ssu, ssc, stop := setupController(client, kruiseClient)
+		defer close(stop)
+
+		if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+			t.Errorf("Failed to turn up StatefulSet : %s", err)
+		}
+		var err error
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("Error getting updated StatefulSet: %v", err)
+		}
+
+		for i := 0; i < int(*set.Spec.RevisionHistoryLimit)+5; i++ {
+			set.Spec.Template.Spec.Containers[0].Image = fmt.Sprintf("foo-%d", i)
+			ssu.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+			updateStatefulSetControl(set, ssc, om, assertUpdateInvariants)
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			if err != nil {
+				t.Fatalf("Error getting updated StatefulSet: %v", err)
+			}
+			revisions, err := ssc.ListRevisions(set)
+			if err != nil {
+				t.Fatalf("Error listing revisions: %v", err)
+			}
+			// the extra 2 revisions are `currentRevision` and `updateRevision`
+			// They're considered as `live`, and truncateHistory only cleans up non-live revisions
+			if len(revisions) > int(*set.Spec.RevisionHistoryLimit)+2 {
+				t.Fatalf("%s: %d greater than limit %d", "", len(revisions), *set.Spec.RevisionHistoryLimit)
+			}
+		}
+	})
+}
+
 func TestStatefulSetControlLimitsHistory(t *testing.T) {
 	type testcase struct {
 		name       string
-		invariants func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+		invariants func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 		initial    func() *appsv1beta1.StatefulSet
 	}
 
-	testFn := func(test *testcase, t *testing.T) {
+	testFn := func(t *testing.T, test *testcase) {
 		set := test.initial()
 		client := fake.NewSimpleClientset()
 		kruiseClient := kruisefake.NewSimpleClientset(set)
-		spc, _, ssc, stop := setupController(client, kruiseClient)
+		om, _, ssc, stop := setupController(client, kruiseClient)
 		defer close(stop)
-		if err := scaleUpStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		for i := 0; i < 10; i++ {
 			set.Spec.Template.Spec.Containers[0].Image = fmt.Sprintf("foo-%d", i)
-			if err := updateStatefulSetControl(set, ssc, spc, assertUpdateInvariants); err != nil {
+			if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
 			selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
-			pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+			pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
-			set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
@@ -2313,14 +2512,14 @@ func TestStatefulSetControlLimitsHistory(t *testing.T) {
 		},
 	}
 	for i := range tests {
-		testFn(&tests[i], t)
+		testFn(t, &tests[i])
 	}
 }
 
 func TestStatefulSetControlRollback(t *testing.T) {
 	type testcase struct {
 		name             string
-		invariants       func(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error
+		invariants       func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
 		initial          func() *appsv1beta1.StatefulSet
 		update           func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet
 		validateUpdate   func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
@@ -2333,28 +2532,28 @@ func TestStatefulSetControlRollback(t *testing.T) {
 		set := test.initial()
 		client := fake.NewSimpleClientset()
 		kruiseClient := kruisefake.NewSimpleClientset(set)
-		spc, _, ssc, stop := setupController(client, kruiseClient)
+		om, _, ssc, stop := setupController(client, kruiseClient)
 		defer close(stop)
-		if err := scaleUpStatefulSetControl(set, ssc, spc, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set = test.update(set)
-		if err := updateStatefulSetControl(set, ssc, spc, assertUpdateInvariants); err != nil {
+		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -2370,17 +2569,17 @@ func TestStatefulSetControlRollback(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		if err := updateStatefulSetControl(set, ssc, spc, assertUpdateInvariants); err != nil {
+		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -2593,55 +2792,114 @@ func (rt *requestTracker) reset() {
 	rt.after = 0
 }
 
-type fakeStatefulPodControl struct {
-	podsLister              corelisters.PodLister
-	claimsLister            corelisters.PersistentVolumeClaimLister
-	setsLister              kruiseappslisters.StatefulSetLister
-	podsIndexer             cache.Indexer
-	claimsIndexer           cache.Indexer
-	setsIndexer             cache.Indexer
-	createPodTracker        requestTracker
-	updatePodTracker        requestTracker
-	inPlaceUpdatePodTracker requestTracker
-	deletePodTracker        requestTracker
+type fakeObjectManager struct {
+	podsLister       corelisters.PodLister
+	claimsLister     corelisters.PersistentVolumeClaimLister
+	setsLister       kruiseappslisters.StatefulSetLister
+	podsIndexer      cache.Indexer
+	claimsIndexer    cache.Indexer
+	setsIndexer      cache.Indexer
+	revisionsIndexer cache.Indexer
+	createPodTracker requestTracker
+	updatePodTracker requestTracker
+	deletePodTracker requestTracker
 }
 
-func newFakeStatefulPodControl(podInformer coreinformers.PodInformer, setInformer kruiseappsinformers.StatefulSetInformer) *fakeStatefulPodControl {
-	claimsIndexer := cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	return &fakeStatefulPodControl{
+func newFakeObjectManager(informerFactory informers.SharedInformerFactory, kruiseInformerFactory kruiseinformers.SharedInformerFactory) *fakeObjectManager {
+	podInformer := informerFactory.Core().V1().Pods()
+	claimInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+	revisionInformer := informerFactory.Apps().V1().ControllerRevisions()
+	setInformer := kruiseInformerFactory.Apps().V1beta1().StatefulSets()
+
+	return &fakeObjectManager{
 		podInformer.Lister(),
-		corelisters.NewPersistentVolumeClaimLister(claimsIndexer),
+		claimInformer.Lister(),
 		setInformer.Lister(),
 		podInformer.Informer().GetIndexer(),
-		claimsIndexer,
+		claimInformer.Informer().GetIndexer(),
 		setInformer.Informer().GetIndexer(),
-		requestTracker{0, nil, 0},
+		revisionInformer.Informer().GetIndexer(),
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0}}
 }
 
-func (spc *fakeStatefulPodControl) SetCreateStatefulPodError(err error, after int) {
-	spc.createPodTracker.err = err
-	spc.createPodTracker.after = after
+func (om *fakeObjectManager) CreatePod(pod *v1.Pod) error {
+	defer om.createPodTracker.inc()
+	if om.createPodTracker.errorReady() {
+		defer om.createPodTracker.reset()
+		return om.createPodTracker.err
+	}
+	pod.SetUID(types.UID(pod.Name + "-uid"))
+	return om.podsIndexer.Update(pod)
 }
 
-func (spc *fakeStatefulPodControl) SetUpdateStatefulPodError(err error, after int) {
-	spc.updatePodTracker.err = err
-	spc.updatePodTracker.after = after
+func (om *fakeObjectManager) GetPod(namespace, podName string) (*v1.Pod, error) {
+	return om.podsLister.Pods(namespace).Get(podName)
 }
 
-func (spc *fakeStatefulPodControl) SetDeleteStatefulPodError(err error, after int) {
-	spc.deletePodTracker.err = err
-	spc.deletePodTracker.after = after
+func (om *fakeObjectManager) UpdatePod(pod *v1.Pod) error {
+	return om.podsIndexer.Update(pod)
 }
 
-func (spc *fakeStatefulPodControl) setPodPending(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+func (om *fakeObjectManager) DeletePod(pod *v1.Pod) error {
+	defer om.deletePodTracker.inc()
+	if om.deletePodTracker.errorReady() {
+		defer om.deletePodTracker.reset()
+		return om.deletePodTracker.err
+	}
+	if key, err := controller.KeyFunc(pod); err != nil {
+		return err
+	} else if obj, found, err := om.podsIndexer.GetByKey(key); err != nil {
+		return err
+	} else if found {
+		return om.podsIndexer.Delete(obj)
+	}
+	return nil // Not found, no error in deleting.
+}
+
+func (om *fakeObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim) error {
+	om.claimsIndexer.Update(claim)
+	return nil
+}
+
+func (om *fakeObjectManager) GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error) {
+	return om.claimsLister.PersistentVolumeClaims(namespace).Get(claimName)
+}
+
+func (om *fakeObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error {
+	// Validate ownerRefs.
+	refs := claim.GetOwnerReferences()
+	for _, ref := range refs {
+		if ref.APIVersion == "" || ref.Kind == "" || ref.Name == "" {
+			return fmt.Errorf("invalid ownerRefs: %s %v", claim.Name, refs)
+		}
+	}
+	om.claimsIndexer.Update(claim)
+	return nil
+}
+
+func (om *fakeObjectManager) SetCreateStatefulPodError(err error, after int) {
+	om.createPodTracker.err = err
+	om.createPodTracker.after = after
+}
+
+func (om *fakeObjectManager) SetUpdateStatefulPodError(err error, after int) {
+	om.updatePodTracker.err = err
+	om.updatePodTracker.after = after
+}
+
+func (om *fakeObjectManager) SetDeleteStatefulPodError(err error, after int) {
+	om.deletePodTracker.err = err
+	om.deletePodTracker.after = after
+}
+
+func (om *fakeObjectManager) setPodPending(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return nil, err
 	}
@@ -2652,16 +2910,16 @@ func (spc *fakeStatefulPodControl) setPodPending(set *appsv1beta1.StatefulSet, o
 	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodPending
 	fakeResourceVersion(pod)
-	spc.podsIndexer.Update(pod)
-	return spc.podsLister.Pods(set.Namespace).List(selector)
+	om.podsIndexer.Update(pod)
+	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (spc *fakeStatefulPodControl) setPodRunning(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+func (om *fakeObjectManager) setPodRunning(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return nil, err
 	}
@@ -2672,16 +2930,16 @@ func (spc *fakeStatefulPodControl) setPodRunning(set *appsv1beta1.StatefulSet, o
 	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodRunning
 	fakeResourceVersion(pod)
-	spc.podsIndexer.Update(pod)
-	return spc.podsLister.Pods(set.Namespace).List(selector)
+	om.podsIndexer.Update(pod)
+	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (spc *fakeStatefulPodControl) setPodReady(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+func (om *fakeObjectManager) setPodReady(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return nil, err
 	}
@@ -2693,90 +2951,74 @@ func (spc *fakeStatefulPodControl) setPodReady(set *appsv1beta1.StatefulSet, ord
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
-	spc.podsIndexer.Update(pod)
-	return spc.podsLister.Pods(set.Namespace).List(selector)
+	om.podsIndexer.Update(pod)
+	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (spc *fakeStatefulPodControl) addTerminatingPod(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
-	pod := newStatefulSetPod(set, ordinal)
-	pod.Status.Phase = v1.PodRunning
-	deleted := metav1.NewTime(time.Now())
-	pod.DeletionTimestamp = &deleted
-	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-	fakeResourceVersion(pod)
-	podutil.UpdatePodCondition(&pod.Status, &condition)
-	spc.podsIndexer.Update(pod)
+func (om *fakeObjectManager) setPodAvailable(set *appsv1beta1.StatefulSet, ordinal int, lastTransitionTime time.Time) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
-	return spc.podsLister.Pods(set.Namespace).List(selector)
-}
-
-func (spc *fakeStatefulPodControl) setPodTerminated(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
-	pod := newStatefulSetPod(set, ordinal)
-	deleted := metav1.NewTime(time.Now())
-	pod.DeletionTimestamp = &deleted
-	fakeResourceVersion(pod)
-	spc.podsIndexer.Update(pod)
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return nil, err
 	}
-	return spc.podsLister.Pods(set.Namespace).List(selector)
-}
-
-func (spc *fakeStatefulPodControl) CreateStatefulPod(set *appsv1beta1.StatefulSet, pod *v1.Pod) error {
-	defer spc.createPodTracker.inc()
-	if spc.createPodTracker.errorReady() {
-		defer spc.createPodTracker.reset()
-		return spc.createPodTracker.err
+	if 0 > ordinal || ordinal >= len(pods) {
+		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
 	}
-
-	for _, claim := range getPersistentVolumeClaims(set, pod) {
-		spc.claimsIndexer.Update(&claim)
-	}
-	spc.podsIndexer.Update(pod)
-	return nil
-}
-
-func (spc *fakeStatefulPodControl) UpdateStatefulPod(set *appsv1beta1.StatefulSet, pod *v1.Pod) error {
-	defer spc.updatePodTracker.inc()
-	if spc.updatePodTracker.errorReady() {
-		defer spc.updatePodTracker.reset()
-		return spc.updatePodTracker.err
-	}
-	if !identityMatches(set, pod) {
-		updateIdentity(set, pod)
-	}
-	if !storageMatches(set, pod) {
-		updateStorage(set, pod)
-		for _, claim := range getPersistentVolumeClaims(set, pod) {
-			spc.claimsIndexer.Update(&claim)
+	sort.Sort(ascendingOrdinal(pods))
+	pod := pods[ordinal].DeepCopy()
+	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: lastTransitionTime}}
+	_, existingCondition := podutil.GetPodCondition(&pod.Status, condition.Type)
+	if existingCondition != nil {
+		existingCondition.Status = v1.ConditionTrue
+		existingCondition.LastTransitionTime = metav1.Time{Time: lastTransitionTime}
+	} else {
+		existingCondition = &v1.PodCondition{
+			Type:               v1.PodReady,
+			Status:             v1.ConditionTrue,
+			LastTransitionTime: metav1.Time{Time: lastTransitionTime},
 		}
+		pod.Status.Conditions = append(pod.Status.Conditions, *existingCondition)
 	}
-	spc.podsIndexer.Update(pod)
-	return nil
+	podutil.UpdatePodCondition(&pod.Status, &condition)
+	fakeResourceVersion(pod)
+	om.podsIndexer.Update(pod)
+	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (spc *fakeStatefulPodControl) DeleteStatefulPod(set *appsv1beta1.StatefulSet, pod *v1.Pod) error {
-	defer spc.deletePodTracker.inc()
-	if spc.deletePodTracker.errorReady() {
-		defer spc.deletePodTracker.reset()
-		return spc.deletePodTracker.err
+func (om *fakeObjectManager) addTerminatingPod(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+	pod := newStatefulSetPod(set, ordinal)
+	pod.SetUID(types.UID(pod.Name + "-uid")) // To match fakeObjectManager.CreatePod
+	pod.Status.Phase = v1.PodRunning
+	deleted := metav1.NewTime(time.Now())
+	pod.DeletionTimestamp = &deleted
+	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+	fakeResourceVersion(pod)
+	podutil.UpdatePodCondition(&pod.Status, &condition)
+	om.podsIndexer.Update(pod)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return nil, err
 	}
-	if key, err := controller.KeyFunc(pod); err != nil {
-		return err
-	} else if obj, found, err := spc.podsIndexer.GetByKey(key); err != nil {
-		return err
-	} else if found {
-		spc.podsIndexer.Delete(obj)
-	}
-
-	return nil
+	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-var _ StatefulPodControlInterface = &fakeStatefulPodControl{}
+func (om *fakeObjectManager) setPodTerminated(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+	pod := newStatefulSetPod(set, ordinal)
+	deleted := metav1.NewTime(time.Now())
+	pod.DeletionTimestamp = &deleted
+	fakeResourceVersion(pod)
+	om.podsIndexer.Update(pod)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	return om.podsLister.Pods(set.Namespace).List(selector)
+}
+
+var _ StatefulPodControlObjectManager = &fakeObjectManager{}
 
 type fakeStatefulSetStatusUpdater struct {
 	setsLister          kruiseappslisters.StatefulSetLister
@@ -2810,12 +3052,12 @@ func (ssu *fakeStatefulSetStatusUpdater) SetUpdateStatefulSetStatusError(err err
 
 var _ StatusUpdaterInterface = &fakeStatefulSetStatusUpdater{}
 
-func assertMonotonicInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error {
+func assertMonotonicInvariants(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return err
 	}
@@ -2834,12 +3076,9 @@ func assertMonotonicInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPo
 		}
 
 		for _, claim := range getPersistentVolumeClaims(set, pods[ord]) {
-			claim, err := spc.claimsLister.PersistentVolumeClaims(set.Namespace).Get(claim.Name)
-			if err != nil {
+			claim, _ := om.claimsLister.PersistentVolumeClaims(set.Namespace).Get(claim.Name)
+			if err := checkClaimInvarients(set, pods[ord], claim, ord); err != nil {
 				return err
-			}
-			if claim == nil {
-				return fmt.Errorf("claim %s for Pod %s was not created", claim.Name, pods[ord].Name)
 			}
 		}
 
@@ -2850,12 +3089,12 @@ func assertMonotonicInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPo
 	return nil
 }
 
-func assertBurstInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error {
+func assertBurstInvariants(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return err
 	}
@@ -2866,12 +3105,12 @@ func assertBurstInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodCon
 		}
 
 		for _, claim := range getPersistentVolumeClaims(set, pods[ord]) {
-			claim, err := spc.claimsLister.PersistentVolumeClaims(set.Namespace).Get(claim.Name)
+			claim, err := om.claimsLister.PersistentVolumeClaims(set.Namespace).Get(claim.Name)
 			if err != nil {
 				return err
 			}
-			if claim == nil {
-				return fmt.Errorf("claim %s for Pod %s was not created", claim.Name, pods[ord].Name)
+			if err := checkClaimInvarients(set, pods[ord], claim, ord); err != nil {
+				return err
 			}
 		}
 
@@ -2884,12 +3123,12 @@ func assertBurstInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodCon
 	return nil
 }
 
-func assertUpdateInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodControl) error {
+func assertUpdateInvariants(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return err
 	}
@@ -2901,12 +3140,12 @@ func assertUpdateInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodCo
 		}
 
 		for _, claim := range getPersistentVolumeClaims(set, pods[ord]) {
-			claim, err := spc.claimsLister.PersistentVolumeClaims(set.Namespace).Get(claim.Name)
+			claim, err := om.claimsLister.PersistentVolumeClaims(set.Namespace).Get(claim.Name)
 			if err != nil {
 				return err
 			}
-			if claim == nil {
-				return fmt.Errorf("claim %s for Pod %s was not created", claim.Name, pods[ord].Name)
+			if err := checkClaimInvarients(set, pods[ord], claim, ord); err != nil {
+				return err
 			}
 		}
 
@@ -2932,6 +3171,68 @@ func assertUpdateInvariants(set *appsv1beta1.StatefulSet, spc *fakeStatefulPodCo
 	return nil
 }
 
+func checkClaimInvarients(set *appsv1beta1.StatefulSet, pod *v1.Pod, claim *v1.PersistentVolumeClaim, ordinal int) error {
+	policy := appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+		WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+		WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+	}
+	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil && utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		policy = *set.Spec.PersistentVolumeClaimRetentionPolicy
+	}
+	claimShouldBeRetained := policy.WhenScaled == appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType
+	if claim == nil {
+		if claimShouldBeRetained {
+			return fmt.Errorf("claim for Pod %s was not created", pod.Name)
+		}
+		return nil // A non-retained claim has no invariants to satisfy.
+	}
+
+	if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(pod) {
+		// The pod has spun up yet, we do not expect the owner refs on the claim to have been set.
+		return nil
+	}
+
+	const retain = appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType
+	const delete = appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType
+	switch {
+	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
+		if hasOwnerRef(claim, set) {
+			return fmt.Errorf("claim %s has unexpected owner ref on %s for StatefulSet retain", claim.Name, set.Name)
+		}
+		if hasOwnerRef(claim, pod) {
+			return fmt.Errorf("claim %s has unexpected owner ref on pod %s for StatefulSet retain", claim.Name, pod.Name)
+		}
+	case policy.WhenScaled == retain && policy.WhenDeleted == delete:
+		if !hasOwnerRef(claim, set) {
+			return fmt.Errorf("claim %s does not have owner ref on %s for StatefulSet deletion", claim.Name, set.Name)
+		}
+		if hasOwnerRef(claim, pod) {
+			return fmt.Errorf("claim %s has unexpected owner ref on pod %s for StatefulSet deletion", claim.Name, pod.Name)
+		}
+	case policy.WhenScaled == delete && policy.WhenDeleted == retain:
+		if hasOwnerRef(claim, set) {
+			return fmt.Errorf("claim %s has unexpected owner ref on %s for scaledown only", claim.Name, set.Name)
+		}
+		if ordinal >= int(*set.Spec.Replicas) && !hasOwnerRef(claim, pod) {
+			return fmt.Errorf("claim %s does not have owner ref on condemned pod %s for scaledown delete", claim.Name, pod.Name)
+		}
+		if ordinal < int(*set.Spec.Replicas) && hasOwnerRef(claim, pod) {
+			return fmt.Errorf("claim %s has unexpected owner ref on condemned pod %s for scaledown delete", claim.Name, pod.Name)
+		}
+	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
+		if ordinal >= int(*set.Spec.Replicas) {
+			if !hasOwnerRef(claim, pod) || hasOwnerRef(claim, set) {
+				return fmt.Errorf("condemned claim %s has bad owner refs: %v", claim.Name, claim.GetOwnerReferences())
+			}
+		} else {
+			if hasOwnerRef(claim, pod) || !hasOwnerRef(claim, set) {
+				return fmt.Errorf("live claim %s has bad owner refs: %v", claim.Name, claim.GetOwnerReferences())
+			}
+		}
+	}
+	return nil
+}
+
 func fakeResourceVersion(object interface{}) {
 	obj, isObj := object.(metav1.Object)
 	if !isObj {
@@ -2945,32 +3246,28 @@ func fakeResourceVersion(object interface{}) {
 }
 
 func scaleUpStatefulSetControl(set *appsv1beta1.StatefulSet,
-	ssc ControlInterface,
-	spc *fakeStatefulPodControl,
+	ssc StatefulSetControlInterface,
+	om *fakeObjectManager,
 	invariants invariantFunc) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
 	for set.Status.ReadyReplicas < *set.Spec.Replicas {
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			return err
 		}
 		sort.Sort(ascendingOrdinal(pods))
 
 		// ensure all pods are valid (have a phase)
-		initialized := false
 		for ord, pod := range pods {
 			if pod.Status.Phase == "" {
-				if pods, err = spc.setPodPending(set, ord); err != nil {
+				if pods, err = om.setPodPending(set, ord); err != nil {
 					return err
 				}
 				break
 			}
-		}
-		if initialized {
-			continue
 		}
 
 		// select one of the pods and move it forward in status
@@ -2979,11 +3276,11 @@ func scaleUpStatefulSetControl(set *appsv1beta1.StatefulSet,
 			pod := pods[ord]
 			switch pod.Status.Phase {
 			case v1.PodPending:
-				if pods, err = spc.setPodRunning(set, ord); err != nil {
+				if pods, err = om.setPodRunning(set, ord); err != nil {
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = spc.setPodReady(set, ord); err != nil {
+				if pods, err = om.setPodReady(set, ord); err != nil {
 					return err
 				}
 			default:
@@ -2995,24 +3292,25 @@ func scaleUpStatefulSetControl(set *appsv1beta1.StatefulSet,
 		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 			return err
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			return err
 		}
-		if err := invariants(set, spc); err != nil {
+		if err := invariants(set, om); err != nil {
 			return err
 		}
 	}
-	return invariants(set, spc)
+	return invariants(set, om)
 }
 
-func scaleDownStatefulSetControl(set *appsv1beta1.StatefulSet, ssc ControlInterface, spc *fakeStatefulPodControl, invariants invariantFunc) error {
+func scaleDownStatefulSetControl(set *appsv1beta1.StatefulSet, ssc StatefulSetControlInterface, om *fakeObjectManager, invariants invariantFunc) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
+
 	for set.Status.Replicas > *set.Spec.Replicas {
-		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			return err
 		}
@@ -3021,42 +3319,72 @@ func scaleDownStatefulSetControl(set *appsv1beta1.StatefulSet, ssc ControlInterf
 			if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 				return err
 			}
-			set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 			if err != nil {
 				return err
 			}
-			if pods, err = spc.addTerminatingPod(set, ordinal); err != nil {
+			if pods, err = om.addTerminatingPod(set, ordinal); err != nil {
 				return err
 			}
 			if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 				return err
 			}
-			set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 			if err != nil {
 				return err
 			}
-			pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+			pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 			if err != nil {
 				return err
 			}
 			sort.Sort(ascendingOrdinal(pods))
 
 			if len(pods) > 0 {
-				spc.podsIndexer.Delete(pods[len(pods)-1])
+				om.podsIndexer.Delete(pods[len(pods)-1])
 			}
 		}
 		if err := ssc.UpdateStatefulSet(set, pods); err != nil {
 			return err
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			return err
 		}
-		if err := invariants(set, spc); err != nil {
+
+		if err := invariants(set, om); err != nil {
 			return err
 		}
 	}
-	return invariants(set, spc)
+	// If there are claims with ownerRefs on pods that have been deleted, delete them.
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		return err
+	}
+	currentPods := map[string]bool{}
+	for _, pod := range pods {
+		currentPods[pod.Name] = true
+	}
+	claims, err := om.claimsLister.PersistentVolumeClaims(set.Namespace).List(selector)
+	if err != nil {
+		return err
+	}
+	for _, claim := range claims {
+		claimPodName := getClaimPodName(set, claim)
+		if claimPodName == "" {
+			continue // Skip claims not related to a stateful set pod.
+		}
+		if _, found := currentPods[claimPodName]; found {
+			continue // Skip claims which still have a current pod.
+		}
+		for _, refs := range claim.GetOwnerReferences() {
+			if refs.Name == claimPodName {
+				om.claimsIndexer.Delete(claim)
+				break
+			}
+		}
+	}
+
+	return invariants(set, om)
 }
 
 func updateComplete(set *appsv1beta1.StatefulSet, pods []*v1.Pod) bool {
@@ -3100,14 +3428,14 @@ func updateComplete(set *appsv1beta1.StatefulSet, pods []*v1.Pod) bool {
 }
 
 func updateStatefulSetControl(set *appsv1beta1.StatefulSet,
-	ssc ControlInterface,
-	spc *fakeStatefulPodControl,
+	ssc StatefulSetControlInterface,
+	om *fakeObjectManager,
 	invariants invariantFunc) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return err
 	}
@@ -3115,16 +3443,16 @@ func updateStatefulSetControl(set *appsv1beta1.StatefulSet,
 		return err
 	}
 
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		return err
 	}
-	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		return err
 	}
 	for !updateComplete(set, pods) {
-		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			return err
 		}
@@ -3132,7 +3460,7 @@ func updateStatefulSetControl(set *appsv1beta1.StatefulSet,
 		initialized := false
 		for ord, pod := range pods {
 			if pod.Status.Phase == "" {
-				if pods, err = spc.setPodPending(set, ord); err != nil {
+				if pods, err = om.setPodPending(set, ord); err != nil {
 					return err
 				}
 				break
@@ -3147,11 +3475,11 @@ func updateStatefulSetControl(set *appsv1beta1.StatefulSet,
 			pod := pods[ord]
 			switch pod.Status.Phase {
 			case v1.PodPending:
-				if pods, err = spc.setPodRunning(set, ord); err != nil {
+				if pods, err = om.setPodRunning(set, ord); err != nil {
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = spc.setPodReady(set, ord); err != nil {
+				if pods, err = om.setPodReady(set, ord); err != nil {
 					return err
 				}
 			default:
@@ -3162,20 +3490,20 @@ func updateStatefulSetControl(set *appsv1beta1.StatefulSet,
 		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
 			return err
 		}
-		set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 		if err != nil {
 			return err
 		}
-		if err := invariants(set, spc); err != nil {
+		if err := invariants(set, om); err != nil {
 			return err
 		}
-		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		pods, err = om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			return err
 		}
 
 	}
-	return invariants(set, spc)
+	return invariants(set, om)
 }
 
 func newRevisionOrDie(set *appsv1beta1.StatefulSet, revision int64) *apps.ControllerRevision {
@@ -3248,4 +3576,9 @@ func TestScaleUpWithMaxUnavailable(t *testing.T) {
 	if set.Status.Replicas != 3 {
 		t.Fatalf("Expect status replicas=3, got %v", set.Status.Replicas)
 	}
+}
+
+func isOrHasInternalError(err error) bool {
+	agg, ok := err.(utilerrors.Aggregate)
+	return !ok && !apierrors.IsInternalError(err) || ok && len(agg.Errors()) > 0 && !apierrors.IsInternalError(agg.Errors()[0])
 }

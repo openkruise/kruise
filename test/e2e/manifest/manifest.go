@@ -18,7 +18,7 @@ limitations under the License.
 package manifest
 
 import (
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/test/e2e/framework/testfiles"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,8 +28,8 @@ import (
 )
 
 // StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.
-func StatefulSetFromManifest(fileName, ns string) (*appsv1alpha1.StatefulSet, error) {
-	var ss appsv1alpha1.StatefulSet
+func StatefulSetFromManifest(fileName, ns string) (*appsv1beta1.StatefulSet, error) {
+	var ss appsv1beta1.StatefulSet
 	data, err := testfiles.Read(fileName)
 	if err != nil {
 		return nil, err
