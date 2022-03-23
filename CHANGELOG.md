@@ -1,5 +1,50 @@
 # Change Log
 
+## v1.1.0
+
+> Change log since v1.0.1
+
+### Project
+
+- Bump Kubernetes dependencies to 1.22 and controller-runtime to v0.10.2. ([#915](https://github.com/openkruise/kruise/pull/915), [@FillZpp](https://github.com/FillZpp))
+- Disable DeepCopy for some specific cache list. ([#916](https://github.com/openkruise/kruise/pull/916), [@FillZpp](https://github.com/FillZpp))
+
+### InPlace Update
+
+- Support in-place update containers with launch priority, for workloads that supported in-place update, e.g., CloneSet, Advanced StatefulSet. ([#909](https://github.com/openkruise/kruise/pull/909), [@FillZpp](https://github.com/FillZpp))
+
+### CloneSet
+
+- Add `pod-template-hash` label into Pods, which will always be the short hash. ([#931](https://github.com/openkruise/kruise/pull/931), [@FillZpp](https://github.com/FillZpp))
+- Support pre-download image after a number of updated pods has been ready. ([#904](https://github.com/openkruise/kruise/pull/904), [@shiyan2016](https://github.com/shiyan2016))
+- Make maxUnavailable also limited to pods in new revision. ([#899](https://github.com/openkruise/kruise/pull/899), [@FillZpp](https://github.com/FillZpp))
+
+### Advanced DaemonSet
+
+- Refactor daemonset controller and fetch upstream codebase. ([#883](https://github.com/openkruise/kruise/pull/883), [@FillZpp](https://github.com/FillZpp))
+- Support preDelete lifecycle for both scale down and recreate update. ([#923](https://github.com/openkruise/kruise/pull/923), [@FillZpp](https://github.com/FillZpp))
+- Fix node event handler that should compare update selector matching changed. ([#920](https://github.com/openkruise/kruise/pull/920), [@LastNight1997](https://github.com/LastNight1997))
+- Optimize `dedupCurHistories` func in ReconcileDaemonSet. ([#912](https://github.com/openkruise/kruise/pull/912), [@LastNight1997](https://github.com/LastNight1997))
+
+### Advanced StatefulSet
+
+- Support StatefulSetAutoDeletePVC feature. ([#882](https://github.com/openkruise/kruise/pull/882), [@veophi](https://github.com/veophi))
+
+### SidecarSet
+
+- Support shared volumes in init containers. ([#929](https://github.com/openkruise/kruise/pull/929), [@outgnaY](https://github.com/outgnaY))
+- Support transferEnv in init containers. ([#897](https://github.com/openkruise/kruise/pull/897), [@pigletfly](https://github.com/pigletfly))
+- Optimize the injection for pod webhook that checks container exists. ([#927](https://github.com/openkruise/kruise/pull/927), [@zmberg](https://github.com/zmberg))
+- Fix validateSidecarConflict to avoid a same sidecar container exists in multiple sidecarsets. ([#884](https://github.com/openkruise/kruise/pull/884), [@pigletfly](https://github.com/pigletfly))
+
+### Kruise-daemon
+
+- Support CRI-O and any other common CRI types. ([#930](https://github.com/openkruise/kruise/pull/930), [@diannaowa](https://github.com/diannaowa)) & ([#936](https://github.com/openkruise/kruise/pull/936), [@FillZpp](https://github.com/FillZpp))
+
+### Other
+
+- Add `kruise_manager_is_leader` metric. ([#917](https://github.com/openkruise/kruise/pull/917), [@hatowang](https://github.com/hatowang))
+
 ## v1.0.1
 
 > Change log since v1.0.0
