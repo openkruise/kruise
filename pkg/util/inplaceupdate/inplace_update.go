@@ -216,9 +216,7 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 				return err
 			}
 			// record restart count of the pod(containers)
-			if spec.ContainerImages != nil || spec.UpdateEnvFromMetadata {
-				recordPodAndContainersRestartCount(clone, &spec, updateState.Revision)
-			}
+			recordPodAndContainersRestartCount(clone, &spec, updateState.Revision)
 			appspub.RemoveInPlaceUpdateGrace(clone)
 		}
 		_, err = c.podAdapter.UpdatePod(clone)
@@ -257,9 +255,7 @@ func (c *realControl) updateNextBatch(pod *v1.Pod, opts *UpdateOptions) (bool, e
 			return err
 		}
 		// record restart count of the pod(containers)
-		if spec.ContainerImages != nil || spec.UpdateEnvFromMetadata {
-			recordPodAndContainersRestartCount(clone, &spec, state.Revision)
-		}
+		recordPodAndContainersRestartCount(clone, &spec, state.Revision)
 		updated = true
 		_, err = c.podAdapter.UpdatePod(clone)
 		return err
@@ -339,9 +335,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 				return err
 			}
 			// record restart count of the pod(containers)
-			if spec.ContainerImages != nil || spec.UpdateEnvFromMetadata {
-				recordPodAndContainersRestartCount(clone, spec, inPlaceUpdateState.Revision)
-			}
+			recordPodAndContainersRestartCount(clone, spec, inPlaceUpdateState.Revision)
 			appspub.RemoveInPlaceUpdateGrace(clone)
 		} else {
 			inPlaceUpdateSpecJSON, _ := json.Marshal(spec)
@@ -479,6 +473,9 @@ func doPreCheckBeforeNext(pod *v1.Pod, preCheck *appspub.InPlaceUpdatePreCheckBe
 
 // recordPodAndContainersRestartCount record the count of pod(containers) restarts
 func recordPodAndContainersRestartCount(pod *v1.Pod, spec *UpdateSpec, revision string) {
+	if spec.ContainerImages == nil && !spec.UpdateEnvFromMetadata {
+		return
+	}
 	var currentPodRestartCount int64
 	containersRestartCount := make(map[string]appspub.InPlaceUpdateContainerRestartCount)
 	//revision := pod.GetLabels()["controller-revision-hash"]
