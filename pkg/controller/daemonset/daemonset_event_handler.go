@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 	"strings"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +41,8 @@ var _ handler.EventHandler = &podEventHandler{}
 
 type podEventHandler struct {
 	client.Reader
-	expectations kubecontroller.ControllerExpectationsInterface
+	expectations     kubecontroller.ControllerExpectationsInterface
+	deletionUIDCache sync.Map
 }
 
 func enqueueDaemonSet(q workqueue.RateLimitingInterface, ds *appsv1alpha1.DaemonSet) {
@@ -117,7 +119,7 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
 		// for modification of the deletion timestamp and expect an ds to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod.
-		e.Delete(event.DeleteEvent{Object: evt.ObjectNew}, q)
+		e.deletePod(curPod, q, false)
 		return
 	}
 
@@ -153,7 +155,10 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 		klog.Errorf("DeleteEvent parse pod failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
 		return
 	}
+	e.deletePod(pod, q, true)
+}
 
+func (e *podEventHandler) deletePod(pod *v1.Pod, q workqueue.RateLimitingInterface, isDeleted bool) {
 	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
@@ -164,8 +169,15 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 		return
 	}
 
-	klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, ds.Name)
-	e.expectations.DeletionObserved(keyFunc(ds))
+	if _, loaded := e.deletionUIDCache.LoadOrStore(pod.UID, struct{}{}); !loaded {
+		e.expectations.DeletionObserved(keyFunc(ds))
+	}
+	if isDeleted {
+		e.deletionUIDCache.Delete(pod.UID)
+		klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, ds.Name)
+	} else {
+		klog.V(4).Infof("Pod %s/%s terminating, owner: %s", pod.Namespace, pod.Name, ds.Name)
+	}
 	enqueueDaemonSet(q, ds)
 }
 
