@@ -114,7 +114,7 @@ type InPlaceUpdateContainerRestartCount struct {
 	// RestartCount is the container restart count
 	RestartCount int `json:"restartCount,omitempty"`
 	// Timestamp is the time for this update
-	Timestamp metav1.Time `json:"timestamp"`
+	Timestamp metav1.Time `json:"timestamp,omitempty"`
 }
 
 func GetInPlaceUpdateState(obj metav1.Object) (string, bool) {
