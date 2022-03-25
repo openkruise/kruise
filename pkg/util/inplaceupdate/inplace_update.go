@@ -89,7 +89,6 @@ type UpdateSpec struct {
 	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
 	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
 }
-
 type realControl struct {
 	podAdapter      podadapter.Adapter
 	revisionAdapter revisionadapter.Interface
@@ -478,14 +477,15 @@ func recordPodAndContainersRestartCount(pod *v1.Pod, spec *UpdateSpec, revision 
 	}
 	var currentPodRestartCount int64
 	containersRestartCount := make(map[string]appspub.InPlaceUpdateContainerRestartCount)
-	//revision := pod.GetLabels()["controller-revision-hash"]
 
 	if v, ok := pod.Annotations[appspub.InPlaceUpdatePodRestartKey]; ok {
 		currentPodRestartCount, _ = strconv.ParseInt(v, 10, 64)
 	}
 
 	if v, ok := pod.Annotations[appspub.InPlaceUpdateContainersRestartKey]; ok {
-		_ = json.Unmarshal([]byte(v), &containersRestartCount)
+		if err := json.Unmarshal([]byte(v), &containersRestartCount); err != nil {
+			return
+		}
 	}
 	calculateRestartCountFunc := func(cname string) {
 		containerRestartCount, ok := containersRestartCount[cname]
