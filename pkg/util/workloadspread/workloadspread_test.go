@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -787,10 +788,11 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 
 func TestIsReferenceEqual(t *testing.T) {
 	cases := []struct {
-		name         string
-		getTargetRef func() *appsv1alpha1.TargetReference
-		getOwnerRef  func() *metav1.OwnerReference
-		expectEqual  bool
+		name            string
+		getTargetRef    func() *appsv1alpha1.TargetReference
+		getOwnerRef     func() *metav1.OwnerReference
+		podTemplateHash string
+		expectEqual     bool
 	}{
 		{
 			name: "ApiVersion, Kind, Name equals",
@@ -806,6 +808,7 @@ func TestIsReferenceEqual(t *testing.T) {
 					APIVersion: "apps.kruise.io/v1alpha1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
+					Controller: utilpointer.BoolPtr(true),
 				}
 			},
 			expectEqual: true,
@@ -824,6 +827,7 @@ func TestIsReferenceEqual(t *testing.T) {
 					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
+					Controller: utilpointer.BoolPtr(true),
 				}
 			},
 			expectEqual: true,
@@ -842,6 +846,7 @@ func TestIsReferenceEqual(t *testing.T) {
 					APIVersion: "apps/v1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
+					Controller: utilpointer.BoolPtr(true),
 				}
 			},
 			expectEqual: false,
@@ -860,16 +865,44 @@ func TestIsReferenceEqual(t *testing.T) {
 					APIVersion: "apps.kruise.io/v1alpha1",
 					Kind:       "CloneSet",
 					Name:       "test-2",
+					Controller: utilpointer.BoolPtr(true),
 				}
 			},
 			expectEqual: false,
+		},
+		{
+			name: "Deployment, but replicaset is not cached",
+			getTargetRef: func() *appsv1alpha1.TargetReference {
+				return &appsv1alpha1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       "test-1",
+				}
+			},
+			podTemplateHash: "123456",
+			getOwnerRef: func() *metav1.OwnerReference {
+				return &metav1.OwnerReference{
+					APIVersion: "apps/v1",
+					Kind:       "ReplicaSet",
+					Name:       "test-1-123456",
+					Controller: utilpointer.BoolPtr(true),
+				}
+			},
+			expectEqual: true,
 		},
 	}
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			h := Handler{}
-			if h.isReferenceEqual(cs.getTargetRef(), cs.getOwnerRef(), "") != cs.expectEqual {
+			deploy := &apps.Deployment{}
+			deploy.SetName(cs.getTargetRef().Name)
+			cli := fake.NewClientBuilder().WithObjects(deploy).Build()
+			h := Handler{Client: cli}
+			pod := &corev1.Pod{}
+			pod.SetNamespace("")
+			pod.Labels = map[string]string{apps.DefaultDeploymentUniqueLabelKey: cs.podTemplateHash}
+			pod.SetOwnerReferences([]metav1.OwnerReference{*cs.getOwnerRef()})
+			if h.isReferenceEqual(cs.getTargetRef(), pod) != cs.expectEqual {
 				t.Fatalf("isReferenceEqual failed")
 			}
 		})

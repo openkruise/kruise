@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -289,6 +290,8 @@ func (r *ReconcileWorkloadSpread) listPodInfoForWorkloadSpread(ws *appsv1alpha1.
 			return nil, nil, "", 0, err
 		}
 
+		maxRevision := 0
+		var latestRS *appsv1.ReplicaSet
 		for i := range rsList.Items {
 			rs := &rsList.Items[i]
 			ownerRef := metav1.GetControllerOfNoCopy(rs)
@@ -296,9 +299,19 @@ func (r *ReconcileWorkloadSpread) listPodInfoForWorkloadSpread(ws *appsv1alpha1.
 				continue
 			}
 			workloadUIDs = append(workloadUIDs, rs.UID)
-			if util.EqualIgnoreHash(&rs.Spec.Template, &deployment.Spec.Template) {
-				latestRevision = rs.Labels[appsv1.DefaultDeploymentUniqueLabelKey]
+			rsRevision, _ := strconv.Atoi(rs.Annotations[appsv1.ControllerRevisionHashLabelKey])
+			if maxRevision < rsRevision {
+				latestRS = rs
+				maxRevision = rsRevision
 			}
+		}
+
+		if latestRS != nil &&
+			// Solve the case that deployment cache is synced more slowly than replicaset
+			wsutil.IsReplicaSetRevisionLessThanOrEqualToDeployment(latestRS, deployment) &&
+			// double check for the replicaset and deployment pod template
+			util.EqualIgnoreHash(&latestRS.Spec.Template, &deployment.Spec.Template) {
+			latestRevision = latestRS.Labels[appsv1.DefaultDeploymentUniqueLabelKey]
 		}
 
 		if len(latestRevision) == 0 {

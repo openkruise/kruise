@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"strconv"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -1681,6 +1681,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			// create deployment, replicas = 2
 			deployment = tester.CreateDeployment(deployment)
 			tester.WaitForDeploymentRunning(deployment)
+			tester.WaitForWorkloadSpreadRunning(workloadSpread)
 
 			// get pods, and check workloadSpread
 			ginkgo.By(fmt.Sprintf("get deployment(%s/%s) pods, and check workloadSpread(%s/%s) status", deployment.Namespace, deployment.Name, workloadSpread.Namespace, workloadSpread.Name))
@@ -1718,6 +1719,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			deployment.Spec.Replicas = pointer.Int32Ptr(6)
 			tester.UpdateDeployment(deployment)
 			tester.WaitForDeploymentRunning(deployment)
+			tester.WaitForWorkloadSpreadRunning(workloadSpread)
 
 			// get pods, and check workloadSpread
 			ginkgo.By(fmt.Sprintf("get deployment(%s/%s) pods, and check workloadSpread(%s/%s) status", deployment.Namespace, deployment.Name, workloadSpread.Namespace, workloadSpread.Name))
@@ -1800,6 +1802,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			deployment.Spec.Replicas = pointer.Int32Ptr(2)
 			tester.UpdateDeployment(deployment)
 			tester.WaitForDeploymentRunning(deployment)
+			tester.WaitForWorkloadSpreadRunning(workloadSpread)
 
 			// get pods, and check workloadSpread
 			ginkgo.By(fmt.Sprintf("get deployment(%s/%s) pods, and check workloadSpread(%s/%s) status", deployment.Namespace, deployment.Name, workloadSpread.Namespace, workloadSpread.Name))

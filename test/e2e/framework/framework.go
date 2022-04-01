@@ -26,7 +26,6 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
@@ -213,51 +212,51 @@ func (f *Framework) BeforeEach() {
 func (f *Framework) AfterEach() {
 	RemoveCleanupAction(f.cleanupHandle)
 
-	// DeleteNamespace at the very end in defer, to avoid any
-	// expectation failures preventing deleting the namespace.
-	defer func() {
-		nsDeletionErrors := map[string]error{}
-		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
-		// if delete-namespace set to false, namespace will always be preserved.
-		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
-		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
-			for _, ns := range f.namespacesToDelete {
-				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-				timeout := DefaultNamespaceDeletionTimeout
-				if f.NamespaceDeletionTimeout != 0 {
-					timeout = f.NamespaceDeletionTimeout
-				}
-				if err := deleteNS(f.ClientSet, f.DynamicClient, ns.Name, timeout); err != nil {
-					if !apierrors.IsNotFound(err) {
-						nsDeletionErrors[ns.Name] = err
-					} else {
-						Logf("Namespace %v was already deleted", ns.Name)
-					}
-				}
-			}
-		} else {
-			if !TestContext.DeleteNamespace {
-				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-			} else {
-				Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
-			}
-		}
-
-		// Paranoia-- prevent reuse!
-		f.Namespace = nil
-		f.KruiseClientSet = nil
-		f.ClientSet = nil
-		f.namespacesToDelete = nil
-
-		// if we had errors deleting, report them now.
-		if len(nsDeletionErrors) != 0 {
-			messages := []string{}
-			for namespaceKey, namespaceErr := range nsDeletionErrors {
-				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
-			}
-			Failf(strings.Join(messages, ","))
-		}
-	}()
+	//// DeleteNamespace at the very end in defer, to avoid any
+	//// expectation failures preventing deleting the namespace.
+	//defer func() {
+	//	nsDeletionErrors := map[string]error{}
+	//	// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
+	//	// if delete-namespace set to false, namespace will always be preserved.
+	//	// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
+	//	if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
+	//		for _, ns := range f.namespacesToDelete {
+	//			ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
+	//			timeout := DefaultNamespaceDeletionTimeout
+	//			if f.NamespaceDeletionTimeout != 0 {
+	//				timeout = f.NamespaceDeletionTimeout
+	//			}
+	//			if err := deleteNS(f.ClientSet, f.DynamicClient, ns.Name, timeout); err != nil {
+	//				if !apierrors.IsNotFound(err) {
+	//					nsDeletionErrors[ns.Name] = err
+	//				} else {
+	//					Logf("Namespace %v was already deleted", ns.Name)
+	//				}
+	//			}
+	//		}
+	//	} else {
+	//		if !TestContext.DeleteNamespace {
+	//			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
+	//		} else {
+	//			Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
+	//		}
+	//	}
+	//
+	//	// Paranoia-- prevent reuse!
+	//	f.Namespace = nil
+	//	f.KruiseClientSet = nil
+	//	f.ClientSet = nil
+	//	f.namespacesToDelete = nil
+	//
+	//	// if we had errors deleting, report them now.
+	//	if len(nsDeletionErrors) != 0 {
+	//		messages := []string{}
+	//		for namespaceKey, namespaceErr := range nsDeletionErrors {
+	//			messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
+	//		}
+	//		Failf(strings.Join(messages, ","))
+	//	}
+	//}()
 
 	// Print events if the test failed.
 	if ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {

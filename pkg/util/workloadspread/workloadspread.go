@@ -51,8 +51,6 @@ const (
 
 	PodDeletionCostPositive = 100
 	PodDeletionCostNegative = -100
-
-	DeploymentRevisionAnnotation = "deployment.kubernetes.io/revision"
 )
 
 var (
@@ -183,7 +181,7 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 			continue
 		}
 		// determine if the reference of workloadSpread and pod is equal
-		if h.isReferenceEqual(ws.Spec.TargetReference, ref, pod.Namespace) {
+		if h.isReferenceEqual(ws.Spec.TargetReference, pod) {
 			matchedWS = &ws
 			// pod has at most one matched workloadSpread
 			break
@@ -195,8 +193,8 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 	}
 
 	defer func() {
-		klog.V(3).Infof("Cost of handling pod creation by WorkloadSpread (%s/%s) is %v",
-			matchedWS.Namespace, matchedWS.Name, time.Since(start))
+		klog.V(3).Infof("Cost of handling Pod(%v/%v) creation by WorkloadSpread (%s/%s) is %v",
+			pod.Namespace, pod.Name, matchedWS.Namespace, matchedWS.Name, time.Since(start))
 	}()
 
 	return h.mutatingPod(matchedWS, pod, nil, CreateOperation)
@@ -272,7 +270,7 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 			pod.Namespace, podName, suitableSubsetName, matchedWS.Namespace, matchedWS.Name)
 	}
 
-	klog.V(3).Infof("handler operation[%s] Pod(%s/%s) generatedUID(%s) for WorkloadSpread(%s/%s) done",
+	klog.V(3).Infof("handle operation[%s] Pod(%s/%s) generatedUID(%s) for WorkloadSpread(%s/%s) done",
 		operation, pod.Namespace, podName, generatedUID, matchedWS.Namespace, matchedWS.Name)
 
 	return injectErr
@@ -409,7 +407,7 @@ func (h *Handler) handleWorkloadChange(ws *appsv1alpha1.WorkloadSpread, pod *cor
 		return false, -1, nil
 	}
 
-	var workloadReplicas int32 = 1
+	var workloadReplicas int32 = 0
 	switch ws.Spec.TargetReference.Kind {
 	// Deployment Handler
 	case controllerKindDep.Kind:
@@ -426,28 +424,45 @@ func (h *Handler) handleWorkloadChange(ws *appsv1alpha1.WorkloadSpread, pod *cor
 		if err := h.Client.Get(context.TODO(), depKey, deployment); client.IgnoreNotFound(err) != nil {
 			return false, -1, err
 		} else if errors.IsNotFound(err) {
-			return false, -1, nil
+			// In creation case, this pod most likely is the latest revision, because this deployment cache is not synced by our informer, how fresh is this pod!
+			// In deletion/eviction case, if this deployment is not found, the pod most likely is dangling pod, we can ignore this case, because the workload has gone!
+			// Actually, in most cases, this condition will not be true, because we have returned in HandlePodCreation func if deployment is not found.
+			klog.Warningf("WorkloadSpread(%v/%v) cannot find Deployment when handle Pod(%v) create", ws.Namespace, ws.Name, pod.Name)
 		}
 
-		// record workload replicas if possible
-		if deployment.Spec.Replicas != nil {
-			workloadReplicas = *deployment.Spec.Replicas
+		// deployment is not deleted and is cached by this webhook informer
+		if deployment != nil {
+			if deployment.Spec.Replicas != nil {
+				workloadReplicas = *deployment.Spec.Replicas
+			} else {
+				// deployment default replicas is 1
+				workloadReplicas = 1
+			}
+
+			replicaset := h.GetOwnerReplicaSetFor(pod)
+			if replicaset != nil &&
+				// make sure it is not the case that the replicaset is cached before deployment
+				IsReplicaSetRevisionLessThanOrEqualToDeployment(replicaset, deployment) &&
+				!util.EqualIgnoreHash(&deployment.Spec.Template, &replicaset.Spec.Template) {
+				return false, workloadReplicas, nil
+			}
+
+			// we check the existence of replicaset to address informer cache latency problem, because if the
+			// replicaset is not found when creating, the pod most likely is the latest revision.
+			if replicaset == nil && operation != CreateOperation {
+				return false, workloadReplicas, nil
+			}
 		}
 
-		// if you are confused for why we compute updatedRevision via the following algorithm, you can refer to deployment controller codes
-		// https://github.com/kubernetes/kubernetes/blob/c9589d647373ee2901fe381e62d40b669e819fba/pkg/controller/deployment/sync.go#L189
-		updateRevision := kubecontroller.ComputeHash(&deployment.Spec.Template, deployment.Status.CollisionCount)
-		if updateRevision != podTemplateHash {
-			return false, -1, nil
-		}
-
-		// if workloadSpread doesn't observe this updatedRevision yet, then reset the workloadSpread status.
-		if ws.Status.ObservedWorkloadRevision != podTemplateHash {
-			newStatus := resetStatus(ws, int(*deployment.Spec.Replicas), podTemplateHash)
+		// If workloadSpread doesn't observe this updatedRevision yet, then refresh the workloadSpread status.
+		// But, we are only interested in creation event to refresh the status.
+		if ws.Status.ObservedWorkloadRevision != podTemplateHash && operation == CreateOperation {
+			// TODO: In case of workload not found, if use percentages as MaxSurge, we cannot reset the status
+			newStatus := resetStatus(ws, int(workloadReplicas), podTemplateHash)
 			if newStatus == nil {
 				return true, workloadReplicas, nil
 			}
-			klog.V(3).Infof("WorkloadSpread(%v/%v) observed deployment revision changed: %v --> %v, and reset status %+v -> %+v",
+			klog.Warningf("WorkloadSpread(%v/%v) observed deployment revision changed: %v --> %v, and reset status %+v -> %+v",
 				ws.Namespace, ws.Name, ws.Status.ObservedWorkloadRevision, podTemplateHash, ws.Status, *newStatus)
 			ws.Status = *newStatus
 		}
@@ -457,6 +472,23 @@ func (h *Handler) handleWorkloadChange(ws *appsv1alpha1.WorkloadSpread, pod *cor
 	}
 
 	return true, workloadReplicas, nil
+}
+
+func (h *Handler) GetOwnerReplicaSetFor(pod *corev1.Pod) *appsv1.ReplicaSet {
+	owner := metav1.GetControllerOfNoCopy(pod)
+	if owner == nil || owner.Kind != controllerKindRS.Kind {
+		return nil
+	}
+	ownerKey := types.NamespacedName{
+		Name:      owner.Name,
+		Namespace: pod.GetNamespace(),
+	}
+
+	replicaset := &appsv1.ReplicaSet{}
+	if err := h.Get(context.TODO(), ownerKey, replicaset); err == nil {
+		return replicaset
+	}
+	return nil
 }
 
 // resetStatus will reset some fields of status, including:
@@ -809,7 +841,9 @@ func (h *Handler) getSuitableSubsetForOldRevision(ws *appsv1alpha1.WorkloadSprea
 	return &ws.Status.SubsetStatuses[suitableSubsetIndex]
 }
 
-func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) bool {
+func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, pod *corev1.Pod) bool {
+	namespace := pod.GetNamespace()
+	owner := metav1.GetControllerOfNoCopy(pod)
 	targetGv, err := schema.ParseGroupVersion(target.APIVersion)
 	if err != nil {
 		klog.Errorf("parse TargetReference apiVersion (%s) failed: %s", target.APIVersion, err.Error())
@@ -820,20 +854,34 @@ func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *m
 	if target.Kind == controllerKindDep.Kind {
 		rs := &appsv1.ReplicaSet{}
 		err = h.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: owner.Name}, rs)
-		if err != nil {
+		switch {
+		case client.IgnoreNotFound(err) != nil:
 			return false
-		}
-		if rs.UID != owner.UID {
-			return false
-		}
 
-		owner = metav1.GetControllerOf(rs)
-		if owner == nil {
+		// address informer cache latency problem, we directly fetch the deployment instead of replicaSet.
+		// TODO: hanle the case that the deployment is not found due to informer cache latency. In fact, all types of workloads face this problem too.
+		case errors.IsNotFound(err):
+			deploymentName := ParseDeploymentNameFrom(pod)
+			if deploymentName != "" {
+				deployment := &appsv1.Deployment{}
+				deploymentKey := types.NamespacedName{Name: deploymentName, Namespace: namespace}
+				return h.Get(context.TODO(), deploymentKey, deployment) == nil
+			}
 			return false
-		}
-		ok, err := VerifyGroupKind(owner, controllerKindDep.Kind, []string{controllerKindDep.Group})
-		if !ok || err != nil {
-			return false
+
+		default:
+			if rs.UID != owner.UID {
+				return false
+			}
+
+			owner = metav1.GetControllerOf(rs)
+			if owner == nil {
+				return false
+			}
+			ok, err := VerifyGroupKind(owner, controllerKindDep.Kind, []string{controllerKindDep.Group})
+			if !ok || err != nil {
+				return false
+			}
 		}
 	}
 	ownerGv, err = schema.ParseGroupVersion(owner.APIVersion)
@@ -843,4 +891,31 @@ func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *m
 	}
 
 	return targetGv.Group == ownerGv.Group && target.Kind == owner.Kind && target.Name == owner.Name
+}
+
+func ParseDeploymentNameFrom(pod *corev1.Pod) string {
+	owner := metav1.GetControllerOfNoCopy(pod)
+	if owner == nil || owner.Kind != controllerKindRS.Kind {
+		return ""
+	}
+
+	podTemplateHash := pod.Labels[appsv1.DefaultDeploymentUniqueLabelKey]
+	if podTemplateHash == "" {
+		return ""
+	}
+
+	deploymentName := owner.Name[:len(owner.Name)-len(podTemplateHash)-1]
+	klog.V(5).Infof("parsed deployment-name: %v, replicaset-name: %v, pod-template-hash: %v.",
+		deploymentName, owner.Name, podTemplateHash)
+
+	return deploymentName
+}
+
+func IsReplicaSetRevisionLessThanOrEqualToDeployment(replicaset *appsv1.ReplicaSet, deployment *appsv1.Deployment) bool {
+	var rsRevision, dmRevision int64
+	rsRevisionStr := replicaset.Annotations[appsv1.ControllerRevisionHashLabelKey]
+	dmRevisionStr := deployment.Annotations[appsv1.ControllerRevisionHashLabelKey]
+	_ = runtime.Convert_string_To_int64(&rsRevisionStr, &rsRevision, nil)
+	_ = runtime.Convert_string_To_int64(&dmRevisionStr, &dmRevision, nil)
+	return rsRevision <= dmRevision
 }

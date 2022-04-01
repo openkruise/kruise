@@ -89,6 +89,38 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 	}
 	replicas := len(activePods)
 
+	var subsetMaxReplicas int
+	if subset != nil && subset.MaxReplicas != nil {
+		subsetMaxReplicas, err = intstr.GetValueFromIntOrPercent(subset.MaxReplicas, int(workloadReplicas), true)
+		if err != nil || subsetMaxReplicas < 0 {
+			klog.Errorf("failed to get maxReplicas value from subset (%s) of WorkloadSpread (%s/%s)",
+				subset.Name, ws.Namespace, ws.Name)
+			return nil
+		}
+	}
+
+	IsPodDeletionCostAllCorrect := func(checkPods []*corev1.Pod) bool {
+		negativeCost := strconv.Itoa(wsutil.PodDeletionCostNegative * (subsetIndex + 1))
+		positiveCost := strconv.Itoa(wsutil.PodDeletionCostPositive * (len(ws.Spec.Subsets) - subsetIndex))
+		switch {
+		case subset == nil:
+			return checkPodsDeletionCost(checkPods, 0, "", len(activePods), negativeCost)
+		case subset.MaxReplicas == nil:
+			return checkPodsDeletionCost(checkPods, len(activePods), positiveCost, 0, "")
+		default:
+			return checkPodsDeletionCost(checkPods, subsetMaxReplicas, positiveCost, len(activePods)-subsetMaxReplicas, negativeCost)
+		}
+	}
+
+	// If all pod deletion cost are correct, just return to avoid repeatedly and frequently updating the pods.
+	// In fact, it's not necessary to adjust the deletion cost according to pod ready condition every reconcile,
+	// because the pod ready condition has much higher priority than deletion cost for workload, so don't worry:
+	// - CloneSet:
+	// - Deployment/ReplicaSet:
+	if IsPodDeletionCostAllCorrect(activePods) {
+		return nil
+	}
+
 	// First we partition Pods into two lists: positive, negative list.
 	if subset == nil {
 		// for the scene of FakeSubsetName, where the pods don't match any subset and will be deleted preferentially.
@@ -96,32 +128,24 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 	} else if subset.MaxReplicas == nil {
 		// maxReplicas is nil, which means there is no limit to the number of Pods in this subset.
 		positivePods = activePods
+	} else if replicas <= subsetMaxReplicas {
+		// the number of pods in this subset does not reach the MaxReplicas limitation
+		positivePods = activePods
 	} else {
-		subsetMaxReplicas, err := intstr.GetValueFromIntOrPercent(subset.MaxReplicas, int(workloadReplicas), true)
-		if err != nil || subsetMaxReplicas < 0 {
-			klog.Errorf("failed to get maxReplicas value from subset (%s) of WorkloadSpread (%s/%s)",
-				subset.Name, ws.Namespace, ws.Name)
-			return nil
-		}
+		// Pods are classified two class, the one is more healthy and it's size = subsetMaxReplicas, so
+		// setting deletion-cost to positive, another one is the left Pods means preferring to delete it,
+		// setting deletion-cost to negative， size = replicas - subsetMaxReplicas.
+		positivePods = make([]*corev1.Pod, 0, subsetMaxReplicas)
+		negativePods = make([]*corev1.Pod, 0, replicas-subsetMaxReplicas)
 
-		if replicas <= subsetMaxReplicas {
-			positivePods = activePods
-		} else {
-			// Pods are classified two class, the one is more healthy and it's size = subsetMaxReplicas, so
-			// setting deletion-cost to positive, another one is the left Pods means preferring to delete it,
-			// setting deletion-cost to negative， size = replicas - subsetMaxReplicas.
-			positivePods = make([]*corev1.Pod, 0, subsetMaxReplicas)
-			negativePods = make([]*corev1.Pod, 0, replicas-subsetMaxReplicas)
-
-			// sort Pods according to Pod's condition.
-			indexes := sortDeleteIndexes(activePods)
-			// partition Pods into negativePods and positivePods by sorted indexes.
-			for i := range indexes {
-				if i < (replicas - subsetMaxReplicas) {
-					negativePods = append(negativePods, activePods[indexes[i]])
-				} else {
-					positivePods = append(positivePods, activePods[indexes[i]])
-				}
+		// sort Pods according to Pod's condition.
+		indexes := sortDeleteIndexes(activePods)
+		// partition Pods into negativePods and positivePods by sorted indexes.
+		for i := range indexes {
+			if i < (replicas - subsetMaxReplicas) {
+				negativePods = append(negativePods, activePods[indexes[i]])
+			} else {
+				positivePods = append(positivePods, activePods[indexes[i]])
 			}
 		}
 	}
@@ -202,4 +226,19 @@ func sortDeleteIndexes(pods []*corev1.Pod) []int {
 	})
 
 	return waitDeleteIndexes
+}
+
+func checkPodsDeletionCost(pods []*corev1.Pod, positiveCount int, positiveCost string, negativeCount int, negativeCost string) bool {
+	realPositiveCount, realNegativeCount := 0, 0
+	for _, pod := range pods {
+		switch pod.Annotations[wsutil.PodDeletionCostAnnotation] {
+		case positiveCost:
+			realPositiveCount++
+		case negativeCost:
+			realNegativeCount++
+		default:
+			return false
+		}
+	}
+	return realPositiveCount == positiveCount && realNegativeCount == negativeCount
 }
