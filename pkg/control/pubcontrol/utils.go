@@ -64,6 +64,7 @@ const (
 // parameters:
 // 1. allowed(bool) indicates whether to allow this update operation
 // 2. err(error)
+
 func PodUnavailableBudgetValidatePod(client client.Client, pod *corev1.Pod, control PubControl, operation Operation, dryRun bool) (allowed bool, reason string, err error) {
 	pub := control.GetPodUnavailableBudget()
 	// If the pod is not ready, it doesn't count towards healthy and we should not decrement
