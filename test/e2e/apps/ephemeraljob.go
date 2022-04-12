@@ -308,7 +308,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			gomega.Eventually(func() int {
 				job, _ := tester.GetEphemeralJob(job1.Name)
 				return int(job.Status.Running)
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(1))
+			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(1))
 
 			gomega.Eventually(func() int {
 				targetPods, err := tester.GetPodsByEjob(job1.Name)
