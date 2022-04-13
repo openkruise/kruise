@@ -194,7 +194,11 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	}
 
 	if state != "" {
-		if updated, gotPod, err := c.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
+		var requiredPodNotReady bool
+		if cs.Spec.Lifecycle != nil && cs.Spec.Lifecycle.InPlaceUpdate != nil {
+			requiredPodNotReady = cs.Spec.Lifecycle.InPlaceUpdate.MarkPodNotReady
+		}
+		if updated, gotPod, err := c.lifecycleControl.UpdatePodLifecycle(pod, state, requiredPodNotReady); err != nil {
 			return false, 0, err
 		} else if updated {
 			clonesetutils.ResourceVersionExpectations.Expect(gotPod)
@@ -245,7 +249,8 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 				var updated bool
 				var gotPod *v1.Pod
 				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
-					if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
+					requiredPodNotReady := cs.Spec.Lifecycle.InPlaceUpdate.MarkPodNotReady
+					if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate, requiredPodNotReady); err == nil && updated {
 						clonesetutils.ResourceVersionExpectations.Expect(gotPod)
 						klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
 							clonesetutils.GetControllerKey(cs), pod.Name)

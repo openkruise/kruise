@@ -790,7 +790,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, pod *v1.Pod) (bool, error) {
 	if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.PreDelete, pod) {
-		if updated, _, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
+		requiredPodNotReady := set.Spec.Lifecycle.PreDelete.MarkPodNotReady
+		if updated, _, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete, requiredPodNotReady); err != nil {
 			return false, err
 		} else if updated {
 			klog.V(3).Infof("StatefulSet %s scaling update pod %s lifecycle to PreparingDelete",
@@ -842,7 +843,11 @@ func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulS
 	}
 
 	if state != "" {
-		if updated, _, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
+		var requiredPodNotReady bool
+		if set.Spec.Lifecycle != nil && set.Spec.Lifecycle.InPlaceUpdate != nil {
+			requiredPodNotReady = set.Spec.Lifecycle.InPlaceUpdate.MarkPodNotReady
+		}
+		if updated, _, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, state, requiredPodNotReady); err != nil {
 			return false, 0, err
 		} else if updated {
 			klog.V(3).Infof("AdvancedStatefulSet %s update pod %s lifecycle to %s",
@@ -886,7 +891,8 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 			var err error
 			var updated bool
 			if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
-				if updated, _, err = ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
+				requiredPodNotReady := set.Spec.Lifecycle.InPlaceUpdate.MarkPodNotReady
+				if updated, _, err = ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate, requiredPodNotReady); err == nil && updated {
 					klog.V(3).Infof("StatefulSet %s updated pod %s lifecycle to PreparingUpdate",
 						getStatefulSetKey(set), pod.Name)
 				}

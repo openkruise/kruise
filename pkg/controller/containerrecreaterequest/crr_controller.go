@@ -273,7 +273,7 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1
 			}
 		}
 
-		err := utilpodreadiness.AddNotReadyKey(r.Client, pod, getReadinessMessage(crr))
+		err := utilpodreadiness.NewCommon(r.Client).AddNotReadyKey(pod, getReadinessMessage(crr))
 		if err != nil {
 			return fmt.Errorf("add Pod not ready error: %v", err)
 		}
@@ -287,7 +287,7 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1
 
 func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
 	if pod != nil && pod.DeletionTimestamp == nil && utilpodreadiness.ContainsReadinessGate(pod) {
-		err := utilpodreadiness.RemoveNotReadyKey(r.Client, pod, getReadinessMessage(crr))
+		err := utilpodreadiness.NewCommon(r.Client).RemoveNotReadyKey(pod, getReadinessMessage(crr))
 		if err != nil {
 			return fmt.Errorf("remove Pod not ready error: %v", err)
 		}

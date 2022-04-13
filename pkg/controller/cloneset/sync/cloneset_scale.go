@@ -165,6 +165,14 @@ func (r *realControl) Scale(
 }
 
 func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, podsInPreDelete []*v1.Pod, numToDelete int) (bool, error) {
+	//  We do not allow regret once the pod enter PreparingDelete state if MarkPodNotReady is set.
+	// Actually, there is a bug cased by this transformation from PreparingDelete to Normal,
+	// i.e., Lifecycle Updated Hook may be lost if the pod was transformed from Updating state
+	// to PreparingDelete.
+	if lifecycle.IsRequiredPodNotReady(cs.Spec.Lifecycle) {
+		return false, nil
+	}
+
 	diff := int(*cs.Spec.Replicas) - len(pods) + numToDelete
 	var modified bool
 	for _, pod := range podsInPreDelete {
@@ -177,7 +185,7 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 
 		klog.V(3).Infof("CloneSet %s patch pod %s lifecycle from PreparingDelete to Normal",
 			clonesetutils.GetControllerKey(cs), pod.Name)
-		if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStateNormal); err != nil {
+		if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStateNormal, false); err != nil {
 			return modified, err
 		} else if updated {
 			modified = true
@@ -270,7 +278,8 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 	var modified bool
 	for _, pod := range podsToDelete {
 		if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.PreDelete, pod) {
-			if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
+			requiredPodNotReady := cs.Spec.Lifecycle.PreDelete.MarkPodNotReady
+			if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete, requiredPodNotReady); err != nil {
 				return false, err
 			} else if updated {
 				klog.V(3).Infof("CloneSet %s scaling update pod %s lifecycle to PreparingDelete",
