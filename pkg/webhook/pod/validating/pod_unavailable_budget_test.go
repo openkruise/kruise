@@ -24,9 +24,9 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -86,10 +86,12 @@ var (
 
 	podDemo = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "test-pod-0",
-			Namespace:   "default",
-			Labels:      map[string]string{"app": "pub-controller"},
-			Annotations: map[string]string{},
+			Name:      "test-pod-0",
+			Namespace: "default",
+			Labels:    map[string]string{"app": "pub-controller"},
+			Annotations: map[string]string{
+				pubcontrol.PodRelatedPubAnnotation: pubDemo.Name,
+			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -352,11 +354,13 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 			name: "valid update pod, no matched pub, allow",
 			oldPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
+				delete(pod.Annotations, pubcontrol.PodRelatedPubAnnotation)
 				return pod
 			},
 			newPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
 				pod.Labels["app"] = "no-pub"
+				delete(pod.Annotations, pubcontrol.PodRelatedPubAnnotation)
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
@@ -424,8 +428,9 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 			decoder, _ := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub()).Build()
 			podHandler := PodCreateHandler{
-				Client:  fClient,
-				Decoder: decoder,
+				Client:     fClient,
+				Decoder:    decoder,
+				pubControl: pubcontrol.NewPubControl(fClient),
 			}
 			oldPodRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.oldPod())),
@@ -581,8 +586,9 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			decoder, _ := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).Build()
 			podHandler := PodCreateHandler{
-				Client:  fClient,
-				Decoder: decoder,
+				Client:     fClient,
+				Decoder:    decoder,
+				pubControl: pubcontrol.NewPubControl(fClient),
 			}
 			evictionRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.eviction())),
@@ -715,8 +721,9 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			decoder, _ := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).Build()
 			podHandler := PodCreateHandler{
-				Client:  fClient,
-				Decoder: decoder,
+				Client:     fClient,
+				Decoder:    decoder,
+				pubControl: pubcontrol.NewPubControl(fClient),
 			}
 			deletionRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.deletion())),

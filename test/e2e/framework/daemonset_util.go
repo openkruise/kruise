@@ -108,7 +108,7 @@ func (t *DaemonSetTester) UpdateDaemonSet(name string, fn func(ds *appsv1alpha1.
 func (t *DaemonSetTester) DeleteDaemonSet(namespace, name string) {
 	err := t.kc.AppsV1alpha1().DaemonSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
-		Logf("delete daemonset(%s.%s) failed: %s", t.ns, name, err.Error())
+		Logf("delete daemonset(%s/%s) failed: %s", t.ns, name, err.Error())
 		return
 	}
 }

@@ -58,7 +58,7 @@ func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarContro
 			Name:      podClone.Name,
 		}
 		if err := p.Client.Get(context.TODO(), key, podClone); err != nil {
-			klog.Errorf("error getting updated pod(%s.%s) from client", podClone.Namespace, podClone.Name)
+			klog.Errorf("error getting updated pod(%s/%s) from client", podClone.Namespace, podClone.Name)
 		}
 		return updateErr
 	})

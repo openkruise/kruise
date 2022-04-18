@@ -172,7 +172,7 @@ func (s *ResourceDistributionTester) CreateNamespaces(namespaces ...*corev1.Name
 
 func (s *ResourceDistributionTester) CreateSecretResources(secrets ...*corev1.Secret) {
 	for _, secret := range secrets {
-		Logf("create secrets(%s.%s)", secret.Namespace, secret.Name)
+		Logf("create secrets(%s/%s)", secret.Namespace, secret.Name)
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			_, err := s.c.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 			return err
@@ -322,7 +322,7 @@ func (s *ResourceDistributionTester) WaitForSecretCreated(namespace, name string
 			return true, nil
 		})
 	if pollErr != nil {
-		Failf("Failed waiting for secret(%s.%s) to enter created: %v", namespace, name, pollErr)
+		Failf("Failed waiting for secret(%s/%s) to enter created: %v", namespace, name, pollErr)
 	}
 }
 

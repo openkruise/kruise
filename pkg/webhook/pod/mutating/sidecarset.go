@@ -94,7 +94,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	// check pod
 	if isUpdated {
 		if !matchedSidecarSets[0].IsPodAvailabilityChanged(pod, oldPod) {
-			klog.V(3).Infof("pod(%s.%s) availability unchanged for sidecarSet, and ignore", pod.Namespace, pod.Name)
+			klog.V(3).Infof("pod(%s/%s) availability unchanged for sidecarSet, and ignore", pod.Namespace, pod.Name)
 			return nil
 		}
 	}
@@ -106,12 +106,12 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	if err != nil {
 		return err
 	} else if len(sidecarContainers) == 0 && len(sidecarInitContainers) == 0 {
-		klog.V(3).Infof("[sidecar inject] pod(%s.%s) don't have injected containers", pod.Namespace, pod.Name)
+		klog.V(3).Infof("[sidecar inject] pod(%s/%s) don't have injected containers", pod.Namespace, pod.Name)
 		return nil
 	}
 
 	klog.V(3).Infof("[sidecar inject] begin inject sidecarContainers(%v) sidecarInitContainers(%v) sidecarSecrets(%v), volumes(%s)"+
-		"annotations(%v) into pod(%s.%s)", sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations,
+		"annotations(%v) into pod(%s/%s)", sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations,
 		pod.Namespace, pod.Name)
 	klog.V(4).Infof("[sidecar inject] before mutating: %v", util.DumpJSON(pod))
 	// apply sidecar set info into pod
@@ -203,7 +203,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
 				return nil, nil, nil, nil, nil,
-					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
+					fmt.Errorf("pod(%s/%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
 			}
 			for k, v := range olderSidecarSetHash {
 				sidecarSetHash[k] = sidecarcontrol.SidecarSetUpgradeSpec{
@@ -219,7 +219,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
 				return nil, nil, nil, nil, nil,
-					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
+					fmt.Errorf("pod(%s/%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
 			}
 			for k, v := range olderSidecarSetHash {
 				sidecarSetHashWithoutImage[k] = sidecarcontrol.SidecarSetUpgradeSpec{
@@ -234,7 +234,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 	sidecarSetNames := make([]string, 0)
 	for _, control := range matchedSidecarSets {
 		sidecarSet := control.GetSidecarset()
-		klog.V(3).Infof("build pod(%s.%s) sidecar containers for sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
+		klog.V(3).Infof("build pod(%s/%s) sidecar containers for sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
 		// sidecarSet List
 		sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
 		// pre-process volumes only in sidecar
