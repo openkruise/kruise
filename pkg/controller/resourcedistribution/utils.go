@@ -293,8 +293,15 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 		for _, namespace := range namespacesList.Items {
 			matchedSet.Insert(namespace.Name)
 		}
-	} else if len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0 {
-		// 2. select the namespaces via targets.NamespaceLabelSelector
+	} else {
+		// 2. select the namespaces via targets.IncludedNamespaces
+		for _, namespace := range targets.IncludedNamespaces.List {
+			matchedSet.Insert(namespace.Name)
+		}
+	}
+
+	if !targets.AllNamespaces && (len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0) {
+		// 3. select the namespaces via targets.NamespaceLabelSelector
 		selectors, err := util.GetFastLabelSelector(&targets.NamespaceLabelSelector)
 		if err != nil {
 			return nil, nil, err
@@ -306,11 +313,6 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 		for _, namespace := range namespaces.Items {
 			matchedSet.Insert(namespace.Name)
 		}
-	}
-
-	// 3. select the namespaces via targets.IncludedNamespaces
-	for _, namespace := range targets.IncludedNamespaces.List {
-		matchedSet.Insert(namespace.Name)
 	}
 
 	// 4. exclude the namespaces via target.ExcludedNamespaces
