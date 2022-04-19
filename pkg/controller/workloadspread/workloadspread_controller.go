@@ -299,7 +299,8 @@ func (r *ReconcileWorkloadSpread) listPodInfoForWorkloadSpread(ws *appsv1alpha1.
 				continue
 			}
 			workloadUIDs = append(workloadUIDs, rs.UID)
-			rsRevision, _ := strconv.Atoi(rs.Annotations[appsv1.ControllerRevisionHashLabelKey])
+			rsRevision, _ := strconv.Atoi(rs.Annotations[wsutil.DeploymentRevisionAnnotation])
+			klog.V(3).Infof("ReplicaSet(%v) Revision: %v", client.ObjectKeyFromObject(rs), rsRevision)
 			if maxRevision < rsRevision {
 				latestRS = rs
 				maxRevision = rsRevision
@@ -315,7 +316,9 @@ func (r *ReconcileWorkloadSpread) listPodInfoForWorkloadSpread(ws *appsv1alpha1.
 		}
 
 		if len(latestRevision) == 0 {
-			klog.Warningf("WorkloadSpread(%v/%v) cannot find the latest revision for Deployment", ws.Namespace, ws.Name)
+			message := fmt.Sprintf("WorkloadSpread(%v/%v) cannot find the latest revision for Deployment", ws.Namespace, ws.Name)
+			klog.Warning(message)
+			return nil, nil, "", 0, fmt.Errorf(message)
 		}
 
 		workloadReplicas = *deployment.Spec.Replicas

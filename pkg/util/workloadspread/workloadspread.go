@@ -46,8 +46,8 @@ import (
 const (
 	// MatchedWorkloadSpreadSubsetAnnotations matched pod workloadSpread
 	MatchedWorkloadSpreadSubsetAnnotations = "apps.kruise.io/matched-workloadspread"
-
-	PodDeletionCostAnnotation = "controller.kubernetes.io/pod-deletion-cost"
+	PodDeletionCostAnnotation              = "controller.kubernetes.io/pod-deletion-cost"
+	DeploymentRevisionAnnotation           = "deployment.kubernetes.io/revision"
 
 	PodDeletionCostPositive = 100
 	PodDeletionCostNegative = -100
@@ -841,6 +841,7 @@ func (h *Handler) getSuitableSubsetForOldRevision(ws *appsv1alpha1.WorkloadSprea
 	return &ws.Status.SubsetStatuses[suitableSubsetIndex]
 }
 
+// isReferenceEqual is only used for handling pod creation.
 func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, pod *corev1.Pod) bool {
 	namespace := pod.GetNamespace()
 	owner := metav1.GetControllerOfNoCopy(pod)
@@ -859,15 +860,31 @@ func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, pod *cor
 			return false
 
 		// address informer cache latency problem, we directly fetch the deployment instead of replicaSet.
-		// TODO: hanle the case that the deployment is not found due to informer cache latency. In fact, all types of workloads face this problem too.
+		// TODO: In fact, all types of workloads face this problem too.
 		case errors.IsNotFound(err):
 			deploymentName := ParseDeploymentNameFrom(pod)
-			if deploymentName != "" {
-				deployment := &appsv1.Deployment{}
-				deploymentKey := types.NamespacedName{Name: deploymentName, Namespace: namespace}
-				return h.Get(context.TODO(), deploymentKey, deployment) == nil
+			if deploymentName == "" {
+				return false
 			}
-			return false
+			deployment := &appsv1.Deployment{}
+			deploymentKey := types.NamespacedName{Name: deploymentName, Namespace: namespace}
+			getDMErr := h.Get(context.TODO(), deploymentKey, deployment)
+			switch {
+			case client.IgnoreNotFound(getDMErr) != nil:
+				return false
+			case errors.IsNotFound(getDMErr):
+				// If deployment is not cached by informer, we should fetch it from APIServer directly.
+				// In most cases, this logic will not be executed unless deployment informer of kruise
+				// has some problems (e.g., latency) when creating deployment.
+				deployment, err = kubeClient.GetGenericClient().KubeClient.AppsV1().
+					Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{ResourceVersion: "0"})
+				if err != nil {
+					return false
+				}
+				fallthrough
+			default:
+				owner = metav1.NewControllerRef(deployment, controllerKindDep)
+			}
 
 		default:
 			if rs.UID != owner.UID {
@@ -913,8 +930,8 @@ func ParseDeploymentNameFrom(pod *corev1.Pod) string {
 
 func IsReplicaSetRevisionLessThanOrEqualToDeployment(replicaset *appsv1.ReplicaSet, deployment *appsv1.Deployment) bool {
 	var rsRevision, dmRevision int64
-	rsRevisionStr := replicaset.Annotations[appsv1.ControllerRevisionHashLabelKey]
-	dmRevisionStr := deployment.Annotations[appsv1.ControllerRevisionHashLabelKey]
+	rsRevisionStr := replicaset.Annotations[DeploymentRevisionAnnotation]
+	dmRevisionStr := deployment.Annotations[DeploymentRevisionAnnotation]
 	_ = runtime.Convert_string_To_int64(&rsRevisionStr, &rsRevision, nil)
 	_ = runtime.Convert_string_To_int64(&dmRevisionStr, &dmRevision, nil)
 	return rsRevision <= dmRevision

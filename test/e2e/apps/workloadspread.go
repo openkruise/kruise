@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 	"strconv"
 	"time"
 
@@ -30,9 +29,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/utils/integer"
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -876,11 +877,18 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			ginkgo.By("Creating workloadSpread, check its subsetStatus...")
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
-			gomega.Eventually(func() int32 {
-				workloadSpread, err := tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
+
+			ginkgo.By("Wait workloadSpread Reconcile...")
+			gomega.Eventually(func() bool {
+				workloadSpread, err = tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return workloadSpread.Status.SubsetStatuses[0].Replicas
-			}, 5*time.Minute, time.Second).Should(gomega.Equal(int32(4)))
+				return workloadSpread.Status.ObservedGeneration == workloadSpread.GetGeneration()
+			}, 5*time.Minute, time.Second).Should(gomega.BeTrue())
+
+			ginkgo.By("Check all pod were managed by workloadSpread...")
+			oldPodBelongToSubsetA := workloadSpread.Status.SubsetStatuses[0].Replicas
+			oldPodBelongToSubsetB := workloadSpread.Status.SubsetStatuses[1].Replicas
+			gomega.Expect(oldPodBelongToSubsetA + oldPodBelongToSubsetB).Should(gomega.Equal(int32(4)))
 
 			ginkgo.By("Extend CloneSet to 6 replicas, check subsetStatus and pods...")
 			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
@@ -932,11 +940,13 @@ var _ = SIGDescribe("workloadspread", func() {
 				}
 				uninjectPods++
 			}
+			expectedSubsetAReplicas := integer.Int32Max(oldPodBelongToSubsetA, 2)
+			expectedSubsetBReplicas := 6 - expectedSubsetAReplicas
 			gomega.Expect(zeroDeletionCost).To(gomega.Equal(0))
-			gomega.Expect(positiveDeletionCost).To(gomega.Equal(4))
-			gomega.Expect(negativeDeletionCost).To(gomega.Equal(2))
-			gomega.Expect(subset1Pods).To(gomega.Equal(4))
-			gomega.Expect(subset2Pods).To(gomega.Equal(2))
+			gomega.Expect(positiveDeletionCost).To(gomega.Equal(int(expectedSubsetAReplicas)))
+			gomega.Expect(negativeDeletionCost).To(gomega.Equal(int(expectedSubsetBReplicas)))
+			gomega.Expect(subset1Pods).To(gomega.Equal(int(expectedSubsetAReplicas)))
+			gomega.Expect(subset2Pods).To(gomega.Equal(int(expectedSubsetBReplicas)))
 			gomega.Expect(uninjectPods).To(gomega.Equal(0))
 
 			ginkgo.By("Shrink CloneSet to 3 replicas, check subsetStatus and pods...")

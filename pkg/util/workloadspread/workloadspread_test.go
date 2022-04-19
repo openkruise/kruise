@@ -902,7 +902,7 @@ func TestIsReferenceEqual(t *testing.T) {
 			pod.SetNamespace("")
 			pod.Labels = map[string]string{apps.DefaultDeploymentUniqueLabelKey: cs.podTemplateHash}
 			pod.SetOwnerReferences([]metav1.OwnerReference{*cs.getOwnerRef()})
-			if h.isReferenceEqual(cs.getTargetRef(), pod) != cs.expectEqual {
+			if matched := h.isReferenceEqual(cs.getTargetRef(), pod); matched != cs.expectEqual {
 				t.Fatalf("isReferenceEqual failed")
 			}
 		})
