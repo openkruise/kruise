@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kruise
+  description: 
+    Lightweight Kubernetes
+  links:
+    - title: Website
+      url: https://openkruise.io/
+    - title: Documentation
+      url: https://openkruise.io/docs/
+    - title: Blog
+      url: https://openkruise.io/blog
+  annotations:
+    github.com/project-slug:  "PhoenixRedflash/kruise" 
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  owner: "Group:Phoenix"
+  lifecycle: production
