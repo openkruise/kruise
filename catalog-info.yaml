@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: kruise
   description: 
-    Lightweight Kubernetes
+    an extended component suite for Kubernetes
   links:
     - title: Website
       url: https://openkruise.io/
