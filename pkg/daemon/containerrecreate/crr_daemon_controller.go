@@ -238,8 +238,13 @@ func (c *Controller) sync(key string) (retErr error) {
 	}()
 
 	// once first update its phase to recreating
-	if crr.Status.Phase != appsv1alpha1.ContainerRecreateRequestRecreating {
-		return c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestRecreating)
+	//if crr.Status.Phase != appsv1alpha1.ContainerRecreateRequestRecreating {
+	//	return c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestRecreating)
+	//}
+
+	// once first update its phase to pending. 这么做就一定会被krusie daemon kill一次
+	if crr.Status.Phase == "" {
+		return c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestPending)
 	}
 
 	if crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil {

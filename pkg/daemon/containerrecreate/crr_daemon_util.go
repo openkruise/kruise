@@ -87,6 +87,12 @@ func getCurrentCRRContainersRecreateStates(
 				Message: "not found container on Node",
 			}
 
+		} else if kubeContainerStatus.State == kubeletcontainer.ContainerStateExited ||
+			kubeContainerStatus.State == kubeletcontainer.ContainerStateUnknown {
+			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+				Name:  c.Name,
+				Phase: appsv1alpha1.ContainerRecreateRequestPending,
+			}
 		} else if kubeContainerStatus.State != kubeletcontainer.ContainerStateRunning {
 			// for no-running state, we consider it will be recreated or restarted soon
 			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
