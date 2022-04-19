@@ -337,6 +337,8 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 			if crr.Spec.Strategy.OrderedRecreate {
 				break
 			}
+		}
+		if state.RestartCount != 0 {
 			continue
 		}
 
@@ -357,6 +359,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 			return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
 		}
 		state.Phase = appsv1alpha1.ContainerRecreateRequestRecreating
+		state.RestartCount += 1
 		break
 	}
 

@@ -115,7 +115,9 @@ func getCurrentCRRContainersRecreateStates(
 				Phase: appsv1alpha1.ContainerRecreateRequestPending,
 			}
 		}
-
+		if previousContainerRecreateState != nil {
+			currentState.RestartCount = previousContainerRecreateState.RestartCount
+		}
 		statuses = append(statuses, currentState)
 	}
 

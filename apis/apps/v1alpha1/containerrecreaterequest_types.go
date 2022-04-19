@@ -160,6 +160,8 @@ type ContainerRecreateRequestContainerRecreateState struct {
 	Phase ContainerRecreateRequestPhase `json:"phase"`
 	// A human readable message indicating details about this state.
 	Message string `json:"message,omitempty"`
+	// The number of times the container has been restarted by krusie-daemon
+	RestartCount int `json:"restartCount,omitempty"`
 }
 
 // ContainerRecreateRequestSyncContainerStatus only uses in the annotation `crr.apps.kruise.io/sync-container-statuses`.
