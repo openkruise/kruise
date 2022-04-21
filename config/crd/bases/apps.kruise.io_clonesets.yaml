@@ -427,6 +427,12 @@ spec:
                 description: currentRevision, if not empty, indicates the current
                   revision version of the CloneSet.
                 type: string
+              expectUpdatedReplicas:
+                description: ExpectedUpdatedReplicas is the number of Pods that should
+                  be updated by CloneSet controller. This field is calculated via
+                  Replicas - Partition.
+                format: int32
+                type: integer
               labelSelector:
                 description: LabelSelector is label selectors for query over pods
                   that should match the replica count used by HPA.
