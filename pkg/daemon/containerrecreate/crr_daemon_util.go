@@ -188,3 +188,12 @@ func convertCRRToPod(crr *appsv1alpha1.ContainerRecreateRequest) *v1.Pod {
 
 	return pod
 }
+
+func hasContainerContext(obj *appsv1alpha1.ContainerRecreateRequest) bool {
+	for _, c := range obj.Spec.Containers {
+		if c.StatusContext == nil {
+			return false
+		}
+	}
+	return true
+}

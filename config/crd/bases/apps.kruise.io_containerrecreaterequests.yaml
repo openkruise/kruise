@@ -202,9 +202,9 @@ spec:
                           type: object
                       type: object
                     statusContext:
-                      description: StatusContext is synced from the real Pod status
-                        during this ContainerRecreateRequest creating. Populated by
-                        the system. Read-only.
+                      description: StatusContext is synced from the real container
+                        status during this ContainerRecreateRequest creating. Populated
+                        by the kruise daemon.
                       properties:
                         containerID:
                           description: Container's ID in the format 'docker://<container_id>'.

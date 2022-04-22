@@ -67,8 +67,8 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if !reflect.DeepEqual(obj.Spec, oldObj.Spec) {
-			return admission.Errored(http.StatusForbidden, fmt.Errorf("spec of ContainerRecreateRequest is immutable"))
+		if !reflect.DeepEqual(obj.Spec, oldObj.Spec) && reflect.DeepEqual(obj.Spec.Containers, oldObj.Spec.Containers) {
+			return admission.Errored(http.StatusForbidden, fmt.Errorf("spec of ContainerRecreateRequest is immutable, except spec.containers"))
 		}
 		if obj.Labels[appsv1alpha1.ContainerRecreateRequestPodNameKey] != oldObj.Labels[appsv1alpha1.ContainerRecreateRequestPodNameKey] {
 			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1alpha1.ContainerRecreateRequestPodNameKey))
@@ -188,11 +188,6 @@ func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRe
 
 		if c.PreStop != nil && c.PreStop.HTTPGet != nil {
 			c.Ports = podContainer.Ports
-		}
-
-		c.StatusContext = &appsv1alpha1.ContainerRecreateRequestContainerContext{
-			ContainerID:  podContainerStatus.ContainerID,
-			RestartCount: podContainerStatus.RestartCount,
 		}
 	}
 

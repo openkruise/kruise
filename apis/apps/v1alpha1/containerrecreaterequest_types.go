@@ -68,9 +68,8 @@ type ContainerRecreateRequestContainer struct {
 	// Populated by the system.
 	// Read-only.
 	Ports []v1.ContainerPort `json:"ports,omitempty"`
-	// StatusContext is synced from the real Pod status during this ContainerRecreateRequest creating.
-	// Populated by the system.
-	// Read-only.
+	// StatusContext is synced from the real container status during this ContainerRecreateRequest creating.
+	// Populated by the kruise daemon.
 	StatusContext *ContainerRecreateRequestContainerContext `json:"statusContext,omitempty"`
 }
 

@@ -574,7 +574,6 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
 				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
 				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestFailurePolicyFail))
-				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(pod.Status.ContainerStatuses[0].ContainerID))
 				ginkgo.By("Wait CRR recreate completion")
 				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
 					crr, err = resetartContainerTester.GetCRR(crr.Name)
@@ -593,7 +592,6 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				pod, err = resetartContainerTester.GetPod(pod.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
-				gomega.Expect(pod.Status.ContainerStatuses[0].ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[0].StatusContext.ContainerID))
 				gomega.Expect(pod.Status.ContainerStatuses[0].RestartCount).Should(gomega.Equal(int32(1)))
 				gomega.Expect(crr.Status.CompletionTime.Sub(pod.Status.ContainerStatuses[0].State.Running.StartedAt.Time)).Should(gomega.BeNumerically(">", 4*time.Second))
 			}

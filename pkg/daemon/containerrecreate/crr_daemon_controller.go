@@ -298,7 +298,7 @@ func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecrea
 }
 
 func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
-	runtimeManager, err := c.newRuntimeManager(c.runtimeFactory, crr)
+	runtimeManager, err := c.newRuntimeManager(crr)
 	if err != nil {
 		klog.Errorf("Failed to find runtime service for %s/%s: %v", crr.Namespace, crr.Name, err)
 		return c.completeCRRStatus(crr, fmt.Sprintf("failed to find runtime service: %v", err))
@@ -311,6 +311,9 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 		return fmt.Errorf("failed to GetPodStatus %s/%s with uid %s: %v", pod.Namespace, pod.Name, pod.UID, err)
 	}
 	klog.V(5).Infof("CRR %s/%s for Pod %s GetPodStatus: %v", crr.Namespace, crr.Name, pod.Name, util.DumpJSON(podStatus))
+	if !hasContainerContext(crr) {
+		return c.injectCRRContainerContext(crr, podStatus)
+	}
 
 	newCRRContainerRecreateStates := getCurrentCRRContainersRecreateStates(crr, podStatus)
 	if !reflect.DeepEqual(crr.Status.ContainerRecreateStates, newCRRContainerRecreateStates) {
@@ -415,31 +418,53 @@ func (c *Controller) completeCRRStatus(crr *appsv1alpha1.ContainerRecreateReques
 	return c.runtimeClient.Status().Update(context.TODO(), crr)
 }
 
-func (c *Controller) newRuntimeManager(runtimeFactory daemonruntime.Factory, crr *appsv1alpha1.ContainerRecreateRequest) (kuberuntime.Runtime, error) {
-	var runtimeName string
-	for i := range crr.Spec.Containers {
-		c := &crr.Spec.Containers[i]
-		if c.StatusContext == nil || c.StatusContext.ContainerID == "" {
-			return nil, fmt.Errorf("no statusContext or empty containerID in %s container", c.Name)
-		}
+func (c *Controller) newRuntimeManager(crr *appsv1alpha1.ContainerRecreateRequest) (kuberuntime.Runtime, error) {
+	pod := &v1.Pod{}
+	podErr := c.runtimeClient.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Spec.PodName}, pod)
+	if podErr != nil {
+		return nil, fmt.Errorf("failed to get Pod for CRR: %v", podErr)
+	}
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return nil, fmt.Errorf("empty containerStatuses in pod status")
+	}
 
-		containerID := kubeletcontainer.ContainerID{}
-		if err := containerID.ParseString(c.StatusContext.ContainerID); err != nil {
-			return nil, fmt.Errorf("failed to parse containerID %s in %s container: %v", c.StatusContext.ContainerID, c.Name, err)
-		}
-		if runtimeName == "" {
-			runtimeName = containerID.Type
-		} else if runtimeName != containerID.Type {
-			return nil, fmt.Errorf("has different runtime types %s, %s in Pod", runtimeName, containerID.Type)
+	var existingID string
+	for _, cs := range pod.Status.ContainerStatuses {
+		if len(cs.ContainerID) > 0 {
+			existingID = cs.ContainerID
+			break
 		}
 	}
-	if runtimeName == "" {
-		return nil, fmt.Errorf("no runtime type found in Pod")
+	if existingID == "" {
+		return nil, fmt.Errorf("empty container id in pod status")
 	}
-	runtimeService := runtimeFactory.GetRuntimeServiceByName(runtimeName)
+
+	containerID := kubeletcontainer.ContainerID{}
+	if err := containerID.ParseString(pod.Status.ContainerStatuses[0].ContainerID); err != nil {
+		return nil, fmt.Errorf("failed to parse containerID %s: %v", pod.Status.ContainerStatuses[0].ContainerID, err)
+	} else if containerID.Type == "" {
+		return nil, fmt.Errorf("no runtime name in containerID %s", pod.Status.ContainerStatuses[0].ContainerID)
+	}
+
+	runtimeName := containerID.Type
+	runtimeService := c.runtimeFactory.GetRuntimeServiceByName(runtimeName)
 	if runtimeService == nil {
 		return nil, fmt.Errorf("not found runtime service for %s in daemon", runtimeName)
 	}
 
 	return kuberuntime.NewGenericRuntime(runtimeName, runtimeService, c.eventRecorder, &http.Client{}), nil
+}
+
+func (c *Controller) injectCRRContainerContext(crr *appsv1alpha1.ContainerRecreateRequest, status *kubeletcontainer.PodStatus) error {
+	crr = crr.DeepCopy()
+	for i, c := range crr.Spec.Containers {
+		if c.StatusContext == nil {
+			containerStatus := status.FindContainerStatusByName(c.Name)
+			crr.Spec.Containers[i].StatusContext = &appsv1alpha1.ContainerRecreateRequestContainerContext{
+				ContainerID:  containerStatus.ID.String(),
+				RestartCount: int32(containerStatus.RestartCount),
+			}
+		}
+	}
+	return c.runtimeClient.Update(context.TODO(), crr)
 }
