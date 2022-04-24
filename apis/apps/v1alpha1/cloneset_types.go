@@ -170,7 +170,7 @@ type CloneSetStatus struct {
 
 	// ExpectedUpdatedReplicas is the number of Pods that should be updated by CloneSet controller.
 	// This field is calculated via Replicas - Partition.
-	ExpectedUpdatedReplicas int32 `json:"expectUpdatedReplicas,omitempty"`
+	ExpectedUpdatedReplicas int32 `json:"expectedUpdatedReplicas,omitempty"`
 
 	// UpdateRevision, if not empty, indicates the latest revision of the CloneSet.
 	UpdateRevision string `json:"updateRevision,omitempty"`
