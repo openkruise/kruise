@@ -493,7 +493,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				set.Namespace,
 				set.Name,
 				replicas[i].Name)
-			if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
+			if _, err := ssc.deletePod(set, replicas[i]); err != nil {
 				return &status, err
 			}
 			if getPodRevision(replicas[i]) == currentRevision.Name {
@@ -740,7 +740,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 					set.Namespace,
 					set.Name,
 					replicas[target].Name)
-				if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
+				if _, err := ssc.deletePod(set, replicas[target]); err != nil {
 					return &status, err
 				}
 			}
