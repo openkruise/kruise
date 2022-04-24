@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/utils/integer"
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -864,21 +865,29 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			ginkgo.By("Creating workloadSpread, check its subsetStatus...")
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
-			gomega.Eventually(func() int32 {
-				workloadSpread, err := tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
+			gomega.Eventually(func() bool {
+				workloadSpread, err = tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return workloadSpread.Status.SubsetStatuses[0].Replicas
+				return workloadSpread.Generation == workloadSpread.Status.ObservedGeneration
+			}, 5*time.Minute, time.Second).Should(gomega.BeTrue())
+			gomega.Eventually(func() int32 {
+				workloadSpread, err = tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return workloadSpread.Status.SubsetStatuses[0].Replicas + workloadSpread.Status.SubsetStatuses[1].Replicas
 			}, 5*time.Minute, time.Second).Should(gomega.Equal(int32(4)))
 
-			ginkgo.By("Extend CloneSet to 6 replicas, check subsetStatus and pods...")
+			ginkgo.By("Scale CloneSet up to 6 replicas, check subsetStatus and pods...")
 			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
-			gomega.Eventually(func() int32 {
-				workloadSpread, err := tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
+			gomega.Eventually(func() bool {
+				workloadSpread, err = tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return workloadSpread.Status.SubsetStatuses[1].Replicas
-			}, 5*time.Minute, time.Second).Should(gomega.Equal(int32(2)))
+				return workloadSpread.Generation == workloadSpread.Status.ObservedGeneration
+			}, 5*time.Minute, time.Second).Should(gomega.BeTrue())
+
+			expectSubsetAReplicas := integer.Int32Max(workloadSpread.Status.SubsetStatuses[0].Replicas, 2)
+			expectSubsetBReplicas := 6 - expectSubsetAReplicas
 
 			pods, err = tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -920,23 +929,25 @@ var _ = SIGDescribe("workloadspread", func() {
 				}
 				uninjectPods++
 			}
-			gomega.Expect(zeroDeletionCost).To(gomega.Equal(0))
-			gomega.Expect(positiveDeletionCost).To(gomega.Equal(4))
-			gomega.Expect(negativeDeletionCost).To(gomega.Equal(2))
-			gomega.Expect(subset1Pods).To(gomega.Equal(4))
-			gomega.Expect(subset2Pods).To(gomega.Equal(2))
-			gomega.Expect(uninjectPods).To(gomega.Equal(0))
 
-			ginkgo.By("Shrink CloneSet to 3 replicas, check subsetStatus and pods...")
+			expectSubsetAPositive := integer.Int32Min(expectSubsetAReplicas, 2)
+			gomega.Expect(zeroDeletionCost).To(gomega.Equal(0))
+			gomega.Expect(positiveDeletionCost).To(gomega.Equal(int(expectSubsetAPositive+expectSubsetBReplicas)))
+			gomega.Expect(negativeDeletionCost).To(gomega.Equal(int(6-expectSubsetAPositive-expectSubsetBReplicas)))
+			gomega.Expect(uninjectPods).To(gomega.Equal(0))
+			gomega.Expect(subset1Pods).To(gomega.Equal(expectSubsetAReplicas))
+			gomega.Expect(subset2Pods).To(gomega.Equal(expectSubsetBReplicas))
+
+			ginkgo.By("Scale CloneSet down to 3 replicas, check subsetStatus and pods...")
 			cloneSet.Spec.Replicas = pointer.Int32Ptr(3)
 			cloneSet.Spec.Template.Spec.NodeSelector = nil
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
-			gomega.Eventually(func() int32 {
-				workloadSpread, err := tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
+			gomega.Eventually(func() bool {
+				workloadSpread, err = tester.GetWorkloadSpread(workloadSpread.Namespace, workloadSpread.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return workloadSpread.Status.SubsetStatuses[0].Replicas
-			}, 5*time.Minute, time.Second).Should(gomega.Equal(int32(2)))
+				return workloadSpread.Generation == workloadSpread.Status.ObservedGeneration
+			}, 5*time.Minute, time.Second).Should(gomega.BeTrue())
 
 			pods, err = tester.GetSelectorPods(cloneSet.Namespace, cloneSet.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
