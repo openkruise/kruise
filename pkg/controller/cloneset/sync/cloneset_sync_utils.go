@@ -76,8 +76,12 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
 	if cs.Spec.UpdateStrategy.Partition != nil {
-		partition, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.Partition, replicas, true)
-		partition = integer.IntMin(partition, replicas)
+		if pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err != nil {
+			// TODO: maybe, we should block pod update if partition settings is wrong
+			klog.Errorf("CloneSet %s/%s partition value is illegal", cs.Namespace, cs.Name)
+		} else {
+			partition = pValue
+		}
 	}
 	if cs.Spec.UpdateStrategy.MaxSurge != nil {
 		maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, replicas, true)

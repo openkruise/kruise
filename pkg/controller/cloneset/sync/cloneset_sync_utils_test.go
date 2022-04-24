@@ -467,6 +467,117 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			expectResult: expectationDiffs{},
 		},
 		{
+			name: "update recreate partition=99% with maxUnavailable=3, maxSurge=2 (step 1/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromInt(3), intstr.FromInt(2)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 1, updateMaxUnavailable: 3, scaleUpLimit: 1},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=3, maxSurge=2 (step 2/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromInt(3), intstr.FromInt(2)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
+			},
+			expectResult: expectationDiffs{scaleNum: -1, scaleNumOldRevision: -1, deleteReadyLimit: 3},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=3, maxSurge=2 (step 3/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromInt(3), intstr.FromInt(2)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
+			},
+			expectResult: expectationDiffs{},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=40%, maxSurge=30% (step 1/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromString("40%"), intstr.FromString("30%")),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 1, updateMaxUnavailable: 2, scaleUpLimit: 1},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=40%, maxSurge=30% (step 2/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromString("40%"), intstr.FromString("30%")),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
+			},
+			expectResult: expectationDiffs{scaleNum: -1, scaleNumOldRevision: -1, deleteReadyLimit: 2},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=40%, maxSurge=30% (step 3/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromString("40%"), intstr.FromString("30%")),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
+			},
+			expectResult: expectationDiffs{},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=30%, maxSurge=30% (step 1/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromString("30%"), intstr.FromString("30%")),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			expectResult: expectationDiffs{scaleNum: 1, useSurge: 1, updateNum: 1, updateMaxUnavailable: 1, scaleUpLimit: 1},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=30%, maxSurge=30% (step 2/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromString("30%"), intstr.FromString("30%")),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
+			},
+			expectResult: expectationDiffs{scaleNum: -1, scaleNumOldRevision: -1, deleteReadyLimit: 1},
+		},
+		{
+			name: "update recreate partition=99% with maxUnavailable=30%, maxSurge=30% (step 3/3)",
+			set:  createTestCloneSet(5, intstr.FromString("99%"), intstr.FromString("30%"), intstr.FromString("30%")),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
+			},
+			expectResult: expectationDiffs{},
+		},
+		{
 			name: "revision consistent 1",
 			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
 			pods: []*v1.Pod{

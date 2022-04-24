@@ -23,6 +23,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util"
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
@@ -60,7 +61,12 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 	// ignore if all Pods update in one batch
 	var partition, maxUnavailable int
 	if cs.Spec.UpdateStrategy.Partition != nil {
-		partition, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.Partition, int(*cs.Spec.Replicas), true)
+		if pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err != nil {
+			klog.Errorf("CloneSet %s/%s partition value is illegal", cs.Namespace, cs.Name)
+			return err
+		} else {
+			partition = pValue
+		}
 	}
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)
