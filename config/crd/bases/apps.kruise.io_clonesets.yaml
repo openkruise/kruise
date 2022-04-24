@@ -427,7 +427,7 @@ spec:
                 description: currentRevision, if not empty, indicates the current
                   revision version of the CloneSet.
                 type: string
-              expectUpdatedReplicas:
+              expectedUpdatedReplicas:
                 description: ExpectedUpdatedReplicas is the number of Pods that should
                   be updated by CloneSet controller. This field is calculated via
                   Replicas - Partition.
