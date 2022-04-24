@@ -522,6 +522,86 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
 			gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[1].Containers).Should(gomega.Equal([]string{"nginx"}))
 		})
+
+		ginkgo.It(`CloneSet partition="99%", replicas=4, make sure one pod is upgraded`, func() {
+			updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{
+				Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
+				Partition:      &intstr.IntOrString{Type: intstr.String, StrVal: "99%"},
+			}
+			cs := tester.NewCloneSet("clone-"+randStr, 4, updateStrategy)
+			imageConfig := imageutils.GetConfig(imageutils.Nginx)
+			imageConfig.SetRegistry("docker.io/library")
+			imageConfig.SetVersion("alpine")
+			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(4)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+
+			pods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(4))
+
+			ginkgo.By("Update image to nginx mainline-alpine")
+			imageConfig.SetVersion("mainline-alpine")
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				if cs.Annotations == nil {
+					cs.Annotations = map[string]string{}
+				}
+				cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for CloneSet generation consistent")
+			gomega.Eventually(func() bool {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Generation == cs.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+
+			ginkgo.By("Wait for one pods updated")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.UpdatedReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			time.Sleep(10 * time.Second)
+			ginkgo.By("Wait for one pods updated, check again after 10s")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.UpdatedReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Wait for one pods updated and ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.UpdatedReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check expectedPartitionReplicas filed")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ExpectedUpdatedReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+		})
 	})
 
 	framework.KruiseDescribe("CloneSet pre-download images", func() {

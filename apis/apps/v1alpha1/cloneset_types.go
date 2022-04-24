@@ -168,6 +168,10 @@ type CloneSetStatus struct {
 	// indicated by updateRevision and have a Ready Condition.
 	UpdatedReadyReplicas int32 `json:"updatedReadyReplicas"`
 
+	// ExpectedUpdatedReplicas is the number of Pods that should be updated by CloneSet controller.
+	// This field is calculated via Replicas - Partition.
+	ExpectedUpdatedReplicas int32 `json:"expectUpdatedReplicas,omitempty"`
+
 	// UpdateRevision, if not empty, indicates the latest revision of the CloneSet.
 	UpdateRevision string `json:"updateRevision,omitempty"`
 

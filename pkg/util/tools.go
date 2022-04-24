@@ -145,3 +145,32 @@ func IsContainerImageEqual(image1, image2 string) bool {
 
 	return repo1 == repo2 && tag1 == tag2
 }
+
+// CalculatePartitionReplicas returns absolute value of partition for workload. This func can solve some
+// corner cases about percentage-type partition, such as:
+// - if partition > "0%" and replicas > 0, we will ensure at least 1 old pod is reserved.
+// - if partition < "100%" and replicas > 1, we will ensure at least 1 pod is upgraded.
+func CalculatePartitionReplicas(partition *intstrutil.IntOrString, replicasPointer *int32) (int, error) {
+	if partition == nil {
+		return 0, nil
+	}
+
+	replicas := 1
+	if replicasPointer != nil {
+		replicas = int(*replicasPointer)
+	}
+
+	// 'roundUp=true' will ensure at least 1 old pod is reserved if partition > "0%" and replicas > 0.
+	pValue, err := intstrutil.GetScaledValueFromIntOrPercent(partition, replicas, true)
+	if err != nil {
+		return pValue, err
+	}
+
+	// if partition < "100%" and replicas > 1, we will ensure at least 1 pod is upgraded.
+	if replicas > 1 && pValue == replicas && partition.Type == intstrutil.String && partition.StrVal != "100%" {
+		pValue = replicas - 1
+	}
+
+	pValue = integer.IntMax(integer.IntMin(pValue, replicas), 0)
+	return pValue, nil
+}
