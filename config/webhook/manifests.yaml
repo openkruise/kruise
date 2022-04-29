@@ -13,6 +13,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-pod
+  failurePolicy: Fail
+  name: mpod.kb.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kruise-io-v1alpha1-advancedcronjob
   failurePolicy: Fail
   name: madvancedcronjob.kb.io
@@ -152,26 +172,6 @@ webhooks:
     - UPDATE
     resources:
     - nodeimages
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-pod
-  failurePolicy: Fail
-  name: mpod.kb.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - pods
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -514,6 +514,27 @@ webhooks:
     - UPDATE
     resources:
     - nodeimages
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kruise-io-persistentpodstate
+  failurePolicy: Fail
+  name: vpersistentpodstate.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - persistentpodstates
   sideEffects: None
 - admissionReviewVersions:
   - v1

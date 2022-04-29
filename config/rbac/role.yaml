@@ -300,6 +300,26 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - persistentpodstates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - persistentpodstates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - resourcedistributions
   verbs:
   - get
