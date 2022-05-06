@@ -73,9 +73,10 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
-						Name:    "nginx-sidecar",
-						Image:   imageutils.GetE2EImage(imageutils.Nginx),
-						Command: []string{"tail", "-f", "/dev/null"},
+						Name:            "nginx-sidecar",
+						Image:           imageutils.GetE2EImage(imageutils.Nginx),
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						Command:         []string{"tail", "-f", "/dev/null"},
 					},
 					PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
 					ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
@@ -163,7 +164,7 @@ func (s *SidecarSetTester) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet)
 }
 
 func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
-	Logf("update pod(%s.%s)", pod.Namespace, pod.Name)
+	Logf("update pod(%s/%s)", pod.Namespace, pod.Name)
 	podClone := pod.DeepCopy()
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		podClone.Annotations = pod.Annotations
@@ -201,7 +202,7 @@ func (s *SidecarSetTester) WaitForSidecarSetUpgradeComplete(sidecarSet *appsv1al
 }
 
 func (s *SidecarSetTester) CreateDeployment(deployment *apps.Deployment) {
-	Logf("create deployment(%s.%s)", deployment.Namespace, deployment.Name)
+	Logf("create deployment(%s/%s)", deployment.Namespace, deployment.Name)
 	_, err := s.c.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	s.WaitForDeploymentRunning(deployment)
@@ -242,7 +243,7 @@ func (s *SidecarSetTester) DeleteDeployments(namespace string) {
 func (s *SidecarSetTester) DeleteDeployment(deployment *apps.Deployment) {
 	err := s.c.AppsV1().Deployments(deployment.Namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 	if err != nil {
-		Logf("delete deployment(%s.%s) failed: %s", deployment.Namespace, deployment.Name, err.Error())
+		Logf("delete deployment(%s/%s) failed: %s", deployment.Namespace, deployment.Name, err.Error())
 		return
 	}
 	s.WaitForDeploymentDeleted(deployment)
@@ -381,11 +382,11 @@ func (s *SidecarSetTester) NewBaseCloneSet(namespace string) *appsv1alpha1.Clone
 }
 
 func (t *SidecarSetTester) CreateCloneSet(cloneset *appsv1alpha1.CloneSet) *appsv1alpha1.CloneSet {
-	Logf("create CloneSet(%s.%s)", cloneset.Namespace, cloneset.Name)
+	Logf("create CloneSet(%s/%s)", cloneset.Namespace, cloneset.Name)
 	_, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Create(context.TODO(), cloneset, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	t.WaitForCloneSetRunning(cloneset)
-	Logf("create cloneset(%s.%s) done", cloneset.Namespace, cloneset.Name)
+	Logf("create cloneset(%s/%s) done", cloneset.Namespace, cloneset.Name)
 	cloneset, _ = t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 	return cloneset
 }

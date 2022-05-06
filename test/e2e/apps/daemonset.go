@@ -44,7 +44,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
-			framework.Logf("Deleting DaemonSet %s.%s in cluster", ns, dsName)
+			framework.Logf("Deleting DaemonSet %s/%s in cluster", ns, dsName)
 			tester.DeleteDaemonSet(ns, dsName)
 		})
 

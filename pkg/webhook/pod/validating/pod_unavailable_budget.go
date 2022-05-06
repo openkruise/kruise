@@ -80,7 +80,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	// filter out invalid Delete operation, only validate delete pods resources
 	case admissionv1.Delete:
 		if req.AdmissionRequest.SubResource != "" {
-			klog.V(6).Infof("pod(%s.%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
+			klog.V(6).Infof("pod(%s/%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
 			return true, "", nil
 		}
 		if err := p.Decoder.DecodeRaw(req.OldObject, newPod); err != nil {
@@ -98,7 +98,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	case admissionv1.Create:
 		// ignore create operation other than subresource eviction
 		if req.AdmissionRequest.SubResource != "eviction" {
-			klog.V(6).Infof("pod(%s.%s) AdmissionRequest operation(CREATE) Resource(%s) subResource(%s), then admit", req.Namespace, req.Name, req.Resource, req.SubResource)
+			klog.V(6).Infof("pod(%s/%s) AdmissionRequest operation(CREATE) Resource(%s) subResource(%s), then admit", req.Namespace, req.Name, req.Resource, req.SubResource)
 			return true, "", nil
 		}
 		eviction := &policy.Eviction{}
@@ -133,11 +133,11 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	// returns true for pod conditions that allow the operation for pod without checking PUB.
 	if newPod.Status.Phase == corev1.PodSucceeded || newPod.Status.Phase == corev1.PodFailed ||
 		newPod.Status.Phase == corev1.PodPending || newPod.Status.Phase == "" || !newPod.ObjectMeta.DeletionTimestamp.IsZero() {
-		klog.V(3).Infof("pod(%s.%s) Status(%s) Deletion(%v), then admit", newPod.Namespace, newPod.Name, newPod.Status.Phase, !newPod.ObjectMeta.DeletionTimestamp.IsZero())
+		klog.V(3).Infof("pod(%s/%s) Status(%s) Deletion(%v), then admit", newPod.Namespace, newPod.Name, newPod.Status.Phase, !newPod.ObjectMeta.DeletionTimestamp.IsZero())
 		return true, "", nil
 	}
 
-	pub, err := pubcontrol.GetPodUnavailableBudgetForPod(p.Client, p.finders, newPod)
+	pub, err := p.pubControl.GetPubForPod(newPod)
 	if err != nil {
 		return false, "", err
 	}
@@ -145,21 +145,20 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	if pub == nil {
 		return true, "", nil
 	}
-	control := pubcontrol.NewPubControl(pub, p.finders, p.Client)
-	klog.V(3).Infof("validating pod(%s.%s) operation(%s) for pub(%s.%s)", newPod.Namespace, newPod.Name, req.Operation, pub.Namespace, pub.Name)
 
+	klog.V(3).Infof("validating pod(%s/%s) operation(%s) for pub(%s/%s)", newPod.Namespace, newPod.Name, req.Operation, pub.Namespace, pub.Name)
 	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
 	// and will no longer check the pub quota
 	if newPod.Annotations[pubcontrol.PodPubNoProtectionAnnotation] == "true" {
-		klog.V(3).Infof("pod(%s.%s) contains annotations[%s], then don't need check pub", newPod.Namespace, newPod.Name, pubcontrol.PodPubNoProtectionAnnotation)
+		klog.V(3).Infof("pod(%s/%s) contains annotations[%s], then don't need check pub", newPod.Namespace, newPod.Name, pubcontrol.PodPubNoProtectionAnnotation)
 		return true, "", nil
 	}
 
 	// the change will not cause pod unavailability, then pass
-	if !control.IsPodUnavailableChanged(oldPod, newPod) {
-		klog.V(3).Infof("validate pod(%s.%s) changed cannot cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
+	if !p.pubControl.IsPodUnavailableChanged(oldPod, newPod) {
+		klog.V(3).Infof("validate pod(%s/%s) changed cannot cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
 		return true, "", nil
 	}
 
-	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, newPod, control, pubcontrol.Operation(req.Operation), dryRun)
+	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, p.pubControl, pub, newPod, pubcontrol.Operation(req.Operation), dryRun)
 }

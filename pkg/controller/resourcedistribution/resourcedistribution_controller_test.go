@@ -76,7 +76,7 @@ func TestDoReconcile(t *testing.T) {
 		resource := &corev1.Secret{}
 		// check whether resource exists
 		if err := reconcileHandler.Client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: "test-secret-1"}, resource); err != nil {
-			t.Fatalf("failed to get resource(%s.%s) from fake client, err %v", namespace, "test-secret-1", err)
+			t.Fatalf("failed to get resource(%s/%s) from fake client, err %v", namespace, "test-secret-1", err)
 		}
 		// check resource source and version
 		if !isControlledByDistributor(resource, distributor) {

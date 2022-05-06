@@ -132,7 +132,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	var pub *policyv1alpha1.PodUnavailableBudget
 	var err error
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) && len(waitUpdateIndexes) > 0 {
-		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, c.controllerFinder, pods[waitUpdateIndexes[0]])
+		pub, err = c.pubControl.GetPubForPod(pods[waitUpdateIndexes[0]])
 		if err != nil {
 			return err
 		}
@@ -142,7 +142,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		pod := pods[idx]
 		// Determine the pub before updating the pod
 		if pub != nil {
-			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, pod, pubcontrol.NewPubControl(pub, c.controllerFinder, c.Client), pubcontrol.UpdateOperation, false)
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pub, pod, pubcontrol.UpdateOperation, false)
 			if err != nil {
 				return err
 				// pub check does not pass, try again in seconds

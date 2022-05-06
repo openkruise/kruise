@@ -19,6 +19,8 @@ package controllerfinder
 import (
 	"context"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,9 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // ScaleAndSelector is used to return (controller, scale, selector) fields from the
@@ -41,6 +40,8 @@ type ScaleAndSelector struct {
 	Selector *metav1.LabelSelector
 	// metadata
 	Metadata metav1.ObjectMeta
+	// template labels
+	TempLabels map[string]string
 }
 
 type ControllerReference struct {
@@ -123,6 +124,18 @@ func (r *ControllerFinder) Finders() []PodControllerFinder {
 		r.getPodStatefulSet, r.getPodKruiseCloneSet, r.getPodKruiseStatefulSet}
 }
 
+func IsValidGroupVersionKind(apiVersion, kind string) bool {
+	for _, gvk := range validWorkloadList {
+		valid, err := verifyGroupKind(apiVersion, kind, gvk)
+		if err != nil {
+			return false
+		} else if valid {
+			return true
+		}
+	}
+	return false
+}
+
 var (
 	ControllerKindRS       = apps.SchemeGroupVersion.WithKind("ReplicaSet")
 	ControllerKindSS       = apps.SchemeGroupVersion.WithKind("StatefulSet")
@@ -130,12 +143,14 @@ var (
 	ControllerKindDep      = apps.SchemeGroupVersion.WithKind("Deployment")
 	ControllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
 	ControllerKruiseKindSS = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
+
+	validWorkloadList = []schema.GroupVersionKind{ControllerKindRS, ControllerKindSS, ControllerKindRC, ControllerKindDep, ControllerKruiseKindCS, ControllerKruiseKindSS}
 )
 
 // getPodReplicaSet finds a replicaset which has no matching deployments.
 func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, ControllerKindRS.Kind, []string{ControllerKindRS.Group})
+	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKindRS)
 	if !ok {
 		return nil, nil
 	}
@@ -165,14 +180,15 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 			Name:       replicaSet.Name,
 			UID:        replicaSet.UID,
 		},
-		Metadata: replicaSet.ObjectMeta,
+		Metadata:   replicaSet.ObjectMeta,
+		TempLabels: replicaSet.Spec.Template.Labels,
 	}, nil
 }
 
 // getPodReplicaSet finds a replicaset which has no matching deployments.
 func (r *ControllerFinder) getReplicaSet(ref ControllerReference, namespace string) (*apps.ReplicaSet, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, ControllerKindRS.Kind, []string{ControllerKindRS.Group})
+	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKindRS)
 	if !ok {
 		return nil, nil
 	}
@@ -194,7 +210,7 @@ func (r *ControllerFinder) getReplicaSet(ref ControllerReference, namespace stri
 // getPodStatefulSet returns the statefulset referenced by the provided controllerRef.
 func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, ControllerKindSS.Kind, []string{ControllerKindSS.Group})
+	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKindSS)
 	if !ok {
 		return nil, nil
 	}
@@ -220,14 +236,15 @@ func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace 
 			Name:       statefulSet.Name,
 			UID:        statefulSet.UID,
 		},
-		Metadata: statefulSet.ObjectMeta,
+		Metadata:   statefulSet.ObjectMeta,
+		TempLabels: statefulSet.Spec.Template.Labels,
 	}, nil
 }
 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (r *ControllerFinder) getPodDeployment(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, ControllerKindDep.Kind, []string{ControllerKindDep.Group})
+	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKindDep)
 	if !ok {
 		return nil, nil
 	}
@@ -252,13 +269,14 @@ func (r *ControllerFinder) getPodDeployment(ref ControllerReference, namespace s
 			Name:       deployment.Name,
 			UID:        deployment.UID,
 		},
-		Metadata: deployment.ObjectMeta,
+		Metadata:   deployment.ObjectMeta,
+		TempLabels: deployment.Spec.Template.Labels,
 	}, nil
 }
 
 func (r *ControllerFinder) getPodReplicationController(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, ControllerKindRC.Kind, []string{ControllerKindRC.Group})
+	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKindRC)
 	if !ok {
 		return nil, nil
 	}
@@ -283,14 +301,15 @@ func (r *ControllerFinder) getPodReplicationController(ref ControllerReference, 
 			Name:       rc.Name,
 			UID:        rc.UID,
 		},
-		Metadata: rc.ObjectMeta,
+		Metadata:   rc.ObjectMeta,
+		TempLabels: rc.Spec.Template.Labels,
 	}, nil
 }
 
 // getPodStatefulSet returns the kruise cloneSet referenced by the provided controllerRef.
 func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, ControllerKruiseKindCS.Kind, []string{ControllerKruiseKindCS.Group})
+	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKruiseKindCS)
 	if !ok {
 		return nil, nil
 	}
@@ -316,14 +335,15 @@ func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespa
 			Name:       cloneSet.Name,
 			UID:        cloneSet.UID,
 		},
-		Metadata: cloneSet.ObjectMeta,
+		Metadata:   cloneSet.ObjectMeta,
+		TempLabels: cloneSet.Spec.Template.Labels,
 	}, nil
 }
 
 // getPodStatefulSet returns the kruise statefulset referenced by the provided controllerRef.
 func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
-	ok, _ := verifyGroupKind(ref, ControllerKruiseKindSS.Kind, []string{ControllerKruiseKindSS.Group})
+	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKruiseKindSS)
 	if !ok {
 		return nil, nil
 	}
@@ -349,25 +369,15 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 			Name:       ss.Name,
 			UID:        ss.UID,
 		},
-		Metadata: ss.ObjectMeta,
+		Metadata:   ss.ObjectMeta,
+		TempLabels: ss.Spec.Template.Labels,
 	}, nil
 }
 
-func verifyGroupKind(ref ControllerReference, expectedKind string, expectedGroups []string) (bool, error) {
-	gv, err := schema.ParseGroupVersion(ref.APIVersion)
+func verifyGroupKind(apiVersion, kind string, gvk schema.GroupVersionKind) (bool, error) {
+	gv, err := schema.ParseGroupVersion(apiVersion)
 	if err != nil {
 		return false, err
 	}
-
-	if ref.Kind != expectedKind {
-		return false, nil
-	}
-
-	for _, group := range expectedGroups {
-		if group == gv.Group {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return gv.Group == gvk.Group && kind == gvk.Kind, nil
 }

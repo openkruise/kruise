@@ -84,7 +84,7 @@ func (c *commonControl) IsPodReady(pod *v1.Pod) bool {
 	for _, container := range pod.Spec.Containers {
 		// If container is empty container, then its image must be empty image
 		if emptyImage := emptyContainers[container.Name]; emptyImage != "" && container.Image != emptyImage {
-			klog.V(5).Infof("pod(%s.%s) sidecar empty container(%s) Image(%s) isn't Empty Image(%s)",
+			klog.V(5).Infof("pod(%s/%s) sidecar empty container(%s) Image(%s) isn't Empty Image(%s)",
 				pod.Namespace, pod.Name, container.Name, container.Image, emptyImage)
 			return false
 		}
@@ -107,7 +107,7 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
 	if stateStr, _ := pod.Annotations[SidecarsetInplaceUpdateStateKey]; len(stateStr) > 0 {
 		if err := json.Unmarshal([]byte(stateStr), &sidecarUpdateStates); err != nil {
-			klog.Errorf("parse pod(%s.%s) annotations[%s] value(%s) failed: %s",
+			klog.Errorf("parse pod(%s/%s) annotations[%s] value(%s) failed: %s",
 				pod.Namespace, pod.Name, SidecarsetInplaceUpdateStateKey, stateStr, err.Error())
 		}
 	}
@@ -227,7 +227,7 @@ func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets
 		return true
 		// this won't happen in practice, unless someone manually edit pod annotations
 	} else if err := json.Unmarshal([]byte(stateStr), &sidecarUpdateStates); err != nil {
-		klog.V(5).Infof("parse pod(%s.%s) annotations[%s] value(%s) failed: %s",
+		klog.V(5).Infof("parse pod(%s/%s) annotations[%s] value(%s) failed: %s",
 			pod.Namespace, pod.Name, SidecarsetInplaceUpdateStateKey, stateStr, err.Error())
 		return false
 	}
@@ -259,7 +259,7 @@ func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets
 			// we assume that users should not update workload template with new image
 			// which actually has the same imageID as the old image
 			if oldStatus.ImageID == cs.ImageID && containerImages[cs.Name] != cs.Image {
-				klog.V(5).Infof("pod(%s.%s) container %s status imageID not changed, then inconsistent", pod.Namespace, pod.Name, cs.Name)
+				klog.V(5).Infof("pod(%s/%s) container %s status imageID not changed, then inconsistent", pod.Namespace, pod.Name, cs.Name)
 				return false
 			}
 		}
