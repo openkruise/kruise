@@ -23,8 +23,8 @@ import (
 	"reflect"
 
 	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -41,6 +41,8 @@ type PodCreateHandler struct {
 
 	// Decoder decodes objects
 	Decoder *admission.Decoder
+
+	finder *controllerfinder.ControllerFinder
 }
 
 var _ admission.Handler = &PodCreateHandler{}
@@ -94,6 +96,7 @@ var _ inject.Client = &PodCreateHandler{}
 // InjectClient injects the client into the PodCreateHandler
 func (h *PodCreateHandler) InjectClient(c client.Client) error {
 	h.Client = c
+	h.finder = controllerfinder.NewControllerFinder(c)
 	return nil
 }
 

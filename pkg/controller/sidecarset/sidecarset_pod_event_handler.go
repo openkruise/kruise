@@ -56,7 +56,7 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	}
 
 	for _, sidecarSet := range sidecarSets {
-		klog.V(3).Infof("Create pod(%s.%s) and reconcile sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
+		klog.V(3).Infof("Create pod(%s/%s) and reconcile sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name: sidecarSet.Name,

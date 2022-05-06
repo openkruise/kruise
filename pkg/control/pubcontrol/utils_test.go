@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -173,9 +172,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 		matchedPub    bool
 	}{
 		{
-			name: "matched pub targetRef deployment",
+			name: "matched pub",
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
+				pod.Annotations[PodRelatedPubAnnotation] = pubDemo.Name
 				return pod
 			},
 			getDeployment: func() *apps.Deployment {
@@ -199,35 +199,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 			matchedPub: true,
 		},
 		{
-			name: "no matched pub targetRef deployment, for unequal name",
-			getPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
-				return pod
-			},
-			getDeployment: func() *apps.Deployment {
-				dep := deploymentDemo.DeepCopy()
-				return dep
-			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				rep := replicaSetDemo.DeepCopy()
-				return rep
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
-					Name:       "no-deployment",
-					Kind:       deploymentDemo.Kind,
-					APIVersion: deploymentDemo.APIVersion,
-				}
-				return pub
-			},
-			matchedPub: false,
-		},
-		{
 			name: "no matched pub targetRef deployment, for unequal ns",
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
+				pod.Annotations[PodRelatedPubAnnotation] = pubDemo.Name
 				return pod
 			},
 			getDeployment: func() *apps.Deployment {
@@ -252,29 +227,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 			matchedPub: false,
 		},
 		{
-			name: "matched pub selector",
+			name: "no match, pub not found",
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				return pod
-			},
-			getDeployment: func() *apps.Deployment {
-				dep := deploymentDemo.DeepCopy()
-				return dep
-			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				rep := replicaSetDemo.DeepCopy()
-				return rep
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			matchedPub: true,
-		},
-		{
-			name: "no match pub selector",
-			getPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
+				pod.Annotations[PodRelatedPubAnnotation] = "o-pub"
 				return pod
 			},
 			getDeployment: func() *apps.Deployment {
@@ -301,17 +257,17 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), cs.getReplicaSet(), cs.getPub()).Build()
-			controllerFinder := controllerfinder.NewControllerFinder(fakeClient)
+			control := NewPubControl(fakeClient)
 			pod := cs.getPod()
-			pub, err := GetPodUnavailableBudgetForPod(fakeClient, controllerFinder, pod)
+			pub, err := control.GetPubForPod(pod)
 			if err != nil {
-				t.Fatalf("GetPodUnavailableBudgetForPod failed: %s", err.Error())
+				t.Fatalf("GetPubForPod failed: %s", err.Error())
 			}
 			if cs.matchedPub && pub == nil {
-				t.Fatalf("GetPodUnavailableBudgetForPod failed")
+				t.Fatalf("GetPubForPod failed")
 			}
 			if !cs.matchedPub && pub != nil {
-				t.Fatalf("GetPodUnavailableBudgetForPod failed")
+				t.Fatalf("GetPubForPod failed")
 			}
 		})
 	}

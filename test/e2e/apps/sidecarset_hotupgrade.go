@@ -72,7 +72,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// get pods
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -116,7 +116,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// check pod image and annotations
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -227,7 +227,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// check pod image and annotations
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)

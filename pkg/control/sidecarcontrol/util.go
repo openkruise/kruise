@@ -126,7 +126,7 @@ func GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, annotationKey stri
 
 	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
 	if err := json.Unmarshal([]byte(annotations[hashKey]), &sidecarSetHash); err != nil {
-		klog.Errorf("parse pod(%s.%s) annotations[%s] value(%s) failed: %s", pod.GetNamespace(), pod.GetName(), hashKey,
+		klog.Errorf("parse pod(%s/%s) annotations[%s] value(%s) failed: %s", pod.GetNamespace(), pod.GetName(), hashKey,
 			annotations[hashKey], err.Error())
 		// to be compatible with older sidecarSet hash struct, map[string]string
 		olderSidecarSetHash := make(map[string]string)
@@ -157,7 +157,7 @@ func updatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 	hashKey := SidecarSetHashAnnotation
 	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
 	if err := json.Unmarshal([]byte(pod.Annotations[hashKey]), &sidecarSetHash); err != nil {
-		klog.Errorf("unmarshal pod(%s.%s) annotations[%s] failed: %s", pod.Namespace, pod.Name, hashKey, err.Error())
+		klog.Errorf("unmarshal pod(%s/%s) annotations[%s] failed: %s", pod.Namespace, pod.Name, hashKey, err.Error())
 
 		// to be compatible with older sidecarSet hash struct, map[string]string
 		olderSidecarSetHash := make(map[string]string)
@@ -289,7 +289,7 @@ func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *ap
 				// get envVar in container
 				eVar := util.GetContainerEnvVar(&appContainer, envName)
 				if eVar == nil {
-					klog.Warningf("pod(%s.%s) container(%s) get env(%s) is nil", pod.Namespace, pod.Name, appContainer.Name, envName)
+					klog.Warningf("pod(%s/%s) container(%s) get env(%s) is nil", pod.Namespace, pod.Name, appContainer.Name, envName)
 					continue
 				}
 				injectedEnvs = append(injectedEnvs, *eVar)
@@ -324,7 +324,7 @@ func GetSidecarTransferEnvs(sidecarContainer *appsv1alpha1.SidecarContainer, pod
 		if tEnv.SourceContainerNameFrom != nil && tEnv.SourceContainerNameFrom.FieldRef != nil {
 			containerName, err := ExtractContainerNameFromFieldPath(tEnv.SourceContainerNameFrom.FieldRef, pod)
 			if err != nil {
-				klog.Errorf("get containerName from pod(%s.%s) annotations or labels[%s] failed: %s", pod.Namespace, pod.Name, tEnv.SourceContainerNameFrom.FieldRef, err.Error())
+				klog.Errorf("get containerName from pod(%s/%s) annotations or labels[%s] failed: %s", pod.Namespace, pod.Name, tEnv.SourceContainerNameFrom.FieldRef, err.Error())
 				continue
 			}
 			sourceContainerName = containerName

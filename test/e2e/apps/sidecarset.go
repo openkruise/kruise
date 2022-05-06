@@ -77,7 +77,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
 			// get pods
@@ -134,7 +134,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
 			// get pods
@@ -216,7 +216,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				time.Sleep(time.Second)
 
 				deploymentIn := cs.getDeployment()
-				ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+				ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 				tester.CreateDeployment(deploymentIn)
 				// get pods
 				pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -319,7 +319,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				time.Sleep(time.Second)
 
 				deploymentIn := cs.getDeployment()
-				ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+				ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 				tester.CreateDeployment(deploymentIn)
 				// get pods
 				pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -392,7 +392,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 					Value: "127.0.0.1",
 				},
 			}
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// get pods
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -467,7 +467,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 					Value: "127.0.0.1",
 				},
 			}
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// get pods
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -542,7 +542,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 					Value: "127.0.0.1",
 				},
 			}
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// get pods
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -595,7 +595,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.Containers[0].Image = BusyboxImage
@@ -635,7 +635,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
 			sidecarSetIn, err := kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetIn.Name, metav1.GetOptions{})
@@ -725,7 +725,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.Containers[0].Image = BusyboxImage
@@ -769,7 +769,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// update pod[0] labels[canary.release] = true
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
@@ -842,7 +842,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
 			except := &appsv1alpha1.SidecarSetStatus{
@@ -897,7 +897,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(4)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
 			// update sidecarSet sidecar container
@@ -945,7 +945,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
 			// check sidecarSet

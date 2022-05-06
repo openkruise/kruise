@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"time"
 
 	kruiseappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -29,6 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -38,6 +40,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -70,6 +73,9 @@ var (
 const (
 	DeletionTimeout       = 20 * time.Second
 	UpdatedDelayCheckTime = 10 * time.Second
+
+	// patch related-pub annotation Reconcile prefix
+	PatchPubAnnotationReconcilePrefix = "patch#"
 )
 
 var ConflictRetry = wait.Backoff{
@@ -104,6 +110,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Scheme:           mgr.GetScheme(),
 		recorder:         mgr.GetEventRecorderFor("podunavailablebudget-controller"),
 		controllerFinder: controllerfinder.NewControllerFinder(mgr.GetClient()),
+		pubControl:       pubcontrol.NewPubControl(mgr.GetClient()),
 	}
 }
 
@@ -124,8 +131,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{client: mgr.GetClient(),
-		controllerFinder: controllerfinder.NewControllerFinder(mgr.GetClient())}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, newEnqueueRequestForPod(mgr.GetClient())); err != nil {
 		return err
 	}
 
@@ -203,6 +209,7 @@ type ReconcilePodUnavailableBudget struct {
 	Scheme           *runtime.Scheme
 	recorder         record.EventRecorder
 	controllerFinder *controllerfinder.ControllerFinder
+	pubControl       pubcontrol.PubControl
 }
 
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets,verbs=get;list;watch;create;update;patch;delete
@@ -210,14 +217,23 @@ type ReconcilePodUnavailableBudget struct {
 
 // pkg/controller/cloneset/cloneset_controller.go Watch for changes to CloneSet
 func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// patch related-pub annotation in  pods
+	if strings.Contains(req.Name, PatchPubAnnotationReconcilePrefix) {
+		if err := r.patchRelatedPubAnnotationInPod(req); err != nil {
+			klog.Errorf("PodUnavailableBudget patch related-pub annotation in workload(%s/%s)'s pods failed: %s", req.Namespace, req.Name, err.Error())
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// Fetch the PodUnavailableBudget instance
 	pub := &policyv1alpha1.PodUnavailableBudget{}
 	err := r.Get(context.TODO(), req.NamespacedName, pub)
 	if (err != nil && errors.IsNotFound(err)) || (err == nil && !pub.DeletionTimestamp.IsZero()) {
-		klog.V(3).Infof("pub(%s.%s) is Deletion in this time", req.Namespace, req.Name)
+		klog.V(3).Infof("pub(%s/%s) is Deletion in this time", req.Namespace, req.Name)
 		if cacheErr := util.GlobalCache.Delete(&policyv1alpha1.PodUnavailableBudget{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "policy.kruise.io/v1alpha1",
+				APIVersion: policyv1alpha1.GroupVersion.String(),
 				Kind:       "PodUnavailableBudget",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -235,7 +251,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 		return reconcile.Result{}, err
 	}
 
-	klog.V(3).Infof("begin to process podUnavailableBudget(%s.%s)", pub.Namespace, pub.Name)
+	klog.V(3).Infof("begin to process podUnavailableBudget(%s/%s)", pub.Namespace, pub.Name)
 	recheckTime, err := r.syncPodUnavailableBudget(pub)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -247,8 +263,8 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 }
 
 func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1alpha1.PodUnavailableBudget) (*time.Time, error) {
-	control := pubcontrol.NewPubControl(pub, r.controllerFinder, r.Client)
-	pods, expectedCount, err := control.GetPodsForPub()
+	currentTime := time.Now()
+	pods, expectedCount, err := r.pubControl.GetPodsForPub(pub)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +272,7 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 		r.recorder.Eventf(pub, corev1.EventTypeNormal, "NoPods", "No matching pods found")
 	}
 
-	klog.V(3).Infof("pub(%s.%s) controller pods(%d) expectedCount(%d)", pub.Namespace, pub.Name, len(pods), expectedCount)
+	klog.V(3).Infof("pub(%s/%s) controller pods(%d) expectedCount(%d)", pub.Namespace, pub.Name, len(pods), expectedCount)
 	desiredAvailable, err := r.getDesiredAvailableForPub(pub, expectedCount)
 	if err != nil {
 		r.recorder.Eventf(pub, corev1.EventTypeWarning, "CalculateExpectedPodCountFailed", "Failed to calculate the number of expected pods: %v", err)
@@ -266,8 +282,6 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	// for debug
 	var conflictTimes int
 	var costOfGet, costOfUpdate time.Duration
-
-	currentTime := time.Now()
 	var pubClone *policyv1alpha1.PodUnavailableBudget
 	refresh := false
 	var recheckTime *time.Time
@@ -313,7 +327,7 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 		// unavailablePods contains information about pods whose specification changed(in-place update), in case of informer cache latency, after 5 seconds to remove it.
 		var disruptedPods, unavailablePods map[string]metav1.Time
 		disruptedPods, unavailablePods, recheckTime = r.buildDisruptedAndUnavailablePods(pods, pubClone, currentTime)
-		currentAvailable := countAvailablePods(pods, disruptedPods, unavailablePods, control)
+		currentAvailable := countAvailablePods(pods, disruptedPods, unavailablePods, r.pubControl)
 
 		start = time.Now()
 		updateErr := r.updatePubStatus(pubClone, currentAvailable, desiredAvailable, expectedCount, disruptedPods, unavailablePods)
@@ -329,9 +343,58 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	klog.V(3).Infof("Controller cost of pub(%s/%s): conflict times %v, cost of Get %v, cost of Update %v",
 		pub.Namespace, pub.Name, conflictTimes, costOfGet, costOfUpdate)
 	if err != nil {
-		klog.Errorf("update pub(%s.%s) status failed: %s", pub.Namespace, pub.Name, err.Error())
+		klog.Errorf("update pub(%s/%s) status failed: %s", pub.Namespace, pub.Name, err.Error())
 	}
 	return recheckTime, err
+}
+
+// patch related-pub annotation in all pods of workload
+func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(req ctrl.Request) error {
+	// req.Name Format = patch#{apiVersion}#{workload.Kind}#{workload.Name}
+	// example for patch#apps/v1#Deployment#echoserver
+	arr := strings.Split(req.Name, "#")
+	if len(arr) != 4 {
+		klog.Warningf("Reconcile PodUnavailableBudget workload(%s) is invalid", req.Name)
+		return nil
+	}
+	// fetch workload
+	apiVersion, kind, ns, name := arr[1], arr[2], req.Namespace, arr[3]
+	workload, err := r.controllerFinder.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
+	if err != nil {
+		return err
+	} else if workload == nil {
+		klog.Warningf("Reconcile PodUnavailableBudget workload(%s) is Not Found", req.Name)
+		return nil
+	}
+
+	// fetch pub for workload
+	pub, err := r.getPubForWorkload(workload)
+	if err != nil || pub == nil {
+		return err
+	}
+	pods, _, err := r.controllerFinder.GetPodsForRef(workload.APIVersion, workload.Kind, workload.Name, workload.Metadata.Namespace, true)
+	if err != nil {
+		return err
+	}
+	updatedPods := make([]*corev1.Pod, 0, len(pods))
+	for i := range pods {
+		if pods[i].Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
+			updatedPods = append(updatedPods, pods[i].DeepCopy())
+		}
+	}
+	if len(updatedPods) == 0 {
+		return nil
+	}
+
+	// update related-pub annotation in pods
+	for _, pod := range updatedPods {
+		body := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, pubcontrol.PodRelatedPubAnnotation, pub.Name)
+		if err = r.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
+			return err
+		}
+	}
+	klog.V(3).Infof("patch pub(%s/%s) old pods(%d) related-pub annotation success", pub.Namespace, pub.Name, len(updatedPods))
+	return nil
 }
 
 func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[string]metav1.Time, control pubcontrol.PubControl) (currentAvailable int32) {
@@ -432,7 +495,7 @@ func (r *ReconcilePodUnavailableBudget) getExpectedScale(pub *policyv1alpha1.Pod
 		for _, finder := range r.controllerFinder.Finders() {
 			scaleNSelector, err := finder(ref, pub.Namespace)
 			if err != nil {
-				klog.Errorf("podUnavailableBudget(%s.%s) handle TargetReference failed: %s", pub.Namespace, pub.Name, err.Error())
+				klog.Errorf("podUnavailableBudget(%s/%s) handle TargetReference failed: %s", pub.Namespace, pub.Name, err.Error())
 				return 0, err
 			}
 			if scaleNSelector != nil && scaleNSelector.Metadata.DeletionTimestamp.IsZero() {
@@ -563,7 +626,41 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 	if err = util.GlobalCache.Add(pub); err != nil {
 		klog.Errorf("Add cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
 	}
-	klog.V(3).Infof("pub(%s.%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
+	klog.V(3).Infof("pub(%s/%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
 		pub.Namespace, pub.Name, len(disruptedPods), len(unavailablePods), expectedCount, desiredAvailable, currentAvailable, unavailableAllowed)
 	return nil
+}
+
+func (r *ReconcilePodUnavailableBudget) getPubForWorkload(workload *controllerfinder.ScaleAndSelector) (*policyv1alpha1.PodUnavailableBudget, error) {
+	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	if err := r.List(context.TODO(), pubList, &client.ListOptions{Namespace: workload.Metadata.Namespace}, utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+	for i := range pubList.Items {
+		pub := &pubList.Items[i]
+		// if targetReference isn't nil, priority to take effect
+		if pub.Spec.TargetReference != nil {
+			// belongs the same workload
+			if isReferenceEqual(&policyv1alpha1.TargetReference{
+				APIVersion: workload.APIVersion,
+				Kind:       workload.Kind,
+				Name:       workload.Name,
+			}, pub.Spec.TargetReference) {
+				return pub, nil
+			}
+		} else {
+			// This error is irreversible, so continue
+			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			if err != nil {
+				continue
+			}
+			// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
+			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(workload.TempLabels)) {
+				continue
+			}
+			return pub, nil
+		}
+	}
+	klog.V(6).Infof("could not find PodUnavailableBudget for workload %s in namespace %s with labels: %v", workload.Name, workload.Metadata.Namespace, workload.TempLabels)
+	return nil, nil
 }

@@ -20,10 +20,10 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +42,8 @@ type PodCreateHandler struct {
 	// Decoder decodes objects
 	Decoder *admission.Decoder
 
-	finders *controllerfinder.ControllerFinder
+	finders    *controllerfinder.ControllerFinder
+	pubControl pubcontrol.PubControl
 }
 
 func (h *PodCreateHandler) validatingPodFn(ctx context.Context, req admission.Request) (allowed bool, reason string, err error) {
@@ -90,6 +91,7 @@ var _ inject.Client = &PodCreateHandler{}
 func (h *PodCreateHandler) InjectClient(c client.Client) error {
 	h.Client = c
 	h.finders = controllerfinder.NewControllerFinder(c)
+	h.pubControl = pubcontrol.NewPubControl(c)
 	return nil
 }
 

@@ -18,7 +18,7 @@ package podunavailablebudget
 
 import (
 	"context"
-	"reflect"
+	"fmt"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -29,6 +29,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,9 +46,17 @@ import (
 
 var _ handler.EventHandler = &enqueueRequestForPod{}
 
+func newEnqueueRequestForPod(c client.Client) handler.EventHandler {
+	e := &enqueueRequestForPod{client: c}
+	e.controllerFinder = controllerfinder.NewControllerFinder(c)
+	e.pubControl = pubcontrol.NewPubControl(c)
+	return e
+}
+
 type enqueueRequestForPod struct {
 	client           client.Client
 	controllerFinder *controllerfinder.ControllerFinder
+	pubControl       pubcontrol.PubControl
 }
 
 func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -68,13 +77,18 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	if !ok {
 		return
 	}
-
-	pub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, pod)
-	if pub == nil {
+	// add related-pub annotation in pod
+	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
+		p.enqueuePatchPubAnnotationRequest(q, pod)
 		return
 	}
 
-	klog.V(3).Infof("add pod(%s.%s) reconcile pub(%s.%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
+	// reconcile pub
+	pub, _ := p.pubControl.GetPubForPod(pod)
+	if pub == nil {
+		return
+	}
+	klog.V(3).Infof("add pod(%s/%s) reconcile pub(%s/%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
 	q.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      pub.Name,
@@ -90,50 +104,11 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		return
 	}
 
-	//labels changed, and reconcile union pubs
-	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) {
-		oldPub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, oldPod)
-		newPub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, newPod)
-		if oldPub != nil && newPub != nil && oldPub.Name == newPub.Name {
-			control := pubcontrol.NewPubControl(newPub, p.controllerFinder, p.client)
-			if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, newPub, control); isReconcile {
-				q.AddAfter(reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      newPub.Name,
-						Namespace: newPub.Namespace,
-					},
-				}, enqueueDelayTime)
-			}
-			return
-		}
-		if oldPub != nil {
-			klog.V(3).Infof("pod(%s.%s) labels changed, and reconcile pub(%s.%s)", oldPod.Namespace, oldPod.Name, oldPub.Namespace, oldPub.Name)
-			q.Add(reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      oldPub.Name,
-					Namespace: oldPub.Namespace,
-				},
-			})
-		}
-		if newPub != nil {
-			klog.V(3).Infof("pod(%s.%s) labels changed, and reconcile pub(%s.%s)", newPod.Namespace, newPod.Name, newPub.Namespace, newPub.Name)
-			q.Add(reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      newPub.Name,
-					Namespace: newPub.Namespace,
-				},
-			})
-		}
-
-		return
-	}
-
-	pub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, newPod)
+	pub, _ := p.pubControl.GetPubForPod(newPod)
 	if pub == nil {
 		return
 	}
-	control := pubcontrol.NewPubControl(pub, p.controllerFinder, p.client)
-	if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, pub, control); isReconcile {
+	if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, pub, p.pubControl); isReconcile {
 		q.AddAfter(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      pub.Name,
@@ -144,12 +119,30 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 
 }
 
+func (p *enqueueRequestForPod) enqueuePatchPubAnnotationRequest(q workqueue.RateLimitingInterface, pod *corev1.Pod) {
+	ref := metav1.GetControllerOf(pod)
+	if ref == nil {
+		return
+	}
+	if !controllerfinder.IsValidGroupVersionKind(ref.APIVersion, ref.Kind) {
+		return
+	}
+
+	// name = patch#apps/v1#kind#name
+	name := fmt.Sprintf("%s%s#%s#%s", PatchPubAnnotationReconcilePrefix, ref.APIVersion, ref.Kind, ref.Name)
+	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      name,
+	}})
+	klog.V(6).Infof("reconcile patch workload(%s) related-pub annotation", name)
+}
+
 func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, control pubcontrol.PubControl) (bool, time.Duration) {
 	var enqueueDelayTime time.Duration
 	// If the pod's deletion timestamp is set, remove endpoint from ready address.
 	if oldPod.DeletionTimestamp.IsZero() && !newPod.DeletionTimestamp.IsZero() {
 		enqueueDelayTime = time.Second * 5
-		klog.V(3).Infof("pod(%s.%s) DeletionTimestamp changed, and reconcile pub(%s.%s) delayTime(5s)", newPod.Namespace, newPod.Name, pub.Namespace, pub.Name)
+		klog.V(3).Infof("pod(%s/%s) DeletionTimestamp changed, and reconcile pub(%s/%s) delayTime(5s)", newPod.Namespace, newPod.Name, pub.Namespace, pub.Name)
 		return true, enqueueDelayTime
 		// oldPod Deletion is set, then no reconcile
 	} else if !oldPod.DeletionTimestamp.IsZero() {
@@ -163,7 +156,7 @@ func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUn
 	oldReady := control.IsPodReady(oldPod) && control.IsPodStateConsistent(oldPod)
 	newReady := control.IsPodReady(newPod) && control.IsPodStateConsistent(newPod)
 	if oldReady != newReady {
-		klog.V(3).Infof("pod(%s.%s) ConsistentAndReady changed(from %v to %v), and reconcile pub(%s.%s)",
+		klog.V(3).Infof("pod(%s/%s) ConsistentAndReady changed(from %v to %v), and reconcile pub(%s/%s)",
 			newPod.Namespace, newPod.Name, oldReady, newReady, pub.Namespace, pub.Name)
 		return true, enqueueDelayTime
 	}
