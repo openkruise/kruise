@@ -17,6 +17,7 @@ limitations under the License.
 package sidecarcontrol
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -24,17 +25,18 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -47,6 +49,9 @@ const (
 
 	// SidecarSetListAnnotation represent sidecarset list that injected pods
 	SidecarSetListAnnotation = "kruise.io/sidecarset-injected-list"
+
+	// SidecarSetInjectNamespaceLabelSelectorAnnotation represent the label of namespace which be injected to
+	SidecarSetInjectNamespaceLabelSelectorAnnotation = "kruise.io/sidecarset-inject-namespace-label-selector"
 
 	// SidecarEnvKey specifies the environment variable which record a container as injected
 	SidecarEnvKey = "IS_INJECTED"
@@ -72,7 +77,14 @@ type SidecarSetUpgradeSpec struct {
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
-func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
+func PodMatchedSidecarSet(cl client.Client, pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
+
+	// if pod.Namespace in selectedNamespaces, then inject the sidecar
+	selectedNamespaces := GetNamespacesByLabelSelector(cl, sidecarSet)
+	if selectedNamespaces.Has(pod.Namespace) {
+		return true, nil
+	}
+
 	//If matchedNamespace is not empty, sidecarSet will only match the pods in the namespace
 	if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != pod.Namespace {
 		return false, nil
@@ -87,6 +99,33 @@ func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (
 		return true, nil
 	}
 	return false, nil
+}
+
+func GetNamespaceLabelSelector(labelSelector string) labels.Selector {
+	labelsKv := strings.Split(labelSelector, "=")
+
+	if len(labelsKv) > 1 {
+		lm := map[string]string{labelsKv[0]: labelsKv[1]}
+		return labels.Set(lm).AsSelector()
+	}
+	return labels.Everything()
+}
+
+func GetNamespacesByLabelSelector(cl client.Client, sidecarSet appsv1alpha1.SidecarSet) sets.String {
+	selectedNamespaces := sets.NewString()
+	if label, ok := sidecarSet.Annotations[SidecarSetInjectNamespaceLabelSelectorAnnotation]; ok {
+		nsList := &corev1.NamespaceList{}
+		err := cl.List(context.TODO(), nsList, utilclient.DisableDeepCopy, client.MatchingLabelsSelector{Selector: GetNamespaceLabelSelector(label)})
+		if err != nil {
+			return selectedNamespaces
+		}
+
+		for _, ns := range nsList.Items {
+			selectedNamespaces.Insert(ns.Name)
+		}
+	}
+
+	return selectedNamespaces
 }
 
 // IsActivePod determines the pod whether need be injected and updated

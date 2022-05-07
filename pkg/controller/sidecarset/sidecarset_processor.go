@@ -219,7 +219,7 @@ func (p *Processor) listMatchedSidecarSets(pod *corev1.Pod) string {
 	//matched SidecarSet.Name list
 	sidecarSetNames := make([]string, 0)
 	for _, sidecarSet := range sidecarSetList.Items {
-		if matched, _ := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); matched {
+		if matched, _ := sidecarcontrol.PodMatchedSidecarSet(p.Client, pod, sidecarSet); matched {
 			sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
 		}
 	}
