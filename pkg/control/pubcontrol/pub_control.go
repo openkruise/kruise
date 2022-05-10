@@ -69,7 +69,7 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
-		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
+		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
 		return matchedPods, expectedCount, err
 	} else if pub.Spec.Selector == nil {
 		klog.Warningf("pub(%s/%s) spec.Selector cannot be empty", pub.Namespace, pub.Name)

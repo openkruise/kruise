@@ -24,10 +24,14 @@ import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -197,4 +201,51 @@ func isPodRecordedInPub(podName string, pub *policyv1alpha1.PodUnavailableBudget
 		return true
 	}
 	return false
+}
+
+func GetPubForWorkload(c client.Client, workload *controllerfinder.ScaleAndSelector) (*policyv1alpha1.PodUnavailableBudget, error) {
+	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	if err := c.List(context.TODO(), pubList, &client.ListOptions{Namespace: workload.Metadata.Namespace}, utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+	for i := range pubList.Items {
+		pub := &pubList.Items[i]
+		// if targetReference isn't nil, priority to take effect
+		if pub.Spec.TargetReference != nil {
+			// belongs the same workload
+			if IsReferenceEqual(&policyv1alpha1.TargetReference{
+				APIVersion: workload.APIVersion,
+				Kind:       workload.Kind,
+				Name:       workload.Name,
+			}, pub.Spec.TargetReference) {
+				return pub, nil
+			}
+		} else {
+			// This error is irreversible, so continue
+			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			if err != nil {
+				continue
+			}
+			// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
+			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(workload.TempLabels)) {
+				continue
+			}
+			return pub, nil
+		}
+	}
+	klog.V(6).Infof("could not find PodUnavailableBudget for workload %s in namespace %s with labels: %v", workload.Name, workload.Metadata.Namespace, workload.TempLabels)
+	return nil, nil
+}
+
+// check APIVersion, Kind, Name
+func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
+	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
+	if err != nil {
+		return false
+	}
+	gv2, err := schema.ParseGroupVersion(ref2.APIVersion)
+	if err != nil {
+		return false
+	}
+	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
 }

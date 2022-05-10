@@ -81,6 +81,15 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
+	// patch related-pub annotation in pod
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) ||
+		utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetDeleteGate) {
+		err = h.pubMutatingPod(ctx, req, obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+	}
+
 	if reflect.DeepEqual(obj, clone) {
 		return admission.Allowed("")
 	}
