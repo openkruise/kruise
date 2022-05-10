@@ -18,7 +18,6 @@ package podunavailablebudget
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -29,10 +28,8 @@ import (
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -77,11 +74,6 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	if !ok {
 		return
 	}
-	// add related-pub annotation in pod
-	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
-		p.enqueuePatchPubAnnotationRequest(q, pod)
-		return
-	}
 
 	// reconcile pub
 	pub, _ := p.pubControl.GetPubForPod(pod)
@@ -117,24 +109,6 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		}, enqueueDelayTime)
 	}
 
-}
-
-func (p *enqueueRequestForPod) enqueuePatchPubAnnotationRequest(q workqueue.RateLimitingInterface, pod *corev1.Pod) {
-	ref := metav1.GetControllerOf(pod)
-	if ref == nil {
-		return
-	}
-	if !controllerfinder.IsValidGroupVersionKind(ref.APIVersion, ref.Kind) {
-		return
-	}
-
-	// name = patch#apps/v1#kind#name
-	name := fmt.Sprintf("%s%s#%s#%s", PatchPubAnnotationReconcilePrefix, ref.APIVersion, ref.Kind, ref.Name)
-	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
-		Namespace: pod.Namespace,
-		Name:      name,
-	}})
-	klog.V(6).Infof("reconcile patch workload(%s) related-pub annotation", name)
 }
 
 func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, control pubcontrol.PubControl) (bool, time.Duration) {
@@ -235,7 +209,7 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		// if targetReference isn't nil, priority to take effect
 		if pub.Spec.TargetReference != nil {
 			// belongs the same workload
-			if isReferenceEqual(targetRef, pub.Spec.TargetReference) {
+			if pubcontrol.IsReferenceEqual(targetRef, pub.Spec.TargetReference) {
 				matchedPubs = append(matchedPubs, pub)
 			}
 		} else {
@@ -262,17 +236,4 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		klog.V(3).Infof("workload(%s/%s) replicas changed, and reconcile pub(%s/%s)",
 			namespace, targetRef.Name, pub.Namespace, pub.Name)
 	}
-}
-
-// check APIVersion, Kind, Name
-func isReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
-	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
-	if err != nil {
-		return false
-	}
-	gv2, err := schema.ParseGroupVersion(ref2.APIVersion)
-	if err != nil {
-		return false
-	}
-	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
 }
