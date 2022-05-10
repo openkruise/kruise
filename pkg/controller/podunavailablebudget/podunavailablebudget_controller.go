@@ -20,7 +20,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 
 	kruiseappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -30,7 +29,6 @@ import (
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -40,7 +38,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -73,9 +70,6 @@ var (
 const (
 	DeletionTimeout       = 20 * time.Second
 	UpdatedDelayCheckTime = 10 * time.Second
-
-	// patch related-pub annotation Reconcile prefix
-	PatchPubAnnotationReconcilePrefix = "patch#"
 )
 
 var ConflictRetry = wait.Backoff{
@@ -217,15 +211,6 @@ type ReconcilePodUnavailableBudget struct {
 
 // pkg/controller/cloneset/cloneset_controller.go Watch for changes to CloneSet
 func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// patch related-pub annotation in  pods
-	if strings.Contains(req.Name, PatchPubAnnotationReconcilePrefix) {
-		if err := r.patchRelatedPubAnnotationInPod(req); err != nil {
-			klog.Errorf("PodUnavailableBudget patch related-pub annotation in workload(%s/%s)'s pods failed: %s", req.Namespace, req.Name, err.Error())
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// Fetch the PodUnavailableBudget instance
 	pub := &policyv1alpha1.PodUnavailableBudget{}
 	err := r.Get(context.TODO(), req.NamespacedName, pub)
@@ -234,7 +219,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 		if cacheErr := util.GlobalCache.Delete(&policyv1alpha1.PodUnavailableBudget{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: policyv1alpha1.GroupVersion.String(),
-				Kind:       "PodUnavailableBudget",
+				Kind:       controllerKind.Kind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      req.Name,
@@ -270,6 +255,12 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	}
 	if len(pods) == 0 {
 		r.recorder.Eventf(pub, corev1.EventTypeNormal, "NoPods", "No matching pods found")
+	} else {
+		// patch related-pub annotation in all pods of workload
+		if err = r.patchRelatedPubAnnotationInPod(pub, pods); err != nil {
+			klog.Errorf("pub(%s/%s) patch pod annotation failed: %s", pub.Namespace, pub.Name, err.Error())
+			return nil, err
+		}
 	}
 
 	klog.V(3).Infof("pub(%s/%s) controller pods(%d) expectedCount(%d)", pub.Namespace, pub.Name, len(pods), expectedCount)
@@ -348,35 +339,8 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	return recheckTime, err
 }
 
-// patch related-pub annotation in all pods of workload
-func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(req ctrl.Request) error {
-	// req.Name Format = patch#{apiVersion}#{workload.Kind}#{workload.Name}
-	// example for patch#apps/v1#Deployment#echoserver
-	arr := strings.Split(req.Name, "#")
-	if len(arr) != 4 {
-		klog.Warningf("Reconcile PodUnavailableBudget workload(%s) is invalid", req.Name)
-		return nil
-	}
-	// fetch workload
-	apiVersion, kind, ns, name := arr[1], arr[2], req.Namespace, arr[3]
-	workload, err := r.controllerFinder.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
-	if err != nil {
-		return err
-	} else if workload == nil {
-		klog.Warningf("Reconcile PodUnavailableBudget workload(%s) is Not Found", req.Name)
-		return nil
-	}
-
-	// fetch pub for workload
-	pub, err := r.getPubForWorkload(workload)
-	if err != nil || pub == nil {
-		return err
-	}
-	pods, _, err := r.controllerFinder.GetPodsForRef(workload.APIVersion, workload.Kind, workload.Name, workload.Metadata.Namespace, true)
-	if err != nil {
-		return err
-	}
-	updatedPods := make([]*corev1.Pod, 0, len(pods))
+func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) error {
+	var updatedPods []*corev1.Pod
 	for i := range pods {
 		if pods[i].Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
 			updatedPods = append(updatedPods, pods[i].DeepCopy())
@@ -385,11 +349,10 @@ func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(req ctrl.
 	if len(updatedPods) == 0 {
 		return nil
 	}
-
 	// update related-pub annotation in pods
 	for _, pod := range updatedPods {
 		body := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, pubcontrol.PodRelatedPubAnnotation, pub.Name)
-		if err = r.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
+		if err := r.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
 			return err
 		}
 	}
@@ -429,7 +392,7 @@ func (r *ReconcilePodUnavailableBudget) getPodsForPub(pub *policyv1alpha1.PodUna
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
-		matchedPods, _, err := r.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
+		matchedPods, _, err := r.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
 		return matchedPods, err
 	} else if pub.Spec.Selector == nil {
 		r.recorder.Eventf(pub, corev1.EventTypeWarning, "NoSelector", "Selector cannot be empty")
@@ -629,38 +592,4 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 	klog.V(3).Infof("pub(%s/%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
 		pub.Namespace, pub.Name, len(disruptedPods), len(unavailablePods), expectedCount, desiredAvailable, currentAvailable, unavailableAllowed)
 	return nil
-}
-
-func (r *ReconcilePodUnavailableBudget) getPubForWorkload(workload *controllerfinder.ScaleAndSelector) (*policyv1alpha1.PodUnavailableBudget, error) {
-	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
-	if err := r.List(context.TODO(), pubList, &client.ListOptions{Namespace: workload.Metadata.Namespace}, utilclient.DisableDeepCopy); err != nil {
-		return nil, err
-	}
-	for i := range pubList.Items {
-		pub := &pubList.Items[i]
-		// if targetReference isn't nil, priority to take effect
-		if pub.Spec.TargetReference != nil {
-			// belongs the same workload
-			if isReferenceEqual(&policyv1alpha1.TargetReference{
-				APIVersion: workload.APIVersion,
-				Kind:       workload.Kind,
-				Name:       workload.Name,
-			}, pub.Spec.TargetReference) {
-				return pub, nil
-			}
-		} else {
-			// This error is irreversible, so continue
-			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
-			if err != nil {
-				continue
-			}
-			// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
-			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(workload.TempLabels)) {
-				continue
-			}
-			return pub, nil
-		}
-	}
-	klog.V(6).Infof("could not find PodUnavailableBudget for workload %s in namespace %s with labels: %v", workload.Name, workload.Metadata.Namespace, workload.TempLabels)
-	return nil, nil
 }

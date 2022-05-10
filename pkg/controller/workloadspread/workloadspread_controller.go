@@ -264,7 +264,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 
 	switch targetRef.Kind {
 	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind:
-		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, targetRef.Name, ws.Namespace, false)
+		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, ws.Namespace, targetRef.Name, false)
 	case controllerKindJob.Kind:
 		pods, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
 	default:

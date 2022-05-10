@@ -33,7 +33,7 @@ import (
 )
 
 // GetPodsForRef return target workload's podList and spec.replicas.
-func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, active bool) ([]*corev1.Pod, int32, error) {
+func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, active bool) ([]*corev1.Pod, int32, error) {
 	workloadUIDs := make([]types.UID, 0)
 	var workloadReplicas int32
 

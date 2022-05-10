@@ -448,6 +448,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// create sidecarset
 			sidecarSet := sidecarTester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.InitContainers = nil
 			sidecarSet.Spec.Namespace = ns
 			sidecarSet.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -938,6 +939,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// create sidecarSet
 			sidecarSet := sidecarTester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.InitContainers = nil
 			sidecarSet.Spec.Namespace = ns
 			sidecarSet.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
