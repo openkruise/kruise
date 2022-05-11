@@ -80,7 +80,7 @@ type SidecarSetUpgradeSpec struct {
 func PodMatchedSidecarSet(cl client.Client, pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
 
 	// if pod.Namespace in selectedNamespaces, then inject the sidecar
-	selectedNamespaces := GetNamespacesByLabelSelector(cl, sidecarSet)
+	selectedNamespaces := GetNamespacesByNsLabelSelectorAnnotation(cl, sidecarSet.Annotations)
 	if selectedNamespaces.Has(pod.Namespace) {
 		return true, nil
 	}
@@ -101,21 +101,21 @@ func PodMatchedSidecarSet(cl client.Client, pod *corev1.Pod, sidecarSet appsv1al
 	return false, nil
 }
 
-func GetNamespaceLabelSelector(labelSelector string) labels.Selector {
-	labelsKv := strings.Split(labelSelector, "=")
+func getNamespaceLabelSelectorAnnotation(labelSelectorAnnotation string) labels.Selector {
+	labelsKv := strings.Split(labelSelectorAnnotation, "=")
 
 	if len(labelsKv) > 1 {
 		lm := map[string]string{labelsKv[0]: labelsKv[1]}
 		return labels.Set(lm).AsSelector()
 	}
-	return labels.Everything()
+	return labels.Nothing()
 }
 
-func GetNamespacesByLabelSelector(cl client.Client, sidecarSet appsv1alpha1.SidecarSet) sets.String {
+func GetNamespacesByNsLabelSelectorAnnotation(cl client.Client, sidecarSetAnnotation map[string]string) sets.String {
 	selectedNamespaces := sets.NewString()
-	if label, ok := sidecarSet.Annotations[SidecarSetInjectNamespaceLabelSelectorAnnotation]; ok {
+	if label, ok := sidecarSetAnnotation[SidecarSetInjectNamespaceLabelSelectorAnnotation]; ok {
 		nsList := &corev1.NamespaceList{}
-		err := cl.List(context.TODO(), nsList, utilclient.DisableDeepCopy, client.MatchingLabelsSelector{Selector: GetNamespaceLabelSelector(label)})
+		err := cl.List(context.TODO(), nsList, utilclient.DisableDeepCopy, client.MatchingLabelsSelector{Selector: getNamespaceLabelSelectorAnnotation(label)})
 		if err != nil {
 			return selectedNamespaces
 		}

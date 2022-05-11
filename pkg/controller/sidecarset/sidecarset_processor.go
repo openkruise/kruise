@@ -266,9 +266,9 @@ func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, 
 		return nil, err
 	}
 
-	// If sidecarSet.Spec.Namespace is empty, then select in cluster
-	scopedNamespaces := []string{s.Spec.Namespace}
-	selectedPods, err := p.getSelectedPods(scopedNamespaces, selector)
+	// get namespaces from ns label selector and append the namespace of sidecarSet
+	scopedNamespaces := sidecarcontrol.GetNamespacesByNsLabelSelectorAnnotation(p.Client, s.Annotations).Insert(s.Spec.Namespace)
+	selectedPods, err := p.getSelectedPods(scopedNamespaces.List(), selector)
 	if err != nil {
 		return nil, err
 	}
