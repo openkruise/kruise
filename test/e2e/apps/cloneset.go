@@ -22,8 +22,6 @@ import (
 	"sort"
 	"time"
 
-	utilpointer "k8s.io/utils/pointer"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -37,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("CloneSet", func() {
@@ -291,7 +290,7 @@ var _ = SIGDescribe("CloneSet", func() {
 				Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
-			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
+			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64Ptr(3)
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -370,7 +369,7 @@ var _ = SIGDescribe("CloneSet", func() {
 				Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
-			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
+			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64Ptr(3)
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))

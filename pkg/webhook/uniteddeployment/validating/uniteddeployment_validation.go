@@ -238,7 +238,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
 		}
-		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("statefulSetTemplate", "spec", "template"), webhookutil.DefaultPodValidationOptions)...)
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("statefulSetTemplate", "spec", "template"))...)
 	} else if template.AdvancedStatefulSetTemplate != nil {
 		labels := labels.Set(template.AdvancedStatefulSetTemplate.Labels)
 		if !selector.Matches(labels) {
@@ -251,7 +251,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
 		}
-		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("advancedStatefulSetTemplate", "spec", "template"), webhookutil.DefaultPodValidationOptions)...)
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("advancedStatefulSetTemplate", "spec", "template"))...)
 	} else if template.DeploymentTemplate != nil {
 		labels := labels.Set(template.DeploymentTemplate.Labels)
 		if !selector.Matches(labels) {

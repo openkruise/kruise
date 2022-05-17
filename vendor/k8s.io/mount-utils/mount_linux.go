@@ -19,7 +19,6 @@ limitations under the License.
 package mount
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
@@ -45,8 +43,6 @@ const (
 	fsckErrorsCorrected = 1
 	// 'fsck' found errors but exited without correcting them
 	fsckErrorsUncorrected = 4
-	// Error thrown by exec cmd.Run() when process spawned by cmd.Start() completes before cmd.Wait() is called (see - k/k issue #103753)
-	errNoChildProcesses = "wait: no child processes"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -56,8 +52,6 @@ type Mounter struct {
 	mounterPath string
 	withSystemd bool
 }
-
-var _ MounterForceUnmounter = &Mounter{}
 
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
@@ -89,11 +83,11 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, nil /* mountFlags */, true)
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, true)
 		if err != nil {
 			return err
 		}
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, nil /* mountFlags */, true)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, true)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{
@@ -105,24 +99,19 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	if _, ok := fsTypesNeedMounter[fstype]; ok {
 		mounterPath = mounter.mounterPath
 	}
-	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, nil /* mountFlags */, true)
+	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, true)
 }
 
 // MountSensitiveWithoutSystemd is the same as MountSensitive() but disable using systemd mount.
 func (mounter *Mounter) MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
-	return mounter.MountSensitiveWithoutSystemdWithMountFlags(source, target, fstype, options, sensitiveOptions, nil /* mountFlags */)
-}
-
-// MountSensitiveWithoutSystemdWithMountFlags is the same as MountSensitiveWithoutSystemd with additional mount flags.
-func (mounter *Mounter) MountSensitiveWithoutSystemdWithMountFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, false)
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, false)
 		if err != nil {
 			return err
 		}
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, false)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, false)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{
@@ -134,14 +123,14 @@ func (mounter *Mounter) MountSensitiveWithoutSystemdWithMountFlags(source string
 	if _, ok := fsTypesNeedMounter[fstype]; ok {
 		mounterPath = mounter.mounterPath
 	}
-	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, mountFlags, false)
+	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, false)
 }
 
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
 // sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
 // systemdMountRequired is an extension of option to decide whether uses systemd mount.
-func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string, systemdMountRequired bool) error {
-	mountArgs, mountArgsLogStr := MakeMountArgsSensitiveWithMountFlags(source, target, fstype, options, sensitiveOptions, mountFlags)
+func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string, sensitiveOptions []string, systemdMountRequired bool) error {
+	mountArgs, mountArgsLogStr := MakeMountArgsSensitive(source, target, fstype, options, sensitiveOptions)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
 		mountArgsLogStr = mountCmd + " " + mountArgsLogStr
@@ -183,14 +172,6 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		if err.Error() == errNoChildProcesses {
-			if command.ProcessState.Success() {
-				// We don't consider errNoChildProcesses an error if the process itself succeeded (see - k/k issue #103753).
-				return nil
-			}
-			// Rewrite err with the actual exit error of the process.
-			err = &exec.ExitError{ProcessState: command.ProcessState}
-		}
 		klog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, mountArgsLogStr, string(output))
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s",
 			err, mountCmd, mountArgsLogStr, string(output))
@@ -232,22 +213,10 @@ func MakeMountArgs(source, target, fstype string, options []string) (mountArgs [
 // MakeMountArgsSensitive makes the arguments to the mount(8) command.
 // sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
 func MakeMountArgsSensitive(source, target, fstype string, options []string, sensitiveOptions []string) (mountArgs []string, mountArgsLogStr string) {
-	return MakeMountArgsSensitiveWithMountFlags(source, target, fstype, options, sensitiveOptions, nil /* mountFlags */)
-}
-
-// MakeMountArgsSensitiveWithMountFlags makes the arguments to the mount(8) command.
-// sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
-// mountFlags are additional mount flags that are not related with the fstype
-// and mount options
-func MakeMountArgsSensitiveWithMountFlags(source, target, fstype string, options []string, sensitiveOptions []string, mountFlags []string) (mountArgs []string, mountArgsLogStr string) {
 	// Build mount command as follows:
-	//   mount [$mountFlags] [-t $fstype] [-o $options] [$source] $target
+	//   mount [-t $fstype] [-o $options] [$source] $target
 	mountArgs = []string{}
 	mountArgsLogStr = ""
-
-	mountArgs = append(mountArgs, mountFlags...)
-	mountArgsLogStr += strings.Join(mountFlags, " ")
-
 	if len(fstype) > 0 {
 		mountArgs = append(mountArgs, "-t", fstype)
 		mountArgsLogStr += strings.Join(mountArgs, " ")
@@ -294,29 +263,7 @@ func (mounter *Mounter) Unmount(target string) error {
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		if err.Error() == errNoChildProcesses {
-			if command.ProcessState.Success() {
-				// We don't consider errNoChildProcesses an error if the process itself succeeded (see - k/k issue #103753).
-				return nil
-			}
-			// Rewrite err with the actual exit error of the process.
-			err = &exec.ExitError{ProcessState: command.ProcessState}
-		}
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
-	}
-	return nil
-}
-
-// UnmountWithForce unmounts given target but will retry unmounting with force option
-// after given timeout.
-func (mounter *Mounter) UnmountWithForce(target string, umountTimeout time.Duration) error {
-	err := tryUnmount(target, umountTimeout)
-	if err != nil {
-		if err == context.DeadlineExceeded {
-			klog.V(2).Infof("Timed out waiting for unmount of %s, trying with -f", target)
-			err = forceUmount(target)
-		}
-		return err
 	}
 	return nil
 }
@@ -476,10 +423,11 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	return nil
 }
 
-func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
+// GetDiskFormat uses 'blkid' to see if the given disk is unformatted
+func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
-	dataOut, err := exec.Command("blkid", args...).CombinedOutput()
+	dataOut, err := mounter.Exec.Command("blkid", args...).CombinedOutput()
 	output := string(dataOut)
 	klog.V(4).Infof("Output: %q", output)
 
@@ -526,11 +474,6 @@ func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
 	}
 
 	return fstype, nil
-}
-
-// GetDiskFormat uses 'blkid' to see if the given disk is unformatted
-func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
-	return getDiskFormat(mounter.Exec, disk)
 }
 
 // ListProcMounts is shared with NsEnterMounter
@@ -629,35 +572,4 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	}
 
 	return refs, nil
-}
-
-// tryUnmount calls plain "umount" and waits for unmountTimeout for it to finish.
-func tryUnmount(path string, unmountTimeout time.Duration) error {
-	klog.V(4).Infof("Unmounting %s", path)
-	ctx, cancel := context.WithTimeout(context.Background(), unmountTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "umount", path)
-	out, cmderr := cmd.CombinedOutput()
-
-	// CombinedOutput() does not return DeadlineExceeded, make sure it's
-	// propagated on timeout.
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-
-	if cmderr != nil {
-		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
-	}
-	return nil
-}
-
-func forceUmount(path string) error {
-	cmd := exec.Command("umount", "-f", path)
-	out, cmderr := cmd.CombinedOutput()
-
-	if cmderr != nil {
-		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
-	}
-	return nil
 }

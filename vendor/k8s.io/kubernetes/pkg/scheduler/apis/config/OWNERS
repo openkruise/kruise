@@ -2,10 +2,12 @@
 
 approvers:
 - api-approvers
+- sig-scheduling-maintainers
+- sttts
+- luxas
 reviewers:
+- sig-scheduling
 - api-reviewers
-- sig-scheduling-api-reviewers
-- sig-scheduling-api-approvers
-labels:
-- kind/api-change
-- sig/scheduling
+- dixudx
+- luxas
+- sttts

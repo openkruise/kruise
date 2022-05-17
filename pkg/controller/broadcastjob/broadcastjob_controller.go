@@ -40,12 +40,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
-	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
@@ -599,7 +599,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason))
 	}
 
-	if fitsNodeAffinity, _ := v1affinityhelper.GetRequiredNodeAffinity(pod).Match(node); !fitsNodeAffinity {
+	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod))
 	}
 
@@ -623,7 +623,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable))
 	}
 
-	insufficientResources := noderesources.Fits(pod, nodeInfo, true)
+	insufficientResources := noderesources.Fits(pod, nodeInfo)
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))

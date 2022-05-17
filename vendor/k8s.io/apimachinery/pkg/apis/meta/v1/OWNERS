@@ -8,6 +8,9 @@ reviewers:
 - brendandburns
 - caesarxuchao
 - liggitt
+- nikhiljindal
+- gmarek
+- erictune
 - davidopp
 - sttts
 - quinton-hoole
@@ -17,7 +20,11 @@ reviewers:
 - ncdc
 - soltysh
 - dims
+- madhusudancs
 - hongchaodeng
 - krousey
+- mml
+- mbohlool
 - therc
 - kevin-wangzefeng
+- jianhuiz

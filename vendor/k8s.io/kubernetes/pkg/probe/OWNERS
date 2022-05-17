@@ -1,9 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - sig-node-approvers
+  - Random-Liu
+  - dchen1107
+  - derekwaynecarr
+  - tallclair
+  - vishh
+  - yujuhong
 reviewers:
   - sig-node-reviewers
-
-labels:
-- sig/node

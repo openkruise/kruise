@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	utilpointer "k8s.io/utils/pointer"
 )
 

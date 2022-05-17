@@ -118,21 +118,25 @@ func newFakePodControl() *fakePodControl {
 	}
 }
 
-func (f *fakePodControl) CreatePods(namespace string, template *corev1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *corev1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.FakePodControl.CreatePods(namespace, template, object, controllerRef); err != nil {
-		return fmt.Errorf("failed to create pod for DaemonSet")
+	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object, controllerRef); err != nil {
+		return fmt.Errorf("failed to create pod on node %q", nodeName)
 	}
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    template.Labels,
-			Namespace: namespace,
+			Labels:       template.Labels,
+			Namespace:    namespace,
+			GenerateName: fmt.Sprintf("%s-", nodeName),
 		},
 	}
 
-	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%p-", pod))
+	if len(nodeName) != 0 {
+		pod.Spec.NodeName = nodeName
+	}
+	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", nodeName))
 
 	template.Spec.DeepCopyInto(&pod.Spec)
 
@@ -143,6 +147,30 @@ func (f *fakePodControl) CreatePods(namespace string, template *corev1.PodTempla
 	dsKey, _ := controller.KeyFunc(ds)
 	f.expectations.CreationObserved(dsKey)
 
+	return nil
+}
+
+func (f *fakePodControl) CreatePodsWithControllerRef(namespace string, template *corev1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+	f.Lock()
+	defer f.Unlock()
+	if err := f.FakePodControl.CreatePodsWithControllerRef(namespace, template, object, controllerRef); err != nil {
+
+		return fmt.Errorf("failed to create pod for DaemonSet")
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    template.Labels,
+			Namespace: namespace,
+		},
+	}
+	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%p-", pod))
+	template.Spec.DeepCopyInto(&pod.Spec)
+	f.podStore.Update(pod)
+	f.podIDMap[pod.Name] = pod
+	ds := object.(*appsv1alpha1.DaemonSet)
+	dsKey, _ := controller.KeyFunc(ds)
+	f.expectations.CreationObserved(dsKey)
 	return nil
 }
 

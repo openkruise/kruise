@@ -51,38 +51,30 @@ type enqueueRequestsFromMapFunc struct {
 	toRequests MapFunc
 }
 
-// Create implements EventHandler.
+// Create implements EventHandler
 func (e *enqueueRequestsFromMapFunc) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	reqs := map[reconcile.Request]empty{}
-	e.mapAndEnqueue(q, evt.Object, reqs)
+	e.mapAndEnqueue(q, evt.Object)
 }
 
-// Update implements EventHandler.
+// Update implements EventHandler
 func (e *enqueueRequestsFromMapFunc) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	reqs := map[reconcile.Request]empty{}
-	e.mapAndEnqueue(q, evt.ObjectOld, reqs)
-	e.mapAndEnqueue(q, evt.ObjectNew, reqs)
+	e.mapAndEnqueue(q, evt.ObjectOld)
+	e.mapAndEnqueue(q, evt.ObjectNew)
 }
 
-// Delete implements EventHandler.
+// Delete implements EventHandler
 func (e *enqueueRequestsFromMapFunc) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	reqs := map[reconcile.Request]empty{}
-	e.mapAndEnqueue(q, evt.Object, reqs)
+	e.mapAndEnqueue(q, evt.Object)
 }
 
-// Generic implements EventHandler.
+// Generic implements EventHandler
 func (e *enqueueRequestsFromMapFunc) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
-	reqs := map[reconcile.Request]empty{}
-	e.mapAndEnqueue(q, evt.Object, reqs)
+	e.mapAndEnqueue(q, evt.Object)
 }
 
-func (e *enqueueRequestsFromMapFunc) mapAndEnqueue(q workqueue.RateLimitingInterface, object client.Object, reqs map[reconcile.Request]empty) {
+func (e *enqueueRequestsFromMapFunc) mapAndEnqueue(q workqueue.RateLimitingInterface, object client.Object) {
 	for _, req := range e.toRequests(object) {
-		_, ok := reqs[req]
-		if !ok {
-			q.Add(req)
-			reqs[req] = empty{}
-		}
+		q.Add(req)
 	}
 }
 

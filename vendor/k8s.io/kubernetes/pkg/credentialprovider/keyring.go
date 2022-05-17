@@ -23,8 +23,9 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a

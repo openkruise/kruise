@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
-// Annotation keys for annotations used in this package.
 const (
 	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
 	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
@@ -35,37 +34,33 @@ const (
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
 
-// These constants identify the PodOperations that can be made on a pod configuration.
 const (
-	// SET is the current pod configuration.
+	// This is the current pod configuration
 	SET PodOperation = iota
-	// ADD signifies pods that are new to this source.
+	// Pods with the given ids are new to this source
 	ADD
-	// DELETE signifies pods that are gracefully deleted from this source.
+	// Pods with the given ids are gracefully deleted from this source
 	DELETE
-	// REMOVE signifies pods that have been removed from this source.
+	// Pods with the given ids have been removed from this source
 	REMOVE
-	// UPDATE signifies pods have been updated in this source.
+	// Pods with the given ids have been updated in this source
 	UPDATE
-	// RECONCILE signifies pods that have unexpected status in this source,
-	// kubelet should reconcile status with this source.
+	// Pods with the given ids have unexpected status in this source,
+	// kubelet should reconcile status with this source
 	RECONCILE
-)
 
-// These constants identify the sources of pods.
-const (
-	// Filesource idenitified updates from a file.
+	// These constants identify the sources of pods
+	// Updates from a file
 	FileSource = "file"
-	// HTTPSource identifies updates from querying a web page.
+	// Updates from querying a web page
 	HTTPSource = "http"
-	// ApiserverSource identifies updates from Kubernetes API Server.
+	// Updates from Kubernetes API Server
 	ApiserverSource = "api"
-	// AllSource identifies updates from all sources.
+	// Updates from all sources
 	AllSource = "*"
-)
 
-// NamespaceDefault is a string representing the default namespace.
-const NamespaceDefault = metav1.NamespaceDefault
+	NamespaceDefault = metav1.NamespaceDefault
+)
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
 // sending an array of size one and Op == ADD|REMOVE (with REMOVE, only the ID is required).
@@ -82,7 +77,7 @@ type PodUpdate struct {
 	Source string
 }
 
-// GetValidatedSources gets all validated sources from the specified sources.
+// Gets all validated sources from the specified sources.
 func GetValidatedSources(sources []string) ([]string, error) {
 	validated := make([]string, 0, len(sources))
 	for _, source := range sources {
@@ -120,8 +115,8 @@ const (
 	SyncPodUpdate
 	// SyncPodCreate is when the pod is created from source
 	SyncPodCreate
-	// SyncPodKill is when the pod should have no running containers. A pod stopped in this way could be
-	// restarted in the future due config changes.
+	// SyncPodKill is when the pod is killed based on a trigger internal to the kubelet for eviction.
+	// If a SyncPodKill request is made to pod workers, the request is never dropped, and will always be processed.
 	SyncPodKill
 )
 
@@ -183,9 +178,4 @@ func Preemptable(preemptor, preemptee *v1.Pod) bool {
 // IsCriticalPodBasedOnPriority checks if the given pod is a critical pod based on priority resolved from pod Spec.
 func IsCriticalPodBasedOnPriority(priority int32) bool {
 	return priority >= scheduling.SystemCriticalPriority
-}
-
-// IsNodeCriticalPod checks if the given pod is a system-node-critical
-func IsNodeCriticalPod(pod *v1.Pod) bool {
-	return IsCriticalPod(pod) && (pod.Spec.PriorityClassName == scheduling.SystemNodeCritical)
 }

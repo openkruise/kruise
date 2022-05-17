@@ -103,7 +103,7 @@ func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
 }
 
 const (
-	specPackagePath          = "k8s.io/kube-openapi/pkg/validation/spec"
+	specPackagePath          = "github.com/go-openapi/spec"
 	openAPICommonPackagePath = "k8s.io/kube-openapi/pkg/common"
 )
 

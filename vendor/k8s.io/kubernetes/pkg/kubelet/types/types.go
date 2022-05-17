@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -61,7 +61,7 @@ func (t *Timestamp) GetString() string {
 	return t.time.Format(RFC3339NanoFixed)
 }
 
-// SortedContainerStatuses is a type to help sort container statuses based on container names.
+// A type to help sort container statuses based on container names.
 type SortedContainerStatuses []v1.ContainerStatus
 
 func (s SortedContainerStatuses) Len() int      { return len(s) }
@@ -87,8 +87,6 @@ func SortInitContainerStatuses(p *v1.Pod, statuses []v1.ContainerStatus) {
 	}
 }
 
-// SortStatusesOfInitContainers returns the statuses of InitContainers of pod p,
-// in the order that they appear in its spec.
 func SortStatusesOfInitContainers(p *v1.Pod, statusMap map[string]*v1.ContainerStatus) []v1.ContainerStatus {
 	containers := p.Spec.InitContainers
 	statuses := []v1.ContainerStatus{}
@@ -108,8 +106,8 @@ type Reservation struct {
 	Kubernetes v1.ResourceList
 }
 
-// ResolvedPodUID is a pod UID which has been translated/resolved to the representation known to kubelets.
+// A pod UID which has been translated/resolved to the representation known to kubelets.
 type ResolvedPodUID types.UID
 
-// MirrorPodUID is a pod UID for a mirror pod.
+// A pod UID for a mirror pod.
 type MirrorPodUID types.UID

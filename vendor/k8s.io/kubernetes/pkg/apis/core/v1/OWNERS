@@ -13,6 +13,9 @@ reviewers:
 - vishh
 - mikedanese
 - liggitt
+- nikhiljindal
+- gmarek
+- erictune
 - davidopp
 - pmorie
 - sttts
@@ -27,6 +30,7 @@ reviewers:
 - jsafrane
 - dims
 - errordeveloper
+- madhusudancs
 - krousey
 - jayunit100
 - rootfs

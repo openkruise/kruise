@@ -585,7 +585,6 @@ func (in *RollbackConfig) DeepCopy() *RollbackConfig {
 func (in *RollingUpdateDaemonSet) DeepCopyInto(out *RollingUpdateDaemonSet) {
 	*out = *in
 	out.MaxUnavailable = in.MaxUnavailable
-	out.MaxSurge = in.MaxSurge
 	return
 }
 

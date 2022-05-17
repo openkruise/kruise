@@ -20,6 +20,9 @@ import (
 	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -27,11 +30,11 @@ import (
 
 var (
 	// Apply uses server-side apply to patch the given object.
-	Apply Patch = applyPatch{}
+	Apply = applyPatch{}
 
 	// Merge uses the raw object as a merge patch, without modifications.
 	// Use MergeFrom if you wish to compute a diff instead.
-	Merge Patch = mergePatch{}
+	Merge = mergePatch{}
 )
 
 type patch struct {
@@ -45,7 +48,7 @@ func (s *patch) Type() types.PatchType {
 }
 
 // Data implements Patch.
-func (s *patch) Data(obj Object) ([]byte, error) {
+func (s *patch) Data(obj runtime.Object) ([]byte, error) {
 	return s.data, nil
 }
 
@@ -87,39 +90,23 @@ type MergeFromOptions struct {
 type mergeFromPatch struct {
 	patchType   types.PatchType
 	createPatch func(originalJSON, modifiedJSON []byte, dataStruct interface{}) ([]byte, error)
-	from        Object
+	from        runtime.Object
 	opts        MergeFromOptions
 }
 
-// Type implements Patch.
+// Type implements patch.
 func (s *mergeFromPatch) Type() types.PatchType {
 	return s.patchType
 }
 
 // Data implements Patch.
-func (s *mergeFromPatch) Data(obj Object) ([]byte, error) {
-	original := s.from
-	modified := obj
-
-	if s.opts.OptimisticLock {
-		version := original.GetResourceVersion()
-		if len(version) == 0 {
-			return nil, fmt.Errorf("cannot use OptimisticLock, object %q does not have any resource version we can use", original)
-		}
-
-		original = original.DeepCopyObject().(Object)
-		original.SetResourceVersion("")
-
-		modified = modified.DeepCopyObject().(Object)
-		modified.SetResourceVersion(version)
-	}
-
-	originalJSON, err := json.Marshal(original)
+func (s *mergeFromPatch) Data(obj runtime.Object) ([]byte, error) {
+	originalJSON, err := json.Marshal(s.from)
 	if err != nil {
 		return nil, err
 	}
 
-	modifiedJSON, err := json.Marshal(modified)
+	modifiedJSON, err := json.Marshal(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +114,27 @@ func (s *mergeFromPatch) Data(obj Object) ([]byte, error) {
 	data, err := s.createPatch(originalJSON, modifiedJSON, obj)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.opts.OptimisticLock {
+		dataMap := map[string]interface{}{}
+		if err := json.Unmarshal(data, &dataMap); err != nil {
+			return nil, err
+		}
+		fromMeta, ok := s.from.(metav1.Object)
+		if !ok {
+			return nil, fmt.Errorf("cannot use OptimisticLock, from object %q is not a valid metav1.Object", s.from)
+		}
+		resourceVersion := fromMeta.GetResourceVersion()
+		if len(resourceVersion) == 0 {
+			return nil, fmt.Errorf("cannot use OptimisticLock, from object %q does not have any resource version we can use", s.from)
+		}
+		u := &unstructured.Unstructured{Object: dataMap}
+		u.SetResourceVersion(resourceVersion)
+		data, err = json.Marshal(u)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return data, nil
@@ -147,13 +155,13 @@ func createStrategicMergePatch(originalJSON, modifiedJSON []byte, dataStruct int
 // e.g. the existing list is not replaced completely but rather merged with the new one using the list's `patchMergeKey`.
 // See https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/ for more details on
 // the difference between merge-patch and strategic-merge-patch.
-func MergeFrom(obj Object) Patch {
+func MergeFrom(obj runtime.Object) Patch {
 	return &mergeFromPatch{patchType: types.MergePatchType, createPatch: createMergePatch, from: obj}
 }
 
 // MergeFromWithOptions creates a Patch that patches using the merge-patch strategy with the given object as base.
 // See MergeFrom for more details.
-func MergeFromWithOptions(obj Object, opts ...MergeFromOption) Patch {
+func MergeFromWithOptions(obj runtime.Object, opts ...MergeFromOption) Patch {
 	options := &MergeFromOptions{}
 	for _, opt := range opts {
 		opt.ApplyToMergeFrom(options)
@@ -187,7 +195,7 @@ func (p mergePatch) Type() types.PatchType {
 }
 
 // Data implements Patch.
-func (p mergePatch) Data(obj Object) ([]byte, error) {
+func (p mergePatch) Data(obj runtime.Object) ([]byte, error) {
 	// NB(directxman12): we might technically want to be using an actual encoder
 	// here (in case some more performant encoder is introduced) but this is
 	// correct and sufficient for our uses (it's what the JSON serializer in
@@ -204,7 +212,7 @@ func (p applyPatch) Type() types.PatchType {
 }
 
 // Data implements Patch.
-func (p applyPatch) Data(obj Object) ([]byte, error) {
+func (p applyPatch) Data(obj runtime.Object) ([]byte, error) {
 	// NB(directxman12): we might technically want to be using an actual encoder
 	// here (in case some more performant encoder is introduced) but this is
 	// correct and sufficient for our uses (it's what the JSON serializer in

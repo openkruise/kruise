@@ -38,11 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
-// clientListWatcherFunc knows how to create a ListWatcher.
+// clientListWatcherFunc knows how to create a ListWatcher
 type createListWatcherFunc func(gvk schema.GroupVersionKind, ip *specificInformersMap) (*cache.ListWatch, error)
 
 // newSpecificInformersMap returns a new specificInformersMap (like
@@ -52,8 +48,6 @@ func newSpecificInformersMap(config *rest.Config,
 	mapper meta.RESTMapper,
 	resync time.Duration,
 	namespace string,
-	selectors SelectorsByGVK,
-	disableDeepCopy DisableDeepCopyByGVK,
 	createListWatcher createListWatcherFunc) *specificInformersMap {
 	ip := &specificInformersMap{
 		config:            config,
@@ -66,13 +60,11 @@ func newSpecificInformersMap(config *rest.Config,
 		startWait:         make(chan struct{}),
 		createListWatcher: createListWatcher,
 		namespace:         namespace,
-		selectors:         selectors,
-		disableDeepCopy:   disableDeepCopy,
 	}
 	return ip
 }
 
-// MapEntry contains the cached data for an Informer.
+// MapEntry contains the cached data for an Informer
 type MapEntry struct {
 	// Informer is the cached informer
 	Informer cache.SharedIndexInformer
@@ -128,13 +120,6 @@ type specificInformersMap struct {
 	// namespace is the namespace that all ListWatches are restricted to
 	// default or empty string means all namespaces
 	namespace string
-
-	// selectors are the label or field selectors that will be added to the
-	// ListWatch ListOptions.
-	selectors SelectorsByGVK
-
-	// disableDeepCopy indicates not to deep copy objects during get or list objects.
-	disableDeepCopy DisableDeepCopyByGVK
 }
 
 // Start calls Run on each of the informers and sets started to true.  Blocks on the context.
@@ -231,15 +216,9 @@ func (ip *specificInformersMap) addInformerToMap(gvk schema.GroupVersionKind, ob
 	if err != nil {
 		return nil, false, err
 	}
-
 	i := &MapEntry{
 		Informer: ni,
-		Reader: CacheReader{
-			indexer:          ni.GetIndexer(),
-			groupVersionKind: gvk,
-			scopeName:        rm.Scope.Name(),
-			disableDeepCopy:  ip.disableDeepCopy.IsDisabled(gvk),
-		},
+		Reader:   CacheReader{indexer: ni.GetIndexer(), groupVersionKind: gvk, scopeName: rm.Scope.Name()},
 	}
 	ip.informersByGVK[gvk] = i
 
@@ -277,21 +256,17 @@ func createStructuredListWatch(gvk schema.GroupVersionKind, ip *specificInformer
 	// Create a new ListWatch for the obj
 	return &cache.ListWatch{
 		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
-			ip.selectors[gvk].ApplyToList(&opts)
 			res := listObj.DeepCopyObject()
-			namespace := restrictNamespaceBySelector(ip.namespace, ip.selectors[gvk])
-			isNamespaceScoped := namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot
-			err := client.Get().NamespaceIfScoped(namespace, isNamespaceScoped).Resource(mapping.Resource.Resource).VersionedParams(&opts, ip.paramCodec).Do(ctx).Into(res)
+			isNamespaceScoped := ip.namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot
+			err := client.Get().NamespaceIfScoped(ip.namespace, isNamespaceScoped).Resource(mapping.Resource.Resource).VersionedParams(&opts, ip.paramCodec).Do(ctx).Into(res)
 			return res, err
 		},
 		// Setup the watch function
 		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-			ip.selectors[gvk].ApplyToList(&opts)
 			// Watch needs to be set to true separately
 			opts.Watch = true
-			namespace := restrictNamespaceBySelector(ip.namespace, ip.selectors[gvk])
-			isNamespaceScoped := namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot
-			return client.Get().NamespaceIfScoped(namespace, isNamespaceScoped).Resource(mapping.Resource.Resource).VersionedParams(&opts, ip.paramCodec).Watch(ctx)
+			isNamespaceScoped := ip.namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot
+			return client.Get().NamespaceIfScoped(ip.namespace, isNamespaceScoped).Resource(mapping.Resource.Resource).VersionedParams(&opts, ip.paramCodec).Watch(ctx)
 		},
 	}, nil
 }
@@ -303,12 +278,7 @@ func createUnstructuredListWatch(gvk schema.GroupVersionKind, ip *specificInform
 	if err != nil {
 		return nil, err
 	}
-
-	// If the rest configuration has a negotiated serializer passed in,
-	// we should remove it and use the one that the dynamic client sets for us.
-	cfg := rest.CopyConfig(ip.config)
-	cfg.NegotiatedSerializer = nil
-	dynamicClient, err := dynamic.NewForConfig(cfg)
+	dynamicClient, err := dynamic.NewForConfig(ip.config)
 	if err != nil {
 		return nil, err
 	}
@@ -319,21 +289,17 @@ func createUnstructuredListWatch(gvk schema.GroupVersionKind, ip *specificInform
 	// Create a new ListWatch for the obj
 	return &cache.ListWatch{
 		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
-			ip.selectors[gvk].ApplyToList(&opts)
-			namespace := restrictNamespaceBySelector(ip.namespace, ip.selectors[gvk])
-			if namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
-				return dynamicClient.Resource(mapping.Resource).Namespace(namespace).List(ctx, opts)
+			if ip.namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
+				return dynamicClient.Resource(mapping.Resource).Namespace(ip.namespace).List(ctx, opts)
 			}
 			return dynamicClient.Resource(mapping.Resource).List(ctx, opts)
 		},
 		// Setup the watch function
 		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-			ip.selectors[gvk].ApplyToList(&opts)
 			// Watch needs to be set to true separately
 			opts.Watch = true
-			namespace := restrictNamespaceBySelector(ip.namespace, ip.selectors[gvk])
-			if namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
-				return dynamicClient.Resource(mapping.Resource).Namespace(namespace).Watch(ctx, opts)
+			if ip.namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
+				return dynamicClient.Resource(mapping.Resource).Namespace(ip.namespace).Watch(ctx, opts)
 			}
 			return dynamicClient.Resource(mapping.Resource).Watch(ctx, opts)
 		},
@@ -348,13 +314,8 @@ func createMetadataListWatch(gvk schema.GroupVersionKind, ip *specificInformersM
 		return nil, err
 	}
 
-	// Always clear the negotiated serializer and use the one
-	// set from the metadata client.
-	cfg := rest.CopyConfig(ip.config)
-	cfg.NegotiatedSerializer = nil
-
 	// grab the metadata client
-	client, err := metadata.NewForConfig(cfg)
+	client, err := metadata.NewForConfig(ip.config)
 	if err != nil {
 		return nil, err
 	}
@@ -366,84 +327,21 @@ func createMetadataListWatch(gvk schema.GroupVersionKind, ip *specificInformersM
 	// create the relevant listwatch
 	return &cache.ListWatch{
 		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
-			ip.selectors[gvk].ApplyToList(&opts)
-
-			var (
-				list *metav1.PartialObjectMetadataList
-				err  error
-			)
-			namespace := restrictNamespaceBySelector(ip.namespace, ip.selectors[gvk])
-			if namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
-				list, err = client.Resource(mapping.Resource).Namespace(namespace).List(ctx, opts)
-			} else {
-				list, err = client.Resource(mapping.Resource).List(ctx, opts)
+			if ip.namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
+				return client.Resource(mapping.Resource).Namespace(ip.namespace).List(ctx, opts)
 			}
-			if list != nil {
-				for i := range list.Items {
-					list.Items[i].SetGroupVersionKind(gvk)
-				}
-			}
-			return list, err
+			return client.Resource(mapping.Resource).List(ctx, opts)
 		},
 		// Setup the watch function
 		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
-			ip.selectors[gvk].ApplyToList(&opts)
 			// Watch needs to be set to true separately
 			opts.Watch = true
-
-			var (
-				watcher watch.Interface
-				err     error
-			)
-			namespace := restrictNamespaceBySelector(ip.namespace, ip.selectors[gvk])
-			if namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
-				watcher, err = client.Resource(mapping.Resource).Namespace(namespace).Watch(ctx, opts)
-			} else {
-				watcher, err = client.Resource(mapping.Resource).Watch(ctx, opts)
+			if ip.namespace != "" && mapping.Scope.Name() != meta.RESTScopeNameRoot {
+				return client.Resource(mapping.Resource).Namespace(ip.namespace).Watch(ctx, opts)
 			}
-			if watcher != nil {
-				watcher = newGVKFixupWatcher(gvk, watcher)
-			}
-			return watcher, err
+			return client.Resource(mapping.Resource).Watch(ctx, opts)
 		},
 	}, nil
-}
-
-type gvkFixupWatcher struct {
-	watcher watch.Interface
-	ch      chan watch.Event
-	gvk     schema.GroupVersionKind
-	wg      sync.WaitGroup
-}
-
-func newGVKFixupWatcher(gvk schema.GroupVersionKind, watcher watch.Interface) watch.Interface {
-	ch := make(chan watch.Event)
-	w := &gvkFixupWatcher{
-		gvk:     gvk,
-		watcher: watcher,
-		ch:      ch,
-	}
-	w.wg.Add(1)
-	go w.run()
-	return w
-}
-
-func (w *gvkFixupWatcher) run() {
-	for e := range w.watcher.ResultChan() {
-		e.Object.GetObjectKind().SetGroupVersionKind(w.gvk)
-		w.ch <- e
-	}
-	w.wg.Done()
-}
-
-func (w *gvkFixupWatcher) Stop() {
-	w.watcher.Stop()
-	w.wg.Wait()
-	close(w.ch)
-}
-
-func (w *gvkFixupWatcher) ResultChan() <-chan watch.Event {
-	return w.ch
 }
 
 // resyncPeriod returns a function which generates a duration each time it is
@@ -452,27 +350,7 @@ func (w *gvkFixupWatcher) ResultChan() <-chan watch.Event {
 func resyncPeriod(resync time.Duration) func() time.Duration {
 	return func() time.Duration {
 		// the factor will fall into [0.9, 1.1)
-		factor := rand.Float64()/5.0 + 0.9 //nolint:gosec
+		factor := rand.Float64()/5.0 + 0.9
 		return time.Duration(float64(resync.Nanoseconds()) * factor)
 	}
-}
-
-// restrictNamespaceBySelector returns either a global restriction for all ListWatches
-// if not default/empty, or the namespace that a ListWatch for the specific resource
-// is restricted to, based on a specified field selector for metadata.namespace field.
-func restrictNamespaceBySelector(namespaceOpt string, s Selector) string {
-	if namespaceOpt != "" {
-		// namespace is already restricted
-		return namespaceOpt
-	}
-	fieldSelector := s.Field
-	if fieldSelector == nil || fieldSelector.Empty() {
-		return ""
-	}
-	// check whether a selector includes the namespace field
-	value, found := fieldSelector.RequiresExactMatch("metadata.namespace")
-	if found {
-		return value
-	}
-	return ""
 }

@@ -27,7 +27,7 @@ const (
 	TaintNodeUnreachable = "node.kubernetes.io/unreachable"
 
 	// TaintNodeUnschedulable will be added when node becomes unschedulable
-	// and removed when node becomes schedulable.
+	// and removed when node becomes scheduable.
 	TaintNodeUnschedulable = "node.kubernetes.io/unschedulable"
 
 	// TaintNodeMemoryPressure will be added when node has memory pressure
@@ -43,6 +43,6 @@ const (
 	TaintNodeNetworkUnavailable = "node.kubernetes.io/network-unavailable"
 
 	// TaintNodePIDPressure will be added when node has pid pressure
-	// and removed when node has enough pid.
+	// and removed when node has enough disk.
 	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
 )

@@ -41,11 +41,6 @@ func (in *CSIStorageCapacity) DeepCopyInto(out *CSIStorageCapacity) {
 		x := (*in).DeepCopy()
 		*out = &x
 	}
-	if in.MaximumVolumeSize != nil {
-		in, out := &in.MaximumVolumeSize, &out.MaximumVolumeSize
-		x := (*in).DeepCopy()
-		*out = &x
-	}
 	return
 }
 

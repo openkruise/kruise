@@ -156,10 +156,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 `
 
 var checkImpl = `
-var (
-	_ clientset.Interface = &Clientset{}
-	_ testing.FakeClient  = &Clientset{}
-)
+var _ clientset.Interface = &Clientset{}
 `
 
 var clientsetInterfaceImplTemplate = `

@@ -18,119 +18,106 @@ package validation
 
 import (
 	"fmt"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 // ValidateDefaultPreemptionArgs validates that DefaultPreemptionArgs are correct.
-func ValidateDefaultPreemptionArgs(path *field.Path, args *config.DefaultPreemptionArgs) error {
-	var allErrs field.ErrorList
-	percentagePath := path.Child("minCandidateNodesPercentage")
-	absolutePath := path.Child("minCandidateNodesAbsolute")
-	if err := validateMinCandidateNodesPercentage(args.MinCandidateNodesPercentage, percentagePath); err != nil {
-		allErrs = append(allErrs, err)
+func ValidateDefaultPreemptionArgs(args config.DefaultPreemptionArgs) error {
+	if err := validateMinCandidateNodesPercentage(args.MinCandidateNodesPercentage); err != nil {
+		return err
 	}
-	if err := validateMinCandidateNodesAbsolute(args.MinCandidateNodesAbsolute, absolutePath); err != nil {
-		allErrs = append(allErrs, err)
+	if err := validateMinCandidateNodesAbsolute(args.MinCandidateNodesAbsolute); err != nil {
+		return err
 	}
 	if args.MinCandidateNodesPercentage == 0 && args.MinCandidateNodesAbsolute == 0 {
-		allErrs = append(allErrs,
-			field.Invalid(percentagePath, args.MinCandidateNodesPercentage, "cannot be zero at the same time as minCandidateNodesAbsolute"),
-			field.Invalid(absolutePath, args.MinCandidateNodesAbsolute, "cannot be zero at the same time as minCandidateNodesPercentage"))
+		return fmt.Errorf("both minCandidateNodesPercentage and minCandidateNodesAbsolute cannot be zero")
 	}
-	return allErrs.ToAggregate()
+	return nil
 }
 
 // validateMinCandidateNodesPercentage validates that
 // minCandidateNodesPercentage is within the allowed range.
-func validateMinCandidateNodesPercentage(minCandidateNodesPercentage int32, p *field.Path) *field.Error {
+func validateMinCandidateNodesPercentage(minCandidateNodesPercentage int32) error {
 	if minCandidateNodesPercentage < 0 || minCandidateNodesPercentage > 100 {
-		return field.Invalid(p, minCandidateNodesPercentage, "not in valid range [0, 100]")
+		return fmt.Errorf("minCandidateNodesPercentage is not in the range [0, 100]")
 	}
 	return nil
 }
 
 // validateMinCandidateNodesAbsolute validates that minCandidateNodesAbsolute
 // is within the allowed range.
-func validateMinCandidateNodesAbsolute(minCandidateNodesAbsolute int32, p *field.Path) *field.Error {
+func validateMinCandidateNodesAbsolute(minCandidateNodesAbsolute int32) error {
 	if minCandidateNodesAbsolute < 0 {
-		return field.Invalid(p, minCandidateNodesAbsolute, "not in valid range [0, inf)")
+		return fmt.Errorf("minCandidateNodesAbsolute is not in the range [0, inf)")
 	}
 	return nil
 }
 
 // ValidateInterPodAffinityArgs validates that InterPodAffinityArgs are correct.
-func ValidateInterPodAffinityArgs(path *field.Path, args *config.InterPodAffinityArgs) error {
-	return validateHardPodAffinityWeight(path.Child("hardPodAffinityWeight"), args.HardPodAffinityWeight)
+func ValidateInterPodAffinityArgs(args config.InterPodAffinityArgs) error {
+	return ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinityWeight"), args.HardPodAffinityWeight)
 }
 
-// validateHardPodAffinityWeight validates that weight is within allowed range.
-func validateHardPodAffinityWeight(path *field.Path, w int32) error {
+// ValidateHardPodAffinityWeight validates that weight is within allowed range.
+func ValidateHardPodAffinityWeight(path *field.Path, w int32) error {
 	const (
 		minHardPodAffinityWeight = 0
 		maxHardPodAffinityWeight = 100
 	)
 
 	if w < minHardPodAffinityWeight || w > maxHardPodAffinityWeight {
-		msg := fmt.Sprintf("not in valid range [%d, %d]", minHardPodAffinityWeight, maxHardPodAffinityWeight)
+		msg := fmt.Sprintf("not in valid range [%d-%d]", minHardPodAffinityWeight, maxHardPodAffinityWeight)
 		return field.Invalid(path, w, msg)
 	}
 	return nil
 }
 
 // ValidateNodeLabelArgs validates that NodeLabelArgs are correct.
-func ValidateNodeLabelArgs(path *field.Path, args *config.NodeLabelArgs) error {
-	var allErrs field.ErrorList
-
-	allErrs = append(allErrs, validateNoConflict(args.PresentLabels, args.AbsentLabels,
-		path.Child("presentLabels"), path.Child("absentLabels"))...)
-	allErrs = append(allErrs, validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference,
-		path.Child("presentLabelsPreference"), path.Child("absentLabelsPreference"))...)
-
-	return allErrs.ToAggregate()
+func ValidateNodeLabelArgs(args config.NodeLabelArgs) error {
+	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
+		return err
+	}
+	if err := validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference); err != nil {
+		return err
+	}
+	return nil
 }
 
 // validateNoConflict validates that presentLabels and absentLabels do not conflict.
-func validateNoConflict(presentLabels, absentLabels []string, presentPath, absentPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	m := make(map[string]int, len(presentLabels)) // label -> index
-	for i, l := range presentLabels {
-		m[l] = i
+func validateNoConflict(presentLabels []string, absentLabels []string) error {
+	m := make(map[string]struct{}, len(presentLabels))
+	for _, l := range presentLabels {
+		m[l] = struct{}{}
 	}
-	for i, l := range absentLabels {
-		if j, ok := m[l]; ok {
-			allErrs = append(allErrs, field.Invalid(presentPath.Index(j), l,
-				fmt.Sprintf("conflict with %v", absentPath.Index(i).String())))
+	for _, l := range absentLabels {
+		if _, ok := m[l]; ok {
+			return fmt.Errorf("detecting at least one label (e.g., %q) that exist in both the present(%+v) and absent(%+v) label list", l, presentLabels, absentLabels)
 		}
 	}
-	return allErrs
+	return nil
 }
 
 // ValidatePodTopologySpreadArgs validates that PodTopologySpreadArgs are correct.
 // It replicates the validation from pkg/apis/core/validation.validateTopologySpreadConstraints
 // with an additional check for .labelSelector to be nil.
-func ValidatePodTopologySpreadArgs(path *field.Path, args *config.PodTopologySpreadArgs) error {
+func ValidatePodTopologySpreadArgs(args *config.PodTopologySpreadArgs) error {
 	var allErrs field.ErrorList
-	if err := validateDefaultingType(path.Child("defaultingType"), args.DefaultingType, args.DefaultConstraints); err != nil {
+	if err := validateDefaultingType(field.NewPath("defaultingType"), args.DefaultingType, args.DefaultConstraints); err != nil {
 		allErrs = append(allErrs, err)
 	}
+	path := field.NewPath("defaultConstraints")
 
-	defaultConstraintsPath := path.Child("defaultConstraints")
 	for i, c := range args.DefaultConstraints {
-		p := defaultConstraintsPath.Index(i)
+		p := path.Index(i)
 		if c.MaxSkew <= 0 {
 			f := p.Child("maxSkew")
-			allErrs = append(allErrs, field.Invalid(f, c.MaxSkew, "not in valid range (0, inf)"))
+			allErrs = append(allErrs, field.Invalid(f, c.MaxSkew, "must be greater than zero"))
 		}
 		allErrs = append(allErrs, validateTopologyKey(p.Child("topologyKey"), c.TopologyKey)...)
 		if err := validateWhenUnsatisfiable(p.Child("whenUnsatisfiable"), c.WhenUnsatisfiable); err != nil {
@@ -140,7 +127,7 @@ func ValidatePodTopologySpreadArgs(path *field.Path, args *config.PodTopologySpr
 			f := field.Forbidden(p.Child("labelSelector"), "constraint must not define a selector, as they deduced for each pod")
 			allErrs = append(allErrs, f)
 		}
-		if err := validateConstraintNotRepeat(defaultConstraintsPath, args.DefaultConstraints, i); err != nil {
+		if err := validateConstraintNotRepeat(path, args.DefaultConstraints, i); err != nil {
 			allErrs = append(allErrs, err)
 		}
 	}
@@ -152,7 +139,7 @@ func ValidatePodTopologySpreadArgs(path *field.Path, args *config.PodTopologySpr
 
 func validateDefaultingType(p *field.Path, v config.PodTopologySpreadConstraintsDefaulting, constraints []v1.TopologySpreadConstraint) *field.Error {
 	if v != config.SystemDefaulting && v != config.ListDefaulting {
-		return field.NotSupported(p, v, []string{string(config.SystemDefaulting), string(config.ListDefaulting)})
+		return field.Invalid(p, v, fmt.Sprintf("must be one of {%q, %q}", config.SystemDefaulting, config.ListDefaulting))
 	}
 	if v == config.SystemDefaulting && len(constraints) > 0 {
 		return field.Invalid(p, v, "when .defaultConstraints are not empty")
@@ -194,14 +181,17 @@ func validateConstraintNotRepeat(path *field.Path, constraints []v1.TopologySpre
 }
 
 // ValidateRequestedToCapacityRatioArgs validates that RequestedToCapacityRatioArgs are correct.
-func ValidateRequestedToCapacityRatioArgs(path *field.Path, args *config.RequestedToCapacityRatioArgs) error {
-	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
-	allErrs = append(allErrs, validateResourcesNoMax(args.Resources, path.Child("resources"))...)
-	return allErrs.ToAggregate()
+func ValidateRequestedToCapacityRatioArgs(args config.RequestedToCapacityRatioArgs) error {
+	if err := validateFunctionShape(args.Shape); err != nil {
+		return err
+	}
+	if err := validateResourcesNoMax(args.Resources); err != nil {
+		return err
+	}
+	return nil
 }
 
-func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Path) field.ErrorList {
+func validateFunctionShape(shape []config.UtilizationShapePoint) error {
 	const (
 		minUtilization = 0
 		maxUtilization = 100
@@ -209,157 +199,88 @@ func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Pat
 		maxScore       = int32(config.MaxCustomPriorityScore)
 	)
 
-	var allErrs field.ErrorList
-
 	if len(shape) == 0 {
-		allErrs = append(allErrs, field.Required(path, "at least one point must be specified"))
-		return allErrs
+		return fmt.Errorf("at least one point must be specified")
 	}
 
 	for i := 1; i < len(shape); i++ {
 		if shape[i-1].Utilization >= shape[i].Utilization {
-			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), shape[i].Utilization, "utilization values must be sorted in increasing order"))
-			break
+			return fmt.Errorf("utilization values must be sorted. Utilization[%d]==%d >= Utilization[%d]==%d", i-1, shape[i-1].Utilization, i, shape[i].Utilization)
 		}
 	}
 
 	for i, point := range shape {
-		if point.Utilization < minUtilization || point.Utilization > maxUtilization {
-			msg := fmt.Sprintf("not in valid range [%d, %d]", minUtilization, maxUtilization)
-			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), point.Utilization, msg))
+		if point.Utilization < minUtilization {
+			return fmt.Errorf("utilization values must not be less than %d. Utilization[%d]==%d", minUtilization, i, point.Utilization)
 		}
-
-		if point.Score < minScore || point.Score > maxScore {
-			msg := fmt.Sprintf("not in valid range [%d, %d]", minScore, maxScore)
-			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("score"), point.Score, msg))
+		if point.Utilization > maxUtilization {
+			return fmt.Errorf("utilization values must not be greater than %d. Utilization[%d]==%d", maxUtilization, i, point.Utilization)
+		}
+		if point.Score < minScore {
+			return fmt.Errorf("score values must not be less than %d. Score[%d]==%d", minScore, i, point.Score)
+		}
+		if point.Score > maxScore {
+			return fmt.Errorf("score values must not be greater than %d. Score[%d]==%d", maxScore, i, point.Score)
 		}
 	}
 
-	return allErrs
+	return nil
 }
 
-// weight of resource is allowed to exceed 100, this is only applicable to `RequestedToCapacityRatio` plugin for backwards compatibility reason.
-func validateResourcesNoMax(resources []config.ResourceSpec, p *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for i, r := range resources {
+// TODO potentially replace with validateResources
+func validateResourcesNoMax(resources []config.ResourceSpec) error {
+	for _, r := range resources {
 		if r.Weight < 1 {
-			allErrs = append(allErrs, field.Invalid(p.Index(i).Child("weight"), r.Weight,
-				fmt.Sprintf("resource weight of %s not in valid range [1, inf)", r.Name)))
+			return fmt.Errorf("resource %s weight %d must not be less than 1", string(r.Name), r.Weight)
 		}
 	}
-	return allErrs
+	return nil
 }
 
 // ValidateNodeResourcesLeastAllocatedArgs validates that NodeResourcesLeastAllocatedArgs are correct.
-func ValidateNodeResourcesLeastAllocatedArgs(path *field.Path, args *config.NodeResourcesLeastAllocatedArgs) error {
-	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
+func ValidateNodeResourcesLeastAllocatedArgs(args *config.NodeResourcesLeastAllocatedArgs) error {
+	return validateResources(args.Resources)
 }
 
 // ValidateNodeResourcesMostAllocatedArgs validates that NodeResourcesMostAllocatedArgs are correct.
-func ValidateNodeResourcesMostAllocatedArgs(path *field.Path, args *config.NodeResourcesMostAllocatedArgs) error {
-	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
+func ValidateNodeResourcesMostAllocatedArgs(args *config.NodeResourcesMostAllocatedArgs) error {
+	return validateResources(args.Resources)
 }
 
-func validateResources(resources []config.ResourceSpec, p *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for i, resource := range resources {
-		if resource.Weight <= 0 || resource.Weight > 100 {
-			msg := fmt.Sprintf("resource weight of %v not in valid range (0, 100]", resource.Name)
-			allErrs = append(allErrs, field.Invalid(p.Index(i).Child("weight"), resource.Weight, msg))
+func validateResources(resources []config.ResourceSpec) error {
+	for _, resource := range resources {
+		if resource.Weight <= 0 {
+			return fmt.Errorf("resource Weight of %v should be a positive value, got %v", resource.Name, resource.Weight)
+		}
+		if resource.Weight > 100 {
+			return fmt.Errorf("resource Weight of %v should be less than 100, got %v", resource.Name, resource.Weight)
 		}
 	}
-	return allErrs
-}
-
-// ValidateNodeResourcesBalancedAllocationArgs validates that NodeResourcesBalancedAllocationArgs are set correctly.
-func ValidateNodeResourcesBalancedAllocationArgs(path *field.Path, args *config.NodeResourcesBalancedAllocationArgs) error {
-	var allErrs field.ErrorList
-	seenResources := sets.NewString()
-	for i, resource := range args.Resources {
-		if seenResources.Has(resource.Name) {
-			allErrs = append(allErrs, field.Duplicate(path.Child("resources").Index(i).Child("name"), resource.Name))
-		} else {
-			seenResources.Insert(resource.Name)
-		}
-		if resource.Weight != 1 {
-			allErrs = append(allErrs, field.Invalid(path.Child("resources").Index(i).Child("weight"), resource.Weight, "must be 1"))
-		}
-	}
-	return allErrs.ToAggregate()
+	return nil
 }
 
 // ValidateNodeAffinityArgs validates that NodeAffinityArgs are correct.
-func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) error {
+func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
 	if args.AddedAffinity == nil {
 		return nil
 	}
 	affinity := args.AddedAffinity
-	var errs []error
+	f := field.NewPath("addedAffinity")
+	var allErrs field.ErrorList
 	if ns := affinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {
-		_, err := nodeaffinity.NewNodeSelector(ns, field.WithPath(path.Child("addedAffinity", "requiredDuringSchedulingIgnoredDuringExecution")))
+		_, err := nodeaffinity.NewNodeSelector(ns)
 		if err != nil {
-			errs = append(errs, err)
+			// TODO(#96167): Expand all field.Error(s) returned once constructor use them.
+			allErrs = append(allErrs, field.Invalid(f.Child("requiredDuringSchedulingIgnoredDuringExecution"), affinity.RequiredDuringSchedulingIgnoredDuringExecution, err.Error()))
 		}
 	}
 	// TODO: Add validation for requiredDuringSchedulingRequiredDuringExecution when it gets added to the API.
 	if terms := affinity.PreferredDuringSchedulingIgnoredDuringExecution; len(terms) != 0 {
-		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms, field.WithPath(path.Child("addedAffinity", "preferredDuringSchedulingIgnoredDuringExecution")))
+		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms)
 		if err != nil {
-			errs = append(errs, err)
+			// TODO(#96167): Expand all field.Error(s) returned once constructor use them.
+			allErrs = append(allErrs, field.Invalid(f.Child("preferredDuringSchedulingIgnoredDuringExecution"), affinity.PreferredDuringSchedulingIgnoredDuringExecution, err.Error()))
 		}
-	}
-	return errors.Flatten(errors.NewAggregate(errs))
-}
-
-// ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
-func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
-	var allErrs field.ErrorList
-
-	if args.BindTimeoutSeconds < 0 {
-		allErrs = append(allErrs, field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value"))
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
-		allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
-	} else if args.Shape != nil {
-		// When the feature is off, return an error if the config is not nil.
-		// This prevents unexpected configuration from taking effect when the
-		// feature turns on in the future.
-		allErrs = append(allErrs, field.Invalid(path.Child("shape"), args.Shape, "unexpected field `shape`, remove it or turn on the feature gate VolumeCapacityPriority"))
-	}
-	return allErrs.ToAggregate()
-}
-
-func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFitArgs) error {
-	var allErrs field.ErrorList
-	resPath := path.Child("ignoredResources")
-	for i, res := range args.IgnoredResources {
-		path := resPath.Index(i)
-		if errs := metav1validation.ValidateLabelName(res, path); len(errs) != 0 {
-			allErrs = append(allErrs, errs...)
-		}
-	}
-
-	groupPath := path.Child("ignoredResourceGroups")
-	for i, group := range args.IgnoredResourceGroups {
-		path := groupPath.Index(i)
-		if strings.Contains(group, "/") {
-			allErrs = append(allErrs, field.Invalid(path, group, "resource group name can't contain '/'"))
-		}
-		if errs := metav1validation.ValidateLabelName(group, path); len(errs) != 0 {
-			allErrs = append(allErrs, errs...)
-		}
-	}
-
-	if args.ScoringStrategy != nil {
-		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, path.Child("resources"))...)
-		if args.ScoringStrategy.RequestedToCapacityRatio != nil && len(args.ScoringStrategy.RequestedToCapacityRatio.Shape) > 0 {
-			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, path.Child("shape"))...)
-		}
-	}
-
-	if len(allErrs) == 0 {
-		return nil
 	}
 	return allErrs.ToAggregate()
 }

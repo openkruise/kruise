@@ -38,7 +38,7 @@ type remoteImageService struct {
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
 func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
-	klog.V(3).InfoS("Connecting to image service", "endpoint", endpoint)
+	klog.V(3).Infof("Connecting to image service %s", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 
 	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
-		klog.ErrorS(err, "Connect remote image service failed", "address", addr)
+		klog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err
 	}
 
@@ -68,7 +68,7 @@ func (r *remoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runt
 		Filter: filter,
 	})
 	if err != nil {
-		klog.ErrorS(err, "ListImages with filter from image service failed", "filter", filter)
+		klog.Errorf("ListImages with filter %+v from image service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -84,16 +84,15 @@ func (r *remoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 		Image: image,
 	})
 	if err != nil {
-		klog.ErrorS(err, "Get ImageStatus from image service failed", "image", image.Image)
+		klog.Errorf("ImageStatus %q from image service failed: %v", image.Image, err)
 		return nil, err
 	}
 
 	if resp.Image != nil {
 		if resp.Image.Id == "" || resp.Image.Size_ == 0 {
 			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
-			err := errors.New(errorMessage)
-			klog.ErrorS(err, "ImageStatus failed", "image", image.Image)
-			return nil, err
+			klog.Errorf("ImageStatus failed: %s", errorMessage)
+			return nil, errors.New(errorMessage)
 		}
 	}
 
@@ -111,13 +110,13 @@ func (r *remoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 		SandboxConfig: podSandboxConfig,
 	})
 	if err != nil {
-		klog.ErrorS(err, "PullImage from image service failed", "image", image.Image)
+		klog.Errorf("PullImage %q from image service failed: %v", image.Image, err)
 		return "", err
 	}
 
 	if resp.ImageRef == "" {
-		klog.ErrorS(errors.New("PullImage failed"), "ImageRef of image is not set", "image", image.Image)
 		errorMessage := fmt.Sprintf("imageRef of image %q is not set", image.Image)
+		klog.Errorf("PullImage failed: %s", errorMessage)
 		return "", errors.New(errorMessage)
 	}
 
@@ -133,7 +132,7 @@ func (r *remoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 		Image: image,
 	})
 	if err != nil {
-		klog.ErrorS(err, "RemoveImage from image service failed", "image", image.Image)
+		klog.Errorf("RemoveImage %q from image service failed: %v", image.Image, err)
 		return err
 	}
 
@@ -149,7 +148,7 @@ func (r *remoteImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error
 
 	resp, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{})
 	if err != nil {
-		klog.ErrorS(err, "ImageFsInfo from image service failed")
+		klog.Errorf("ImageFsInfo from image service failed: %v", err)
 		return nil, err
 	}
 	return resp.GetImageFilesystems(), nil

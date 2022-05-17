@@ -65,7 +65,7 @@ type LeaderElectionConfiguration struct {
 	// resourceName indicates the name of resource object that will be used to lock
 	// during leader election cycles.
 	ResourceName string
-	// resourceNamespace indicates the namespace of resource object that will be used to lock
+	// resourceName indicates the namespace of resource object that will be used to lock
 	// during leader election cycles.
 	ResourceNamespace string
 }

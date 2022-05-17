@@ -18,8 +18,10 @@ package clientcmd
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -46,24 +48,24 @@ const (
 )
 
 var (
-	RecommendedConfigDir  = filepath.Join(homedir.HomeDir(), RecommendedHomeDir)
-	RecommendedHomeFile   = filepath.Join(RecommendedConfigDir, RecommendedFileName)
-	RecommendedSchemaFile = filepath.Join(RecommendedConfigDir, RecommendedSchemaName)
+	RecommendedConfigDir  = path.Join(homedir.HomeDir(), RecommendedHomeDir)
+	RecommendedHomeFile   = path.Join(RecommendedConfigDir, RecommendedFileName)
+	RecommendedSchemaFile = path.Join(RecommendedConfigDir, RecommendedSchemaName)
 )
 
 // currentMigrationRules returns a map that holds the history of recommended home directories used in previous versions.
 // Any future changes to RecommendedHomeFile and related are expected to add a migration rule here, in order to make
 // sure existing config files are migrated to their new locations properly.
 func currentMigrationRules() map[string]string {
-	var oldRecommendedHomeFileName string
+	oldRecommendedHomeFile := path.Join(os.Getenv("HOME"), "/.kube/.kubeconfig")
+	oldRecommendedWindowsHomeFile := path.Join(os.Getenv("HOME"), RecommendedHomeDir, RecommendedFileName)
+
+	migrationRules := map[string]string{}
+	migrationRules[RecommendedHomeFile] = oldRecommendedHomeFile
 	if goruntime.GOOS == "windows" {
-		oldRecommendedHomeFileName = RecommendedFileName
-	} else {
-		oldRecommendedHomeFileName = ".kubeconfig"
+		migrationRules[RecommendedHomeFile] = oldRecommendedWindowsHomeFile
 	}
-	return map[string]string{
-		RecommendedHomeFile: filepath.Join(os.Getenv("HOME"), RecommendedHomeDir, oldRecommendedHomeFileName),
-	}
+	return migrationRules
 }
 
 type ClientConfigLoader interface {
@@ -225,7 +227,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	mapConfig := clientcmdapi.NewConfig()
 
 	for _, kubeconfig := range kubeconfigs {
-		mergo.Merge(mapConfig, kubeconfig, mergo.WithOverride)
+		mergo.MergeWithOverwrite(mapConfig, kubeconfig)
 	}
 
 	// merge all of the struct values in the reverse order so that priority is given correctly
@@ -233,14 +235,14 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	nonMapConfig := clientcmdapi.NewConfig()
 	for i := len(kubeconfigs) - 1; i >= 0; i-- {
 		kubeconfig := kubeconfigs[i]
-		mergo.Merge(nonMapConfig, kubeconfig, mergo.WithOverride)
+		mergo.MergeWithOverwrite(nonMapConfig, kubeconfig)
 	}
 
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
 	// get the values we expect.
 	config := clientcmdapi.NewConfig()
-	mergo.Merge(config, mapConfig, mergo.WithOverride)
-	mergo.Merge(config, nonMapConfig, mergo.WithOverride)
+	mergo.MergeWithOverwrite(config, mapConfig)
+	mergo.MergeWithOverwrite(config, nonMapConfig)
 
 	if rules.ResolvePaths() {
 		if err := ResolveLocalPaths(config); err != nil {
@@ -281,13 +283,18 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return fmt.Errorf("cannot migrate %v to %v because it is a directory", source, destination)
 		}
 
-		data, err := ioutil.ReadFile(source)
+		in, err := os.Open(source)
 		if err != nil {
 			return err
 		}
-		// destination is created with mode 0666 before umask
-		err = ioutil.WriteFile(destination, data, 0666)
+		defer in.Close()
+		out, err := os.Create(destination)
 		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		if _, err = io.Copy(out, in); err != nil {
 			return err
 		}
 	}

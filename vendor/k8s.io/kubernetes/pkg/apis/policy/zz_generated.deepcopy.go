@@ -261,13 +261,6 @@ func (in *PodDisruptionBudgetStatus) DeepCopyInto(out *PodDisruptionBudgetStatus
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]v1.Condition, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	return
 }
 

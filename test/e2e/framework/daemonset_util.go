@@ -76,7 +76,7 @@ func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, ima
 					},
 					HostNetwork:                   true,
 					Tolerations:                   []v1.Toleration{{Operator: v1.TolerationOpExists}},
-					TerminationGracePeriodSeconds: utilpointer.Int64(3),
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(3),
 				},
 			},
 			UpdateStrategy: updateStrategy,

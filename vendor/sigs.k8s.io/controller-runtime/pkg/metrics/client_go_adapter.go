@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"net/url"
 	"time"
 
@@ -51,25 +50,8 @@ const (
 )
 
 var (
-	// client metrics.
-
-	// RequestLatency reports the request latency in seconds per verb/URL.
-	// Deprecated: This metric is deprecated for removal in a future release: using the URL as a
-	// dimension results in cardinality explosion for some consumers. It was deprecated upstream
-	// in k8s v1.14 and hidden in v1.17 via https://github.com/kubernetes/kubernetes/pull/83836.
-	// It is not registered by default. To register:
-	//	import (
-	//		clientmetrics "k8s.io/client-go/tools/metrics"
-	//		clmetrics "sigs.k8s.io/controller-runtime/metrics"
-	//	)
-	//
-	//	func init() {
-	//		clmetrics.Registry.MustRegister(clmetrics.RequestLatency)
-	//		clientmetrics.Register(clientmetrics.RegisterOpts{
-	//			RequestLatency: clmetrics.LatencyAdapter
-	//		})
-	//	}
-	RequestLatency = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	// client metrics
+	requestLatency = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Subsystem: RestClientSubsystem,
 		Name:      LatencyKey,
 		Help:      "Request latency in seconds. Broken down by verb and URL.",
@@ -82,7 +64,7 @@ var (
 		Help:      "Number of HTTP requests, partitioned by status code, method, and host.",
 	}, []string{"code", "method", "host"})
 
-	// reflector metrics.
+	// reflector metrics
 
 	// TODO(directxman12): update these to be histograms once the metrics overhaul KEP
 	// PRs start landing.
@@ -141,18 +123,20 @@ func init() {
 	registerReflectorMetrics()
 }
 
-// registerClientMetrics sets up the client latency metrics from client-go.
+// registerClientMetrics sets up the client latency metrics from client-go
 func registerClientMetrics() {
 	// register the metrics with our registry
+	Registry.MustRegister(requestLatency)
 	Registry.MustRegister(requestResult)
 
 	// register the metrics with client-go
 	clientmetrics.Register(clientmetrics.RegisterOpts{
-		RequestResult: &resultAdapter{metric: requestResult},
+		RequestLatency: &latencyAdapter{metric: requestLatency},
+		RequestResult:  &resultAdapter{metric: requestResult},
 	})
 }
 
-// registerReflectorMetrics sets up reflector (reconcile) loop metrics.
+// registerReflectorMetrics sets up reflector (reconcile) loop metrics
 func registerReflectorMetrics() {
 	Registry.MustRegister(listsTotal)
 	Registry.MustRegister(listsDuration)
@@ -174,13 +158,11 @@ func registerReflectorMetrics() {
 // copied (more-or-less directly) from k8s.io/kubernetes setup code
 // (which isn't anywhere in an easily-importable place).
 
-// LatencyAdapter implements LatencyMetric.
-type LatencyAdapter struct {
+type latencyAdapter struct {
 	metric *prometheus.HistogramVec
 }
 
-// Observe increments the request latency metric for the given verb/URL.
-func (l *LatencyAdapter) Observe(_ context.Context, verb string, u url.URL, latency time.Duration) {
+func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
 	l.metric.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
 }
 
@@ -188,7 +170,7 @@ type resultAdapter struct {
 	metric *prometheus.CounterVec
 }
 
-func (r *resultAdapter) Increment(_ context.Context, code, method, host string) {
+func (r *resultAdapter) Increment(code, method, host string) {
 	r.metric.WithLabelValues(code, method, host).Inc()
 }
 

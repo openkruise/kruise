@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // IsJobFinished returns true when finishing job
@@ -152,7 +153,7 @@ func getAssignedNode(pod *v1.Pod) string {
 		terms := pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 		for _, t := range terms {
 			for _, req := range t.MatchFields {
-				if req.Key == metav1.ObjectNameField && req.Operator == v1.NodeSelectorOpIn && len(req.Values) == 1 {
+				if req.Key == core.ObjectNameField && req.Operator == v1.NodeSelectorOpIn && len(req.Values) == 1 {
 					return req.Values[0]
 				}
 			}

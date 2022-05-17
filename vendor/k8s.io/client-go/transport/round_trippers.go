@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
+	"k8s.io/klog/v2"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/klog/v2"
 )
 
 // HTTPWrappersForConfig wraps a round tripper with any relevant layered
@@ -68,13 +68,13 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	switch {
 	case bool(klog.V(9).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugCurlCommand, DebugURLTiming, DebugResponseHeaders)
+		rt = newDebuggingRoundTripper(rt, debugCurlCommand, debugURLTiming, debugResponseHeaders)
 	case bool(klog.V(8).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugJustURL, DebugRequestHeaders, DebugResponseStatus, DebugResponseHeaders)
+		rt = newDebuggingRoundTripper(rt, debugJustURL, debugRequestHeaders, debugResponseStatus, debugResponseHeaders)
 	case bool(klog.V(7).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugJustURL, DebugRequestHeaders, DebugResponseStatus)
+		rt = newDebuggingRoundTripper(rt, debugJustURL, debugRequestHeaders, debugResponseStatus)
 	case bool(klog.V(6).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugURLTiming)
+		rt = newDebuggingRoundTripper(rt, debugURLTiming)
 	}
 
 	return rt
@@ -346,42 +346,32 @@ func (r *requestInfo) toCurl() string {
 		}
 	}
 
-	return fmt.Sprintf("curl -v -X%s %s '%s'", r.RequestVerb, headers, r.RequestURL)
+	return fmt.Sprintf("curl -k -v -X%s %s '%s'", r.RequestVerb, headers, r.RequestURL)
 }
 
 // debuggingRoundTripper will display information about the requests passing
 // through it based on what is configured
 type debuggingRoundTripper struct {
 	delegatedRoundTripper http.RoundTripper
-	levels                map[DebugLevel]bool
+
+	levels map[debugLevel]bool
 }
 
-// DebugLevel is used to enable debugging of certain
-// HTTP requests and responses fields via the debuggingRoundTripper.
-type DebugLevel int
+type debugLevel int
 
 const (
-	// DebugJustURL will add to the debug output HTTP requests method and url.
-	DebugJustURL DebugLevel = iota
-	// DebugURLTiming will add to the debug output the duration of HTTP requests.
-	DebugURLTiming
-	// DebugCurlCommand will add to the debug output the curl command equivalent to the
-	// HTTP request.
-	DebugCurlCommand
-	// DebugRequestHeaders will add to the debug output the HTTP requests headers.
-	DebugRequestHeaders
-	// DebugResponseStatus will add to the debug output the HTTP response status.
-	DebugResponseStatus
-	// DebugResponseHeaders will add to the debug output the HTTP response headers.
-	DebugResponseHeaders
+	debugJustURL debugLevel = iota
+	debugURLTiming
+	debugCurlCommand
+	debugRequestHeaders
+	debugResponseStatus
+	debugResponseHeaders
 )
 
-// NewDebuggingRoundTripper allows to display in the logs output debug information
-// on the API requests performed by the client.
-func NewDebuggingRoundTripper(rt http.RoundTripper, levels ...DebugLevel) http.RoundTripper {
+func newDebuggingRoundTripper(rt http.RoundTripper, levels ...debugLevel) *debuggingRoundTripper {
 	drt := &debuggingRoundTripper{
 		delegatedRoundTripper: rt,
-		levels:                make(map[DebugLevel]bool, len(levels)),
+		levels:                make(map[debugLevel]bool, len(levels)),
 	}
 	for _, v := range levels {
 		drt.levels[v] = true
@@ -428,14 +418,15 @@ func maskValue(key string, value string) string {
 func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqInfo := newRequestInfo(req)
 
-	if rt.levels[DebugJustURL] {
+	if rt.levels[debugJustURL] {
 		klog.Infof("%s %s", reqInfo.RequestVerb, reqInfo.RequestURL)
 	}
-	if rt.levels[DebugCurlCommand] {
+	if rt.levels[debugCurlCommand] {
 		klog.Infof("%s", reqInfo.toCurl())
+
 	}
-	if rt.levels[DebugRequestHeaders] {
-		klog.Info("Request Headers:")
+	if rt.levels[debugRequestHeaders] {
+		klog.Infof("Request Headers:")
 		for key, values := range reqInfo.RequestHeaders {
 			for _, value := range values {
 				value = maskValue(key, value)
@@ -450,14 +441,14 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 
 	reqInfo.complete(response, err)
 
-	if rt.levels[DebugURLTiming] {
+	if rt.levels[debugURLTiming] {
 		klog.Infof("%s %s %s in %d milliseconds", reqInfo.RequestVerb, reqInfo.RequestURL, reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
-	if rt.levels[DebugResponseStatus] {
+	if rt.levels[debugResponseStatus] {
 		klog.Infof("Response Status: %s in %d milliseconds", reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
-	if rt.levels[DebugResponseHeaders] {
-		klog.Info("Response Headers:")
+	if rt.levels[debugResponseHeaders] {
+		klog.Infof("Response Headers:")
 		for key, values := range reqInfo.ResponseHeaders {
 			for _, value := range values {
 				klog.Infof("    %s: %s", key, value)

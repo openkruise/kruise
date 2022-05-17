@@ -192,7 +192,7 @@ func deleteTaints(taintsToRemove []v1.Taint, newTaints *[]v1.Taint) ([]error, bo
 	allErrs := []error{}
 	var removed bool
 	for _, taintToRemove := range taintsToRemove {
-		removed = false // nolint:ineffassign
+		removed = false
 		if len(taintToRemove.Effect) > 0 {
 			*newTaints, removed = DeleteTaint(*newTaints, &taintToRemove)
 		} else {

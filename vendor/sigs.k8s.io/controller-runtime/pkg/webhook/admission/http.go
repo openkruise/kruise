@@ -51,7 +51,14 @@ func (wh *Webhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reviewResponse Response
-	if r.Body == nil {
+	if r.Body != nil {
+		if body, err = ioutil.ReadAll(r.Body); err != nil {
+			wh.log.Error(err, "unable to read the body from the incoming request")
+			reviewResponse = Errored(http.StatusBadRequest, err)
+			wh.writeResponse(w, reviewResponse)
+			return
+		}
+	} else {
 		err = errors.New("request body is empty")
 		wh.log.Error(err, "bad request")
 		reviewResponse = Errored(http.StatusBadRequest, err)
@@ -59,16 +66,9 @@ func (wh *Webhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer r.Body.Close()
-	if body, err = ioutil.ReadAll(r.Body); err != nil {
-		wh.log.Error(err, "unable to read the body from the incoming request")
-		reviewResponse = Errored(http.StatusBadRequest, err)
-		wh.writeResponse(w, reviewResponse)
-		return
-	}
-
 	// verify the content type is accurate
-	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "application/json" {
 		err = fmt.Errorf("contentType=%s, expected application/json", contentType)
 		wh.log.Error(err, "unable to process a request with an unknown content type", "content type", contentType)
 		reviewResponse = Errored(http.StatusBadRequest, err)
@@ -96,6 +96,7 @@ func (wh *Webhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	wh.log.V(1).Info("received request", "UID", req.UID, "kind", req.Kind, "resource", req.Resource)
 
+	// TODO: add panic-recovery for Handle
 	reviewResponse = wh.Handle(ctx, req)
 	wh.writeResponseTyped(w, reviewResponse, actualAdmRevGVK)
 }
@@ -124,7 +125,8 @@ func (wh *Webhook) writeResponseTyped(w io.Writer, response Response, admRevGVK 
 
 // writeAdmissionResponse writes ar to w.
 func (wh *Webhook) writeAdmissionResponse(w io.Writer, ar v1.AdmissionReview) {
-	if err := json.NewEncoder(w).Encode(ar); err != nil {
+	err := json.NewEncoder(w).Encode(ar)
+	if err != nil {
 		wh.log.Error(err, "unable to encode the response")
 		wh.writeResponse(w, Errored(http.StatusInternalServerError, err))
 	} else {

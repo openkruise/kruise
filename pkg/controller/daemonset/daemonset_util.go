@@ -31,8 +31,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
 )

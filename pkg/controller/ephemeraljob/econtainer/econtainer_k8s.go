@@ -2,16 +2,11 @@ package econtainer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-
-	"github.com/openkruise/kruise/pkg/util"
-	"k8s.io/apimachinery/pkg/types"
-
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kubeclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -133,29 +128,65 @@ func (k *k8sControl) GetEphemeralContainers(targetPod *v1.Pod) []v1.EphemeralCon
 	return targetPod.Spec.EphemeralContainers
 }
 
+//func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
+//	oldPodJS, _ := json.Marshal(targetPod)
+//	newPod := targetPod.DeepCopy()
+//	for i := range k.Spec.Template.EphemeralContainers {
+//		ec := k.Spec.Template.EphemeralContainers[i].DeepCopy()
+//		ec.Env = append(ec.Env, v1.EnvVar{
+//			Name:  appsv1alpha1.EphemeralContainerEnvKey,
+//			Value: string(k.UID),
+//		})
+//		newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, *ec)
+//	}
+//	newPodJS, _ := json.Marshal(newPod)
+//
+//	patch, err := strategicpatch.CreateTwoWayMergePatch(oldPodJS, newPodJS, &v1.Pod{})
+//	if err != nil {
+//		return fmt.Errorf("error creating patch to add ephemeral containers: %v", err)
+//	}
+//
+//	klog.Infof("EphemeralJob %s/%s tries to patch containers to pod %s: %v", k.Namespace, k.Name, targetPod.Name, util.DumpJSON(patch))
+//
+//	kubeClient := kubeclient.GetGenericClient().KubeClient
+//	_, err = kubeClient.CoreV1().Pods(targetPod.Namespace).
+//		Patch(context.TODO(), targetPod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
+//	return err
+//}
+
+// k8s 1.20
 func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
-	oldPodJS, _ := json.Marshal(targetPod)
-	newPod := targetPod.DeepCopy()
-	for i := range k.Spec.Template.EphemeralContainers {
-		ec := k.Spec.Template.EphemeralContainers[i].DeepCopy()
-		ec.Env = append(ec.Env, v1.EnvVar{
+	kubeclient := kubeclient.GetGenericClient().KubeClient
+	eContainers, err := kubeclient.CoreV1().Pods(targetPod.Namespace).GetEphemeralContainers(context.TODO(), targetPod.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("error get ephemeral containers in pod %s/%s: %v", targetPod.Namespace, targetPod.Name, err)
+	}
+
+	if eContainers == nil {
+		eContainers = &v1.EphemeralContainers{}
+		eContainers.Namespace = k.Namespace
+		eContainers.Name = k.Name
+		eContainers.EphemeralContainers = k.Spec.Template.EphemeralContainers
+	}
+
+	ephemeralContainerMaps, _ := getEphemeralContainersMaps(eContainers.EphemeralContainers)
+	for _, e := range k.Spec.Template.EphemeralContainers {
+		if _, ok := ephemeralContainerMaps[e.Name]; ok {
+			klog.Warningf("ephemeral container %s has exist in pod %s", e.Name, targetPod.Name)
+			continue
+		}
+
+		klog.Infof("ephemeral container %s add to pod %s", e.Name, targetPod.Name)
+		e.Env = append(e.Env, v1.EnvVar{
 			Name:  appsv1alpha1.EphemeralContainerEnvKey,
 			Value: string(k.UID),
 		})
-		newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, *ec)
-	}
-	newPodJS, _ := json.Marshal(newPod)
-
-	patch, err := strategicpatch.CreateTwoWayMergePatch(oldPodJS, newPodJS, &v1.Pod{})
-	if err != nil {
-		return fmt.Errorf("error creating patch to add ephemeral containers: %v", err)
+		eContainers.EphemeralContainers = append(eContainers.EphemeralContainers, e)
 	}
 
-	klog.Infof("EphemeralJob %s/%s tries to patch containers to pod %s: %v", k.Namespace, k.Name, targetPod.Name, util.DumpJSON(patch))
+	klog.Infof("EphemeralJob %s/%s tries to add containers to pod %s: %v", k.Namespace, k.Name, targetPod.Name, util.DumpJSON(eContainers))
 
-	kubeClient := kubeclient.GetGenericClient().KubeClient
-	_, err = kubeClient.CoreV1().Pods(targetPod.Namespace).
-		Patch(context.TODO(), targetPod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
+	_, err = kubeclient.CoreV1().Pods(targetPod.Namespace).UpdateEphemeralContainers(context.TODO(), targetPod.Name, eContainers, metav1.UpdateOptions{})
 	return err
 }
 

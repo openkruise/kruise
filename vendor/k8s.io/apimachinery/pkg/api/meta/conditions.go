@@ -57,7 +57,7 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 // RemoveStatusCondition removes the corresponding conditionType from conditions.
 // conditions must be non-nil.
 func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string) {
-	if conditions == nil || len(*conditions) == 0 {
+	if conditions == nil {
 		return
 	}
 	newConditions := make([]metav1.Condition, 0, len(*conditions)-1)

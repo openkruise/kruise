@@ -20,10 +20,10 @@ import corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 
 var (
 	DefaultPodValidationOptions = corevalidation.PodValidationOptions{
-		AllowDownwardAPIHugePages:       true,
-		AllowInvalidPodDeletionCost:     true,
-		AllowWindowsHostProcessField:    true,
-		AllowExpandedDNSConfig:          true,
-		AllowIndivisibleHugePagesValues: true,
+		AllowDownwardAPIHugePages: true,
+		//AllowInvalidPodDeletionCost:     true,pkg/webhook/statefulset/validating/statefulset_validation.go:200:81
+		//AllowWindowsHostProcessField:    true,
+		//AllowExpandedDNSConfig:          true,
+		//AllowIndivisibleHugePagesValues: true,
 	}
 )

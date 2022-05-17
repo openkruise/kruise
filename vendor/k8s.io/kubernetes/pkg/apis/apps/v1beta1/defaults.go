@@ -60,6 +60,7 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
 		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
 	}
+
 }
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart

@@ -135,7 +135,11 @@ func (o *PathOptions) GetDefaultFilename() string {
 }
 
 func (o *PathOptions) IsExplicitFile() bool {
-	return len(o.LoadingRules.ExplicitPath) > 0
+	if len(o.LoadingRules.ExplicitPath) > 0 {
+		return true
+	}
+
+	return false
 }
 
 func (o *PathOptions) GetExplicitFile() string {
@@ -370,7 +374,7 @@ func (p *persister) Persist(config map[string]string) error {
 	authInfo, ok := newConfig.AuthInfos[p.user]
 	if ok && authInfo.AuthProvider != nil {
 		authInfo.AuthProvider.Config = config
-		return ModifyConfig(p.configAccess, *newConfig, false)
+		ModifyConfig(p.configAccess, *newConfig, false)
 	}
 	return nil
 }

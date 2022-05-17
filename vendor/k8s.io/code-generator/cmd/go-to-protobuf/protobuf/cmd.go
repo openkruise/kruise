@@ -364,12 +364,7 @@ func Run(g *Generator) {
 func deps(c *generator.Context, pkgs []*protobufPackage) map[string][]string {
 	ret := map[string][]string{}
 	for _, p := range pkgs {
-		pkg, ok := c.Universe[p.PackagePath]
-		if !ok {
-			log.Fatalf("Unrecognized package: %s", p.PackagePath)
-		}
-
-		for _, d := range pkg.Imports {
+		for _, d := range c.Universe[p.PackagePath].Imports {
 			ret[p.PackagePath] = append(ret[p.PackagePath], d.Path)
 		}
 	}

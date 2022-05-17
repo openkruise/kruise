@@ -46,8 +46,6 @@ var SupportedVerbs = []string{
 	"list",
 	"watch",
 	"patch",
-	"apply",
-	"applyStatus",
 }
 
 // ReadonlyVerbs represents a list of read-only verbs.
@@ -74,7 +72,6 @@ var unsupportedExtensionVerbs = []string{
 var inputTypeSupportedVerbs = []string{
 	"create",
 	"update",
-	"apply",
 }
 
 // resultTypeSupportedVerbs is a list of verb types that supports overriding the
@@ -85,7 +82,6 @@ var resultTypeSupportedVerbs = []string{
 	"get",
 	"list",
 	"patch",
-	"apply",
 }
 
 // Extensions allows to extend the default set of client verbs

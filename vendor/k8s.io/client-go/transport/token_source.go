@@ -43,29 +43,9 @@ func TokenSourceWrapTransport(ts oauth2.TokenSource) func(http.RoundTripper) htt
 	}
 }
 
-type ResettableTokenSource interface {
-	oauth2.TokenSource
-	ResetTokenOlderThan(time.Time)
-}
-
-// ResettableTokenSourceWrapTransport returns a WrapTransport that injects bearer tokens
-// authentication from an ResettableTokenSource.
-func ResettableTokenSourceWrapTransport(ts ResettableTokenSource) func(http.RoundTripper) http.RoundTripper {
-	return func(rt http.RoundTripper) http.RoundTripper {
-		return &tokenSourceTransport{
-			base: rt,
-			ort: &oauth2.Transport{
-				Source: ts,
-				Base:   rt,
-			},
-			src: ts,
-		}
-	}
-}
-
-// NewCachedFileTokenSource returns a resettable token source which reads a
-// token from a file at a specified path and periodically reloads it.
-func NewCachedFileTokenSource(path string) *cachingTokenSource {
+// NewCachedFileTokenSource returns a oauth2.TokenSource reads a token from a
+// file at a specified path and periodically reloads it.
+func NewCachedFileTokenSource(path string) oauth2.TokenSource {
 	return &cachingTokenSource{
 		now:    time.Now,
 		leeway: 10 * time.Second,
@@ -80,9 +60,9 @@ func NewCachedFileTokenSource(path string) *cachingTokenSource {
 	}
 }
 
-// NewCachedTokenSource returns resettable token source with caching. It reads
-// a token from a designed TokenSource if not in cache or expired.
-func NewCachedTokenSource(ts oauth2.TokenSource) *cachingTokenSource {
+// NewCachedTokenSource returns a oauth2.TokenSource reads a token from a
+// designed TokenSource. The ts would provide the source of token.
+func NewCachedTokenSource(ts oauth2.TokenSource) oauth2.TokenSource {
 	return &cachingTokenSource{
 		now:  time.Now,
 		base: ts,
@@ -92,7 +72,6 @@ func NewCachedTokenSource(ts oauth2.TokenSource) *cachingTokenSource {
 type tokenSourceTransport struct {
 	base http.RoundTripper
 	ort  http.RoundTripper
-	src  ResettableTokenSource
 }
 
 func (tst *tokenSourceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -100,15 +79,7 @@ func (tst *tokenSourceTransport) RoundTrip(req *http.Request) (*http.Response, e
 	if req.Header.Get("Authorization") != "" {
 		return tst.base.RoundTrip(req)
 	}
-	// record time before RoundTrip to make sure newly acquired Unauthorized
-	// token would not be reset. Another request from user is required to reset
-	// and proceed.
-	start := time.Now()
-	resp, err := tst.ort.RoundTrip(req)
-	if err == nil && resp != nil && resp.StatusCode == 401 && tst.src != nil {
-		tst.src.ResetTokenOlderThan(start)
-	}
-	return resp, err
+	return tst.ort.RoundTrip(req)
 }
 
 func (tst *tokenSourceTransport) CancelRequest(req *http.Request) {
@@ -148,11 +119,12 @@ type cachingTokenSource struct {
 
 	sync.RWMutex
 	tok *oauth2.Token
-	t   time.Time
 
 	// for testing
 	now func() time.Time
 }
+
+var _ = oauth2.TokenSource(&cachingTokenSource{})
 
 func (ts *cachingTokenSource) Token() (*oauth2.Token, error) {
 	now := ts.now()
@@ -181,16 +153,6 @@ func (ts *cachingTokenSource) Token() (*oauth2.Token, error) {
 		return ts.tok, nil
 	}
 
-	ts.t = ts.now()
 	ts.tok = tok
 	return tok, nil
-}
-
-func (ts *cachingTokenSource) ResetTokenOlderThan(t time.Time) {
-	ts.Lock()
-	defer ts.Unlock()
-	if ts.t.Before(t) {
-		ts.tok = nil
-		ts.t = time.Time{}
-	}
 }

@@ -115,13 +115,6 @@ func (in *ExtenderFilterResult) DeepCopyInto(out *ExtenderFilterResult) {
 			(*out)[key] = val
 		}
 	}
-	if in.FailedAndUnresolvableNodes != nil {
-		in, out := &in.FailedAndUnresolvableNodes, &out.FailedAndUnresolvableNodes
-		*out = make(FailedNodesMap, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	return
 }
 

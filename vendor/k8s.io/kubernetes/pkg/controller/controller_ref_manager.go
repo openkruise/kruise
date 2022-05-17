@@ -124,7 +124,6 @@ type PodControllerRefManager struct {
 	BaseControllerRefManager
 	controllerKind schema.GroupVersionKind
 	podControl     PodControlInterface
-	finalizers     []string
 }
 
 // NewPodControllerRefManager returns a PodControllerRefManager that exposes
@@ -144,7 +143,6 @@ func NewPodControllerRefManager(
 	selector labels.Selector,
 	controllerKind schema.GroupVersionKind,
 	canAdopt func() error,
-	finalizers ...string,
 ) *PodControllerRefManager {
 	return &PodControllerRefManager{
 		BaseControllerRefManager: BaseControllerRefManager{
@@ -154,7 +152,6 @@ func NewPodControllerRefManager(
 		},
 		controllerKind: controllerKind,
 		podControl:     podControl,
-		finalizers:     finalizers,
 	}
 }
 
@@ -219,7 +216,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 
-	patchBytes, err := ownerRefControllerPatch(m.Controller, m.controllerKind, pod.UID, m.finalizers...)
+	patchBytes, err := ownerRefControllerPatch(m.Controller, m.controllerKind, pod.UID)
 	if err != nil {
 		return err
 	}
@@ -231,7 +228,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	patchBytes, err := deleteOwnerRefStrategicMergePatch(pod.UID, m.Controller.GetUID(), m.finalizers...)
+	patchBytes, err := deleteOwnerRefStrategicMergePatch(pod.UID, m.Controller.GetUID())
 	if err != nil {
 		return err
 	}
@@ -521,22 +518,19 @@ type objectForDeleteOwnerRefStrategicMergePatch struct {
 }
 
 type objectMetaForMergePatch struct {
-	UID              types.UID           `json:"uid"`
-	OwnerReferences  []map[string]string `json:"ownerReferences"`
-	DeleteFinalizers []string            `json:"$deleteFromPrimitiveList/finalizers,omitempty"`
+	UID             types.UID           `json:"uid"`
+	OwnerReferences []map[string]string `json:"ownerReferences"`
 }
 
-func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUID types.UID, finalizers ...string) ([]byte, error) {
+func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...types.UID) ([]byte, error) {
+	var pieces []map[string]string
+	for _, ownerUID := range ownerUIDs {
+		pieces = append(pieces, map[string]string{"$patch": "delete", "uid": string(ownerUID)})
+	}
 	patch := objectForDeleteOwnerRefStrategicMergePatch{
 		Metadata: objectMetaForMergePatch{
-			UID: dependentUID,
-			OwnerReferences: []map[string]string{
-				{
-					"$patch": "delete",
-					"uid":    string(ownerUID),
-				},
-			},
-			DeleteFinalizers: finalizers,
+			UID:             dependentUID,
+			OwnerReferences: pieces,
 		},
 	}
 	patchBytes, err := json.Marshal(&patch)
@@ -553,10 +547,9 @@ type objectForAddOwnerRefPatch struct {
 type objectMetaForPatch struct {
 	OwnerReferences []metav1.OwnerReference `json:"ownerReferences"`
 	UID             types.UID               `json:"uid"`
-	Finalizers      []string                `json:"finalizers,omitempty"`
 }
 
-func ownerRefControllerPatch(controller metav1.Object, controllerKind schema.GroupVersionKind, uid types.UID, finalizers ...string) ([]byte, error) {
+func ownerRefControllerPatch(controller metav1.Object, controllerKind schema.GroupVersionKind, uid types.UID) ([]byte, error) {
 	blockOwnerDeletion := true
 	isController := true
 	addControllerPatch := objectForAddOwnerRefPatch{
@@ -572,7 +565,6 @@ func ownerRefControllerPatch(controller metav1.Object, controllerKind schema.Gro
 					BlockOwnerDeletion: &blockOwnerDeletion,
 				},
 			},
-			Finalizers: finalizers,
 		},
 	}
 	patchBytes, err := json.Marshal(&addControllerPatch)

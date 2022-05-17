@@ -23,8 +23,7 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
-	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/recorder"
@@ -32,7 +31,7 @@ import (
 
 const inClusterNamespacePath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
-// Options provides the required configuration to create a new resource lock.
+// Options provides the required configuration to create a new resource lock
 type Options struct {
 	// LeaderElection determines whether or not to use leader election when
 	// starting the manager.
@@ -85,14 +84,8 @@ func NewResourceLock(config *rest.Config, recorderProvider recorder.Provider, op
 	}
 	id = id + "_" + string(uuid.NewUUID())
 
-	// Construct clients for leader election
-	rest.AddUserAgent(config, "leader-election")
-	corev1Client, err := corev1client.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	coordinationClient, err := coordinationv1client.NewForConfig(config)
+	// Construct client for leader election
+	client, err := kubernetes.NewForConfig(rest.AddUserAgent(config, "leader-election"))
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +93,8 @@ func NewResourceLock(config *rest.Config, recorderProvider recorder.Provider, op
 	return resourcelock.New(options.LeaderElectionResourceLock,
 		options.LeaderElectionNamespace,
 		options.LeaderElectionID,
-		corev1Client,
-		coordinationClient,
+		client.CoreV1(),
+		client.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorderProvider.GetEventRecorderFor(id),
@@ -111,7 +104,8 @@ func NewResourceLock(config *rest.Config, recorderProvider recorder.Provider, op
 func getInClusterNamespace() (string, error) {
 	// Check whether the namespace file exists.
 	// If not, we are not running in cluster so can't guess the namespace.
-	if _, err := os.Stat(inClusterNamespacePath); os.IsNotExist(err) {
+	_, err := os.Stat(inClusterNamespacePath)
+	if os.IsNotExist(err) {
 		return "", fmt.Errorf("not running in-cluster, please specify LeaderElectionNamespace")
 	} else if err != nil {
 		return "", fmt.Errorf("error checking namespace file: %w", err)

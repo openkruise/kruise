@@ -22,11 +22,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 	"unicode"
 
 	jsonutil "k8s.io/apimachinery/pkg/util/json"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 )
 
@@ -213,15 +215,16 @@ type YAMLOrJSONDecoder struct {
 	bufferSize int
 
 	decoder decoder
+	rawData []byte
 }
 
 type JSONSyntaxError struct {
-	Offset int64
-	Err    error
+	Line int
+	Err  error
 }
 
 func (e JSONSyntaxError) Error() string {
-	return fmt.Sprintf("json: offset %d: %s", e.Offset, e.Err.Error())
+	return fmt.Sprintf("json: line %d: %s", e.Line, e.Err.Error())
 }
 
 type YAMLSyntaxError struct {
@@ -247,18 +250,35 @@ func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder {
 // provide object, or returns an error.
 func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	if d.decoder == nil {
-		buffer, _, isJSON := GuessJSONStream(d.r, d.bufferSize)
+		buffer, origData, isJSON := GuessJSONStream(d.r, d.bufferSize)
 		if isJSON {
 			d.decoder = json.NewDecoder(buffer)
+			d.rawData = origData
 		} else {
 			d.decoder = NewYAMLToJSONDecoder(buffer)
 		}
 	}
 	err := d.decoder.Decode(into)
-	if syntax, ok := err.(*json.SyntaxError); ok {
-		return JSONSyntaxError{
-			Offset: syntax.Offset,
-			Err:    syntax,
+	if jsonDecoder, ok := d.decoder.(*json.Decoder); ok {
+		if syntax, ok := err.(*json.SyntaxError); ok {
+			data, readErr := ioutil.ReadAll(jsonDecoder.Buffered())
+			if readErr != nil {
+				klog.V(4).Infof("reading stream failed: %v", readErr)
+			}
+			js := string(data)
+
+			// if contents from io.Reader are not complete,
+			// use the original raw data to prevent panic
+			if int64(len(js)) <= syntax.Offset {
+				js = string(d.rawData)
+			}
+
+			start := strings.LastIndex(js[:syntax.Offset], "\n") + 1
+			line := strings.Count(js[:start], "\n")
+			return JSONSyntaxError{
+				Line: line,
+				Err:  fmt.Errorf(syntax.Error()),
+			}
 		}
 	}
 	return err
@@ -291,18 +311,14 @@ func (r *YAMLReader) Read() ([]byte, error) {
 		if i := bytes.Index(line, []byte(separator)); i == 0 {
 			// We have a potential document terminator
 			i += sep
-			trimmed := strings.TrimSpace(string(line[i:]))
-			// We only allow comments and spaces following the yaml doc separator, otherwise we'll return an error
-			if len(trimmed) > 0 && string(trimmed[0]) != "#" {
-				return nil, YAMLSyntaxError{
-					err: fmt.Errorf("invalid Yaml document separator: %s", trimmed),
+			after := line[i:]
+			if len(strings.TrimRightFunc(string(after), unicode.IsSpace)) == 0 {
+				if buffer.Len() != 0 {
+					return buffer.Bytes(), nil
 				}
-			}
-			if buffer.Len() != 0 {
-				return buffer.Bytes(), nil
-			}
-			if err == io.EOF {
-				return nil, err
+				if err == io.EOF {
+					return nil, err
+				}
 			}
 		}
 		if err == io.EOF {
@@ -345,12 +361,6 @@ func GuessJSONStream(r io.Reader, size int) (io.Reader, []byte, bool) {
 	buffer := bufio.NewReaderSize(r, size)
 	b, _ := buffer.Peek(size)
 	return buffer, b, hasJSONPrefix(b)
-}
-
-// IsJSONBuffer scans the provided buffer, looking
-// for an open brace indicating this is JSON.
-func IsJSONBuffer(buf []byte) bool {
-	return hasJSONPrefix(buf)
 }
 
 var jsonPrefix = []byte("{")

@@ -25,8 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // MostAllocated is a score plugin that favors nodes with high allocation based on requested resources.
@@ -38,7 +36,7 @@ type MostAllocated struct {
 var _ = framework.ScorePlugin(&MostAllocated{})
 
 // MostAllocatedName is the name of the plugin used in the plugin registry and configurations.
-const MostAllocatedName = names.NodeResourcesMostAllocated
+const MostAllocatedName = "NodeResourcesMostAllocated"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (ma *MostAllocated) Name() string {
@@ -48,8 +46,8 @@ func (ma *MostAllocated) Name() string {
 // Score invoked at the Score extension point.
 func (ma *MostAllocated) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := ma.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
+	if err != nil || nodeInfo.Node() == nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))
 	}
 
 	// ma.score favors nodes with most requested resources.
@@ -65,12 +63,13 @@ func (ma *MostAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewMostAllocated initializes a new plugin and returns it.
-func NewMostAllocated(maArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func NewMostAllocated(maArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	args, ok := maArgs.(*config.NodeResourcesMostAllocatedArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesMostAllocatedArgs, got %T", args)
 	}
-	if err := validation.ValidateNodeResourcesMostAllocatedArgs(nil, args); err != nil {
+
+	if err := validation.ValidateNodeResourcesMostAllocatedArgs(args); err != nil {
 		return nil, err
 	}
 
@@ -85,24 +84,19 @@ func NewMostAllocated(maArgs runtime.Object, h framework.Handle, fts feature.Fea
 			Name:                MostAllocatedName,
 			scorer:              mostResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
-			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
 
-func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap) int64 {
-	return func(requested, allocable resourceToValueMap) int64 {
+func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+	return func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
 		var nodeScore, weightSum int64
-		for resource := range requested {
-			weight := resToWeightMap[resource]
+		for resource, weight := range resToWeightMap {
 			resourceScore := mostRequestedScore(requested[resource], allocable[resource])
 			nodeScore += resourceScore * weight
 			weightSum += weight
 		}
-		if weightSum == 0 {
-			return 0
-		}
-		return nodeScore / weightSum
+		return (nodeScore / weightSum)
 	}
 }
 
