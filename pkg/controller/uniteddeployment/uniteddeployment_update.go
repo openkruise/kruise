@@ -94,23 +94,8 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 	}
 	klog.V(4).Infof("UnitedDeployment %s/%s has subsets %v, expects subsets %v", ud.Namespace, ud.Name, gotSubsets.List(), expectedSubsets.List())
 
-	var creates []string
-	for _, expectSubset := range expectedSubsets.List() {
-		if gotSubsets.Has(expectSubset) {
-			continue
-		}
-
-		creates = append(creates, expectSubset)
-	}
-
-	var deletes []string
-	for _, gotSubset := range gotSubsets.List() {
-		if expectedSubsets.Has(gotSubset) {
-			continue
-		}
-
-		deletes = append(deletes, gotSubset)
-	}
+	creates := expectedSubsets.Difference(gotSubsets).List()
+	deletes := gotSubsets.Difference(expectedSubsets).List()
 
 	revision := currentRevision.Name
 	if updatedRevision != nil {
