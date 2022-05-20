@@ -22,6 +22,8 @@ import (
 	"sync"
 
 	"github.com/docker/distribution/reference"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
@@ -173,4 +175,17 @@ func CalculatePartitionReplicas(partition *intstrutil.IntOrString, replicasPoint
 
 	pValue = integer.IntMax(integer.IntMin(pValue, replicas), 0)
 	return pValue, nil
+}
+
+// check APIVersion, Kind, Name
+func IsReferenceEqual(ref1, ref2 appsv1alpha1.TargetReference) bool {
+	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
+	if err != nil {
+		return false
+	}
+	gv2, err := schema.ParseGroupVersion(ref2.APIVersion)
+	if err != nil {
+		return false
+	}
+	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
 }

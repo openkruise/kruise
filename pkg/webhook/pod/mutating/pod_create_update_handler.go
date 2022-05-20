@@ -90,6 +90,12 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		}
 	}
 
+	// persistent pod state
+	err = h.persistentPodStateMutatingPod(ctx, req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
 	if reflect.DeepEqual(obj, clone) {
 		return admission.Allowed("")
 	}

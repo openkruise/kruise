@@ -36,6 +36,8 @@ type ScaleAndSelector struct {
 	ControllerReference
 	// controller.spec.Replicas
 	Scale int32
+	// kruise statefulSet.spec.ReserveOrdinals
+	ReserveOrdinals []int
 	// controller.spec.Selector
 	Selector *metav1.LabelSelector
 	// metadata
@@ -361,8 +363,9 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 	}
 
 	return &ScaleAndSelector{
-		Scale:    *(ss.Spec.Replicas),
-		Selector: ss.Spec.Selector,
+		Scale:           *(ss.Spec.Replicas),
+		ReserveOrdinals: ss.Spec.ReserveOrdinals,
+		Selector:        ss.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: ss.APIVersion,
 			Kind:       ss.Kind,
