@@ -70,9 +70,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileContainerRecreateRequest {
+	cli := util.NewClientFromManager(mgr, "containerrecreaterequest-controller")
 	return &ReconcileContainerRecreateRequest{
-		Client: util.NewClientFromManager(mgr, "containerrecreaterequest-controller"),
-		clock:  clock.RealClock{},
+		Client:              cli,
+		clock:               clock.RealClock{},
+		podReadinessControl: utilpodreadiness.New(cli),
 	}
 }
 
@@ -104,7 +106,8 @@ var _ reconcile.Reconciler = &ReconcileContainerRecreateRequest{}
 // ReconcileContainerRecreateRequest reconciles a ContainerRecreateRequest object
 type ReconcileContainerRecreateRequest struct {
 	client.Client
-	clock clock.Clock
+	clock               clock.Clock
+	podReadinessControl utilpodreadiness.Interface
 }
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests,verbs=get;list;watch;create;update;patch;delete
@@ -273,7 +276,7 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1
 			}
 		}
 
-		err := utilpodreadiness.AddNotReadyKey(r.Client, pod, getReadinessMessage(crr))
+		err := r.podReadinessControl.AddNotReadyKey(pod, getReadinessMessage(crr))
 		if err != nil {
 			return fmt.Errorf("add Pod not ready error: %v", err)
 		}
@@ -287,7 +290,7 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1
 
 func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
 	if pod != nil && pod.DeletionTimestamp == nil && utilpodreadiness.ContainsReadinessGate(pod) {
-		err := utilpodreadiness.RemoveNotReadyKey(r.Client, pod, getReadinessMessage(crr))
+		err := r.podReadinessControl.RemoveNotReadyKey(pod, getReadinessMessage(crr))
 		if err != nil {
 			return fmt.Errorf("remove Pod not ready error: %v", err)
 		}

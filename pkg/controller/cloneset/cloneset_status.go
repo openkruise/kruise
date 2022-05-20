@@ -21,6 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+	"github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -88,7 +89,7 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 		if coreControl.IsPodUpdateReady(pod, 0) {
 			newStatus.ReadyReplicas++
 		}
-		if coreControl.IsPodUpdateReady(pod, cs.Spec.MinReadySeconds) {
+		if sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
 			newStatus.AvailableReplicas++
 		}
 		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) {

@@ -755,7 +755,8 @@ func (dsc *ReconcileDaemonSet) syncWithPreparingDelete(ds *appsv1alpha1.DaemonSe
 			podsCanDelete = append(podsCanDelete, podName)
 			continue
 		}
-		if updated, gotPod, err := dsc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete); err != nil {
+		markPodNotReady := ds.Spec.Lifecycle.PreDelete.MarkPodNotReady
+		if updated, gotPod, err := dsc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete, markPodNotReady); err != nil {
 			return nil, err
 		} else if updated {
 			klog.V(3).Infof("DaemonSet %s/%s has marked Pod %s as PreparingDelete", ds.Namespace, ds.Name, podName)
@@ -989,7 +990,6 @@ func (dsc *ReconcileDaemonSet) refreshUpdateStates(ds *appsv1alpha1.DaemonSet) e
 
 	opts := &inplaceupdate.UpdateOptions{}
 	opts = inplaceupdate.SetOptionsDefaults(opts)
-
 	for _, pod := range pods {
 		if dsc.inplaceControl == nil {
 			continue
