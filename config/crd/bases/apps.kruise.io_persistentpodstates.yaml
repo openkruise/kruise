@@ -1,0 +1,140 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: persistentpodstates.apps.kruise.io
+spec:
+  group: apps.kruise.io
+  names:
+    kind: PersistentPodState
+    listKind: PersistentPodStateList
+    plural: persistentpodstates
+    singular: persistentpodstate
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PersistentPodState is the Schema for the PersistentPodState API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PersistentPodStateSpec defines the desired state of PersistentPodState
+            properties:
+              persistentPodStateRetentionPolicy:
+                description: PersistentPodStateRetentionPolicy describes the policy
+                  used for PodState. The default policy of 'WhenScaled' causes when
+                  scale down statefulSet, deleting it.
+                type: string
+              preferredPersistentTopology:
+                description: Pod rebuilt topology preferred for node labels, with
+                  xx weight for example  kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone
+                items:
+                  properties:
+                    preference:
+                      properties:
+                        nodeTopologyKeys:
+                          description: A list of node selector requirements by node's
+                            labels.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - nodeTopologyKeys
+                      type: object
+                    weight:
+                      format: int32
+                      type: integer
+                  required:
+                  - preference
+                  - weight
+                  type: object
+                type: array
+              requiredPersistentTopology:
+                description: Pod rebuilt topology required for node labels for example
+                  kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone
+                properties:
+                  nodeTopologyKeys:
+                    description: A list of node selector requirements by node's labels.
+                    items:
+                      type: string
+                    type: array
+                required:
+                - nodeTopologyKeys
+                type: object
+              targetRef:
+                description: TargetReference contains enough information to let you
+                  identify an workload for PersistentPodState Selector and TargetReference
+                  are mutually exclusive, TargetReference is priority to take effect
+                  current only support StatefulSet
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  kind:
+                    description: Kind of the referent.
+                    type: string
+                  name:
+                    description: Name of the referent.
+                    type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                type: object
+            required:
+            - targetRef
+            type: object
+          status:
+            properties:
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this PersistentPodState. It corresponds to the PersistentPodState's
+                  generation, which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              podStates:
+                additionalProperties:
+                  properties:
+                    nodeName:
+                      description: pod.spec.nodeName
+                      type: string
+                    nodeTopologyLabels:
+                      additionalProperties:
+                        type: string
+                      description: node topology labels key=value for example kubernetes.io/hostname=node-1
+                      type: object
+                  type: object
+                description: 'When the pod is ready, record some status information
+                  of the pod, such as: labels, annotations, topologies, etc. map[string]PodState
+                  -> map[Pod.Name]PodState'
+                type: object
+            required:
+            - observedGeneration
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
