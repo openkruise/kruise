@@ -167,10 +167,10 @@ func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) er
 			return err
 		}
 
-		setPodCondition(clone, condition)
+		util.SetPodCondition(clone, condition)
 		// We only update the ready condition to False, and let Kubelet update it to True
 		if condition.Status == v1.ConditionFalse {
-			updatePodReadyCondition(clone)
+			util.SetPodReadyCondition(clone)
 		}
 		return c.podAdapter.UpdatePodStatus(clone)
 	})
@@ -383,68 +383,7 @@ func containsReadinessGate(pod *v1.Pod) bool {
 
 // GetCondition returns the InPlaceUpdateReady condition in Pod.
 func GetCondition(pod *v1.Pod) *v1.PodCondition {
-	return getCondition(pod, appspub.InPlaceUpdateReady)
-}
-
-func getCondition(pod *v1.Pod, cType v1.PodConditionType) *v1.PodCondition {
-	for _, c := range pod.Status.Conditions {
-		if c.Type == cType {
-			return &c
-		}
-	}
-	return nil
-}
-
-func setPodCondition(pod *v1.Pod, condition v1.PodCondition) {
-	for i, c := range pod.Status.Conditions {
-		if c.Type == condition.Type {
-			if c.Status != condition.Status {
-				pod.Status.Conditions[i] = condition
-			}
-			return
-		}
-	}
-	pod.Status.Conditions = append(pod.Status.Conditions, condition)
-}
-
-func updatePodReadyCondition(pod *v1.Pod) {
-	podReady := getCondition(pod, v1.PodReady)
-	if podReady == nil {
-		return
-	}
-
-	containersReady := getCondition(pod, v1.ContainersReady)
-	if containersReady == nil || containersReady.Status != v1.ConditionTrue {
-		return
-	}
-
-	var unreadyMessages []string
-	for _, rg := range pod.Spec.ReadinessGates {
-		c := getCondition(pod, rg.ConditionType)
-		if c == nil {
-			unreadyMessages = append(unreadyMessages, fmt.Sprintf("corresponding condition of pod readiness gate %q does not exist.", string(rg.ConditionType)))
-		} else if c.Status != v1.ConditionTrue {
-			unreadyMessages = append(unreadyMessages, fmt.Sprintf("the status of pod readiness gate %q is not \"True\", but %v", string(rg.ConditionType), c.Status))
-		}
-	}
-
-	newPodReady := v1.PodCondition{
-		Type:               v1.PodReady,
-		Status:             v1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-	}
-	// Set "Ready" condition to "False" if any readiness gate is not ready.
-	if len(unreadyMessages) != 0 {
-		unreadyMessage := strings.Join(unreadyMessages, ", ")
-		newPodReady = v1.PodCondition{
-			Type:    v1.PodReady,
-			Status:  v1.ConditionFalse,
-			Reason:  "ReadinessGatesNotReady",
-			Message: unreadyMessage,
-		}
-	}
-
-	setPodCondition(pod, newPodReady)
+	return util.GetCondition(pod, appspub.InPlaceUpdateReady)
 }
 
 func roundupSeconds(d time.Duration) time.Duration {

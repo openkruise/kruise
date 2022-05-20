@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +60,9 @@ func addNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v
 			condition.Message = messages.dump()
 			condition.LastTransitionTime = metav1.Now()
 		}
+
+		// set pod ready condition to "False"
+		util.SetPodReadyCondition(newPod)
 
 		return adp.UpdatePodStatus(newPod)
 	})
