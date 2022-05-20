@@ -40,4 +40,9 @@ type Lifecycle struct {
 type LifecycleHook struct {
 	LabelsHandler     map[string]string `json:"labelsHandler,omitempty"`
 	FinalizersHandler []string          `json:"finalizersHandler,omitempty"`
+	// MarkPodNotReady = true means:
+	// - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+	// - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+	// Default to false.
+	MarkPodNotReady bool `json:"markPodNotReady,omitempty"`
 }
