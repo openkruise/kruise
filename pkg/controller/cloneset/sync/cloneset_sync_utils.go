@@ -122,7 +122,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 				if isSpecifiedDelete(cs, p) {
 					toDeleteNewRevisionCount++
-				} else if !isPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
+				} else if !IsPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
 					unavailableNewRevisionCount++
 				}
 			}
@@ -138,7 +138,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 				if isSpecifiedDelete(cs, p) {
 					toDeleteOldRevisionCount++
-				} else if !isPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
+				} else if !IsPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
 					unavailableOldRevisionCount++
 				}
 			}
@@ -235,10 +235,10 @@ func isSpecifiedDelete(cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
 }
 
 func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod) bool {
-	return isPodAvailable(coreControl, pod, 0)
+	return IsPodAvailable(coreControl, pod, 0)
 }
 
-func isPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
+func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
 	state := lifecycle.GetPodLifecycleState(pod)
 	if state != "" && state != appspub.LifecycleStateNormal {
 		return false
