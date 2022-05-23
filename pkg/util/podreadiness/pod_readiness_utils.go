@@ -27,22 +27,21 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-func addNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v1.PodConditionType) (bool, error) {
+func addNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v1.PodConditionType) error {
 	if alreadyHasKey(pod, msg, condType) {
-		return true, nil
+		return nil
 	}
 
-	readinessGateExists := false
+	if !containsReadinessGate(pod, condType) {
+		return nil
+	}
+
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newPod, err := adp.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
 		}
-		if !containsReadinessGate(newPod, condType) {
-			return nil
-		}
 
-		readinessGateExists = true
 		condition := getReadinessCondition(newPod, condType)
 		if condition == nil {
 			_, messages := addMessage("", msg)
@@ -63,24 +62,22 @@ func addNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v
 
 		// set pod ready condition to "False"
 		util.SetPodReadyCondition(newPod)
-
 		return adp.UpdatePodStatus(newPod)
 	})
-	return readinessGateExists, err
+	return err
 }
 
-func removeNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v1.PodConditionType) (bool, error) {
-	readinessGateExists := false
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+func removeNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v1.PodConditionType) error {
+	if !containsReadinessGate(pod, condType) {
+		return nil
+	}
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newPod, err := adp.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
 		}
-		if !containsReadinessGate(newPod, condType) {
-			return nil
-		}
 
-		readinessGateExists = true
 		condition := getReadinessCondition(newPod, condType)
 		if condition == nil {
 			return nil
@@ -94,10 +91,8 @@ func removeNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condTyp
 		}
 		condition.Message = messages.dump()
 		condition.LastTransitionTime = metav1.Now()
-
 		return adp.UpdatePodStatus(newPod)
 	})
-	return readinessGateExists, err
 }
 
 func addMessage(base string, msg Message) (bool, messageList) {

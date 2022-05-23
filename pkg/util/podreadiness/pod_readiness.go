@@ -44,13 +44,11 @@ type commonControl struct {
 }
 
 func (c *commonControl) AddNotReadyKey(pod *v1.Pod, msg Message) error {
-	_, err := addNotReadyKey(c.adp, pod, msg, appspub.KruisePodReadyConditionType)
-	return err
+	return addNotReadyKey(c.adp, pod, msg, appspub.KruisePodReadyConditionType)
 }
 
 func (c *commonControl) RemoveNotReadyKey(pod *v1.Pod, msg Message) error {
-	_, err := removeNotReadyKey(c.adp, pod, msg, appspub.KruisePodReadyConditionType)
-	return err
+	return removeNotReadyKey(c.adp, pod, msg, appspub.KruisePodReadyConditionType)
 }
 
 type Message struct {
