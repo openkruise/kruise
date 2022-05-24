@@ -90,7 +90,7 @@ var _ inject.Client = &PodCreateHandler{}
 // InjectClient injects the client into the PodCreateHandler
 func (h *PodCreateHandler) InjectClient(c client.Client) error {
 	h.Client = c
-	h.finders = controllerfinder.NewControllerFinder(c)
+	h.finders = controllerfinder.Finder
 	h.pubControl = pubcontrol.NewPubControl(c)
 	return nil
 }

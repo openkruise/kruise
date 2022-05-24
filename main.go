@@ -24,6 +24,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -147,6 +148,11 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+	err = controllerfinder.InitControllerFinder(mgr)
+	if err != nil {
+		setupLog.Error(err, "unable to start ControllerFinder")
 		os.Exit(1)
 	}
 

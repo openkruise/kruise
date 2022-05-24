@@ -44,6 +44,6 @@ type PubControl interface {
 }
 
 func NewPubControl(client client.Client) PubControl {
-	controllerFinder := controllerfinder.NewControllerFinder(client)
+	controllerFinder := controllerfinder.Finder
 	return &commonControl{controllerFinder: controllerFinder, Client: client}
 }

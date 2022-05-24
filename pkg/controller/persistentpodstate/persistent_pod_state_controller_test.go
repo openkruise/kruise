@@ -519,7 +519,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 			fakeClient := clientBuilder.Build()
 			reconciler := ReconcilePersistentPodState{
 				Client: fakeClient,
-				finder: controllerfinder.NewControllerFinder(fakeClient),
+				finder: &controllerfinder.ControllerFinder{Client: fakeClient},
 			}
 			if _, err := reconciler.Reconcile(context.TODO(), request); err != nil {
 				t.Fatalf("reconcile failed, err: %v", err)

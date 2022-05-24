@@ -588,7 +588,7 @@ func TestUpdate(t *testing.T) {
 			lifecycle.New(fakeClient),
 			inplaceupdate.New(fakeClient, clonesetutils.RevisionAdapterImpl),
 			record.NewFakeRecorder(10),
-			controllerfinder.NewControllerFinder(fakeClient),
+			&controllerfinder.ControllerFinder{Client: fakeClient},
 			pubcontrol.NewPubControl(fakeClient),
 		}
 		currentRevision := mc.updateRevision
