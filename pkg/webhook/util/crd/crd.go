@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/openkruise/kruise/apis"
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
@@ -30,6 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/openkruise/kruise/apis"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 var (

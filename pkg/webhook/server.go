@@ -22,9 +22,6 @@ import (
 	"net/http"
 	"time"
 
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
-	"github.com/openkruise/kruise/pkg/webhook/util/health"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -32,6 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
+
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
+	"github.com/openkruise/kruise/pkg/webhook/util/health"
 )
 
 type GateFunc func() (enabled bool)

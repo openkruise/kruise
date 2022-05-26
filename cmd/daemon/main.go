@@ -23,17 +23,17 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/daemon"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-
-	"github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+
+	"github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/daemon"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 var (
