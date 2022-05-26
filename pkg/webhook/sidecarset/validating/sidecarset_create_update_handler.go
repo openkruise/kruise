@@ -249,6 +249,9 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("upgradeStrategy").Child("upgradeType"),
 					container.Name, fmt.Sprintf("container %v upgradeType is immutable", container.Name)))
 			}
+		} else {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"),
+				container.Name, fmt.Sprintf("container %v is not found", container.Name)))
 		}
 	}
 
