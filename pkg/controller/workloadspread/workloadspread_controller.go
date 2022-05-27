@@ -154,7 +154,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:           cli,
 		scheme:           mgr.GetScheme(),
 		recorder:         mgr.GetEventRecorderFor(controllerName),
-		controllerFinder: controllerfinder.NewControllerFinder(mgr.GetClient()),
+		controllerFinder: controllerfinder.Finder,
 	}
 }
 

@@ -103,7 +103,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		recorder:         mgr.GetEventRecorderFor("podunavailablebudget-controller"),
-		controllerFinder: controllerfinder.NewControllerFinder(mgr.GetClient()),
+		controllerFinder: controllerfinder.Finder,
 		pubControl:       pubcontrol.NewPubControl(mgr.GetClient()),
 	}
 }
@@ -208,6 +208,7 @@ type ReconcilePodUnavailableBudget struct {
 
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=*,resources=*/scale,verbs=get;list;watch
 
 // pkg/controller/cloneset/cloneset_controller.go Watch for changes to CloneSet
 func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {

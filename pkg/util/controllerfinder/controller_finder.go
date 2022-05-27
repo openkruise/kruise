@@ -24,11 +24,37 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
+
+var Finder *ControllerFinder
+
+func InitControllerFinder(mgr manager.Manager) error {
+	Finder = &ControllerFinder{
+		Client: mgr.GetClient(),
+		mapper: mgr.GetRESTMapper(),
+	}
+	k8sClient, err := clientset.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return err
+	}
+	Finder.discoveryClient = k8sClient.Discovery()
+	scaleKindResolver := scaleclient.NewDiscoveryScaleKindResolver(Finder.discoveryClient)
+	Finder.scaleNamespacer, err = scaleclient.NewForConfig(mgr.GetConfig(), Finder.mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 // ScaleAndSelector is used to return (controller, scale, selector) fields from the
 // controller finder functions.
@@ -42,8 +68,6 @@ type ScaleAndSelector struct {
 	Selector *metav1.LabelSelector
 	// metadata
 	Metadata metav1.ObjectMeta
-	// template labels
-	TempLabels map[string]string
 }
 
 type ControllerReference struct {
@@ -63,12 +87,10 @@ type PodControllerFinder func(ref ControllerReference, namespace string) (*Scale
 
 type ControllerFinder struct {
 	client.Client
-}
 
-func NewControllerFinder(c client.Client) *ControllerFinder {
-	return &ControllerFinder{
-		Client: c,
-	}
+	mapper          meta.RESTMapper
+	scaleNamespacer scaleclient.ScalesGetter
+	discoveryClient discovery.DiscoveryInterface
 }
 
 func (r *ControllerFinder) GetExpectedScaleForPods(pods []*corev1.Pod) (int32, error) {
@@ -123,19 +145,7 @@ func (r *ControllerFinder) GetScaleAndSelectorForRef(apiVersion, kind, ns, name 
 
 func (r *ControllerFinder) Finders() []PodControllerFinder {
 	return []PodControllerFinder{r.getPodReplicationController, r.getPodDeployment, r.getPodReplicaSet,
-		r.getPodStatefulSet, r.getPodKruiseCloneSet, r.getPodKruiseStatefulSet}
-}
-
-func IsValidGroupVersionKind(apiVersion, kind string) bool {
-	for _, gvk := range validWorkloadList {
-		valid, err := verifyGroupKind(apiVersion, kind, gvk)
-		if err != nil {
-			return false
-		} else if valid {
-			return true
-		}
-	}
-	return false
+		r.getPodStatefulSet, r.getPodKruiseCloneSet, r.getPodKruiseStatefulSet, r.getScaleController}
 }
 
 var (
@@ -173,6 +183,7 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 		}
 		return r.getPodDeployment(refSs, namespace)
 	}
+
 	return &ScaleAndSelector{
 		Scale:    *(replicaSet.Spec.Replicas),
 		Selector: replicaSet.Spec.Selector,
@@ -182,8 +193,7 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 			Name:       replicaSet.Name,
 			UID:        replicaSet.UID,
 		},
-		Metadata:   replicaSet.ObjectMeta,
-		TempLabels: replicaSet.Spec.Template.Labels,
+		Metadata: replicaSet.ObjectMeta,
 	}, nil
 }
 
@@ -238,8 +248,7 @@ func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace 
 			Name:       statefulSet.Name,
 			UID:        statefulSet.UID,
 		},
-		Metadata:   statefulSet.ObjectMeta,
-		TempLabels: statefulSet.Spec.Template.Labels,
+		Metadata: statefulSet.ObjectMeta,
 	}, nil
 }
 
@@ -271,8 +280,7 @@ func (r *ControllerFinder) getPodDeployment(ref ControllerReference, namespace s
 			Name:       deployment.Name,
 			UID:        deployment.UID,
 		},
-		Metadata:   deployment.ObjectMeta,
-		TempLabels: deployment.Spec.Template.Labels,
+		Metadata: deployment.ObjectMeta,
 	}, nil
 }
 
@@ -295,16 +303,14 @@ func (r *ControllerFinder) getPodReplicationController(ref ControllerReference, 
 		return nil, nil
 	}
 	return &ScaleAndSelector{
-		Scale:    *(rc.Spec.Replicas),
-		Selector: &metav1.LabelSelector{MatchLabels: rc.Spec.Selector},
+		Scale: *(rc.Spec.Replicas),
 		ControllerReference: ControllerReference{
 			APIVersion: rc.APIVersion,
 			Kind:       rc.Kind,
 			Name:       rc.Name,
 			UID:        rc.UID,
 		},
-		Metadata:   rc.ObjectMeta,
-		TempLabels: rc.Spec.Template.Labels,
+		Metadata: rc.ObjectMeta,
 	}, nil
 }
 
@@ -337,8 +343,7 @@ func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespa
 			Name:       cloneSet.Name,
 			UID:        cloneSet.UID,
 		},
-		Metadata:   cloneSet.ObjectMeta,
-		TempLabels: cloneSet.Spec.Template.Labels,
+		Metadata: cloneSet.ObjectMeta,
 	}, nil
 }
 
@@ -372,8 +377,53 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 			Name:       ss.Name,
 			UID:        ss.UID,
 		},
-		Metadata:   ss.ObjectMeta,
-		TempLabels: ss.Spec.Template.Labels,
+		Metadata: ss.ObjectMeta,
+	}, nil
+}
+
+func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
+	if isValidGroupVersionKind(ref.APIVersion, ref.Kind) {
+		return nil, nil
+	}
+	gv, err := schema.ParseGroupVersion(ref.APIVersion)
+	if err != nil {
+		return nil, err
+	}
+	gk := schema.GroupKind{
+		Group: gv.Group,
+		Kind:  ref.Kind,
+	}
+
+	mapping, err := r.mapper.RESTMapping(gk, gv.Version)
+	if err != nil {
+		return nil, err
+	}
+	gr := mapping.Resource.GroupResource()
+	scale, err := r.scaleNamespacer.Scales(namespace).Get(context.TODO(), gr, ref.Name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// TODO, implementsScale
+			return nil, nil
+		}
+		return nil, err
+	}
+	if ref.UID != "" && scale.UID != ref.UID {
+		return nil, nil
+	}
+	selector, err := metav1.ParseToLabelSelector(scale.Status.Selector)
+	if err != nil {
+		return nil, err
+	}
+	return &ScaleAndSelector{
+		Scale: scale.Spec.Replicas,
+		ControllerReference: ControllerReference{
+			APIVersion: ref.APIVersion,
+			Kind:       ref.Kind,
+			Name:       ref.Name,
+			UID:        scale.UID,
+		},
+		Metadata: scale.ObjectMeta,
+		Selector: selector,
 	}, nil
 }
 
@@ -383,4 +433,16 @@ func verifyGroupKind(apiVersion, kind string, gvk schema.GroupVersionKind) (bool
 		return false, err
 	}
 	return gv.Group == gvk.Group && kind == gvk.Kind, nil
+}
+
+func isValidGroupVersionKind(apiVersion, kind string) bool {
+	for _, gvk := range validWorkloadList {
+		valid, err := verifyGroupKind(apiVersion, kind, gvk)
+		if err != nil {
+			return false
+		} else if valid {
+			return true
+		}
+	}
+	return false
 }

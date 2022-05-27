@@ -56,8 +56,9 @@ var (
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "pub-test",
+			Namespace:   "default",
+			Name:        "pub-test",
+			Annotations: map[string]string{},
 		},
 		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
@@ -421,6 +422,50 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				return pubStatus
 			},
 		},
+		{
+			name: "valid update pod, pub feature-gate annotation, allow",
+			oldPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				return pod
+			},
+			newPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Spec.Containers[0].Image = "nginx:1.18"
+				return pod
+			},
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "DELETE"
+				return pub
+			},
+			expectAllow: true,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				return pubStatus
+			},
+		},
+		{
+			name: "valid update pod, pub feature-gate annotation, reject",
+			oldPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				return pod
+			},
+			newPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Spec.Containers[0].Image = "nginx:1.18"
+				return pod
+			},
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "UPDATE"
+				return pub
+			},
+			expectAllow: false,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				return pubStatus
+			},
+		},
 	}
 
 	for _, cs := range cases {
@@ -658,6 +703,27 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			},
 			subresource: "",
 			expectAllow: false,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				return pubStatus
+			},
+		},
+		{
+			name: "delete pod, pub feature-gate annotation, allow",
+			deletion: func() *metav1.DeleteOptions {
+				return &metav1.DeleteOptions{}
+			},
+			newPod: func() *corev1.Pod {
+				podIn := podDemo.DeepCopy()
+				return podIn
+			},
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "UPDATE"
+				return pub
+			},
+			subresource: "",
+			expectAllow: true,
 			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
