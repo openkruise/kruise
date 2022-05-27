@@ -79,7 +79,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcilePersistentPodState{
 		Client: cli,
 		scheme: mgr.GetScheme(),
-		finder: controllerfinder.NewControllerFinder(cli),
+		finder: controllerfinder.Finder,
 	}
 }
 

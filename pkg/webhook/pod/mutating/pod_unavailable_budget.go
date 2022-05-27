@@ -20,9 +20,9 @@ import (
 	"context"
 
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
+	"github.com/openkruise/kruise/pkg/controller/podunavailablebudget"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -33,18 +33,7 @@ func (h *PodCreateHandler) pubMutatingPod(ctx context.Context, req admission.Req
 		req.AdmissionRequest.Resource.Resource != "pods" {
 		return nil
 	}
-	ref := metav1.GetControllerOf(pod)
-	if ref == nil {
-		return nil
-	}
-	workload, err := h.finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, "")
-	if err != nil {
-		return err
-	} else if workload == nil {
-		return nil
-	}
-	// fetch pub for workload
-	pub, err := pubcontrol.GetPubForWorkload(h.Client, workload)
+	pub, err := podunavailablebudget.GetPubForPod(h.Client, pod)
 	if err != nil {
 		return err
 	} else if pub == nil {

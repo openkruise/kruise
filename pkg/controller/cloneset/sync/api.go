@@ -58,7 +58,7 @@ func New(c client.Client, recorder record.EventRecorder) Interface {
 		inplaceControl:   inplaceupdate.New(c, clonesetutils.RevisionAdapterImpl),
 		lifecycleControl: lifecycle.New(c),
 		recorder:         recorder,
-		controllerFinder: controllerfinder.NewControllerFinder(c),
+		controllerFinder: controllerfinder.Finder,
 		pubControl:       pubcontrol.NewPubControl(c),
 	}
 }

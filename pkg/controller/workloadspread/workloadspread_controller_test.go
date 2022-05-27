@@ -1409,7 +1409,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			reconciler := ReconcileWorkloadSpread{
 				Client:           fakeClient,
 				recorder:         record.NewFakeRecorder(10),
-				controllerFinder: controllerfinder.NewControllerFinder(fakeClient),
+				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
 			}
 
 			err := reconciler.syncWorkloadSpread(workloadSpread)
@@ -1609,7 +1609,7 @@ func TestDelayReconcile(t *testing.T) {
 			reconciler := ReconcileWorkloadSpread{
 				Client:           fakeClient,
 				recorder:         record.NewFakeRecorder(10),
-				controllerFinder: controllerfinder.NewControllerFinder(fakeClient),
+				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
 			}
 
 			durationStore = requeueduration.DurationStore{}
@@ -2031,7 +2031,7 @@ func TestManagerExistingPods(t *testing.T) {
 			reconciler := ReconcileWorkloadSpread{
 				Client:           fakeClient,
 				recorder:         record.NewFakeRecorder(10),
-				controllerFinder: controllerfinder.NewControllerFinder(fakeClient),
+				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
 			}
 
 			durationStore = requeueduration.DurationStore{}

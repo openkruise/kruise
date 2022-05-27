@@ -25,9 +25,11 @@ import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,7 +47,7 @@ var _ handler.EventHandler = &enqueueRequestForPod{}
 
 func newEnqueueRequestForPod(c client.Client) handler.EventHandler {
 	e := &enqueueRequestForPod{client: c}
-	e.controllerFinder = controllerfinder.NewControllerFinder(c)
+	e.controllerFinder = controllerfinder.Finder
 	e.pubControl = pubcontrol.NewPubControl(c)
 	return e
 }
@@ -74,9 +76,12 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	if !ok {
 		return
 	}
-
-	// reconcile pub
-	pub, _ := p.pubControl.GetPubForPod(pod)
+	var pub *policyv1alpha1.PodUnavailableBudget
+	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
+		pub, _ = GetPubForPod(p.client, pod)
+	} else {
+		pub, _ = p.pubControl.GetPubForPod(pod)
+	}
 	if pub == nil {
 		return
 	}
@@ -87,6 +92,49 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 			Namespace: pub.Namespace,
 		},
 	})
+}
+
+func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+	ref := metav1.GetControllerOf(pod)
+	if ref == nil {
+		return nil, nil
+	}
+	workload, err := controllerfinder.Finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, "")
+	if err != nil {
+		return nil, err
+	} else if workload == nil {
+		return nil, nil
+	}
+	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	if err = c.List(context.TODO(), pubList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+	for i := range pubList.Items {
+		pub := &pubList.Items[i]
+		// if targetReference isn't nil, priority to take effect
+		if pub.Spec.TargetReference != nil {
+			// belongs the same workload
+			if pubcontrol.IsReferenceEqual(&policyv1alpha1.TargetReference{
+				APIVersion: workload.APIVersion,
+				Kind:       workload.Kind,
+				Name:       workload.Name,
+			}, pub.Spec.TargetReference) {
+				return pub, nil
+			}
+		} else {
+			// This error is irreversible, so continue
+			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			if err != nil {
+				continue
+			}
+			// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
+			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+			return pub, nil
+		}
+	}
+	return nil, nil
 }
 
 func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old, cur runtime.Object) {

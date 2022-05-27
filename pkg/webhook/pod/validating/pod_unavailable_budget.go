@@ -18,12 +18,15 @@ package validating
 
 import (
 	"context"
+	"strings"
 
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -140,9 +143,10 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	pub, err := p.pubControl.GetPubForPod(newPod)
 	if err != nil {
 		return false, "", err
-	}
-	// if there is no matching PodUnavailableBudget, just return true
-	if pub == nil {
+		// if there is no matching PodUnavailableBudget, just return true
+	} else if pub == nil {
+		return true, "", nil
+	} else if !isNeedPubProtection(pub, pubcontrol.Operation(req.Operation)) {
 		return true, "", nil
 	}
 
@@ -161,4 +165,23 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	}
 
 	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, p.pubControl, pub, newPod, pubcontrol.Operation(req.Operation), dryRun)
+}
+
+func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation pubcontrol.Operation) bool {
+	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
+	if !ok {
+		return true
+	}
+	operations := sets.NewString()
+	for _, o := range strings.Split(operationValue, ",") {
+		operations.Insert(o)
+	}
+	// update operation
+	if operation == pubcontrol.UpdateOperation && operations.Has(pubcontrol.UpdateOperation) {
+		return true
+		// delete, eviction operation
+	} else if operation != pubcontrol.UpdateOperation && operations.Has(pubcontrol.DeleteOperation) {
+		return true
+	}
+	return false
 }

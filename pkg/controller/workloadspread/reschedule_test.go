@@ -268,9 +268,11 @@ func TestRescheduleSubset(t *testing.T) {
 			}
 
 			reconciler := ReconcileWorkloadSpread{
-				Client:           fakeClient,
-				recorder:         record.NewFakeRecorder(10),
-				controllerFinder: controllerfinder.NewControllerFinder(fakeClient),
+				Client:   fakeClient,
+				recorder: record.NewFakeRecorder(10),
+				controllerFinder: &controllerfinder.ControllerFinder{
+					Client: fakeClient,
+				},
 			}
 
 			err := reconciler.syncWorkloadSpread(workloadSpread)

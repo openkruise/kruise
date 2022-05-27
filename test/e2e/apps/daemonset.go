@@ -55,7 +55,6 @@ var _ = SIGDescribe("DaemonSet", func() {
 		*/
 		framework.ConformanceIt("should run and stop simple daemon", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
-
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
 			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

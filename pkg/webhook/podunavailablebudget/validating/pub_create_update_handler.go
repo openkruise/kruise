@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
@@ -82,8 +83,18 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 }
 
 func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetFn(obj, old *policyv1alpha1.PodUnavailableBudget) field.ErrorList {
+	// validate pub.annotations
+	allErrs := field.ErrorList{}
+	if operationsValue, ok := obj.Annotations[policyv1alpha1.PubProtectOperationAnnotation]; ok {
+		operations := strings.Split(operationsValue, ",")
+		for _, operation := range operations {
+			if operation != string(admissionv1.Update) && operation != string(admissionv1.Delete) {
+				allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectOperationAnnotation)))
+			}
+		}
+	}
 	//validate Pub.Spec
-	allErrs := validatePodUnavailableBudgetSpec(obj, field.NewPath("spec"))
+	allErrs = append(allErrs, validatePodUnavailableBudgetSpec(obj, field.NewPath("spec"))...)
 	// when operation is update, validating whether old and new pub conflict
 	if old != nil {
 		allErrs = append(allErrs, validateUpdatePubConflict(obj, old, field.NewPath("spec"))...)

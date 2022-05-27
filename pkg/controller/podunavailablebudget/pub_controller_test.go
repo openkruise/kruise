@@ -767,10 +767,11 @@ func TestPubReconcile(t *testing.T) {
 					t.Fatalf("create pod failed: %s", err.Error())
 				}
 			}
+			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: fakeClient}
 			reconciler := ReconcilePodUnavailableBudget{
 				Client:           fakeClient,
 				recorder:         record.NewFakeRecorder(10),
-				controllerFinder: controllerfinder.NewControllerFinder(fakeClient),
+				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
 				pubControl:       pubcontrol.NewPubControl(fakeClient),
 			}
 

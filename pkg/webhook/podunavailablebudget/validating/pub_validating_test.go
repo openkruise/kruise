@@ -43,8 +43,9 @@ var (
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "pub-test",
+			Namespace:   "default",
+			Name:        "pub-test",
+			Annotations: map[string]string{},
 		},
 		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
@@ -134,6 +135,28 @@ func TestValidatingPub(t *testing.T) {
 				return pub
 			},
 			expectErrList: 1,
+		},
+		{
+			name: "invalid pub feature-gate annotation",
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.MinAvailable = nil
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "xxxxx"
+				return pub
+			},
+			expectErrList: 1,
+		},
+		{
+			name: "valid pub feature-gate annotation",
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.MinAvailable = nil
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "DELETE"
+				return pub
+			},
+			expectErrList: 0,
 		},
 	}
 
