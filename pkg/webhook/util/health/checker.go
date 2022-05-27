@@ -132,8 +132,5 @@ func Checker(_ *http.Request) error {
 	lock.Lock()
 	defer lock.Unlock()
 	_, err = client.Do(req)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

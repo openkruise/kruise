@@ -24,9 +24,10 @@ import (
 	"os"
 	"path"
 
+	"k8s.io/klog/v2"
+
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	"github.com/openkruise/kruise/pkg/webhook/util/writer/atomic"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -71,9 +72,7 @@ func NewFSCertWriter(ops FSCertWriterOptions) (CertWriter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &fsCertWriter{
-		FSCertWriterOptions: &ops,
-	}, nil
+	return &fsCertWriter{FSCertWriterOptions: &ops}, nil
 }
 
 // EnsureCert provisions certificates for a webhookClientConfig by writing the certificates in the filesystem.

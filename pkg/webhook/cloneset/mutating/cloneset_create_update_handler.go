@@ -22,25 +22,20 @@ import (
 	"net/http"
 	"reflect"
 
+	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // CloneSetCreateUpdateHandler handles CloneSet
 type CloneSetCreateUpdateHandler struct {
-	// To use the client, you need to do the following:
-	// - uncomment it
-	// - import sigs.k8s.io/controller-runtime/pkg/client
-	// - uncomment the InjectClient method at the bottom of this file.
-	// Client  client.Client
-
 	// Decoder decodes objects
 	Decoder *admission.Decoder
 }
@@ -86,14 +81,6 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 	}
 	return resp
 }
-
-//var _ inject.Client = &CloneSetCreateUpdateHandler{}
-//
-//// InjectClient injects the client into the CloneSetCreateUpdateHandler
-//func (h *CloneSetCreateUpdateHandler) InjectClient(c client.Client) error {
-//	h.Client = c
-//	return nil
-//}
 
 var _ admission.DecoderInjector = &CloneSetCreateUpdateHandler{}
 

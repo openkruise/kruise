@@ -18,14 +18,12 @@ limitations under the License.
 package writer
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	"k8s.io/klog/v2"
+
+	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 )
 
 const (
@@ -65,7 +63,7 @@ func handleCommon(dnsName string, ch certReadWriter) (*generator.Artifacts, bool
 	// Recreate the cert if it's invalid.
 	valid := validCert(certs, dnsName)
 	if !valid {
-		klog.Info("cert is invalid or expiring, regenerating a new one")
+		klog.Info("cert is invalid or expired, regenerating a new one")
 		certs, err = ch.overwrite(certs.ResourceVersion)
 		if err != nil {
 			return nil, false, err
@@ -81,57 +79,29 @@ func createIfNotExists(ch certReadWriter) (*generator.Artifacts, bool, error) {
 	if isNotFound(err) {
 		// Create if not exists
 		certs, err = ch.write()
-		switch {
 		// This may happen if there is another racer.
-		case isAlreadyExists(err):
+		if isAlreadyExists(err) {
 			certs, err = ch.read()
-			return certs, true, err
-		default:
-			return certs, true, err
 		}
+		return certs, true, err
 	}
 	return certs, false, err
 }
 
 // certReadWriter provides methods for reading and writing certificates.
 type certReadWriter interface {
-	// read reads a webhook name and returns the certs for it.
+	// read a webhook name and returns the certs for it.
 	read() (*generator.Artifacts, error)
-	// write writes the certs and return the certs it wrote.
+	// write the certs and return the certs it wrote.
 	write() (*generator.Artifacts, error)
-	// overwrite overwrites the existing certs and return the certs it wrote.
+	// overwrite the existing certs and return the certs it wrote.
 	overwrite(resourceVersion string) (*generator.Artifacts, error)
 }
 
 func validCert(certs *generator.Artifacts, dnsName string) bool {
-	if certs == nil || certs.Cert == nil || certs.Key == nil || certs.CACert == nil {
+	if certs == nil {
 		return false
 	}
-
-	// Verify key and cert are valid pair
-	_, err := tls.X509KeyPair(certs.Cert, certs.Key)
-	if err != nil {
-		return false
-	}
-
-	// Verify cert is good for desired DNS name and signed by CA and will be valid for desired period of time.
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(certs.CACert) {
-		return false
-	}
-	block, _ := pem.Decode(certs.Cert)
-	if block == nil {
-		return false
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return false
-	}
-	ops := x509.VerifyOptions{
-		DNSName:     dnsName,
-		Roots:       pool,
-		CurrentTime: time.Now().AddDate(0, 6, 0),
-	}
-	_, err = cert.Verify(ops)
-	return err == nil
+	expired := time.Now().AddDate(0, 6, 0)
+	return generator.ValidCACert(certs.Key, certs.Cert, certs.CACert, dnsName, expired)
 }
