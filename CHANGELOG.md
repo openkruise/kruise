@@ -1,5 +1,41 @@
 # Change Log
 
+## v1.2.0
+
+> Change log since v1.1.0
+
+### New CRD and Controller: PersistentPodState
+
+With the development of cloud native, more and more companies start to deploy stateful services (e.g., Etcd, MQ) using Kubernetes.
+K8S StatefulSet is a workload for managing stateful services, and it considers the deployment characteristics of stateful services in many aspects.
+However, StatefulSet persistent only limited pod state, such as Pod Name is ordered and unchanging, PVC persistence,
+and can not cover other states, e.g. Pod IP retention, priority scheduling to previously deployed Nodes.
+
+So we provide `PersistentPodState` CRD to persistent other states of the Pod, such as "IP Retention".
+
+For more detail, please refer to its [documentation](https://openkruise.io/docs/user-manuals/persistentpodstate) and [proposal](https://github.com/openkruise/kruise/blob/master/docs/proposals/20220421-persistent-pod-state.md).
+
+### CloneSet
+
+- Ensure at least one pod is upgraded if CloneSet has `partition < 100%` **(Behavior Change)**. ([#954](https://github.com/openkruise/kruise/pull/954), [@veophi](https://github.com/veophi))
+- Add `expectedUpdatedReplicas` field into CloneSet status. ([#954](https://github.com/openkruise/kruise/pull/954) & [#963](https://github.com/openkruise/kruise/pull/963), [@veophi](https://github.com/veophi))
+- Add `markPodNotReady` field into lifecycle hook to support marking Pod as NotReady during preparingDelete or preparingUpdate. ([#979](https://github.com/openkruise/kruise/pull/979), [@veophi](https://github.com/veophi))
+
+### StatefulSet
+
+- Add `markPodNotReady` field into lifecycle hook to support marking Pod as NotReady during preparingDelete or preparingUpdate. ([#979](https://github.com/openkruise/kruise/pull/979), [@veophi](https://github.com/veophi))
+
+### PodUnavailableBudget
+
+- Support to protect any custom workloads with scale subresource. ([#982](https://github.com/openkruise/kruise/pull/982), [@zmberg](https://github.com/zmberg))
+- Optimize performance in large-scale clusters by avoiding DeepCopy list. ([#955](https://github.com/openkruise/kruise/pull/955), [@zmberg](https://github.com/zmberg))
+
+### Others
+
+- Remove some commented code and simplify some. ([#983](https://github.com/openkruise/kruise/pull/983), [@hezhizhen](https://github.com/hezhizhen))
+- Sidecarset forbid updating of sidecar container name. ([#937](https://github.com/openkruise/kruise/pull/937), [@adairxie](https://github.com/adairxie))
+- Optimize the logic of listNamespacesForDistributor func. ([#952](https://github.com/openkruise/kruise/pull/952), [@hantmac](https://github.com/hantmac))
+
 ## v1.1.0
 
 > Change log since v1.0.1
