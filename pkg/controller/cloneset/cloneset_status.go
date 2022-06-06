@@ -77,6 +77,7 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.AvailableReplicas != oldStatus.AvailableReplicas ||
 		newStatus.UpdatedReadyReplicas != oldStatus.UpdatedReadyReplicas ||
 		newStatus.UpdatedReplicas != oldStatus.UpdatedReplicas ||
+		newStatus.ExpectedUpdatedReplicas != oldStatus.ExpectedUpdatedReplicas ||
 		newStatus.UpdateRevision != oldStatus.UpdateRevision ||
 		newStatus.CurrentRevision != oldStatus.CurrentRevision ||
 		newStatus.LabelSelector != oldStatus.LabelSelector
