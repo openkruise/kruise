@@ -27,10 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	scaleclient "k8s.io/client-go/scale"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -43,16 +45,23 @@ func InitControllerFinder(mgr manager.Manager) error {
 		Client: mgr.GetClient(),
 		mapper: mgr.GetRESTMapper(),
 	}
+	cfg := mgr.GetConfig()
+	if cfg.GroupVersion == nil {
+		cfg.GroupVersion = &schema.GroupVersion{}
+	}
+	codecs := serializer.NewCodecFactory(mgr.GetScheme())
+	cfg.NegotiatedSerializer = codecs.WithoutConversion()
+	restClient, err := rest.RESTClientFor(cfg)
+	if err != nil {
+		return err
+	}
 	k8sClient, err := clientset.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
 	}
 	Finder.discoveryClient = k8sClient.Discovery()
 	scaleKindResolver := scaleclient.NewDiscoveryScaleKindResolver(Finder.discoveryClient)
-	Finder.scaleNamespacer, err = scaleclient.NewForConfig(mgr.GetConfig(), Finder.mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
-	if err != nil {
-		return err
-	}
+	Finder.scaleNamespacer = scaleclient.New(restClient, Finder.mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	return nil
 }
 
