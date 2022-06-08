@@ -321,9 +321,7 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 	}
 
 	// 5. remove matched namespaces from unmatched namespace set
-	for _, matched := range matchedSet.List() {
-		unmatchedSet.Delete(matched)
-	}
+	unmatchedSet = unmatchedSet.Difference(matchedSet)
 
 	return matchedSet.List(), unmatchedSet.List(), nil
 }
