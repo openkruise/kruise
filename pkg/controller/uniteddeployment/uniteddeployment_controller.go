@@ -209,7 +209,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		klog.Errorf("Fail to get Subsets of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeFindSubsets), err.Error())
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, err
 	}
 
 	nextReplicas, err := GetAllocatedReplicas(nameToSubset, instance)
@@ -219,7 +219,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 			instance.Namespace, instance.Name, err.Error())
 		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", err.Error())
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, err
 	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
@@ -229,6 +229,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	if err != nil {
 		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
+		return reconcile.Result{}, err
 	}
 
 	return r.updateStatus(instance, newStatus, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount, control)
