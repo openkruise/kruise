@@ -167,7 +167,7 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 	for _, pod := range upgradePods {
 		podNames = append(podNames, pod.Name)
 		if err := p.updatePodSidecarAndHash(control, pod); err != nil {
-			err := fmt.Errorf("updatePodSidecarAndHash error, s:%s, pod:%s, err:%v", sidecarset.Name, pod.Name, err)
+			klog.Errorf("updatePodSidecarAndHash error, s:%s, pod:%s, err:%v", sidecarset.Name, pod.Name, err)
 			return err
 		}
 		p.updateExpectations.ExpectUpdated(sidecarset.Name, sidecarcontrol.GetSidecarSetRevision(sidecarset), pod)
@@ -178,34 +178,28 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 }
 
 func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarControl, pod *corev1.Pod) error {
-	podClone := pod.DeepCopy()
+	podClone := &corev1.Pod{}
+	sidecarSet := control.GetSidecarset()
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := p.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, podClone); err != nil {
+			klog.Errorf("error getting updated pod %s from client", control.GetSidecarset().Name)
+		}
 		// update pod sidecar container
 		updatePodSidecarContainer(control, podClone)
-
 		// older pod don't have SidecarSetListAnnotation
 		// which is to improve the performance of the sidecarSet controller
 		sidecarSetNames, ok := podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation]
 		if !ok || len(sidecarSetNames) == 0 {
 			podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation] = p.listMatchedSidecarSets(podClone)
 		}
-
+		// in-place update pod annotations
+		if err := sidecarcontrol.PatchPodMetadata(&podClone.ObjectMeta, sidecarSet.Spec.PatchPodMetadata); err != nil {
+			klog.Errorf("sidecarSet(%s) update pod(%s/%s) metadata failed: %s", sidecarSet.Name, podClone.Namespace, podClone.Name, err.Error())
+			return err
+		}
 		//update pod in store
-		updateErr := p.Client.Update(context.TODO(), podClone)
-		if updateErr == nil {
-			return nil
-		}
-
-		key := types.NamespacedName{
-			Namespace: podClone.Namespace,
-			Name:      podClone.Name,
-		}
-		if err := p.Client.Get(context.TODO(), key, podClone); err != nil {
-			klog.Errorf("error getting updated pod %s from client", control.GetSidecarset().Name)
-		}
-		return updateErr
+		return p.Client.Update(context.TODO(), podClone)
 	})
-
 	return err
 }
 
@@ -528,6 +522,7 @@ func updateContainerInPod(container corev1.Container, pod *corev1.Pod) {
 func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev1.Pod) {
 	sidecarSet := control.GetSidecarset()
 
+	// upgrade sidecar containers
 	var changedContainers []string
 	for _, sidecarContainer := range sidecarSet.Spec.Containers {
 		//sidecarContainer := &sidecarset.Spec.Containers[i]
@@ -577,7 +572,6 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 	}
 	// update pod information in upgrade
 	control.UpdatePodAnnotationsInUpgrade(changedContainers, pod)
-	return
 }
 
 func inconsistentStatus(sidecarSet *appsv1alpha1.SidecarSet, status *appsv1alpha1.SidecarSetStatus) bool {

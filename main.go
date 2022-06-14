@@ -114,6 +114,7 @@ func main() {
 		})
 	}
 
+	ctx := ctrl.SetupSignalHandler()
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
 	cfg.UserAgent = "kruise-manager"
@@ -169,8 +170,6 @@ func main() {
 	}
 
 	// +kubebuilder:scaffold:builder
-
-	ctx := ctrl.SetupSignalHandler()
 	setupLog.Info("initialize webhook")
 	if err := webhook.Initialize(ctx, cfg); err != nil {
 		setupLog.Error(err, "unable to initialize webhook")

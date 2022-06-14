@@ -48,7 +48,6 @@ var _ = SIGDescribe("SidecarSet", func() {
 	})
 
 	framework.KruiseDescribe("SidecarSet HotUpgrade functionality [SidecarSetHotUpgrade]", func() {
-
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
@@ -110,7 +109,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				HotUpgradeEmptyImage: BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
-			sidecarSetIn = tester.CreateSidecarSet(sidecarSetIn)
+			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
 			// create deployment
@@ -221,7 +220,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				HotUpgradeEmptyImage: BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
-			sidecarSetIn = tester.CreateSidecarSet(sidecarSetIn)
+			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
 			// create deployment
