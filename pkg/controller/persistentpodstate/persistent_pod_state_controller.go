@@ -27,6 +27,7 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -58,6 +59,7 @@ var (
 	KindSts = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 	// kruise
 	KruiseKindSts = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
+	KruiseKindPps = appsv1alpha1.SchemeGroupVersion.WithKind("PersistentPodState")
 	// AutoGeneratePersistentPodStatePrefix auto generate PersistentPodState crd
 	AutoGeneratePersistentPodStatePrefix = "generate#"
 )
@@ -70,6 +72,9 @@ var (
 // Add creates a new PersistentPodState Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
+	if !discovery.DiscoverGVK(KruiseKindPps) {
+		return nil
+	}
 	return add(mgr, newReconciler(mgr))
 }
 
