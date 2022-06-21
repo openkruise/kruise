@@ -201,7 +201,7 @@ func GetPodVolume(pod *v1.Pod, volumeName string) *v1.Volume {
 }
 
 func IsRunningAndReady(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
+	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod) && pod.DeletionTimestamp.IsZero()
 }
 
 func GetPodContainerImageIDs(pod *v1.Pod) map[string]string {

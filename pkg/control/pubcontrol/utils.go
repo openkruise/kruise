@@ -19,6 +19,7 @@ package pubcontrol
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -48,15 +50,9 @@ var ConflictRetry = wait.Backoff{
 	Jitter:   0.1,
 }
 
-type Operation string
-
 const (
-	UpdateOperation = "UPDATE"
-	DeleteOperation = "DELETE"
-
 	// Marked pods will not be pub-protected, solving the scenario of force pod deletion
 	PodPubNoProtectionAnnotation = "pub.kruise.io/no-protect"
-
 	// related-pub annotation in pod
 	PodRelatedPubAnnotation = "kruise.io/related-pub"
 )
@@ -64,22 +60,37 @@ const (
 // parameters:
 // 1. allowed(bool) indicates whether to allow this update operation
 // 2. err(error)
-func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, pub *policyv1alpha1.PodUnavailableBudget, pod *corev1.Pod, operation Operation, dryRun bool) (allowed bool, reason string, err error) {
-	// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-	if !control.IsPodReady(pod) {
+func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, pod *corev1.Pod, operation policyv1alpha1.PubOperation, dryRun bool) (allowed bool, reason string, err error) {
+	klog.V(3).Infof("validating pod(%s/%s) operation(%s) for PodUnavailableBudget", pod.Namespace, pod.Name, operation)
+	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
+	// and will no longer check the pub quota
+	if pod.Annotations[PodPubNoProtectionAnnotation] == "true" {
+		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, PodPubNoProtectionAnnotation)
+		return true, "", nil
+		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
+	} else if !control.IsPodReady(pod) {
 		klog.V(3).Infof("pod(%s/%s) is not ready, then don't need check pub", pod.Namespace, pod.Name)
 		return true, "", nil
 	}
-	// pod is in pub.Status.DisruptedPods or pub.Status.UnavailablePods, then don't need check it
-	if isPodRecordedInPub(pod.Name, pub) {
-		klog.V(5).Infof("pod(%s/%s) already is recorded in pub(%s/%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
+
+	// pub for pod
+	pub, err := control.GetPubForPod(pod)
+	if err != nil {
+		return false, "", err
+		// if there is no matching PodUnavailableBudget, just return true
+	} else if pub == nil {
+		return true, "", nil
+	} else if !isNeedPubProtection(pub, operation) {
+		klog.V(3).Infof("pod(%s/%s) operation(%s) is not in pub(%s) protection", pod.Namespace, pod.Name, pub.Name)
+		return true, "", nil
+		// pod is in pub.Status.DisruptedPods or pub.Status.UnavailablePods, then don't need check it
+	} else if isPodRecordedInPub(pod.Name, pub) {
+		klog.V(3).Infof("pod(%s/%s) already is recorded in pub(%s/%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
 		return true, "", nil
 	}
-
-	// for debug
+	// check and decrement pub quota
 	var conflictTimes int
 	var costOfGet, costOfUpdate time.Duration
-
 	refresh := false
 	var pubClone *policyv1alpha1.PodUnavailableBudget
 	err = retry.RetryOnConflict(ConflictRetry, func() error {
@@ -128,7 +139,7 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 
 		// If this is a dry-run, we don't need to go any further than that.
 		if dryRun {
-			klog.V(5).Infof("pod(%s) operation for pub(%s/%s) is a dry run", pod.Name, pubClone.Namespace, pubClone.Name)
+			klog.V(3).Infof("pod(%s) operation for pub(%s/%s) is a dry run", pod.Name, pubClone.Namespace, pubClone.Name)
 			return nil
 		}
 		klog.V(3).Infof("pub(%s/%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
@@ -163,7 +174,7 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 	return true, "", nil
 }
 
-func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget, operation Operation) error {
+func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) error {
 	if pub.Status.UnavailableAllowed <= 0 {
 		return errors.NewForbidden(policyv1alpha1.Resource("podunavailablebudget"), pub.Name, fmt.Errorf("pub unavailable allowed is negative"))
 	}
@@ -180,7 +191,7 @@ func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget,
 		pub.Status.UnavailablePods = make(map[string]metav1.Time)
 	}
 
-	if operation == UpdateOperation {
+	if operation == policyv1alpha1.PubUpdateOperation {
 		pub.Status.UnavailablePods[podName] = metav1.Time{Time: time.Now()}
 		klog.V(3).Infof("pod(%s) is recorded in pub(%s/%s) UnavailablePods", podName, pub.Namespace, pub.Name)
 	} else {
@@ -211,4 +222,13 @@ func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
 		return false
 	}
 	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
+}
+
+func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) bool {
+	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
+	if !ok || operationValue == "" {
+		return true
+	}
+	operations := sets.NewString(strings.Split(operationValue, ",")...)
+	return operations.Has(string(operation))
 }

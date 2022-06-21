@@ -18,7 +18,6 @@ package validating
 
 import (
 	"context"
-	"strings"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
@@ -26,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -46,8 +44,6 @@ var (
 // 2. reason(string)
 // 3. err(error)
 func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context, req admission.Request) (bool, string, error) {
-	var newPod, oldPod *corev1.Pod
-	var dryRun bool
 	// ignore kube-system, kube-public
 	for _, namespace := range IgnoredNamespaces {
 		if req.Namespace == namespace {
@@ -55,23 +51,30 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 	}
 
-	klog.V(6).Infof("pub validate operation(%s) pod(%s/%s)", req.Operation, req.Namespace, req.Name)
-	newPod = &corev1.Pod{}
+	var checkPod *corev1.Pod
+	var dryRun bool
+	var operation policyv1alpha1.PubOperation
 	switch req.AdmissionRequest.Operation {
 	// filter out invalid Update operation, we only validate update Pod.MetaData, Pod.Spec
 	case admissionv1.Update:
+		newPod := &corev1.Pod{}
 		//decode new pod
 		err := p.Decoder.Decode(req, newPod)
 		if err != nil {
 			return false, "", err
 		}
-		oldPod = &corev1.Pod{}
+		oldPod := &corev1.Pod{}
 		if err = p.Decoder.Decode(
 			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			oldPod); err != nil {
 			return false, "", err
 		}
-
+		// the change will not cause pod unavailability, then pass
+		if !p.pubControl.IsPodUnavailableChanged(oldPod, newPod) {
+			klog.V(6).Infof("validate pod(%s/%s) changed can not cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
+			return true, "", nil
+		}
+		checkPod = oldPod
 		options := &metav1.UpdateOptions{}
 		err = p.Decoder.DecodeRaw(req.Options, options)
 		if err != nil {
@@ -79,6 +82,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		// if dry run
 		dryRun = dryrun.IsDryRun(options.DryRun)
+		operation = policyv1alpha1.PubUpdateOperation
 
 	// filter out invalid Delete operation, only validate delete pods resources
 	case admissionv1.Delete:
@@ -86,7 +90,8 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 			klog.V(6).Infof("pod(%s/%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
 			return true, "", nil
 		}
-		if err := p.Decoder.DecodeRaw(req.OldObject, newPod); err != nil {
+		checkPod = &corev1.Pod{}
+		if err := p.Decoder.DecodeRaw(req.OldObject, checkPod); err != nil {
 			return false, "", err
 		}
 		deletion := &metav1.DeleteOptions{}
@@ -96,6 +101,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		// if dry run
 		dryRun = dryrun.IsDryRun(deletion.DryRun)
+		operation = policyv1alpha1.PubDeleteOperation
 
 	// filter out invalid Create operation, only validate create pod eviction subresource
 	case admissionv1.Create:
@@ -114,74 +120,25 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		if eviction.DeleteOptions != nil {
 			dryRun = dryrun.IsDryRun(eviction.DeleteOptions.DryRun)
 		}
+		checkPod = &corev1.Pod{}
 		key := types.NamespacedName{
 			Namespace: req.AdmissionRequest.Namespace,
 			Name:      req.AdmissionRequest.Name,
 		}
-		if err = p.Client.Get(ctx, key, newPod); err != nil {
+		if err = p.Client.Get(ctx, key, checkPod); err != nil {
 			return false, "", err
 		}
+		operation = policyv1alpha1.PubDeleteOperation
 	}
 
 	// Get the workload corresponding to the pod, if it has been deleted then it is not protected
-	if ref := metav1.GetControllerOf(newPod); ref != nil {
-		workload, err := p.finders.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, newPod.Namespace, ref.Name, ref.UID)
+	if ref := metav1.GetControllerOf(checkPod); ref != nil {
+		workload, err := p.finders.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, checkPod.Namespace, ref.Name, ref.UID)
 		if err != nil {
 			return false, "", err
 		} else if workload == nil || !workload.Metadata.DeletionTimestamp.IsZero() {
 			return true, "", nil
 		}
 	}
-
-	// returns true for pod conditions that allow the operation for pod without checking PUB.
-	if newPod.Status.Phase == corev1.PodSucceeded || newPod.Status.Phase == corev1.PodFailed ||
-		newPod.Status.Phase == corev1.PodPending || newPod.Status.Phase == "" || !newPod.ObjectMeta.DeletionTimestamp.IsZero() {
-		klog.V(3).Infof("pod(%s/%s) Status(%s) Deletion(%v), then admit", newPod.Namespace, newPod.Name, newPod.Status.Phase, !newPod.ObjectMeta.DeletionTimestamp.IsZero())
-		return true, "", nil
-	}
-
-	pub, err := p.pubControl.GetPubForPod(newPod)
-	if err != nil {
-		return false, "", err
-		// if there is no matching PodUnavailableBudget, just return true
-	} else if pub == nil {
-		return true, "", nil
-	} else if !isNeedPubProtection(pub, pubcontrol.Operation(req.Operation)) {
-		return true, "", nil
-	}
-
-	klog.V(3).Infof("validating pod(%s/%s) operation(%s) for pub(%s/%s)", newPod.Namespace, newPod.Name, req.Operation, pub.Namespace, pub.Name)
-	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
-	// and will no longer check the pub quota
-	if newPod.Annotations[pubcontrol.PodPubNoProtectionAnnotation] == "true" {
-		klog.V(3).Infof("pod(%s/%s) contains annotations[%s], then don't need check pub", newPod.Namespace, newPod.Name, pubcontrol.PodPubNoProtectionAnnotation)
-		return true, "", nil
-	}
-
-	// the change will not cause pod unavailability, then pass
-	if !p.pubControl.IsPodUnavailableChanged(oldPod, newPod) {
-		klog.V(3).Infof("validate pod(%s/%s) changed cannot cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
-		return true, "", nil
-	}
-
-	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, p.pubControl, pub, newPod, pubcontrol.Operation(req.Operation), dryRun)
-}
-
-func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation pubcontrol.Operation) bool {
-	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
-	if !ok {
-		return true
-	}
-	operations := sets.NewString()
-	for _, o := range strings.Split(operationValue, ",") {
-		operations.Insert(o)
-	}
-	// update operation
-	if operation == pubcontrol.UpdateOperation && operations.Has(pubcontrol.UpdateOperation) {
-		return true
-		// delete, eviction operation
-	} else if operation != pubcontrol.UpdateOperation && operations.Has(pubcontrol.DeleteOperation) {
-		return true
-	}
-	return false
+	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, p.pubControl, checkPod, operation, dryRun)
 }
