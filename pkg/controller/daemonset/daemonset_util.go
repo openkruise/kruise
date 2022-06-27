@@ -254,7 +254,10 @@ func unavailableCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, er
 	}
 	r := ds.Spec.UpdateStrategy.RollingUpdate
 	if r == nil {
-		return 0, nil
+		return 1, nil
+	}
+	if r.MaxUnavailable == nil {
+		return 1, nil
 	}
 	return intstrutil.GetScaledValueFromIntOrPercent(r.MaxUnavailable, numberToSchedule, true)
 }
