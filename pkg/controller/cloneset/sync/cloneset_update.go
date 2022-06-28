@@ -128,21 +128,12 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	// 5. limit max count of pods can update
 	waitUpdateIndexes = limitUpdateIndexes(coreControl, cs.Spec.MinReadySeconds, diffRes, waitUpdateIndexes, pods, targetRevision.Name)
 
-	// Determine the pub before updating the pod
-	var pub *policyv1alpha1.PodUnavailableBudget
-	var err error
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) && len(waitUpdateIndexes) > 0 {
-		pub, err = c.pubControl.GetPubForPod(pods[waitUpdateIndexes[0]])
-		if err != nil {
-			return err
-		}
-	}
 	// 6. update pods
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
 		// Determine the pub before updating the pod
-		if pub != nil {
-			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pub, pod, pubcontrol.UpdateOperation, false)
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pod, policyv1alpha1.PubUpdateOperation, false)
 			if err != nil {
 				return err
 				// pub check does not pass, try again in seconds

@@ -23,6 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -31,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -346,12 +348,112 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			newPods := make([]corev1.Pod, 0)
 			for _, pod := range pods {
-				if !pod.DeletionTimestamp.IsZero() || pod.Spec.Containers[0].Image != NewWebserverImage {
+				if !pod.DeletionTimestamp.IsZero() {
 					continue
 				}
+				gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(NewWebserverImage))
 				newPods = append(newPods, *pod)
 			}
 			gomega.Expect(newPods).To(gomega.HaveLen(2))
+
+			// add unavailable label
+			labelKey := fmt.Sprintf("%sdata", appspub.PubUnavailablePodLabelPrefix)
+			labelBody := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, labelKey, "true")
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), newPods[0].Name, types.MergePatchType, []byte(labelBody), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
+			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
+				UnavailableAllowed: 0,
+				DesiredAvailable:   1,
+				CurrentAvailable:   1,
+				TotalReplicas:      2,
+			}
+			setPubStatus(expectStatus)
+			gomega.Eventually(func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pub, err = kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				nowStatus := &pub.Status
+				setPubStatus(nowStatus)
+				return nowStatus
+			}, 60*time.Second, time.Second).Should(gomega.Equal(expectStatus))
+
+			// update pod image, ignore
+			podIn1, err := c.CoreV1().Pods(ns).Get(context.TODO(), newPods[0].Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn1.Spec.Containers[0].Image = WebserverImage
+			_, err = c.CoreV1().Pods(ns).Update(context.TODO(), podIn1, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// add unavailable label reject
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), newPods[1].Name, types.MergePatchType, []byte(labelBody), metav1.PatchOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			// update pod image, reject
+			podIn2, err := c.CoreV1().Pods(ns).Get(context.TODO(), newPods[1].Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn2.Spec.Containers[0].Image = WebserverImage
+			_, err = c.CoreV1().Pods(ns).Update(context.TODO(), podIn2, metav1.UpdateOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			// add pub protect operation DELETE
+			annotationBody := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, policyv1alpha1.PubProtectOperationAnnotation, policyv1alpha1.PubDeleteOperation)
+			_, err = kc.PolicyV1alpha1().PodUnavailableBudgets(ns).Patch(context.TODO(), pub.Name, types.MergePatchType, []byte(annotationBody), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 3)
+			// update pod image, allow
+			podIn2, err = c.CoreV1().Pods(ns).Get(context.TODO(), newPods[1].Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn2.Spec.Containers[0].Image = WebserverImage
+			_, err = c.CoreV1().Pods(ns).Update(context.TODO(), podIn2, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 3)
+
+			// check pod image
+			pods, err = sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				if !pod.DeletionTimestamp.IsZero() {
+					continue
+				}
+				gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(WebserverImage))
+			}
+
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
+			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
+				UnavailableAllowed: 0,
+				DesiredAvailable:   1,
+				CurrentAvailable:   1,
+				TotalReplicas:      2,
+			}
+			setPubStatus(expectStatus)
+			gomega.Eventually(func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pub, err = kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				nowStatus := &pub.Status
+				setPubStatus(nowStatus)
+				return nowStatus
+			}, 60*time.Second, time.Second).Should(gomega.Equal(expectStatus))
+
+			// delete unavailable label
+			deleteLabelBody := fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, labelKey)
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), newPods[0].Name, types.StrategicMergePatchType, []byte(deleteLabelBody), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
+			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
+				UnavailableAllowed: 1,
+				DesiredAvailable:   1,
+				CurrentAvailable:   2,
+				TotalReplicas:      2,
+			}
+			setPubStatus(expectStatus)
+			gomega.Eventually(func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pub, err = kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				nowStatus := &pub.Status
+				setPubStatus(nowStatus)
+				return nowStatus
+			}, 60*time.Second, time.Second).Should(gomega.Equal(expectStatus))
+
 			ginkgo.By("PodUnavailableBudget targetReference pods, update failed image and block done")
 		})
 
