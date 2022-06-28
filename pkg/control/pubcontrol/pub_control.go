@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
@@ -43,17 +44,22 @@ type commonControl struct {
 func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
-	return util.IsRunningAndReady(pod)
+	if !util.IsRunningAndReady(pod) {
+		return false
+	}
+
+	// unavailable label
+	return !appspub.HasUnavailableLabel(pod.Labels)
 }
 
 func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool {
-	// kruise workload in-place situation
-	if newPod == nil || oldPod == nil {
-		return true
-	}
 	// If pod.spec changed, pod will be in unavailable condition
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
 		klog.V(3).Infof("pod(%s/%s) specification changed, and maybe cause unavailability", newPod.Namespace, newPod.Name)
+		return true
+	}
+	// pod add unavailable label
+	if !appspub.HasUnavailableLabel(oldPod.Labels) && appspub.HasUnavailableLabel(newPod.Labels) {
 		return true
 	}
 	// pod other changes will not cause unavailability situation, then return false
