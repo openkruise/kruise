@@ -19,12 +19,15 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -45,6 +48,10 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.KruiseDaemon))
+	}
+
 	var copy runtime.Object = obj.DeepCopy()
 	defaults.SetDefaultsImagePullJob(obj)
 	if reflect.DeepEqual(obj, copy) {
