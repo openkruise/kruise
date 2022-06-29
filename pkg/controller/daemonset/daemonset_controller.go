@@ -223,6 +223,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			ds := e.Object.(*appsv1alpha1.DaemonSet)
 			klog.V(4).Infof("Deleting DaemonSet %s/%s", ds.Namespace, ds.Name)
 			dsc.expectations.DeleteExpectations(keyFunc(ds))
+			newPodForDSCache.Delete(ds.UID)
 			return true
 		},
 	})
@@ -449,13 +450,28 @@ func isControlledByDaemonSet(p *corev1.Pod, uuid types.UID) bool {
 
 // NewPod creates a new pod
 func NewPod(ds *appsv1alpha1.DaemonSet, nodeName string) *corev1.Pod {
+	// firstly load the cache before lock
+	if pod := loadNewPodForDS(ds); pod != nil {
+		return pod
+	}
+
+	newPodForDSLock.Lock()
+	defer newPodForDSLock.Unlock()
+
+	// load the cache again after locked
+	if pod := loadNewPodForDS(ds); pod != nil {
+		return pod
+	}
+
 	newPod := &corev1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
 	newPod.Namespace = ds.Namespace
-	newPod.Spec.NodeName = nodeName
+	// no need to set nodeName
+	// newPod.Spec.NodeName = nodeName
 
 	// Added default tolerations for DaemonSet pods.
 	daemonsetutil.AddOrUpdateDaemonPodTolerations(&newPod.Spec)
 
+	newPodForDSCache.Store(ds.UID, &newPodForDS{generation: ds.Generation, pod: newPod})
 	return newPod
 }
 
