@@ -19,6 +19,7 @@ package daemonset
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -36,6 +37,27 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
 )
+
+var (
+	// newPodForDSCache is a cache for NewPod, it is map[ds.UID]*newPodForDS
+	newPodForDSCache sync.Map
+	newPodForDSLock  sync.Mutex
+)
+
+type newPodForDS struct {
+	generation int64
+	pod        *corev1.Pod
+}
+
+func loadNewPodForDS(ds *appsv1alpha1.DaemonSet) *corev1.Pod {
+	if val, ok := newPodForDSCache.Load(ds.UID); ok {
+		newPodCache := val.(*newPodForDS)
+		if newPodCache.generation >= ds.Generation {
+			return newPodCache.pod
+		}
+	}
+	return nil
+}
 
 // nodeInSameCondition returns true if all effective types ("Status" is true) equals;
 // otherwise, returns false.
