@@ -22,15 +22,23 @@ spec:
   - additionalPrinterColumns:
     - description: The desired number of pods.
       jsonPath: .status.desiredNumberScheduled
-      name: DesiredNumber
+      name: DESIRED
       type: integer
     - description: The current number of pods.
       jsonPath: .status.currentNumberScheduled
-      name: CurrentNumber
+      name: CURRENT
+      type: integer
+    - description: The ready number of pods.
+      jsonPath: .status.numberReady
+      name: READY
       type: integer
     - description: The updated number of pods.
       jsonPath: .status.updatedNumberScheduled
-      name: UpdatedNumberScheduled
+      name: UP-TO-DATE
+      type: integer
+    - description: The updated number of pods.
+      jsonPath: .status.numberAvailable
+      name: AVAILABLE
       type: integer
     - description: CreationTimestamp is a timestamp representing the server time when
         this object was created. It is not guaranteed to be set in happens-before

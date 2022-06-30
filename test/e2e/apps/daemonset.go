@@ -18,8 +18,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 )
 
@@ -405,6 +407,95 @@ var _ = SIGDescribe("DaemonSet", func() {
 				return newVersionCount
 			}, time.Second*60, time.Second).Should(gomega.Equal(1))
 
+		})
+
+		framework.ConformanceIt("should successfully surging update daemonset with minReadySeconds", func() {
+			label := map[string]string{framework.DaemonSetNameLabel: dsName}
+
+			ginkgo.By(fmt.Sprintf("Creating DaemonSet %q", dsName))
+			maxSurge := intstr.FromString("100%")
+			maxUnavailable := intstr.FromInt(0)
+			ds := tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+					MaxSurge:       &maxSurge,
+					MaxUnavailable: &maxUnavailable,
+				},
+			})
+			ds.Spec.MinReadySeconds = 10
+			ds, err := tester.CreateDaemonSet(ds)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
+			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckRunningOnAllNodes(ds))
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+			err = tester.CheckDaemonStatus(dsName)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ds, err = tester.GetDaemonSet(dsName)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Get all old daemon pods on nodes")
+			oldNodeToDaemonPods, err := tester.GetNodesToDaemonPods(label)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(oldNodeToDaemonPods).To(gomega.HaveLen(int(ds.Status.DesiredNumberScheduled)))
+
+			nodeNameList := sets.NewString()
+			for nodeName, pods := range oldNodeToDaemonPods {
+				nodeNameList.Insert(nodeName)
+				gomega.Expect(pods).To(gomega.HaveLen(1))
+				gomega.Expect(podutil.IsPodReady(pods[0])).To(gomega.BeTrue())
+			}
+
+			//change pods container image
+			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1alpha1.DaemonSet) {
+				ds.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
+
+			ginkgo.By("Check all surging Pods created")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
+				nodeToDaemonPods, err := tester.GetNodesToDaemonPods(label)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(nodeToDaemonPods).To(gomega.HaveLen(int(ds.Status.DesiredNumberScheduled)))
+
+				for _, nodeName := range nodeNameList.List() {
+					pods := nodeToDaemonPods[nodeName]
+					if len(pods) < 2 {
+						continue
+					}
+
+					for _, pod := range pods {
+						if pod.Name == oldNodeToDaemonPods[nodeName][0].Name {
+							gomega.Expect(pod.DeletionTimestamp).To(gomega.BeNil())
+						}
+					}
+					nodeNameList.Delete(nodeName)
+				}
+				return nodeNameList.Len() == 0, nil
+			})
+
+			ginkgo.By("Check all old Pods deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
+				nodeToDaemonPods, err := tester.GetNodesToDaemonPods(label)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(nodeToDaemonPods).To(gomega.HaveLen(int(ds.Status.DesiredNumberScheduled)))
+
+				finished := true
+				for nodeName, pods := range nodeToDaemonPods {
+					if len(pods) != 1 {
+						finished = false
+						continue
+					}
+
+					gomega.Expect(pods[0].Name).NotTo(gomega.Equal(oldNodeToDaemonPods[nodeName][0].Name))
+					gomega.Expect(podutil.IsPodReady(pods[0])).To(gomega.BeTrue())
+					c := podutil.GetPodReadyCondition(pods[0].Status)
+					gomega.Expect(int32(time.Since(c.LastTransitionTime.Time) / time.Second)).To(gomega.BeNumerically(">", ds.Spec.MinReadySeconds))
+				}
+				return finished, nil
+			})
 		})
 	})
 })
