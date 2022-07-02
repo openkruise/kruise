@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -356,4 +357,13 @@ func isPodPreDeleting(pod *corev1.Pod) bool {
 
 func isPodNilOrPreDeleting(pod *corev1.Pod) bool {
 	return pod == nil || isPodPreDeleting(pod)
+}
+
+func podAvailableWaitingTime(pod *corev1.Pod, minReadySeconds int32, now time.Time) time.Duration {
+	c := podutil.GetPodReadyCondition(pod.Status)
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	if c == nil || c.LastTransitionTime.IsZero() {
+		return minReadySecondsDuration
+	}
+	return minReadySecondsDuration - now.Sub(c.LastTransitionTime.Time)
 }

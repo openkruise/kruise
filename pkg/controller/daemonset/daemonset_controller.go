@@ -290,13 +290,23 @@ type ReconcileDaemonSet struct {
 
 // Reconcile reads that state of the cluster for a DaemonSet object and makes changes based on the state read
 // and what is in the DaemonSet.Spec
-func (dsc *ReconcileDaemonSet) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (dsc *ReconcileDaemonSet) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, retErr error) {
 	onceBackoffGC.Do(func() {
 		go wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, ctx.Done())
 	})
-	startTime := dsc.failedPodsBackoff.Clock.Now()
+	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing DaemonSet %q (%v)", request.String(), dsc.failedPodsBackoff.Clock.Now().Sub(startTime))
+		if retErr == nil {
+			if res.Requeue || res.RequeueAfter > 0 {
+				klog.Infof("Finished syncing DaemonSet %s, cost %v, result: %v", request, time.Since(startTime), res)
+			} else {
+				klog.Infof("Finished syncing DaemonSet %s, cost %v", request, time.Since(startTime))
+			}
+		} else {
+			klog.Errorf("Failed syncing DaemonSet %s: %v", request, retErr)
+		}
+		// clean the duration store
+		_ = durationStore.Pop(request.String())
 	}()
 
 	err := dsc.syncDaemonSet(request)
@@ -561,6 +571,7 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(ds *appsv1alpha1.DaemonSet, 
 		toUpdate.Status.DaemonSetHash = hash
 
 		if _, updateErr = dsClient.UpdateStatus(context.TODO(), toUpdate, metav1.UpdateOptions{}); updateErr == nil {
+			klog.Infof("Updated DaemonSet %s/%s status to %v", ds.Namespace, ds.Name, kruiseutil.DumpJSON(toUpdate.Status))
 			return nil
 		}
 
@@ -888,6 +899,8 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 			case podutil.IsPodAvailable(oldestNewPod, ds.Spec.MinReadySeconds, metav1.Time{Time: dsc.failedPodsBackoff.Clock.Now()}):
 				klog.V(5).Infof("Pod %s/%s from daemonset %s is now ready and will replace older pod %s", oldestNewPod.Namespace, oldestNewPod.Name, ds.Name, oldestOldPod.Name)
 				podsToDelete = append(podsToDelete, oldestOldPod.Name)
+			case podutil.IsPodReady(oldestNewPod) && ds.Spec.MinReadySeconds > 0:
+				durationStore.Push(keyFunc(ds), podAvailableWaitingTime(oldestNewPod, ds.Spec.MinReadySeconds, dsc.failedPodsBackoff.Clock.Now()))
 			}
 		}
 
