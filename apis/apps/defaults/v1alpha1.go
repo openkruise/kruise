@@ -283,11 +283,9 @@ func SetDefaultsDaemonSet(obj *v1alpha1.DaemonSet) {
 			obj.Spec.UpdateStrategy.RollingUpdate.Type = v1alpha1.StandardRollingUpdateType
 		}
 
-		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil && obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
 			maxUnavailable := intstr.FromInt(1)
 			obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-		}
-		if obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
 			MaxSurge := intstr.FromInt(0)
 			obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &MaxSurge
 		}
