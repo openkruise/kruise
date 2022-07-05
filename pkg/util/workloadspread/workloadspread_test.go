@@ -751,7 +751,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			var err error
 			switch cs.getOperation() {
 			case CreateOperation:
-				err = handler.HandlePodCreation(podIn)
+				_, err = handler.HandlePodCreation(podIn)
 			case DeleteOperation:
 				err = handler.HandlePodDeletion(podIn, DeleteOperation)
 			case EvictionOperation:

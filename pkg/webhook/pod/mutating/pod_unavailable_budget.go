@@ -28,21 +28,21 @@ import (
 )
 
 // mutating relate-pub annotation in pod
-func (h *PodCreateHandler) pubMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
+func (h *PodCreateHandler) pubMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
 	if len(req.AdmissionRequest.SubResource) > 0 || req.AdmissionRequest.Operation != admissionv1.Create ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
-		return nil
+		return true, nil
 	}
 	pub, err := podunavailablebudget.GetPubForPod(h.Client, pod)
 	if err != nil {
-		return err
+		return false, err
 	} else if pub == nil {
-		return nil
+		return true, nil
 	}
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[pubcontrol.PodRelatedPubAnnotation] = pub.Name
 	klog.V(3).Infof("mutating add pod(%s/%s) annotation[%s]=%s", pod.Namespace, pod.Name, pubcontrol.PodRelatedPubAnnotation, pub.Name)
-	return nil
+	return false, nil
 }

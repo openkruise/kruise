@@ -26,6 +26,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
@@ -80,7 +81,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	cli := util.NewClientFromManager(mgr, "persistentpodstate-controller")
+	cli := utilclient.NewClientFromManager(mgr, "persistentpodstate-controller")
 	return &ReconcilePersistentPodState{
 		Client: cli,
 		scheme: mgr.GetScheme(),

@@ -26,6 +26,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
@@ -64,7 +65,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileEphemeralJob {
 	return &ReconcileEphemeralJob{
-		Client: util.NewClientFromManager(mgr, "ephemeraljob-controller"),
+		Client: utilclient.NewClientFromManager(mgr, "ephemeraljob-controller"),
 		scheme: mgr.GetScheme(),
 	}
 }

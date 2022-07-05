@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"reflect"
 
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -55,48 +54,56 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	clone := obj.DeepCopy()
 	// when pod.namespace is empty, using req.namespace
 	if obj.Namespace == "" {
 		obj.Namespace = req.Namespace
 	}
 
-	injectPodReadinessGate(req, obj)
+	var changed bool
+
+	if skip := injectPodReadinessGate(req, obj); !skip {
+		changed = true
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpread) {
-		err = h.workloadSpreadMutatingPod(ctx, req, obj)
-		if err != nil {
+		if skip, err := h.workloadSpreadMutatingPod(ctx, req, obj); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
+		} else if !skip {
+			changed = true
 		}
 	}
 
-	err = h.sidecarsetMutatingPod(ctx, req, obj)
-	if err != nil {
+	if skip, err := h.sidecarsetMutatingPod(ctx, req, obj); err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
+	} else if !skip {
+		changed = true
 	}
 
 	// "the order matters and sidecarsetMutatingPod must precede containerLaunchPriorityInitialization"
-	err = h.containerLaunchPriorityInitialization(ctx, req, obj)
-	if err != nil {
+	if skip, err := h.containerLaunchPriorityInitialization(ctx, req, obj); err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
+	} else if !skip {
+		changed = true
 	}
 
 	// patch related-pub annotation in pod
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) ||
 		utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetDeleteGate) {
-		err = h.pubMutatingPod(ctx, req, obj)
-		if err != nil {
+		if skip, err := h.pubMutatingPod(ctx, req, obj); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
+		} else if !skip {
+			changed = true
 		}
 	}
 
 	// persistent pod state
-	err = h.persistentPodStateMutatingPod(ctx, req, obj)
-	if err != nil {
+	if skip, err := h.persistentPodStateMutatingPod(ctx, req, obj); err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
+	} else if !skip {
+		changed = true
 	}
 
-	if reflect.DeepEqual(obj, clone) {
+	if !changed {
 		return admission.Allowed("")
 	}
 	marshalled, err := json.Marshal(obj)

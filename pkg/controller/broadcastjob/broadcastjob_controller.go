@@ -25,7 +25,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
@@ -89,7 +89,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	recorder := mgr.GetEventRecorderFor("broadcastjob-controller")
 	return &ReconcileBroadcastJob{
-		Client:   util.NewClientFromManager(mgr, "broadcastjob-controller"),
+		Client:   utilclient.NewClientFromManager(mgr, "broadcastjob-controller"),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
 	}

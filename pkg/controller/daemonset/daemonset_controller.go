@@ -66,6 +66,7 @@ import (
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
@@ -168,7 +169,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 15*time.Minute)
 	revisionAdapter := revisionadapter.NewDefaultImpl()
 
-	cli := kruiseutil.NewClientFromManager(mgr, "daemonset-controller")
+	cli := utilclient.NewClientFromManager(mgr, "daemonset-controller")
 	dsc := &ReconcileDaemonSet{
 		kubeClient:    genericClient.KubeClient,
 		kruiseClient:  genericClient.KruiseClient,

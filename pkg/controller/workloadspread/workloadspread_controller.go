@@ -45,6 +45,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
@@ -149,7 +150,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	cli := util.NewClientFromManager(mgr, controllerName)
+	cli := utilclient.NewClientFromManager(mgr, controllerName)
 	return &ReconcileWorkloadSpread{
 		Client:           cli,
 		scheme:           mgr.GetScheme(),

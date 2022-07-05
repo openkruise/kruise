@@ -37,17 +37,17 @@ import (
 )
 
 // mutate pod based on SidecarSet Object
-func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
+func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
 	if len(req.AdmissionRequest.SubResource) > 0 ||
 		(req.AdmissionRequest.Operation != admissionv1.Create && req.AdmissionRequest.Operation != admissionv1.Update) ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
-		return nil
+		return true, nil
 	}
 	// filter out pods that don't require inject, include the following:
 	// 1. Deletion pod
 	// 2. ignore namespace: "kube-system", "kube-public"
 	if !sidecarcontrol.IsActivePod(pod) {
-		return nil
+		return true, nil
 	}
 
 	var oldPod *corev1.Pod
@@ -59,14 +59,14 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		if err := h.Decoder.Decode(
 			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			oldPod); err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	// DisableDeepCopy:true, indicates must be deep copy before update sidecarSet objection
 	sidecarsetList := &appsv1alpha1.SidecarSetList{}
 	if err := h.Client.List(ctx, sidecarsetList, utilclient.DisableDeepCopy); err != nil {
-		return err
+		return false, err
 	}
 
 	matchedSidecarSets := make([]sidecarcontrol.SidecarControl, 0)
@@ -75,7 +75,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 			continue
 		}
 		if matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); err != nil {
-			return err
+			return false, err
 		} else if !matched {
 			continue
 		}
@@ -88,14 +88,14 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		matchedSidecarSets = append(matchedSidecarSets, control)
 	}
 	if len(matchedSidecarSets) == 0 {
-		return nil
+		return true, nil
 	}
 
 	// check pod
 	if isUpdated {
 		if !matchedSidecarSets[0].IsPodAvailabilityChanged(pod, oldPod) {
 			klog.V(3).Infof("pod(%s/%s) availability unchanged for sidecarSet, and ignore", pod.Namespace, pod.Name)
-			return nil
+			return true, nil
 		}
 	}
 
@@ -104,10 +104,10 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	//build sidecar containers, sidecar initContainers, sidecar volumes, annotations to inject into pod object
 	sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations, err := buildSidecars(isUpdated, pod, oldPod, matchedSidecarSets)
 	if err != nil {
-		return err
+		return false, err
 	} else if len(sidecarContainers) == 0 && len(sidecarInitContainers) == 0 {
 		klog.V(3).Infof("[sidecar inject] pod(%s/%s) don't have injected containers", pod.Namespace, pod.Name)
-		return nil
+		return true, nil
 	}
 
 	klog.V(3).Infof("[sidecar inject] begin inject sidecarContainers(%v) sidecarInitContainers(%v) sidecarSecrets(%v), volumes(%s)"+
@@ -136,7 +136,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		pod.Annotations[k] = v
 	}
 	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
-	return nil
+	return false, nil
 }
 
 func mergeSidecarSecrets(secretsInPod, secretsInSidecar []corev1.LocalObjectReference) (allSecrets []corev1.LocalObjectReference) {
