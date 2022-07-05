@@ -20,13 +20,6 @@ import (
 	"context"
 	"flag"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-	"github.com/openkruise/kruise/pkg/util"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +32,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -68,7 +68,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	expectations := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	recorder := mgr.GetEventRecorderFor("sidecarset-controller")
-	cli := util.NewClientFromManager(mgr, "sidecarset-controller")
+	cli := utilclient.NewClientFromManager(mgr, "sidecarset-controller")
 	return &ReconcileSidecarSet{
 		Client:    cli,
 		scheme:    mgr.GetScheme(),

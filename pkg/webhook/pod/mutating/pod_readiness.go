@@ -26,12 +26,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func injectPodReadinessGate(req admission.Request, pod *v1.Pod) {
+func injectPodReadinessGate(req admission.Request, pod *v1.Pod) (skip bool) {
 	if req.Operation != admissionv1.Create {
-		return
+		return true
 	}
 	if !util.IsPodOwnedByKruise(pod) && !utilfeature.DefaultFeatureGate.Enabled(features.KruisePodReadinessGate) {
-		return
+		return true
 	}
 	util.InjectReadinessGateToPod(pod, appspub.KruisePodReadyConditionType)
+	return false
 }

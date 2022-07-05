@@ -45,7 +45,7 @@ func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1alpha1.Sideca
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}

@@ -35,15 +35,15 @@ const (
 )
 
 // mutate pod based on static ip
-func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
+func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
 	// only handler Create Pod Object Request
 	if len(req.AdmissionRequest.SubResource) > 0 || req.AdmissionRequest.Operation != admissionv1.Create ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
-		return nil
+		return true, nil
 	}
 	ref := metav1.GetControllerOf(pod)
 	if ref == nil || ref.Kind != "StatefulSet" {
-		return nil
+		return true, nil
 	}
 	// selector persistentPodState
 	persistentPodState := SelectorPersistentPodState(h.Client, appsv1alpha1.TargetReference{
@@ -52,23 +52,30 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 		Name:       ref.Name,
 	}, pod.Namespace)
 	if persistentPodState == nil || len(persistentPodState.Status.PodStates) == 0 {
-		return nil
+		return true, nil
 	}
 
 	// when data is NotFound, indicates that the pod is created for the first time and the scenario does not require persistent pod state
 	podState, ok := persistentPodState.Status.PodStates[pod.Name]
 	if !ok || len(podState.NodeTopologyLabels) == 0 {
-		return nil
+		return true, nil
 	}
 
 	// inject PersistentPodState node affinity in pod
 	nodeSelector, preference := createNodeAffinity(persistentPodState.Spec, podState)
 	if len(nodeSelector) == 0 && len(preference) == 0 {
-		return nil
+		return true, nil
 	}
 
 	klog.V(3).Infof("inject node affinity(required: %s, preferred: %s) in pod(%s/%s) for PersistentPodState",
 		util.DumpJSON(nodeSelector), util.DumpJSON(preference), pod.Namespace, pod.Name)
+
+	// inject persistentPodState annotation in pod
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[InjectedPersistentPodStateKey] = persistentPodState.Name
+
 	// nodeSelector
 	if len(nodeSelector) != 0 {
 		if pod.Spec.NodeSelector == nil {
@@ -81,22 +88,17 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 	}
 
 	// preferences
-	if len(preference) == 0 {
-		return nil
+	if len(preference) > 0 {
+		if pod.Spec.Affinity == nil {
+			pod.Spec.Affinity = &corev1.Affinity{}
+		}
+		if pod.Spec.Affinity.NodeAffinity == nil {
+			pod.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+		}
+		pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, preference...)
 	}
-	if pod.Spec.Affinity == nil {
-		pod.Spec.Affinity = &corev1.Affinity{}
-	}
-	if pod.Spec.Affinity.NodeAffinity == nil {
-		pod.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
-	}
-	pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, preference...)
-	// inject persistentPodState annotation in pod
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
-	}
-	pod.Annotations[InjectedPersistentPodStateKey] = persistentPodState.Name
-	return nil
+
+	return false, nil
 }
 
 // return two parameters:

@@ -144,7 +144,7 @@ func main() {
 		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
 		Namespace:                  namespace,
 		SyncPeriod:                 syncPeriod,
-		NewClient:                  utilclient.NewClient,
+		NewCache:                   utilclient.NewCache,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

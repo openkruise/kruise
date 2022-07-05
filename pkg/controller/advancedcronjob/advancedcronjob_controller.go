@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -64,7 +64,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	recorder := mgr.GetEventRecorderFor("advancedcronjob-controller")
 	return &ReconcileAdvancedCronJob{
-		Client:   util.NewClientFromManager(mgr, "advancedcronjob-controller"),
+		Client:   utilclient.NewClientFromManager(mgr, "advancedcronjob-controller"),
 		scheme:   mgr.GetScheme(),
 		recorder: recorder,
 		Clock:    realClock{},

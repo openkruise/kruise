@@ -28,11 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req admission.Request,
-	pod *corev1.Pod) error {
+func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
 	if len(req.AdmissionRequest.SubResource) > 0 ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
-		return nil
+		return true, nil
 	}
 
 	workloadSpreadHandler := wsutil.NewWorkloadSpreadHandler(h.Client)
@@ -43,16 +42,16 @@ func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req ad
 		options := &metav1.CreateOptions{}
 		err := h.Decoder.DecodeRaw(req.Options, options)
 		if err != nil {
-			return err
+			return false, err
 		}
 		// check dry run
 		dryRun = dryrun.IsDryRun(options.DryRun)
 		if dryRun {
 			klog.V(5).Infof("Operation[%s] Pod (%s/%s) is a dry run, then admit", req.AdmissionRequest.Operation, pod.Namespace, pod.Name)
-			return nil
+			return true, nil
 		}
 		return workloadSpreadHandler.HandlePodCreation(pod)
 	default:
-		return nil
+		return true, nil
 	}
 }

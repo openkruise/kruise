@@ -26,6 +26,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
@@ -70,7 +71,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileContainerRecreateRequest {
-	cli := util.NewClientFromManager(mgr, "containerrecreaterequest-controller")
+	cli := utilclient.NewClientFromManager(mgr, "containerrecreaterequest-controller")
 	return &ReconcileContainerRecreateRequest{
 		Client:              cli,
 		clock:               clock.RealClock{},

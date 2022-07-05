@@ -27,6 +27,7 @@ import (
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -74,7 +75,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileImagePullJob {
 	return &ReconcileImagePullJob{
-		Client: util.NewClientFromManager(mgr, "imagepulljob-controller"),
+		Client: utilclient.NewClientFromManager(mgr, "imagepulljob-controller"),
 		scheme: mgr.GetScheme(),
 		clock:  clock.RealClock{},
 	}

@@ -21,7 +21,7 @@ import (
 
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -99,7 +99,7 @@ func TestReconcile(t *testing.T) {
 	// channel when it is finished.
 	mgr, err := manager.New(cfg, manager.Options{})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = util.NewClientFromManager(mgr, "test-uniteddeployment-controller")
+	c = utilclient.NewClientFromManager(mgr, "test-uniteddeployment-controller")
 
 	recFn, requests := SetupTestReconcile(newReconciler(mgr))
 	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())

@@ -12,15 +12,15 @@ import (
 )
 
 // start containers based on priority order
-func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
+func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
 	if len(req.AdmissionRequest.SubResource) > 0 ||
 		req.AdmissionRequest.Operation != admissionv1.Create ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
-		return nil
+		return true, nil
 	}
 
 	if len(pod.Spec.Containers) == 1 {
-		return nil
+		return true, nil
 	}
 
 	// if ordered flag has been set, then just process ordered logic and skip check for priority
@@ -30,20 +30,20 @@ func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Con
 			priority[i] = 0 - i
 		}
 		h.setPodEnv(priority, pod)
-		return nil
+		return false, nil
 	}
 
 	// check whether containers have KRUISE_CONTAINER_PRIORITY key value pairs
 	priority, priorityFlag, err := h.getPriority(pod)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !priorityFlag {
-		return nil
+		return true, nil
 	}
 
 	h.setPodEnv(priority, pod)
-	return nil
+	return false, nil
 }
 
 // the return []int is prioirty for each container in the pod, ordered as container
