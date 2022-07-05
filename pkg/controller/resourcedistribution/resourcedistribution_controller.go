@@ -22,12 +22,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
-	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -45,6 +39,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
 )
 
 func init() {
@@ -67,7 +67,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	cli := util.NewClientFromManager(mgr, "resourcedistribution-controller")
+	cli := utilclient.NewClientFromManager(mgr, "resourcedistribution-controller")
 	return &ReconcileResourceDistribution{
 		Client: cli,
 		scheme: mgr.GetScheme(),

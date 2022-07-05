@@ -152,7 +152,7 @@ func matchReference(ref *metav1.OwnerReference) (bool, error) {
 
 // TODO consider pod/status update operation
 
-func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
+func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 	start := time.Now()
 
 	// filter out pods, include the following:
@@ -161,18 +161,18 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 	// 3. Pod.OwnerReference is nil
 	// 4. Pod.OwnerReference is not one of workloads, such as CloneSet, Deployment, ReplicaSet.
 	if !kubecontroller.IsPodActive(pod) {
-		return nil
+		return true, nil
 	}
 	ref := metav1.GetControllerOf(pod)
 	matched, err := matchReference(ref)
 	if err != nil || !matched {
-		return nil
+		return true, nil
 	}
 
 	var matchedWS *appsv1alpha1.WorkloadSpread
 	workloadSpreadList := &appsv1alpha1.WorkloadSpreadList{}
 	if err = h.Client.List(context.TODO(), workloadSpreadList, &client.ListOptions{Namespace: pod.Namespace}); err != nil {
-		return err
+		return false, err
 	}
 	for _, ws := range workloadSpreadList.Items {
 		if ws.Spec.TargetReference == nil || !ws.DeletionTimestamp.IsZero() {
@@ -187,7 +187,7 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 	}
 	// not found matched workloadSpread
 	if matchedWS == nil {
-		return nil
+		return true, nil
 	}
 
 	defer func() {
@@ -195,7 +195,7 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 			matchedWS.Namespace, matchedWS.Name, time.Since(start))
 	}()
 
-	return h.mutatingPod(matchedWS, pod, nil, CreateOperation)
+	return false, h.mutatingPod(matchedWS, pod, nil, CreateOperation)
 }
 
 func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error {

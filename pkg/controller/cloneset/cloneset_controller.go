@@ -29,7 +29,6 @@ import (
 	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -95,7 +94,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cli.KubeClient.CoreV1().Events("")})
 		recorder = eventBroadcaster.NewRecorder(mgr.GetScheme(), v1.EventSource{Component: "cloneset-controller"})
 	}
-	cli := util.NewClientFromManager(mgr, "cloneset-controller")
+	cli := utilclient.NewClientFromManager(mgr, "cloneset-controller")
 	reconciler := &ReconcileCloneSet{
 		Client:            cli,
 		scheme:            mgr.GetScheme(),

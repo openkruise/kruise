@@ -28,6 +28,7 @@ import (
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
@@ -92,7 +93,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		recorder = eventBroadcaster.NewRecorder(mgr.GetScheme(), v1.EventSource{Component: controllerName})
 	}
 	return &ReconcileNodeImage{
-		Client:        util.NewClientFromManager(mgr, controllerName),
+		Client:        utilclient.NewClientFromManager(mgr, controllerName),
 		scheme:        mgr.GetScheme(),
 		clock:         clock.RealClock{},
 		eventRecorder: recorder,

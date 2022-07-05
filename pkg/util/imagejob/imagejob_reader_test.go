@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -164,7 +164,7 @@ func TestAll(t *testing.T) {
 	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
-	c = util.NewClientFromManager(mgr, "test-nodeimage-utils")
+	c = utilclient.NewClientFromManager(mgr, "test-nodeimage-utils")
 
 	for _, o := range initialNodeImages {
 		if err = c.Create(context.TODO(), o); err != nil {
