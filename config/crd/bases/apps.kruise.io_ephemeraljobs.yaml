@@ -88,8 +88,8 @@ spec:
               replicas:
                 description: Replicas indicates a part of the quantity from matched
                   pods by selector. Usually it is used for gray scale working. if
-                  Replicas exceeded the matched number by selector, replicas will
-                  not work.
+                  Replicas exceeded the matched number by selector or not be set,
+                  replicas will not work.
                 format: int32
                 type: integer
               selector:
