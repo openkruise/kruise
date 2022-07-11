@@ -255,7 +255,7 @@ func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v
 			continue
 		}
 
-		if len(targetPods) < int(*job.Spec.Replicas) {
+		if job.Spec.Replicas == nil || len(targetPods) < int(*job.Spec.Replicas) {
 			targetPods = append(targetPods, &podList.Items[i])
 		}
 	}
@@ -375,20 +375,27 @@ func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, 
 		return err
 	}
 
+	var replicas int32
+	if job.Spec.Replicas == nil {
+		replicas = job.Status.Matches
+	} else {
+		replicas = *job.Spec.Replicas
+	}
+
 	if job.Status.Matches == 0 {
 		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
 		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobMatchedEmpty, "MatchEmpty", "job match no pods")
-	} else if job.Status.Succeeded == *job.Spec.Replicas && job.Status.Succeeded > 0 {
+	} else if job.Status.Succeeded == replicas && job.Status.Succeeded > 0 {
 		job.Status.CompletionTime = timeNow()
 		job.Status.Phase = appsv1alpha1.EphemeralJobSucceeded
 		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobSucceeded, "JobSucceeded", "job success to run all tasks")
 	} else if job.Status.Running > 0 {
 		job.Status.Phase = appsv1alpha1.EphemeralJobRunning
-	} else if job.Status.Failed == *job.Spec.Replicas {
+	} else if job.Status.Failed == replicas {
 		job.Status.CompletionTime = timeNow()
 		job.Status.Phase = appsv1alpha1.EphemeralJobFailed
 		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobFailed, "JobFailed", "job failed to run all tasks")
-	} else if job.Status.Waiting == *job.Spec.Replicas {
+	} else if job.Status.Waiting == replicas {
 		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
 	} else {
 		job.Status.Phase = appsv1alpha1.EphemeralJobUnknown
