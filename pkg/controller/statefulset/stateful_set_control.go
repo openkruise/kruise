@@ -828,7 +828,7 @@ func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulS
 	switch lifecycle.GetPodLifecycleState(pod) {
 	case appspub.LifecycleStateUpdating:
 		if opts.CheckPodUpdateCompleted(pod) == nil {
-			if set.Spec.Lifecycle != nil && !lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
+			if set.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
 				state = appspub.LifecycleStateUpdated
 			} else {
 				state = appspub.LifecycleStateNormal
