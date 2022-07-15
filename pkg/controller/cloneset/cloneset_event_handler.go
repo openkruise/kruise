@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 	"strings"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -35,6 +36,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+)
+
+var (
+	// initialingRateLimiter calculates the delay duration for existing Pods
+	// triggered Create event when the Informer cache has just synced.
+	initialingRateLimiter = workqueue.NewItemExponentialFailureRateLimiter(3*time.Second, 30*time.Second)
 )
 
 type podEventHandler struct {
@@ -59,8 +66,18 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 			return
 		}
 		klog.V(4).Infof("Pod %s/%s created, owner: %s", pod.Namespace, pod.Name, req.Name)
+
+		isSatisfied, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(req.String())
 		clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pod.Name)
-		q.Add(*req)
+		if isSatisfied {
+			// If the scale expectation is satisfied, it should be an existing Pod and the Informer
+			// cache should have just synced.
+			q.AddAfter(*req, initialingRateLimiter.When(req))
+		} else {
+			// Otherwise, add it immediately and reset the rate limiter
+			initialingRateLimiter.Forget(req)
+			q.Add(*req)
+		}
 		return
 	}
 
@@ -241,8 +258,17 @@ func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
 		if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil {
+			isSatisfied, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(req.String())
 			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pvc.Name)
-			q.Add(*req)
+			if isSatisfied {
+				// If the scale expectation is satisfied, it should be an existing Pod and the Informer
+				// cache should have just synced.
+				q.AddAfter(*req, initialingRateLimiter.When(req))
+			} else {
+				// Otherwise, add it immediately and reset the rate limiter
+				initialingRateLimiter.Forget(req)
+				q.Add(*req)
+			}
 		}
 	}
 }
