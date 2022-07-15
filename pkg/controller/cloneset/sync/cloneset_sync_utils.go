@@ -17,6 +17,7 @@ limitations under the License.
 package sync
 
 import (
+	"flag"
 	"math"
 	"reflect"
 
@@ -35,21 +36,37 @@ import (
 	"k8s.io/utils/integer"
 )
 
+func init() {
+	flag.BoolVar(&scalingExcludePreparingDelete, "cloneset-scaling-exclude-preparing-delete", false,
+		"If true, CloneSet Controller will calculate scale number excluding Pods in PreparingDelete state.")
+}
+
+var (
+	// scalingExcludePreparingDelete indicates whether the controller should calculate scale number excluding Pods in PreparingDelete state.
+	scalingExcludePreparingDelete bool
+)
+
 type expectationDiffs struct {
-	// scaleNum is the diff number that should scale
-	// '0' means no need to scale
-	// positive number means need to scale out
-	// negative number means need to scale in
-	scaleNum int
-	// scaleNumOldRevision is part of the scaleNum number
-	// it indicates the scale number of old revision Pods
-	scaleNumOldRevision int
+	// scaleUpNum is a non-negative integer, which indicates the number that should scale up.
+	scaleUpNum int
+	// scaleNumOldRevision is a non-negative integer, which indicates the number of old revision Pods that should scale up.
+	// It might be bigger than scaleUpNum, but controller will scale up at most scaleUpNum number of Pods.
+	scaleUpNumOldRevision int
+	// scaleDownNum is a non-negative integer, which indicates the number that should scale down.
+	// It has excluded the number of Pods that are already specified to delete.
+	scaleDownNum int
+	// scaleDownNumOldRevision is a non-negative integer, which indicates the number of old revision Pods that should scale down.
+	// It might be bigger than scaleDownNum, but controller will scale down at most scaleDownNum number of Pods.
+	// It has excluded the number of old Pods that are already specified to delete.
+	scaleDownNumOldRevision int
+
 	// scaleUpLimit is the limit number of creating Pods when scaling up
 	// it is limited by scaleStrategy.maxUnavailable
 	scaleUpLimit int
 	// deleteReadyLimit is the limit number of ready Pods that can be deleted
 	// it is limited by UpdateStrategy.maxUnavailable
 	deleteReadyLimit int
+
 	// useSurge is the number that temporarily expect to be above the desired replicas
 	useSurge int
 	// useSurgeOldRevision is part of the useSurge number
@@ -93,7 +110,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 	var newRevisionCount, newRevisionActiveCount, oldRevisionCount, oldRevisionActiveCount int
 	var unavailableNewRevisionCount, unavailableOldRevisionCount int
-	var toDeleteNewRevisionCount, toDeleteOldRevisionCount, preDeletingCount int
+	var toDeleteNewRevisionCount, toDeleteOldRevisionCount, preDeletingNewRevisionCount, preDeletingOldRevisionCount int
 	defer func() {
 		if res.isEmpty() {
 			return
@@ -101,12 +118,12 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		klog.V(1).Infof("Calculate diffs for CloneSet %s/%s, replicas=%d, partition=%d, maxSurge=%d, maxUnavailable=%d,"+
 			" allPods=%d, newRevisionPods=%d, newRevisionActivePods=%d, oldRevisionPods=%d, oldRevisionActivePods=%d,"+
 			" unavailableNewRevisionCount=%d, unavailableOldRevisionCount=%d,"+
-			" preDeletingCount=%d, toDeleteNewRevisionCount=%d, toDeleteOldRevisionCount=%d."+
+			" preDeletingNewRevisionCount=%d, preDeletingOldRevisionCount=%d, toDeleteNewRevisionCount=%d, toDeleteOldRevisionCount=%d."+
 			" Result: %+v",
 			cs.Namespace, cs.Name, replicas, partition, maxSurge, maxUnavailable,
 			len(pods), newRevisionCount, newRevisionActiveCount, oldRevisionCount, oldRevisionActiveCount,
 			unavailableNewRevisionCount, unavailableOldRevisionCount,
-			preDeletingCount, toDeleteNewRevisionCount, toDeleteOldRevisionCount,
+			preDeletingNewRevisionCount, preDeletingOldRevisionCount, toDeleteNewRevisionCount, toDeleteOldRevisionCount,
 			res)
 	}()
 
@@ -116,7 +133,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 			switch state := lifecycle.GetPodLifecycleState(p); state {
 			case appspub.LifecycleStatePreparingDelete:
-				preDeletingCount++
+				preDeletingNewRevisionCount++
 			default:
 				newRevisionActiveCount++
 
@@ -132,7 +149,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 			switch state := lifecycle.GetPodLifecycleState(p); state {
 			case appspub.LifecycleStatePreparingDelete:
-				preDeletingCount++
+				preDeletingOldRevisionCount++
 			default:
 				oldRevisionActiveCount++
 
@@ -147,7 +164,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 	updateOldDiff := oldRevisionActiveCount - partition
 	updateNewDiff := newRevisionActiveCount - (replicas - partition)
-	totalUnavailable := preDeletingCount + unavailableNewRevisionCount + unavailableOldRevisionCount
+	totalUnavailable := preDeletingNewRevisionCount + preDeletingOldRevisionCount + unavailableNewRevisionCount + unavailableOldRevisionCount
 	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
 	// If the CloneSetPartitionRollback is not enabled, Pods can only update to the new revision
 	if updateRevision == currentRevision || !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPartitionRollback) {
@@ -161,7 +178,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		// Use surge for maxUnavailable not satisfied before scaling
 		var scaleSurge, scaleOldRevisionSurge int
 		if toDeleteCount := toDeleteNewRevisionCount + toDeleteOldRevisionCount; toDeleteCount > 0 {
-			scaleSurge = integer.IntMin(integer.IntMax((unavailableNewRevisionCount+unavailableOldRevisionCount+toDeleteCount+preDeletingCount)-maxUnavailable, 0), toDeleteCount)
+			scaleSurge = integer.IntMin(integer.IntMax((totalUnavailable+toDeleteCount)-maxUnavailable, 0), toDeleteCount)
 			if scaleSurge > toDeleteNewRevisionCount {
 				scaleOldRevisionSurge = scaleSurge - toDeleteNewRevisionCount
 			}
@@ -193,19 +210,31 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		}
 	}
 
-	res.scaleNum = replicas + res.useSurge - len(pods)
-	if res.scaleNum > 0 {
-		res.scaleNumOldRevision = integer.IntMax(partition+res.useSurgeOldRevision-oldRevisionCount, 0)
-	} else if res.scaleNum < 0 {
-		res.scaleNumOldRevision = integer.IntMin(partition+res.useSurgeOldRevision-oldRevisionCount, 0)
+	// prepare for scale calculation
+	currentTotalCount := len(pods)
+	currentTotalOldCount := oldRevisionCount
+	if shouldScalingExcludePreparingDelete(cs) {
+		currentTotalCount = currentTotalCount - preDeletingOldRevisionCount - preDeletingNewRevisionCount
+		currentTotalOldCount = currentTotalOldCount - preDeletingOldRevisionCount
+	}
+	expectedTotalCount := replicas + res.useSurge
+	expectedTotalOldCount := partition + res.useSurgeOldRevision
+
+	// scale up
+	if num := expectedTotalCount - currentTotalCount; num > 0 {
+		res.scaleUpNum = num
+		res.scaleUpNumOldRevision = integer.IntMax(expectedTotalOldCount-currentTotalOldCount, 0)
+
+		res.scaleUpLimit = integer.IntMin(res.scaleUpNum, integer.IntMax(scaleMaxUnavailable-totalUnavailable, 0))
 	}
 
-	if res.scaleNum > 0 {
-		res.scaleUpLimit = integer.IntMax(scaleMaxUnavailable-totalUnavailable, 0)
-		res.scaleUpLimit = integer.IntMin(res.scaleNum, res.scaleUpLimit)
+	// scale down
+	// Note that this should exclude the number of Pods that are already specified to delete.
+	if num := currentTotalCount - toDeleteOldRevisionCount - toDeleteNewRevisionCount - expectedTotalCount; num > 0 {
+		res.scaleDownNum = num
+		res.scaleDownNumOldRevision = integer.IntMax(currentTotalOldCount-toDeleteOldRevisionCount-expectedTotalOldCount, 0)
 	}
-
-	if toDeleteNewRevisionCount > 0 || toDeleteOldRevisionCount > 0 || res.scaleNum < 0 {
+	if toDeleteNewRevisionCount > 0 || toDeleteOldRevisionCount > 0 || res.scaleDownNum > 0 {
 		res.deleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-totalUnavailable, 0)
 	}
 
@@ -244,4 +273,8 @@ func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySecon
 		return false
 	}
 	return coreControl.IsPodUpdateReady(pod, minReadySeconds)
+}
+
+func shouldScalingExcludePreparingDelete(cs *appsv1alpha1.CloneSet) bool {
+	return scalingExcludePreparingDelete || cs.Labels[appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey] == "true"
 }

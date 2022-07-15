@@ -70,19 +70,16 @@ func (r *realControl) Scale(
 	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision)
 	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
 
-	if diffRes.scaleNum > 0 && diffRes.scaleNum > diffRes.scaleUpLimit {
+	if diffRes.scaleUpNum > diffRes.scaleUpLimit {
 		r.recorder.Event(updateCS, v1.EventTypeWarning, "ScaleUpLimited", fmt.Sprintf("scaleUp is limited because of scaleStrategy.maxUnavailable, limit: %d", diffRes.scaleUpLimit))
 	}
 
 	// 3. scale out
-	if diffRes.scaleNum > 0 && diffRes.scaleUpLimit > 0 {
+	if diffRes.scaleUpNum > 0 {
 		// total number of this creation
 		expectedCreations := diffRes.scaleUpLimit
 		// lack number of current version
-		expectedCurrentCreations := 0
-		if diffRes.scaleNumOldRevision > 0 {
-			expectedCurrentCreations = diffRes.scaleNumOldRevision
-		}
+		expectedCurrentCreations := diffRes.scaleUpNumOldRevision
 
 		klog.V(3).Infof("CloneSet %s begin to scale out %d pods including %d (current rev)",
 			controllerKey, expectedCreations, expectedCurrentCreations)
@@ -110,44 +107,36 @@ func (r *realControl) Scale(
 	// 5. specified delete
 	if podsToDelete := util.DiffPods(podsSpecifiedToDelete, podsInPreDelete); len(podsToDelete) > 0 {
 		newPodsToDelete, oldPodsToDelete := clonesetutils.SplitPodsByRevision(podsToDelete, updateRevision)
-		klog.V(3).Infof("CloneSet %s try to delete pods specified. Delete ready limit: %d. Pods: %v, %v.",
+		klog.V(3).Infof("CloneSet %s try to delete pods specified. Delete ready limit: %d. New Pods: %v, old Pods: %v.",
 			controllerKey, diffRes.deleteReadyLimit, util.GetPodNames(newPodsToDelete).List(), util.GetPodNames(oldPodsToDelete).List())
 
-		podsToDelete = make([]*v1.Pod, 0, len(podsToDelete))
-		for _, pod := range newPodsToDelete {
+		podsCanDelete := make([]*v1.Pod, 0, len(podsToDelete))
+		for _, pod := range podsToDelete {
 			if !isPodReady(coreControl, pod) {
-				podsToDelete = append(podsToDelete, pod)
+				podsCanDelete = append(podsCanDelete, pod)
 			} else if diffRes.deleteReadyLimit > 0 {
-				podsToDelete = append(podsToDelete, pod)
-				diffRes.deleteReadyLimit--
-			}
-		}
-		for _, pod := range oldPodsToDelete {
-			if !isPodReady(coreControl, pod) {
-				podsToDelete = append(podsToDelete, pod)
-			} else if diffRes.deleteReadyLimit > 0 {
-				podsToDelete = append(podsToDelete, pod)
+				podsCanDelete = append(podsCanDelete, pod)
 				diffRes.deleteReadyLimit--
 			}
 		}
 
-		if modified, err := r.deletePods(updateCS, podsToDelete, pvcs); err != nil || modified {
+		if modified, err := r.deletePods(updateCS, podsCanDelete, pvcs); err != nil || modified {
 			return modified, err
 		}
 	}
 
 	// 6. scale in
-	if diffRes.scaleNum < 0 {
+	if diffRes.scaleDownNum > 0 {
 		if numToDelete > 0 {
 			klog.V(3).Infof("CloneSet %s skip to scale in %d for %d to delete, including %d specified and %d preDelete",
-				controllerKey, diffRes.scaleNum, numToDelete, len(podsSpecifiedToDelete), len(podsInPreDelete))
+				controllerKey, diffRes.scaleDownNum, numToDelete, len(podsSpecifiedToDelete), len(podsInPreDelete))
 			return false, nil
 		}
 
 		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev), delete ready limit: %d",
-			controllerKey, -diffRes.scaleNum, -diffRes.scaleNumOldRevision, diffRes.deleteReadyLimit)
+			controllerKey, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, diffRes.deleteReadyLimit)
 
-		podsPreparingToDelete := r.choosePodsToDelete(updateCS, -diffRes.scaleNum, -diffRes.scaleNumOldRevision, notUpdatedPods, updatedPods)
+		podsPreparingToDelete := r.choosePodsToDelete(updateCS, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, notUpdatedPods, updatedPods)
 		podsToDelete := make([]*v1.Pod, 0, len(podsPreparingToDelete))
 		for _, pod := range podsPreparingToDelete {
 			if !isPodReady(coreControl, pod) {

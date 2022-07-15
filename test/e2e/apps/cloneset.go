@@ -17,12 +17,11 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
-
-	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -32,11 +31,15 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("CloneSet", func() {
@@ -140,6 +143,179 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+		})
+
+		framework.ConformanceIt("specific delete a Pod, when scalingExcludePreparingDelete is disabled", func() {
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Spec.Template.Labels["lifecycle-hook"] = "true"
+			cs.Spec.Lifecycle = &appspub.Lifecycle{
+				PreDelete: &appspub.LifecycleHook{
+					LabelsHandler: map[string]string{"lifecycle-hook": "true"},
+				},
+			}
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			oldPods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(oldPods).To(gomega.HaveLen(int(cs.Status.Replicas)))
+
+			specifiedPodName := oldPods[0].Name
+			ginkgo.By(fmt.Sprintf("Patch Pod %s with specified-delete label", specifiedPodName))
+			patchBody := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"true"}}}`, appsv1alpha1.SpecifiedDeleteKey))
+			_, err = c.CoreV1().Pods(cs.Namespace).Patch(context.TODO(), specifiedPodName, types.StrategicMergePatchType, patchBody, metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait specified pod becoming PreparingDelete")
+			gomega.Eventually(func() appspub.LifecycleStateType {
+				pod, err := c.CoreV1().Pods(cs.Namespace).Get(context.TODO(), specifiedPodName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return appspub.LifecycleStateType(pod.Labels[appspub.LifecycleStateKey])
+			}, 10*time.Second, time.Second).Should(gomega.Equal(appspub.LifecycleStatePreparingDelete))
+
+			ginkgo.By("Should not scale up")
+			gomega.Consistently(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(3)))
+
+			newPods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(util.GetPodNames(newPods).List()).Should(gomega.Equal(util.GetPodNames(newPods).List()))
+
+			ginkgo.By("Remove lifecycle hook label and wait it to be deleted")
+			patchBody = []byte(`{"metadata":{"labels":{"lifecycle-hook":null}}}`)
+			_, err = c.CoreV1().Pods(cs.Namespace).Patch(context.TODO(), specifiedPodName, types.StrategicMergePatchType, patchBody, metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() *v1.Pod {
+				pod, err := c.CoreV1().Pods(cs.Namespace).Get(context.TODO(), specifiedPodName, metav1.GetOptions{})
+				if err != nil {
+					if errors.IsNotFound(err) {
+						return nil
+					}
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				}
+				return pod
+			}, 30*time.Second, time.Second).Should(gomega.BeNil())
+
+			ginkgo.By("Wait new Pod created and two old Pods should be still running")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			newPods, err = tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(newPods).To(gomega.HaveLen(int(cs.Status.Replicas)))
+
+			keepOldPods := util.GetPodNames(newPods).Intersection(util.GetPodNames(oldPods)).List()
+			gomega.Expect(keepOldPods).To(gomega.HaveLen(2))
+		})
+
+		framework.ConformanceIt("specific scale down with lifecycle and then scale up, when scalingExcludePreparingDelete is enabled", func() {
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Labels = map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"}
+			cs.Spec.Template.Labels["lifecycle-hook"] = "true"
+			cs.Spec.Lifecycle = &appspub.Lifecycle{
+				PreDelete: &appspub.LifecycleHook{
+					LabelsHandler: map[string]string{"lifecycle-hook": "true"},
+				},
+			}
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			oldPods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(oldPods).To(gomega.HaveLen(int(cs.Status.Replicas)))
+
+			specifiedPodName := oldPods[0].Name
+			ginkgo.By(fmt.Sprintf("Scale down replicas=2 with specified Pod %s", specifiedPodName))
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				cs.Spec.Replicas = utilpointer.Int32(2)
+				cs.Spec.ScaleStrategy.PodsToDelete = []string{specifiedPodName}
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait specified pod becoming PreparingDelete")
+			gomega.Eventually(func() appspub.LifecycleStateType {
+				pod, err := c.CoreV1().Pods(cs.Namespace).Get(context.TODO(), specifiedPodName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return appspub.LifecycleStateType(pod.Labels[appspub.LifecycleStateKey])
+			}, 10*time.Second, time.Second).Should(gomega.Equal(appspub.LifecycleStatePreparingDelete))
+
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Status.Replicas).To(gomega.Equal(int32(3)))
+
+			ginkgo.By("Scale up to 3 again and wait status.replicas to be 4")
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				cs.Spec.Replicas = utilpointer.Int32(3)
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 10*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+
+			ginkgo.By("Remove lifecycle hook label and wait it to be deleted")
+			patchBody := []byte(`{"metadata":{"labels":{"lifecycle-hook":null}}}`)
+			_, err = c.CoreV1().Pods(cs.Namespace).Patch(context.TODO(), specifiedPodName, types.StrategicMergePatchType, patchBody, metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() *v1.Pod {
+				pod, err := c.CoreV1().Pods(cs.Namespace).Get(context.TODO(), specifiedPodName, metav1.GetOptions{})
+				if err != nil {
+					if errors.IsNotFound(err) {
+						return nil
+					}
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				}
+				return pod
+			}, 30*time.Second, time.Second).Should(gomega.BeNil())
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			newPods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(newPods).To(gomega.HaveLen(int(cs.Status.Replicas)))
+
+			keepOldPods := util.GetPodNames(newPods).Intersection(util.GetPodNames(oldPods)).List()
+			gomega.Expect(keepOldPods).To(gomega.HaveLen(2))
 		})
 	})
 
