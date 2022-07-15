@@ -22,6 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	// SidecarSetCustomVersionLabel is designed to record and label the controllerRevision of sidecarSet.
+	// This label will be passed from SidecarSet to its corresponding ControllerRevision, users can use
+	// this label to selector the ControllerRevision they want.
+	// For example, users can update the label from "version-1" to "version-2" when they upgrade the
+	// sidecarSet to "version-2", and they write the "version-2" to InjectionStrategy.Revision.CustomVersion
+	// when they decided to promote the "version-2", to avoid some risks about gray deployment of SidecarSet.
+	SidecarSetCustomVersionLabel = "apps.kruise.io/sidecarset-custom-version"
+)
+
 // SidecarSetSpec defines the desired state of SidecarSet
 type SidecarSetSpec struct {
 	// selector is a label query over pods that should be injected
@@ -142,7 +152,37 @@ type SidecarSetInjectionStrategy struct {
 	// but the injected sidecar container remains updating and running.
 	// default is false
 	Paused bool `json:"paused,omitempty"`
+
+	// Revision can help users rolling update SidecarSet safely. If users set
+	// this filed, SidecarSet will try to inject specific revision according to
+	// different policies.
+	Revision *SidecarSetInjectRevision `json:"revision,omitempty"`
 }
+
+type SidecarSetInjectRevision struct {
+	// CustomVersion corresponds to label 'apps.kruise.io/sidecarset-custom-version' of (History) SidecarSet.
+	// SidecarSet will select the specific ControllerRevision via this CustomVersion, and then restore the
+	// history SidecarSet to inject specific version of the sidecar to pods.
+	// + optional
+	CustomVersion *string `json:"customVersion,omitempty"`
+	// RevisionName corresponds to a specific ControllerRevision name of SidecarSet that you want to inject to Pods.
+	// + optional
+	RevisionName *string `json:"revisionName,omitempty"`
+	// Policy describes the behavior of revision injection.
+	// Defaults to Always.
+	Policy SidecarSetInjectRevisionPolicy `json:"policy,omitempty"`
+}
+
+type SidecarSetInjectRevisionPolicy string
+
+const (
+	// AlwaysSidecarSetInjectRevisionPolicy means the SidecarSet will always inject
+	// the specific revision to Pods when pod creating, except matching UpdateStrategy.Selector.
+	AlwaysSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "Always"
+	// PartitionBasedSidecarSetInjectRevisionPolicy means the SidecarSet will inject the
+	// specific or the latest revision according to Partition.
+	//PartitionBasedSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "PartitionBased"
+)
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet
 // controller will use to perform updates. It includes any additional parameters

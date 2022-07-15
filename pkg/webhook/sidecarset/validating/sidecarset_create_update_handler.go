@@ -86,7 +86,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 	// validating ObjectMeta
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, validateSidecarSetName, field.NewPath("metadata"))
 	// validating spec
-	allErrs = append(allErrs, validateSidecarSetSpec(obj, field.NewPath("spec"))...)
+	allErrs = append(allErrs, h.validateSidecarSetSpec(obj, field.NewPath("spec"))...)
 	// when operation is update, older isn't empty, and validating whether old and new containers conflict
 	if older != nil {
 		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec.containers"))...)
@@ -110,7 +110,7 @@ func validateSidecarSetName(name string, prefix bool) (allErrs []string) {
 	return allErrs
 }
 
-func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 
@@ -120,8 +120,10 @@ func validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) f
 	} else {
 		allErrs = append(allErrs, validateSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
+	//validating SidecarSetInjectionStrategy
+	allErrs = append(allErrs, h.validateSidecarSetInjectionStrategy(obj, fldPath.Child("injectionStrategy"))...)
 	//validating SidecarSetUpdateStrategy
-	allErrs = append(allErrs, validateSidecarSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, validateSidecarSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
 	//validating volumes
 	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
@@ -147,6 +149,31 @@ func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), selector, ""))
 	}
 	return allErrs
+}
+
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+	errList := field.ErrorList{}
+	revisionInfo := obj.Spec.InjectionStrategy.Revision
+
+	if revisionInfo != nil {
+		switch {
+		case revisionInfo.RevisionName == nil && revisionInfo.CustomVersion == nil:
+			errList = append(errList, field.Invalid(field.NewPath("revision"), revisionInfo, "revisionName and customVersion cannot be empty simultaneously"))
+		default:
+			revision, err := sidecarcontrol.NewHistoryControl(h.Client).GetHistorySidecarSet(obj, revisionInfo)
+			if err != nil || revision == nil {
+				errList = append(errList, field.Invalid(field.NewPath("revision"), revision, fmt.Sprintf("Cannot find specific ControllerRevision, err: %v", err)))
+			}
+		}
+
+		switch revisionInfo.Policy {
+		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy:
+		default:
+			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, only support 'Always' currently", revisionInfo.Policy)))
+		}
+
+	}
+	return errList
 }
 
 func validateSidecarSetUpdateStrategy(strategy *appsv1alpha1.SidecarSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
