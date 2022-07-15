@@ -343,7 +343,7 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) error {
 	var updatedPods []*corev1.Pod
 	for i := range pods {
-		if pods[i].Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
+		if pods[i].Annotations[pubcontrol.PodRelatedPubAnnotation] != pub.Name {
 			updatedPods = append(updatedPods, pods[i].DeepCopy())
 		}
 	}

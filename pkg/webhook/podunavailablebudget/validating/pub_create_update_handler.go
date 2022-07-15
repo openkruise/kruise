@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
@@ -95,10 +94,6 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudget
 	}
 	//validate Pub.Spec
 	allErrs = append(allErrs, validatePodUnavailableBudgetSpec(obj, field.NewPath("spec"))...)
-	// when operation is update, validating whether old and new pub conflict
-	if old != nil {
-		allErrs = append(allErrs, validateUpdatePubConflict(obj, old, field.NewPath("spec"))...)
-	}
 	//validate whether pub is in conflict with others
 	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
 	if err := h.Client.List(context.TODO(), pubList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
@@ -109,14 +104,14 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudget
 	return allErrs
 }
 
-func validateUpdatePubConflict(obj, old *policyv1alpha1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
+/*func validateUpdatePubConflict(obj, old *policyv1alpha1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// selector and targetRef can't be changed
 	if !reflect.DeepEqual(obj.Spec.Selector, old.Spec.Selector) || !reflect.DeepEqual(obj.Spec.TargetReference, old.Spec.TargetReference) {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "selector and targetRef cannot be modified"))
 	}
 	return allErrs
-}
+}*/
 
 func validatePodUnavailableBudgetSpec(obj *policyv1alpha1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
