@@ -77,9 +77,7 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 		return
 	}
 	var pub *policyv1alpha1.PodUnavailableBudget
-	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
-		pub, _ = GetPubForPod(p.client, pod)
-	} else {
+	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] != "" {
 		pub, _ = p.pubControl.GetPubForPod(pod)
 	}
 	if pub == nil {
