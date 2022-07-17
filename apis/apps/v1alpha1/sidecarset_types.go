@@ -62,12 +62,12 @@ type SidecarSetSpec struct {
 }
 
 // SidecarSetNamespaceSelector defines the namespaces that the pods will be injected to
-// Namespaces and LabelSelector are mutually exclusive
 type SidecarSetNamespaceSelector struct {
 	// Namespaces sidecarSet will only match the pods in the namespaces
+	// if namespaces are empty, sidecarSet will match the pods in the namespaces those match label selectors
 	// otherwise, match pods in all namespaces(in cluster)
-	Namespaces []string `json:"namespaces,omitempty"`
-	// match the namespaces with label selectors
+	// Namespaces and LabelSelector are mutually exclusive
+	Namespaces           []string `json:"namespaces,omitempty"`
 	metav1.LabelSelector `json:",inline"`
 }
 

@@ -79,10 +79,6 @@ func PodMatchedSidecarSet(cl client.Client, pod *corev1.Pod, sidecarSet appsv1al
 	if !selectedNamespaces.Has(pod.Namespace) {
 		return false, nil
 	}
-
-	if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != pod.Namespace {
-		return false, nil
-	}
 	// if selector not matched, then continue
 	selector, err := metav1.LabelSelectorAsSelector(sidecarSet.Spec.Selector)
 	if err != nil {
