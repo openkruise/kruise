@@ -17,6 +17,7 @@ limitations under the License.
 package sidecarcontrol
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -28,13 +29,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -72,8 +73,13 @@ type SidecarSetUpgradeSpec struct {
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
-func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
-	//If matchedNamespace is not empty, sidecarSet will only match the pods in the namespace
+func PodMatchedSidecarSet(cl client.Client, pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
+	//If pod's namespace in selectedNamespaces, sidecarSet will match the pods in the selectedNamespaces
+	selectedNamespaces := GetNamespacesFromNamespaceSelector(cl, sidecarSet.Spec)
+	if !selectedNamespaces.Has(pod.Namespace) {
+		return false, nil
+	}
+
 	if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != pod.Namespace {
 		return false, nil
 	}
@@ -388,4 +394,27 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 		}
 	}
 	return "", "", fmt.Errorf("field label not supported: %s", label)
+}
+
+func GetNamespacesFromNamespaceSelector(cl client.Client, sidecarSetSpec appsv1alpha1.SidecarSetSpec) sets.String {
+	if len(sidecarSetSpec.NamespaceSelector.Namespaces) > 0 {
+		return sets.NewString(sidecarSetSpec.NamespaceSelector.Namespaces...)
+	}
+	namespaces := sets.NewString()
+	if sidecarSetSpec.Namespace != "" {
+		namespaces.Insert(sidecarSetSpec.Namespace)
+	}
+	// 1. select the namespaces via Spec.NamespaceLabelSelector
+	selectors, err := util.GetFastLabelSelector(&sidecarSetSpec.NamespaceSelector.LabelSelector)
+	if err != nil {
+		return namespaces
+	}
+	namespaceList := &corev1.NamespaceList{}
+	if err := cl.List(context.TODO(), namespaceList, &client.ListOptions{LabelSelector: selectors}); err != nil {
+		return namespaces
+	}
+	for i := range namespaceList.Items {
+		namespaces.Insert(namespaceList.Items[i].Name)
+	}
+	return namespaces
 }

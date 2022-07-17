@@ -219,7 +219,7 @@ func (p *Processor) listMatchedSidecarSets(pod *corev1.Pod) string {
 	//matched SidecarSet.Name list
 	sidecarSetNames := make([]string, 0)
 	for _, sidecarSet := range sidecarSetList.Items {
-		if matched, _ := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); matched {
+		if matched, _ := sidecarcontrol.PodMatchedSidecarSet(p.Client, pod, sidecarSet); matched {
 			sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
 		}
 	}
@@ -267,8 +267,8 @@ func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, 
 	}
 
 	// If sidecarSet.Spec.Namespace is empty, then select in cluster
-	scopedNamespaces := []string{s.Spec.Namespace}
-	selectedPods, err := p.getSelectedPods(scopedNamespaces, selector)
+	scopedNamespaces := sidecarcontrol.GetNamespacesFromNamespaceSelector(p.Client, s.Spec)
+	selectedPods, err := p.getSelectedPods(scopedNamespaces.List(), selector)
 	if err != nil {
 		return nil, err
 	}

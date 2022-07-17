@@ -39,7 +39,8 @@ import (
 )
 
 const (
-	defaultNs = "default"
+	defaultNs   = "default"
+	selectorNs1 = "select-1"
 )
 
 func TestMain(m *testing.M) {
@@ -106,7 +107,61 @@ var (
 			},
 		},
 	}
-
+	sidecarSetWithNsSelector = &appsv1alpha1.SidecarSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "sidecarset-ns",
+			Labels: map[string]string{},
+		},
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "suxing-test",
+				},
+			},
+			NamespaceSelector: &appsv1alpha1.SidecarSetNamespaceSelector{
+				Namespaces: []string{},
+				LabelSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"istio-injection": "enabled"},
+				},
+			},
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "dns-f",
+						Image: "dns-f-image:1.0",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "volume-1",
+								MountPath: "/a/b/c",
+							},
+							{
+								Name:      "volume-2",
+								MountPath: "/d/e/f",
+							},
+						},
+					},
+					PodInjectPolicy: appsv1alpha1.AfterAppContainerType,
+					ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+						Type: appsv1alpha1.ShareVolumePolicyEnabled,
+					},
+				},
+				{
+					Container: corev1.Container{
+						Name:  "log-agent",
+						Image: "log-agent-image:1.0",
+					},
+					PodInjectPolicy: appsv1alpha1.AfterAppContainerType,
+					ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+						Type: appsv1alpha1.ShareVolumePolicyDisabled,
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{Name: "volume-1"},
+				{Name: "volume-2"},
+			},
+		},
+	}
 	sidecarsetWithTransferEnv = &appsv1alpha1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -334,6 +389,58 @@ var (
 		},
 	}
 
+	nsWithIstioEnable = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   selectorNs1,
+			Labels: map[string]string{"istio-injection": "enabled"},
+		},
+	}
+
+	podWithNsSelector = &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-ns",
+			Namespace: selectorNs1,
+			Labels:    map[string]string{"app": "suxing-test"},
+		},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				{
+					Name:  "init-0",
+					Image: "busybox:1.0.0",
+				},
+			},
+			Containers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx:1.15.1",
+					Env: []corev1.EnvVar{
+						{
+							Name:  "hello1",
+							Value: "world1",
+						},
+						{
+							Name:  "hello2",
+							Value: "world2",
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "volume-a",
+							MountPath: "/a/b",
+						},
+						{
+							Name:      "volume-b",
+							MountPath: "/e/f",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{Name: "volume-a"},
+				{Name: "volume-b"},
+			},
+		},
+	}
 	podWithStaragent = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
@@ -397,6 +504,26 @@ func testPodHasNoMatchedSidecarSet(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 
 	if len(podOut.Spec.Containers) != len(podIn.Spec.Containers) {
 		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers), len(podOut.Spec.Containers))
+	}
+}
+func TestPodWithNsSelectorHasMatchedSidecarSet(t *testing.T) {
+	sidecarSetIn := sidecarSetWithNsSelector.DeepCopy()
+	nsWithSelector := nsWithIstioEnable.DeepCopy()
+	testPodWithSelectorNsMatchedSidecarSet(t, sidecarSetIn, nsWithSelector)
+}
+
+func testPodWithSelectorNsMatchedSidecarSet(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet, ns *corev1.Namespace) {
+	podIn := podWithNsSelector.DeepCopy()
+	podOut := podIn.DeepCopy()
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn, ns).Build()
+	client.Create(context.Background(), ns)
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_, _ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+
+	if len(podOut.Spec.Containers) == len(podIn.Spec.Containers) {
+		t.Fatalf("expect %v containers but got %v", len(podOut.Spec.Containers), len(podIn.Spec.Containers))
 	}
 }
 

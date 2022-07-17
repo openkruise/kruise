@@ -31,6 +31,9 @@ type SidecarSetSpec struct {
 	// otherwise, match pods in all namespaces(in cluster)
 	Namespace string `json:"namespace,omitempty"`
 
+	// NamespaceSelector represents the namespaces the pods will be injected to
+	NamespaceSelector *SidecarSetNamespaceSelector `json:"namespaceSelector,omitempty"`
+
 	// InitContainers is the list of init containers to be injected into the selected pod
 	// We will inject those containers by their name in ascending order
 	// We only inject init containers when a new pod is created, it does not apply to any existing pod
@@ -56,6 +59,16 @@ type SidecarSetSpec struct {
 	// RevisionHistoryLimit indicates the maximum quantity of stored revisions about the SidecarSet.
 	// default value is 10
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+}
+
+// SidecarSetNamespaceSelector defines the namespaces that the pods will be injected to
+// Namespaces and LabelSelector are mutually exclusive
+type SidecarSetNamespaceSelector struct {
+	// Namespaces sidecarSet will only match the pods in the namespaces
+	// otherwise, match pods in all namespaces(in cluster)
+	Namespaces []string `json:"namespaces,omitempty"`
+	// match the namespaces with label selectors
+	metav1.LabelSelector `json:",inline"`
 }
 
 // SidecarContainer defines the container of Sidecar
