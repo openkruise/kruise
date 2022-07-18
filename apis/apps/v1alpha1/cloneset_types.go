@@ -30,6 +30,10 @@ const (
 
 	// DefaultCloneSetMaxUnavailable is the default value of maxUnavailable for CloneSet update strategy.
 	DefaultCloneSetMaxUnavailable = "20%"
+
+	// CloneSetScalingExcludePreparingDeleteKey is the label key that enables scalingExcludePreparingDelete
+	// only for this CloneSet, which means it will calculate scale number excluding Pods in PreparingDelete state.
+	CloneSetScalingExcludePreparingDeleteKey = "apps.kruise.io/cloneset-scaling-exclude-preparing-delete"
 )
 
 // CloneSetSpec defines the desired state of CloneSet
