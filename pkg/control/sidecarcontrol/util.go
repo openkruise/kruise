@@ -67,8 +67,8 @@ type SidecarSetUpgradeSpec struct {
 	UpdateTimestamp              metav1.Time `json:"updateTimestamp"`
 	SidecarSetHash               string      `json:"hash"`
 	SidecarSetName               string      `json:"sidecarSetName"`
-	SidecarList                  []string    `json:"sidecarList"`        // sidecarSet container list
-	SidecarSetControllerRevision string      `json:"controllerRevision"` // sidecarSet controllerRevision name
+	SidecarList                  []string    `json:"sidecarList"`                  // sidecarSet container list
+	SidecarSetControllerRevision string      `json:"controllerRevision,omitempty"` // sidecarSet controllerRevision name
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.

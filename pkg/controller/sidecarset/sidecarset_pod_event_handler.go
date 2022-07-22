@@ -2,6 +2,7 @@ package sidecarset
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"time"
 
@@ -177,6 +178,13 @@ func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1
 			newPod.Namespace, newPod.Name, oldConsistent, newConsistent, sidecarSet.Name)
 		enqueueDelayTime = 5 * time.Second
 		return true, enqueueDelayTime
+	}
+
+	// If the pod's labels changed, and sidecarSet enable selector updateStrategy, should reconcile.
+	if !reflect.DeepEqual(oldPod.Labels, newPod.Labels) && sidecarSet.Spec.UpdateStrategy.Selector != nil {
+		klog.V(3).Infof("pod(%s/%s) Labels changed and sidecarSet (%s) enable selector upgrade strategy, "+
+			"and reconcile sidecarSet", newPod.Namespace, newPod.Name, sidecarSet.Name)
+		return true, 0
 	}
 
 	return false, enqueueDelayTime
