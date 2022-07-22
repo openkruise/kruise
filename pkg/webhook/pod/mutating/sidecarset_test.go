@@ -19,6 +19,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,12 +28,15 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -460,6 +464,74 @@ func testInjectionStrategyPaused(t *testing.T, sidecarIn *appsv1alpha1.SidecarSe
 
 	if len(podOut.Spec.Containers) != len(podIn.Spec.Containers) {
 		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers), len(podOut.Spec.Containers))
+	}
+}
+
+func TestInjectionStrategyRevision(t *testing.T) {
+	spec := map[string]interface{}{
+		"spec": map[string]interface{}{
+			"initContainers": []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "init-2",
+						Image: "busybox:1.0.0",
+					},
+				},
+			},
+			"containers": []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "dns-f",
+						Image: "dns-f-image:1.0",
+					},
+					PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+					ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+						Type: appsv1alpha1.ShareVolumePolicyDisabled,
+					},
+				},
+			},
+		},
+	}
+
+	raw, _ := json.Marshal(spec)
+	revisionID := fmt.Sprintf("%s-12345", sidecarSet1.Name)
+	sidecarSetIn := sidecarSet1.DeepCopy()
+	sidecarSetIn.Spec.InjectionStrategy.Revision = &appsv1alpha1.SidecarSetInjectRevision{
+		CustomVersion: &revisionID,
+		Policy:        appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
+	}
+	historyInjection := []client.Object{
+		sidecarSetIn,
+		&apps.ControllerRevision{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: webhookutil.GetNamespace(),
+				Name:      revisionID,
+				Labels: map[string]string{
+					appsv1alpha1.SidecarSetCustomVersionLabel: revisionID,
+				},
+			},
+			Data: runtime.RawExtension{
+				Raw: raw,
+			},
+		},
+	}
+	testInjectionStrategyRevision(t, historyInjection)
+}
+
+func testInjectionStrategyRevision(t *testing.T, env []client.Object) {
+	podIn := pod1.DeepCopy()
+	podOut := podIn.DeepCopy()
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewClientBuilder().WithObjects(env...).Build()
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	if err != nil {
+		t.Fatalf("failed to mutating pod, err: %v", err)
+	}
+
+	if len(podIn.Spec.Containers)+len(podIn.Spec.InitContainers)+2 != len(podOut.Spec.Containers)+len(podOut.Spec.InitContainers) {
+		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers)+2, len(podOut.Spec.Containers))
 	}
 }
 

@@ -305,21 +305,14 @@ func (p *Processor) getSelectedPods(namespaces []string, selector labels.Selecto
 	return
 }
 
-func (p *Processor) registerLatestRevision(sidecarSet *appsv1alpha1.SidecarSet, pods []*corev1.Pod) (
+func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []*corev1.Pod) (
 	latestRevision *apps.ControllerRevision, collisionCount int32, err error,
 ) {
+	sidecarSet := set.DeepCopy()
 	// get revision selector of this sidecarSet
 	hc := sidecarcontrol.NewHistoryControl(p.Client)
-	selector, err := util.GetFastLabelSelector(
-		hc.GetRevisionLabelSelector(sidecarSet),
-	)
-	if err != nil {
-		klog.Errorf("Failed to convert labels to selector, err %v, name %v", err, sidecarSet.Name)
-		return nil, collisionCount, nil
-	}
-
 	// list all revisions
-	revisions, err := p.historyController.ListControllerRevisions(sidecarSet, selector)
+	revisions, err := p.historyController.ListControllerRevisions(sidecarcontrol.MockSidecarSetForRevision(set), hc.GetRevisionSelector(sidecarSet))
 	if err != nil {
 		klog.Errorf("Failed to list history controllerRevisions, err %v, name %v", err, sidecarSet.Name)
 		return nil, collisionCount, err
@@ -369,12 +362,30 @@ func (p *Processor) registerLatestRevision(sidecarSet *appsv1alpha1.SidecarSet, 
 		revisions = append(revisions, latestRevision)
 	}
 
+	// update custom revision for the latest controller revision
+	if err = p.updateCustomVersionLabel(latestRevision, sidecarSet.Labels[appsv1alpha1.SidecarSetCustomVersionLabel]); err != nil {
+		return nil, collisionCount, err
+	}
+
 	// only store limited history revisions
 	if err = p.truncateHistory(revisions, sidecarSet, pods); err != nil {
 		klog.Errorf("Failed to truncate history for %s: err: %v", sidecarSet.Name, err)
 	}
 
 	return latestRevision, collisionCount, nil
+}
+
+func (p *Processor) updateCustomVersionLabel(revision *apps.ControllerRevision, customVersion string) error {
+	if customVersion != "" && customVersion != revision.Labels[appsv1alpha1.SidecarSetCustomVersionLabel] {
+		revisionClone := revision.DeepCopy()
+		patchBody := fmt.Sprintf(`{"metadata":{"labels":{"%v":"%v"}}}`, appsv1alpha1.SidecarSetCustomVersionLabel, customVersion)
+		err := p.Client.Patch(context.TODO(), revisionClone, client.RawPatch(types.StrategicMergePatchType, []byte(patchBody)))
+		if err != nil {
+			klog.Errorf(`Failed to patch custom revision label "%v" to latest revision %v, err: %v`, revision.Name, customVersion, err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (p *Processor) truncateHistory(revisions []*apps.ControllerRevision, s *appsv1alpha1.SidecarSet, pods []*corev1.Pod) error {
@@ -395,9 +406,9 @@ func (p *Processor) truncateHistory(revisions []*apps.ControllerRevision, s *app
 	// the number of revisions need to delete
 	deletionCount := revisionCount - limitation
 	// only delete the revisions that no pods use.
-	activeRevisions := filterActiveRevisions(s, pods)
+	activeRevisions := filterActiveRevisions(s, pods, revisions)
 	for i := 0; i < revisionCount-1 && deletionCount > 0; i++ {
-		if !activeRevisions.Has(revisions[i].Name) { // && revision.InjectionStrategy.ControllerRevision != revisions[i].Name
+		if !activeRevisions.Has(revisions[i].Name) {
 			if err := p.historyController.DeleteControllerRevision(revisions[i]); err != nil && !errors.IsNotFound(err) {
 				return err
 			}
@@ -412,13 +423,34 @@ func (p *Processor) truncateHistory(revisions []*apps.ControllerRevision, s *app
 	return nil
 }
 
-func filterActiveRevisions(s *appsv1alpha1.SidecarSet, pods []*corev1.Pod) sets.String {
+func filterActiveRevisions(s *appsv1alpha1.SidecarSet, pods []*corev1.Pod, revisions []*apps.ControllerRevision) sets.String {
 	activeRevisions := sets.NewString()
 	for _, pod := range pods {
 		if revision := sidecarcontrol.GetPodSidecarSetControllerRevision(s.Name, pod); revision != "" {
 			activeRevisions.Insert(revision)
 		}
 	}
+
+	if s.Spec.InjectionStrategy.Revision != nil {
+		equalRevisions := make([]*apps.ControllerRevision, 0)
+		if s.Spec.InjectionStrategy.Revision.RevisionName != nil {
+			activeRevisions.Insert(*s.Spec.InjectionStrategy.Revision.RevisionName)
+		}
+
+		if s.Spec.InjectionStrategy.Revision.CustomVersion != nil {
+			for i := range revisions {
+				revision := revisions[i]
+				if revision.Labels[appsv1alpha1.SidecarSetCustomVersionLabel] == *s.Spec.InjectionStrategy.Revision.CustomVersion {
+					equalRevisions = append(equalRevisions, revision)
+				}
+			}
+			if len(equalRevisions) > 0 {
+				history.SortControllerRevisions(equalRevisions)
+				activeRevisions.Insert(equalRevisions[len(equalRevisions)-1].Name)
+			}
+		}
+	}
+
 	return activeRevisions
 }
 
