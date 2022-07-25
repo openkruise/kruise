@@ -142,6 +142,14 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	for k, v := range injectedAnnotations {
 		pod.Annotations[k] = v
 	}
+	// patch pod metadata, annotations & labels
+	for _, control := range matchedSidecarSets {
+		sidecarSet := control.GetSidecarset()
+		if err = sidecarcontrol.PatchPodMetadata(&pod.ObjectMeta, sidecarSet.Spec.PatchPodMetadata); err != nil {
+			klog.Errorf("sidecarSet(%s) update pod(%s/%s) metadata failed: %s", sidecarSet.Name, pod.Namespace, pod.Name, err.Error())
+			return false, err
+		}
+	}
 	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
 	return false, nil
 }

@@ -20,6 +20,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/klog/v2"
 )
 
@@ -28,10 +29,7 @@ func GetHost() string {
 }
 
 func GetNamespace() string {
-	if ns := os.Getenv("POD_NAMESPACE"); len(ns) > 0 {
-		return ns
-	}
-	return "kruise-system"
+	return util.GetKruiseNamespace()
 }
 
 func GetSecretName() string {

@@ -22,19 +22,22 @@ import (
 	"regexp"
 	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
-
+	"github.com/openkruise/kruise/pkg/util/configuration"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -388,4 +391,117 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 		}
 	}
 	return "", "", fmt.Errorf("field label not supported: %s", label)
+}
+
+func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1alpha1.SidecarSetPatchPodMetadata) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	if originMetadata.Annotations == nil {
+		originMetadata.Annotations = map[string]string{}
+	}
+	for _, patch := range patches {
+		switch patch.PatchPolicy {
+		case appsv1alpha1.SidecarSetRetainPatchPolicy, "":
+			retainPatchPodMetadata(originMetadata, patch)
+		case appsv1alpha1.SidecarSetOverwritePatchPolicy:
+			overwritePatchPodMetadata(originMetadata, patch)
+		case appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy:
+			if err = mergePatchJsonPodMetadata(originMetadata, patch); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func retainPatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1alpha1.SidecarSetPatchPodMetadata) {
+	for k, v := range patchPodField.Annotations {
+		if _, ok := originMetadata.Annotations[k]; !ok {
+			originMetadata.Annotations[k] = v
+		}
+	}
+}
+
+func overwritePatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1alpha1.SidecarSetPatchPodMetadata) {
+	for k, v := range patchPodField.Annotations {
+		originMetadata.Annotations[k] = v
+	}
+}
+
+func mergePatchJsonPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1alpha1.SidecarSetPatchPodMetadata) error {
+	for key, patchJSON := range patchPodField.Annotations {
+		if origin, ok := originMetadata.Annotations[key]; ok && origin != "" {
+			modified, err := jsonpatch.MergePatch([]byte(origin), []byte(patchJSON))
+			if err != nil {
+				return err
+			}
+			originMetadata.Annotations[key] = string(modified)
+		} else {
+			originMetadata.Annotations[key] = patchJSON
+		}
+	}
+	return nil
+}
+
+func ValidateSidecarSetPatchMetadataWhitelist(c client.Client, sidecarSet *appsv1alpha1.SidecarSet) error {
+	if len(sidecarSet.Spec.PatchPodMetadata) == 0 {
+		return nil
+	}
+
+	regAnnotations := make([]*regexp.Regexp, 0)
+	whitelist, err := configuration.GetSidecarSetPatchMetadataWhiteList(c)
+	if err != nil {
+		return err
+	} else if whitelist == nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarSetPatchPodMetadataDefaultsAllowed) {
+			return nil
+		}
+		return fmt.Errorf("SidecarSet patch metadata whitelist not found")
+	}
+
+	for _, rule := range whitelist.Rules {
+		if rule.Selector != nil {
+			selector, err := util.GetFastLabelSelector(rule.Selector)
+			if err != nil {
+				return err
+			}
+			if !selector.Matches(labels.Set(sidecarSet.Labels)) {
+				continue
+			}
+		}
+		for _, key := range rule.AllowedAnnotationKeyExprs {
+			reg, err := regexp.Compile(key)
+			if err != nil {
+				return err
+			}
+			regAnnotations = append(regAnnotations, reg)
+		}
+	}
+	if len(regAnnotations) == 0 {
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarSetPatchPodMetadataDefaultsAllowed) {
+			return nil
+		}
+		return fmt.Errorf("sidecarSet patch metadata annotation is not allowed")
+	}
+	for _, patch := range sidecarSet.Spec.PatchPodMetadata {
+		for key := range patch.Annotations {
+			if !matchRegKey(key, regAnnotations) {
+				return fmt.Errorf("sidecarSet patch metadata annotation(%s) is not allowed", key)
+			}
+		}
+	}
+	return nil
+}
+
+func matchRegKey(key string, regs []*regexp.Regexp) bool {
+	for _, reg := range regs {
+		if reg.MatchString(key) {
+			return true
+		}
+	}
+	return false
 }

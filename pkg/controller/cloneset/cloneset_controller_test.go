@@ -474,7 +474,7 @@ func checkStatus(g *gomega.GomegaWithT, total, updated int32) {
 		err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		return []int32{cs.Status.Replicas, cs.Status.UpdatedReplicas}
-	}, time.Second*3, time.Millisecond*500).Should(gomega.Equal([]int32{total, updated}))
+	}, time.Second*10, time.Millisecond*500).Should(gomega.Equal([]int32{total, updated}))
 }
 
 func getPodNames(pods []*v1.Pod) sets.String {

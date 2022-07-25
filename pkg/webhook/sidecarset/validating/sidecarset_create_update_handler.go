@@ -134,7 +134,30 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1
 	} else {
 		allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, spec.Containers, vols, fldPath.Root())...)
 	}
+	// validating metadata
+	annotationKeys := sets.NewString()
+	if err := sidecarcontrol.ValidateSidecarSetPatchMetadataWhitelist(h.Client, obj); err != nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), err.Error()))
+	}
+	for _, patch := range spec.PatchPodMetadata {
+		if len(patch.Annotations) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), "no annotations defined for SidecarSet"))
+		} else {
+			metadata := metav1.ObjectMeta{Annotations: patch.Annotations, Name: "fake-name"}
+			allErrs = append(allErrs, genericvalidation.ValidateObjectMeta(&metadata, false, validateSidecarSetName, field.NewPath("patchPodMetadata"))...)
+		}
+		if patch.PatchPolicy == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), "no patchPolicy defined for patchPodMetadata"))
+		}
+		for k := range patch.Annotations {
+			if annotationKeys.Has(k) {
+				allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), fmt.Sprintf("patch annotation[%s] already exist", k)))
+			} else {
+				annotationKeys.Insert(k)
+			}
 
+		}
+	}
 	return allErrs
 }
 
@@ -296,6 +319,9 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 	volumeInOthers := make(map[string]*appsv1alpha1.SidecarSet)
 	// init container name -> sidecarset
 	initContainerInOthers := make(map[string]*appsv1alpha1.SidecarSet)
+	// patch pod annotation key -> sidecarset.Name#patchPolicy
+	annotationsInOthers := make(map[string]string)
+
 	matchedList := make([]*appsv1alpha1.SidecarSet, 0)
 	for i := range sidecarSets.Items {
 		obj := &sidecarSets.Items[i]
@@ -316,6 +342,14 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 		}
 		for _, volume := range set.Spec.Volumes {
 			volumeInOthers[volume.Name] = set
+		}
+		for _, patch := range set.Spec.PatchPodMetadata {
+			if patch.PatchPolicy == appsv1alpha1.SidecarSetRetainPatchPolicy {
+				continue
+			}
+			for key := range patch.Annotations {
+				annotationsInOthers[key] = fmt.Sprintf("%s#%s", set.Name, patch.PatchPolicy)
+			}
 		}
 	}
 
@@ -345,6 +379,22 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 		}
 	}
 
+	// whether pod metadata conflict
+	for _, patch := range sidecarSet.Spec.PatchPodMetadata {
+		if patch.PatchPolicy == appsv1alpha1.SidecarSetRetainPatchPolicy {
+			continue
+		}
+		for key := range patch.Annotations {
+			other, ok := annotationsInOthers[key]
+			if !ok {
+				continue
+			}
+			slice := strings.Split(other, "#")
+			if patch.PatchPolicy == appsv1alpha1.SidecarSetOverwritePatchPolicy || appsv1alpha1.SidecarSetPatchPolicyType(slice[1]) == appsv1alpha1.SidecarSetOverwritePatchPolicy {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("patchPodMetadata"), key, fmt.Sprintf("annotation %s is in conflict with sidecarset %s", key, slice[0])))
+			}
+		}
+	}
 	return allErrs
 }
 

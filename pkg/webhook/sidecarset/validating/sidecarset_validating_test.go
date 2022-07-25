@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +20,29 @@ import (
 )
 
 var (
+	sidecarsetList = &appsv1alpha1.SidecarSetList{
+		Items: []appsv1alpha1.SidecarSet{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+				},
+			},
+		},
+	}
+	sidecarset = &appsv1alpha1.SidecarSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"a": "b"},
+			},
+		},
+	}
+)
+
+var (
 	testScheme *runtime.Scheme
 	handler    = &SidecarSetCreateUpdateHandler{}
 )
@@ -25,6 +50,7 @@ var (
 func init() {
 	testScheme = runtime.NewScheme()
 	apps.AddToScheme(testScheme)
+	corev1.AddToScheme(testScheme)
 }
 
 func TestValidateSidecarSet(t *testing.T) {
@@ -214,6 +240,48 @@ func TestValidateSidecarSet(t *testing.T) {
 				},
 			},
 		},
+		"wrong-metadata": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+				},
+				Containers: []appsv1alpha1.SidecarContainer{
+					{
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+							Type: appsv1alpha1.ShareVolumePolicyDisabled,
+						},
+						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+						},
+						Container: corev1.Container{
+							Name:                     "test-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+				PatchPodMetadata: []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+					},
+					{
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+					},
+				},
+			},
+		},
 		"wrong-name-injectionStrategy": {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
 			Spec: appsv1alpha1.SidecarSetSpec{
@@ -295,13 +363,13 @@ func TestValidateSidecarSet(t *testing.T) {
 			},
 		},
 	}
-
+	_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", features.SidecarSetPatchPodMetadataDefaultsAllowed))
 	for name, sidecarSet := range errorCases {
 		fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(SidecarSetRevisions...).Build()
 		handler.Client = fakeClient
 		allErrs := handler.validateSidecarSetSpec(&sidecarSet, field.NewPath("spec"))
 		if len(allErrs) != 1 {
-			t.Errorf("%v: expect errors len 1, but got: %v", name, allErrs)
+			t.Errorf("%v: expect errors len 1, but got: len %d %v", name, len(allErrs), util.DumpJSON(allErrs))
 		} else {
 			fmt.Printf("%v: %v\n", name, allErrs)
 		}
@@ -309,7 +377,7 @@ func TestValidateSidecarSet(t *testing.T) {
 }
 
 func TestSidecarSetNameConflict(t *testing.T) {
-	sidecarsetList := &appsv1alpha1.SidecarSetList{
+	listDemo := &appsv1alpha1.SidecarSetList{
 		Items: []appsv1alpha1.SidecarSet{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
@@ -336,7 +404,7 @@ func TestSidecarSetNameConflict(t *testing.T) {
 			},
 		},
 	}
-	sidecarset := &appsv1alpha1.SidecarSet{
+	sidecarDemo := &appsv1alpha1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
 		Spec: appsv1alpha1.SidecarSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -359,7 +427,7 @@ func TestSidecarSetNameConflict(t *testing.T) {
 			},
 		},
 	}
-	allErrs := validateSidecarConflict(sidecarsetList, sidecarset, field.NewPath("spec.containers"))
+	allErrs := validateSidecarConflict(listDemo, sidecarDemo, field.NewPath("spec.containers"))
 	if len(allErrs) != 2 {
 		t.Errorf("expect errors len 2, but got: %v", len(allErrs))
 	} else {
@@ -519,28 +587,112 @@ func TestSelectorConflict(t *testing.T) {
 	}
 }
 
-func TestSidecarSetVolumeConflict(t *testing.T) {
-	sidecarsetList := &appsv1alpha1.SidecarSetList{
-		Items: []appsv1alpha1.SidecarSet{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
-				Spec: appsv1alpha1.SidecarSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"a": "b"},
+func TestSidecarSetPodMetadataConflict(t *testing.T) {
+	cases := []struct {
+		name              string
+		getSidecarSet     func() *appsv1alpha1.SidecarSet
+		getSidecarSetList func() *appsv1alpha1.SidecarSetList
+		expectErrLen      int
+	}{
+		{
+			name: "sidecarset annotation key conflict",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarset.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
 					},
-				},
+				}
+				return demo
 			},
+			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+				demo := sidecarsetList.DeepCopy()
+				demo.Items[0].Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+					},
+				}
+				return demo
+			},
+			expectErrLen: 1,
 		},
-	}
-	sidecarset := &appsv1alpha1.SidecarSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"a": "b"},
+		{
+			name: "sidecarset annotation key different",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarset.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+					},
+				}
+				return demo
 			},
+			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+				demo := sidecarsetList.DeepCopy()
+				demo.Items[0].Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+						Annotations: map[string]string{
+							"key2": "value2",
+						},
+					},
+				}
+				return demo
+			},
+			expectErrLen: 0,
+		},
+		{
+			name: "sidecarset annotation key same, and json",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarset.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						Annotations: map[string]string{
+							"oom-score": `{"log-agent": 1}`,
+						},
+					},
+				}
+				return demo
+			},
+			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+				demo := sidecarsetList.DeepCopy()
+				demo.Items[0].Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						Annotations: map[string]string{
+							"oom-score": `{"envoy": 1}`,
+						},
+					},
+				}
+				return demo
+			},
+			expectErrLen: 0,
 		},
 	}
 
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			sidecar := cs.getSidecarSet()
+			list := cs.getSidecarSetList()
+			errs := validateSidecarConflict(list, sidecar, field.NewPath("spec"))
+			if len(errs) != cs.expectErrLen {
+				t.Fatalf("except ErrLen(%d), but get errs(%d)", cs.expectErrLen, len(errs))
+			}
+		})
+	}
+}
+
+func TestSidecarSetVolumeConflict(t *testing.T) {
 	cases := []struct {
 		name              string
 		getSidecarSet     func() *appsv1alpha1.SidecarSet
@@ -655,9 +807,9 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			sidecarset := cs.getSidecarSet()
-			sidecarsetList := cs.getSidecarSetList()
-			errs := validateSidecarConflict(sidecarsetList, sidecarset, field.NewPath("spec"))
+			sidecar := cs.getSidecarSet()
+			list := cs.getSidecarSetList()
+			errs := validateSidecarConflict(list, sidecar, field.NewPath("spec"))
 			if len(errs) != cs.expectErrLen {
 				t.Fatalf("except ErrLen(%d), but get errs(%d)", cs.expectErrLen, len(errs))
 			}
