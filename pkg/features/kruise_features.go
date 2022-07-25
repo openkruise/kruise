@@ -82,6 +82,9 @@ const (
 
 	// Enables policies controlling deletion of PVCs created by a StatefulSet.
 	StatefulSetAutoDeletePVC featuregate.Feature = "StatefulSetAutoDeletePVC"
+
+	// SidecarSetPatchPodMetadataDefaultsAllowed whether sidecarSet patch pod metadata is allowed
+	SidecarSetPatchPodMetadataDefaultsAllowed featuregate.Feature = "SidecarSetPatchPodMetadataDefaultsAllowed"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -89,17 +92,18 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
 	DaemonWatchingPod: {Default: true, PreRelease: featuregate.Beta},
 
-	CloneSetShortHash:                {Default: false, PreRelease: featuregate.Alpha},
-	KruisePodReadinessGate:           {Default: false, PreRelease: featuregate.Alpha},
-	PreDownloadImageForInPlaceUpdate: {Default: false, PreRelease: featuregate.Alpha},
-	CloneSetPartitionRollback:        {Default: false, PreRelease: featuregate.Alpha},
-	ResourcesDeletionProtection:      {Default: false, PreRelease: featuregate.Alpha},
-	WorkloadSpread:                   {Default: false, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetDeleteGate:   {Default: false, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetUpdateGate:   {Default: false, PreRelease: featuregate.Alpha},
-	TemplateNoDefaults:               {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceUpdateEnvFromMetadata:     {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetAutoDeletePVC:         {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetShortHash:                         {Default: false, PreRelease: featuregate.Alpha},
+	KruisePodReadinessGate:                    {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForInPlaceUpdate:          {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetPartitionRollback:                 {Default: false, PreRelease: featuregate.Alpha},
+	ResourcesDeletionProtection:               {Default: false, PreRelease: featuregate.Alpha},
+	WorkloadSpread:                            {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetDeleteGate:            {Default: false, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetUpdateGate:            {Default: false, PreRelease: featuregate.Alpha},
+	TemplateNoDefaults:                        {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceUpdateEnvFromMetadata:              {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetAutoDeletePVC:                  {Default: false, PreRelease: featuregate.Alpha},
+	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

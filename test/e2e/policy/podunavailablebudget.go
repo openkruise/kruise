@@ -574,7 +574,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
-			sidecarSet = sidecarTester.CreateSidecarSet(sidecarSet)
+			sidecarSet, _ = sidecarTester.CreateSidecarSet(sidecarSet)
 			time.Sleep(time.Second)
 
 			// create deployment
@@ -1065,7 +1065,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
-			sidecarSet = sidecarTester.CreateSidecarSet(sidecarSet)
+			sidecarSet, _ = sidecarTester.CreateSidecarSet(sidecarSet)
 
 			// create cloneset
 			cloneset := tester.NewBaseCloneSet(ns)

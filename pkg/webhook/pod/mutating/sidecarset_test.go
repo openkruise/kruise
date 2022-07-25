@@ -467,6 +467,47 @@ func testInjectionStrategyPaused(t *testing.T, sidecarIn *appsv1alpha1.SidecarSe
 	}
 }
 
+func TestInjectMetadata(t *testing.T) {
+	podIn := pod1.DeepCopy()
+	demo1 := sidecarSet1.DeepCopy()
+	demo1.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+		{
+			PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+			Annotations: map[string]string{
+				"key1": `{"log-agent":1}`,
+			},
+		},
+		{
+			PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+			Annotations: map[string]string{
+				"key": "envoy=1,log=2",
+			},
+		},
+	}
+	demo2 := sidecarSet1.DeepCopy()
+	demo2.Name = "sidecarset2"
+	demo2.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+		{
+			PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+			Annotations: map[string]string{
+				"key1": `{"envoy":2}`,
+			},
+		},
+	}
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewClientBuilder().WithObjects(demo1, demo2).Build()
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	podHandler.sidecarsetMutatingPod(context.Background(), req, podIn)
+	expect := map[string]string{
+		"key1": `{"envoy":2,"log-agent":1}`,
+		"key":  "envoy=1,log=2",
+	}
+	if expect["key1"] != podIn.Annotations["key1"] || expect["key"] != podIn.Annotations["key"] {
+		t.Fatalf("sidecarSet inject annotations failed, expect %v, but get %v", expect, podIn.Annotations)
+	}
+}
+
 func TestInjectionStrategyRevision(t *testing.T) {
 	spec := map[string]interface{}{
 		"spec": map[string]interface{}{

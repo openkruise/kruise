@@ -255,6 +255,22 @@ spec:
                 description: Namespace sidecarSet will only match the pods in the
                   namespace otherwise, match pods in all namespaces(in cluster)
                 type: string
+              patchPodMetadata:
+                description: SidecarSet support to inject & in-place update metadata
+                  in pod.
+                items:
+                  properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: annotations
+                      type: object
+                    patchPolicy:
+                      description: labels map[string]string `json:"labels,omitempty"`
+                        patch pod metadata policy, Default is "Retain"
+                      type: string
+                  type: object
+                type: array
               revisionHistoryLimit:
                 description: RevisionHistoryLimit indicates the maximum quantity of
                   stored revisions about the SidecarSet. default value is 10

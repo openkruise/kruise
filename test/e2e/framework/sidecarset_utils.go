@@ -59,6 +59,9 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sidecarset",
+			Labels: map[string]string{
+				"app": "sidecar",
+			},
 		},
 		Spec: appsv1alpha1.SidecarSetSpec{
 			InitContainers: []appsv1alpha1.SidecarContainer{
@@ -137,13 +140,12 @@ func (s *SidecarSetTester) NewBaseDeployment(namespace string) *apps.Deployment 
 	}
 }
 
-func (s *SidecarSetTester) CreateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) *appsv1alpha1.SidecarSet {
+func (s *SidecarSetTester) CreateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (*appsv1alpha1.SidecarSet, error) {
 	Logf("create sidecarSet(%s)", sidecarSet.Name)
 	_, err := s.kc.AppsV1alpha1().SidecarSets().Create(context.TODO(), sidecarSet, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	s.WaitForSidecarSetCreated(sidecarSet)
-	sidecarSet, _ = s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
-	return sidecarSet
+	return s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 }
 
 func (s *SidecarSetTester) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) {
@@ -190,7 +192,8 @@ func (s *SidecarSetTester) WaitForSidecarSetUpgradeComplete(sidecarSet *appsv1al
 			if inner.Status.MatchedPods == exceptStatus.MatchedPods &&
 				inner.Status.UpdatedPods == exceptStatus.UpdatedPods &&
 				inner.Status.UpdatedReadyPods == exceptStatus.UpdatedReadyPods &&
-				inner.Status.ReadyPods == exceptStatus.ReadyPods {
+				inner.Status.ReadyPods == exceptStatus.ReadyPods &&
+				inner.Generation == inner.Status.ObservedGeneration {
 				return true, nil
 			}
 			return false, nil

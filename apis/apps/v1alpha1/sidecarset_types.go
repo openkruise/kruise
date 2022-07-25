@@ -66,7 +66,41 @@ type SidecarSetSpec struct {
 	// RevisionHistoryLimit indicates the maximum quantity of stored revisions about the SidecarSet.
 	// default value is 10
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+
+	// SidecarSet support to inject & in-place update metadata in pod.
+	PatchPodMetadata []SidecarSetPatchPodMetadata `json:"patchPodMetadata,omitempty"`
 }
+
+type SidecarSetPatchPodMetadata struct {
+	// annotations
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// labels map[string]string `json:"labels,omitempty"`
+	// patch pod metadata policy, Default is "Retain"
+	PatchPolicy SidecarSetPatchPolicyType `json:"patchPolicy,omitempty"`
+}
+
+type SidecarSetPatchPolicyType string
+
+var (
+	// SidecarSetRetainPatchPolicy indicates if PatchPodFields conflicts with Pod,
+	// will ignore PatchPodFields, and retain the corresponding fields of pods.
+	// SidecarSet webhook cannot allow the conflict of PatchPodFields between SidecarSets under this policy type.
+	// Note: Retain is only supported for injection, and the Metadata will not be updated when upgrading the Sidecar Container in-place.
+	SidecarSetRetainPatchPolicy SidecarSetPatchPolicyType = "Retain"
+
+	// SidecarSetOverwritePatchPolicy indicates if PatchPodFields conflicts with Pod,
+	// SidecarSet will apply PatchPodFields to overwrite the corresponding fields of pods.
+	// SidecarSet webhook cannot allow the conflict of PatchPodFields between SidecarSets under this policy type.
+	// Overwrite support to inject and in-place metadata.
+	SidecarSetOverwritePatchPolicy SidecarSetPatchPolicyType = "Overwrite"
+
+	// SidecarSetMergePatchJsonPatchPolicy indicate that sidecarSet use application/merge-patch+json to patch annotation value,
+	// for example, A patch annotation[oom-score] = '{"log-agent": 1}' and B patch annotation[oom-score] = '{"envoy": 2}'
+	// result pod annotation[oom-score] = '{"log-agent": 1, "envoy": 2}'
+	// MergePatchJson support to inject and in-place metadata.
+	SidecarSetMergePatchJsonPatchPolicy SidecarSetPatchPolicyType = "MergePatchJson"
+)
 
 // SidecarContainer defines the container of Sidecar
 type SidecarContainer struct {
