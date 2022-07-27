@@ -116,6 +116,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			deployment.Spec.Replicas = utilpointer.Int32Ptr(1)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
+			time.Sleep(time.Second * 3)
 
 			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
@@ -292,6 +293,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			deployment.Spec.Template.Spec.Containers[0].Image = InvalidImage
 			_, err = c.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 5)
 
 			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
@@ -326,6 +328,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			deployment.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
 			_, err = c.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			tester.WaitForDeploymentReadyAndRunning(deployment)
 
 			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
