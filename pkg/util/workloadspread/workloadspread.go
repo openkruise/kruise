@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
 )
@@ -52,10 +53,13 @@ const (
 )
 
 var (
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindCS       = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKruiseKindAlphaSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKruiseKindBetaSts  = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindJob            = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKindRS             = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindDep            = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindSts            = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
 type Operation string
@@ -76,6 +80,7 @@ var (
 		{Kind: controllerKruiseKindCS.Kind, Groups: []string{controllerKruiseKindCS.Group}},
 		{Kind: controllerKindRS.Kind, Groups: []string{controllerKindRS.Group}},
 		{Kind: controllerKindJob.Kind, Groups: []string{controllerKindJob.Group}},
+		{Kind: controllerKindSts.Kind, Groups: []string{controllerKindSts.Group, controllerKruiseKindAlphaSts.Group, controllerKruiseKindBetaSts.Group}},
 	}
 )
 

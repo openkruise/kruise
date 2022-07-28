@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
@@ -116,6 +117,14 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 		oldReplicas = *evt.ObjectOld.(*batchv1.Job).Spec.Parallelism
 		newReplicas = *evt.ObjectNew.(*batchv1.Job).Spec.Parallelism
 		gvk = controllerKindJob
+	case *appsv1.StatefulSet:
+		oldReplicas = *evt.ObjectOld.(*appsv1.StatefulSet).Spec.Replicas
+		newReplicas = *evt.ObjectNew.(*appsv1.StatefulSet).Spec.Replicas
+		gvk = controllerKindSts
+	case *appsv1beta1.StatefulSet:
+		oldReplicas = *evt.ObjectOld.(*appsv1beta1.StatefulSet).Spec.Replicas
+		newReplicas = *evt.ObjectNew.(*appsv1beta1.StatefulSet).Spec.Replicas
+		gvk = controllerKruiseKindSts
 	default:
 		return
 	}
@@ -160,6 +169,10 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 		gvk = controllerKindRS
 	case *batchv1.Job:
 		gvk = controllerKindJob
+	case *appsv1.StatefulSet:
+		gvk = controllerKindSts
+	case *appsv1beta1.StatefulSet:
+		gvk = controllerKruiseKindSts
 	default:
 		return
 	}

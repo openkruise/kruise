@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -80,11 +81,13 @@ const (
 )
 
 var (
-	controllerKruiseKindWS = appsv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpread")
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindWS  = appsv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpread")
+	controllerKruiseKindCS  = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKruiseKindSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindSts       = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRS        = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindDep       = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindJob       = batchv1.SchemeGroupVersion.WithKind("Job")
 )
 
 // this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
@@ -264,7 +267,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 	targetRef := ws.Spec.TargetReference
 
 	switch targetRef.Kind {
-	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind:
+	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind, controllerKindSts.Kind:
 		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, ws.Namespace, targetRef.Name, false)
 	case controllerKindJob.Kind:
 		pods, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
@@ -301,7 +304,7 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 	}
 
 	// group Pods by subset
-	podMap, err := r.groupPod(ws, pods)
+	podMap, err := r.groupPod(ws, pods, workloadReplicas)
 	if err != nil {
 		return err
 	}
@@ -344,15 +347,29 @@ func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSprea
 }
 
 // groupPod returns a map, the key is the name of subset and the value represents the Pods of the corresponding subset.
-func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod) (map[string][]*corev1.Pod, error) {
+func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod, replicas int32) (map[string][]*corev1.Pod, error) {
 	podMap := make(map[string][]*corev1.Pod, len(ws.Spec.Subsets)+1)
 	podMap[FakeSubsetName] = []*corev1.Pod{}
+	subsetMissingReplicas := make(map[string]int, len(ws.Spec.Subsets))
 	for _, subset := range ws.Spec.Subsets {
 		podMap[subset.Name] = []*corev1.Pod{}
+		subsetMissingReplicas[subset.Name], _ = intstr.GetScaledValueFromIntOrPercent(
+			intstr.ValueOrDefault(subset.MaxReplicas, intstr.FromInt(math.MaxInt32)), int(replicas), true)
 	}
 
 	for i := range pods {
-		subsetName, err := r.getSuitableSubsetNameForPod(ws, pods[i])
+		injectWS := getInjectWorkloadSpreadFromPod(pods[i])
+		if injectWS == nil || injectWS.Name != ws.Name {
+			continue
+		}
+		if _, exist := podMap[injectWS.Subset]; !exist {
+			continue
+		}
+		subsetMissingReplicas[injectWS.Subset]--
+	}
+
+	for i := range pods {
+		subsetName, err := r.getSuitableSubsetNameForPod(ws, pods[i], subsetMissingReplicas)
 		if err != nil {
 			return nil, err
 		}
@@ -369,11 +386,11 @@ func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods
 }
 
 // getSuitableSubsetNameForPod will return (FakeSubsetName, nil) if not found suitable subset for pod
-func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) (string, error) {
+func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (string, error) {
 	injectWS := getInjectWorkloadSpreadFromPod(pod)
 	if injectWS == nil || injectWS.Name != ws.Name {
 		// process the pods that were created before workloadSpread
-		matchedSubset, err := r.getSuitableSubsetForOldPod(ws, pod)
+		matchedSubset, err := r.getSuitableSubsetForOldPod(ws, pod, subsetMissingReplicas)
 		if err != nil {
 			return "", err
 		} else if matchedSubset == nil {
@@ -386,7 +403,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.W
 
 // getSuitableSubsetForOldPod returns a suitable subset for the pod which was created before workloadSpread.
 // getSuitableSubsetForOldPod will return (nil, nil) if there is no suitable subset for the pod.
-func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) (*appsv1alpha1.WorkloadSpreadSubset, error) {
+func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (*appsv1alpha1.WorkloadSpreadSubset, error) {
 	if len(pod.Spec.NodeName) == 0 {
 		return nil, nil
 	}
@@ -411,10 +428,15 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.Wo
 			klog.Errorf("unexpected error occurred when matching pod (%s/%s) with subset, please check requiredSelectorTerm field of subset (%s) in WorkloadSpread (%s/%s), err: %s",
 				pod.Namespace, pod.Name, subset.Name, ws.Namespace, ws.Name, err.Error())
 		}
+		quotaScore := int64(0)
+		if subsetMissingReplicas[subset.Name] > 0 {
+			quotaScore = int64(1)
+		}
+		finalScore := preferredScore*10 + quotaScore
 		// select the most favorite subsets for the pod by subset.PreferredNodeSelectorTerms
-		if matched && preferredScore > maxPreferredScore {
+		if matched && finalScore > maxPreferredScore {
 			favoriteSubset = subset
-			maxPreferredScore = preferredScore
+			maxPreferredScore = finalScore
 		}
 	}
 
@@ -422,6 +444,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.Wo
 		if err := r.patchFavoriteSubsetMetadataToPod(pod, ws, favoriteSubset); err != nil {
 			return nil, err
 		}
+		subsetMissingReplicas[favoriteSubset.Name]--
 		return favoriteSubset, nil
 	}
 

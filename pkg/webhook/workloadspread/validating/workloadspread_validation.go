@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsvbeta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 const (
@@ -42,10 +43,13 @@ const (
 )
 
 var (
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindCS       = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKindSts            = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRS             = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindDep            = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindJob            = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindBetaSts  = appsvbeta1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKruiseKindAlphaSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
 func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
@@ -115,6 +119,20 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
 				}
+			case controllerKindSts.Kind:
+				ok, err := verifyGroupKind(spec.TargetReference, controllerKindSts.Kind, []string{controllerKindSts.Group})
+				if ok && err == nil {
+					break
+				}
+				ok, err = verifyGroupKind(spec.TargetReference, controllerKindSts.Kind, []string{controllerKruiseKindAlphaSts.Group})
+				if ok && err == nil {
+					break
+				}
+				ok, err = verifyGroupKind(spec.TargetReference, controllerKindSts.Kind, []string{controllerKruiseKindBetaSts.Group})
+				if ok && err == nil {
+					break
+				}
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
 			default:
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference's GroupKind is not permitted."))
 			}
