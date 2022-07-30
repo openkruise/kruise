@@ -112,7 +112,7 @@ spec:
                         properties:
                           completionPolicy:
                             description: CompletionPolicy indicates the completion
-                              policy of the job. Default is Always CompletionPolicyType
+                              policy of the job. Default is Always CompletionPolicyType.
                             properties:
                               activeDeadlineSeconds:
                                 description: ActiveDeadlineSeconds specifies the duration
@@ -138,8 +138,8 @@ spec:
                                 format: int32
                                 type: integer
                               type:
-                                description: Type indicates the type of the CompletionPolicy
-                                  Default is Always
+                                description: Type indicates the type of the CompletionPolicy.
+                                  Default is Always.
                                 type: string
                             type: object
                           failurePolicy:
@@ -153,6 +153,7 @@ spec:
                                 type: integer
                               type:
                                 description: Type indicates the type of FailurePolicyType.
+                                  Default is FailurePolicyTypeFailFast.
                                 type: string
                             type: object
                           parallelism:

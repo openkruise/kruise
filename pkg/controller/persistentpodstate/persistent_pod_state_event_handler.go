@@ -114,14 +114,11 @@ func isPodValidChanged(oldPod, newPod *corev1.Pod) bool {
 	}
 	// If the pod's deletion timestamp is set, reconcile
 	if oldPod.DeletionTimestamp.IsZero() && !newPod.DeletionTimestamp.IsZero() {
-		klog.V(3).Infof("pod(%s/%s) DeletionTimestamp changed, and reconcile", newPod.Namespace, newPod.Name)
 		return true
 	}
 
 	// when pod ready, then reconcile
 	if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(newPod) {
-		klog.V(3).Infof("pod(%s/%s) from not ready to ready, and reconcile",
-			newPod.Namespace, newPod.Name)
 		return true
 	}
 	return false

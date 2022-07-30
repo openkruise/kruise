@@ -37,7 +37,7 @@ type BroadcastJobSpec struct {
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// CompletionPolicy indicates the completion policy of the job.
-	// Default is Always CompletionPolicyType
+	// Default is Always CompletionPolicyType.
 	// +optional
 	CompletionPolicy CompletionPolicy `json:"completionPolicy" protobuf:"bytes,3,opt,name=completionPolicy"`
 
@@ -52,8 +52,8 @@ type BroadcastJobSpec struct {
 
 // CompletionPolicy indicates the completion policy for the job
 type CompletionPolicy struct {
-	// Type indicates the type of the CompletionPolicy
-	// Default is Always
+	// Type indicates the type of the CompletionPolicy.
+	// Default is Always.
 	Type CompletionPolicyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=CompletionPolicyType"`
 
 	// ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active
@@ -83,8 +83,8 @@ const (
 	// Always means the job will eventually finish on these conditions:
 	// 1) after all pods on the desired nodes are completed (regardless succeeded or failed),
 	// 2) exceeds ActiveDeadlineSeconds,
-	// 3) exceeds BackoffLimit.
-	// This is the default CompletionPolicyType
+	// 3) exceeds RestartLimit.
+	// This is the default CompletionPolicyType.
 	Always CompletionPolicyType = "Always"
 
 	// Never means the job will be kept alive after all pods on the desired nodes are completed.
@@ -153,6 +153,7 @@ const (
 // FailurePolicy indicates the behavior of the job, when failed pod is found.
 type FailurePolicy struct {
 	// Type indicates the type of FailurePolicyType.
+	// Default is FailurePolicyTypeFailFast.
 	Type FailurePolicyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=FailurePolicyType"`
 
 	// RestartLimit specifies the number of retries before marking the pod failed.
@@ -167,9 +168,10 @@ const (
 	FailurePolicyTypeContinue FailurePolicyType = "Continue"
 
 	// FailurePolicyTypeFailFast means the job will be failed, when failed pod is found.
+	// This is the default FailurePolicyType.
 	FailurePolicyTypeFailFast FailurePolicyType = "FailFast"
 
-	// FailurePolicyTypePause means the the job will be paused, when failed pod is found.
+	// FailurePolicyTypePause means the job will be paused, when failed pod is found.
 	FailurePolicyTypePause FailurePolicyType = "Pause"
 )
 
@@ -185,7 +187,7 @@ const (
 	JobComplete JobConditionType = "Complete"
 
 	// JobFailed means the job has failed its execution. A failed job means the job has either exceeded the
-	// ActiveDeadlineSeconds limit, or the aggregated number of container restarts for all pods have exceeded the BackoffLimit.
+	// ActiveDeadlineSeconds limit, or the aggregated number of container restarts for all pods have exceeded the RestartLimit.
 	JobFailed JobConditionType = "Failed"
 )
 

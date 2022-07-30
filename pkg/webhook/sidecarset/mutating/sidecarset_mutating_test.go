@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 )
 
 func TestMutatingSidecarSetFn(t *testing.T) {
@@ -25,6 +26,18 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 						Name:  "dns-f",
 						Image: "dns:1.0",
 					},
+				},
+			},
+			PatchPodMetadata: []appsv1alpha1.SidecarSetPatchPodMetadata{
+				{
+					Annotations: map[string]string{
+						"key1": "value1",
+					},
+				},
+			},
+			InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
+				Revision: &appsv1alpha1.SidecarSetInjectRevision{
+					CustomVersion: pointer.String("1"),
 				},
 			},
 		},
@@ -63,5 +76,14 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 	}
 	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation] != "6wbd76bd7984x24fb4f44fv9222cw9v9bcf85x766744wddd4zwx927zzz2zb684" {
 		t.Fatalf("sidecarset %v hash initialized incorrectly, got %v", sidecarSet.Name, sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation])
+	}
+	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] != "82684vwf9d4cb4wz4vffx4ddfbb47ww4z4wwxdbwb8w2zbb7zvf4524cdd49bv94" {
+		t.Fatalf("sidecarset %v hash-without-image initialized incorrectly, got %v", sidecarSet.Name, sidecarSet.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation])
+	}
+	if sidecarSet.Spec.PatchPodMetadata[0].PatchPolicy != appsv1alpha1.SidecarSetRetainPatchPolicy {
+		t.Fatalf("sidecarset %v patchPodMetadata incorrectly, got %v", sidecarSet.Name, sidecarSet.Spec.PatchPodMetadata)
+	}
+	if sidecarSet.Spec.InjectionStrategy.Revision.Policy != appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy {
+		t.Fatalf("sidecarset %v InjectionStrategy inilize incorrectly, got %v", sidecarSet.Name, sidecarSet.Spec.InjectionStrategy.Revision.Policy)
 	}
 }

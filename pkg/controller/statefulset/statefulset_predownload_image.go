@@ -45,8 +45,9 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 		return nil
 	}
 
-	// ignore if update type is ReCreate
-	if string(sts.Spec.UpdateStrategy.Type) == string(appsv1beta1.RecreatePodUpdateStrategyType) {
+	// ignore if update type is OnDelete or pod update policy is ReCreate
+	if string(sts.Spec.UpdateStrategy.Type) == string(apps.OnDeleteStatefulSetStrategyType) || sts.Spec.UpdateStrategy.RollingUpdate == nil ||
+		string(sts.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy) == string(appsv1beta1.RecreatePodUpdateStrategyType) {
 		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for update type is %s",
 			sts.Namespace, sts.Name, sts.Spec.UpdateStrategy.Type)
 		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")

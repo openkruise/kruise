@@ -279,6 +279,9 @@ func unavailableCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, er
 	if r == nil {
 		return 0, nil
 	}
+	if r.MaxUnavailable == nil {
+		return 0, nil
+	}
 	return intstrutil.GetScaledValueFromIntOrPercent(r.MaxUnavailable, numberToSchedule, true)
 }
 

@@ -105,11 +105,7 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 		newStatus.CurrentRevision = newStatus.UpdateRevision
 	}
 
-	if newStatus.UpdateRevision == newStatus.CurrentRevision {
-		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas
-	} else {
-		if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err == nil {
-			newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
-		}
+	if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err == nil {
+		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
 	}
 }

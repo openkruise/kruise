@@ -63,6 +63,9 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		if err != nil {
 			return false, "", err
 		}
+		if newPod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
+			return true, "", nil
+		}
 		oldPod := &corev1.Pod{}
 		if err = p.Decoder.Decode(
 			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
@@ -129,6 +132,10 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 			return false, "", err
 		}
 		operation = policyv1alpha1.PubDeleteOperation
+	}
+
+	if checkPod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
+		return true, "", nil
 	}
 
 	// Get the workload corresponding to the pod, if it has been deleted then it is not protected

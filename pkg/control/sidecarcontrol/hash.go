@@ -14,16 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mutating
+package sidecarcontrol
 
 import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/util/rand"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 // SidecarSetHash returns a hash of the SidecarSet.

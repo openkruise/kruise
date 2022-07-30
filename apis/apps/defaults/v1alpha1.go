@@ -43,6 +43,23 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 
 	//default setting history revision limitation
 	SetDefaultRevisionHistoryLimit(&obj.Spec.RevisionHistoryLimit)
+
+	// default patchPolicy is 'Retain'
+	for i := range obj.Spec.PatchPodMetadata {
+		patch := &obj.Spec.PatchPodMetadata[i]
+		if patch.PatchPolicy == "" {
+			patch.PatchPolicy = v1alpha1.SidecarSetRetainPatchPolicy
+		}
+	}
+
+	//default setting injectRevisionStrategy
+	SetDefaultInjectRevision(&obj.Spec.InjectionStrategy)
+}
+
+func SetDefaultInjectRevision(strategy *v1alpha1.SidecarSetInjectionStrategy) {
+	if strategy.Revision != nil && strategy.Revision.Policy == "" {
+		strategy.Revision.Policy = v1alpha1.AlwaysSidecarSetInjectRevisionPolicy
+	}
 }
 
 func SetDefaultRevisionHistoryLimit(revisionHistoryLimit **int32) {
