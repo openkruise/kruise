@@ -70,9 +70,6 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		if !reflect.DeepEqual(obj.Spec, oldObj.Spec) {
 			return admission.Errored(http.StatusForbidden, fmt.Errorf("spec of ContainerRecreateRequest is immutable"))
 		}
-		if obj.Labels[appsv1alpha1.ContainerRecreateRequestPodNameKey] != oldObj.Labels[appsv1alpha1.ContainerRecreateRequestPodNameKey] {
-			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1alpha1.ContainerRecreateRequestPodNameKey))
-		}
 		if obj.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] != oldObj.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] {
 			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1alpha1.ContainerRecreateRequestPodUIDKey))
 		}
@@ -96,7 +93,6 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 	if obj.Spec.Strategy == nil {
 		obj.Spec.Strategy = &appsv1alpha1.ContainerRecreateRequestStrategy{}
 	}
-	obj.Labels[appsv1alpha1.ContainerRecreateRequestPodNameKey] = obj.Spec.PodName
 	obj.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey] = "true"
 	if len(obj.Spec.Containers) == 0 {
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("containers list can not be null"))
