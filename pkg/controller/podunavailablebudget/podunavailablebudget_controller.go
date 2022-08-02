@@ -424,7 +424,7 @@ func (r *ReconcilePodUnavailableBudget) getPodsForPub(pub *policyv1alpha1.PodUna
 func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1alpha1.PodUnavailableBudget, expectedCount int32) (desiredAvailable int32, err error) {
 	if pub.Spec.MaxUnavailable != nil {
 		var maxUnavailable int
-		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(pub.Spec.MaxUnavailable, int(expectedCount), false)
+		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(pub.Spec.MaxUnavailable, int(expectedCount), true)
 		if err != nil {
 			return
 		}

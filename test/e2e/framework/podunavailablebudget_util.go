@@ -188,7 +188,7 @@ func (t *PodUnavailableBudgetTester) CreateDeployment(deployment *apps.Deploymen
 	Logf("create deployment(%s/%s)", deployment.Namespace, deployment.Name)
 	_, err := t.c.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	t.WaitForDeploymentRunning(deployment)
+	t.WaitForDeploymentReadyAndRunning(deployment)
 	Logf("create deployment(%s/%s) done", deployment.Namespace, deployment.Name)
 }
 
@@ -216,23 +216,6 @@ func (t *PodUnavailableBudgetTester) WaitForPubCreated(pub *policyv1alpha1.PodUn
 	}
 }
 
-func (t *PodUnavailableBudgetTester) WaitForDeploymentRunning(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
-			inner, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			if *inner.Spec.Replicas == inner.Status.ReadyReplicas {
-				return true, nil
-			}
-			return false, nil
-		})
-	if pollErr != nil {
-		Failf("Failed waiting for deployment to enter running: %v", pollErr)
-	}
-}
-
 func (t *PodUnavailableBudgetTester) WaitForCloneSetRunning(cloneset *appsv1alpha1.CloneSet) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
 		func() (bool, error) {
@@ -250,27 +233,16 @@ func (t *PodUnavailableBudgetTester) WaitForCloneSetRunning(cloneset *appsv1alph
 	}
 }
 
-func (t *PodUnavailableBudgetTester) WaitForDeploymentMinReadyAndRunning(deployments []*apps.Deployment, minReady int32) {
+func (t *PodUnavailableBudgetTester) WaitForDeploymentReadyAndRunning(deployment *apps.Deployment) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
 		func() (bool, error) {
-			var readyReplicas int32 = 0
-			completed := 0
-			for _, deployment := range deployments {
-				inner, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				readyReplicas += inner.Status.ReadyReplicas
-				count := *inner.Spec.Replicas
-				if inner.Status.UpdatedReplicas == count && count == inner.Status.ReadyReplicas && count == inner.Status.Replicas {
-					completed++
-				}
+			inner, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
 			}
-
-			if readyReplicas < minReady {
-				return false, fmt.Errorf("deployment ReadyReplicas(%d) < except(%d)", readyReplicas, minReady)
-			}
-			if completed == len(deployments) {
+			count := *inner.Spec.Replicas
+			if inner.Generation == inner.Status.ObservedGeneration && inner.Status.UpdatedReplicas == count &&
+				count == inner.Status.ReadyReplicas && count == inner.Status.Replicas {
 				return true, nil
 			}
 			return false, nil
