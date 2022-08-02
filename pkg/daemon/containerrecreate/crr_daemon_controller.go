@@ -144,7 +144,7 @@ func newCRRInformer(client kruiseclient.Interface, nodeName string) cache.Shared
 		},
 		&appsv1alpha1.ContainerRecreateRequest{},
 		0, // do not resync
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		cache.Indexers{CRRPodNameIndex: SpecPodNameIndexFunc, cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	return im
 }
@@ -213,11 +213,17 @@ func (c *Controller) sync(key string) (retErr error) {
 		return nil
 	}
 
-	sel, _ := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: map[string]string{appsv1alpha1.ContainerRecreateRequestPodNameKey: podName}})
-	crrList, err := c.crrLister.ContainerRecreateRequests(namespace).List(sel)
+	objectList, err := c.crrInformer.GetIndexer().ByIndex(CRRPodNameIndex, podName)
 	if err != nil {
-		klog.Errorf("Failed to list ContainerRecreateRequest for Pod %s: %v", key, err)
 		return err
+	}
+
+	crrList := make([]*appsv1alpha1.ContainerRecreateRequest, 0, len(objectList))
+	for _, obj := range objectList {
+		crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+		if ok && crr != nil && crr.Namespace == namespace {
+			crrList = append(crrList, crr)
+		}
 	}
 	if len(crrList) == 0 {
 		return nil

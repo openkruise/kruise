@@ -65,7 +65,7 @@ func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimiti
 
 func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.RateLimitingInterface) {
 	crrList := &appsv1alpha1.ContainerRecreateRequestList{}
-	err := e.List(context.TODO(), crrList, client.InNamespace(pod.Namespace), client.MatchingLabels{appsv1alpha1.ContainerRecreateRequestPodNameKey: pod.Name})
+	err := e.List(context.TODO(), crrList, client.InNamespace(pod.Namespace), client.MatchingLabels{appsv1alpha1.ContainerRecreateRequestPodUIDKey: string(pod.UID)})
 	if err != nil {
 		klog.Errorf("Failed to get CRR List for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
 		return

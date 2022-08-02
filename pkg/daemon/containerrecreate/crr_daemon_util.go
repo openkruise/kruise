@@ -18,6 +18,7 @@ package containerrecreate
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -27,6 +28,11 @@ import (
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilpointer "k8s.io/utils/pointer"
+)
+
+const (
+	// CRRPodNameIndex is the lookup name for the most comment index function, which is to index by the crr.spec.podName field.
+	CRRPodNameIndex = "podName"
 )
 
 type crrListByPhaseAndCreated []*appsv1alpha1.ContainerRecreateRequest
@@ -187,4 +193,13 @@ func convertCRRToPod(crr *appsv1alpha1.ContainerRecreateRequest) *v1.Pod {
 	}
 
 	return pod
+}
+
+// SpecPodNameIndexFunc is a default index function that indexes based on crr.spec.podName
+func SpecPodNameIndexFunc(obj interface{}) ([]string, error) {
+	crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+	if !ok {
+		return []string{""}, fmt.Errorf("object cannot be convert to CRR")
+	}
+	return []string{crr.Spec.PodName}, nil
 }
