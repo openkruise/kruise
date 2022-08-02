@@ -118,6 +118,7 @@ func main() {
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
 	cfg.UserAgent = "kruise-manager"
+	cfg.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 
 	setupLog.Info("new clientset registry")
 	err := extclient.NewRegistry(cfg)
