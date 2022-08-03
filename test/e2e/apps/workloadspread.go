@@ -73,6 +73,17 @@ var _ = SIGDescribe("workloadspread", func() {
 			if _, exist := node.GetLabels()["node-role.kubernetes.io/master"]; exist {
 				continue
 			}
+			// The node-role.kubernetes.io/master will be only set in taints since Kubernetes v1.24
+			var isMaster bool
+			for _, taint := range node.Spec.Taints {
+				if taint.Key == "node-role.kubernetes.io/master" {
+					isMaster = true
+					break
+				}
+			}
+			if isMaster {
+				continue
+			}
 			workers = append(workers, &node)
 		}
 		gomega.Expect(len(workers) > 2).Should(gomega.Equal(true))
