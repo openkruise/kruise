@@ -1483,7 +1483,7 @@ func TestUpdateSubsetSequence(t *testing.T) {
 	}
 
 	r := ReconcileWorkloadSpread{}
-	subsetsPods, err := r.groupPod(workloadSpread, pods)
+	subsetsPods, err := r.groupPod(workloadSpread, pods, 5)
 	if err != nil {
 		t.Fatalf("error group pods")
 	}
