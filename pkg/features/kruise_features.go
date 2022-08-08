@@ -86,6 +86,10 @@ const (
 	// SidecarSetPatchPodMetadataDefaultsAllowed whether sidecarSet patch pod metadata is allowed
 	SidecarSetPatchPodMetadataDefaultsAllowed featuregate.Feature = "SidecarSetPatchPodMetadataDefaultsAllowed"
 
+	// SidecarTerminator enables SidecarTerminator to stop sidecar containers when all main containers exited.
+	// SidecarTerminator only works for the Pods with 'Never' or 'OnFailure' restartPolicy.
+	SidecarTerminator featuregate.Feature = "SidecarTerminator"
+
 	// PodProbeMarkerGate enable Kruise provide the ability to execute custom Probes.
 	// Note: custom probe execution requires kruise daemon, so currently only traditional Kubelet is supported, not virtual-kubelet.
 	PodProbeMarkerGate featuregate.Feature = "PodProbeMarkerGate"
@@ -112,6 +116,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	InPlaceUpdateEnvFromMetadata:              {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetAutoDeletePVC:                  {Default: false, PreRelease: featuregate.Alpha},
 	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
+	SidecarTerminator:                         {Default: false, PreRelease: featuregate.Alpha},
 	PodProbeMarkerGate:                        {Default: false, PreRelease: featuregate.Alpha},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
 }

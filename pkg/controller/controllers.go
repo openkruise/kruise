@@ -33,6 +33,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/podunavailablebudget"
 	"github.com/openkruise/kruise/pkg/controller/resourcedistribution"
 	"github.com/openkruise/kruise/pkg/controller/sidecarset"
+	"github.com/openkruise/kruise/pkg/controller/sidecarterminator"
 	"github.com/openkruise/kruise/pkg/controller/statefulset"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment"
 	"github.com/openkruise/kruise/pkg/controller/workloadspread"
@@ -61,6 +62,7 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, ephemeraljob.Add)
 	controllerAddFuncs = append(controllerAddFuncs, containerlauchpriority.Add)
 	controllerAddFuncs = append(controllerAddFuncs, persistentpodstate.Add)
+	controllerAddFuncs = append(controllerAddFuncs, sidecarterminator.Add)
 	controllerAddFuncs = append(controllerAddFuncs, podprobemarker.Add)
 	controllerAddFuncs = append(controllerAddFuncs, nodepodprobe.Add)
 }
