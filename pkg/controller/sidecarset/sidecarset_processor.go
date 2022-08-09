@@ -192,9 +192,10 @@ func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarContro
 		if !ok || len(sidecarSetNames) == 0 {
 			podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation] = p.listMatchedSidecarSets(podClone)
 		}
-		// in-place update pod annotations
-		if err := sidecarcontrol.PatchPodMetadata(&podClone.ObjectMeta, sidecarSet.Spec.PatchPodMetadata); err != nil {
-			klog.Errorf("sidecarSet(%s) update pod(%s/%s) metadata failed: %s", sidecarSet.Name, podClone.Namespace, podClone.Name, err.Error())
+		// patch pod metadata
+		_, err := sidecarcontrol.PatchPodMetadata(&podClone.ObjectMeta, sidecarSet.Spec.PatchPodMetadata)
+		if err != nil {
+			klog.Errorf("sidecarSet(%s) patch pod(%s/%s) metadata failed: %s", sidecarSet.Name, podClone.Namespace, podClone.Name, err.Error())
 			return err
 		}
 		//update pod in store
@@ -570,7 +571,11 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 			pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(olderSidecar)] = sidecarSet.ResourceVersion
 		}
 	}
+	// update sidecarSet hash in pod annotations[kruise.io/sidecarset-hash]
+	sidecarcontrol.UpdatePodSidecarSetHash(pod, sidecarSet)
 	// update pod information in upgrade
+	// UpdatePodAnnotationsInUpgrade needs to be called when Update Container, including hot-upgrade reset empty image.
+	// However, reset empty image should not update pod sidecarSet hash annotation, so UpdatePodSidecarSetHash needs to be called additionally
 	control.UpdatePodAnnotationsInUpgrade(changedContainers, pod)
 }
 

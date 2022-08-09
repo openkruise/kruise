@@ -96,12 +96,8 @@ func (c *commonControl) IsPodReady(pod *v1.Pod) bool {
 }
 
 func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod) {
-
 	sidecarSet := c.GetSidecarset()
-	// 1. sidecar hash
-	updatePodSidecarSetHash(pod, sidecarSet)
-
-	// 3. record the ImageID, before update pod sidecar container
+	// record the ImageID, before update pod sidecar container
 	// if it is changed, indicates the update is complete.
 	//format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
