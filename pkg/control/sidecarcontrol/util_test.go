@@ -176,6 +176,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				control := New(sidecarSetDemo.DeepCopy())
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				return pod
 			},
@@ -190,6 +191,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				control := New(sidecarSetDemo.DeepCopy())
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				return pod
@@ -206,6 +208,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				control := New(sidecarSetDemo.DeepCopy())
 				// upgrade cold sidecar completed
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				// start upgrading hot sidecar
@@ -225,6 +228,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				control := New(sidecarSetDemo.DeepCopy())
 				// upgrade cold sidecar completed
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				// start upgrading hot sidecar
@@ -247,6 +251,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				control := New(sidecarSetDemo.DeepCopy())
 				// upgrade cold sidecar completed
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				// start upgrading hot sidecar
@@ -409,7 +414,7 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			podInput := cs.getPod()
 			sidecarSetInput := cs.getSidecarSet()
-			updatePodSidecarSetHash(podInput, sidecarSetInput)
+			UpdatePodSidecarSetHash(podInput, sidecarSetInput)
 			// sidecarSet hash
 			sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
 			err := json.Unmarshal([]byte(podInput.Annotations[SidecarSetHashAnnotation]), &sidecarSetHash)
@@ -737,11 +742,12 @@ func TestGetSidecarTransferEnvs(t *testing.T) {
 
 func TestPatchPodMetadata(t *testing.T) {
 	cases := []struct {
-		name      string
-		getPod    func() *corev1.Pod
-		patches   func() []appsv1alpha1.SidecarSetPatchPodMetadata
-		expect    metav1.ObjectMeta
-		expectErr bool
+		name              string
+		getPod            func() *corev1.Pod
+		patches           func() []appsv1alpha1.SidecarSetPatchPodMetadata
+		expectAnnotations map[string]string
+		expectErr         bool
+		skip              bool
 	}{
 		{
 			name: "add pod annotation",
@@ -766,12 +772,11 @@ func TestPatchPodMetadata(t *testing.T) {
 				}
 				return patch
 			},
-			expect: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
+			expectAnnotations: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
 			},
+			skip:      false,
 			expectErr: false,
 		},
 		{
@@ -804,12 +809,11 @@ func TestPatchPodMetadata(t *testing.T) {
 				}
 				return patch
 			},
-			expect: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					"key1": "old",
-					"key2": "value2",
-				},
+			expectAnnotations: map[string]string{
+				"key1": "old",
+				"key2": "value2",
 			},
+			skip:      false,
 			expectErr: false,
 		},
 		{
@@ -832,17 +836,47 @@ func TestPatchPodMetadata(t *testing.T) {
 						Annotations: map[string]string{
 							"key1": `{"log-agent":1}`,
 							"key2": `{"envoy":2}`,
+							"key3": `{"probe":5}`,
 						},
 					},
 				}
 				return patch
 			},
-			expect: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					"key1": `{"log-agent":1}`,
-					"key2": `{"envoy":2,"log-agent":1}`,
-				},
+			expectAnnotations: map[string]string{
+				"key1": `{"log-agent":1}`,
+				"key2": `{"envoy":2,"log-agent":1}`,
+				"key3": `{"probe":5}`,
 			},
+			skip:      false,
+			expectErr: false,
+		},
+		{
+			name: "json merge pod annotation, skip",
+			getPod: func() *corev1.Pod {
+				demo := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"key1": `{"log-agent":1}`,
+						},
+					},
+				}
+				return demo
+			},
+			patches: func() []appsv1alpha1.SidecarSetPatchPodMetadata {
+				patch := []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						Annotations: map[string]string{
+							"key1": `{"log-agent":1}`,
+						},
+					},
+				}
+				return patch
+			},
+			expectAnnotations: map[string]string{
+				"key1": `{"log-agent":1}`,
+			},
+			skip:      true,
 			expectErr: false,
 		},
 	}
@@ -850,13 +884,15 @@ func TestPatchPodMetadata(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			pod := cs.getPod()
-			err := PatchPodMetadata(&pod.ObjectMeta, cs.patches())
+			skip, err := PatchPodMetadata(&pod.ObjectMeta, cs.patches())
 			if cs.expectErr && err == nil {
 				t.Fatalf("PatchPodMetadata failed")
 			} else if !cs.expectErr && err != nil {
 				t.Fatalf("PatchPodMetadata failed: %v", err)
-			} else if !reflect.DeepEqual(cs.expect.Annotations, pod.Annotations) {
-				t.Fatalf("expect %v, but get %v", cs.expect.Annotations, pod.Annotations)
+			} else if skip != cs.skip {
+				t.Fatalf("expect %v, but get %v", cs.skip, skip)
+			} else if !reflect.DeepEqual(cs.expectAnnotations, pod.Annotations) {
+				t.Fatalf("expect %v, but get %v", cs.expectAnnotations, pod.Annotations)
 			}
 		})
 	}

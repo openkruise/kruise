@@ -108,7 +108,6 @@ func TestGetPodMatchedSidecarSets(t *testing.T) {
 			getSidecarSets: func() []*appsv1alpha1.SidecarSet {
 				sidecar1 := sidecarSetDemo.DeepCopy()
 				sidecar1.Name = "test-sidecarset-1"
-				fmt.Println(sidecar1.Name, sidecar1.ResourceVersion)
 				sidecar2 := sidecarSetDemo.DeepCopy()
 				sidecar2.Name = "test-sidecarset-2"
 				sidecar3 := sidecarSetDemo.DeepCopy()
