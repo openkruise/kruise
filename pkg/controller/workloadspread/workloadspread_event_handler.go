@@ -34,7 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
@@ -100,9 +101,9 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 	var newReplicas int32
 
 	switch evt.ObjectNew.(type) {
-	case *appsalphav1.CloneSet:
-		oldReplicas = *evt.ObjectOld.(*appsalphav1.CloneSet).Spec.Replicas
-		newReplicas = *evt.ObjectNew.(*appsalphav1.CloneSet).Spec.Replicas
+	case *appsv1alpha1.CloneSet:
+		oldReplicas = *evt.ObjectOld.(*appsv1alpha1.CloneSet).Spec.Replicas
+		newReplicas = *evt.ObjectNew.(*appsv1alpha1.CloneSet).Spec.Replicas
 		gvk = controllerKruiseKindCS
 	case *appsv1.Deployment:
 		oldReplicas = *evt.ObjectOld.(*appsv1.Deployment).Spec.Replicas
@@ -116,6 +117,14 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 		oldReplicas = *evt.ObjectOld.(*batchv1.Job).Spec.Parallelism
 		newReplicas = *evt.ObjectNew.(*batchv1.Job).Spec.Parallelism
 		gvk = controllerKindJob
+	case *appsv1.StatefulSet:
+		oldReplicas = *evt.ObjectOld.(*appsv1.StatefulSet).Spec.Replicas
+		newReplicas = *evt.ObjectNew.(*appsv1.StatefulSet).Spec.Replicas
+		gvk = controllerKindSts
+	case *appsv1beta1.StatefulSet:
+		oldReplicas = *evt.ObjectOld.(*appsv1beta1.StatefulSet).Spec.Replicas
+		newReplicas = *evt.ObjectNew.(*appsv1beta1.StatefulSet).Spec.Replicas
+		gvk = controllerKruiseKindSts
 	default:
 		return
 	}
@@ -152,7 +161,7 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 	obj client.Object, action EventAction) {
 	var gvk schema.GroupVersionKind
 	switch obj.(type) {
-	case *appsalphav1.CloneSet:
+	case *appsv1alpha1.CloneSet:
 		gvk = controllerKruiseKindCS
 	case *appsv1.Deployment:
 		gvk = controllerKindDep
@@ -160,6 +169,10 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 		gvk = controllerKindRS
 	case *batchv1.Job:
 		gvk = controllerKindJob
+	case *appsv1.StatefulSet:
+		gvk = controllerKindSts
+	case *appsv1beta1.StatefulSet:
+		gvk = controllerKruiseKindSts
 	default:
 		return
 	}
@@ -184,8 +197,8 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 
 func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
 	workloadNamespaceName types.NamespacedName,
-	gvk schema.GroupVersionKind) (*appsalphav1.WorkloadSpread, error) {
-	wsList := &appsalphav1.WorkloadSpreadList{}
+	gvk schema.GroupVersionKind) (*appsv1alpha1.WorkloadSpread, error) {
+	wsList := &appsv1alpha1.WorkloadSpreadList{}
 	listOptions := &client.ListOptions{Namespace: workloadNamespaceName.Namespace}
 	if err := w.List(context.TODO(), wsList, listOptions); err != nil {
 		klog.Errorf("List WorkloadSpread failed: %s", err.Error())
