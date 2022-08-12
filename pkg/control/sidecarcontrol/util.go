@@ -19,6 +19,7 @@ package sidecarcontrol
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -156,7 +157,8 @@ func IsPodSidecarUpdated(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) b
 	return GetSidecarSetRevision(sidecarSet) == GetPodSidecarSetRevision(sidecarSet.Name, pod)
 }
 
-func updatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) {
+// UpdatePodSidecarSetHash when sidecarSet in-place update sidecar container, Update sidecarSet hash in Pod annotations[kruise.io/sidecarset-hash]
+func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) {
 	hashKey := SidecarSetHashAnnotation
 	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
 	if err := json.Unmarshal([]byte(pod.Annotations[hashKey]), &sidecarSetHash); err != nil {
@@ -393,16 +395,17 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 	return "", "", fmt.Errorf("field label not supported: %s", label)
 }
 
-func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1alpha1.SidecarSetPatchPodMetadata) (err error) {
+// PatchPodMetadata patch pod annotations and labels
+func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1alpha1.SidecarSetPatchPodMetadata) (skip bool, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
 		}
 	}()
-
 	if originMetadata.Annotations == nil {
 		originMetadata.Annotations = map[string]string{}
 	}
+	oldData := originMetadata.DeepCopy()
 	for _, patch := range patches {
 		switch patch.PatchPolicy {
 		case appsv1alpha1.SidecarSetRetainPatchPolicy, "":
@@ -411,11 +414,14 @@ func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1alpha1.
 			overwritePatchPodMetadata(originMetadata, patch)
 		case appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy:
 			if err = mergePatchJsonPodMetadata(originMetadata, patch); err != nil {
-				return err
+				return
 			}
 		}
 	}
-	return nil
+	if reflect.DeepEqual(oldData.Annotations, originMetadata.Annotations) {
+		skip = true
+	}
+	return
 }
 
 func retainPatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1alpha1.SidecarSetPatchPodMetadata) {
