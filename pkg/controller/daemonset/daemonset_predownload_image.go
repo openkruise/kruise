@@ -90,7 +90,7 @@ func (r *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alpha
 	for name, image := range containerImages {
 		// job name is revision name + container name, it can not be more than 255 characters
 		jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
-		err := imagejobutilfunc.CreateJobForWorkload(r.Client, ds, clonesetutils.ControllerKind, jobName, image, labelMap, *selector, pullSecrets)
+		err := imagejobutilfunc.CreateJobForWorkload(r.Client, ds, controllerKind, jobName, image, labelMap, *selector, pullSecrets)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				klog.Errorf("DaemonSet %s/%s failed to create ImagePullJob %s: %v", ds.Namespace, ds.Name, jobName, err)

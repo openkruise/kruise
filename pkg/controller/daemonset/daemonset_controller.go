@@ -405,7 +405,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 
 	if !isPreDownloadDisabled {
 		if ds.Status.UpdatedNumberScheduled != ds.Status.DesiredNumberScheduled ||
-			cur.Name != ds.Status.DaemonSetHash {
+			hash != ds.Status.DaemonSetHash {
 			// get ads pre-download annotation
 			minUpdatedReadyPodsCount := 0
 			if minUpdatedReadyPods, ok := ds.Annotations[appsv1alpha1.ImagePreDownloadMinUpdatedReadyPods]; ok {
