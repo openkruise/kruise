@@ -19,10 +19,7 @@ package daemonset
 import (
 	"context"
 	"fmt"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,6 +29,11 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
 func (r *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alpha1.DaemonSet, oldRevisions []*apps.ControllerRevision, updateRevision *apps.ControllerRevision) error {

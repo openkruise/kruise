@@ -21,10 +21,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"reflect"
 	"sort"
 	"sync"
@@ -37,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -69,16 +67,18 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
-	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -403,7 +403,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 		return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
 	}
 
-	if !isPreDownloadDisabled {
+	if !isPreDownloadDisabled && dsc.Client != nil {
 		if ds.Status.UpdatedNumberScheduled != ds.Status.DesiredNumberScheduled ||
 			hash != ds.Status.DaemonSetHash {
 			// get ads pre-download annotation
