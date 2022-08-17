@@ -212,8 +212,7 @@ func (h *PodCreateHandler) getSpecificRevisionSidecarSetForPod(sidecarSet *appsv
 	var err error
 	var matchedSidecarSet *appsv1alpha1.SidecarSet
 	for _, revision := range revisions {
-		revisionHash := revision.Annotations[sidecarcontrol.SidecarSetHashAnnotation]
-		if revisionHash != "" && sidecarcontrol.GetPodSidecarSetRevision(sidecarSet.Name, pod) == revisionHash {
+		if sidecarcontrol.GetPodSidecarSetControllerRevision(sidecarSet.Name, pod) == revision.Name {
 			matchedSidecarSet, err = h.getSpecificHistorySidecarSet(sidecarSet, &appsv1alpha1.SidecarSetInjectRevision{RevisionName: &revision.Name})
 			if err != nil {
 				return nil, err
@@ -228,10 +227,14 @@ func (h *PodCreateHandler) getSpecificHistorySidecarSet(sidecarSet *appsv1alpha1
 	// else return its corresponding history revision
 	hc := sidecarcontrol.NewHistoryControl(h.Client)
 	historySidecarSet, err := hc.GetHistorySidecarSet(sidecarSet, revisionInfo)
-	if err != nil || historySidecarSet == nil {
+	if err != nil {
 		klog.Warningf("Failed to restore history revision for SidecarSet %v, ControllerRevision name %v:, error: %v",
 			sidecarSet.Name, sidecarSet.Spec.InjectionStrategy.Revision, err)
 		return nil, err
+	}
+	if historySidecarSet == nil {
+		historySidecarSet = sidecarSet.DeepCopy()
+		klog.Warningf("Failed to restore history revision for SidecarSet %v, will use the latest", sidecarSet.Name)
 	}
 	return historySidecarSet, nil
 }

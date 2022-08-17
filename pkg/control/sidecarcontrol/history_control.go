@@ -264,6 +264,7 @@ func copySidecarSetSpecRevision(dst, src map[string]interface{}) {
 	dst["containers"] = src["containers"]
 	dst["initContainers"] = src["initContainers"]
 	dst["imagePullSecrets"] = src["imagePullSecrets"]
+	dst["patchPodMetadata"] = src["patchPodMetadata"]
 }
 
 func restoreRevisionInfo(sidecarSet *appsv1alpha1.SidecarSet, revision *apps.ControllerRevision) error {
