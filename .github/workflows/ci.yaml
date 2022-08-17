@@ -99,7 +99,7 @@ jobs:
           make test
           git status
       - name: Publish Unit Test Coverage
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v3
         with:
           flags: unittests
           file: cover.out
