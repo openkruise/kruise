@@ -1130,6 +1130,72 @@ var _ = SIGDescribe("SidecarSet", func() {
 			ginkgo.By(fmt.Sprintf("sidecarSet history revision check done"))
 		})
 
+		framework.ConformanceIt("sidecarSet history revision data checker", func() {
+			// check function
+			revisionChecker := func(list []*apps.ControllerRevision) {
+				gomega.Expect(list).To(gomega.HaveLen(2))
+				history.SortControllerRevisions(list)
+				patchPodMetadata := map[string][]appsv1alpha1.SidecarSetPatchPodMetadata{}
+				for _, revision := range list {
+					mice := make(map[string]interface{})
+					err := json.Unmarshal(revision.Data.Raw, &mice)
+					gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+					spec := mice["spec"].(map[string]interface{})
+					_, ok1 := spec["volumes"]
+					_, ok2 := spec["containers"]
+					_, ok3 := spec["initContainers"]
+					_, ok4 := spec["imagePullSecrets"]
+					_, ok5 := spec["patchPodMetadata"]
+					gomega.Expect(ok1 && ok2 && ok3 && ok4 && ok5).To(gomega.BeTrue())
+					b, _ := json.Marshal(spec["patchPodMetadata"])
+					var patch []appsv1alpha1.SidecarSetPatchPodMetadata
+					gomega.Expect(json.Unmarshal(b, &patch)).NotTo(gomega.HaveOccurred())
+					patchPodMetadata[revision.Name] = patch
+				}
+				gomega.Expect(patchPodMetadata[list[0].Name][0].Annotations["sidecarset.kruise.io/test"] == "version-1").Should(gomega.BeTrue())
+				gomega.Expect(patchPodMetadata[list[1].Name][0].Annotations["sidecarset.kruise.io/test"] == "version-2").Should(gomega.BeTrue())
+			}
+
+			waitingForSidecarSetReconcile := func(name string) {
+				gomega.Eventually(func() bool {
+					sidecarSet, err := kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), name, metav1.GetOptions{})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return sidecarSet.Status.ObservedGeneration == sidecarSet.Generation
+				}, 10*time.Second, time.Second).Should(gomega.BeTrue())
+			}
+
+			ginkgo.By("check after sidecarset creating...")
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn.SetName("e2e-test-for-history-revision-data")
+			sidecarSetIn.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "secret-1"}}
+			sidecarSetIn.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				{
+					PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+					Annotations: map[string]string{
+						"sidecarset.kruise.io/test": "version-1",
+					},
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
+			waitingForSidecarSetReconcile(sidecarSetIn.Name)
+
+			ginkgo.By(fmt.Sprintf("Updating SidecarSet %s", sidecarSetIn.Name))
+			sidecarSetIn.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				{
+					PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+					Annotations: map[string]string{
+						"sidecarset.kruise.io/test": "version-2",
+					},
+				},
+			}
+			tester.UpdateSidecarSet(sidecarSetIn)
+			waitingForSidecarSetReconcile(sidecarSetIn.Name)
+			list := tester.ListControllerRevisions(sidecarSetIn)
+			revisionChecker(list)
+			ginkgo.By(fmt.Sprintf("sidecarSet history revision data check done"))
+		})
+
 		framework.ConformanceIt("sidecarSet InjectionStrategy.Revision checker", func() {
 			// create sidecarSet
 			nginxName := func(tag string) string {
