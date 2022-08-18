@@ -965,6 +965,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				return nowStatus
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
+			time.Sleep(5 * time.Second)
 			// check now pod
 			pods, err := sidecarTester.GetSelectorPods(cloneset.Namespace, cloneset.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
