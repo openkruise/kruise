@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsvbeta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 const (
@@ -42,10 +43,13 @@ const (
 )
 
 var (
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindCS       = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKindSts            = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRS             = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindDep            = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindJob            = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindBetaSts  = appsvbeta1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKruiseKindAlphaSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
 func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
@@ -115,6 +119,11 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
 				}
+			case controllerKindSts.Kind:
+				ok, err := verifyGroupKind(spec.TargetReference, controllerKindSts.Kind, []string{controllerKindSts.Group, controllerKruiseKindAlphaSts.Group, controllerKruiseKindBetaSts.Group})
+				if !ok || err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
+				}
 			default:
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference's GroupKind is not permitted."))
 			}
@@ -122,7 +131,7 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 	}
 
 	// validate subsets
-	allErrs = append(allErrs, validateWorkloadSpreadSubsets(spec.Subsets, fldPath.Child("subsets"))...)
+	allErrs = append(allErrs, validateWorkloadSpreadSubsets(obj, spec.Subsets, fldPath.Child("subsets"))...)
 
 	// validate scheduleStrategy
 	if spec.ScheduleStrategy.Type != "" &&
@@ -160,7 +169,7 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 	return allErrs
 }
 
-func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	//if len(subsets) < 2 {
@@ -240,6 +249,11 @@ func validateWorkloadSpreadSubsets(subsets []appsv1alpha1.WorkloadSpreadSubset, 
 				firstMaxReplicasType = &subset.MaxReplicas.Type
 			} else if subset.MaxReplicas.Type != *firstMaxReplicasType {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "the maxReplicas type of all subsets must be the same"))
+				return allErrs
+			}
+
+			if ws.Spec.TargetReference != nil && ws.Spec.TargetReference.Kind == controllerKindSts.Kind && subset.MaxReplicas.Type != intstr.Int {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, "the maxReplicas type must be Int for StatefulSet"))
 				return allErrs
 			}
 

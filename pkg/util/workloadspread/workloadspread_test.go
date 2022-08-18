@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -153,6 +154,7 @@ var (
 func init() {
 	scheme = runtime.NewScheme()
 	_ = appsv1alpha1.AddToScheme(scheme)
+	_ = appsv1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 }
 
@@ -984,6 +986,20 @@ func TestFilterReference(t *testing.T) {
 	for _, ref := range refs {
 		if matched, _ := matchReference(ref); !matched {
 			t.Fatalf("error")
+		}
+	}
+}
+
+func TestGetParentNameAndOrdinal(t *testing.T) {
+	for i := 0; i < 500; i++ {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("sample-%d", i),
+			},
+		}
+		_, id := getParentNameAndOrdinal(&pod)
+		if id != i {
+			t.Fatal("failed to parse pod name")
 		}
 	}
 }
