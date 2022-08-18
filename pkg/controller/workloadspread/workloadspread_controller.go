@@ -85,11 +85,13 @@ const (
 )
 
 var (
-	controllerKruiseKindWS = appsv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpread")
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindWS  = appsv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpread")
+	controllerKruiseKindCS  = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKruiseKindSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindSts       = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRS        = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindDep       = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindJob       = batchv1.SchemeGroupVersion.WithKind("Job")
 )
 
 // this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
@@ -269,7 +271,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 	targetRef := ws.Spec.TargetReference
 
 	switch targetRef.Kind {
-	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind:
+	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind, controllerKindSts.Kind:
 		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, ws.Namespace, targetRef.Name, false)
 	case controllerKindJob.Kind:
 		pods, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
