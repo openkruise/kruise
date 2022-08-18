@@ -323,6 +323,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 		return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
 	}
 
+	var newKilledContainerStatus []appsv1alpha1.ContainerRecreateRequestKilledContainerStatus
 	var completedCount int
 	for i := range newCRRContainerRecreateStates {
 		state := &newCRRContainerRecreateStates[i]
@@ -362,8 +363,20 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 			}
 			return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
 		}
+
+		newKilledContainerStatus = append(newKilledContainerStatus, appsv1alpha1.ContainerRecreateRequestKilledContainerStatus{
+			Name:         state.Name,
+			RestartCount: int32(kubeContainerStatus.RestartCount),
+			ContainerID:  kubeContainerStatus.ID.String(),
+		})
 		state.Phase = appsv1alpha1.ContainerRecreateRequestRecreating
 		break
+	}
+
+	if len(newKilledContainerStatus) > 0 {
+		if err := c.patchKilledContainerStatuses(crr, newKilledContainerStatus); err != nil {
+			return err
+		}
 	}
 
 	if !reflect.DeepEqual(crr.Status.ContainerRecreateStates, newCRRContainerRecreateStates) {
@@ -392,6 +405,24 @@ func (c *Controller) patchCRRContainerRecreateStates(crr *appsv1alpha1.Container
 		}
 	}()
 	return c.runtimeClient.Status().Patch(context.TODO(), crr, runtimeclient.RawPatch(types.MergePatchType, []byte(body)))
+}
+
+func (c *Controller) patchKilledContainerStatuses(crr *appsv1alpha1.ContainerRecreateRequest, status []appsv1alpha1.ContainerRecreateRequestKilledContainerStatus) error {
+	statusStr := util.DumpJSON(status)
+	klog.V(3).Infof("CRR %s/%s patch killedContainerStatues: %v", crr.Namespace, crr.Name, statusStr)
+	if crr.Annotations[appsv1alpha1.ContainerRecreateRequestKilledContainerStatusesKey] != statusStr {
+		body := util.DumpJSON(syncPatchBody{Metadata: syncPatchMetadata{Annotations: map[string]string{appsv1alpha1.ContainerRecreateRequestKilledContainerStatusesKey: statusStr}}})
+		return c.runtimeClient.Patch(context.TODO(), crr, runtimeclient.RawPatch(types.MergePatchType, []byte(body)))
+	}
+	return nil
+}
+
+type syncPatchBody struct {
+	Metadata syncPatchMetadata `json:"metadata"`
+}
+
+type syncPatchMetadata struct {
+	Annotations map[string]string `json:"annotations"`
 }
 
 func (c *Controller) updateCRRPhase(crr *appsv1alpha1.ContainerRecreateRequest, phase appsv1alpha1.ContainerRecreateRequestPhase) error {

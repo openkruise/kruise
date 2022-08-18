@@ -236,6 +236,10 @@ spec:
                     description: FailurePolicy decides whether to continue if one
                       container fails to recreate
                     type: string
+                  forceRecreate:
+                    description: ForceRecreate indicates whether to force kill the
+                      container even if the previous one is not running.
+                    type: boolean
                   minStartedSeconds:
                     description: Minimum number of seconds for which a newly created
                       container should be started and ready without any of its container

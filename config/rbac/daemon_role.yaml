@@ -38,6 +38,7 @@ rules:
   - get
   - list
   - watch
+  - patch
 - apiGroups:
   - apps.kruise.io
   resources:

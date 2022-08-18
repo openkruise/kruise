@@ -37,6 +37,8 @@ const (
 	// ContainerRecreateRequestUnreadyAcquiredKey indicates the Pod has been forced to not-ready.
 	// It is required if the unreadyGracePeriodSeconds is set in ContainerRecreateRequests.
 	ContainerRecreateRequestUnreadyAcquiredKey = "crr.apps.kruise.io/unready-acquired"
+
+	ContainerRecreateRequestKilledContainerStatusesKey = "crr.apps.kruise.io/killed-container-statuses"
 )
 
 // ContainerRecreateRequestSpec defines the desired state of ContainerRecreateRequest
@@ -106,6 +108,8 @@ type ContainerRecreateRequestStrategy struct {
 	FailurePolicy ContainerRecreateRequestFailurePolicyType `json:"failurePolicy,omitempty"`
 	// OrderedRecreate indicates whether to recreate the next container only if the previous one has recreated completely.
 	OrderedRecreate bool `json:"orderedRecreate,omitempty"`
+	// ForceRecreate indicates whether to force kill the container even if the previous one is not running.
+	ForceRecreate bool `json:"forceRecreate,omitempty"`
 	// TerminationGracePeriodSeconds is the optional duration in seconds to wait the container terminating gracefully.
 	// Value must be non-negative integer. The value zero indicates delete immediately.
 	// If this value is nil, we will use pod.Spec.TerminationGracePeriodSeconds as default value.
@@ -165,6 +169,17 @@ type ContainerRecreateRequestSyncContainerStatus struct {
 	Name string `json:"name"`
 	// Specifies whether the container has passed its readiness probe.
 	Ready bool `json:"ready"`
+	// The number of times the container has been restarted, currently based on
+	// the number of dead containers that have not yet been removed.
+	RestartCount int32 `json:"restartCount"`
+	// Container's ID in the format 'docker://<container_id>'.
+	ContainerID string `json:"containerID,omitempty"`
+}
+
+// ContainerRecreateRequestKilledContainerStatus contains the state of the last killed container.
+type ContainerRecreateRequestKilledContainerStatus struct {
+	// Name of the container.
+	Name string `json:"name"`
 	// The number of times the container has been restarted, currently based on
 	// the number of dead containers that have not yet been removed.
 	RestartCount int32 `json:"restartCount"`

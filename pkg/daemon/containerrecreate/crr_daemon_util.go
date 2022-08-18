@@ -69,6 +69,7 @@ func getCurrentCRRContainersRecreateStates(
 	}
 
 	syncContainerStatuses := getCRRSyncContainerStatuses(crr)
+	killedContainerStatuses := getCRRKilledContainerStatuses(crr)
 	var statuses []appsv1alpha1.ContainerRecreateRequestContainerRecreateState
 
 	for i := range crr.Spec.Containers {
@@ -82,6 +83,7 @@ func getCurrentCRRContainersRecreateStates(
 		}
 
 		syncContainerStatus := syncContainerStatuses[c.Name]
+		killedContainerStatus := killedContainerStatuses[c.Name]
 		kubeContainerStatus := podStatus.FindContainerStatusByName(c.Name)
 
 		var currentState appsv1alpha1.ContainerRecreateRequestContainerRecreateState
@@ -99,7 +101,6 @@ func getCurrentCRRContainersRecreateStates(
 				Name:  c.Name,
 				Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
 			}
-
 		} else if kubeContainerStatus.ID.String() != c.StatusContext.ContainerID ||
 			kubeContainerStatus.RestartCount > int(c.StatusContext.RestartCount) ||
 			kubeContainerStatus.StartedAt.After(crr.CreationTimestamp.Time) {
@@ -114,7 +115,9 @@ func getCurrentCRRContainersRecreateStates(
 				syncContainerStatus.Ready {
 				currentState.Phase = appsv1alpha1.ContainerRecreateRequestSucceeded
 			}
-
+			if crr.Spec.Strategy.ForceRecreate && (killedContainerStatus == nil || killedContainerStatus.ContainerID == "") {
+				currentState.Phase = appsv1alpha1.ContainerRecreateRequestPending
+			}
 		} else {
 			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 				Name:  c.Name,
@@ -152,6 +155,25 @@ func getCRRSyncContainerStatuses(crr *appsv1alpha1.ContainerRecreateRequest) map
 	statuses := make(map[string]*appsv1alpha1.ContainerRecreateRequestSyncContainerStatus, len(syncContainerStatuses))
 	for i := range syncContainerStatuses {
 		c := &syncContainerStatuses[i]
+		statuses[c.Name] = c
+	}
+	return statuses
+}
+
+func getCRRKilledContainerStatuses(crr *appsv1alpha1.ContainerRecreateRequest) map[string]*appsv1alpha1.ContainerRecreateRequestKilledContainerStatus {
+	str := crr.Annotations[appsv1alpha1.ContainerRecreateRequestKilledContainerStatusesKey]
+	if str == "" {
+		return nil
+	}
+	var killedContainerStatuses []appsv1alpha1.ContainerRecreateRequestKilledContainerStatus
+	if err := json.Unmarshal([]byte(str), &killedContainerStatuses); err != nil {
+		klog.Errorf("Failed to unmarshal CRR %s/%s killedContainerStatuses %s: %v", crr.Namespace, crr.Name, str, err)
+		return nil
+	}
+
+	statuses := make(map[string]*appsv1alpha1.ContainerRecreateRequestKilledContainerStatus, len(killedContainerStatuses))
+	for i := range killedContainerStatuses {
+		c := &killedContainerStatuses[i]
 		statuses[c.Name] = c
 	}
 	return statuses
