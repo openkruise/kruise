@@ -20,16 +20,20 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/openkruise/kruise/pkg/util/configuration"
+
+	"k8s.io/klog/v2"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -41,6 +45,7 @@ var _ handler.EventHandler = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct {
 	reader client.Reader
+	client client.Client
 }
 
 func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -87,8 +92,12 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 
 func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1alpha1.PersistentPodState {
 	ref := metav1.GetControllerOf(pod)
-	// only statefulSet
-	if ref == nil || ref.Kind != KindSts.Kind {
+	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(p.client)
+	if err != nil {
+		klog.Errorf("Failed to get persistent pod state config white list, error: %v\n", err.Error())
+		return nil
+	}
+	if ref == nil || !whiteList.ValidateAPIVersionAndKind(ref.APIVersion, ref.Kind) {
 		return nil
 	}
 	ppsName := pod.Annotations[mutating.InjectedPersistentPodStateKey]
@@ -253,4 +262,67 @@ func (p *enqueueRequestForKruiseStatefulSet) Update(evt event.UpdateEvent, q wor
 			})
 		}
 	}
+}
+
+var _ handler.EventHandler = &enqueueRequestForStatefulSetLike{}
+
+type enqueueRequestForStatefulSetLike struct {
+	reader client.Reader
+}
+
+func (p *enqueueRequestForStatefulSetLike) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	workload := evt.Object.(*unstructured.Unstructured)
+	annotations := workload.GetAnnotations()
+	if annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" &&
+		(annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != "" ||
+			annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != "") {
+		enqueuePersistentPodStateRequest(q, workload.GetAPIVersion(), workload.GetKind(), workload.GetNamespace(), workload.GetName())
+	}
+}
+
+func (p *enqueueRequestForStatefulSetLike) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	oWorkload := evt.ObjectOld.(*unstructured.Unstructured)
+	nWorkload := evt.ObjectNew.(*unstructured.Unstructured)
+	oAnnotations := oWorkload.GetAnnotations()
+	nAnnotations := nWorkload.GetAnnotations()
+	if oAnnotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] != nAnnotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] ||
+		oAnnotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != nAnnotations[appsv1alpha1.AnnotationRequiredPersistentTopology] ||
+		oAnnotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != nAnnotations[appsv1alpha1.AnnotationPreferredPersistentTopology] {
+		enqueuePersistentPodStateRequest(q, nWorkload.GetAPIVersion(), nWorkload.GetKind(), nWorkload.GetNamespace(), nWorkload.GetName())
+	}
+
+	// delete statefulSet scenario
+	if oWorkload.GetDeletionTimestamp().IsZero() && !nWorkload.GetDeletionTimestamp().IsZero() {
+		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+			APIVersion: oWorkload.GetAPIVersion(),
+			Kind:       oWorkload.GetKind(),
+			Name:       nWorkload.GetName(),
+		}, nWorkload.GetNamespace()); pps != nil {
+			q.Add(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      pps.Name,
+					Namespace: pps.Namespace,
+				},
+			})
+		}
+	}
+}
+
+func (p *enqueueRequestForStatefulSetLike) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	workload := evt.Object.(*unstructured.Unstructured)
+	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+		APIVersion: workload.GetAPIVersion(),
+		Kind:       workload.GetKind(),
+		Name:       workload.GetName(),
+	}, workload.GetNamespace()); pps != nil {
+		q.Add(reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      pps.Name,
+				Namespace: pps.Namespace,
+			},
+		})
+	}
+}
+
+func (p *enqueueRequestForStatefulSetLike) Generic(genericEvent event.GenericEvent, limitingInterface workqueue.RateLimitingInterface) {
 }

@@ -21,11 +21,13 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -154,7 +156,7 @@ func (r *ControllerFinder) GetScaleAndSelectorForRef(apiVersion, kind, ns, name 
 
 func (r *ControllerFinder) Finders() []PodControllerFinder {
 	return []PodControllerFinder{r.getPodReplicationController, r.getPodDeployment, r.getPodReplicaSet,
-		r.getPodStatefulSet, r.getPodKruiseCloneSet, r.getPodKruiseStatefulSet, r.getScaleController}
+		r.getPodStatefulSet, r.getPodKruiseCloneSet, r.getPodKruiseStatefulSet, r.getPodStatefulSetLike, r.getScaleController}
 }
 
 var (
@@ -388,6 +390,61 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 		},
 		Metadata: ss.ObjectMeta,
 	}, nil
+}
+
+// getPodStatefulSetLike returns the statefulset like referenced by the provided controllerRef.
+func (r *ControllerFinder) getPodStatefulSetLike(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
+	// This error is irreversible, so there is no need to return error
+	gv, err := schema.ParseGroupVersion(ref.APIVersion)
+	if err != nil {
+		return nil, nil
+	}
+	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(r.Client)
+	if err != nil {
+		return nil, err
+	}
+	if !whiteList.ValidateAPIVersionAndKind(ref.APIVersion, ref.Kind) {
+		return nil, nil
+	}
+	gvk := schema.GroupVersionKind{
+		Group:   gv.Group,
+		Version: gv.Version,
+		Kind:    ref.Kind,
+	}
+	workload := &unstructured.Unstructured{}
+	workload.SetGroupVersionKind(gvk)
+	err = r.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: ref.Name}, workload)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if ref.UID != "" && workload.GetUID() != ref.UID {
+		return nil, nil
+	}
+
+	scaleSelector := &ScaleAndSelector{
+		Scale:    0,
+		Selector: nil,
+		ControllerReference: ControllerReference{
+			APIVersion: workload.GetAPIVersion(),
+			Kind:       workload.GetKind(),
+			Name:       workload.GetName(),
+			UID:        workload.GetUID(),
+		},
+		Metadata: metav1.ObjectMeta{
+			Namespace:   workload.GetNamespace(),
+			Name:        workload.GetName(),
+			Annotations: workload.GetAnnotations(),
+			UID:         workload.GetUID(),
+		},
+	}
+	obj := workload.UnstructuredContent()
+	if val, found, err := unstructured.NestedInt64(obj, "spec.replicas"); err == nil && found {
+		scaleSelector.Scale = int32(val)
+	}
+	return scaleSelector, nil
 }
 
 func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {

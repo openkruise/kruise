@@ -22,6 +22,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,8 +42,13 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 		req.AdmissionRequest.Resource.Resource != "pods" {
 		return true, nil
 	}
+
+	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(h.Client)
+	if err != nil {
+		return false, err
+	}
 	ref := metav1.GetControllerOf(pod)
-	if ref == nil || ref.Kind != "StatefulSet" {
+	if ref == nil || !whiteList.ValidateAPIVersionAndKind(ref.APIVersion, ref.Kind) {
 		return true, nil
 	}
 	// selector persistentPodState

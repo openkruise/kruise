@@ -16,10 +16,16 @@ limitations under the License.
 
 package configuration
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
 const (
 	SidecarSetPatchPodMetadataWhiteListKey = "SidecarSet_PatchPodMetadata_WhiteList"
+	PPSWatchCustomWorkloadWhiteList        = "PPS_Watch_Custom_Workload_WhiteList"
 )
 
 type SidecarSetPatchMetadataWhiteList struct {
@@ -32,4 +38,40 @@ type SidecarSetPatchMetadataWhiteRule struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 	// Support for regular expressions
 	AllowedAnnotationKeyExprs []string `json:"allowedAnnotationKeyExprs"`
+}
+
+type PPSWatchWatchCustomWorkloadWhiteList struct {
+	Workloads []schema.GroupVersionKind `json:"workloads,omitempty"`
+}
+
+func (p *PPSWatchWatchCustomWorkloadWhiteList) IsValid(gk metav1.GroupKind) bool {
+	for _, workload := range p.Workloads {
+		if workload.Group == gk.Group && workload.Kind == gk.Kind {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *PPSWatchWatchCustomWorkloadWhiteList) ValidateAPIVersionAndKind(apiVersion, kind string) bool {
+	if p.IsDefaultSupport(apiVersion, kind) {
+		return true
+	}
+	gv, err := schema.ParseGroupVersion(apiVersion)
+	if err != nil {
+		return false
+	}
+	gk := metav1.GroupKind{Group: gv.Group, Kind: kind}
+	return p.IsValid(gk)
+}
+
+func (p *PPSWatchWatchCustomWorkloadWhiteList) IsDefaultSupport(apiVersion, kind string) bool {
+	gv, err := schema.ParseGroupVersion(apiVersion)
+	if err != nil {
+		return false
+	}
+	if (gv.Group == v1alpha1.GroupVersion.Group || gv.Group == appsv1.GroupName) && kind == "StatefulSet" {
+		return true
+	}
+	return false
 }

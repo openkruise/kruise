@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,12 +51,30 @@ func GetSidecarSetPatchMetadataWhiteList(client client.Client) (*SidecarSetPatch
 	return whiteList, nil
 }
 
+func GetPPSWatchWatchCustomWorkloadWhiteList(client client.Client) (*PPSWatchWatchCustomWorkloadWhiteList, error) {
+	whiteList := &PPSWatchWatchCustomWorkloadWhiteList{Workloads: make([]schema.GroupVersionKind, 0)}
+	data, err := getKruiseConfiguration(client)
+	if err != nil {
+		return nil, err
+	} else if len(data) == 0 {
+		return whiteList, nil
+	}
+	value, ok := data[PPSWatchCustomWorkloadWhiteList]
+	if !ok {
+		return whiteList, nil
+	}
+	if err = json.Unmarshal([]byte(value), whiteList); err != nil {
+		return nil, err
+	}
+	return whiteList, nil
+}
+
 func getKruiseConfiguration(c client.Client) (map[string]string, error) {
 	cfg := &corev1.ConfigMap{}
 	err := c.Get(context.TODO(), client.ObjectKey{Namespace: util.GetKruiseNamespace(), Name: KruiseConfigurationName}, cfg)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil, nil
+			return map[string]string{}, nil
 		}
 		return nil, err
 	}

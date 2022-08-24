@@ -35,6 +35,10 @@ const (
 	// for example kruise.io/preferred-persistent-topology: kubernetes.io/hostname[,xxx]
 	// optional
 	AnnotationPreferredPersistentTopology = "kruise.io/preferred-persistent-topology"
+	// AnnotationPersistentPodAnnotations Pod needs persistent annotations
+	// for example kruise.io/persistent-pod-annotations: cni.projectcalico.org/podIP[,xxx]
+	// optional
+	AnnotationPersistentPodAnnotations = "kruise.io/persistent-pod-annotations"
 )
 
 // PersistentPodStateSpec defines the desired state of PersistentPodState
@@ -43,6 +47,9 @@ type PersistentPodStateSpec struct {
 	// Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
 	// current only support StatefulSet
 	TargetReference TargetReference `json:"targetRef"`
+
+	// Persist the annotations information of the pods that need to be saved
+	PersistentPodAnnotations []PersistentPodAnnotation `json:"persistentPodAnnotations,omitempty"`
 
 	// Pod rebuilt topology required for node labels
 	// for example kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone
@@ -65,6 +72,10 @@ type PreferredTopologyTerm struct {
 type NodeTopologyTerm struct {
 	// A list of node selector requirements by node's labels.
 	NodeTopologyKeys []string `json:"nodeTopologyKeys"`
+}
+
+type PersistentPodAnnotation struct {
+	Key string `json:"key"`
 }
 
 type PersistentPodStateRetentionPolicyType string
@@ -91,6 +102,8 @@ type PodState struct {
 	// node topology labels key=value
 	// for example kubernetes.io/hostname=node-1
 	NodeTopologyLabels map[string]string `json:"nodeTopologyLabels,omitempty"`
+	// pod persistent annotations
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // +genclient

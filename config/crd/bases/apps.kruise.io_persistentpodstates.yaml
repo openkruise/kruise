@@ -36,6 +36,17 @@ spec:
           spec:
             description: PersistentPodStateSpec defines the desired state of PersistentPodState
             properties:
+              persistentPodAnnotations:
+                description: Persist the annotations information of the pods that
+                  need to be saved
+                items:
+                  properties:
+                    key:
+                      type: string
+                  required:
+                  - key
+                  type: object
+                type: array
               persistentPodStateRetentionPolicy:
                 description: PersistentPodStateRetentionPolicy describes the policy
                   used for PodState. The default policy of 'WhenScaled' causes when
@@ -111,6 +122,11 @@ spec:
               podStates:
                 additionalProperties:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: pod persistent annotations
+                      type: object
                     nodeName:
                       description: pod.spec.nodeName
                       type: string

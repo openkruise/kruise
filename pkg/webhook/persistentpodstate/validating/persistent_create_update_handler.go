@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -71,7 +72,16 @@ func (h *PersistentPodStateCreateUpdateHandler) Handle(ctx context.Context, req 
 
 func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(obj, old *appsv1alpha1.PersistentPodState) field.ErrorList {
 	//validate pps.Spec
-	allErrs := validatePersistentPodStateSpec(obj, field.NewPath("spec"))
+	allErrs := field.ErrorList{}
+	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(h.Client)
+	if err != nil {
+		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("failed to get persistent pod state config white list, error: %v", err)))
+		return allErrs
+	}
+	errs := validatePersistentPodStateSpec(obj, field.NewPath("spec"), whiteList)
+	if len(errs) != 0 {
+		allErrs = append(allErrs, errs...)
+	}
 	// when operation is update, validating whether old and new pps conflict
 	if old != nil {
 		allErrs = append(allErrs, validateUpdateObjImmutable(obj, old, field.NewPath("spec"))...)
@@ -95,19 +105,17 @@ func validateUpdateObjImmutable(obj, old *appsv1alpha1.PersistentPodState, fldPa
 	return allErrs
 }
 
-func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPath *field.Path) field.ErrorList {
+func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPath *field.Path, whiteList *configuration.PPSWatchWatchCustomWorkloadWhiteList) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	// targetRef
 	if spec.TargetReference.APIVersion == "" || spec.TargetReference.Name == "" || spec.TargetReference.Kind == "" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, "empty TargetReference is not valid for PersistentPodState."))
 	}
-	_, err := schema.ParseGroupVersion(spec.TargetReference.APIVersion)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, err.Error()))
-	}
-	if spec.TargetReference.Kind != "StatefulSet" {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, "TargetReference.Kind must be StatefulSet"))
+
+	apiVersion, kind := spec.TargetReference.APIVersion, spec.TargetReference.Kind
+	if !whiteList.ValidateAPIVersionAndKind(apiVersion, kind) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, "TargetReference.Kind must be StatefulSet or in PPS_Watch_Custom_Workload_WhiteList"))
 	}
 
 	if spec.RequiredPersistentTopology == nil && len(spec.PreferredPersistentTopology) == 0 {
