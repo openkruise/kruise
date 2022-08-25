@@ -364,4 +364,7 @@ func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
 	if obj.Spec.PullPolicy.BackoffLimit == nil {
 		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
 	}
+	if obj.Spec.PullPolicy.Type == "" {
+		obj.Spec.PullPolicy.Type = v1alpha1.PullIfNotPresent
+	}
 }

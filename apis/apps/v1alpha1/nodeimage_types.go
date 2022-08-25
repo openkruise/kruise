@@ -90,6 +90,11 @@ type ImageTagPullPolicy struct {
 	// +optional
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 
+	// Specifies the Pod ImagePullPolicy of the pulling task.
+	// Defaults to IfNotPresent
+	// +optional
+	Type PullPolicyType `json:"type,omitempty"`
+
 	// TTLSecondsAfterFinished limits the lifetime of a pulling task that has finished execution (either Complete or Failed).
 	// If this field is set, ttlSecondsAfterFinished after the task finishes, it is eligible to be automatically deleted.
 	// If this field is unset, the task won't be automatically deleted.

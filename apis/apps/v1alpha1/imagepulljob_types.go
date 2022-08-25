@@ -83,6 +83,11 @@ type ImagePullJobNodeSelector struct {
 
 // PullPolicy defines the policy of the pulling task
 type PullPolicy struct {
+	// Specifies the type of Pod ImagePullPolicy of the pulling task.
+	// Defaults to IfNotPresent
+	// +optional
+	Type PullPolicyType `json:"type,omitempty"`
+
 	// Specifies the timeout of the pulling task.
 	// Defaults to 600
 	// +optional

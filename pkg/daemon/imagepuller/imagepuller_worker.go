@@ -424,11 +424,13 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 	startTime := metav1.Now()
 
 	klog.Infof("Worker is starting to pull image %s:%s version %v", w.name, tag, w.tagSpec.Version)
-
-	if _, e := w.getImageInfo(ctx); e == nil {
-		klog.Infof("Image %s:%s is already exists", w.name, tag)
-		newStatus.Progress = 100
-		return nil
+	// When PullPolicy type is always, there is no need to check whether there is an image locally
+	if w.tagSpec.PullPolicy.Type != appsv1alpha1.PullAlways {
+		if _, e := w.getImageInfo(ctx); e == nil {
+			klog.Infof("Image %s:%s is already exists", w.name, tag)
+			newStatus.Progress = 100
+			return nil
+		}
 	}
 
 	// make it asynchronous for CRI runtime will block in pulling image

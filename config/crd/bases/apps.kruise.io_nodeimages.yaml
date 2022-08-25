@@ -198,6 +198,10 @@ spec:
                                   after it finishes.
                                 format: int32
                                 type: integer
+                              type:
+                                description: Specifies the Pod ImagePullPolicy of
+                                  the pulling task. Defaults to IfNotPresent
+                                type: string
                             type: object
                           tag:
                             description: Specifies the image tag

@@ -92,6 +92,18 @@ const (
 	Never CompletionPolicyType = "Never"
 )
 
+// PullPolicyType indicates the type of pull policy
+type PullPolicyType string
+
+const (
+	// PullAlways means the job always attempts to pull the latest image.
+	PullAlways PullPolicyType = "Always"
+
+	// PullIfNotPresent means the job pulls if the image isn't present on disk.
+	// This is the default PullPolicyType.
+	PullIfNotPresent PullPolicyType = "IfNotPresent"
+)
+
 // BroadcastJobStatus defines the observed state of BroadcastJob
 type BroadcastJobStatus struct {
 	// The latest available observations of an object's current state.

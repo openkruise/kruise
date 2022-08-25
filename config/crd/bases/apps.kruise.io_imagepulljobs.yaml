@@ -165,6 +165,10 @@ spec:
                       to 600
                     format: int32
                     type: integer
+                  type:
+                    description: Specifies the type of Pod ImagePullPolicy of the
+                      pulling task. Defaults to IfNotPresent
+                    type: string
                 type: object
               pullSecrets:
                 description: ImagePullSecrets is an optional list of references to
