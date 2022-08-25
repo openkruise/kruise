@@ -81,10 +81,6 @@ type NodeImageListerExpansion interface{}
 // NodePodProbeLister.
 type NodePodProbeListerExpansion interface{}
 
-// NodePodProbeNamespaceListerExpansion allows custom methods to be added to
-// NodePodProbeNamespaceLister.
-type NodePodProbeNamespaceListerExpansion interface{}
-
 // PersistentPodStateListerExpansion allows custom methods to be added to
 // PersistentPodStateLister.
 type PersistentPodStateListerExpansion interface{}

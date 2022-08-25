@@ -32,7 +32,6 @@ import (
 // FakeNodePodProbes implements NodePodProbeInterface
 type FakeNodePodProbes struct {
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
 var nodepodprobesResource = schema.GroupVersionResource{Group: "apps.kruise.io", Version: "v1alpha1", Resource: "nodepodprobes"}
@@ -42,8 +41,7 @@ var nodepodprobesKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version
 // Get takes name of the nodePodProbe, and returns the corresponding nodePodProbe object, and an error if there is any.
 func (c *FakeNodePodProbes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NodePodProbe, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(nodepodprobesResource, c.ns, name), &v1alpha1.NodePodProbe{})
-
+		Invokes(testing.NewRootGetAction(nodepodprobesResource, name), &v1alpha1.NodePodProbe{})
 	if obj == nil {
 		return nil, err
 	}
@@ -53,8 +51,7 @@ func (c *FakeNodePodProbes) Get(ctx context.Context, name string, options v1.Get
 // List takes label and field selectors, and returns the list of NodePodProbes that match those selectors.
 func (c *FakeNodePodProbes) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NodePodProbeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(nodepodprobesResource, nodepodprobesKind, c.ns, opts), &v1alpha1.NodePodProbeList{})
-
+		Invokes(testing.NewRootListAction(nodepodprobesResource, nodepodprobesKind, opts), &v1alpha1.NodePodProbeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -75,15 +72,13 @@ func (c *FakeNodePodProbes) List(ctx context.Context, opts v1.ListOptions) (resu
 // Watch returns a watch.Interface that watches the requested nodePodProbes.
 func (c *FakeNodePodProbes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(nodepodprobesResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(nodepodprobesResource, opts))
 }
 
 // Create takes the representation of a nodePodProbe and creates it.  Returns the server's representation of the nodePodProbe, and an error, if there is any.
 func (c *FakeNodePodProbes) Create(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.CreateOptions) (result *v1alpha1.NodePodProbe, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(nodepodprobesResource, c.ns, nodePodProbe), &v1alpha1.NodePodProbe{})
-
+		Invokes(testing.NewRootCreateAction(nodepodprobesResource, nodePodProbe), &v1alpha1.NodePodProbe{})
 	if obj == nil {
 		return nil, err
 	}
@@ -93,8 +88,7 @@ func (c *FakeNodePodProbes) Create(ctx context.Context, nodePodProbe *v1alpha1.N
 // Update takes the representation of a nodePodProbe and updates it. Returns the server's representation of the nodePodProbe, and an error, if there is any.
 func (c *FakeNodePodProbes) Update(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.UpdateOptions) (result *v1alpha1.NodePodProbe, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(nodepodprobesResource, c.ns, nodePodProbe), &v1alpha1.NodePodProbe{})
-
+		Invokes(testing.NewRootUpdateAction(nodepodprobesResource, nodePodProbe), &v1alpha1.NodePodProbe{})
 	if obj == nil {
 		return nil, err
 	}
@@ -105,8 +99,7 @@ func (c *FakeNodePodProbes) Update(ctx context.Context, nodePodProbe *v1alpha1.N
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeNodePodProbes) UpdateStatus(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.UpdateOptions) (*v1alpha1.NodePodProbe, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(nodepodprobesResource, "status", c.ns, nodePodProbe), &v1alpha1.NodePodProbe{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(nodepodprobesResource, "status", nodePodProbe), &v1alpha1.NodePodProbe{})
 	if obj == nil {
 		return nil, err
 	}
@@ -116,14 +109,13 @@ func (c *FakeNodePodProbes) UpdateStatus(ctx context.Context, nodePodProbe *v1al
 // Delete takes name of the nodePodProbe and deletes it. Returns an error if one occurs.
 func (c *FakeNodePodProbes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(nodepodprobesResource, c.ns, name), &v1alpha1.NodePodProbe{})
-
+		Invokes(testing.NewRootDeleteAction(nodepodprobesResource, name), &v1alpha1.NodePodProbe{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeNodePodProbes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(nodepodprobesResource, c.ns, listOpts)
+	action := testing.NewRootDeleteCollectionAction(nodepodprobesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.NodePodProbeList{})
 	return err
@@ -132,8 +124,7 @@ func (c *FakeNodePodProbes) DeleteCollection(ctx context.Context, opts v1.Delete
 // Patch applies the patch and returns the patched nodePodProbe.
 func (c *FakeNodePodProbes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NodePodProbe, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(nodepodprobesResource, c.ns, name, pt, data, subresources...), &v1alpha1.NodePodProbe{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(nodepodprobesResource, name, pt, data, subresources...), &v1alpha1.NodePodProbe{})
 	if obj == nil {
 		return nil, err
 	}

@@ -27,23 +27,29 @@ type PodProbeMarkerSpec struct {
 	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	Selector *metav1.LabelSelector `json:"selector"`
-	// Custom container probe, supports Exec, Tcp, and returns the result to Pod yaml
-	ContainerProbes []ContainerProbe `json:"containerProbes"`
-	// According to the execution result of ContainerProbe, perform specific actions,
-	// such as: patch Pod labels, annotations, ReadinessGate Condition
-	MarkerItems []ProbeMarker `json:"markerItems,omitempty"`
+	// Custom container probe, current only support Exec().
+	// Probe Result will record in Pod.Status.Conditions, and condition.type=probe.name.
+	// condition.status=True indicates probe success
+	// condition.status=False indicates probe fails
+	Probes []ContainerProbe `json:"probes"`
 }
 
 type ContainerProbe struct {
-	// container name
+	// probe name, unique within the Pod(Even between different containers, they cannot be the same)
 	Name string `json:"name"`
+	// container name
+	ContainerName string `json:"containerName"`
 	// container probe spec
-	Probes []ContainerProbeSpec `json:"probes"`
+	Probe ContainerProbeSpec `json:"probe"`
+	// According to the execution result of ContainerProbe, perform specific actions,
+	// such as: patch Pod labels, annotations, ReadinessGate Condition
+	MarkerPolicy []ProbeMarkerPolicy `json:"markerPolicy,omitempty"`
+	// Used for NodeProbeProbe to quickly find the corresponding PodProbeMarker resource.
+	// User is not allowed to configure
+	PodProbeMarkerName string `json:"podProbeMarkerName,omitempty"`
 }
 
 type ContainerProbeSpec struct {
-	// probe name, unique within the Pod
-	Name string `json:"name"`
 	// The action taken to determine the health of a container
 	v1.Handler `json:",inline"`
 	// Number of seconds after the container has started before liveness probes are initiated.
@@ -69,22 +75,19 @@ type ContainerProbeSpec struct {
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 }
 
-type ProbeMarker struct {
-	// probe name
-	ProbeName string `json:"probeName"`
-	// True or False
-	Expectation ProbeStatus `json:"expectation"`
-	// Labels
+type ProbeMarkerPolicy struct {
+	// probe status, True or False
+	// For example: State=True, annotations[controller.kubernetes.io/pod-deletion-cost] = '10'.
+	// State=False, annotations[controller.kubernetes.io/pod-deletion-cost] = '-10'.
+	// In addition, if State=False is not defined, Exec execution fails, and the annotations[controller.kubernetes.io/pod-deletion-cost] will be Deleted
+	State ProbeState `json:"state"`
+	// Patch Labels pod.labels
 	Labels map[string]string `json:"labels,omitempty"`
-	// annotations
+	// Patch annotations pod.annotations
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-type PodProbeMarkerStatus struct {
-	// observedGeneration is the most recent generation observed for this PodProbeMarker. It corresponds to the
-	// PodProbeMarker's generation, which is updated on mutation by the API Server.
-	ObservedGeneration int64 `json:"observedGeneration"`
-}
+type PodProbeMarkerStatus struct{}
 
 // +genclient
 // +kubebuilder:object:root=true

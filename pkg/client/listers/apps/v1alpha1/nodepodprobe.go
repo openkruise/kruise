@@ -30,8 +30,9 @@ type NodePodProbeLister interface {
 	// List lists all NodePodProbes in the indexer.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.NodePodProbe, err error)
-	// NodePodProbes returns an object that can list and get NodePodProbes.
-	NodePodProbes(namespace string) NodePodProbeNamespaceLister
+	// Get retrieves the NodePodProbe from the index for a given name.
+	// Objects returned here must be treated as read-only.
+	Get(name string) (*v1alpha1.NodePodProbe, error)
 	NodePodProbeListerExpansion
 }
 
@@ -53,41 +54,9 @@ func (s *nodePodProbeLister) List(selector labels.Selector) (ret []*v1alpha1.Nod
 	return ret, err
 }
 
-// NodePodProbes returns an object that can list and get NodePodProbes.
-func (s *nodePodProbeLister) NodePodProbes(namespace string) NodePodProbeNamespaceLister {
-	return nodePodProbeNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// NodePodProbeNamespaceLister helps list and get NodePodProbes.
-// All objects returned here must be treated as read-only.
-type NodePodProbeNamespaceLister interface {
-	// List lists all NodePodProbes in the indexer for a given namespace.
-	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NodePodProbe, err error)
-	// Get retrieves the NodePodProbe from the indexer for a given namespace and name.
-	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NodePodProbe, error)
-	NodePodProbeNamespaceListerExpansion
-}
-
-// nodePodProbeNamespaceLister implements the NodePodProbeNamespaceLister
-// interface.
-type nodePodProbeNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all NodePodProbes in the indexer for a given namespace.
-func (s nodePodProbeNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.NodePodProbe, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.NodePodProbe))
-	})
-	return ret, err
-}
-
-// Get retrieves the NodePodProbe from the indexer for a given namespace and name.
-func (s nodePodProbeNamespaceLister) Get(name string) (*v1alpha1.NodePodProbe, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the NodePodProbe from the index for a given name.
+func (s *nodePodProbeLister) Get(name string) (*v1alpha1.NodePodProbe, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

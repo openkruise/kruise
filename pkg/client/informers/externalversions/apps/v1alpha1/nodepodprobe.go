@@ -41,33 +41,32 @@ type NodePodProbeInformer interface {
 type nodePodProbeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
 // NewNodePodProbeInformer constructs a new informer for NodePodProbe type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewNodePodProbeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredNodePodProbeInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewNodePodProbeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredNodePodProbeInformer(client, resyncPeriod, indexers, nil)
 }
 
 // NewFilteredNodePodProbeInformer constructs a new informer for NodePodProbe type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredNodePodProbeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredNodePodProbeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NodePodProbes(namespace).List(context.TODO(), options)
+				return client.AppsV1alpha1().NodePodProbes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().NodePodProbes(namespace).Watch(context.TODO(), options)
+				return client.AppsV1alpha1().NodePodProbes().Watch(context.TODO(), options)
 			},
 		},
 		&appsv1alpha1.NodePodProbe{},
@@ -77,7 +76,7 @@ func NewFilteredNodePodProbeInformer(client versioned.Interface, namespace strin
 }
 
 func (f *nodePodProbeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNodePodProbeInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredNodePodProbeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *nodePodProbeInformer) Informer() cache.SharedIndexInformer {

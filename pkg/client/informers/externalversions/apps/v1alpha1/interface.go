@@ -110,7 +110,7 @@ func (v *version) NodeImages() NodeImageInformer {
 
 // NodePodProbes returns a NodePodProbeInformer.
 func (v *version) NodePodProbes() NodePodProbeInformer {
-	return &nodePodProbeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &nodePodProbeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // PersistentPodStates returns a PersistentPodStateInformer.

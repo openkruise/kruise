@@ -1,0 +1,477 @@
+/*
+Copyright 2022 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package podprobe
+
+import (
+	"reflect"
+	"testing"
+	"time"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
+	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	commonutil "github.com/openkruise/kruise/pkg/util"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
+)
+
+var (
+	demoNodePodProbe = appsv1alpha1.NodePodProbe{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-1",
+		},
+		Spec: appsv1alpha1.NodePodProbeSpec{
+			PodProbes: []appsv1alpha1.PodProbe{
+				{
+					Name: "pod-1",
+					Uid:  "pod-1-uid",
+					Probes: []appsv1alpha1.ContainerProbe{
+						{
+							Name:          "healthy",
+							ContainerName: "main",
+							Probe: appsv1alpha1.ContainerProbeSpec{
+								Handler: corev1.Handler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"/bin/sh", "-c", "/healthy.sh"},
+									},
+								},
+								InitialDelaySeconds: 100,
+							},
+							PodProbeMarkerName: "ppm-1",
+						},
+					},
+				},
+			},
+		},
+	}
+)
+
+func TestUpdateNodePodProbeStatus(t *testing.T) {
+	cases := []struct {
+		name                     string
+		getUpdate                func() Update
+		getNodePodProbe          func() *appsv1alpha1.NodePodProbe
+		expectNodePodProbeStatus func() appsv1alpha1.NodePodProbeStatus
+	}{
+		{
+			name: "test1, update pod probe status",
+			getUpdate: func() Update {
+				return Update{Key: probeKey{"pod-1-uid", "main", "healthy"}, State: appsv1alpha1.ProbeTrue}
+			},
+			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
+				demo := demoNodePodProbe.DeepCopy()
+				demo.Status = appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-0",
+							Uid:  "pod-0-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeTrue,
+								},
+							},
+						},
+					},
+				}
+				return demo
+			},
+			expectNodePodProbeStatus: func() appsv1alpha1.NodePodProbeStatus {
+				obj := appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-0",
+							Uid:  "pod-0-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeTrue,
+								},
+							},
+						},
+						{
+							Name: "pod-1",
+							Uid:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeTrue,
+								},
+							},
+						},
+					},
+				}
+				return obj
+			},
+		},
+		{
+			name: "test2, update pod probe status",
+			getUpdate: func() Update {
+				return Update{Key: probeKey{"pod-1-uid", "main", "healthy"}, State: appsv1alpha1.ProbeTrue}
+			},
+			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
+				demo := demoNodePodProbe.DeepCopy()
+				demo.Status = appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-0",
+							Uid:  "pod-0-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeTrue,
+								},
+							},
+						},
+						{
+							Name: "pod-1",
+							Uid:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "other",
+									State: appsv1alpha1.ProbeFalse,
+								},
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeFalse,
+								},
+							},
+						},
+					},
+				}
+				return demo
+			},
+			expectNodePodProbeStatus: func() appsv1alpha1.NodePodProbeStatus {
+				obj := appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-0",
+							Uid:  "pod-0-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeTrue,
+								},
+							},
+						},
+						{
+							Name: "pod-1",
+							Uid:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "other",
+									State: appsv1alpha1.ProbeFalse,
+								},
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeTrue,
+								},
+							},
+						},
+					},
+				}
+				return obj
+			},
+		},
+		{
+			name: "test2, update pod probe status",
+			getUpdate: func() Update {
+				return Update{Key: probeKey{"pod-1-uid", "main", "healthy"}, State: appsv1alpha1.ProbeTrue}
+			},
+			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
+				demo := demoNodePodProbe.DeepCopy()
+				demo.Status = appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-1",
+							Uid:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "other",
+									State: appsv1alpha1.ProbeFalse,
+								},
+							},
+						},
+					},
+				}
+				return demo
+			},
+			expectNodePodProbeStatus: func() appsv1alpha1.NodePodProbeStatus {
+				obj := appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-1",
+							Uid:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "other",
+									State: appsv1alpha1.ProbeFalse,
+								},
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeTrue,
+								},
+							},
+						},
+					},
+				}
+				return obj
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(cs.getNodePodProbe())
+			informer := newNodePodProbeInformer(fakeClient, "node-1")
+			c := &Controller{
+				nodePodProbeInformer: informer,
+				nodePodProbeLister:   listersalpha1.NewNodePodProbeLister(informer.GetIndexer()),
+				workers:              make(map[probeKey]*worker),
+				nodePodProbeClient:   fakeClient.AppsV1alpha1().NodePodProbes(),
+				nodeName:             "node-1",
+				result: NewResultManager(workqueue.NewNamedRateLimitingQueue(
+					workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second),
+					"sync_node_pod_probe",
+				)),
+			}
+			stopCh := make(chan struct{}, 1)
+			go c.nodePodProbeInformer.Run(stopCh)
+			if !cache.WaitForCacheSync(stopCh, c.nodePodProbeInformer.HasSynced) {
+				return
+			}
+			c.result.cache = map[string]Update{
+				"container-id-1": cs.getUpdate(),
+			}
+			err := c.syncUpdateNodePodProbeStatus()
+			if err != nil {
+				t.Fatalf("syncUpdateNodePodProbeStatus failed: %s", err.Error())
+				return
+			}
+			time.Sleep(time.Second)
+			if !checkNodePodProbeStatusEqual(c.nodePodProbeLister, cs.expectNodePodProbeStatus()) {
+				t.Fatalf("checkNodePodProbeStatusEqual failed")
+			}
+		})
+	}
+}
+
+func checkNodePodProbeStatusEqual(lister listersalpha1.NodePodProbeLister, expect appsv1alpha1.NodePodProbeStatus) bool {
+	npp, err := lister.Get("node-1")
+	if err != nil {
+		klog.Errorf("Get NodePodProbe failed: %s", err.Error())
+		return false
+	}
+	for i := range npp.Status.PodProbeStatuses {
+		podProbe := npp.Status.PodProbeStatuses[i]
+		for j := range podProbe.ProbeStates {
+			obj := &podProbe.ProbeStates[j]
+			obj.LastTransitionTime = metav1.Time{}
+			obj.LastProbeTime = metav1.Time{}
+		}
+	}
+	return reflect.DeepEqual(npp.Status.PodProbeStatuses, expect.PodProbeStatuses)
+}
+
+func TestSyncNodePodProbe(t *testing.T) {
+	cases := []struct {
+		name                     string
+		getNodePodProbe          func() *appsv1alpha1.NodePodProbe
+		setWorkers               func(c *Controller)
+		expectNodePodProbeStatus func() appsv1alpha1.NodePodProbeStatus
+		expectWorkers            func(c *Controller) map[probeKey]*worker
+	}{
+		{
+			name: "test1, sync nodePodProbe",
+			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
+				demo := demoNodePodProbe.DeepCopy()
+				demo.Status = appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-1",
+							Uid:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "other",
+									State: appsv1alpha1.ProbeFalse,
+								},
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeFalse,
+								},
+							},
+						},
+						{
+							Name: "pod-2",
+							Uid:  "pod-2-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "other",
+									State: appsv1alpha1.ProbeFalse,
+								},
+							},
+						},
+					},
+				}
+				return demo
+			},
+			setWorkers: func(c *Controller) {
+				c.workers = map[probeKey]*worker{}
+				key1 := probeKey{"pod-1-uid", "main", "check"}
+				c.workers[key1] = newWorker(c, key1, &appsv1alpha1.ContainerProbeSpec{
+					Handler: corev1.Handler{
+						Exec: &corev1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "/check.sh"},
+						},
+					},
+				})
+				key2 := probeKey{"pod-1-uid", "main", "healthy"}
+				c.workers[key1] = newWorker(c, key2, &appsv1alpha1.ContainerProbeSpec{
+					Handler: corev1.Handler{
+						Exec: &corev1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "/healthy2.sh"},
+						},
+					},
+				})
+			},
+			expectWorkers: func(c *Controller) map[probeKey]*worker {
+				expect := map[probeKey]*worker{}
+				key := probeKey{"pod-1-uid", "main", "healthy"}
+				expect[key] = newWorker(c, key, &appsv1alpha1.ContainerProbeSpec{
+					Handler: corev1.Handler{
+						Exec: &corev1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "/healthy.sh"},
+						},
+					},
+					InitialDelaySeconds: 100,
+				})
+				return expect
+			},
+			expectNodePodProbeStatus: func() appsv1alpha1.NodePodProbeStatus {
+				return appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-1",
+							Uid:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "healthy",
+									State: appsv1alpha1.ProbeFalse,
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "test2, sync nodePodProbe",
+			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
+				demo := demoNodePodProbe.DeepCopy()
+				demo.Spec.PodProbes[0].Probes = append(demo.Spec.PodProbes[0].Probes, appsv1alpha1.ContainerProbe{
+					Name:          "check",
+					ContainerName: "nginx",
+					Probe: appsv1alpha1.ContainerProbeSpec{
+						Handler: corev1.Handler{
+							Exec: &corev1.ExecAction{
+								Command: []string{"/bin/sh", "-c", "/check.sh"},
+							},
+						},
+						InitialDelaySeconds: 100,
+					},
+					PodProbeMarkerName: "ppm-1",
+				})
+				return demo
+			},
+			setWorkers: func(c *Controller) {
+				c.workers = map[probeKey]*worker{}
+			},
+			expectWorkers: func(c *Controller) map[probeKey]*worker {
+				expect := map[probeKey]*worker{}
+				key1 := probeKey{"pod-1-uid", "main", "healthy"}
+				expect[key1] = newWorker(c, key1, &appsv1alpha1.ContainerProbeSpec{
+					Handler: corev1.Handler{
+						Exec: &corev1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "/healthy.sh"},
+						},
+					},
+					InitialDelaySeconds: 100,
+				})
+				key2 := probeKey{"pod-1-uid", "nginx", "check"}
+				expect[key2] = newWorker(c, key2, &appsv1alpha1.ContainerProbeSpec{
+					Handler: corev1.Handler{
+						Exec: &corev1.ExecAction{
+							Command: []string{"/bin/sh", "-c", "/check.sh"},
+						},
+					},
+					InitialDelaySeconds: 100,
+				})
+				return expect
+			},
+			expectNodePodProbeStatus: func() appsv1alpha1.NodePodProbeStatus {
+				return appsv1alpha1.NodePodProbeStatus{}
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(cs.getNodePodProbe())
+			informer := newNodePodProbeInformer(fakeClient, "node-1")
+			c := &Controller{
+				nodePodProbeInformer: informer,
+				nodePodProbeLister:   listersalpha1.NewNodePodProbeLister(informer.GetIndexer()),
+				workers:              make(map[probeKey]*worker),
+				nodePodProbeClient:   fakeClient.AppsV1alpha1().NodePodProbes(),
+				nodeName:             "node-1",
+				result: NewResultManager(workqueue.NewNamedRateLimitingQueue(
+					workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second),
+					"sync_node_pod_probe",
+				)),
+			}
+			stopCh := make(chan struct{}, 1)
+			go c.nodePodProbeInformer.Run(stopCh)
+			if !cache.WaitForCacheSync(stopCh, c.nodePodProbeInformer.HasSynced) {
+				return
+			}
+			err := c.sync()
+			if err != nil {
+				t.Fatalf("NodePodProbe sync failed: %s", err.Error())
+				return
+			}
+			time.Sleep(time.Second)
+			if !checkNodePodProbeStatusEqual(c.nodePodProbeLister, cs.expectNodePodProbeStatus()) {
+				t.Fatalf("checkNodePodProbeStatusEqual failed")
+			}
+			if len(c.workers) != len(cs.expectWorkers(c)) {
+				t.Fatalf("expect(%d), but get(%d)", len(cs.expectWorkers(c)), len(c.workers))
+			}
+			for _, worker := range cs.expectWorkers(c) {
+				obj, ok := c.workers[worker.key]
+				if !ok {
+					t.Fatalf("expect(%v), but not found", worker.key)
+				}
+				if !reflect.DeepEqual(worker.spec, obj.spec) {
+					t.Fatalf("expect(%s), but get(%s)", commonutil.DumpJSON(worker.spec), commonutil.DumpJSON(obj.spec))
+				}
+			}
+		})
+	}
+}

@@ -22,57 +22,65 @@ import (
 
 // NodePodProbeSpec defines the desired state of NodePodProbe
 type NodePodProbeSpec struct {
-	PodContainerProbes []PodContainerProbe `json:"podContainerProbes"`
+	PodProbes []PodProbe `json:"podProbes,omitempty"`
 }
 
-type PodContainerProbe struct {
+type PodProbe struct {
 	// pod name
-	PodName string `json:"podName"`
+	Name string `json:"name"`
+	// pod namespace
+	Namespace string `json:"namespace,omitempty"`
+	// pod uid
+	Uid string `json:"uid"`
 	// Custom container probe, supports Exec, Tcp, and returns the result to Pod yaml
-	ContainerProbes []ContainerProbe `json:"containerProbes"`
+	Probes []ContainerProbe `json:"probes,omitempty"`
 }
 
 type NodePodProbeStatus struct {
-	// observedGeneration is the most recent generation observed for this NodePodProbe. It corresponds to the
-	// NodePodProbe's generation, which is updated on mutation by the API Server.
-	ObservedGeneration int64 `json:"observedGeneration"`
 	// pod probe results
-	PodProbeResults []PodContainerProbeResult `json:"podProbeResults"`
+	PodProbeStatuses []PodProbeStatus `json:"podProbeStatuses,omitempty"`
 }
 
-type PodContainerProbeResult struct {
-	PodName string `json:"podName"`
-	// container probe result
-	ContainerProbes []ContainerProbeResult `json:"containerProbes"`
-}
-
-type ContainerProbeResult struct {
-	// container name
+type PodProbeStatus struct {
+	// pod name
 	Name string `json:"name"`
-	// probe results
-	Probes []ProbeResult `json:"probes"`
+	// pod namespace
+	Namespace string `json:"namespace,omitempty"`
+	// pod uid
+	Uid string `json:"uid"`
+	// pod probe result
+	ProbeStates []ContainerProbeState `json:"probeStates,omitempty"`
 }
 
-type ProbeResult struct {
+type ContainerProbeState struct {
 	// probe name
 	Name string `json:"name"`
-	// container probe exec state
-	Status ProbeStatus `json:"status"`
+	// container probe exec state, True or False
+	State ProbeState `json:"state"`
+	// Last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 	// If Status=True, Message records the return result of Probe.
 	// If Status=False, Message records Probe's error message
-	Message string `json:"message"`
+	Message string `json:"message,omitempty"`
 }
 
-type ProbeStatus string
+type ProbeState string
 
 const (
-	ProbeTrue    ProbeStatus = "True"
-	ProbeFalse   ProbeStatus = "False"
-	ProbeUnknown ProbeStatus = "Unknown"
+	ProbeTrue    ProbeState = "True"
+	ProbeFalse   ProbeState = "False"
+	ProbeUnknown ProbeState = "Unknown"
 )
 
 // +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
 
 // NodePodProbe is the Schema for the NodePodProbe API

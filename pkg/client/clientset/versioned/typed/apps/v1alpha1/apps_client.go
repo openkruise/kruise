@@ -80,8 +80,8 @@ func (c *AppsV1alpha1Client) NodeImages() NodeImageInterface {
 	return newNodeImages(c)
 }
 
-func (c *AppsV1alpha1Client) NodePodProbes(namespace string) NodePodProbeInterface {
-	return newNodePodProbes(c, namespace)
+func (c *AppsV1alpha1Client) NodePodProbes() NodePodProbeInterface {
+	return newNodePodProbes(c)
 }
 
 func (c *AppsV1alpha1Client) PersistentPodStates(namespace string) PersistentPodStateInterface {
