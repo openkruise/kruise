@@ -458,6 +458,10 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 				ws.Namespace, ws.Name, pod.Name)
 			return false, nil, ""
 		}
+		// no need to update WorkloadSpread status if MaxReplicas == nil
+		if suitableSubset.MissingReplicas == -1 {
+			return false, suitableSubset, ""
+		}
 		if suitableSubset.CreatingPods == nil {
 			suitableSubset.CreatingPods = map[string]metav1.Time{}
 		}
@@ -482,6 +486,9 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		if suitableSubset == nil {
 			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s)", ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
 			return false, nil, ""
+		}
+		if suitableSubset.MissingReplicas == -1 {
+			return false, suitableSubset, ""
 		}
 		if suitableSubset.DeletingPods == nil {
 			suitableSubset.DeletingPods = map[string]metav1.Time{}
