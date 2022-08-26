@@ -163,7 +163,8 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 	ws := workloadSpreadDemo.DeepCopy()
 	ws.Status.SubsetStatuses[0].MissingReplicas = 0
 	subset := appsv1alpha1.WorkloadSpreadSubset{
-		Name: "subset-b",
+		Name:        "subset-b",
+		MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
 		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 			MatchExpressions: []corev1.NodeSelectorRequirement{
 				{
@@ -177,7 +178,7 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 	ws.Spec.Subsets = append(ws.Spec.Subsets, subset)
 	status := appsv1alpha1.WorkloadSpreadSubsetStatus{
 		Name:            "subset-b",
-		MissingReplicas: -1,
+		MissingReplicas: 2,
 		CreatingPods:    map[string]metav1.Time{},
 		DeletingPods:    map[string]metav1.Time{},
 	}
@@ -365,7 +366,6 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				}
 				demo.Status.SubsetStatuses = append(demo.Status.SubsetStatuses, status)
 				demo.ResourceVersion = "1"
-				demo.Status.SubsetStatuses[1].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				return demo
 			},
 		},
@@ -493,7 +493,6 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.ResourceVersion = "1"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = -1
-				workloadSpread.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				return workloadSpread
 			},
 		},
@@ -738,7 +737,6 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = -1
-				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				return workloadSpread
 			},
 		},
