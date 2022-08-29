@@ -400,7 +400,7 @@ func (r *ReconcilePodUnavailableBudget) getPodsForPub(pub *policyv1alpha1.PodUna
 		return nil, nil
 	}
 	// get pods for selector
-	labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+	labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
 	if err != nil {
 		r.recorder.Eventf(pub, corev1.EventTypeWarning, "Selector", fmt.Sprintf("Label selector failed: %s", err.Error()))
 		return nil, nil

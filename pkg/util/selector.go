@@ -17,8 +17,13 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"reflect"
+	"unsafe"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -115,14 +120,65 @@ func sliceContains(a, b []string) bool {
 	return true
 }
 
-func GetFastLabelSelector(ps *metav1.LabelSelector) (labels.Selector, error) {
-	var selector labels.Selector
-	if len(ps.MatchExpressions) == 0 && len(ps.MatchLabels) != 0 {
-		selector = labels.SelectorFromValidatedSet(ps.MatchLabels)
-		return selector, nil
+func ValidatedLabelSelectorAsSelector(ps *metav1.LabelSelector) (labels.Selector, error) {
+	if ps == nil {
+		return labels.Nothing(), nil
+	}
+	if len(ps.MatchLabels)+len(ps.MatchExpressions) == 0 {
+		return labels.Everything(), nil
 	}
 
-	return metav1.LabelSelectorAsSelector(ps)
+	selector := labels.NewSelector()
+	for k, v := range ps.MatchLabels {
+		r, err := newRequirement(k, selection.Equals, []string{v})
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*r)
+	}
+	for _, expr := range ps.MatchExpressions {
+		var op selection.Operator
+		switch expr.Operator {
+		case metav1.LabelSelectorOpIn:
+			op = selection.In
+		case metav1.LabelSelectorOpNotIn:
+			op = selection.NotIn
+		case metav1.LabelSelectorOpExists:
+			op = selection.Exists
+		case metav1.LabelSelectorOpDoesNotExist:
+			op = selection.DoesNotExist
+		default:
+			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
+		}
+		r, err := newRequirement(expr.Key, op, append([]string(nil), expr.Values...))
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*r)
+	}
+	return selector, nil
+}
+
+func newRequirement(key string, op selection.Operator, vals []string) (*labels.Requirement, error) {
+	sel := &labels.Requirement{}
+	selVal := reflect.ValueOf(sel)
+	val := reflect.Indirect(selVal)
+
+	keyField := val.FieldByName("key")
+	keyFieldPtr := (*string)(unsafe.Pointer(keyField.UnsafeAddr()))
+	*keyFieldPtr = key
+
+	opField := val.FieldByName("operator")
+	opFieldPtr := (*selection.Operator)(unsafe.Pointer(opField.UnsafeAddr()))
+	*opFieldPtr = op
+
+	if len(vals) > 0 {
+		valuesField := val.FieldByName("strValues")
+		valuesFieldPtr := (*[]string)(unsafe.Pointer(valuesField.UnsafeAddr()))
+		*valuesFieldPtr = vals
+	}
+
+	return sel, nil
 }
 
 // whether selectors overlap (indicates that selector1, selector2 have same key, and there is an certain intersection）

@@ -5,10 +5,10 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/updatesort"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -48,7 +48,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 			return true
 		}
 		// if selector failed, always return false
-		selector, err := metav1.LabelSelectorAsSelector(strategy.Selector)
+		selector, err := util.ValidatedLabelSelectorAsSelector(strategy.Selector)
 		if err != nil {
 			klog.Errorf("sidecarSet(%s) rolling selector error, err: %v", sidecarset.Name, err)
 			return false

@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 var _ handler.EventHandler = &podEventHandler{}
@@ -211,7 +212,7 @@ func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1alpha1.DaemonSe
 	var dsMatched []*appsv1alpha1.DaemonSet
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
-		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+		selector, err := util.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil || selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
