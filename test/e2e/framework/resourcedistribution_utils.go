@@ -379,7 +379,7 @@ func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1a
 		}
 	} else if len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0 {
 		// 1. select the namespaces via targets.NamespaceLabelSelector
-		selectors, err := util.GetFastLabelSelector(&targets.NamespaceLabelSelector)
+		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceLabelSelector)
 		if err != nil {
 			return nil, nil, err
 		}

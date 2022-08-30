@@ -82,9 +82,9 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 		return nil, 0, nil
 	}
 	// get pods for selector
-	labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+	labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
 	if err != nil {
-		klog.Warningf("pub(%s/%s) GetFastLabelSelector failed: %s", pub.Namespace, pub.Name, err.Error())
+		klog.Warningf("pub(%s/%s) ValidatedLabelSelectorAsSelector failed: %s", pub.Namespace, pub.Name, err.Error())
 		return nil, 0, nil
 	}
 	listOptions = &client.ListOptions{Namespace: pub.Namespace, LabelSelector: labelSelector}

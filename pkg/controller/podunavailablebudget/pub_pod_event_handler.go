@@ -121,7 +121,7 @@ func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavaila
 			}
 		} else {
 			// This error is irreversible, so continue
-			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
 			if err != nil {
 				continue
 			}
@@ -260,7 +260,7 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 			}
 		} else {
 			// This error is irreversible, so continue
-			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
 			if err != nil {
 				continue
 			}

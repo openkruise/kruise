@@ -412,7 +412,7 @@ func (t *WorkloadSpreadTester) WaitJobCompleted(job *batchv1.Job) {
 }
 
 func (t *WorkloadSpreadTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
-	faster, err := util.GetFastLabelSelector(selector)
+	faster, err := util.ValidatedLabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
 	}

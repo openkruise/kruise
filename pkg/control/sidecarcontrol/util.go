@@ -82,7 +82,7 @@ func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (
 		return false, nil
 	}
 	// if selector not matched, then continue
-	selector, err := metav1.LabelSelectorAsSelector(sidecarSet.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.Selector)
 	if err != nil {
 		return false, err
 	}
@@ -471,7 +471,7 @@ func ValidateSidecarSetPatchMetadataWhitelist(c client.Client, sidecarSet *appsv
 
 	for _, rule := range whitelist.Rules {
 		if rule.Selector != nil {
-			selector, err := util.GetFastLabelSelector(rule.Selector)
+			selector, err := util.ValidatedLabelSelectorAsSelector(rule.Selector)
 			if err != nil {
 				return err
 			}

@@ -141,7 +141,7 @@ func (r *realControl) GetRevisionSelector(s *appsv1alpha1.SidecarSet) labels.Sel
 			SidecarSetKindName: s.GetName(),
 		},
 	}
-	selector, err := util.GetFastLabelSelector(labelSelector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(labelSelector)
 	if err != nil {
 		// static error, just panic
 		panic("Incorrect label selector for ControllerRevision of SidecarSet.")

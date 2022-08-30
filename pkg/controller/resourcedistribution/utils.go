@@ -79,7 +79,7 @@ func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1
 
 // matchViaLabelSelector return true if namespace matches with target.NamespacesLabelSelectors
 func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
 	if err != nil {
 		return false, err
 	}
@@ -302,7 +302,7 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 
 	if !targets.AllNamespaces && (len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0) {
 		// 3. select the namespaces via targets.NamespaceLabelSelector
-		selectors, err := util.GetFastLabelSelector(&targets.NamespaceLabelSelector)
+		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceLabelSelector)
 		if err != nil {
 			return nil, nil, err
 		}

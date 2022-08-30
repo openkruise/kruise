@@ -29,6 +29,7 @@ import (
 	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -214,7 +215,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		return reconcile.Result{}, nil
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(instance.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
 	if err != nil {
 		klog.Errorf("Error converting CloneSet %s selector: %v", request, err)
 		// This is a non-transient error, so don't retry.

@@ -222,7 +222,7 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 }
 
 func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v1.Pod, error) {
-	selector, err := util.GetFastLabelSelector(job.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v
 
 // filterInjectedPods will return pods which has injected ephemeral containers
 func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJob) ([]*v1.Pod, error) {
-	selector, err := util.GetFastLabelSelector(job.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}

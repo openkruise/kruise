@@ -24,6 +24,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 
@@ -156,7 +157,7 @@ func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha
 	var selector labels.Selector
 	var daemonSets []*appsv1alpha1.DaemonSet
 	for _, ds := range dsList {
-		selector, err = metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+		selector, err = kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -343,7 +344,7 @@ func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1alpha1.DaemonSet) b
 		if ds.Spec.UpdateStrategy.RollingUpdate == nil || ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
 			return false
 		}
-		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
+		selector, err := kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return false
