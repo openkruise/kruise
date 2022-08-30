@@ -25,7 +25,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,6 +37,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
@@ -161,7 +161,7 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 }
 
 func (ssc *defaultStatefulSetControl) ListRevisions(set *appsv1beta1.StatefulSet) ([]*apps.ControllerRevision, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	collisionCount int32,
 	pods []*v1.Pod,
 	revisions []*apps.ControllerRevision) (*appsv1beta1.StatefulSetStatus, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return set.Status.DeepCopy(), err
 	}

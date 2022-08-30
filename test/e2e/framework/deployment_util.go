@@ -77,7 +77,7 @@ func (t *DeploymentTester) GetDeployment(name string) (*appsv1.Deployment, error
 }
 
 func (t *DeploymentTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]v1.Pod, error) {
-	faster, err := util.GetFastLabelSelector(selector)
+	faster, err := util.ValidatedLabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
 	}

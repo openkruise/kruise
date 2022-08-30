@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klog/v2"
 )
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -29,7 +29,7 @@ func podMatchedEphemeralJob(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) (bool,
 	if pod.Namespace != ejob.Namespace {
 		return false, nil
 	}
-	selector, err := metav1.LabelSelectorAsSelector(ejob.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(ejob.Spec.Selector)
 	if err != nil {
 		return false, err
 	}

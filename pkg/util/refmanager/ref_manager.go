@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/openkruise/kruise/pkg/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,7 +48,7 @@ type RefManager struct {
 // New returns a RefManager that exposes
 // methods to manage the controllerRef of pods.
 func New(client client.Client, selector *metav1.LabelSelector, owner metav1.Object, schema *runtime.Scheme) (*RefManager, error) {
-	s, err := metav1.LabelSelectorAsSelector(selector)
+	s, err := util.ValidatedLabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
 	}

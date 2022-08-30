@@ -318,7 +318,7 @@ func (s *SidecarSetTester) WaitForSidecarSetDeleted(sidecarSet *appsv1alpha1.Sid
 }
 
 func (s *SidecarSetTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]*corev1.Pod, error) {
-	faster, err := util.GetFastLabelSelector(selector)
+	faster, err := util.ValidatedLabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +412,7 @@ func (t *SidecarSetTester) WaitForCloneSetRunning(cloneset *appsv1alpha1.CloneSe
 }
 
 func (t *SidecarSetTester) ListControllerRevisions(sidecarSet *appsv1alpha1.SidecarSet) []*apps.ControllerRevision {
-	selector, err := util.GetFastLabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{
+	selector, err := util.ValidatedLabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: map[string]string{
 		sidecarcontrol.SidecarSetKindName: sidecarSet.Name,
 	}})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())

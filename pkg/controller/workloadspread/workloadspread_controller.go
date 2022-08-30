@@ -232,7 +232,7 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 		return nil, -1, err
 	}
 
-	labelSelector, err := util.GetFastLabelSelector(job.Spec.Selector)
+	labelSelector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		klog.Errorf("gets labelSelector failed: %s", err.Error())
 		return nil, -1, nil

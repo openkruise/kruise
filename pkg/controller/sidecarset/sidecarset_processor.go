@@ -256,7 +256,7 @@ func (p *Processor) updateSidecarSetStatus(sidecarSet *appsv1alpha1.SidecarSet, 
 // If you need update the pod object, you must DeepCopy it
 func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, error) {
 	// get more faster selector
-	selector, err := util.GetFastLabelSelector(s.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(s.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ package controllerfinder
 import (
 	"context"
 
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	appsv1 "k8s.io/api/apps/v1"
@@ -113,7 +114,7 @@ func (r *ControllerFinder) getReplicaSetsForDeployment(apiVersion, kind, ns, nam
 	}
 	// List ReplicaSets owned by this Deployment
 	rsList := &appsv1.ReplicaSetList{}
-	selector, err := metav1.LabelSelectorAsSelector(scaleNSelector.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(scaleNSelector.Selector)
 	if err != nil {
 		klog.Errorf("Deployment (%s/%s) get labelSelector failed: %s", ns, name, err.Error())
 		return nil, nil

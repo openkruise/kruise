@@ -72,7 +72,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 	}()
 
 	if job.Spec.PodSelector != nil {
-		selector, err := util.GetFastLabelSelector(&job.Spec.PodSelector.LabelSelector)
+		selector, err := util.ValidatedLabelSelectorAsSelector(&job.Spec.PodSelector.LabelSelector)
 		if err != nil {
 			return nil, fmt.Errorf("parse podSelector error: %v", err)
 		}
@@ -143,7 +143,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 		return nodeImages, nil
 	}
 
-	selector, err := util.GetFastLabelSelector(&job.Spec.Selector.LabelSelector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(&job.Spec.Selector.LabelSelector)
 	if err != nil {
 		return nil, fmt.Errorf("parse selector error: %v", err)
 	}
@@ -173,7 +173,7 @@ func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *ap
 		var oldMatched bool
 
 		if job.Spec.PodSelector != nil {
-			selector, err := util.GetFastLabelSelector(&job.Spec.PodSelector.LabelSelector)
+			selector, err := util.ValidatedLabelSelectorAsSelector(&job.Spec.PodSelector.LabelSelector)
 			if err != nil {
 				return nil, nil, fmt.Errorf("parse podSelector for %s/%s error: %v", job.Namespace, job.Name, err)
 			}
@@ -198,7 +198,7 @@ func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *ap
 				oldMatched = true
 			}
 		} else {
-			selector, err := util.GetFastLabelSelector(&job.Spec.Selector.LabelSelector)
+			selector, err := util.ValidatedLabelSelectorAsSelector(&job.Spec.Selector.LabelSelector)
 			if err != nil {
 				return nil, nil, fmt.Errorf("parse selector for %s/%s error: %v", job.Namespace, job.Name, err)
 			}
@@ -244,7 +244,7 @@ func GetActiveJobsForPod(reader client.Reader, pod, oldPod *v1.Pod) (newJobs, ol
 		job := &jobList.Items[i]
 
 		if job.Spec.PodSelector != nil {
-			selector, err := util.GetFastLabelSelector(&job.Spec.PodSelector.LabelSelector)
+			selector, err := util.ValidatedLabelSelectorAsSelector(&job.Spec.PodSelector.LabelSelector)
 			if err != nil {
 				return nil, nil, fmt.Errorf("parse podSelector for %s/%s error: %v", job.Namespace, job.Name, err)
 			}
