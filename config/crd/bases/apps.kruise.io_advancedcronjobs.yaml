@@ -184,6 +184,11 @@ spec:
                       a CronJob.
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              timeZone:
+                description: The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+                  If not specified, this will default to the time zone of the kruise-controller-manager
+                  process.
+                type: string
             required:
             - schedule
             - template
