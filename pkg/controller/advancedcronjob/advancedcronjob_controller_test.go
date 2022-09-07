@@ -19,20 +19,20 @@ package advancedcronjob
 import (
 	"flag"
 	"testing"
-
-	batchv1 "k8s.io/api/batch/v1"
-
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -43,6 +43,63 @@ func init() {
 	klog.InitFlags(nil)
 	_ = flag.Set("logtostderr", "true")
 	_ = flag.Set("v", "10")
+}
+
+func TestScheduleWithTimeZone(t *testing.T) {
+	cases := []struct {
+		schedule     string
+		timeZone     *string
+		previousTZ   string
+		expectedNext string
+	}{
+		{
+			schedule:     "0 10 * * ?",
+			timeZone:     nil,
+			previousTZ:   "2022-09-05T09:01:00Z",
+			expectedNext: "2022-09-05T10:00:00Z",
+		},
+		{
+			schedule:     "0 10 * * ?",
+			timeZone:     nil,
+			previousTZ:   "2022-09-05T11:01:00Z",
+			expectedNext: "2022-09-06T10:00:00Z",
+		},
+		{
+			schedule:     "0 10 * * ?",
+			timeZone:     utilpointer.String("Asia/Shanghai"),
+			previousTZ:   "2022-09-05T09:01:00Z",
+			expectedNext: "2022-09-06T02:00:00Z",
+		},
+		{
+			schedule:     "0 10 * * ?",
+			timeZone:     utilpointer.String("Asia/Shanghai"),
+			previousTZ:   "2022-09-06T01:01:00Z",
+			expectedNext: "2022-09-06T02:00:00Z",
+		},
+		{
+			schedule:     "TZ=Asia/Shanghai 0 10 * * ?",
+			timeZone:     nil,
+			previousTZ:   "2022-09-06T01:01:00Z",
+			expectedNext: "2022-09-06T02:00:00Z",
+		},
+	}
+
+	for i, tc := range cases {
+		acj := &appsv1alpha1.AdvancedCronJob{Spec: appsv1alpha1.AdvancedCronJobSpec{Schedule: tc.schedule, TimeZone: tc.timeZone}}
+		sched, err := cron.ParseStandard(formatSchedule(acj))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		previousTZ, err := time.Parse(time.RFC3339, tc.previousTZ)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gotNext := sched.Next(previousTZ).Format(time.RFC3339)
+		if gotNext != tc.expectedNext {
+			t.Fatalf("case %d failed, expected next %s, got %s", i, tc.expectedNext, gotNext)
+		}
+	}
 }
 
 // Test scenario:
@@ -87,7 +144,6 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = appsv1alpha1.AddToScheme(scheme)
 	_ = batchv1.AddToScheme(scheme)
-	_ = batchv1beta1.AddToScheme(scheme)
 	_ = v1.AddToScheme(scheme)
 
 	// A job
@@ -185,7 +241,7 @@ func broadcastJobTemplate() appsv1alpha1.CronJobTemplate {
 
 func jobTemplate() appsv1alpha1.CronJobTemplate {
 	return appsv1alpha1.CronJobTemplate{
-		JobTemplate: &batchv1beta1.JobTemplateSpec{
+		JobTemplate: &batchv1.JobTemplateSpec{
 			Spec: batchv1.JobSpec{
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{},
