@@ -23,6 +23,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"time"
+	_ "time/tzdata" // for AdvancedCronJob Time Zone support
 
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/spf13/pflag"
