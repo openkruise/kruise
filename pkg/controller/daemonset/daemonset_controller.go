@@ -415,15 +415,11 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 					klog.Errorf("Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for %s: %v", request, err)
 				}
 			}
-			updatedReadyReplicas := ds.Status.UpdatedNumberScheduled
-			if cur.Name != ds.Status.DaemonSetHash {
-				updatedReadyReplicas = 0
-			}
-			if int32(minUpdatedReadyPodsCount) <= updatedReadyReplicas {
-				// pre-download images for new revision
-				if err := dsc.createImagePullJobsForInPlaceUpdate(ds, old, cur); err != nil {
-					klog.Errorf("Failed to create ImagePullJobs for %s: %v", request, err)
-				}
+			// todo: check whether the updatedReadyPodsCount greater than minUpdatedReadyPodsCount
+			_ = minUpdatedReadyPodsCount
+			// pre-download images for new revision
+			if err := dsc.createImagePullJobsForInPlaceUpdate(ds, old, cur); err != nil {
+				klog.Errorf("Failed to create ImagePullJobs for %s: %v", request, err)
 			}
 		} else {
 			// delete ImagePullJobs if revisions have been consistent
