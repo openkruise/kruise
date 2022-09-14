@@ -468,6 +468,7 @@ func recordPodAndContainersRestartCount(pod *v1.Pod, spec *UpdateSpec, revision 
 	pod.Annotations[appspub.InPlaceUpdateContainersRestartKey] = string(containersRestartCountJson)
 	pod.Annotations[appspub.InPlaceUpdatePodRestartKey] = strconv.FormatInt(currentPodRestartCount, 10)
 }
+
 func hasEqualCondition(pod *v1.Pod, newCondition *v1.PodCondition) bool {
 	oldCondition := util.GetCondition(pod, newCondition.Type)
 	isEqual := oldCondition != nil && oldCondition.Status == newCondition.Status &&
