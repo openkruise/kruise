@@ -101,8 +101,9 @@ func (s *PodUnavailableBudgetTester) NewBaseDeployment(namespace string) *apps.D
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "main",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Name:            "main",
+							Image:           imageutils.GetE2EImage(imageutils.Httpd),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -152,8 +153,9 @@ func (s *PodUnavailableBudgetTester) NewBaseCloneSet(namespace string) *appsv1al
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "main",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Name:            "main",
+							Image:           imageutils.GetE2EImage(imageutils.Httpd),
+							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
 				},
@@ -174,7 +176,7 @@ func (s *PodUnavailableBudgetTester) NewBaseCloneSet(namespace string) *appsv1al
 }
 
 func (t *PodUnavailableBudgetTester) CreatePub(pub *policyv1alpha1.PodUnavailableBudget) *policyv1alpha1.PodUnavailableBudget {
-	Logf("create PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name)
+	Logf("create PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name)
 	_, err := t.kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Create(context.TODO(), pub, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	t.WaitForPubCreated(pub)
@@ -183,19 +185,19 @@ func (t *PodUnavailableBudgetTester) CreatePub(pub *policyv1alpha1.PodUnavailabl
 }
 
 func (t *PodUnavailableBudgetTester) CreateDeployment(deployment *apps.Deployment) {
-	Logf("create deployment(%s.%s)", deployment.Namespace, deployment.Name)
+	Logf("create deployment(%s/%s)", deployment.Namespace, deployment.Name)
 	_, err := t.c.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	t.WaitForDeploymentRunning(deployment)
-	Logf("create deployment(%s.%s) done", deployment.Namespace, deployment.Name)
+	t.WaitForDeploymentReadyAndRunning(deployment)
+	Logf("create deployment(%s/%s) done", deployment.Namespace, deployment.Name)
 }
 
 func (t *PodUnavailableBudgetTester) CreateCloneSet(cloneset *appsv1alpha1.CloneSet) *appsv1alpha1.CloneSet {
-	Logf("create CloneSet(%s.%s)", cloneset.Namespace, cloneset.Name)
+	Logf("create CloneSet(%s/%s)", cloneset.Namespace, cloneset.Name)
 	_, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Create(context.TODO(), cloneset, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	t.WaitForCloneSetRunning(cloneset)
-	Logf("create cloneset(%s.%s) done", cloneset.Namespace, cloneset.Name)
+	Logf("create cloneset(%s/%s) done", cloneset.Namespace, cloneset.Name)
 	cloneset, _ = t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 	return cloneset
 }
@@ -211,23 +213,6 @@ func (t *PodUnavailableBudgetTester) WaitForPubCreated(pub *policyv1alpha1.PodUn
 		})
 	if pollErr != nil {
 		Failf("Failed waiting for PodUnavailableBudget to enter running: %v", pollErr)
-	}
-}
-
-func (t *PodUnavailableBudgetTester) WaitForDeploymentRunning(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
-			inner, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			if *inner.Spec.Replicas == inner.Status.ReadyReplicas {
-				return true, nil
-			}
-			return false, nil
-		})
-	if pollErr != nil {
-		Failf("Failed waiting for deployment to enter running: %v", pollErr)
 	}
 }
 
@@ -248,27 +233,16 @@ func (t *PodUnavailableBudgetTester) WaitForCloneSetRunning(cloneset *appsv1alph
 	}
 }
 
-func (t *PodUnavailableBudgetTester) WaitForDeploymentMinReadyAndRunning(deployments []*apps.Deployment, minReady int32) {
+func (t *PodUnavailableBudgetTester) WaitForDeploymentReadyAndRunning(deployment *apps.Deployment) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
 		func() (bool, error) {
-			var readyReplicas int32 = 0
-			completed := 0
-			for _, deployment := range deployments {
-				inner, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				readyReplicas += inner.Status.ReadyReplicas
-				count := *inner.Spec.Replicas
-				if inner.Status.UpdatedReplicas == count && count == inner.Status.ReadyReplicas && count == inner.Status.Replicas {
-					completed++
-				}
+			inner, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
 			}
-
-			if readyReplicas < minReady {
-				return false, fmt.Errorf("deployment ReadyReplicas(%d) < except(%d)", readyReplicas, minReady)
-			}
-			if completed == len(deployments) {
+			count := *inner.Spec.Replicas
+			if inner.Generation == inner.Status.ObservedGeneration && inner.Status.UpdatedReplicas == count &&
+				count == inner.Status.ReadyReplicas && count == inner.Status.Replicas {
 				return true, nil
 			}
 			return false, nil
@@ -319,7 +293,7 @@ func (t *PodUnavailableBudgetTester) DeletePubs(namespace string) {
 	for _, pub := range pubList.Items {
 		err := t.kc.PolicyV1alpha1().PodUnavailableBudgets(namespace).Delete(context.TODO(), pub.Name, metav1.DeleteOptions{})
 		if err != nil {
-			Logf("delete PodUnavailableBudget(%s.%s) failed: %s", pub.Namespace, pub.Name, err.Error())
+			Logf("delete PodUnavailableBudget(%s/%s) failed: %s", pub.Namespace, pub.Name, err.Error())
 		}
 	}
 }
@@ -334,7 +308,7 @@ func (t *PodUnavailableBudgetTester) DeleteDeployments(namespace string) {
 	for _, deployment := range deploymentList.Items {
 		err := t.c.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 		if err != nil {
-			Logf("delete Deployment(%s.%s) failed: %s", deployment.Namespace, deployment.Name, err.Error())
+			Logf("delete Deployment(%s/%s) failed: %s", deployment.Namespace, deployment.Name, err.Error())
 			continue
 		}
 		t.WaitForDeploymentDeleted(&deployment)
@@ -351,7 +325,7 @@ func (t *PodUnavailableBudgetTester) DeleteCloneSets(namespace string) {
 	for _, object := range objectList.Items {
 		err := t.kc.AppsV1alpha1().CloneSets(namespace).Delete(context.TODO(), object.Name, metav1.DeleteOptions{})
 		if err != nil {
-			Logf("delete CloneSet(%s.%s) failed: %s", object.Namespace, object.Name, err.Error())
+			Logf("delete CloneSet(%s/%s) failed: %s", object.Namespace, object.Name, err.Error())
 			continue
 		}
 		t.WaitForCloneSetDeleted(&object)

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +49,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcilePodReadiness {
 	return &ReconcilePodReadiness{
-		Client: util.NewClientFromManager(mgr, "pod-readiness-controller"),
+		Client: utilclient.NewClientFromManager(mgr, "pod-readiness-controller"),
 	}
 }
 

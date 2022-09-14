@@ -19,6 +19,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,12 +28,15 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -393,7 +397,7 @@ func testPodHasNoMatchedSidecarSet(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	_ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, _ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 
 	if len(podOut.Spec.Containers) != len(podIn.Spec.Containers) {
 		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers), len(podOut.Spec.Containers))
@@ -435,7 +439,7 @@ func doMergeSidecarSecretsTest(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	_ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, _ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 
 	if len(podOut.Spec.ImagePullSecrets) != len(podIn.Spec.ImagePullSecrets)+len(sidecarSetIn.Spec.ImagePullSecrets)-repeat {
 		t.Fatalf("expect %v secrets but got %v", len(podIn.Spec.ImagePullSecrets)+len(sidecarSetIn.Spec.ImagePullSecrets)-repeat, len(podOut.Spec.ImagePullSecrets))
@@ -456,10 +460,119 @@ func testInjectionStrategyPaused(t *testing.T, sidecarIn *appsv1alpha1.SidecarSe
 	client := fake.NewClientBuilder().WithObjects(sidecarPaused).Build()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	_ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, _ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 
 	if len(podOut.Spec.Containers) != len(podIn.Spec.Containers) {
 		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers), len(podOut.Spec.Containers))
+	}
+}
+
+func TestInjectMetadata(t *testing.T) {
+	podIn := pod1.DeepCopy()
+	demo1 := sidecarSet1.DeepCopy()
+	demo1.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+		{
+			PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+			Annotations: map[string]string{
+				"key1": `{"log-agent":1}`,
+			},
+		},
+		{
+			PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+			Annotations: map[string]string{
+				"key": "envoy=1,log=2",
+			},
+		},
+	}
+	demo2 := sidecarSet1.DeepCopy()
+	demo2.Name = "sidecarset2"
+	demo2.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+		{
+			PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+			Annotations: map[string]string{
+				"key1": `{"envoy":2}`,
+			},
+		},
+	}
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewClientBuilder().WithObjects(demo1, demo2).Build()
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	podHandler.sidecarsetMutatingPod(context.Background(), req, podIn)
+	expect := map[string]string{
+		"key1": `{"envoy":2,"log-agent":1}`,
+		"key":  "envoy=1,log=2",
+	}
+	if expect["key1"] != podIn.Annotations["key1"] || expect["key"] != podIn.Annotations["key"] {
+		t.Fatalf("sidecarSet inject annotations failed, expect %v, but get %v", expect, podIn.Annotations)
+	}
+}
+
+func TestInjectionStrategyRevision(t *testing.T) {
+	spec := map[string]interface{}{
+		"spec": map[string]interface{}{
+			"initContainers": []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "init-2",
+						Image: "busybox:1.0.0",
+					},
+				},
+			},
+			"containers": []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "dns-f",
+						Image: "dns-f-image:1.0",
+					},
+					PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+					ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+						Type: appsv1alpha1.ShareVolumePolicyDisabled,
+					},
+				},
+			},
+		},
+	}
+
+	raw, _ := json.Marshal(spec)
+	revisionID := fmt.Sprintf("%s-12345", sidecarSet1.Name)
+	sidecarSetIn := sidecarSet1.DeepCopy()
+	sidecarSetIn.Spec.InjectionStrategy.Revision = &appsv1alpha1.SidecarSetInjectRevision{
+		CustomVersion: &revisionID,
+		Policy:        appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
+	}
+	historyInjection := []client.Object{
+		sidecarSetIn,
+		&apps.ControllerRevision{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: webhookutil.GetNamespace(),
+				Name:      revisionID,
+				Labels: map[string]string{
+					appsv1alpha1.SidecarSetCustomVersionLabel: revisionID,
+				},
+			},
+			Data: runtime.RawExtension{
+				Raw: raw,
+			},
+		},
+	}
+	testInjectionStrategyRevision(t, historyInjection)
+}
+
+func testInjectionStrategyRevision(t *testing.T, env []client.Object) {
+	podIn := pod1.DeepCopy()
+	podOut := podIn.DeepCopy()
+	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	client := fake.NewClientBuilder().WithObjects(env...).Build()
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	if err != nil {
+		t.Fatalf("failed to mutating pod, err: %v", err)
+	}
+
+	if len(podIn.Spec.Containers)+len(podIn.Spec.InitContainers)+2 != len(podOut.Spec.Containers)+len(podOut.Spec.InitContainers) {
+		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers)+2, len(podOut.Spec.Containers))
 	}
 }
 
@@ -475,7 +588,7 @@ func testSidecarSetPodInjectPolicy(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -552,7 +665,7 @@ func testSidecarVolumesAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSe
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -700,7 +813,7 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 			podOut := podIn.DeepCopy()
 			podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 			req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-			err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+			_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 			if err != nil {
 				t.Fatalf("inject sidecar into pod failed, err: %v", err)
 			}
@@ -732,7 +845,7 @@ func testSidecarSetTransferEnv(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -766,7 +879,7 @@ func testSidecarSetHashInject(t *testing.T, sidecarSetIn1 *appsv1alpha1.SidecarS
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
@@ -797,7 +910,7 @@ func testSidecarSetNameInject(t *testing.T, sidecarSetIn1, sidecarSetIn3 *appsv1
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
 	if err != nil {
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}

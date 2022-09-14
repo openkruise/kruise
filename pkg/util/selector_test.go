@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -501,5 +502,81 @@ func TestIsMatchExpOverlap(t *testing.T) {
 				t.Fatalf("isMatchExpOverlap(%s) except(%v) but get(%v)", cs.name, cs.except, overlap)
 			}
 		})
+	}
+}
+
+func TestValidatedLabelSelectorAsSelector(t *testing.T) {
+	labelSelectors := []metav1.LabelSelector{
+		{
+			MatchLabels: map[string]string{"k1": "A", "k2": "B"},
+		},
+		{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{Key: "k3", Operator: metav1.LabelSelectorOpIn, Values: []string{"C", "D"}},
+				{Key: "k4", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"E"}},
+				{Key: "k5", Operator: metav1.LabelSelectorOpExists},
+				{Key: "k6", Operator: metav1.LabelSelectorOpDoesNotExist},
+			},
+		},
+		{
+			MatchLabels: map[string]string{"k1": "A", "k2": "B"},
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{Key: "k3", Operator: metav1.LabelSelectorOpIn, Values: []string{"C", "D"}},
+				{Key: "k4", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"E"}},
+				{Key: "k5", Operator: metav1.LabelSelectorOpExists},
+				{Key: "k6", Operator: metav1.LabelSelectorOpDoesNotExist},
+			},
+		},
+		{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{Key: "k7", Operator: metav1.LabelSelectorOpIn, Values: []string{"F", "G"}},
+				{Key: "k7", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"H"}},
+			},
+		},
+	}
+
+	for _, ps := range labelSelectors {
+		sel1, err := metav1.LabelSelectorAsSelector(&ps)
+		if err != nil {
+			t.Fatalf("Failed LabelSelectorAsSelector for %v: %v", DumpJSON(ps), err)
+		}
+		sel2, err := ValidatedLabelSelectorAsSelector(&ps)
+		if err != nil {
+			t.Fatalf("Failed ValidatedLabelSelectorAsSelector for %v: %v", DumpJSON(ps), err)
+		}
+		if !reflect.DeepEqual(sel1, sel2) {
+			t.Fatalf("Expected selector %+v, got %+v", sel1, sel2)
+		}
+	}
+}
+
+var (
+	benchSelector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "apps.kruise.io/foo",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"Hello", "World"},
+			},
+			{
+				Key:      "apps.kruise.io/bar",
+				Operator: metav1.LabelSelectorOpNotIn,
+				Values:   []string{"Hello", "World"},
+			},
+		},
+	}
+)
+
+func BenchmarkValidatedLabelSelectorAsSelector(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		ValidatedLabelSelectorAsSelector(benchSelector)
+	}
+}
+
+func BenchmarkOriginalLabelSelectorAsSelector(b *testing.B) {
+	b.ReportAllocs()
+	for n := 0; n < b.N; n++ {
+		metav1.LabelSelectorAsSelector(benchSelector)
 	}
 }

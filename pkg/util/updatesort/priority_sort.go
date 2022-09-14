@@ -21,8 +21,8 @@ import (
 	"strconv"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -70,7 +70,7 @@ func (ps *prioritySort) compare(podI, podJ map[string]string, defaultVal bool) b
 func (ps *prioritySort) getPodWeightPriority(podLabels map[string]string) int64 {
 	var weight int64
 	for _, p := range ps.strategy.WeightPriority {
-		selector, err := metav1.LabelSelectorAsSelector(&p.MatchSelector)
+		selector, err := util.ValidatedLabelSelectorAsSelector(&p.MatchSelector)
 		if err != nil {
 			continue
 		}

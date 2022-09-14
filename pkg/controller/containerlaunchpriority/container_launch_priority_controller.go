@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -52,7 +52,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileContainerLaunchPriority {
 	return &ReconcileContainerLaunchPriority{
-		Client:   util.NewClientFromManager(mgr, "container-launch-priority-controller"),
+		Client:   utilclient.NewClientFromManager(mgr, "container-launch-priority-controller"),
 		recorder: mgr.GetEventRecorderFor("container-launch-priority-controller"),
 	}
 }

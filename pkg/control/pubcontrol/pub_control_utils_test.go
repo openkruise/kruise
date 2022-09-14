@@ -17,16 +17,19 @@ limitations under the License.
 package pubcontrol
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -62,17 +65,20 @@ var (
 			},
 		},
 		Status: policyv1alpha1.PodUnavailableBudgetStatus{
-			UnavailablePods: map[string]metav1.Time{},
-			DisruptedPods:   map[string]metav1.Time{},
+			UnavailablePods:    map[string]metav1.Time{},
+			DisruptedPods:      map[string]metav1.Time{},
+			UnavailableAllowed: 0,
 		},
 	}
 
 	podDemo = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "test-pod",
-			Namespace:   "default",
-			Labels:      map[string]string{"app": "nginx", "pub-controller": "true"},
-			Annotations: map[string]string{},
+			Name:      "test-pod",
+			Namespace: "default",
+			Labels:    map[string]string{"app": "nginx", "pub-controller": "true"},
+			Annotations: map[string]string{
+				PodRelatedPubAnnotation: pubDemo.Name,
+			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "apps/v1",
@@ -163,6 +169,124 @@ var (
 	}
 )
 
+func TestPodUnavailableBudgetValidatePod(t *testing.T) {
+	cases := []struct {
+		name            string
+		getPod          func() *corev1.Pod
+		getPub          func() *policyv1alpha1.PodUnavailableBudget
+		operation       policyv1alpha1.PubOperation
+		expectAllow     bool
+		expectPubStatus func() *policyv1alpha1.PodUnavailableBudgetStatus
+	}{
+		{
+			name: "valid update pod, allow",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				return pod
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Status.UnavailableAllowed = 1
+				return pub
+			},
+			operation:   policyv1alpha1.PubUpdateOperation,
+			expectAllow: true,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				pubStatus.UnavailablePods[podDemo.Name] = metav1.Now()
+				pubStatus.UnavailableAllowed = 0
+				return pubStatus
+			},
+		},
+		{
+			name: "valid update pod, reject",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				return pod
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:   policyv1alpha1.PubUpdateOperation,
+			expectAllow: false,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				return pubStatus
+			},
+		},
+		{
+			name: "valid update pod, pod deletion, ignore",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+				return pod
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:   policyv1alpha1.PubUpdateOperation,
+			expectAllow: true,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				return pubStatus
+			},
+		},
+		{
+			name: "valid update pod, pod not ready, ignore",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				podReadyCondition := podutil.GetPodReadyCondition(pod.Status)
+				podReadyCondition.Status = corev1.ConditionFalse
+				return pod
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:   policyv1alpha1.PubUpdateOperation,
+			expectAllow: true,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				return pubStatus
+			},
+		},
+		{
+			name: "valid update pod, pod unavailable labels, ignore",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Labels[fmt.Sprintf("%sdata", appspub.PubUnavailablePodLabelPrefix)] = "true"
+				return pod
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:   policyv1alpha1.PubUpdateOperation,
+			expectAllow: true,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := pubDemo.Status.DeepCopy()
+				return pubStatus
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getPub()).Build()
+			control := NewPubControl(fakeClient)
+			allow, _, err := PodUnavailableBudgetValidatePod(fakeClient, control, cs.getPod(), cs.operation, false)
+			if err != nil {
+				t.Fatalf("PodUnavailableBudgetValidatePod failed: %s", err.Error())
+			}
+			if cs.expectAllow != allow {
+				t.Fatalf("PodUnavailableBudgetValidatePod failed")
+			}
+		})
+	}
+}
+
 func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -173,9 +297,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 		matchedPub    bool
 	}{
 		{
-			name: "matched pub targetRef deployment",
+			name: "matched pub",
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
+				pod.Annotations[PodRelatedPubAnnotation] = pubDemo.Name
 				return pod
 			},
 			getDeployment: func() *apps.Deployment {
@@ -199,35 +324,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 			matchedPub: true,
 		},
 		{
-			name: "no matched pub targetRef deployment, for unequal name",
-			getPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
-				return pod
-			},
-			getDeployment: func() *apps.Deployment {
-				dep := deploymentDemo.DeepCopy()
-				return dep
-			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				rep := replicaSetDemo.DeepCopy()
-				return rep
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
-					Name:       "no-deployment",
-					Kind:       deploymentDemo.Kind,
-					APIVersion: deploymentDemo.APIVersion,
-				}
-				return pub
-			},
-			matchedPub: false,
-		},
-		{
 			name: "no matched pub targetRef deployment, for unequal ns",
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
+				pod.Annotations[PodRelatedPubAnnotation] = pubDemo.Name
 				return pod
 			},
 			getDeployment: func() *apps.Deployment {
@@ -252,29 +352,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 			matchedPub: false,
 		},
 		{
-			name: "matched pub selector",
+			name: "no match, pub not found",
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				return pod
-			},
-			getDeployment: func() *apps.Deployment {
-				dep := deploymentDemo.DeepCopy()
-				return dep
-			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				rep := replicaSetDemo.DeepCopy()
-				return rep
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			matchedPub: true,
-		},
-		{
-			name: "no match pub selector",
-			getPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
+				pod.Annotations[PodRelatedPubAnnotation] = "o-pub"
 				return pod
 			},
 			getDeployment: func() *apps.Deployment {
@@ -301,17 +382,17 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), cs.getReplicaSet(), cs.getPub()).Build()
-			controllerFinder := controllerfinder.NewControllerFinder(fakeClient)
+			control := NewPubControl(fakeClient)
 			pod := cs.getPod()
-			pub, err := GetPodUnavailableBudgetForPod(fakeClient, controllerFinder, pod)
+			pub, err := control.GetPubForPod(pod)
 			if err != nil {
-				t.Fatalf("GetPodUnavailableBudgetForPod failed: %s", err.Error())
+				t.Fatalf("GetPubForPod failed: %s", err.Error())
 			}
 			if cs.matchedPub && pub == nil {
-				t.Fatalf("GetPodUnavailableBudgetForPod failed")
+				t.Fatalf("GetPubForPod failed")
 			}
 			if !cs.matchedPub && pub != nil {
-				t.Fatalf("GetPodUnavailableBudgetForPod failed")
+				t.Fatalf("GetPubForPod failed")
 			}
 		})
 	}

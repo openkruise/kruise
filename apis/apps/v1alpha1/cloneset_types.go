@@ -30,6 +30,10 @@ const (
 
 	// DefaultCloneSetMaxUnavailable is the default value of maxUnavailable for CloneSet update strategy.
 	DefaultCloneSetMaxUnavailable = "20%"
+
+	// CloneSetScalingExcludePreparingDeleteKey is the label key that enables scalingExcludePreparingDelete
+	// only for this CloneSet, which means it will calculate scale number excluding Pods in PreparingDelete state.
+	CloneSetScalingExcludePreparingDeleteKey = "apps.kruise.io/cloneset-scaling-exclude-preparing-delete"
 )
 
 // CloneSetSpec defines the desired state of CloneSet
@@ -167,6 +171,10 @@ type CloneSetStatus struct {
 	// UpdatedReadyReplicas is the number of Pods created by the CloneSet controller from the CloneSet version
 	// indicated by updateRevision and have a Ready Condition.
 	UpdatedReadyReplicas int32 `json:"updatedReadyReplicas"`
+
+	// ExpectedUpdatedReplicas is the number of Pods that should be updated by CloneSet controller.
+	// This field is calculated via Replicas - Partition.
+	ExpectedUpdatedReplicas int32 `json:"expectedUpdatedReplicas,omitempty"`
 
 	// UpdateRevision, if not empty, indicates the latest revision of the CloneSet.
 	UpdateRevision string `json:"updateRevision,omitempty"`

@@ -22,6 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	// SidecarSetCustomVersionLabel is designed to record and label the controllerRevision of sidecarSet.
+	// This label will be passed from SidecarSet to its corresponding ControllerRevision, users can use
+	// this label to selector the ControllerRevision they want.
+	// For example, users can update the label from "version-1" to "version-2" when they upgrade the
+	// sidecarSet to "version-2", and they write the "version-2" to InjectionStrategy.Revision.CustomVersion
+	// when they decided to promote the "version-2", to avoid some risks about gray deployment of SidecarSet.
+	SidecarSetCustomVersionLabel = "apps.kruise.io/sidecarset-custom-version"
+)
+
 // SidecarSetSpec defines the desired state of SidecarSet
 type SidecarSetSpec struct {
 	// selector is a label query over pods that should be injected
@@ -56,7 +66,41 @@ type SidecarSetSpec struct {
 	// RevisionHistoryLimit indicates the maximum quantity of stored revisions about the SidecarSet.
 	// default value is 10
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
+
+	// SidecarSet support to inject & in-place update metadata in pod.
+	PatchPodMetadata []SidecarSetPatchPodMetadata `json:"patchPodMetadata,omitempty"`
 }
+
+type SidecarSetPatchPodMetadata struct {
+	// annotations
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// labels map[string]string `json:"labels,omitempty"`
+	// patch pod metadata policy, Default is "Retain"
+	PatchPolicy SidecarSetPatchPolicyType `json:"patchPolicy,omitempty"`
+}
+
+type SidecarSetPatchPolicyType string
+
+var (
+	// SidecarSetRetainPatchPolicy indicates if PatchPodFields conflicts with Pod,
+	// will ignore PatchPodFields, and retain the corresponding fields of pods.
+	// SidecarSet webhook cannot allow the conflict of PatchPodFields between SidecarSets under this policy type.
+	// Note: Retain is only supported for injection, and the Metadata will not be updated when upgrading the Sidecar Container in-place.
+	SidecarSetRetainPatchPolicy SidecarSetPatchPolicyType = "Retain"
+
+	// SidecarSetOverwritePatchPolicy indicates if PatchPodFields conflicts with Pod,
+	// SidecarSet will apply PatchPodFields to overwrite the corresponding fields of pods.
+	// SidecarSet webhook cannot allow the conflict of PatchPodFields between SidecarSets under this policy type.
+	// Overwrite support to inject and in-place metadata.
+	SidecarSetOverwritePatchPolicy SidecarSetPatchPolicyType = "Overwrite"
+
+	// SidecarSetMergePatchJsonPatchPolicy indicate that sidecarSet use application/merge-patch+json to patch annotation value,
+	// for example, A patch annotation[oom-score] = '{"log-agent": 1}' and B patch annotation[oom-score] = '{"envoy": 2}'
+	// result pod annotation[oom-score] = '{"log-agent": 1, "envoy": 2}'
+	// MergePatchJson support to inject and in-place metadata.
+	SidecarSetMergePatchJsonPatchPolicy SidecarSetPatchPolicyType = "MergePatchJson"
+)
 
 // SidecarContainer defines the container of Sidecar
 type SidecarContainer struct {
@@ -142,7 +186,37 @@ type SidecarSetInjectionStrategy struct {
 	// but the injected sidecar container remains updating and running.
 	// default is false
 	Paused bool `json:"paused,omitempty"`
+
+	// Revision can help users rolling update SidecarSet safely. If users set
+	// this filed, SidecarSet will try to inject specific revision according to
+	// different policies.
+	Revision *SidecarSetInjectRevision `json:"revision,omitempty"`
 }
+
+type SidecarSetInjectRevision struct {
+	// CustomVersion corresponds to label 'apps.kruise.io/sidecarset-custom-version' of (History) SidecarSet.
+	// SidecarSet will select the specific ControllerRevision via this CustomVersion, and then restore the
+	// history SidecarSet to inject specific version of the sidecar to pods.
+	// + optional
+	CustomVersion *string `json:"customVersion,omitempty"`
+	// RevisionName corresponds to a specific ControllerRevision name of SidecarSet that you want to inject to Pods.
+	// + optional
+	RevisionName *string `json:"revisionName,omitempty"`
+	// Policy describes the behavior of revision injection.
+	// Defaults to Always.
+	Policy SidecarSetInjectRevisionPolicy `json:"policy,omitempty"`
+}
+
+type SidecarSetInjectRevisionPolicy string
+
+const (
+	// AlwaysSidecarSetInjectRevisionPolicy means the SidecarSet will always inject
+	// the specific revision to Pods when pod creating, except matching UpdateStrategy.Selector.
+	AlwaysSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "Always"
+	// PartitionBasedSidecarSetInjectRevisionPolicy means the SidecarSet will inject the
+	// specific or the latest revision according to Partition.
+	//PartitionBasedSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "PartitionBased"
+)
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet
 // controller will use to perform updates. It includes any additional parameters

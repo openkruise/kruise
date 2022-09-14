@@ -21,13 +21,14 @@ import (
 	"context"
 	"errors"
 
-	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 )
 
 const (
@@ -77,9 +78,7 @@ func NewSecretCertWriter(ops SecretCertWriterOptions) (CertWriter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &secretCertWriter{
-		SecretCertWriterOptions: &ops,
-	}, nil
+	return &secretCertWriter{SecretCertWriterOptions: &ops}, nil
 }
 
 // EnsureCert provisions certificates for a webhookClientConfig by writing the certificates to a k8s secret.
@@ -112,8 +111,7 @@ func (s *secretCertWriter) write() (*generator.Artifacts, error) {
 	return certs, err
 }
 
-func (s *secretCertWriter) overwrite(resourceVersion string) (
-	*generator.Artifacts, error) {
+func (s *secretCertWriter) overwrite(resourceVersion string) (*generator.Artifacts, error) {
 	secret, certs, err := s.buildSecret()
 	if err != nil {
 		return nil, err
@@ -122,28 +120,24 @@ func (s *secretCertWriter) overwrite(resourceVersion string) (
 	secret, err = s.Clientset.CoreV1().Secrets(secret.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	if err != nil {
 		klog.Infof("Cert writer update secret failed: %v", err)
-		return certs, err
+		return nil, err
 	}
 	klog.Infof("Cert writer update secret %s resourceVersion from %s to %s",
-		secret.Name, resourceVersion, secret.ResourceVersion)
-	return certs, err
+		secret.Name, resourceVersion, secret.ResourceVersion,
+	)
+	return certs, nil
 }
 
 func (s *secretCertWriter) read() (*generator.Artifacts, error) {
-	//secret := &corev1.Secret{
-	//	TypeMeta: metav1.TypeMeta{
-	//		APIVersion: "v1",
-	//		Kind:       "Secret",
-	//	},
-	//}
 	secret, err := s.Clientset.CoreV1().Secrets(s.Secret.Namespace).Get(context.TODO(), s.Secret.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, notFoundError{err}
-	} else if err != nil {
+	}
+	if err != nil {
 		return nil, err
 	}
 	certs := secretToCerts(secret)
-	if certs != nil && certs.CACert != nil && certs.CAKey != nil {
+	if certs.CACert != nil && certs.CAKey != nil {
 		// Store the CA for next usage.
 		s.CertGenerator.SetCA(certs.CAKey, certs.CACert)
 	}
@@ -151,16 +145,16 @@ func (s *secretCertWriter) read() (*generator.Artifacts, error) {
 }
 
 func secretToCerts(secret *corev1.Secret) *generator.Artifacts {
-	if secret.Data == nil {
-		return &generator.Artifacts{ResourceVersion: secret.ResourceVersion}
-	}
-	return &generator.Artifacts{
-		CAKey:           secret.Data[CAKeyName],
-		CACert:          secret.Data[CACertName],
-		Cert:            secret.Data[ServerCertName],
-		Key:             secret.Data[ServerKeyName],
+	ret := &generator.Artifacts{
 		ResourceVersion: secret.ResourceVersion,
 	}
+	if secret.Data != nil {
+		ret.CAKey = secret.Data[CAKeyName]
+		ret.CACert = secret.Data[CACertName]
+		ret.Cert = secret.Data[ServerCertName]
+		ret.Key = secret.Data[ServerKeyName]
+	}
+	return ret
 }
 
 func certsToSecret(certs *generator.Artifacts, sec types.NamespacedName) *corev1.Secret {

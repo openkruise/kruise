@@ -65,12 +65,9 @@ func (cp *SelfSignedCertGenerator) SetCA(caKey, caCert []byte) {
 // client to verify the server authentication chain.
 // The cert will be valid for 365 days.
 func (cp *SelfSignedCertGenerator) Generate(commonName string) (*Artifacts, error) {
-	var signingKey *rsa.PrivateKey
-	var signingCert *x509.Certificate
-	var valid bool
 	var err error
 
-	valid, signingKey, signingCert = cp.validCACert()
+	valid, signingKey, signingCert := cp.validCACert()
 	if !valid {
 		signingKey, err = NewPrivateKey()
 		if err != nil {
@@ -115,12 +112,10 @@ func (cp *SelfSignedCertGenerator) Generate(commonName string) (*Artifacts, erro
 }
 
 func (cp *SelfSignedCertGenerator) validCACert() (bool, *rsa.PrivateKey, *x509.Certificate) {
-	if !ValidCACert(cp.caKey, cp.caCert, cp.caCert, "",
-		time.Now().AddDate(1, 0, 0)) {
+	if !ValidCACert(cp.caKey, cp.caCert, cp.caCert, "", time.Now().AddDate(1, 0, 0)) {
 		return false, nil, nil
 	}
 
-	var ok bool
 	key, err := keyutil.ParsePrivateKeyPEM(cp.caKey)
 	if err != nil {
 		return false, nil, nil

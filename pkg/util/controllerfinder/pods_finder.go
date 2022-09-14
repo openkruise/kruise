@@ -19,6 +19,9 @@ package controllerfinder
 import (
 	"context"
 
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,13 +30,10 @@ import (
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
 // GetPodsForRef return target workload's podList and spec.replicas.
-func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, active bool) ([]*corev1.Pod, int32, error) {
+func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, active bool) ([]*corev1.Pod, int32, error) {
 	workloadUIDs := make([]types.UID, 0)
 	var workloadReplicas int32
 
@@ -49,37 +49,38 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, acti
 		}
 		workloadReplicas = *rs.Spec.Replicas
 		workloadUIDs = append(workloadUIDs, rs.UID)
-	// Deployment, get the corresponding ReplicaSet UID
-	case ControllerKindDep.Kind:
-		rss, err := r.getReplicaSetsForDeployment(apiVersion, kind, ns, name)
-		if err != nil {
-			return nil, -1, err
-		}
-		if len(rss) == 0 {
-			return nil, 0, nil
-		}
+	// statefulset, rc, cloneSet
+	case ControllerKindSS.Kind, ControllerKindRC.Kind, ControllerKruiseKindCS.Kind, ControllerKruiseKindSS.Kind:
 		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
 		if err != nil {
 			return nil, -1, err
-		}
-		if obj == nil {
-			return nil, 0, nil
-		}
-		workloadReplicas = obj.Scale
-		for _, rs := range rss {
-			workloadUIDs = append(workloadUIDs, rs.UID)
-		}
-	// others, e.g. rc, cloneset, statefulset...
-	default:
-		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
-		if err != nil {
-			return nil, -1, err
-		}
-		if obj == nil {
+		} else if obj == nil {
 			return nil, 0, nil
 		}
 		workloadReplicas = obj.Scale
 		workloadUIDs = append(workloadUIDs, obj.UID)
+	// Deployment, Deployment-like workload, and other workload
+	default:
+		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
+		if err != nil {
+			return nil, -1, err
+		} else if obj == nil {
+			return nil, 0, nil
+		}
+		workloadReplicas = obj.Scale
+		// try to get replicaSets
+		rss, err := r.getReplicaSetsForDeployment(apiVersion, kind, ns, name)
+		if err != nil {
+			return nil, -1, err
+		}
+
+		if len(rss) == 0 {
+			workloadUIDs = append(workloadUIDs, obj.UID)
+		} else {
+			for _, rs := range rss {
+				workloadUIDs = append(workloadUIDs, rs.UID)
+			}
+		}
 	}
 
 	// List all Pods owned by workload UID.
@@ -107,18 +108,13 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, name, ns string, acti
 }
 
 func (r *ControllerFinder) getReplicaSetsForDeployment(apiVersion, kind, ns, name string) ([]appsv1.ReplicaSet, error) {
-	targetRef := ControllerReference{
-		APIVersion: apiVersion,
-		Kind:       kind,
-		Name:       name,
-	}
-	scaleNSelector, err := r.getPodDeployment(targetRef, ns)
+	scaleNSelector, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
 	if err != nil || scaleNSelector == nil {
 		return nil, err
 	}
 	// List ReplicaSets owned by this Deployment
 	rsList := &appsv1.ReplicaSetList{}
-	selector, err := metav1.LabelSelectorAsSelector(scaleNSelector.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(scaleNSelector.Selector)
 	if err != nil {
 		klog.Errorf("Deployment (%s/%s) get labelSelector failed: %s", ns, name, err.Error())
 		return nil, nil

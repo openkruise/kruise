@@ -23,6 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -31,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -67,19 +69,20 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 		})
 
 		ginkgo.It("PodUnavailableBudget selector no matched pods", func() {
-			// create pub
-			pub := tester.NewBasePub(ns)
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
-			tester.CreatePub(pub)
-
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
 			deployment.Spec.Selector.MatchLabels["pub-controller"] = "false"
 			deployment.Spec.Template.Labels["pub-controller"] = "false"
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			// create pub
+			pub := tester.NewBasePub(ns)
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
+			tester.CreatePub(pub)
+			time.Sleep(time.Second * 5)
+
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 0,
 				DesiredAvailable:   0,
@@ -105,16 +108,17 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				Type:   intstr.Int,
 				IntVal: 0,
 			}
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
 			deployment.Spec.Replicas = utilpointer.Int32Ptr(1)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
+			time.Sleep(time.Second * 3)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 0,
 				DesiredAvailable:   1,
@@ -163,11 +167,11 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			time.Sleep(time.Second * 5)
 
 			// delete deployment
-			ginkgo.By(fmt.Sprintf("Deleting Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Deleting Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			err = c.AppsV1().Deployments(deployment.Namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 0,
 				DesiredAvailable:   0,
@@ -193,16 +197,16 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 		ginkgo.It("PodUnavailableBudget selector pods and scale down deployment ignore", func() {
 			// create pub
 			pub := tester.NewBasePub(ns)
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
 			deployment.Spec.Replicas = utilpointer.Int32Ptr(4)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 1,
 				DesiredAvailable:   3,
@@ -220,12 +224,12 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
 			// scale down deployment
-			ginkgo.By(fmt.Sprintf("scale down Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("scale down Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			deployment.Spec.Replicas = utilpointer.Int32Ptr(0)
 			_, err = c.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				DesiredAvailable: 0,
 				TotalReplicas:    0,
@@ -259,15 +263,15 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				Kind:       "Deployment",
 				Name:       "webserver",
 			}
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 1,
 				DesiredAvailable:   1,
@@ -285,12 +289,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
 			// update failed image
-			ginkgo.By(fmt.Sprintf("update Deployment(%s.%s) failed image", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("update Deployment(%s/%s) failed image", deployment.Namespace, deployment.Name))
 			deployment.Spec.Template.Spec.Containers[0].Image = InvalidImage
 			_, err = c.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 5)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 0,
 				DesiredAvailable:   1,
@@ -319,12 +324,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(noUpdatePods).To(gomega.HaveLen(1))
 
 			// update success image
-			ginkgo.By(fmt.Sprintf("update Deployment(%s.%s) success image", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("update Deployment(%s/%s) success image", deployment.Namespace, deployment.Name))
 			deployment.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
 			_, err = c.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			tester.WaitForDeploymentReadyAndRunning(deployment)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 1,
 				DesiredAvailable:   1,
@@ -345,12 +351,112 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			newPods := make([]corev1.Pod, 0)
 			for _, pod := range pods {
-				if !pod.DeletionTimestamp.IsZero() || pod.Spec.Containers[0].Image != NewWebserverImage {
+				if !pod.DeletionTimestamp.IsZero() {
 					continue
 				}
+				gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(NewWebserverImage))
 				newPods = append(newPods, *pod)
 			}
 			gomega.Expect(newPods).To(gomega.HaveLen(2))
+
+			// add unavailable label
+			labelKey := fmt.Sprintf("%sdata", appspub.PubUnavailablePodLabelPrefix)
+			labelBody := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, labelKey, "true")
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), newPods[0].Name, types.MergePatchType, []byte(labelBody), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
+			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
+				UnavailableAllowed: 0,
+				DesiredAvailable:   1,
+				CurrentAvailable:   1,
+				TotalReplicas:      2,
+			}
+			setPubStatus(expectStatus)
+			gomega.Eventually(func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pub, err = kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				nowStatus := &pub.Status
+				setPubStatus(nowStatus)
+				return nowStatus
+			}, 60*time.Second, time.Second).Should(gomega.Equal(expectStatus))
+
+			// update pod image, ignore
+			podIn1, err := c.CoreV1().Pods(ns).Get(context.TODO(), newPods[0].Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn1.Spec.Containers[0].Image = WebserverImage
+			_, err = c.CoreV1().Pods(ns).Update(context.TODO(), podIn1, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// add unavailable label reject
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), newPods[1].Name, types.MergePatchType, []byte(labelBody), metav1.PatchOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			// update pod image, reject
+			podIn2, err := c.CoreV1().Pods(ns).Get(context.TODO(), newPods[1].Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn2.Spec.Containers[0].Image = WebserverImage
+			_, err = c.CoreV1().Pods(ns).Update(context.TODO(), podIn2, metav1.UpdateOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			// add pub protect operation DELETE
+			annotationBody := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, policyv1alpha1.PubProtectOperationAnnotation, policyv1alpha1.PubDeleteOperation)
+			_, err = kc.PolicyV1alpha1().PodUnavailableBudgets(ns).Patch(context.TODO(), pub.Name, types.MergePatchType, []byte(annotationBody), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 3)
+			// update pod image, allow
+			podIn2, err = c.CoreV1().Pods(ns).Get(context.TODO(), newPods[1].Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn2.Spec.Containers[0].Image = WebserverImage
+			_, err = c.CoreV1().Pods(ns).Update(context.TODO(), podIn2, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 3)
+
+			// check pod image
+			pods, err = sidecarTester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				if !pod.DeletionTimestamp.IsZero() {
+					continue
+				}
+				gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(WebserverImage))
+			}
+
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
+			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
+				UnavailableAllowed: 0,
+				DesiredAvailable:   1,
+				CurrentAvailable:   1,
+				TotalReplicas:      2,
+			}
+			setPubStatus(expectStatus)
+			gomega.Eventually(func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pub, err = kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				nowStatus := &pub.Status
+				setPubStatus(nowStatus)
+				return nowStatus
+			}, 60*time.Second, time.Second).Should(gomega.Equal(expectStatus))
+
+			// delete unavailable label
+			deleteLabelBody := fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, labelKey)
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), newPods[0].Name, types.StrategicMergePatchType, []byte(deleteLabelBody), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
+			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
+				UnavailableAllowed: 1,
+				DesiredAvailable:   1,
+				CurrentAvailable:   2,
+				TotalReplicas:      2,
+			}
+			setPubStatus(expectStatus)
+			gomega.Eventually(func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pub, err = kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				nowStatus := &pub.Status
+				setPubStatus(nowStatus)
+				return nowStatus
+			}, 60*time.Second, time.Second).Should(gomega.Equal(expectStatus))
+
 			ginkgo.By("PodUnavailableBudget targetReference pods, update failed image and block done")
 		})
 
@@ -362,7 +468,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 					Type:   intstr.String,
 					StrVal: "50%",
 				}
-				ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+				ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 				tester.CreatePub(pub)
 
 				// create deployment1
@@ -370,15 +476,15 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				deployment.Spec.Replicas = utilpointer.Int32Ptr(5)
 				deploymentIn1 := deployment.DeepCopy()
 				deploymentIn1.Name = fmt.Sprintf("%s-1", deploymentIn1.Name)
-				ginkgo.By(fmt.Sprintf("Creating Deployment1(%s.%s)", deploymentIn1.Namespace, deploymentIn1.Name))
+				ginkgo.By(fmt.Sprintf("Creating Deployment1(%s/%s)", deploymentIn1.Namespace, deploymentIn1.Name))
 				tester.CreateDeployment(deploymentIn1)
 				// create deployment2
 				deploymentIn2 := deployment.DeepCopy()
 				deploymentIn2.Name = fmt.Sprintf("%s-2", deploymentIn1.Name)
-				ginkgo.By(fmt.Sprintf("Creating Deployment2(%s.%s)", deploymentIn2.Namespace, deploymentIn2.Name))
+				ginkgo.By(fmt.Sprintf("Creating Deployment2(%s/%s)", deploymentIn2.Namespace, deploymentIn2.Name))
 				tester.CreateDeployment(deploymentIn2)
 
-				ginkgo.By(fmt.Sprintf("PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+				ginkgo.By(fmt.Sprintf("PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 				expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 5,
 					DesiredAvailable:   5,
@@ -442,11 +548,12 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 		ginkgo.It("PodUnavailableBudget selector SidecarSet, inject sidecar container, update failed sidecar image, block", func() {
 			// create pub
 			pub := tester.NewBasePub(ns)
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create sidecarset
 			sidecarSet := sidecarTester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.InitContainers = nil
 			sidecarSet.Spec.Namespace = ns
 			sidecarSet.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -470,13 +577,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
-			sidecarSet = sidecarTester.CreateSidecarSet(sidecarSet)
+			sidecarSet, _ = sidecarTester.CreateSidecarSet(sidecarSet)
 			time.Sleep(time.Second)
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
 			deployment.Spec.Replicas = utilpointer.Int32Ptr(5)
-			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deployment.Namespace, deployment.Name))
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
 			time.Sleep(time.Second)
@@ -581,16 +688,16 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 		ginkgo.It("PodUnavailableBudget selector cloneSet, strategy.type=recreate, update failed image and block", func() {
 			// create pub
 			pub := tester.NewBasePub(ns)
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create cloneset
 			cloneset := tester.NewBaseCloneSet(ns)
-			ginkgo.By(fmt.Sprintf("Creating CloneSet(%s.%s)", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("Creating CloneSet(%s/%s)", cloneset.Namespace, cloneset.Name))
 			cloneset = tester.CreateCloneSet(cloneset)
 
 			// wait 10 seconds
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 1,
 				DesiredAvailable:   1,
@@ -608,13 +715,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
 			// update failed image
-			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) with failed image", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("update CloneSet(%s/%s) with failed image", cloneset.Namespace, cloneset.Name))
 			cloneset.Spec.Template.Spec.Containers[0].Image = InvalidImage
 			_, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), cloneset, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			//wait 20 seconds
-			ginkgo.By(fmt.Sprintf("waiting 20 seconds, and check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("waiting 20 seconds, and check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 0,
 				DesiredAvailable:   1,
@@ -643,7 +750,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(noUpdatePods).To(gomega.HaveLen(1))
 
 			// update success image
-			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) success image", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("update CloneSet(%s/%s) success image", cloneset.Namespace, cloneset.Name))
 			cloneset, _ = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 			cloneset.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
 			cloneset, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), cloneset, metav1.UpdateOptions{})
@@ -651,7 +758,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			tester.WaitForCloneSetMinReadyAndRunning([]*appsv1alpha1.CloneSet{cloneset}, 1)
 
 			// check pub status
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 1,
 				DesiredAvailable:   1,
@@ -684,16 +791,16 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 		ginkgo.It("PodUnavailableBudget selector cloneSet, strategy.type=in-place, update failed image and block", func() {
 			// create pub
 			pub := tester.NewBasePub(ns)
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create cloneset
 			cloneset := tester.NewBaseCloneSet(ns)
 			cloneset.Spec.UpdateStrategy.Type = appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType
-			ginkgo.By(fmt.Sprintf("Creating CloneSet(%s.%s)", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("Creating CloneSet(%s/%s)", cloneset.Namespace, cloneset.Name))
 			cloneset = tester.CreateCloneSet(cloneset)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 1,
 				DesiredAvailable:   1,
@@ -711,13 +818,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
 			// update failed image
-			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) with failed image", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("update CloneSet(%s/%s) with failed image", cloneset.Namespace, cloneset.Name))
 			cloneset.Spec.Template.Spec.Containers[0].Image = InvalidImage
 			_, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), cloneset, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			//wait 20 seconds
-			ginkgo.By(fmt.Sprintf("waiting 20 seconds, and check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("waiting 20 seconds, and check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 0,
 				DesiredAvailable:   1,
@@ -746,7 +853,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(noUpdatePods).To(gomega.HaveLen(1))
 
 			// update success image
-			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) success image", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("update CloneSet(%s/%s) success image", cloneset.Namespace, cloneset.Name))
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				cloneset, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 				if err != nil {
@@ -760,7 +867,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			tester.WaitForCloneSetMinReadyAndRunning([]*appsv1alpha1.CloneSet{cloneset}, 1)
 
 			//wait 20 seconds
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 1,
 				DesiredAvailable:   1,
@@ -797,7 +904,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				Type:   intstr.String,
 				StrVal: "20%",
 			}
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create cloneset1
@@ -806,16 +913,16 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			cloneset.Spec.UpdateStrategy.Type = appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType
 			clonesetIn1 := cloneset.DeepCopy()
 			clonesetIn1.Name = fmt.Sprintf("%s-1", clonesetIn1.Name)
-			ginkgo.By(fmt.Sprintf("Creating CloneSet1(%s.%s)", clonesetIn1.Namespace, clonesetIn1.Name))
+			ginkgo.By(fmt.Sprintf("Creating CloneSet1(%s/%s)", clonesetIn1.Namespace, clonesetIn1.Name))
 			clonesetIn1 = tester.CreateCloneSet(clonesetIn1)
 			//create cloneSet2
 			clonesetIn2 := cloneset.DeepCopy()
 			clonesetIn2.Name = fmt.Sprintf("%s-2", clonesetIn2.Name)
-			ginkgo.By(fmt.Sprintf("Creating CloneSet2(%s.%s)", clonesetIn2.Namespace, clonesetIn2.Name))
+			ginkgo.By(fmt.Sprintf("Creating CloneSet2(%s/%s)", clonesetIn2.Namespace, clonesetIn2.Name))
 			clonesetIn2 = tester.CreateCloneSet(clonesetIn2)
 
 			// wait 10 seconds
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 2,
 				DesiredAvailable:   8,
@@ -833,7 +940,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
 			// update failed image
-			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) with failed image", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("update CloneSet(%s/%s) with failed image", cloneset.Namespace, cloneset.Name))
 			clonesetIn1.Spec.Template.Spec.Containers[0].Image = InvalidImage
 			_, err = kc.AppsV1alpha1().CloneSets(clonesetIn1.Namespace).Update(context.TODO(), clonesetIn1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -842,7 +949,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			//wait 20 seconds
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 0,
 				DesiredAvailable:   8,
@@ -858,6 +965,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				return nowStatus
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
+			time.Sleep(5 * time.Second)
 			// check now pod
 			pods, err := sidecarTester.GetSelectorPods(cloneset.Namespace, cloneset.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -871,7 +979,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			gomega.Expect(noUpdatePods).To(gomega.HaveLen(8))
 
 			// update success image
-			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) success image", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("update CloneSet(%s/%s) success image", cloneset.Namespace, cloneset.Name))
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				clonesetIn1, err = kc.AppsV1alpha1().CloneSets(clonesetIn1.Namespace).Get(context.TODO(), clonesetIn1.Name, metav1.GetOptions{})
 				if err != nil {
@@ -896,7 +1004,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			tester.WaitForCloneSetMinReadyAndRunning([]*appsv1alpha1.CloneSet{clonesetIn1, clonesetIn2}, 7)
 
 			// check pub status
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 2,
 				DesiredAvailable:   8,
@@ -932,11 +1040,12 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				Type:   intstr.String,
 				StrVal: "20%",
 			}
-			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s.%s)", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
 
 			// create sidecarSet
 			sidecarSet := sidecarTester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.InitContainers = nil
 			sidecarSet.Spec.Namespace = ns
 			sidecarSet.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -960,13 +1069,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
-			sidecarSet = sidecarTester.CreateSidecarSet(sidecarSet)
+			sidecarSet, _ = sidecarTester.CreateSidecarSet(sidecarSet)
 
 			// create cloneset
 			cloneset := tester.NewBaseCloneSet(ns)
 			cloneset.Spec.UpdateStrategy.Type = appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType
 			cloneset.Spec.Replicas = utilpointer.Int32Ptr(10)
-			ginkgo.By(fmt.Sprintf("Creating CloneSet(%s.%s)", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("Creating CloneSet(%s/%s)", cloneset.Namespace, cloneset.Name))
 			cloneset = tester.CreateCloneSet(cloneset)
 
 			time.Sleep(time.Second)
@@ -977,7 +1086,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			pod := pods[0]
 			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(len(cloneset.Spec.Template.Spec.Containers) + len(sidecarSet.Spec.Containers)))
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 2,
 				DesiredAvailable:   8,
@@ -994,7 +1103,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}, 30*time.Second, time.Second).Should(gomega.Equal(expectStatus))
 
 			// update success image
-			ginkgo.By(fmt.Sprintf("update CloneSet(%s.%s) success image", cloneset.Namespace, cloneset.Name))
+			ginkgo.By(fmt.Sprintf("update CloneSet(%s/%s) success image", cloneset.Namespace, cloneset.Name))
 			cloneset, _ = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 			cloneset.Spec.Template.Spec.Containers[0].Image = NewWebserverImage
 			cloneset, err = kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Update(context.TODO(), cloneset, metav1.UpdateOptions{})
@@ -1013,7 +1122,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}
 			sidecarTester.WaitForSidecarSetMinReadyAndUpgrade(sidecarSet, exceptSidecarSetStatus, 2)
 
-			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s.%s) Status", pub.Namespace, pub.Name))
+			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus = &policyv1alpha1.PodUnavailableBudgetStatus{
 				UnavailableAllowed: 2,
 				DesiredAvailable:   8,

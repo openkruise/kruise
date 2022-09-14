@@ -18,7 +18,6 @@ package podunavailablebudget
 
 import (
 	"context"
-	"reflect"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -26,12 +25,13 @@ import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -45,9 +45,17 @@ import (
 
 var _ handler.EventHandler = &enqueueRequestForPod{}
 
+func newEnqueueRequestForPod(c client.Client) handler.EventHandler {
+	e := &enqueueRequestForPod{client: c}
+	e.controllerFinder = controllerfinder.Finder
+	e.pubControl = pubcontrol.NewPubControl(c)
+	return e
+}
+
 type enqueueRequestForPod struct {
 	client           client.Client
 	controllerFinder *controllerfinder.ControllerFinder
+	pubControl       pubcontrol.PubControl
 }
 
 func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -68,19 +76,63 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	if !ok {
 		return
 	}
-
-	pub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, pod)
+	var pub *policyv1alpha1.PodUnavailableBudget
+	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] != "" {
+		pub, _ = p.pubControl.GetPubForPod(pod)
+	}
 	if pub == nil {
 		return
 	}
-
-	klog.V(3).Infof("add pod(%s.%s) reconcile pub(%s.%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
+	klog.V(3).Infof("add pod(%s/%s) reconcile pub(%s/%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
 	q.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      pub.Name,
 			Namespace: pub.Namespace,
 		},
 	})
+}
+
+func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+	ref := metav1.GetControllerOf(pod)
+	if ref == nil {
+		return nil, nil
+	}
+	workload, err := controllerfinder.Finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, "")
+	if err != nil {
+		return nil, err
+	} else if workload == nil {
+		return nil, nil
+	}
+	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	if err = c.List(context.TODO(), pubList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+	for i := range pubList.Items {
+		pub := &pubList.Items[i]
+		// if targetReference isn't nil, priority to take effect
+		if pub.Spec.TargetReference != nil {
+			// belongs the same workload
+			if pubcontrol.IsReferenceEqual(&policyv1alpha1.TargetReference{
+				APIVersion: workload.APIVersion,
+				Kind:       workload.Kind,
+				Name:       workload.Name,
+			}, pub.Spec.TargetReference) {
+				return pub, nil
+			}
+		} else {
+			// This error is irreversible, so continue
+			labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
+			if err != nil {
+				continue
+			}
+			// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
+			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+			return pub, nil
+		}
+	}
+	return nil, nil
 }
 
 func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old, cur runtime.Object) {
@@ -90,50 +142,11 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		return
 	}
 
-	//labels changed, and reconcile union pubs
-	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) {
-		oldPub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, oldPod)
-		newPub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, newPod)
-		if oldPub != nil && newPub != nil && oldPub.Name == newPub.Name {
-			control := pubcontrol.NewPubControl(newPub, p.controllerFinder, p.client)
-			if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, newPub, control); isReconcile {
-				q.AddAfter(reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      newPub.Name,
-						Namespace: newPub.Namespace,
-					},
-				}, enqueueDelayTime)
-			}
-			return
-		}
-		if oldPub != nil {
-			klog.V(3).Infof("pod(%s.%s) labels changed, and reconcile pub(%s.%s)", oldPod.Namespace, oldPod.Name, oldPub.Namespace, oldPub.Name)
-			q.Add(reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      oldPub.Name,
-					Namespace: oldPub.Namespace,
-				},
-			})
-		}
-		if newPub != nil {
-			klog.V(3).Infof("pod(%s.%s) labels changed, and reconcile pub(%s.%s)", newPod.Namespace, newPod.Name, newPub.Namespace, newPub.Name)
-			q.Add(reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      newPub.Name,
-					Namespace: newPub.Namespace,
-				},
-			})
-		}
-
-		return
-	}
-
-	pub, _ := pubcontrol.GetPodUnavailableBudgetForPod(p.client, p.controllerFinder, newPod)
+	pub, _ := p.pubControl.GetPubForPod(newPod)
 	if pub == nil {
 		return
 	}
-	control := pubcontrol.NewPubControl(pub, p.controllerFinder, p.client)
-	if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, pub, control); isReconcile {
+	if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, pub, p.pubControl); isReconcile {
 		q.AddAfter(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      pub.Name,
@@ -149,7 +162,7 @@ func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUn
 	// If the pod's deletion timestamp is set, remove endpoint from ready address.
 	if oldPod.DeletionTimestamp.IsZero() && !newPod.DeletionTimestamp.IsZero() {
 		enqueueDelayTime = time.Second * 5
-		klog.V(3).Infof("pod(%s.%s) DeletionTimestamp changed, and reconcile pub(%s.%s) delayTime(5s)", newPod.Namespace, newPod.Name, pub.Namespace, pub.Name)
+		klog.V(3).Infof("pod(%s/%s) DeletionTimestamp changed, and reconcile pub(%s/%s) delayTime(5s)", newPod.Namespace, newPod.Name, pub.Namespace, pub.Name)
 		return true, enqueueDelayTime
 		// oldPod Deletion is set, then no reconcile
 	} else if !oldPod.DeletionTimestamp.IsZero() {
@@ -163,7 +176,7 @@ func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUn
 	oldReady := control.IsPodReady(oldPod) && control.IsPodStateConsistent(oldPod)
 	newReady := control.IsPodReady(newPod) && control.IsPodStateConsistent(newPod)
 	if oldReady != newReady {
-		klog.V(3).Infof("pod(%s.%s) ConsistentAndReady changed(from %v to %v), and reconcile pub(%s.%s)",
+		klog.V(3).Infof("pod(%s/%s) ConsistentAndReady changed(from %v to %v), and reconcile pub(%s/%s)",
 			newPod.Namespace, newPod.Name, oldReady, newReady, pub.Namespace, pub.Name)
 		return true, enqueueDelayTime
 	}
@@ -242,12 +255,12 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		// if targetReference isn't nil, priority to take effect
 		if pub.Spec.TargetReference != nil {
 			// belongs the same workload
-			if isReferenceEqual(targetRef, pub.Spec.TargetReference) {
+			if pubcontrol.IsReferenceEqual(targetRef, pub.Spec.TargetReference) {
 				matchedPubs = append(matchedPubs, pub)
 			}
 		} else {
 			// This error is irreversible, so continue
-			labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+			labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
 			if err != nil {
 				continue
 			}
@@ -269,17 +282,4 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		klog.V(3).Infof("workload(%s/%s) replicas changed, and reconcile pub(%s/%s)",
 			namespace, targetRef.Name, pub.Namespace, pub.Name)
 	}
-}
-
-// check APIVersion, Kind, Name
-func isReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
-	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
-	if err != nil {
-		return false
-	}
-	gv2, err := schema.ParseGroupVersion(ref2.APIVersion)
-	if err != nil {
-		return false
-	}
-	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
 }

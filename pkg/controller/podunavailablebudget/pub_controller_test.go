@@ -24,6 +24,7 @@ import (
 	"time"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
@@ -766,10 +767,12 @@ func TestPubReconcile(t *testing.T) {
 					t.Fatalf("create pod failed: %s", err.Error())
 				}
 			}
+			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: fakeClient}
 			reconciler := ReconcilePodUnavailableBudget{
 				Client:           fakeClient,
 				recorder:         record.NewFakeRecorder(10),
-				controllerFinder: controllerfinder.NewControllerFinder(fakeClient),
+				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
+				pubControl:       pubcontrol.NewPubControl(fakeClient),
 			}
 
 			_, err := reconciler.syncPodUnavailableBudget(pub)
@@ -784,6 +787,39 @@ func TestPubReconcile(t *testing.T) {
 				t.Fatalf("expect pub status(%v) but get(%v)", cs.expectPubStatus(), newPub.Status)
 			}
 			_ = util.GlobalCache.Delete(pub)
+		})
+	}
+}
+
+func TestDesiredAvailableForPub(t *testing.T) {
+	cases := []struct {
+		name             string
+		getPub           func() *policyv1alpha1.PodUnavailableBudget
+		totalReplicas    int32
+		desiredAvailable int32
+	}{
+		{
+			name: "DesiredAvailableForPub, maxUnavailable 10%, total 15",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				demo := pubDemo.DeepCopy()
+				demo.Spec.MaxUnavailable = &intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "10%",
+				}
+				return demo
+			},
+			totalReplicas:    15,
+			desiredAvailable: 13,
+		},
+	}
+
+	rec := ReconcilePodUnavailableBudget{}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			expect, _ := rec.getDesiredAvailableForPub(cs.getPub(), cs.totalReplicas)
+			if expect != cs.desiredAvailable {
+				t.Fatalf("expect %d, but get %d", cs.desiredAvailable, expect)
+			}
 		})
 	}
 }

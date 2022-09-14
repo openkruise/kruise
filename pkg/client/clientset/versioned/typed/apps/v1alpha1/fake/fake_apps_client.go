@@ -59,6 +59,18 @@ func (c *FakeAppsV1alpha1) NodeImages() v1alpha1.NodeImageInterface {
 	return &FakeNodeImages{c}
 }
 
+func (c *FakeAppsV1alpha1) NodePodProbes() v1alpha1.NodePodProbeInterface {
+	return &FakeNodePodProbes{c}
+}
+
+func (c *FakeAppsV1alpha1) PersistentPodStates(namespace string) v1alpha1.PersistentPodStateInterface {
+	return &FakePersistentPodStates{c, namespace}
+}
+
+func (c *FakeAppsV1alpha1) PodProbeMarkers(namespace string) v1alpha1.PodProbeMarkerInterface {
+	return &FakePodProbeMarkers{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) ResourceDistributions() v1alpha1.ResourceDistributionInterface {
 	return &FakeResourceDistributions{c}
 }

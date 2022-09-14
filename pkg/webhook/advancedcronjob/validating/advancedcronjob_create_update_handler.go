@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 	admissionv1 "k8s.io/api/admission/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -75,6 +77,10 @@ func validateAdvancedCronJobSpec(spec *appsv1alpha1.AdvancedCronJobSpec, fldPath
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAdvancedCronJobSpecSchedule(spec, fldPath)...)
 	allErrs = append(allErrs, validateAdvancedCronJobSpecTemplate(spec, fldPath)...)
+	if spec.StartingDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(*spec.StartingDeadlineSeconds, fldPath.Child("startingDeadlineSeconds"))...)
+	}
+	allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
 	return allErrs
 }
 
@@ -90,6 +96,32 @@ func validateAdvancedCronJobSpecSchedule(spec *appsv1alpha1.AdvancedCronJobSpec,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("schedule"),
 			spec.Schedule, err.Error()))
 	}
+	if strings.Contains(spec.Schedule, "TZ") && spec.TimeZone != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("schedule"),
+			spec.Schedule, "cannot use both timeZone field and TZ or CRON_TZ in schedule"))
+	}
+	return allErrs
+}
+
+func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if timeZone == nil {
+		return allErrs
+	}
+
+	if len(*timeZone) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, "timeZone must be nil or non-empty string"))
+		return allErrs
+	}
+
+	if strings.EqualFold(*timeZone, "Local") {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, "timeZone must be an explicit time zone as defined in https://www.iana.org/time-zones"))
+	}
+
+	if _, err := time.LoadLocation(*timeZone); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, err.Error()))
+	}
+
 	return allErrs
 }
 
@@ -116,7 +148,7 @@ func validateAdvancedCronJobSpecTemplate(spec *appsv1alpha1.AdvancedCronJobSpec,
 	return allErrs
 }
 
-func validateJobTemplateSpec(jobSpec *batchv1beta1.JobTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateJobTemplateSpec(jobSpec *batchv1.JobTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	coreTemplate, err := convertPodTemplateSpec(&jobSpec.Spec.Template)
 	if err != nil {
@@ -165,8 +197,9 @@ func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJobUpdate(obj, 
 	advanceCronJob.Spec.FailedJobsHistoryLimit = oldObj.Spec.FailedJobsHistoryLimit
 	advanceCronJob.Spec.StartingDeadlineSeconds = oldObj.Spec.StartingDeadlineSeconds
 	advanceCronJob.Spec.Paused = oldObj.Spec.Paused
+	advanceCronJob.Spec.TimeZone = oldObj.Spec.TimeZone
 	if !apiequality.Semantic.DeepEqual(advanceCronJob.Spec, oldObj.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to advancedcronjob spec for fields other than 'schedule', 'concurrencyPolicy', 'successfulJobsHistoryLimit', 'failedJobsHistoryLimit', 'startingDeadlineSeconds' and 'paused' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to advancedcronjob spec for fields other than 'schedule', 'concurrencyPolicy', 'successfulJobsHistoryLimit', 'failedJobsHistoryLimit', 'startingDeadlineSeconds', 'timeZone' and 'paused' are forbidden"))
 	}
 	return allErrs
 }

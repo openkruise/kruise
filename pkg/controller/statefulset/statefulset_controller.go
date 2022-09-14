@@ -53,7 +53,7 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -137,7 +137,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 
 	// new a client
-	sigsruntimeClient = util.NewClientFromManager(mgr, "statefulset-controller")
+	sigsruntimeClient = utilclient.NewClientFromManager(mgr, "statefulset-controller")
 
 	return &ReconcileStatefulSet{
 		kruiseClient: genericClient.KruiseClient,
@@ -148,8 +148,8 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 				podLister,
 				pvcLister,
 				recorder),
-			inplaceupdate.New(util.NewClientFromManager(mgr, "statefulset-controller"), revisionadapter.NewDefaultImpl()),
-			lifecycle.New(util.NewClientFromManager(mgr, "statefulset-controller")),
+			inplaceupdate.New(utilclient.NewClientFromManager(mgr, "statefulset-controller"), revisionadapter.NewDefaultImpl()),
+			lifecycle.New(utilclient.NewClientFromManager(mgr, "statefulset-controller")),
 			NewRealStatefulSetStatusUpdater(genericClient.KruiseClient, statefulSetLister),
 			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(revInformer.(toolscache.SharedIndexInformer).GetIndexer())),
 			recorder,

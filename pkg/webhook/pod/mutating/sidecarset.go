@@ -27,8 +27,10 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/history"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,17 +39,17 @@ import (
 )
 
 // mutate pod based on SidecarSet Object
-func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) error {
+func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
 	if len(req.AdmissionRequest.SubResource) > 0 ||
 		(req.AdmissionRequest.Operation != admissionv1.Create && req.AdmissionRequest.Operation != admissionv1.Update) ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
-		return nil
+		return true, nil
 	}
 	// filter out pods that don't require inject, include the following:
 	// 1. Deletion pod
 	// 2. ignore namespace: "kube-system", "kube-public"
 	if !sidecarcontrol.IsActivePod(pod) {
-		return nil
+		return true, nil
 	}
 
 	var oldPod *corev1.Pod
@@ -56,17 +58,17 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	if req.AdmissionRequest.Operation == admissionv1.Update {
 		isUpdated = true
 		oldPod = new(corev1.Pod)
-		if err := h.Decoder.Decode(
+		if err = h.Decoder.Decode(
 			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			oldPod); err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	// DisableDeepCopy:true, indicates must be deep copy before update sidecarSet objection
 	sidecarsetList := &appsv1alpha1.SidecarSetList{}
-	if err := h.Client.List(ctx, sidecarsetList, utilclient.DisableDeepCopy); err != nil {
-		return err
+	if err = h.Client.List(ctx, sidecarsetList, utilclient.DisableDeepCopy); err != nil {
+		return false, err
 	}
 
 	matchedSidecarSets := make([]sidecarcontrol.SidecarControl, 0)
@@ -75,43 +77,66 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 			continue
 		}
 		if matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); err != nil {
-			return err
+			return false, err
 		} else if !matched {
 			continue
 		}
+		// get user-specific revision or the latest revision of SidecarSet
+		suitableSidecarSet, err := h.getSuitableRevisionSidecarSet(&sidecarSet, oldPod, pod, req.AdmissionRequest.Operation)
+		if err != nil {
+			return false, err
+		}
 		// check whether sidecarSet is active
 		// when sidecarSet is not active, it will not perform injections and upgrades process.
-		control := sidecarcontrol.New(sidecarSet.DeepCopy())
+		control := sidecarcontrol.New(suitableSidecarSet)
 		if !control.IsActiveSidecarSet() {
 			continue
 		}
 		matchedSidecarSets = append(matchedSidecarSets, control)
 	}
 	if len(matchedSidecarSets) == 0 {
-		return nil
+		return true, nil
 	}
 
 	// check pod
 	if isUpdated {
 		if !matchedSidecarSets[0].IsPodAvailabilityChanged(pod, oldPod) {
-			klog.V(3).Infof("pod(%s.%s) availability unchanged for sidecarSet, and ignore", pod.Namespace, pod.Name)
-			return nil
+			klog.V(3).Infof("pod(%s/%s) availability unchanged for sidecarSet, and ignore", pod.Namespace, pod.Name)
+			return true, nil
 		}
 	}
 
 	klog.V(3).Infof("[sidecar inject] begin to operation(%s) pod(%s/%s) resources(%s) subResources(%s)",
 		req.Operation, req.Namespace, req.Name, req.Resource, req.SubResource)
+	// patch pod metadata, annotations & labels
+	// When the Pod main container is upgraded in place, and the sidecarSet configuration does not change at this time,
+	// at this point, it can also patch pod metadata
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	skip = true
+	for _, control := range matchedSidecarSets {
+		sidecarSet := control.GetSidecarset()
+		sk, err := sidecarcontrol.PatchPodMetadata(&pod.ObjectMeta, sidecarSet.Spec.PatchPodMetadata)
+		if err != nil {
+			klog.Errorf("sidecarSet(%s) update pod(%s/%s) metadata failed: %s", sidecarSet.Name, pod.Namespace, pod.Name, err.Error())
+			return false, err
+		} else if !sk {
+			// skip = false
+			skip = false
+		}
+	}
 	//build sidecar containers, sidecar initContainers, sidecar volumes, annotations to inject into pod object
 	sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations, err := buildSidecars(isUpdated, pod, oldPod, matchedSidecarSets)
 	if err != nil {
-		return err
+		return false, err
 	} else if len(sidecarContainers) == 0 && len(sidecarInitContainers) == 0 {
-		klog.V(3).Infof("[sidecar inject] pod(%s.%s) don't have injected containers", pod.Namespace, pod.Name)
-		return nil
+		klog.V(3).Infof("[sidecar inject] pod(%s/%s) don't have injected containers", pod.Namespace, pod.Name)
+		return skip, nil
 	}
 
 	klog.V(3).Infof("[sidecar inject] begin inject sidecarContainers(%v) sidecarInitContainers(%v) sidecarSecrets(%v), volumes(%s)"+
-		"annotations(%v) into pod(%s.%s)", sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations,
+		"annotations(%v) into pod(%s/%s)", sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations,
 		pod.Namespace, pod.Name)
 	klog.V(4).Infof("[sidecar inject] before mutating: %v", util.DumpJSON(pod))
 	// apply sidecar set info into pod
@@ -129,14 +154,89 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	// 4. inject imagePullSecrets
 	pod.Spec.ImagePullSecrets = mergeSidecarSecrets(pod.Spec.ImagePullSecrets, sidecarSecrets)
 	// 5. apply annotations
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
 	for k, v := range injectedAnnotations {
 		pod.Annotations[k] = v
 	}
 	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
-	return nil
+	return false, nil
+}
+
+func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha1.SidecarSet, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) (*appsv1alpha1.SidecarSet, error) {
+	switch operation {
+	case admissionv1.Update:
+		// optimization: quickly return if newPod matched the latest sidecarSet
+		if sidecarcontrol.GetPodSidecarSetRevision(sidecarSet.Name, newPod) == sidecarcontrol.GetSidecarSetRevision(sidecarSet) {
+			return sidecarSet.DeepCopy(), nil
+		}
+
+		hc := sidecarcontrol.NewHistoryControl(h.Client)
+		revisions, err := history.NewHistory(h.Client).ListControllerRevisions(sidecarcontrol.MockSidecarSetForRevision(sidecarSet), hc.GetRevisionSelector(sidecarSet))
+		if err != nil {
+			klog.Errorf("Failed to list history controllerRevisions, err %v, name %v", err, sidecarSet.Name)
+			return nil, err
+		}
+
+		suitableSidecarSet, err := h.getSpecificRevisionSidecarSetForPod(sidecarSet, revisions, newPod)
+		if err != nil {
+			return nil, err
+		} else if suitableSidecarSet != nil {
+			return suitableSidecarSet, nil
+		}
+
+		suitableSidecarSet, err = h.getSpecificRevisionSidecarSetForPod(sidecarSet, revisions, oldPod)
+		if err != nil {
+			return nil, err
+		} else if suitableSidecarSet != nil {
+			return suitableSidecarSet, nil
+		}
+
+		return sidecarSet.DeepCopy(), nil
+
+	default:
+		revisionInfo := sidecarSet.Spec.InjectionStrategy.Revision
+		if revisionInfo == nil || (revisionInfo.RevisionName == nil && revisionInfo.CustomVersion == nil) {
+			return sidecarSet.DeepCopy(), nil
+		}
+
+		// TODO: support 'PartitionBased' policy to inject old/new revision according to Partition
+		switch sidecarSet.Spec.InjectionStrategy.Revision.Policy {
+		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy:
+			return h.getSpecificHistorySidecarSet(sidecarSet, revisionInfo)
+		}
+
+		return h.getSpecificHistorySidecarSet(sidecarSet, revisionInfo)
+	}
+}
+
+func (h *PodCreateHandler) getSpecificRevisionSidecarSetForPod(sidecarSet *appsv1alpha1.SidecarSet, revisions []*apps.ControllerRevision, pod *corev1.Pod) (*appsv1alpha1.SidecarSet, error) {
+	var err error
+	var matchedSidecarSet *appsv1alpha1.SidecarSet
+	for _, revision := range revisions {
+		if sidecarcontrol.GetPodSidecarSetControllerRevision(sidecarSet.Name, pod) == revision.Name {
+			matchedSidecarSet, err = h.getSpecificHistorySidecarSet(sidecarSet, &appsv1alpha1.SidecarSetInjectRevision{RevisionName: &revision.Name})
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+	return matchedSidecarSet, nil
+}
+
+func (h *PodCreateHandler) getSpecificHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, revisionInfo *appsv1alpha1.SidecarSetInjectRevision) (*appsv1alpha1.SidecarSet, error) {
+	// else return its corresponding history revision
+	hc := sidecarcontrol.NewHistoryControl(h.Client)
+	historySidecarSet, err := hc.GetHistorySidecarSet(sidecarSet, revisionInfo)
+	if err != nil {
+		klog.Warningf("Failed to restore history revision for SidecarSet %v, ControllerRevision name %v:, error: %v",
+			sidecarSet.Name, sidecarSet.Spec.InjectionStrategy.Revision, err)
+		return nil, err
+	}
+	if historySidecarSet == nil {
+		historySidecarSet = sidecarSet.DeepCopy()
+		klog.Warningf("Failed to restore history revision for SidecarSet %v, will use the latest", sidecarSet.Name)
+	}
+	return historySidecarSet, nil
 }
 
 func mergeSidecarSecrets(secretsInPod, secretsInSidecar []corev1.LocalObjectReference) (allSecrets []corev1.LocalObjectReference) {
@@ -203,7 +303,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
 				return nil, nil, nil, nil, nil,
-					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
+					fmt.Errorf("pod(%s/%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashAnnotation, oldHashStr, err)
 			}
 			for k, v := range olderSidecarSetHash {
 				sidecarSetHash[k] = sidecarcontrol.SidecarSetUpgradeSpec{
@@ -219,7 +319,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
 				return nil, nil, nil, nil, nil,
-					fmt.Errorf("pod(%s.%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
+					fmt.Errorf("pod(%s/%s) invalid annotations[%s] value %v, unmarshal failed: %v", pod.Namespace, pod.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, oldHashStr, err)
 			}
 			for k, v := range olderSidecarSetHash {
 				sidecarSetHashWithoutImage[k] = sidecarcontrol.SidecarSetUpgradeSpec{
@@ -234,16 +334,17 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 	sidecarSetNames := make([]string, 0)
 	for _, control := range matchedSidecarSets {
 		sidecarSet := control.GetSidecarset()
-		klog.V(3).Infof("build pod(%s.%s) sidecar containers for sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
+		klog.V(3).Infof("build pod(%s/%s) sidecar containers for sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
 		// sidecarSet List
 		sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
 		// pre-process volumes only in sidecar
 		volumesMap := getVolumesMapInSidecarSet(sidecarSet)
 		// process sidecarset hash
 		setUpgrade1 := sidecarcontrol.SidecarSetUpgradeSpec{
-			UpdateTimestamp: metav1.Now(),
-			SidecarSetHash:  sidecarcontrol.GetSidecarSetRevision(sidecarSet),
-			SidecarSetName:  sidecarSet.Name,
+			UpdateTimestamp:              metav1.Now(),
+			SidecarSetHash:               sidecarcontrol.GetSidecarSetRevision(sidecarSet),
+			SidecarSetName:               sidecarSet.Name,
+			SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,
 		}
 		setUpgrade2 := sidecarcontrol.SidecarSetUpgradeSpec{
 			UpdateTimestamp: metav1.Now(),

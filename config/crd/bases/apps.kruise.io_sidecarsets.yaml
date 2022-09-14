@@ -229,11 +229,48 @@ spec:
                       to newly created Pods, but the injected sidecar container remains
                       updating and running. default is false
                     type: boolean
+                  revision:
+                    description: Revision can help users rolling update SidecarSet
+                      safely. If users set this filed, SidecarSet will try to inject
+                      specific revision according to different policies.
+                    properties:
+                      customVersion:
+                        description: CustomVersion corresponds to label 'apps.kruise.io/sidecarset-custom-version'
+                          of (History) SidecarSet. SidecarSet will select the specific
+                          ControllerRevision via this CustomVersion, and then restore
+                          the history SidecarSet to inject specific version of the
+                          sidecar to pods.
+                        type: string
+                      policy:
+                        description: Policy describes the behavior of revision injection.
+                          Defaults to Always.
+                        type: string
+                      revisionName:
+                        description: RevisionName corresponds to a specific ControllerRevision
+                          name of SidecarSet that you want to inject to Pods.
+                        type: string
+                    type: object
                 type: object
               namespace:
                 description: Namespace sidecarSet will only match the pods in the
                   namespace otherwise, match pods in all namespaces(in cluster)
                 type: string
+              patchPodMetadata:
+                description: SidecarSet support to inject & in-place update metadata
+                  in pod.
+                items:
+                  properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: annotations
+                      type: object
+                    patchPolicy:
+                      description: labels map[string]string `json:"labels,omitempty"`
+                        patch pod metadata policy, Default is "Retain"
+                      type: string
+                  type: object
+                type: array
               revisionHistoryLimit:
                 description: RevisionHistoryLimit indicates the maximum quantity of
                   stored revisions about the SidecarSet. default value is 10

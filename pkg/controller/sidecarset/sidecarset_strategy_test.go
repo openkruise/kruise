@@ -92,6 +92,7 @@ func factoryPodsCommon(count, upgraded int, sidecarSet *appsv1alpha1.SidecarSet)
 	}
 	for i := 0; i < upgraded; i++ {
 		pods[i].Spec.Containers[1].Image = "test-image:v2"
+		sidecarcontrol.UpdatePodSidecarSetHash(pods[i], control.GetSidecarset())
 		control.UpdatePodAnnotationsInUpgrade([]string{"test-sidecar"}, pods[i])
 	}
 	return pods
@@ -323,9 +324,9 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 		t.Run(cs.name, func(t *testing.T) {
 			control := sidecarcontrol.New(cs.getSidecarset())
 			pods := cs.getPods()
-			injectedPods := strategy.GetNextUpgradePods(control, pods)
-			if cs.exceptNeedUpgradeCount != len(injectedPods) {
-				t.Fatalf("except NeedUpgradeCount(%d), but get value(%d)", cs.exceptNeedUpgradeCount, len(injectedPods))
+			upgradePods := strategy.GetNextUpgradePods(control, pods)
+			if cs.exceptNeedUpgradeCount != len(upgradePods) {
+				t.Fatalf("except NeedUpgradeCount(%d), but get value(%d)", cs.exceptNeedUpgradeCount, len(upgradePods))
 			}
 		})
 	}

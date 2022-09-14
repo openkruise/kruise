@@ -19,9 +19,12 @@ package daemonset
 import (
 	"fmt"
 	"sort"
+	"sync"
+	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 
@@ -36,6 +39,27 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
 )
+
+var (
+	// newPodForDSCache is a cache for NewPod, it is map[ds.UID]*newPodForDS
+	newPodForDSCache sync.Map
+	newPodForDSLock  sync.Mutex
+)
+
+type newPodForDS struct {
+	generation int64
+	pod        *corev1.Pod
+}
+
+func loadNewPodForDS(ds *appsv1alpha1.DaemonSet) *corev1.Pod {
+	if val, ok := newPodForDSCache.Load(ds.UID); ok {
+		newPodCache := val.(*newPodForDS)
+		if newPodCache.generation >= ds.Generation {
+			return newPodCache.pod
+		}
+	}
+	return nil
+}
 
 // nodeInSameCondition returns true if all effective types ("Status" is true) equals;
 // otherwise, returns false.
@@ -133,7 +157,7 @@ func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha
 	var selector labels.Selector
 	var daemonSets []*appsv1alpha1.DaemonSet
 	for _, ds := range dsList {
-		selector, err = metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+		selector, err = kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -256,6 +280,9 @@ func unavailableCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, er
 	if r == nil {
 		return 0, nil
 	}
+	if r.MaxUnavailable == nil {
+		return 0, nil
+	}
 	return intstrutil.GetScaledValueFromIntOrPercent(r.MaxUnavailable, numberToSchedule, true)
 }
 
@@ -317,7 +344,7 @@ func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1alpha1.DaemonSet) b
 		if ds.Spec.UpdateStrategy.RollingUpdate == nil || ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
 			return false
 		}
-		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
+		selector, err := kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return false
@@ -334,4 +361,13 @@ func isPodPreDeleting(pod *corev1.Pod) bool {
 
 func isPodNilOrPreDeleting(pod *corev1.Pod) bool {
 	return pod == nil || isPodPreDeleting(pod)
+}
+
+func podAvailableWaitingTime(pod *corev1.Pod, minReadySeconds int32, now time.Time) time.Duration {
+	c := podutil.GetPodReadyCondition(pod.Status)
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	if c == nil || c.LastTransitionTime.IsZero() {
+		return minReadySecondsDuration
+	}
+	return minReadySecondsDuration - now.Sub(c.LastTransitionTime.Time)
 }

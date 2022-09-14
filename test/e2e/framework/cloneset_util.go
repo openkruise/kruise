@@ -131,7 +131,7 @@ func (t *CloneSetTester) DeleteCloneSet(name string) error {
 }
 
 func (s *CloneSetTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]v1.Pod, error) {
-	faster, err := util.GetFastLabelSelector(selector)
+	faster, err := util.ValidatedLabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
 	}

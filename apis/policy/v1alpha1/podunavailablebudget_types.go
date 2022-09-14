@@ -24,6 +24,19 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type PubOperation string
+
+const (
+	// PubProtectOperationAnnotation indicates the pub protected Operation[DELETE,UPDATE]
+	// the following indicates the pub only protect DELETE,UPDATE Operation
+	// annotations[kruise.io/pub-protect-operations]=DELETE,UPDATE
+	// if the annotations do not exist, the default DELETE and UPDATE are protected
+	PubProtectOperationAnnotation = "kruise.io/pub-protect-operations"
+	// pod webhook operation
+	PubUpdateOperation PubOperation = "UPDATE"
+	PubDeleteOperation PubOperation = "DELETE"
+)
+
 // PodUnavailableBudgetSpec defines the desired state of PodUnavailableBudget
 type PodUnavailableBudgetSpec struct {
 	// Selector label query over pods managed by the budget

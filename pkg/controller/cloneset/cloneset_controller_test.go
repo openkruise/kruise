@@ -29,6 +29,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"golang.org/x/net/context"
@@ -91,7 +92,7 @@ func TestReconcile(t *testing.T) {
 	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
 	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
 	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = util.NewClientFromManager(mgr, "test-cloneset-controller")
+	c = utilclient.NewClientFromManager(mgr, "test-cloneset-controller")
 
 	//recFn, requests := SetupTestReconcile(newReconciler(mgr))
 	g.Expect(add(mgr, newReconciler(mgr))).NotTo(gomega.HaveOccurred())
@@ -473,7 +474,7 @@ func checkStatus(g *gomega.GomegaWithT, total, updated int32) {
 		err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		return []int32{cs.Status.Replicas, cs.Status.UpdatedReplicas}
-	}, time.Second*3, time.Millisecond*500).Should(gomega.Equal([]int32{total, updated}))
+	}, time.Second*10, time.Millisecond*500).Should(gomega.Equal([]int32{total, updated}))
 }
 
 func getPodNames(pods []*v1.Pod) sets.String {

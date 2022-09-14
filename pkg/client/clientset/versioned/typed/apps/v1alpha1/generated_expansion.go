@@ -33,6 +33,12 @@ type ImagePullJobExpansion interface{}
 
 type NodeImageExpansion interface{}
 
+type NodePodProbeExpansion interface{}
+
+type PersistentPodStateExpansion interface{}
+
+type PodProbeMarkerExpansion interface{}
+
 type ResourceDistributionExpansion interface{}
 
 type SidecarSetExpansion interface{}

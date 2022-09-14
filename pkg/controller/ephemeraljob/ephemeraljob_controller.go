@@ -26,6 +26,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
@@ -64,7 +65,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileEphemeralJob {
 	return &ReconcileEphemeralJob{
-		Client: util.NewClientFromManager(mgr, "ephemeraljob-controller"),
+		Client: utilclient.NewClientFromManager(mgr, "ephemeraljob-controller"),
 		scheme: mgr.GetScheme(),
 	}
 }
@@ -221,7 +222,7 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 }
 
 func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v1.Pod, error) {
-	selector, err := util.GetFastLabelSelector(job.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +255,7 @@ func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v
 			continue
 		}
 
-		if len(targetPods) < int(*job.Spec.Replicas) {
+		if job.Spec.Replicas == nil || len(targetPods) < int(*job.Spec.Replicas) {
 			targetPods = append(targetPods, &podList.Items[i])
 		}
 	}
@@ -264,7 +265,7 @@ func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v
 
 // filterInjectedPods will return pods which has injected ephemeral containers
 func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJob) ([]*v1.Pod, error) {
-	selector, err := util.GetFastLabelSelector(job.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
@@ -374,20 +375,27 @@ func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, 
 		return err
 	}
 
+	var replicas int32
+	if job.Spec.Replicas == nil {
+		replicas = job.Status.Matches
+	} else {
+		replicas = *job.Spec.Replicas
+	}
+
 	if job.Status.Matches == 0 {
 		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
 		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobMatchedEmpty, "MatchEmpty", "job match no pods")
-	} else if job.Status.Succeeded == *job.Spec.Replicas && job.Status.Succeeded > 0 {
+	} else if job.Status.Succeeded == replicas && job.Status.Succeeded > 0 {
 		job.Status.CompletionTime = timeNow()
 		job.Status.Phase = appsv1alpha1.EphemeralJobSucceeded
 		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobSucceeded, "JobSucceeded", "job success to run all tasks")
 	} else if job.Status.Running > 0 {
 		job.Status.Phase = appsv1alpha1.EphemeralJobRunning
-	} else if job.Status.Failed == *job.Spec.Replicas {
+	} else if job.Status.Failed == replicas {
 		job.Status.CompletionTime = timeNow()
 		job.Status.Phase = appsv1alpha1.EphemeralJobFailed
 		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobFailed, "JobFailed", "job failed to run all tasks")
-	} else if job.Status.Waiting == *job.Spec.Replicas {
+	} else if job.Status.Waiting == replicas {
 		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
 	} else {
 		job.Status.Phase = appsv1alpha1.EphemeralJobUnknown

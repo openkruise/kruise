@@ -23,7 +23,9 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"time"
+	_ "time/tzdata" // for AdvancedCronJob Time Zone support
 
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -113,6 +115,7 @@ func main() {
 		})
 	}
 
+	ctx := ctrl.SetupSignalHandler()
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
 	cfg.UserAgent = "kruise-manager"
@@ -143,10 +146,15 @@ func main() {
 		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
 		Namespace:                  namespace,
 		SyncPeriod:                 syncPeriod,
-		NewClient:                  utilclient.NewClient,
+		NewCache:                   utilclient.NewCache,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+	err = controllerfinder.InitControllerFinder(mgr)
+	if err != nil {
+		setupLog.Error(err, "unable to start ControllerFinder")
 		os.Exit(1)
 	}
 
@@ -163,8 +171,6 @@ func main() {
 	}
 
 	// +kubebuilder:scaffold:builder
-
-	ctx := ctrl.SetupSignalHandler()
 	setupLog.Info("initialize webhook")
 	if err := webhook.Initialize(ctx, cfg); err != nil {
 		setupLog.Error(err, "unable to initialize webhook")

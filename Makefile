@@ -1,7 +1,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= openkruise/kruise-manager:test
 # Platforms to build the image for
-PLATFORMS ?= linux/amd64,linux/arm64,linux/arm
+PLATFORMS ?= linux/amd64,linux/arm64,linux/arm,linux/ppc64le
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -54,7 +54,7 @@ build: generate fmt vet manifests ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-docker-build: generate fmt vet manifests ## Build docker image with the manager.
+docker-build: ## Build docker image with the manager.
 	docker build --pull --no-cache . -t ${IMG}
 
 docker-push: ## Push docker image with the manager.
@@ -62,7 +62,7 @@ docker-push: ## Push docker image with the manager.
 
 # Build and push the multiarchitecture docker images and manifest.
 docker-multiarch:
-	docker buildx build --pull --no-cache --platform=$(PLATFORMS) --push . -t $(IMG)
+	docker buildx build -f ./Dockerfile_multiarch --pull --no-cache --platform=$(PLATFORMS) --push . -t $(IMG)
 
 ##@ Deployment
 
@@ -91,7 +91,7 @@ endif
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.5)
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
@@ -110,7 +110,7 @@ TMP_DIR=$$(mktemp -d) ;\
 cd $$TMP_DIR ;\
 go mod init tmp ;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef

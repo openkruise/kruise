@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-// ValidCACert think cert and key are valid if they meet the following requirements:
+// ValidCACert treats cert and key are valid if they meet the following requirements:
 // - key and cert are valid pair
 // - caCert is the root ca of cert
 // - cert is for dnsName

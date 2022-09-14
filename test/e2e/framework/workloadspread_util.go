@@ -33,6 +33,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 )
@@ -100,6 +101,63 @@ func (t *WorkloadSpreadTester) NewBaseCloneSet(namespace string) *appsv1alpha1.C
 			},
 		},
 	}
+}
+
+func (t *WorkloadSpreadTester) NewBaseHeadlessStatefulSet(namespace string) (*appsv1alpha1.StatefulSet, *corev1.Service) {
+	statefulset := &appsv1alpha1.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CloneSet",
+			APIVersion: appsv1alpha1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "busybox",
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.StatefulSetSpec{
+			Replicas: utilpointer.Int32Ptr(2),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": namespace,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": namespace,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "main",
+							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+						},
+					},
+				},
+			},
+		},
+	}
+	headlessSVC := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "busybox",
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"app": namespace,
+			},
+			ClusterIP: corev1.ClusterIPNone,
+			Ports: []corev1.ServicePort{
+				{
+					Name: "web-port",
+					Port: 8080,
+				},
+			},
+		},
+	}
+
+	return statefulset, headlessSVC
 }
 
 func (t *WorkloadSpreadTester) NewBaseJob(namespace string) *batchv1.Job {
@@ -229,6 +287,21 @@ func (t *WorkloadSpreadTester) CreateCloneSet(cloneSet *appsv1alpha1.CloneSet) *
 	return cloneSet
 }
 
+func (t *WorkloadSpreadTester) CreateStatefulSet(statefulSet *appsv1alpha1.StatefulSet) *appsv1beta1.StatefulSet {
+	Logf("create statefulSet (%s/%s)", statefulSet.Namespace, statefulSet.Name)
+	_, err := t.kc.AppsV1alpha1().StatefulSets(statefulSet.Namespace).Create(context.TODO(), statefulSet, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	Logf("create statefulSet (%s/%s) success", statefulSet.Namespace, statefulSet.Name)
+	asts, _ := t.kc.AppsV1beta1().StatefulSets(statefulSet.Namespace).Get(context.TODO(), statefulSet.Name, metav1.GetOptions{})
+	return asts
+}
+
+func (t *WorkloadSpreadTester) CreateService(svc *corev1.Service) {
+	Logf("create Service (%s/%s)", svc.Namespace, svc.Name)
+	_, err := t.C.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+}
+
 func (t *WorkloadSpreadTester) CreateDeployment(deployment *appsv1.Deployment) *appsv1.Deployment {
 	Logf("create Deployment (%s/%s)", deployment.Namespace, deployment.Name)
 	_, err := t.C.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
@@ -264,6 +337,25 @@ func (t *WorkloadSpreadTester) WaitForCloneSetRunning(cloneSet *appsv1alpha1.Clo
 		Failf("Failed waiting for cloneSet to enter running: %v", pollErr)
 	}
 	Logf("wait cloneSet (%s/%s) running success", cloneSet.Namespace, cloneSet.Name)
+}
+
+func (t *WorkloadSpreadTester) WaitForStatefulSetRunning(statefulSet *appsv1beta1.StatefulSet) {
+	pollErr := wait.PollImmediate(time.Second, time.Minute*10,
+		func() (bool, error) {
+			inner, err := t.kc.AppsV1beta1().StatefulSets(statefulSet.Namespace).Get(context.TODO(), statefulSet.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if inner.Generation == inner.Status.ObservedGeneration && *inner.Spec.Replicas == inner.Status.ReadyReplicas &&
+				*inner.Spec.Replicas == inner.Status.Replicas && *inner.Spec.Replicas == inner.Status.UpdatedReplicas {
+				return true, nil
+			}
+			return false, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for statefulSet to enter running: %v", pollErr)
+	}
+	Logf("wait statefulSet (%s/%s) running success", statefulSet.Namespace, statefulSet.Name)
 }
 
 func (t *WorkloadSpreadTester) WaitForCloneSetRunReplicas(cloneSet *appsv1alpha1.CloneSet, replicas int32) {
@@ -320,7 +412,7 @@ func (t *WorkloadSpreadTester) WaitJobCompleted(job *batchv1.Job) {
 }
 
 func (t *WorkloadSpreadTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
-	faster, err := util.GetFastLabelSelector(selector)
+	faster, err := util.ValidatedLabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
 	}

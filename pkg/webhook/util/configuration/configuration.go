@@ -23,13 +23,13 @@ import (
 	"net/url"
 	"reflect"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 const (
@@ -73,10 +73,12 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]admission.Handle
 		if wh.ClientConfig.Service != nil {
 			wh.ClientConfig.Service.Namespace = webhookutil.GetNamespace()
 			wh.ClientConfig.Service.Name = webhookutil.GetServiceName()
+
+			if host := webhookutil.GetHost(); len(host) > 0 {
+				convertClientConfig(&wh.ClientConfig, host, webhookutil.GetPort())
+			}
 		}
-		if host := webhookutil.GetHost(); len(host) > 0 && wh.ClientConfig.Service != nil {
-			convertClientConfig(&wh.ClientConfig, host, webhookutil.GetPort())
-		}
+
 		mutatingWHs = append(mutatingWHs, *wh)
 	}
 	mutatingConfig.Webhooks = mutatingWHs
@@ -96,10 +98,12 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]admission.Handle
 		if wh.ClientConfig.Service != nil {
 			wh.ClientConfig.Service.Namespace = webhookutil.GetNamespace()
 			wh.ClientConfig.Service.Name = webhookutil.GetServiceName()
+
+			if host := webhookutil.GetHost(); len(host) > 0 {
+				convertClientConfig(&wh.ClientConfig, host, webhookutil.GetPort())
+			}
 		}
-		if host := webhookutil.GetHost(); len(host) > 0 && wh.ClientConfig.Service != nil {
-			convertClientConfig(&wh.ClientConfig, host, webhookutil.GetPort())
-		}
+
 		validatingWHs = append(validatingWHs, *wh)
 	}
 	validatingConfig.Webhooks = validatingWHs
@@ -122,7 +126,8 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]admission.Handle
 func getPath(clientConfig *admissionregistrationv1.WebhookClientConfig) (string, error) {
 	if clientConfig.Service != nil {
 		return *clientConfig.Service.Path, nil
-	} else if clientConfig.URL != nil {
+	}
+	if clientConfig.URL != nil {
 		u, err := url.Parse(*clientConfig.URL)
 		if err != nil {
 			return "", err

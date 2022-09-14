@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 )
 
 func TestSlowStartBatch(t *testing.T) {
@@ -150,6 +153,148 @@ func TestIsContainerImageEqual(t *testing.T) {
 					t.Fatalf("except repo %s tag %s digest %s, but get %s, %s, %s",
 						excepts[0], excepts[1], excepts[2], repo, tag, digest)
 				}
+			}
+		})
+	}
+}
+
+func TestCalculatePartitionReplicas(t *testing.T) {
+	cases := []struct {
+		name          string
+		replicas      *int32
+		partition     *intstr.IntOrString
+		expectedValue int
+		succeeded     bool
+	}{
+		{
+			name:          `replicas=0, partition=99%, expected=0`,
+			replicas:      pointer.Int32(0),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "99%"},
+			expectedValue: 0,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=10, partition=nil, expected=0`,
+			replicas:      pointer.Int32(10),
+			partition:     nil,
+			expectedValue: 0,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=9, partition=99%, expected=8`,
+			replicas:      pointer.Int32(9),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "99%"},
+			expectedValue: 8,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=10, partition=90%, expected=9`,
+			replicas:      pointer.Int32(10),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "90%"},
+			expectedValue: 9,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=10, partition=1%, expected=1`,
+			replicas:      pointer.Int32(10),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "1%"},
+			expectedValue: 1,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=99, partition=99%, expected=98`,
+			replicas:      pointer.Int32(99),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "99%"},
+			expectedValue: 98,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=99, partition=100%, expected=99`,
+			replicas:      pointer.Int32(99),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "100%"},
+			expectedValue: 99,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=99, partition=0%, expected=0`,
+			replicas:      pointer.Int32(99),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "0%"},
+			expectedValue: 0,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=nil, partition=100%, expected=1`,
+			replicas:      nil,
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "100%"},
+			expectedValue: 1,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=nil, partition=nil, expected=0`,
+			replicas:      nil,
+			partition:     nil,
+			expectedValue: 0,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=nil, partition=1%, expected=1`,
+			replicas:      nil,
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "1%"},
+			expectedValue: 1,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=nil, partition=1%, expected=1`,
+			replicas:      nil,
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "1%"},
+			expectedValue: 1,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=10, partition=5, expected=5`,
+			replicas:      pointer.Int32(10),
+			partition:     &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
+			expectedValue: 5,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=10, partition=1, expected=1`,
+			replicas:      pointer.Int32(10),
+			partition:     &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			expectedValue: 1,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=10, partition=0, expected=0`,
+			replicas:      pointer.Int32(10),
+			partition:     &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectedValue: 0,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=10, partition=10, expected=10`,
+			replicas:      pointer.Int32(10),
+			partition:     &intstr.IntOrString{Type: intstr.Int, IntVal: 10},
+			expectedValue: 10,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=9, partition is illegal, expected=0, err!=nil`,
+			replicas:      pointer.Int32(9),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "99"},
+			expectedValue: 0,
+			succeeded:     false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			calculated, err := CalculatePartitionReplicas(cs.partition, cs.replicas)
+			if (err == nil && !cs.succeeded) || (err != nil && cs.succeeded) {
+				t.Errorf("got %#v, expect error %#v", err, cs.succeeded)
+			}
+			if calculated != cs.expectedValue {
+				t.Errorf("got %#v, expect %#v", calculated, cs.expectedValue)
 			}
 		})
 	}

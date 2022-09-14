@@ -172,7 +172,7 @@ func (s *ResourceDistributionTester) CreateNamespaces(namespaces ...*corev1.Name
 
 func (s *ResourceDistributionTester) CreateSecretResources(secrets ...*corev1.Secret) {
 	for _, secret := range secrets {
-		Logf("create secrets(%s.%s)", secret.Namespace, secret.Name)
+		Logf("create secrets(%s/%s)", secret.Namespace, secret.Name)
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			_, err := s.c.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 			return err
@@ -322,7 +322,7 @@ func (s *ResourceDistributionTester) WaitForSecretCreated(namespace, name string
 			return true, nil
 		})
 	if pollErr != nil {
-		Failf("Failed waiting for secret(%s.%s) to enter created: %v", namespace, name, pollErr)
+		Failf("Failed waiting for secret(%s/%s) to enter created: %v", namespace, name, pollErr)
 	}
 }
 
@@ -379,7 +379,7 @@ func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1a
 		}
 	} else if len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0 {
 		// 1. select the namespaces via targets.NamespaceLabelSelector
-		selectors, err := util.GetFastLabelSelector(&targets.NamespaceLabelSelector)
+		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceLabelSelector)
 		if err != nil {
 			return nil, nil, err
 		}

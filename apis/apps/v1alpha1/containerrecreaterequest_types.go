@@ -22,8 +22,6 @@ import (
 )
 
 const (
-	// [Immutable] Pod name of this ContainerRecreateRequest.
-	ContainerRecreateRequestPodNameKey = "crr.apps.kruise.io/pod-name"
 	// [Immutable] Pod UID of this ContainerRecreateRequest.
 	ContainerRecreateRequestPodUIDKey = "crr.apps.kruise.io/pod-uid"
 	// [Immutable] Node name of this ContainerRecreateRequest.

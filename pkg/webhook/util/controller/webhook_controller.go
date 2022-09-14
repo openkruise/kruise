@@ -22,12 +22,6 @@ import (
 	"sync"
 	"time"
 
-	extclient "github.com/openkruise/kruise/pkg/client"
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	"github.com/openkruise/kruise/pkg/webhook/util/configuration"
-	"github.com/openkruise/kruise/pkg/webhook/util/crd"
-	"github.com/openkruise/kruise/pkg/webhook/util/generator"
-	"github.com/openkruise/kruise/pkg/webhook/util/writer"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -46,6 +40,13 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	extclient "github.com/openkruise/kruise/pkg/client"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/openkruise/kruise/pkg/webhook/util/configuration"
+	"github.com/openkruise/kruise/pkg/webhook/util/crd"
+	"github.com/openkruise/kruise/pkg/webhook/util/generator"
+	"github.com/openkruise/kruise/pkg/webhook/util/writer"
 )
 
 const (
@@ -72,13 +73,10 @@ type Controller struct {
 	handlers   map[string]admission.Handler
 
 	informerFactory informers.SharedInformerFactory
-	//secretLister       corelisters.SecretNamespaceLister
-	//mutatingWCLister   admissionregistrationlisters.MutatingWebhookConfigurationLister
-	//validatingWCLister admissionregistrationlisters.ValidatingWebhookConfigurationLister
-	crdClient   apiextensionsclientset.Interface
-	crdInformer cache.SharedIndexInformer
-	crdLister   apiextensionslisters.CustomResourceDefinitionLister
-	synced      []cache.InformerSynced
+	crdClient       apiextensionsclientset.Interface
+	crdInformer     cache.SharedIndexInformer
+	crdLister       apiextensionslisters.CustomResourceDefinitionLister
+	synced          []cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
 }
@@ -94,9 +92,6 @@ func New(cfg *rest.Config, handlers map[string]admission.Handler) (*Controller, 
 
 	secretInformer := coreinformers.New(c.informerFactory, namespace, nil).Secrets()
 	admissionRegistrationInformer := admissionregistrationinformers.New(c.informerFactory, v1.NamespaceAll, nil)
-	//c.secretLister = secretInformer.Lister().Secrets(namespace)
-	//c.mutatingWCLister = admissionRegistrationInformer.MutatingWebhookConfigurations().Lister()
-	//c.validatingWCLister = admissionRegistrationInformer.ValidatingWebhookConfigurations().Lister()
 
 	secretInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -229,13 +224,13 @@ func (c *Controller) sync() error {
 		klog.Infof("Finished to sync webhook certs and configurations")
 	}()
 
-	var dnsName string
-	var certWriter writer.CertWriter
-	var err error
-
-	if dnsName = webhookutil.GetHost(); len(dnsName) == 0 {
+	dnsName := webhookutil.GetHost()
+	if len(dnsName) == 0 {
 		dnsName = generator.ServiceToCommonName(webhookutil.GetNamespace(), webhookutil.GetServiceName())
 	}
+
+	var certWriter writer.CertWriter
+	var err error
 
 	certWriterType := webhookutil.GetCertWriter()
 	if certWriterType == writer.FsCertWriter || (len(certWriterType) == 0 && len(webhookutil.GetHost()) != 0) {

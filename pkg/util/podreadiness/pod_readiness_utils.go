@@ -17,33 +17,32 @@ limitations under the License.
 package podreadiness
 
 import (
-	"context"
 	"encoding/json"
-	"sort"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/podadapter"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func AddNotReadyKey(c client.Client, pod *v1.Pod, msg Message) error {
-	if alreadyHasKey(pod, msg) {
+func addNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v1.PodConditionType) error {
+	if alreadyHasKey(pod, msg, condType) {
 		return nil
 	}
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod := &v1.Pod{}
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod); err != nil {
+
+	if !containsReadinessGate(pod, condType) {
+		return nil
+	}
+
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		newPod, err := adp.GetPod(pod.Namespace, pod.Name)
+		if err != nil {
 			return err
 		}
-		if !ContainsReadinessGate(pod) {
-			return nil
-		}
 
-		condition := GetReadinessCondition(newPod)
+		condition := getReadinessCondition(newPod, condType)
 		if condition == nil {
 			_, messages := addMessage("", msg)
 			newPod.Status.Conditions = append(newPod.Status.Conditions, v1.PodCondition{
@@ -61,21 +60,25 @@ func AddNotReadyKey(c client.Client, pod *v1.Pod, msg Message) error {
 			condition.LastTransitionTime = metav1.Now()
 		}
 
-		return c.Status().Update(context.TODO(), newPod)
+		// set pod ready condition to "False"
+		util.SetPodReadyCondition(newPod)
+		return adp.UpdatePodStatus(newPod)
 	})
+	return err
 }
 
-func RemoveNotReadyKey(c client.Client, pod *v1.Pod, msg Message) error {
+func removeNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v1.PodConditionType) error {
+	if !containsReadinessGate(pod, condType) {
+		return nil
+	}
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod := &v1.Pod{}
-		if err := c.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, newPod); err != nil {
+		newPod, err := adp.GetPod(pod.Namespace, pod.Name)
+		if err != nil {
 			return err
 		}
-		if !ContainsReadinessGate(pod) {
-			return nil
-		}
 
-		condition := GetReadinessCondition(newPod)
+		condition := getReadinessCondition(newPod, condType)
 		if condition == nil {
 			return nil
 		}
@@ -88,30 +91,8 @@ func RemoveNotReadyKey(c client.Client, pod *v1.Pod, msg Message) error {
 		}
 		condition.Message = messages.dump()
 		condition.LastTransitionTime = metav1.Now()
-
-		return c.Status().Update(context.TODO(), newPod)
+		return adp.UpdatePodStatus(newPod)
 	})
-}
-
-type Message struct {
-	UserAgent string `json:"userAgent"`
-	Key       string `json:"key"`
-}
-
-type messageList []Message
-
-func (c messageList) Len() int      { return len(c) }
-func (c messageList) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
-func (c messageList) Less(i, j int) bool {
-	if c[i].UserAgent == c[j].UserAgent {
-		return c[i].Key < c[j].Key
-	}
-	return c[i].UserAgent < c[j].UserAgent
-}
-
-func (c messageList) dump() string {
-	sort.Sort(c)
-	return util.DumpJSON(c)
 }
 
 func addMessage(base string, msg Message) (bool, messageList) {
@@ -146,29 +127,37 @@ func removeMessage(base string, msg Message) (bool, messageList) {
 }
 
 func GetReadinessCondition(pod *v1.Pod) *v1.PodCondition {
+	return getReadinessCondition(pod, appspub.KruisePodReadyConditionType)
+}
+
+func ContainsReadinessGate(pod *v1.Pod) bool {
+	return containsReadinessGate(pod, appspub.KruisePodReadyConditionType)
+}
+
+func getReadinessCondition(pod *v1.Pod, condType v1.PodConditionType) *v1.PodCondition {
 	if pod == nil {
 		return nil
 	}
 	for i := range pod.Status.Conditions {
 		c := &pod.Status.Conditions[i]
-		if c.Type == appspub.KruisePodReadyConditionType {
+		if c.Type == condType {
 			return c
 		}
 	}
 	return nil
 }
 
-func ContainsReadinessGate(pod *v1.Pod) bool {
+func containsReadinessGate(pod *v1.Pod, condType v1.PodConditionType) bool {
 	for _, g := range pod.Spec.ReadinessGates {
-		if g.ConditionType == appspub.KruisePodReadyConditionType {
+		if g.ConditionType == condType {
 			return true
 		}
 	}
 	return false
 }
 
-func alreadyHasKey(pod *v1.Pod, msg Message) bool {
-	condition := GetReadinessCondition(pod)
+func alreadyHasKey(pod *v1.Pod, msg Message, condType v1.PodConditionType) bool {
+	condition := getReadinessCondition(pod, condType)
 	if condition == nil {
 		return false
 	}

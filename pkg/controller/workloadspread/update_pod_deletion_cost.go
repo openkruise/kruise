@@ -36,6 +36,10 @@ import (
 func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSpread,
 	podMap map[string][]*corev1.Pod,
 	workloadReplicas int32) error {
+	targetRef := ws.Spec.TargetReference
+	if targetRef == nil || !isEffectiveKindForDeletionCost(targetRef) {
+		return nil
+	}
 	// update Pod's deletion-cost annotation in each subset
 	for idx, subset := range ws.Spec.Subsets {
 		if err := r.syncSubsetPodDeletionCost(ws, &subset, idx, podMap[subset.Name], workloadReplicas); err != nil {
@@ -202,4 +206,12 @@ func sortDeleteIndexes(pods []*corev1.Pod) []int {
 	})
 
 	return waitDeleteIndexes
+}
+
+func isEffectiveKindForDeletionCost(targetRef *appsv1alpha1.TargetReference) bool {
+	switch targetRef.Kind {
+	case controllerKindRS.Kind, controllerKindDep.Kind, controllerKruiseKindCS.Kind:
+		return true
+	}
+	return false
 }

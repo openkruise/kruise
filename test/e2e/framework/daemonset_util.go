@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+
 	"reflect"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -108,7 +110,7 @@ func (t *DaemonSetTester) UpdateDaemonSet(name string, fn func(ds *appsv1alpha1.
 func (t *DaemonSetTester) DeleteDaemonSet(namespace, name string) {
 	err := t.kc.AppsV1alpha1().DaemonSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
-		Logf("delete daemonset(%s.%s) failed: %s", t.ns, name, err.Error())
+		Logf("delete daemonset(%s/%s) failed: %s", t.ns, name, err.Error())
 		return
 	}
 }
@@ -418,4 +420,23 @@ func (t *DaemonSetTester) SortPodNames(podList *v1.PodList) []string {
 		names.Insert(podList.Items[i].Name)
 	}
 	return names.List()
+}
+
+func (t *DaemonSetTester) GetNodesToDaemonPods(label map[string]string) (map[string][]*v1.Pod, error) {
+	podList, err := t.ListDaemonPods(label)
+	if err != nil {
+		return nil, err
+	}
+	// Group Pods by Node name.
+	nodeToDaemonPods := make(map[string][]*v1.Pod)
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		nodeName, err := daemonutil.GetTargetNodeName(pod)
+		if err != nil {
+			continue
+		}
+		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
+	}
+
+	return nodeToDaemonPods, nil
 }

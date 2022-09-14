@@ -49,13 +49,13 @@ func setHashSidecarSet(sidecarset *appsv1alpha1.SidecarSet) error {
 		sidecarset.Annotations = make(map[string]string)
 	}
 
-	hash, err := SidecarSetHash(sidecarset)
+	hash, err := sidecarcontrol.SidecarSetHash(sidecarset)
 	if err != nil {
 		return err
 	}
 	sidecarset.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = hash
 
-	hash, err = SidecarSetHashWithoutImage(sidecarset)
+	hash, err = sidecarcontrol.SidecarSetHashWithoutImage(sidecarset)
 	if err != nil {
 		return err
 	}

@@ -28,11 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
@@ -90,6 +92,46 @@ var (
 		Spec: batchv1.JobSpec{
 			Parallelism: pointer.Int32Ptr(2),
 			Completions: pointer.Int32Ptr(10),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "nginx",
+				},
+			},
+		},
+	}
+
+	stsDemo = &appsv1.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sts-test",
+			Namespace: "default",
+			UID:       types.UID("a03eb001-27eb-4713-b634-7c46f6861758"),
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: pointer.Int32Ptr(10),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "nginx",
+				},
+			},
+		},
+	}
+
+	astsDemo = &appsv1beta1.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps.kruise.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "asts-test",
+			Namespace: "default",
+			UID:       types.UID("a03eb001-27eb-4713-b634-7c46f6861758"),
+		},
+		Spec: appsv1beta1.StatefulSetSpec{
+			Replicas: pointer.Int32Ptr(10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -188,16 +230,16 @@ func TestPodEventHandler(t *testing.T) {
 func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 	cases := []struct {
 		name                 string
-		getCloneSet          func() *appsalphav1.CloneSet
-		getWorkloadSpreads   func() []*appsalphav1.WorkloadSpread
-		expectWorkloadSpread func() *appsalphav1.WorkloadSpread
+		getCloneSet          func() *appsv1alpha1.CloneSet
+		getWorkloadSpreads   func() []*appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
 		{
 			name: "no matched WorkloadSpread",
-			getCloneSet: func() *appsalphav1.CloneSet {
+			getCloneSet: func() *appsv1alpha1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.Spec.TargetReference = nil
@@ -214,18 +256,18 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 				workloadSpread4.Name = "ws-4"
 				workloadSpread4.Spec.TargetReference.Name = "test"
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return nil
 			},
 		},
 		{
 			name: "deletionTimestamp is not nil, no matched WorkloadSpread",
-			getCloneSet: func() *appsalphav1.CloneSet {
+			getCloneSet: func() *appsv1alpha1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
@@ -238,18 +280,18 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return nil
 			},
 		},
 		{
 			name: "matched WorkloadSpread ws-1",
-			getCloneSet: func() *appsalphav1.CloneSet {
+			getCloneSet: func() *appsv1alpha1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 
@@ -261,9 +303,9 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				return workloadSpread1
@@ -271,10 +313,10 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 		},
 		{
 			name: "different version, matched WorkloadSpread ws-1",
-			getCloneSet: func() *appsalphav1.CloneSet {
+			getCloneSet: func() *appsv1alpha1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.Spec.TargetReference.APIVersion = "apps.kruise.io/v1"
@@ -287,9 +329,9 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				return workloadSpread1
@@ -297,10 +339,10 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 		},
 		{
 			name: "matched WorkloadSpread ws-3",
-			getCloneSet: func() *appsalphav1.CloneSet {
+			getCloneSet: func() *appsv1alpha1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.Spec.TargetReference = nil
@@ -312,9 +354,9 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 				workloadSpread3 := workloadSpreadDemo.DeepCopy()
 				workloadSpread3.Name = "ws-3"
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := workloadSpreadDemo.DeepCopy()
 				workloadSpread1.Name = "ws-3"
 				return workloadSpread1
@@ -355,7 +397,7 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 }
 
 func TestGetWorkloadSpreadForDeployment(t *testing.T) {
-	targetRef := appsalphav1.TargetReference{
+	targetRef := appsv1alpha1.TargetReference{
 		APIVersion: "apps/v1",
 		Kind:       "Deployment",
 		Name:       "deployment-test",
@@ -366,15 +408,15 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 	cases := []struct {
 		name                 string
 		getDeployment        func() *appsv1.Deployment
-		getWorkloadSpreads   func() []*appsalphav1.WorkloadSpread
-		expectWorkloadSpread func() *appsalphav1.WorkloadSpread
+		getWorkloadSpreads   func() []*appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
 		{
 			name: "no matched WorkloadSpread",
 			getDeployment: func() *appsv1.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.Spec.TargetReference = nil
@@ -391,9 +433,9 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 				workloadSpread4.Name = "ws-4"
 				workloadSpread4.Spec.TargetReference.Name = "test"
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return nil
 			},
 		},
@@ -402,7 +444,7 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 			getDeployment: func() *appsv1.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
@@ -415,9 +457,9 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return nil
 			},
 		},
@@ -426,7 +468,7 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 			getDeployment: func() *appsv1.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 
@@ -438,9 +480,9 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := ws.DeepCopy()
 				workloadSpread.Name = "ws-1"
 				return workloadSpread
@@ -481,7 +523,7 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 }
 
 func TestGetWorkloadSpreadForJob(t *testing.T) {
-	targetRef := appsalphav1.TargetReference{
+	targetRef := appsv1alpha1.TargetReference{
 		APIVersion: "batch/v1",
 		Kind:       "Job",
 		Name:       "job-test",
@@ -492,15 +534,15 @@ func TestGetWorkloadSpreadForJob(t *testing.T) {
 	cases := []struct {
 		name                 string
 		getJob               func() *batchv1.Job
-		getWorkloadSpreads   func() []*appsalphav1.WorkloadSpread
-		expectWorkloadSpread func() *appsalphav1.WorkloadSpread
+		getWorkloadSpreads   func() []*appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
 		{
 			name: "no matched WorkloadSpread",
 			getJob: func() *batchv1.Job {
 				return jobDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.Spec.TargetReference = nil
@@ -517,9 +559,9 @@ func TestGetWorkloadSpreadForJob(t *testing.T) {
 				workloadSpread4.Name = "ws-4"
 				workloadSpread4.Spec.TargetReference.Name = "test"
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return nil
 			},
 		},
@@ -528,7 +570,7 @@ func TestGetWorkloadSpreadForJob(t *testing.T) {
 			getJob: func() *batchv1.Job {
 				return jobDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 
@@ -540,9 +582,9 @@ func TestGetWorkloadSpreadForJob(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := ws.DeepCopy()
 				workloadSpread.Name = "ws-1"
 				return workloadSpread
@@ -583,7 +625,7 @@ func TestGetWorkloadSpreadForJob(t *testing.T) {
 }
 
 func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
-	targetRef := appsalphav1.TargetReference{
+	targetRef := appsv1alpha1.TargetReference{
 		APIVersion: "apps/v1",
 		Kind:       "ReplicaSet",
 		Name:       "rs-test",
@@ -594,15 +636,15 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 	cases := []struct {
 		name                 string
 		getReplicaset        func() *appsv1.ReplicaSet
-		getWorkloadSpreads   func() []*appsalphav1.WorkloadSpread
-		expectWorkloadSpread func() *appsalphav1.WorkloadSpread
+		getWorkloadSpreads   func() []*appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
 		{
 			name: "no matched WorkloadSpread",
 			getReplicaset: func() *appsv1.ReplicaSet {
 				return replicaSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.Spec.TargetReference = nil
@@ -619,9 +661,9 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 				workloadSpread4.Name = "ws-4"
 				workloadSpread4.Spec.TargetReference.Name = "test"
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return nil
 			},
 		},
@@ -630,7 +672,7 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 			getReplicaset: func() *appsv1.ReplicaSet {
 				return replicaSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 				workloadSpread1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
@@ -643,9 +685,9 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return nil
 			},
 		},
@@ -654,7 +696,7 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 			getReplicaset: func() *appsv1.ReplicaSet {
 				return replicaSetDemo.DeepCopy()
 			},
-			getWorkloadSpreads: func() []*appsalphav1.WorkloadSpread {
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
 				workloadSpread1 := ws.DeepCopy()
 				workloadSpread1.Name = "ws-1"
 
@@ -666,9 +708,9 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 				workloadSpread3.Name = "ws-3"
 				workloadSpread3.Spec.TargetReference = nil
 
-				return []*appsalphav1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
 			},
-			expectWorkloadSpread: func() *appsalphav1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := ws.DeepCopy()
 				workloadSpread.Name = "ws-1"
 				return workloadSpread
@@ -708,85 +750,638 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 	}
 }
 
-func TestWorkloadEventHandlerForCreate(t *testing.T) {
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadDemo.DeepCopy()).Build()
-	handler := &workloadEventHandler{Reader: fakeClient}
+func TestGetWorkloadSpreadForStatefulSet(t *testing.T) {
+	targetRef := appsv1alpha1.TargetReference{
+		APIVersion: "apps/v1",
+		Kind:       "StatefulSet",
+		Name:       "sts-test",
+	}
+	ws := workloadSpreadDemo.DeepCopy()
+	ws.Spec.TargetReference = &targetRef
 
-	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	createCloneSet := cloneSetDemo.DeepCopy()
-	createEvt := event.CreateEvent{
-		Object: createCloneSet,
+	cases := []struct {
+		name                 string
+		getStatefulSet       func() *appsv1.StatefulSet
+		getWorkloadSpreads   func() []*appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+	}{
+		{
+			name: "no matched WorkloadSpread",
+			getStatefulSet: func() *appsv1.StatefulSet {
+				return stsDemo.DeepCopy()
+			},
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
+				workloadSpread1 := ws.DeepCopy()
+				workloadSpread1.Name = "ws-1"
+				workloadSpread1.Spec.TargetReference = nil
+
+				workloadSpread2 := ws.DeepCopy()
+				workloadSpread2.Name = "ws-2"
+				workloadSpread2.Spec.TargetReference.APIVersion = "apps.kruise.io/v1"
+
+				workloadSpread3 := ws.DeepCopy()
+				workloadSpread3.Name = "ws-3"
+				workloadSpread3.Spec.TargetReference.Kind = "CloneSet"
+
+				workloadSpread4 := ws.DeepCopy()
+				workloadSpread4.Name = "ws-4"
+				workloadSpread4.Spec.TargetReference.Name = "test"
+
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				return nil
+			},
+		},
+		{
+			name: "deletionTimestamp is not nil, no matched WorkloadSpread",
+			getStatefulSet: func() *appsv1.StatefulSet {
+				return stsDemo.DeepCopy()
+			},
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
+				workloadSpread1 := ws.DeepCopy()
+				workloadSpread1.Name = "ws-1"
+				workloadSpread1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+
+				workloadSpread2 := ws.DeepCopy()
+				workloadSpread2.Name = "ws-2"
+				workloadSpread2.Spec.TargetReference = nil
+
+				workloadSpread3 := ws.DeepCopy()
+				workloadSpread3.Name = "ws-3"
+				workloadSpread3.Spec.TargetReference = nil
+
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				return nil
+			},
+		},
+		{
+			name: "matched WorkloadSpread ws-1",
+			getStatefulSet: func() *appsv1.StatefulSet {
+				return stsDemo.DeepCopy()
+			},
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
+				workloadSpread1 := ws.DeepCopy()
+				workloadSpread1.Name = "ws-1"
+
+				workloadSpread2 := ws.DeepCopy()
+				workloadSpread2.Name = "ws-2"
+				workloadSpread2.Spec.TargetReference = nil
+
+				workloadSpread3 := ws.DeepCopy()
+				workloadSpread3.Name = "ws-3"
+				workloadSpread3.Spec.TargetReference = nil
+
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := ws.DeepCopy()
+				workloadSpread.Name = "ws-1"
+				return workloadSpread
+			},
+		},
 	}
-	handler.Create(createEvt, createQ)
-	if createQ.Len() != 1 {
-		t.Errorf("unexpected create event handle queue size, expected 1 actual %d", createQ.Len())
-		return
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+			for _, ws := range cs.getWorkloadSpreads() {
+				newWorkloadSpread := ws.DeepCopy()
+				err := fakeClient.Create(context.TODO(), newWorkloadSpread)
+				if err != nil {
+					t.Fatalf("create WorkloadSpread failed: %s", err.Error())
+				}
+			}
+
+			nsn := types.NamespacedName{
+				Namespace: cs.getStatefulSet().Namespace,
+				Name:      cs.getStatefulSet().Name,
+			}
+			handler := workloadEventHandler{Reader: fakeClient}
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindSts)
+			expectTopology := cs.expectWorkloadSpread()
+
+			if expectTopology == nil {
+				if workloadSpread != nil {
+					t.Fatalf("get WorkloadSpread for StatefulSet failed")
+				}
+			} else {
+				if workloadSpread == nil || workloadSpread.Name != expectTopology.Name {
+					t.Fatalf("get WorkloadSpread for StatefulSet failed")
+				}
+			}
+		})
 	}
-	key, _ := createQ.Get()
-	nsn, _ := key.(reconcile.Request)
-	if nsn.Namespace != workloadSpreadDemo.Namespace && nsn.Name != workloadSpreadDemo.Name {
-		t.Errorf("match WorkloadSpread %s/%s failed", workloadSpreadDemo.Namespace, workloadSpreadDemo.Name)
+}
+
+func TestGetWorkloadSpreadForAdvancedStatefulSet(t *testing.T) {
+	targetRef := appsv1alpha1.TargetReference{
+		APIVersion: "apps.kruise.io/v1alpha1",
+		Kind:       "StatefulSet",
+		Name:       "asts-test",
+	}
+	ws := workloadSpreadDemo.DeepCopy()
+	ws.Spec.TargetReference = &targetRef
+
+	cases := []struct {
+		name                 string
+		getStatefulSet       func() *appsv1beta1.StatefulSet
+		getWorkloadSpreads   func() []*appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+	}{
+		{
+			name: "no matched WorkloadSpread",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				return astsDemo.DeepCopy()
+			},
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
+				workloadSpread1 := ws.DeepCopy()
+				workloadSpread1.Name = "ws-1"
+				workloadSpread1.Spec.TargetReference = nil
+
+				workloadSpread2 := ws.DeepCopy()
+				workloadSpread2.Name = "ws-2"
+				workloadSpread2.Spec.TargetReference.APIVersion = "rollouts.kruise.io/v1"
+
+				workloadSpread3 := ws.DeepCopy()
+				workloadSpread3.Name = "ws-3"
+				workloadSpread3.Spec.TargetReference.Kind = "CloneSet"
+
+				workloadSpread4 := ws.DeepCopy()
+				workloadSpread4.Name = "ws-4"
+				workloadSpread4.Spec.TargetReference.Name = "test"
+
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3, workloadSpread4}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				return nil
+			},
+		},
+		{
+			name: "deletionTimestamp is not nil, no matched WorkloadSpread",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				return astsDemo.DeepCopy()
+			},
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
+				workloadSpread1 := ws.DeepCopy()
+				workloadSpread1.Name = "ws-1"
+				workloadSpread1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+
+				workloadSpread2 := ws.DeepCopy()
+				workloadSpread2.Name = "ws-2"
+				workloadSpread2.Spec.TargetReference = nil
+
+				workloadSpread3 := ws.DeepCopy()
+				workloadSpread3.Name = "ws-3"
+				workloadSpread3.Spec.TargetReference = nil
+
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				return nil
+			},
+		},
+		{
+			name: "matched WorkloadSpread ws-1",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				return astsDemo.DeepCopy()
+			},
+			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
+				workloadSpread1 := ws.DeepCopy()
+				workloadSpread1.Name = "ws-1"
+
+				workloadSpread2 := ws.DeepCopy()
+				workloadSpread2.Name = "ws-2"
+				workloadSpread2.Spec.TargetReference = nil
+
+				workloadSpread3 := ws.DeepCopy()
+				workloadSpread3.Name = "ws-3"
+				workloadSpread3.Spec.TargetReference = nil
+
+				return []*appsv1alpha1.WorkloadSpread{workloadSpread1, workloadSpread2, workloadSpread3}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := ws.DeepCopy()
+				workloadSpread.Name = "ws-1"
+				return workloadSpread
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+			for _, ws := range cs.getWorkloadSpreads() {
+				newWorkloadSpread := ws.DeepCopy()
+				err := fakeClient.Create(context.TODO(), newWorkloadSpread)
+				if err != nil {
+					t.Fatalf("create WorkloadSpread failed: %s", err.Error())
+				}
+			}
+
+			nsn := types.NamespacedName{
+				Namespace: cs.getStatefulSet().Namespace,
+				Name:      cs.getStatefulSet().Name,
+			}
+			handler := workloadEventHandler{Reader: fakeClient}
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKruiseKindSts)
+			expectTopology := cs.expectWorkloadSpread()
+
+			if expectTopology == nil {
+				if workloadSpread != nil {
+					t.Fatalf("get WorkloadSpread for Advanced StatefulSet failed")
+				}
+			} else {
+				if workloadSpread == nil || workloadSpread.Name != expectTopology.Name {
+					t.Fatalf("get WorkloadSpread for Advanced StatefulSet failed")
+				}
+			}
+		})
+	}
+}
+
+func TestWorkloadEventHandlerForCreate(t *testing.T) {
+	cases := []struct {
+		name              string
+		getWorkload       func() client.Object
+		getWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+	}{
+		{
+			name: "deployment ut",
+			getWorkload: func() client.Object {
+				return deploymentDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: deploymentDemo.APIVersion,
+					Kind:       deploymentDemo.Kind,
+					Name:       deploymentDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "replicaset ut",
+			getWorkload: func() client.Object {
+				return replicaSetDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: replicaSetDemo.APIVersion,
+					Kind:       replicaSetDemo.Kind,
+					Name:       replicaSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "job ut",
+			getWorkload: func() client.Object {
+				return jobDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: jobDemo.APIVersion,
+					Kind:       jobDemo.Kind,
+					Name:       jobDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "cloneset ut",
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: cloneSetDemo.APIVersion,
+					Kind:       cloneSetDemo.Kind,
+					Name:       cloneSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "statefulset ut",
+			getWorkload: func() client.Object {
+				return stsDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: stsDemo.APIVersion,
+					Kind:       stsDemo.Kind,
+					Name:       stsDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "advanced statefulset ut",
+			getWorkload: func() client.Object {
+				return astsDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: astsDemo.APIVersion,
+					Kind:       astsDemo.Kind,
+					Name:       astsDemo.Name,
+				}
+				return ws
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getWorkloadSpread()).Build()
+			handler := &workloadEventHandler{Reader: fakeClient}
+
+			createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			createEvt := event.CreateEvent{
+				Object: cs.getWorkload(),
+			}
+			handler.Create(createEvt, createQ)
+			if createQ.Len() != 1 {
+				t.Errorf("unexpected create event handle queue size, expected 1 actual %d", createQ.Len())
+				return
+			}
+			key, _ := createQ.Get()
+			nsn, _ := key.(reconcile.Request)
+			if nsn.Namespace != workloadSpreadDemo.Namespace && nsn.Name != workloadSpreadDemo.Name {
+				t.Errorf("match WorkloadSpread %s/%s failed", workloadSpreadDemo.Namespace, workloadSpreadDemo.Name)
+			}
+		})
 	}
 }
 
 func TestWorkloadEventHandlerForDelete(t *testing.T) {
-	targetRef := appsalphav1.TargetReference{
-		APIVersion: "apps/v1",
-		Kind:       "Deployment",
-		Name:       "deployment-test",
+	cases := []struct {
+		name              string
+		getWorkload       func() client.Object
+		getWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+	}{
+		{
+			name: "deployment ut",
+			getWorkload: func() client.Object {
+				return deploymentDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: deploymentDemo.APIVersion,
+					Kind:       deploymentDemo.Kind,
+					Name:       deploymentDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "replicaset ut",
+			getWorkload: func() client.Object {
+				return replicaSetDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: replicaSetDemo.APIVersion,
+					Kind:       replicaSetDemo.Kind,
+					Name:       replicaSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "job ut",
+			getWorkload: func() client.Object {
+				return jobDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: jobDemo.APIVersion,
+					Kind:       jobDemo.Kind,
+					Name:       jobDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "cloneset ut",
+			getWorkload: func() client.Object {
+				return cloneSetDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: cloneSetDemo.APIVersion,
+					Kind:       cloneSetDemo.Kind,
+					Name:       cloneSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "statefulset ut",
+			getWorkload: func() client.Object {
+				return stsDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: stsDemo.APIVersion,
+					Kind:       stsDemo.Kind,
+					Name:       stsDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "advanced statefulset ut",
+			getWorkload: func() client.Object {
+				return astsDemo.DeepCopy()
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: astsDemo.APIVersion,
+					Kind:       astsDemo.Kind,
+					Name:       astsDemo.Name,
+				}
+				return ws
+			},
+		},
 	}
-	ws := workloadSpreadDemo.DeepCopy()
-	ws.Spec.TargetReference = &targetRef
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ws.DeepCopy()).Build()
-	handler := &workloadEventHandler{Reader: fakeClient}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getWorkloadSpread()).Build()
+			handler := &workloadEventHandler{Reader: fakeClient}
 
-	deleteQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	deleteDeployment := deploymentDemo.DeepCopy()
-	deleteEvt := event.DeleteEvent{
-		Object: deleteDeployment,
+			deleteQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			deleteEvt := event.DeleteEvent{
+				Object: cs.getWorkload(),
+			}
+			handler.Delete(deleteEvt, deleteQ)
+			if deleteQ.Len() != 1 {
+				t.Errorf("unexpected delete event handle queue size, expected 1 actual %d", deleteQ.Len())
+				return
+			}
+			key, _ := deleteQ.Get()
+			nsn, _ := key.(reconcile.Request)
+			if nsn.Namespace != workloadSpreadDemo.Namespace && nsn.Name != workloadSpreadDemo.Name {
+				t.Errorf("match WorkloadSpread %s/%s failed", workloadSpreadDemo.Namespace, workloadSpreadDemo.Name)
+			}
+		})
 	}
-	handler.Delete(deleteEvt, deleteQ)
-	if deleteQ.Len() != 1 {
-		t.Errorf("unexpected delete event handle queue size, expected 1 actual %d", deleteQ.Len())
-		return
-	}
-	key, _ := deleteQ.Get()
-	nsn, _ := key.(reconcile.Request)
-	if nsn.Namespace != ws.Namespace && nsn.Name != ws.Name {
-		t.Errorf("match WorkloadSpread %s/%s failed", ws.Namespace, ws.Name)
-	}
+
 }
 
 func TestWorkloadEventHandlerForUpdate(t *testing.T) {
-	targetRef := appsalphav1.TargetReference{
-		APIVersion: "apps/v1",
-		Kind:       "ReplicaSet",
-		Name:       "rs-test",
+	cases := []struct {
+		name              string
+		getWorkloads      func() (client.Object, client.Object)
+		getWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+	}{
+		{
+			name: "deployment ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := deploymentDemo.DeepCopy()
+				newObj := deploymentDemo.DeepCopy()
+				newObj.Spec.Replicas = pointer.Int32(*(newObj.Spec.Replicas) + 1)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: deploymentDemo.APIVersion,
+					Kind:       deploymentDemo.Kind,
+					Name:       deploymentDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "replicaset ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := replicaSetDemo.DeepCopy()
+				newObj := replicaSetDemo.DeepCopy()
+				newObj.Spec.Replicas = pointer.Int32(*(newObj.Spec.Replicas) + 1)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: replicaSetDemo.APIVersion,
+					Kind:       replicaSetDemo.Kind,
+					Name:       replicaSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "job ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := jobDemo.DeepCopy()
+				newObj := jobDemo.DeepCopy()
+				newObj.Spec.Parallelism = pointer.Int32(*(newObj.Spec.Parallelism) + 1)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: jobDemo.APIVersion,
+					Kind:       jobDemo.Kind,
+					Name:       jobDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "cloneset ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := cloneSetDemo.DeepCopy()
+				newObj := cloneSetDemo.DeepCopy()
+				newObj.Spec.Replicas = pointer.Int32(*(newObj.Spec.Replicas) + 1)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: cloneSetDemo.APIVersion,
+					Kind:       cloneSetDemo.Kind,
+					Name:       cloneSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "statefulset ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := stsDemo.DeepCopy()
+				newObj := stsDemo.DeepCopy()
+				newObj.Spec.Replicas = pointer.Int32(*(newObj.Spec.Replicas) + 1)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: stsDemo.APIVersion,
+					Kind:       stsDemo.Kind,
+					Name:       stsDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "advanced statefulset ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := astsDemo.DeepCopy()
+				newObj := astsDemo.DeepCopy()
+				newObj.Spec.Replicas = pointer.Int32(*(newObj.Spec.Replicas) + 1)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: astsDemo.APIVersion,
+					Kind:       astsDemo.Kind,
+					Name:       astsDemo.Name,
+				}
+				return ws
+			},
+		},
 	}
-	ws := workloadSpreadDemo.DeepCopy()
-	ws.Spec.TargetReference = &targetRef
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ws.DeepCopy()).Build()
-	handler := &workloadEventHandler{Reader: fakeClient}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getWorkloadSpread()).Build()
+			handler := &workloadEventHandler{Reader: fakeClient}
 
-	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	oldReplicaSet := replicaSetDemo.DeepCopy()
-	newReplicaSet := replicaSetDemo.DeepCopy()
-	newReplicaSet.Spec.Replicas = pointer.Int32Ptr(*(oldReplicaSet.Spec.Replicas) + 1)
-
-	updateEvt := event.UpdateEvent{
-		ObjectOld: oldReplicaSet,
-		ObjectNew: newReplicaSet,
-	}
-	handler.Update(updateEvt, updateQ)
-	if updateQ.Len() != 1 {
-		t.Errorf("unexpected update event handle queue size, expected 1 actual %d", updateQ.Len())
-		return
-	}
-	key, _ := updateQ.Get()
-	nsn, _ := key.(reconcile.Request)
-	if nsn.Namespace != ws.Namespace && nsn.Name != ws.Name {
-		t.Errorf("match WorkloadSpread %s/%s failed", ws.Namespace, ws.Name)
+			updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			oldWorkload, newWorkload := cs.getWorkloads()
+			updateEvt := event.UpdateEvent{
+				ObjectOld: oldWorkload,
+				ObjectNew: newWorkload,
+			}
+			handler.Update(updateEvt, updateQ)
+			if updateQ.Len() != 1 {
+				t.Errorf("unexpected update event handle queue size, expected 1 actual %d", updateQ.Len())
+				return
+			}
+			key, _ := updateQ.Get()
+			nsn, _ := key.(reconcile.Request)
+			if nsn.Namespace != workloadSpreadDemo.Namespace && nsn.Name != workloadSpreadDemo.Name {
+				t.Errorf("match WorkloadSpread %s/%s failed", workloadSpreadDemo.Namespace, workloadSpreadDemo.Name)
+			}
+		})
 	}
 }

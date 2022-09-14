@@ -95,7 +95,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cli.KubeClient.CoreV1().Events("")})
 		recorder = eventBroadcaster.NewRecorder(mgr.GetScheme(), v1.EventSource{Component: "cloneset-controller"})
 	}
-	cli := util.NewClientFromManager(mgr, "cloneset-controller")
+	cli := utilclient.NewClientFromManager(mgr, "cloneset-controller")
 	reconciler := &ReconcileCloneSet{
 		Client:            cli,
 		scheme:            mgr.GetScheme(),
@@ -215,7 +215,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		return reconcile.Result{}, nil
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(instance.Spec.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
 	if err != nil {
 		klog.Errorf("Error converting CloneSet %s selector: %v", request, err)
 		// This is a non-transient error, so don't retry.

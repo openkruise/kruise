@@ -21,12 +21,15 @@ import (
 	"reflect"
 	"strings"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -35,28 +38,28 @@ import (
 
 type commonControl struct {
 	client.Client
-	*policyv1alpha1.PodUnavailableBudget
 	controllerFinder *controllerfinder.ControllerFinder
-}
-
-func (c *commonControl) GetPodUnavailableBudget() *policyv1alpha1.PodUnavailableBudget {
-	return c.PodUnavailableBudget
 }
 
 func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
-	return util.IsRunningAndReady(pod)
+	if !util.IsRunningAndReady(pod) {
+		return false
+	}
+
+	// unavailable label
+	return !appspub.HasUnavailableLabel(pod.Labels)
 }
 
 func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool {
-	// kruise workload in-place situation
-	if newPod == nil || oldPod == nil {
-		return true
-	}
 	// If pod.spec changed, pod will be in unavailable condition
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
-		klog.V(3).Infof("pod(%s.%s) specification changed, and maybe cause unavailability", newPod.Namespace, newPod.Name)
+		klog.V(3).Infof("pod(%s/%s) specification changed, and maybe cause unavailability", newPod.Namespace, newPod.Name)
+		return true
+	}
+	// pod add unavailable label
+	if !appspub.HasUnavailableLabel(oldPod.Labels) && appspub.HasUnavailableLabel(newPod.Labels) {
 		return true
 	}
 	// pod other changes will not cause unavailability situation, then return false
@@ -67,27 +70,26 @@ func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 // return two parameters
 // 1. podList
 // 2. expectedCount, the default is workload.Replicas
-func (c *commonControl) GetPodsForPub() ([]*corev1.Pod, int32, error) {
-	pub := c.GetPodUnavailableBudget()
+func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
 	// if targetReference isn't nil, priority to take effect
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
-		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, ref.Name, pub.Namespace, true)
+		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
 		return matchedPods, expectedCount, err
 	} else if pub.Spec.Selector == nil {
 		klog.Warningf("pub(%s/%s) spec.Selector cannot be empty", pub.Namespace, pub.Name)
 		return nil, 0, nil
 	}
 	// get pods for selector
-	labelSelector, err := util.GetFastLabelSelector(pub.Spec.Selector)
+	labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
 	if err != nil {
-		klog.Warningf("pub(%s/%s) GetFastLabelSelector failed: %s", pub.Namespace, pub.Name, err.Error())
+		klog.Warningf("pub(%s/%s) ValidatedLabelSelectorAsSelector failed: %s", pub.Namespace, pub.Name, err.Error())
 		return nil, 0, nil
 	}
 	listOptions = &client.ListOptions{Namespace: pub.Namespace, LabelSelector: labelSelector}
 	podList := &corev1.PodList{}
-	if err := c.List(context.TODO(), podList, listOptions); err != nil {
+	if err = c.List(context.TODO(), podList, listOptions, utilclient.DisableDeepCopy); err != nil {
 		return nil, 0, err
 	}
 
@@ -102,7 +104,6 @@ func (c *commonControl) GetPodsForPub() ([]*corev1.Pod, int32, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-
 	return matchedPods, expectedCount, nil
 }
 
@@ -119,7 +120,7 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 		}
 
 		if !util.IsPodContainerDigestEqual(sets.NewString(container.Name), pod) {
-			klog.V(5).Infof("pod(%s.%s) container(%s) image is inconsistent", pod.Namespace, pod.Name, container.Name)
+			klog.V(5).Infof("pod(%s/%s) container(%s) image is inconsistent", pod.Namespace, pod.Name, container.Name)
 			return false
 		}
 	}
@@ -138,11 +139,28 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 
 	// whether other containers is consistent
 	if err := inplaceupdate.DefaultCheckInPlaceUpdateCompleted(pod); err != nil {
-		klog.V(5).Infof("check pod(%s.%s) InPlaceUpdate failed: %s", pod.Namespace, pod.Name, err.Error())
+		klog.V(5).Infof("check pod(%s/%s) InPlaceUpdate failed: %s", pod.Namespace, pod.Name, err.Error())
 		return false
 	}
 
 	return true
+}
+
+func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+	if len(pod.Annotations) == 0 || pod.Annotations[PodRelatedPubAnnotation] == "" {
+		return nil, nil
+	}
+	pubName := pod.Annotations[PodRelatedPubAnnotation]
+	pub := &policyv1alpha1.PodUnavailableBudget{}
+	err := c.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pubName}, pub)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			klog.Warningf("pod(%s/%s) pub(%s) Is NotFound", pod.Namespace, pod.Name, pubName)
+			return nil, nil
+		}
+		return nil, err
+	}
+	return pub, nil
 }
 
 func getSidecarSetsInPod(pod *corev1.Pod) (sidecarSets, containers sets.String) {

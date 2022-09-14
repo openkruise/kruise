@@ -19,6 +19,9 @@ package workloadspread
 import (
 	"context"
 	"encoding/json"
+	"math"
+	"regexp"
+	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
 )
@@ -52,10 +56,13 @@ const (
 )
 
 var (
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindCS       = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKruiseKindAlphaSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKruiseKindBetaSts  = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindJob            = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKindRS             = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindDep            = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindSts            = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
 type Operation string
@@ -76,6 +83,7 @@ var (
 		{Kind: controllerKruiseKindCS.Kind, Groups: []string{controllerKruiseKindCS.Group}},
 		{Kind: controllerKindRS.Kind, Groups: []string{controllerKindRS.Group}},
 		{Kind: controllerKindJob.Kind, Groups: []string{controllerKindJob.Group}},
+		{Kind: controllerKindSts.Kind, Groups: []string{controllerKindSts.Group, controllerKruiseKindAlphaSts.Group, controllerKruiseKindBetaSts.Group}},
 	}
 )
 
@@ -152,7 +160,7 @@ func matchReference(ref *metav1.OwnerReference) (bool, error) {
 
 // TODO consider pod/status update operation
 
-func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
+func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 	start := time.Now()
 
 	// filter out pods, include the following:
@@ -161,18 +169,18 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 	// 3. Pod.OwnerReference is nil
 	// 4. Pod.OwnerReference is not one of workloads, such as CloneSet, Deployment, ReplicaSet.
 	if !kubecontroller.IsPodActive(pod) {
-		return nil
+		return true, nil
 	}
 	ref := metav1.GetControllerOf(pod)
 	matched, err := matchReference(ref)
 	if err != nil || !matched {
-		return nil
+		return true, nil
 	}
 
 	var matchedWS *appsv1alpha1.WorkloadSpread
 	workloadSpreadList := &appsv1alpha1.WorkloadSpreadList{}
 	if err = h.Client.List(context.TODO(), workloadSpreadList, &client.ListOptions{Namespace: pod.Namespace}); err != nil {
-		return err
+		return false, err
 	}
 	for _, ws := range workloadSpreadList.Items {
 		if ws.Spec.TargetReference == nil || !ws.DeletionTimestamp.IsZero() {
@@ -187,7 +195,7 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 	}
 	// not found matched workloadSpread
 	if matchedWS == nil {
-		return nil
+		return true, nil
 	}
 
 	defer func() {
@@ -195,7 +203,7 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) error {
 			matchedWS.Namespace, matchedWS.Name, time.Since(start))
 	}()
 
-	return h.mutatingPod(matchedWS, pod, nil, CreateOperation)
+	return false, h.mutatingPod(matchedWS, pod, nil, CreateOperation)
 }
 
 func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error {
@@ -292,50 +300,83 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 	var conflictTimes int
 	var costOfGet, costOfUpdate time.Duration
 
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		unlock := util.GlobalKeyedMutex.Lock(string(matchedWS.GetUID()))
-		defer unlock()
-
-		var err error
-		startGet := time.Now()
-		// try best to get the latest revision of matchedWS in a low cost:
-		// 1. get two matchedWS, one is cached by this webhook process,
-		// another is cached by informer, compare and get the newer one;
-		// 2. if 1. failed, directly fetch matchedWS from APIServer;
-		wsClone, err = h.tryToGetTheLatestMatchedWS(matchedWS, refresh)
-		costOfGet += time.Since(startGet)
-		if err != nil {
-			return err
-		} else if wsClone == nil {
-			return nil
-		}
-
-		// check whether WorkloadSpread has suitable subset for the pod
-		// 1. changed indicates whether workloadSpread status changed
-		// 2. suitableSubset is matched subset for the pod
-		changed, suitableSubset, generatedUID = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
-		if !changed {
-			return nil
-		}
-
-		// update WorkloadSpread status
-		start := time.Now()
-		if err = h.Client.Status().Update(context.TODO(), wsClone); err != nil {
-			refresh = true
-			conflictTimes++
-		} else {
-			klog.V(3).Infof("update workloadSpread(%s/%s) SubsetStatus(%s) missingReplicas(%d) creatingPods(%d) deletingPods(%d) success",
-				wsClone.Namespace, wsClone.Name, suitableSubset.Name,
-				suitableSubset.MissingReplicas, len(suitableSubset.CreatingPods), len(suitableSubset.DeletingPods))
-			if cacheErr := util.GlobalCache.Add(wsClone); cacheErr != nil {
-				klog.Warningf("Failed to update workloadSpread(%s/%s) cache after update status, err: %v", wsClone.Namespace, wsClone.Name, cacheErr)
+	switch matchedWS.Spec.TargetReference.Kind {
+	case controllerKindSts.Kind:
+		// StatefulSet has special logic about pod assignment for subsets.
+		// For example, suppose that we have the following sub sets config:
+		//	- name: subset-a
+		//	  maxReplicas: 5
+		//	- name: subset-b
+		//	  maxReplicas: 5
+		//	- name: subset-c
+		// the pods with order within [0, 5) will be assigned to subset-a;
+		// the pods with order within [5, 10) will be assigned to subset-b;
+		// the pods with order within [10, inf) will be assigned to subset-c.
+		currentThresholdID := int64(0)
+		for _, subset := range matchedWS.Spec.Subsets {
+			cond := getSubsetCondition(matchedWS, subset.Name, appsv1alpha1.SubsetSchedulable)
+			if cond != nil && cond.Status == corev1.ConditionFalse {
+				continue
+			}
+			subsetReplicasLimit := math.MaxInt32
+			if subset.MaxReplicas != nil {
+				subsetReplicasLimit = subset.MaxReplicas.IntValue()
+			}
+			// currently, we do not support reserveOrdinals feature for advanced statefulSet
+			currentThresholdID += int64(subsetReplicasLimit)
+			_, orderID := getParentNameAndOrdinal(pod)
+			if int64(orderID) < currentThresholdID {
+				suitableSubsetName = subset.Name
+				break
 			}
 		}
-		costOfUpdate += time.Since(start)
-		return err
-	}); err != nil {
-		klog.Errorf("update WorkloadSpread(%s/%s) error %s", matchedWS.Namespace, matchedWS.Name, err.Error())
-		return "", "", err
+
+	default:
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			unlock := util.GlobalKeyedMutex.Lock(string(matchedWS.GetUID()))
+			defer unlock()
+
+			var err error
+			startGet := time.Now()
+			// try best to get the latest revision of matchedWS in a low cost:
+			// 1. get two matchedWS, one is cached by this webhook process,
+			// another is cached by informer, compare and get the newer one;
+			// 2. if 1. failed, directly fetch matchedWS from APIServer;
+			wsClone, err = h.tryToGetTheLatestMatchedWS(matchedWS, refresh)
+			costOfGet += time.Since(startGet)
+			if err != nil {
+				return err
+			} else if wsClone == nil {
+				return nil
+			}
+
+			// check whether WorkloadSpread has suitable subset for the pod
+			// 1. changed indicates whether workloadSpread status changed
+			// 2. suitableSubset is matched subset for the pod
+			changed, suitableSubset, generatedUID = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
+			if !changed {
+				return nil
+			}
+
+			// update WorkloadSpread status
+			start := time.Now()
+			if err = h.Client.Status().Update(context.TODO(), wsClone); err != nil {
+				refresh = true
+				conflictTimes++
+			} else {
+				klog.V(3).Infof("update workloadSpread(%s/%s) SubsetStatus(%s) missingReplicas(%d) creatingPods(%d) deletingPods(%d) success",
+					wsClone.Namespace, wsClone.Name, suitableSubset.Name,
+					suitableSubset.MissingReplicas, len(suitableSubset.CreatingPods), len(suitableSubset.DeletingPods))
+				if cacheErr := util.GlobalCache.Add(wsClone); cacheErr != nil {
+					klog.Warningf("Failed to update workloadSpread(%s/%s) cache after update status, err: %v", wsClone.Namespace, wsClone.Name, cacheErr)
+				}
+			}
+			costOfUpdate += time.Since(start)
+			return err
+		}); err != nil {
+			klog.Errorf("update WorkloadSpread(%s/%s) error %s", matchedWS.Namespace, matchedWS.Name, err.Error())
+			return "", "", err
+		}
 	}
 
 	if suitableSubset != nil {
@@ -417,6 +458,10 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 				ws.Namespace, ws.Name, pod.Name)
 			return false, nil, ""
 		}
+		// no need to update WorkloadSpread status if MaxReplicas == nil
+		if suitableSubset.MissingReplicas == -1 {
+			return false, suitableSubset, ""
+		}
 		if suitableSubset.CreatingPods == nil {
 			suitableSubset.CreatingPods = map[string]metav1.Time{}
 		}
@@ -441,6 +486,9 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		if suitableSubset == nil {
 			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s)", ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
 			return false, nil, ""
+		}
+		if suitableSubset.MissingReplicas == -1 {
+			return false, suitableSubset, ""
 		}
 		if suitableSubset.DeletingPods == nil {
 			suitableSubset.DeletingPods = map[string]metav1.Time{}
@@ -620,4 +668,39 @@ func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *m
 	}
 
 	return targetGv.Group == ownerGv.Group && target.Kind == owner.Kind && target.Name == owner.Name
+}
+
+// statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
+var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
+
+// getParentNameAndOrdinal gets the name of pod's parent StatefulSet and pod's ordinal as extracted from its Name. If
+// the Pod was not created by a StatefulSet, its parent is considered to be empty string, and its ordinal is considered
+// to be -1.
+func getParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
+	parent := ""
+	ordinal := -1
+	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
+	if len(subMatches) < 3 {
+		return parent, ordinal
+	}
+	parent = subMatches[1]
+	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+		ordinal = int(i)
+	}
+	return parent, ordinal
+}
+
+func getSubsetCondition(ws *appsv1alpha1.WorkloadSpread, subsetName string, condType appsv1alpha1.WorkloadSpreadSubsetConditionType) *appsv1alpha1.WorkloadSpreadSubsetCondition {
+	for i := range ws.Status.SubsetStatuses {
+		subset := &ws.Status.SubsetStatuses[i]
+		if subset.Name != subsetName {
+			continue
+		}
+		for _, condition := range subset.Conditions {
+			if condition.Type == condType {
+				return &condition
+			}
+		}
+	}
+	return nil
 }

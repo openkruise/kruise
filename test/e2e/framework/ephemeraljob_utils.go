@@ -18,10 +18,11 @@ package framework
 
 import (
 	"context"
+	"time"
+
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -151,7 +152,7 @@ func (t *EphemeralJobTester) CreateTestDeployment(randStr string, replicas int32
 	}
 
 	var err error
-	Logf("create deployment(%s.%s)", deployment.Namespace, deployment.Name)
+	Logf("create deployment(%s/%s)", deployment.Namespace, deployment.Name)
 	_, err = t.c.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	t.WaitForDeploymentRunning(deployment)
@@ -179,7 +180,7 @@ func (t *EphemeralJobTester) CreateTestEphemeralJob(randStr string, replicas, Pa
 		},
 	}
 
-	Logf("create ephemeral job(%s.%s)", job.Namespace, job.Name)
+	Logf("create ephemeral job(%s/%s)", job.Namespace, job.Name)
 	job, _ = t.kc.AppsV1alpha1().EphemeralJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
 	t.WaitForEphemeralJobCreated(job)
 
@@ -189,7 +190,7 @@ func (t *EphemeralJobTester) CreateTestEphemeralJob(randStr string, replicas, Pa
 
 func (t *EphemeralJobTester) CreateEphemeralJob(job *appsv1alpha1.EphemeralJob) *appsv1alpha1.EphemeralJob {
 	job.Namespace = t.ns
-	Logf("create ephemeral job(%s.%s)", job.Namespace, job.Name)
+	Logf("create ephemeral job(%s/%s)", job.Namespace, job.Name)
 	job, _ = t.kc.AppsV1alpha1().EphemeralJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
 	t.WaitForEphemeralJobCreated(job)
 	return job
@@ -232,7 +233,7 @@ func (s *EphemeralJobTester) DeleteDeployments(namespace string) {
 func (s *EphemeralJobTester) DeleteDeployment(deployment *apps.Deployment) {
 	err := s.c.AppsV1().Deployments(deployment.Namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 	if err != nil {
-		Logf("delete deployment(%s.%s) failed: %s", deployment.Namespace, deployment.Name, err.Error())
+		Logf("delete deployment(%s/%s) failed: %s", deployment.Namespace, deployment.Name, err.Error())
 		return
 	}
 	s.WaitForDeploymentDeleted(deployment)

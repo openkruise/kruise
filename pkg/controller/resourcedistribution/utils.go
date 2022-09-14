@@ -79,7 +79,7 @@ func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1
 
 // matchViaLabelSelector return true if namespace matches with target.NamespacesLabelSelectors
 func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
 	if err != nil {
 		return false, err
 	}
@@ -293,9 +293,16 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 		for _, namespace := range namespacesList.Items {
 			matchedSet.Insert(namespace.Name)
 		}
-	} else if len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0 {
-		// 2. select the namespaces via targets.NamespaceLabelSelector
-		selectors, err := util.GetFastLabelSelector(&targets.NamespaceLabelSelector)
+	} else {
+		// 2. select the namespaces via targets.IncludedNamespaces
+		for _, namespace := range targets.IncludedNamespaces.List {
+			matchedSet.Insert(namespace.Name)
+		}
+	}
+
+	if !targets.AllNamespaces && (len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0) {
+		// 3. select the namespaces via targets.NamespaceLabelSelector
+		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceLabelSelector)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -308,20 +315,13 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 		}
 	}
 
-	// 3. select the namespaces via targets.IncludedNamespaces
-	for _, namespace := range targets.IncludedNamespaces.List {
-		matchedSet.Insert(namespace.Name)
-	}
-
 	// 4. exclude the namespaces via target.ExcludedNamespaces
 	for _, namespace := range targets.ExcludedNamespaces.List {
 		matchedSet.Delete(namespace.Name)
 	}
 
 	// 5. remove matched namespaces from unmatched namespace set
-	for _, matched := range matchedSet.List() {
-		unmatchedSet.Delete(matched)
-	}
+	unmatchedSet = unmatchedSet.Difference(matchedSet)
 
 	return matchedSet.List(), unmatchedSet.List(), nil
 }

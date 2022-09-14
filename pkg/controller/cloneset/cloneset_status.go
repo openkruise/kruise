@@ -21,7 +21,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+	"github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -75,6 +77,7 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.AvailableReplicas != oldStatus.AvailableReplicas ||
 		newStatus.UpdatedReadyReplicas != oldStatus.UpdatedReadyReplicas ||
 		newStatus.UpdatedReplicas != oldStatus.UpdatedReplicas ||
+		newStatus.ExpectedUpdatedReplicas != oldStatus.ExpectedUpdatedReplicas ||
 		newStatus.UpdateRevision != oldStatus.UpdateRevision ||
 		newStatus.CurrentRevision != oldStatus.CurrentRevision ||
 		newStatus.LabelSelector != oldStatus.LabelSelector
@@ -87,7 +90,7 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 		if coreControl.IsPodUpdateReady(pod, 0) {
 			newStatus.ReadyReplicas++
 		}
-		if coreControl.IsPodUpdateReady(pod, cs.Spec.MinReadySeconds) {
+		if sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
 			newStatus.AvailableReplicas++
 		}
 		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) {
@@ -100,5 +103,9 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 	// Consider the update revision as stable if revisions of all pods are consistent to it, no need to wait all of them ready
 	if newStatus.UpdatedReplicas == newStatus.Replicas {
 		newStatus.CurrentRevision = newStatus.UpdateRevision
+	}
+
+	if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err == nil {
+		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
 	}
 }

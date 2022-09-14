@@ -19,5 +19,12 @@ package pub
 import v1 "k8s.io/api/core/v1"
 
 const (
+	// KruisePodReadyConditionType can support multiple writers, such as:
+	// - ContainerRecreateRequest;
+	// - Workload controller, including CloneSet, Advanced StatefulSet, Advanced Daemonset.
+	//
+	// If its corresponding condition status was set to "False" by multiple writers,
+	// the condition status will be considered as "True" only when all these writers
+	// set it to "True".
 	KruisePodReadyConditionType v1.PodConditionType = "KruisePodReady"
 )

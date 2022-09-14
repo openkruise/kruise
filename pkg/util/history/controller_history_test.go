@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +82,7 @@ func TestRevisionHistory(t *testing.T) {
 		t.Fatalf("Expected ControllerRevision name %v, got %v", expectedName, newCR.Name)
 	}
 
-	selector, _ := metav1.LabelSelectorAsSelector(parent.Spec.Selector)
+	selector, _ := util.ValidatedLabelSelectorAsSelector(parent.Spec.Selector)
 	gotRevisions, err := historyControl.ListControllerRevisions(parent, selector)
 	if err != nil {
 		t.Fatalf("Failed to list revisions: %v", err)

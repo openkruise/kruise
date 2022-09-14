@@ -97,6 +97,13 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
+                      markPodNotReady:
+                        description: 'MarkPodNotReady = true means: - Pod will be
+                          set to ''NotReady'' at preparingDelete/preparingUpdate state.
+                          - Pod will be restored to ''Ready'' at Updated state if
+                          it was set to ''NotReady'' at preparingUpdate state. Default
+                          to false.'
+                        type: boolean
                     type: object
                   preDelete:
                     description: PreDelete is the hook before Pod to be deleted.
@@ -109,6 +116,13 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
+                      markPodNotReady:
+                        description: 'MarkPodNotReady = true means: - Pod will be
+                          set to ''NotReady'' at preparingDelete/preparingUpdate state.
+                          - Pod will be restored to ''Ready'' at Updated state if
+                          it was set to ''NotReady'' at preparingUpdate state. Default
+                          to false.'
+                        type: boolean
                     type: object
                 type: object
               minReadySeconds:
@@ -427,6 +441,12 @@ spec:
                 description: currentRevision, if not empty, indicates the current
                   revision version of the CloneSet.
                 type: string
+              expectedUpdatedReplicas:
+                description: ExpectedUpdatedReplicas is the number of Pods that should
+                  be updated by CloneSet controller. This field is calculated via
+                  Replicas - Partition.
+                format: int32
+                type: integer
               labelSelector:
                 description: LabelSelector is label selectors for query over pods
                   that should match the replica count used by HPA.

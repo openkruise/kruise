@@ -176,6 +176,84 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			},
 		},
 		{
+			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.WorkloadSpreadSpec{
+				TargetReference: &appsv1alpha1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "demo",
+				},
+				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+					{
+						Name:        "subset-a",
+						MaxReplicas: &replicas1,
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+						},
+					},
+					{
+						Name:        "subset-b",
+						MaxReplicas: nil,
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.WorkloadSpreadSpec{
+				TargetReference: &appsv1alpha1.TargetReference{
+					APIVersion: "apps.kruise.io/v1alpha1",
+					Kind:       "StatefulSet",
+					Name:       "demo",
+				},
+				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+					{
+						Name:        "subset-a",
+						MaxReplicas: &replicas1,
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+						},
+					},
+					{
+						Name:        "subset-b",
+						MaxReplicas: nil,
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.WorkloadSpreadSpec{
+				TargetReference: &appsv1alpha1.TargetReference{
+					APIVersion: "apps.kruise.io/v1beta1",
+					Kind:       "StatefulSet",
+					Name:       "demo",
+				},
+				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+					{
+						Name:        "subset-a",
+						MaxReplicas: &replicas1,
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+						},
+					},
+					{
+						Name:        "subset-b",
+						MaxReplicas: nil,
+						Patch: runtime.RawExtension{
+							Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+						},
+					},
+				},
+			},
+		},
+		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-2", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.WorkloadSpreadSpec{
 				TargetReference: &appsv1alpha1.TargetReference{
@@ -436,6 +514,34 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			},
 			errorSuffix: "spec.subsets",
 		},
+		{
+			name: "statefulset group error",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: "rollouts.kruise.io/v2",
+					Kind:       "StatefulSet",
+					Name:       "demo",
+				}
+				return workloadSpread
+			},
+			errorSuffix: "spec.targetRef",
+		},
+		{
+			name: "statefulset subset is percentage",
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := workloadSpreadDemo.DeepCopy()
+				workloadSpread.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: "apps.kruise.io/v1beta1",
+					Kind:       "StatefulSet",
+					Name:       "demo",
+				}
+				workloadSpread.Spec.Subsets[0].MaxReplicas = &replicas2
+				return workloadSpread
+			},
+			errorSuffix: "spec.subsets[0].maxReplicas",
+		},
+
 		//{
 		//	name: "one subset",
 		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {

@@ -352,13 +352,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				}))
 
 				ginkgo.By("Check Pod containers recreated")
+				gomega.Eventually(func() bool {
+					pod, err = tester.GetPod(pod.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					appContainerStatus := util.GetContainerStatus("app", pod)
+					sidecarContainerStatus := util.GetContainerStatus("sidecar", pod)
+					return appContainerStatus.ContainerID != crr.Spec.Containers[0].StatusContext.ContainerID &&
+						sidecarContainerStatus.ContainerID != crr.Spec.Containers[1].StatusContext.ContainerID
+				}, 60*time.Second, 3*time.Second).Should(gomega.BeTrue())
+
 				pod, err = tester.GetPod(pod.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
 				appContainerStatus := util.GetContainerStatus("app", pod)
 				sidecarContainerStatus := util.GetContainerStatus("sidecar", pod)
-				gomega.Expect(appContainerStatus.ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[0].StatusContext.ContainerID))
-				gomega.Expect(sidecarContainerStatus.ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[1].StatusContext.ContainerID))
 				gomega.Expect(appContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 

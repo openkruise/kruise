@@ -128,21 +128,12 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	// 5. limit max count of pods can update
 	waitUpdateIndexes = limitUpdateIndexes(coreControl, cs.Spec.MinReadySeconds, diffRes, waitUpdateIndexes, pods, targetRevision.Name)
 
-	// Determine the pub before updating the pod
-	var pub *policyv1alpha1.PodUnavailableBudget
-	var err error
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) && len(waitUpdateIndexes) > 0 {
-		pub, err = pubcontrol.GetPodUnavailableBudgetForPod(c.Client, c.controllerFinder, pods[waitUpdateIndexes[0]])
-		if err != nil {
-			return err
-		}
-	}
 	// 6. update pods
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
 		// Determine the pub before updating the pod
-		if pub != nil {
-			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, pod, pubcontrol.NewPubControl(pub, c.controllerFinder, c.Client), pubcontrol.UpdateOperation, false)
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pod, policyv1alpha1.PubUpdateOperation, false)
 			if err != nil {
 				return err
 				// pub check does not pass, try again in seconds
@@ -178,7 +169,7 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	switch lifecycle.GetPodLifecycleState(pod) {
 	case appspub.LifecycleStateUpdating:
 		if opts.CheckPodUpdateCompleted(pod) == nil {
-			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
+			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 				state = appspub.LifecycleStateUpdated
 			} else {
 				state = appspub.LifecycleStateNormal
@@ -193,7 +184,11 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	}
 
 	if state != "" {
-		if updated, gotPod, err := c.lifecycleControl.UpdatePodLifecycle(pod, state); err != nil {
+		var markPodNotReady bool
+		if cs.Spec.Lifecycle != nil && cs.Spec.Lifecycle.InPlaceUpdate != nil {
+			markPodNotReady = cs.Spec.Lifecycle.InPlaceUpdate.MarkPodNotReady
+		}
+		if updated, gotPod, err := c.lifecycleControl.UpdatePodLifecycle(pod, state, markPodNotReady); err != nil {
 			return false, 0, err
 		} else if updated {
 			clonesetutils.ResourceVersionExpectations.Expect(gotPod)
@@ -243,7 +238,8 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 				var updated bool
 				var gotPod *v1.Pod
 				if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
-					if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate); err == nil && updated {
+					markPodNotReady := cs.Spec.Lifecycle.InPlaceUpdate.MarkPodNotReady
+					if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate, markPodNotReady); err == nil && updated {
 						clonesetutils.ResourceVersionExpectations.Expect(gotPod)
 						klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
 							clonesetutils.GetControllerKey(cs), pod.Name)
@@ -342,7 +338,7 @@ func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32,
 
 	var unavailableCount, targetRevisionUnavailableCount, canUpdateCount int
 	for _, p := range pods {
-		if !isPodAvailable(coreControl, p, minReadySeconds) {
+		if !IsPodAvailable(coreControl, p, minReadySeconds) {
 			unavailableCount++
 			if clonesetutils.EqualToRevisionHash("", p, targetRevisionHash) {
 				targetRevisionUnavailableCount++
@@ -357,7 +353,7 @@ func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32,
 
 		// Make sure unavailable pods in all revisions should not be more than maxUnavailable.
 		// Note that update an old pod that already be unavailable will not increase the unavailable number.
-		if isPodAvailable(coreControl, pods[i], minReadySeconds) {
+		if IsPodAvailable(coreControl, pods[i], minReadySeconds) {
 			if unavailableCount >= diffRes.updateMaxUnavailable {
 				break
 			}

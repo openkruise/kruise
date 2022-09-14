@@ -25,7 +25,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
-	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	appsv1 "k8s.io/api/apps/v1"
@@ -83,7 +83,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	cli := util.NewClientFromManager(mgr, "uniteddeployment-controller")
+	cli := utilclient.NewClientFromManager(mgr, "uniteddeployment-controller")
 	return &ReconcileUnitedDeployment{
 		Client: cli,
 		scheme: mgr.GetScheme(),
@@ -209,7 +209,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		klog.Errorf("Fail to get Subsets of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeFindSubsets), err.Error())
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, err
 	}
 
 	nextReplicas, err := GetAllocatedReplicas(nameToSubset, instance)
@@ -219,7 +219,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 			instance.Namespace, instance.Name, err.Error())
 		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", err.Error())
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, err
 	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
@@ -229,6 +229,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	if err != nil {
 		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
+		return reconcile.Result{}, err
 	}
 
 	return r.updateStatus(instance, newStatus, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount, control)

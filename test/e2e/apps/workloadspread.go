@@ -43,7 +43,8 @@ import (
 const WorkloadSpreadFakeZoneKey = "e2e.kruise.io/workloadspread-fake-zone"
 
 var (
-	KruiseKindCloneSet = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	KruiseKindCloneSet    = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	KruiseKindStatefulSet = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 	//controllerKindDep  = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	//controllerKindJob  = batchv1.SchemeGroupVersion.WithKind("Job")
 )
@@ -71,6 +72,17 @@ var _ = SIGDescribe("workloadspread", func() {
 		for i := range nodeList.Items {
 			node := nodeList.Items[i]
 			if _, exist := node.GetLabels()["node-role.kubernetes.io/master"]; exist {
+				continue
+			}
+			// The node-role.kubernetes.io/master will be only set in taints since Kubernetes v1.24
+			var isMaster bool
+			for _, taint := range node.Spec.Taints {
+				if taint.Key == "node-role.kubernetes.io/master" {
+					isMaster = true
+					break
+				}
+			}
+			if isMaster {
 				continue
 			}
 			workers = append(workers, &node)
@@ -1415,6 +1427,85 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 
 			ginkgo.By("manage existing pods by only preferredNodeSelector, then deletion subset-b, done")
+		})
+
+		framework.ConformanceIt("manage statefulset pods only with patch", func() {
+			sts, svc := tester.NewBaseHeadlessStatefulSet(ns)
+			// create workloadSpread
+			targetRef := appsv1alpha1.TargetReference{
+				APIVersion: KruiseKindStatefulSet.GroupVersion().String(),
+				Kind:       KruiseKindStatefulSet.Kind,
+				Name:       sts.Name,
+			}
+			subsets := []appsv1alpha1.WorkloadSpreadSubset{
+				{
+					Name:        "subset-a",
+					MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+					Patch: runtime.RawExtension{
+						Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
+					},
+				},
+				{
+					Name:        "subset-b",
+					MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+					Patch: runtime.RawExtension{
+						Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
+					},
+				},
+				{
+					Name: "subset-c",
+					Patch: runtime.RawExtension{
+						Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-c"}}}`),
+					},
+				},
+			}
+
+			ginkgo.By("Creating workloadspread and waiting for its reconcile...")
+			ws := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, subsets)
+			ws = tester.CreateWorkloadSpread(ws)
+			tester.WaitForWorkloadSpreadRunning(ws)
+
+			ginkgo.By("Creating statefulset with 5 replicas and waiting for pods to be ready...")
+			sts.Spec.Replicas = pointer.Int32Ptr(5)
+			tester.CreateService(svc)
+			statefulSet := tester.CreateStatefulSet(sts)
+			tester.WaitForStatefulSetRunning(statefulSet)
+
+			ginkgo.By("Check workloadspread status...")
+			ws, err := tester.GetWorkloadSpread(ws.Namespace, ws.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			var replicasForSubsetA, replicasForSubsetB, replicasForSubsetC int32
+			for _, subset := range ws.Status.SubsetStatuses {
+				switch subset.Name {
+				case "subset-a":
+					replicasForSubsetA += subset.Replicas
+				case "subset-b":
+					replicasForSubsetB += subset.Replicas
+				case "subset-c":
+					replicasForSubsetC += subset.Replicas
+				}
+			}
+			gomega.Expect(replicasForSubsetA).To(gomega.Equal(int32(2)))
+			gomega.Expect(replicasForSubsetB).To(gomega.Equal(int32(2)))
+			gomega.Expect(replicasForSubsetC).To(gomega.Equal(int32(1)))
+
+			ginkgo.By("List pods of cloneset and check their patch...")
+			pods, err := tester.GetSelectorPods(ns, statefulSet.Spec.Selector)
+			var podForSubsetA, podForSubsetB, podForSubsetC int32
+			for _, pod := range pods {
+				switch pod.Annotations["subset"] {
+				case "subset-a":
+					podForSubsetA++
+				case "subset-b":
+					podForSubsetB++
+				case "subset-c":
+					podForSubsetC++
+				}
+			}
+			gomega.Expect(podForSubsetA).To(gomega.Equal(int32(2)))
+			gomega.Expect(podForSubsetB).To(gomega.Equal(int32(2)))
+			gomega.Expect(podForSubsetC).To(gomega.Equal(int32(1)))
+			ginkgo.By("manage statefulset pods only with patch, done")
 		})
 
 		//ginkgo.It("deploy in two zone, maxReplicas=50%", func() {

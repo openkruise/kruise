@@ -24,9 +24,6 @@ import (
 )
 
 type PubControl interface {
-	// Common
-	// get PodUnavailableBudget
-	GetPodUnavailableBudget() *policyv1alpha1.PodUnavailableBudget
 	// IsPodReady indicates whether pod is fully ready
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
@@ -37,13 +34,16 @@ type PubControl interface {
 	// return two parameters
 	// 1. podList
 	// 2. expectedCount, the default is workload.Replicas
-	GetPodsForPub() ([]*corev1.Pod, int32, error)
+	GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error)
 
 	// webhook
 	// determine if this change to pod might cause unavailability
 	IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
+	// get pub for pod
+	GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error)
 }
 
-func NewPubControl(pub *policyv1alpha1.PodUnavailableBudget, controllerFinder *controllerfinder.ControllerFinder, client client.Client) PubControl {
-	return &commonControl{PodUnavailableBudget: pub, controllerFinder: controllerFinder, Client: client}
+func NewPubControl(client client.Client) PubControl {
+	controllerFinder := controllerfinder.Finder
+	return &commonControl{controllerFinder: controllerFinder, Client: client}
 }

@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,6 +47,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
@@ -76,14 +79,19 @@ const (
 
 	// FakeSubsetName is a fake subset name for such pods that do not match any subsets
 	FakeSubsetName = "kruise.io/workloadspread-fake-subset-name"
+
+	// IgnorePatchExistingPodsAnnotation ignore ws.Spec.Subsets[x].Patch for existing pods
+	IgnorePatchExistingPodsAnnotation = "workloadspread.kruise.io/ignore-patch-existing-pods-metadata"
 )
 
 var (
-	controllerKruiseKindWS = appsv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpread")
-	controllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKindRS       = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindDep      = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	controllerKindJob      = batchv1.SchemeGroupVersion.WithKind("Job")
+	controllerKruiseKindWS  = appsv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpread")
+	controllerKruiseKindCS  = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKruiseKindSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindSts       = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRS        = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindDep       = appsv1.SchemeGroupVersion.WithKind("Deployment")
+	controllerKindJob       = batchv1.SchemeGroupVersion.WithKind("Job")
 )
 
 // this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
@@ -149,12 +157,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	cli := util.NewClientFromManager(mgr, controllerName)
+	cli := utilclient.NewClientFromManager(mgr, controllerName)
 	return &ReconcileWorkloadSpread{
 		Client:           cli,
 		scheme:           mgr.GetScheme(),
 		recorder:         mgr.GetEventRecorderFor(controllerName),
-		controllerFinder: controllerfinder.NewControllerFinder(mgr.GetClient()),
+		controllerFinder: controllerfinder.Finder,
 	}
 }
 
@@ -224,7 +232,7 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 		return nil, -1, err
 	}
 
-	labelSelector, err := util.GetFastLabelSelector(job.Spec.Selector)
+	labelSelector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		klog.Errorf("gets labelSelector failed: %s", err.Error())
 		return nil, -1, nil
@@ -263,8 +271,8 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 	targetRef := ws.Spec.TargetReference
 
 	switch targetRef.Kind {
-	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind:
-		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, targetRef.Name, ws.Namespace, false)
+	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind, controllerKindSts.Kind:
+		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, ws.Namespace, targetRef.Name, false)
 	case controllerKindJob.Kind:
 		pods, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
 	default:
@@ -300,7 +308,7 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 	}
 
 	// group Pods by subset
-	podMap, err := r.groupPod(ws, pods)
+	podMap, err := r.groupPod(ws, pods, workloadReplicas)
 	if err != nil {
 		return err
 	}
@@ -343,15 +351,30 @@ func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSprea
 }
 
 // groupPod returns a map, the key is the name of subset and the value represents the Pods of the corresponding subset.
-func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod) (map[string][]*corev1.Pod, error) {
+func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod, replicas int32) (map[string][]*corev1.Pod, error) {
 	podMap := make(map[string][]*corev1.Pod, len(ws.Spec.Subsets)+1)
 	podMap[FakeSubsetName] = []*corev1.Pod{}
+	subsetMissingReplicas := make(map[string]int)
 	for _, subset := range ws.Spec.Subsets {
 		podMap[subset.Name] = []*corev1.Pod{}
+		subsetMissingReplicas[subset.Name], _ = intstr.GetScaledValueFromIntOrPercent(
+			intstr.ValueOrDefault(subset.MaxReplicas, intstr.FromInt(math.MaxInt32)), int(replicas), true)
+	}
+
+	// count managed pods for each subset
+	for i := range pods {
+		injectWS := getInjectWorkloadSpreadFromPod(pods[i])
+		if injectWS == nil || injectWS.Name != ws.Name || injectWS.Subset == "" {
+			continue
+		}
+		if _, exist := podMap[injectWS.Subset]; !exist {
+			continue
+		}
+		subsetMissingReplicas[injectWS.Subset]--
 	}
 
 	for i := range pods {
-		subsetName, err := r.getSuitableSubsetNameForPod(ws, pods[i])
+		subsetName, err := r.getSuitableSubsetNameForPod(ws, pods[i], subsetMissingReplicas)
 		if err != nil {
 			return nil, err
 		}
@@ -368,11 +391,11 @@ func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods
 }
 
 // getSuitableSubsetNameForPod will return (FakeSubsetName, nil) if not found suitable subset for pod
-func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) (string, error) {
+func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (string, error) {
 	injectWS := getInjectWorkloadSpreadFromPod(pod)
-	if injectWS == nil || injectWS.Name != ws.Name {
+	if injectWS == nil || injectWS.Name != ws.Name || injectWS.Subset == "" {
 		// process the pods that were created before workloadSpread
-		matchedSubset, err := r.getSuitableSubsetForOldPod(ws, pod)
+		matchedSubset, err := r.getAndUpdateSuitableSubsetName(ws, pod, subsetMissingReplicas)
 		if err != nil {
 			return "", err
 		} else if matchedSubset == nil {
@@ -385,7 +408,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.W
 
 // getSuitableSubsetForOldPod returns a suitable subset for the pod which was created before workloadSpread.
 // getSuitableSubsetForOldPod will return (nil, nil) if there is no suitable subset for the pod.
-func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) (*appsv1alpha1.WorkloadSpreadSubset, error) {
+func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (*appsv1alpha1.WorkloadSpreadSubset, error) {
 	if len(pod.Spec.NodeName) == 0 {
 		return nil, nil
 	}
@@ -410,10 +433,16 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.Wo
 			klog.Errorf("unexpected error occurred when matching pod (%s/%s) with subset, please check requiredSelectorTerm field of subset (%s) in WorkloadSpread (%s/%s), err: %s",
 				pod.Namespace, pod.Name, subset.Name, ws.Namespace, ws.Name, err.Error())
 		}
+		quotaScore := int64(0)
+		// we prefer the subset that still has room for more replicas
+		if subsetMissingReplicas[subset.Name] > 0 {
+			quotaScore = int64(1)
+		}
+		finalScore := preferredScore*10 + quotaScore
 		// select the most favorite subsets for the pod by subset.PreferredNodeSelectorTerms
-		if matched && preferredScore > maxPreferredScore {
+		if matched && finalScore > maxPreferredScore {
 			favoriteSubset = subset
-			maxPreferredScore = preferredScore
+			maxPreferredScore = finalScore
 		}
 	}
 
@@ -421,6 +450,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.Wo
 		if err := r.patchFavoriteSubsetMetadataToPod(pod, ws, favoriteSubset); err != nil {
 			return nil, err
 		}
+		subsetMissingReplicas[favoriteSubset.Name]--
 		return favoriteSubset, nil
 	}
 
@@ -432,7 +462,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetForOldPod(ws *appsv1alpha1.Wo
 func (r *ReconcileWorkloadSpread) patchFavoriteSubsetMetadataToPod(pod *corev1.Pod, ws *appsv1alpha1.WorkloadSpread, favoriteSubset *appsv1alpha1.WorkloadSpreadSubset) error {
 	patchMetadata := make(map[string]interface{})
 	// decode favoriteSubset.patch.raw and add their labels and annotations to the patch
-	if favoriteSubset.Patch.Raw != nil {
+	if favoriteSubset.Patch.Raw != nil && !strings.EqualFold(ws.Annotations[IgnorePatchExistingPodsAnnotation], "true") {
 		patchField := map[string]interface{}{}
 		if err := json.Unmarshal(favoriteSubset.Patch.Raw, &patchField); err == nil {
 			if metadata, ok := patchField["metadata"].(map[string]interface{}); ok && metadata != nil {

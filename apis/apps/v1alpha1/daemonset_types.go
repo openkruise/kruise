@@ -228,9 +228,11 @@ type DaemonSetStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=daemon;ads
-// +kubebuilder:printcolumn:name="DesiredNumber",type="integer",JSONPath=".status.desiredNumberScheduled",description="The desired number of pods."
-// +kubebuilder:printcolumn:name="CurrentNumber",type="integer",JSONPath=".status.currentNumberScheduled",description="The current number of pods."
-// +kubebuilder:printcolumn:name="UpdatedNumberScheduled",type="integer",JSONPath=".status.updatedNumberScheduled",description="The updated number of pods."
+// +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".status.desiredNumberScheduled",description="The desired number of pods."
+// +kubebuilder:printcolumn:name="CURRENT",type="integer",JSONPath=".status.currentNumberScheduled",description="The current number of pods."
+// +kubebuilder:printcolumn:name="READY",type="integer",JSONPath=".status.numberReady",description="The ready number of pods."
+// +kubebuilder:printcolumn:name="UP-TO-DATE",type="integer",JSONPath=".status.updatedNumberScheduled",description="The updated number of pods."
+// +kubebuilder:printcolumn:name="AVAILABLE",type="integer",JSONPath=".status.numberAvailable",description="The updated number of pods."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp",description="CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC."
 // +kubebuilder:printcolumn:name="CONTAINERS",type="string",priority=1,JSONPath=".spec.template.spec.containers[*].name",description="The containers of currently  daemonset."
 // +kubebuilder:printcolumn:name="IMAGES",type="string",priority=1,JSONPath=".spec.template.spec.containers[*].image",description="The images of currently advanced daemonset."
