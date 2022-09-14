@@ -168,6 +168,10 @@ func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) er
 			return err
 		}
 
+		if hasEqualCondition(clone, &condition) {
+			return nil
+		}
+
 		util.SetPodCondition(clone, condition)
 		// We only update the ready condition to False, and let Kubelet update it to True
 		if condition.Status == v1.ConditionFalse {
@@ -407,4 +411,11 @@ func doPreCheckBeforeNext(pod *v1.Pod, preCheck *appspub.InPlaceUpdatePreCheckBe
 		}
 	}
 	return nil
+}
+
+func hasEqualCondition(pod *v1.Pod, newCondition *v1.PodCondition) bool {
+	oldCondition := util.GetCondition(pod, newCondition.Type)
+	isEqual := oldCondition != nil && oldCondition.Status == newCondition.Status &&
+		oldCondition.Reason == newCondition.Reason && oldCondition.Message == newCondition.Message
+	return isEqual
 }
