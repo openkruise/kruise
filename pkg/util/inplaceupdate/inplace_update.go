@@ -167,6 +167,10 @@ func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) er
 			return err
 		}
 
+		if hasEqualCondition(clone, &condition) {
+			return nil
+		}
+
 		util.SetPodCondition(clone, condition)
 		// We only update the ready condition to False, and let Kubelet update it to True
 		if condition.Status == v1.ConditionFalse {
@@ -463,4 +467,10 @@ func recordPodAndContainersRestartCount(pod *v1.Pod, spec *UpdateSpec, revision 
 	containersRestartCountJson, _ := json.Marshal(containersRestartCount)
 	pod.Annotations[appspub.InPlaceUpdateContainersRestartKey] = string(containersRestartCountJson)
 	pod.Annotations[appspub.InPlaceUpdatePodRestartKey] = strconv.FormatInt(currentPodRestartCount, 10)
+}
+func hasEqualCondition(pod *v1.Pod, newCondition *v1.PodCondition) bool {
+	oldCondition := util.GetCondition(pod, newCondition.Type)
+	isEqual := oldCondition != nil && oldCondition.Status == newCondition.Status &&
+		oldCondition.Reason == newCondition.Reason && oldCondition.Message == newCondition.Message
+	return isEqual
 }
