@@ -193,8 +193,17 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	current *apps.ControllerRevision,
 	update *apps.ControllerRevision) error {
 	history := make([]*apps.ControllerRevision, 0, len(revisions))
+	if current == nil || update == nil {
+		return nil
+	}
 	// mark all live revisions
-	live := map[string]bool{current.Name: true, update.Name: true}
+	live := map[string]bool{}
+	if current != nil {
+		live[current.Name] = true
+	}
+	if update != nil {
+		live[update.Name] = true
+	}
 	for i := range pods {
 		live[getPodRevision(pods[i])] = true
 	}

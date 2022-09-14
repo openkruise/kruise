@@ -33,7 +33,9 @@ type AppsV1alpha1Interface interface {
 	EphemeralJobsGetter
 	ImagePullJobsGetter
 	NodeImagesGetter
+	NodePodProbesGetter
 	PersistentPodStatesGetter
+	PodProbeMarkersGetter
 	ResourceDistributionsGetter
 	SidecarSetsGetter
 	StatefulSetsGetter
@@ -78,8 +80,16 @@ func (c *AppsV1alpha1Client) NodeImages() NodeImageInterface {
 	return newNodeImages(c)
 }
 
+func (c *AppsV1alpha1Client) NodePodProbes() NodePodProbeInterface {
+	return newNodePodProbes(c)
+}
+
 func (c *AppsV1alpha1Client) PersistentPodStates(namespace string) PersistentPodStateInterface {
 	return newPersistentPodStates(c, namespace)
+}
+
+func (c *AppsV1alpha1Client) PodProbeMarkers(namespace string) PodProbeMarkerInterface {
+	return newPodProbeMarkers(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) ResourceDistributions() ResourceDistributionInterface {
