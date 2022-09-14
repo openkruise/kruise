@@ -193,9 +193,6 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	current *apps.ControllerRevision,
 	update *apps.ControllerRevision) error {
 	history := make([]*apps.ControllerRevision, 0, len(revisions))
-	if current == nil || update == nil {
-		return nil
-	}
 	// mark all live revisions
 	live := map[string]bool{}
 	if current != nil {

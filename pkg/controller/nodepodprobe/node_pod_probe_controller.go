@@ -1,0 +1,362 @@
+/*
+Copyright 2022 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package nodepodprobe
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"reflect"
+	"strings"
+	"time"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+var (
+	nodePodProbeCreationDelayAfterNodeReady = time.Second * 30
+)
+
+func init() {
+	flag.IntVar(&concurrentReconciles, "nodepodprobe-workers", concurrentReconciles, "Max concurrent workers for NodePodProbe controller.")
+}
+
+var (
+	concurrentReconciles = 3
+	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("NodePodProbe")
+)
+
+/**
+* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
+* business logic.  Delete these comments after modifying this file.*
+ */
+
+// Add creates a new NodePodProbe Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// and Start it when the Manager is Started.
+func Add(mgr manager.Manager) error {
+	if !utildiscovery.DiscoverGVK(controllerKind) {
+		return nil
+	}
+	return add(mgr, newReconciler(mgr))
+}
+
+// newReconciler returns a new reconcile.Reconciler
+func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+	cli := utilclient.NewClientFromManager(mgr, "NodePodProbe-controller")
+	return &ReconcileNodePodProbe{
+		Client: cli,
+		scheme: mgr.GetScheme(),
+		finder: controllerfinder.Finder,
+	}
+}
+
+// add adds a new Controller to mgr with r as the reconcile.Reconciler
+func add(mgr manager.Manager, r reconcile.Reconciler) error {
+	// Create a new controller
+	c, err := controller.New("NodePodProbe-controller", mgr, controller.Options{
+		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter: ratelimiter.DefaultControllerRateLimiter()})
+	if err != nil {
+		return err
+	}
+
+	// watch for changes to NodePodProbe
+	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.NodePodProbe{}}, &enqueueRequestForNodePodProbe{}); err != nil {
+		return err
+	}
+
+	// watch for changes to pod
+	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetClient()}); err != nil {
+		return err
+	}
+
+	// watch for changes to node
+	if err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueRequestForNode{Reader: mgr.GetClient()}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var _ reconcile.Reconciler = &ReconcileNodePodProbe{}
+
+// ReconcileNodePodProbe reconciles a NodePodProbe object
+type ReconcileNodePodProbe struct {
+	client.Client
+	scheme *runtime.Scheme
+
+	finder *controllerfinder.ControllerFinder
+}
+
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=nodepodprobes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=nodepodprobes/status,verbs=get;update;patch
+
+// Reconcile reads that state of the cluster for a NodePodProbe object and makes changes based on the state read
+// and what is in the NodePodProbe.Spec
+func (r *ReconcileNodePodProbe) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
+	err := r.syncNodePodProbe(req.Name)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *ReconcileNodePodProbe) syncNodePodProbe(name string) error {
+	// Fetch the NodePodProbe instance
+	npp := &appsv1alpha1.NodePodProbe{}
+	err := r.Get(context.TODO(), client.ObjectKey{Name: name}, npp)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			npp.Name = name
+			return r.Create(context.TODO(), npp)
+		}
+		// Error reading the object - requeue the request.
+		return err
+	}
+	// Fetch Node
+	node := &corev1.Node{}
+	err = r.Get(context.TODO(), client.ObjectKey{Name: name}, node)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	} else if errors.IsNotFound(err) || !node.DeletionTimestamp.IsZero() {
+		return r.Delete(context.TODO(), npp)
+	}
+	// If Pod is deleted, then remove podProbe from NodePodProbe.Spec
+	matchedPods, err := r.syncPodFromNodePodProbe(npp)
+	if err != nil {
+		return err
+	}
+	for _, status := range npp.Status.PodProbeStatuses {
+		pod, ok := matchedPods[status.UID]
+		if !ok {
+			continue
+		}
+		// Write podProbe state to Pod metadata and condition
+		if err = r.updatePodProbeStatus(pod, status); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePodProbe) (map[string]*corev1.Pod, error) {
+	// map[pod.uid]=Pod
+	matchedPods := map[string]*corev1.Pod{}
+	for _, obj := range npp.Spec.PodProbes {
+		pod := &corev1.Pod{}
+		err := r.Get(context.TODO(), client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, pod)
+		if err != nil && !errors.IsNotFound(err) {
+			klog.Errorf("NodePodProbe get pod(%s/%s) failed: %s", obj.Namespace, obj.Name, err.Error())
+			return nil, err
+		}
+		if errors.IsNotFound(err) || !kubecontroller.IsPodActive(pod) || string(pod.UID) != obj.UID {
+			continue
+		}
+		matchedPods[string(pod.UID)] = pod
+	}
+
+	newSpec := appsv1alpha1.NodePodProbeSpec{}
+	for i := range npp.Spec.PodProbes {
+		obj := npp.Spec.PodProbes[i]
+		if _, ok := matchedPods[obj.UID]; ok {
+			newSpec.PodProbes = append(newSpec.PodProbes, obj)
+		}
+	}
+	if reflect.DeepEqual(newSpec, npp.Spec) {
+		return matchedPods, nil
+	}
+
+	nppClone := &appsv1alpha1.NodePodProbe{}
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: npp.Name}, nppClone); err != nil {
+			klog.Errorf("error getting updated npp %s from client", npp.Name)
+		}
+		if reflect.DeepEqual(newSpec, nppClone.Spec) {
+			return nil
+		}
+		nppClone.Spec = newSpec
+		return r.Client.Update(context.TODO(), nppClone)
+	})
+	if err != nil {
+		klog.Errorf("NodePodProbe update NodePodProbe(%s) failed:%s", npp.Name, err.Error())
+		return nil, err
+	}
+	klog.V(3).Infof("NodePodProbe update NodePodProbe(%s) from(%s) -> to(%s) success", npp.Name, util.DumpJSON(npp.Spec), util.DumpJSON(newSpec))
+	return matchedPods, nil
+}
+
+func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status appsv1alpha1.PodProbeStatus) error {
+	// map[probe.name]->probeState
+	currentConditions := make(map[string]appsv1alpha1.ProbeState)
+	for _, condition := range pod.Status.Conditions {
+		currentConditions[string(condition.Type)] = appsv1alpha1.ProbeState(condition.Status)
+	}
+	type metadata struct {
+		Labels      map[string]interface{} `json:"labels,omitempty"`
+		Annotations map[string]interface{} `json:"annotations,omitempty"`
+	}
+	// patch labels or annotations in pod
+	probeMetadata := metadata{
+		Labels:      map[string]interface{}{},
+		Annotations: map[string]interface{}{},
+	}
+	// pod status condition record probe result
+	var probeConditions []corev1.PodCondition
+	var err error
+	for i := range status.ProbeStates {
+		probeState := status.ProbeStates[i]
+		// ignore the probe state
+		if probeState.State == "" || probeState.State == currentConditions[probeState.Name] {
+			continue
+		}
+
+		var conStatus corev1.ConditionStatus
+		if probeState.State == appsv1alpha1.ProbeSucceeded {
+			conStatus = corev1.ConditionTrue
+		} else {
+			conStatus = corev1.ConditionFalse
+		}
+		ppmName, probeName := strings.Split(probeState.Name, "#")[0], strings.Split(probeState.Name, "#")[1]
+		probeConditions = append(probeConditions, corev1.PodCondition{
+			// type -> PodProbeMarker#podProbeMarker.Name#probe.Name
+			Type:               corev1.PodConditionType(fmt.Sprintf("PodProbeMarker#%s#%s", ppmName, probeName)),
+			Status:             conStatus,
+			LastProbeTime:      probeState.LastProbeTime,
+			LastTransitionTime: probeState.LastTransitionTime,
+			Message:            probeState.Message,
+		})
+		// marker pod labels & annotations according to probe state
+		// fetch NodePodProbe
+		ppm := &appsv1alpha1.PodProbeMarker{}
+		err = r.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: ppmName}, ppm)
+		if err != nil {
+			// when NodePodProbe is deleted, should delete probes from NodePodProbe.spec
+			if errors.IsNotFound(err) {
+				continue
+			}
+			klog.Errorf("NodePodProbe(%s) get pod(%s/%s) failed: %s", ppmName, pod.Namespace, pod.Name, err.Error())
+			return err
+		} else if !ppm.DeletionTimestamp.IsZero() {
+			continue
+		}
+		var policy []appsv1alpha1.ProbeMarkerPolicy
+		for _, probe := range ppm.Spec.Probes {
+			if probe.Name == probeName {
+				policy = probe.MarkerPolicy
+				break
+			}
+		}
+		if len(policy) == 0 {
+			continue
+		}
+		// patch pod labels & annotations
+		var matchedPolicy *appsv1alpha1.ProbeMarkerPolicy
+		for j := range policy {
+			if policy[j].State == probeState.State {
+				matchedPolicy = &policy[j]
+				break
+			}
+		}
+		// find matched policy
+		if matchedPolicy != nil {
+			for k, v := range matchedPolicy.Labels {
+				probeMetadata.Labels[k] = v
+			}
+			for k, v := range matchedPolicy.Annotations {
+				probeMetadata.Annotations[k] = v
+			}
+			continue
+		}
+		// If only one Marker Policy is defined, for example: only define State=Succeeded, Patch Labels[healthy]='true'.
+		// When the probe execution success, kruise will patch labels[healthy]='true' to pod.
+		// And when the probe execution fails, Label[healthy] will be deleted.
+		for k := range policy[0].Labels {
+			probeMetadata.Labels[k] = nil
+		}
+		for k := range policy[0].Annotations {
+			probeMetadata.Annotations[k] = nil
+		}
+	}
+	// probe condition no changed, continue
+	if len(probeConditions) == 0 {
+		return nil
+	}
+
+	//update pod metadata and status condition
+	podClone := pod.DeepCopy()
+	if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, podClone); err != nil {
+			klog.Errorf("error getting updated pod(%s/%s) from client", pod.Namespace, pod.Name)
+			return err
+		}
+		oldStatus := podClone.DeepCopy()
+		for i := range probeConditions {
+			condition := probeConditions[i]
+			util.SetPodCondition(podClone, condition)
+		}
+		oldMetadata := podClone.ObjectMeta.DeepCopy()
+		if podClone.Annotations == nil {
+			podClone.Annotations = map[string]string{}
+		}
+		for k, v := range probeMetadata.Labels {
+			// delete the label
+			if v == nil {
+				delete(podClone.Labels, k)
+				// patch the label
+			} else {
+				podClone.Labels[k] = v.(string)
+			}
+		}
+		for k, v := range probeMetadata.Annotations {
+			// delete the annotation
+			if v == nil {
+				delete(podClone.Annotations, k)
+				// patch the annotation
+			} else {
+				podClone.Annotations[k] = v.(string)
+			}
+		}
+		if reflect.DeepEqual(oldStatus, podClone.Status) && reflect.DeepEqual(oldMetadata.Labels, podClone.Labels) &&
+			reflect.DeepEqual(oldMetadata.Annotations, podClone.Annotations) {
+			return nil
+		}
+		return r.Client.Status().Update(context.TODO(), podClone)
+	}); err != nil {
+		klog.Errorf("NodePodProbe patch pod(%s/%s) status failed: %s", podClone.Namespace, podClone.Name, err.Error())
+		return err
+	}
+	klog.V(3).Infof("NodePodProbe update pod(%s/%s) status conditions(%s) success", podClone.Namespace, podClone.Name, util.DumpJSON(probeConditions))
+	return nil
+}

@@ -37,14 +37,12 @@ type PodProbe struct {
 }
 
 type ContainerProbe struct {
-	// probe name, unique within the Pod(Even between different containers, they cannot be the same)
+	// Name is podProbeMarker.Name#probe.Name
 	Name string `json:"name"`
 	// container name
 	ContainerName string `json:"containerName"`
 	// container probe spec
 	Probe ContainerProbeSpec `json:"probe"`
-	// Used for NodeProbeProbe to quickly find the corresponding PodProbeMarker resource.
-	PodProbeMarkerName string `json:"podProbeMarkerName,omitempty"`
 }
 
 type NodePodProbeStatus struct {
@@ -64,7 +62,7 @@ type PodProbeStatus struct {
 }
 
 type ContainerProbeState struct {
-	// probe name
+	// Name is podProbeMarker.Name#probe.Name
 	Name string `json:"name"`
 	// container probe exec state, True or False
 	State ProbeState `json:"state"`

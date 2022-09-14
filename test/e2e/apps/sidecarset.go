@@ -608,6 +608,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create sidecarSet again
 			sidecarSetIn, err = tester.CreateSidecarSet(sidecarSetIn)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 3)
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
