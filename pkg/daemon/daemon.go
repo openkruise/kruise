@@ -23,6 +23,17 @@ import (
 	"net/http"
 	"sync"
 
+	kruiseapis "github.com/openkruise/kruise/apis"
+	"github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/daemon/containermeta"
+	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	"github.com/openkruise/kruise/pkg/daemon/podprobe"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,17 +46,6 @@ import (
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
-
-	kruiseapis "github.com/openkruise/kruise/apis"
-	"github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/daemon/containermeta"
-	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
-	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -150,6 +150,15 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 	var runnables = []Runnable{
 		puller,
 		crrController,
+	}
+
+	// node pod probe
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodProbeMarkerGate) {
+		nppController, err := podprobe.NewController(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to new nodePodProbe daemon controller: %v", err)
+		}
+		runnables = append(runnables, nppController)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DaemonWatchingPod) {

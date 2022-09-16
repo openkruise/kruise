@@ -24,7 +24,6 @@ import (
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -64,34 +63,9 @@ func (p *enqueueRequestForNodePodProbe) Update(evt event.UpdateEvent, q workqueu
 	if !ok {
 		return
 	}
-	if checkNodePodProbeStatusEqual(new.Status.DeepCopy(), old.Status.DeepCopy()) {
-		return
+	if !reflect.DeepEqual(new.Status, old.Status) {
+		p.queue(q, new)
 	}
-	p.queue(q, new)
-}
-
-func checkNodePodProbeStatusEqual(obj1, obj2 *appsalphav1.NodePodProbeStatus) bool {
-	// ignore LastProbeTime, LastTransitionTime and Message
-	t := metav1.Now()
-	for i := range obj1.PodProbeStatuses {
-		podProbe := &obj1.PodProbeStatuses[i]
-		for j := range podProbe.ProbeStates {
-			state := &podProbe.ProbeStates[j]
-			state.LastProbeTime = t
-			state.LastTransitionTime = t
-			state.Message = ""
-		}
-	}
-	for i := range obj2.PodProbeStatuses {
-		podProbe := &obj2.PodProbeStatuses[i]
-		for j := range podProbe.ProbeStates {
-			state := &podProbe.ProbeStates[j]
-			state.LastProbeTime = t
-			state.LastTransitionTime = t
-			state.Message = ""
-		}
-	}
-	return reflect.DeepEqual(obj1, obj2)
 }
 
 func (p *enqueueRequestForNodePodProbe) queue(q workqueue.RateLimitingInterface, npp *appsalphav1.NodePodProbe) {

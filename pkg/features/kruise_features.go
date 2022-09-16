@@ -85,6 +85,10 @@ const (
 
 	// SidecarSetPatchPodMetadataDefaultsAllowed whether sidecarSet patch pod metadata is allowed
 	SidecarSetPatchPodMetadataDefaultsAllowed featuregate.Feature = "SidecarSetPatchPodMetadataDefaultsAllowed"
+
+	// PodProbeMarkerGate enable Kruise provide the ability to execute custom Probes.
+	// Note: custom probe execution requires kruise daemon, so currently only traditional Kubelet is supported, not virtual-kubelet.
+	PodProbeMarkerGate featuregate.Feature = "PodProbeMarkerGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -104,6 +108,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	InPlaceUpdateEnvFromMetadata:              {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetAutoDeletePVC:                  {Default: false, PreRelease: featuregate.Alpha},
 	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
+	PodProbeMarkerGate:                        {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

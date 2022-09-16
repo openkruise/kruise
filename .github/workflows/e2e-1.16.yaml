@@ -10,7 +10,7 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.17'
+  GO_VERSION: '1.18'
   KIND_VERSION: 'v0.14.0'
   KIND_IMAGE: 'kindest/node:v1.16.15'
   KIND_CLUSTER_NAME: 'ci-testing'
@@ -85,6 +85,18 @@ jobs:
               kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
               exit 1
           fi
+          kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
+          do
+            restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
+            if [ "${restartCount}" -eq "0" ];then
+                echo "Kruise-daemon has not restarted"
+            else
+                kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
+                echo "Kruise-daemon has restarted, abort!!!"
+                kubectl logs -p -n ${ns} ${name}
+                exit 1
+            fi
+          done
           exit $retVal
 
   pullimages-containerrecreate:
@@ -154,6 +166,18 @@ jobs:
               kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
               exit 1
           fi
+          kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
+          do
+            restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
+            if [ "${restartCount}" -eq "0" ];then
+                echo "Kruise-daemon has not restarted"
+            else
+                kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
+                echo "Kruise-daemon has restarted, abort!!!"
+                kubectl logs -p -n ${ns} ${name}
+                exit 1
+            fi
+          done
           exit $retVal
 
   advanced-daemonset:
@@ -223,6 +247,18 @@ jobs:
               kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
               exit 1
           fi
+          kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
+          do
+            restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
+            if [ "${restartCount}" -eq "0" ];then
+                echo "Kruise-daemon has not restarted"
+            else
+                kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
+                echo "Kruise-daemon has restarted, abort!!!"
+                kubectl logs -p -n ${ns} ${name}
+                exit 1
+            fi
+          done
           exit $retVal
 
   sidecarset:
@@ -292,6 +328,18 @@ jobs:
               kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
               exit 1
           fi
+          kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
+          do
+            restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
+            if [ "${restartCount}" -eq "0" ];then
+                echo "Kruise-daemon has not restarted"
+            else
+                kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
+                echo "Kruise-daemon has restarted, abort!!!"
+                kubectl logs -p -n ${ns} ${name}
+                exit 1
+            fi
+          done
           exit $retVal
 
   podUnavailableBudget:
@@ -419,4 +467,16 @@ jobs:
               kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
               exit 1
           fi
+          kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
+          do
+            restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
+            if [ "${restartCount}" -eq "0" ];then
+                echo "Kruise-daemon has not restarted"
+            else
+                kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
+                echo "Kruise-daemon has restarted, abort!!!"
+                kubectl logs -p -n ${ns} ${name}
+                exit 1
+            fi
+          done
           exit $retVal

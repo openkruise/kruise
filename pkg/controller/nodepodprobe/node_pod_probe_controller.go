@@ -23,18 +23,19 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -67,7 +68,7 @@ var (
 // Add creates a new NodePodProbe Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !utildiscovery.DiscoverGVK(controllerKind) {
+	if !utildiscovery.DiscoverGVK(controllerKind) || !utilfeature.DefaultFeatureGate.Enabled(features.PodProbeMarkerGate) {
 		return nil
 	}
 	return add(mgr, newReconciler(mgr))
@@ -220,9 +221,10 @@ func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePo
 
 func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status appsv1alpha1.PodProbeStatus) error {
 	// map[probe.name]->probeState
-	currentConditions := make(map[string]appsv1alpha1.ProbeState)
-	for _, condition := range pod.Status.Conditions {
-		currentConditions[string(condition.Type)] = appsv1alpha1.ProbeState(condition.Status)
+	currentConditions := make(map[string]*corev1.PodCondition)
+	for i := range pod.Status.Conditions {
+		condition := &pod.Status.Conditions[i]
+		currentConditions[string(condition.Type)] = condition
 	}
 	type metadata struct {
 		Labels      map[string]interface{} `json:"labels,omitempty"`
@@ -239,11 +241,9 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 	validConditionTypes := sets.NewString()
 	for i := range status.ProbeStates {
 		probeState := status.ProbeStates[i]
-		// ignore the probe state
-		if probeState.State == "" || probeState.State == currentConditions[probeState.Name] {
+		if probeState.State == "" {
 			continue
 		}
-
 		// fetch podProbeMarker
 		ppmName, probeName := strings.Split(probeState.Name, "#")[0], strings.Split(probeState.Name, "#")[1]
 		ppm := &appsv1alpha1.PodProbeMarker{}
@@ -267,7 +267,6 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 				break
 			}
 		}
-
 		if conditionType != "" && validConditionTypes.Has(conditionType) {
 			klog.Warningf("NodePodProbe(%s) pod(%s/%s) condition(%s) is conflict", ppmName, pod.Namespace, pod.Name, conditionType)
 			// patch pod condition
@@ -287,11 +286,9 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 				Message:            probeState.Message,
 			})
 		}
-
 		if len(policy) == 0 {
 			continue
 		}
-
 		// matchedPolicy is when policy.state is equal to probeState.State, otherwise oppositePolicy
 		// 1. If policy[0].state = Succeeded, policy[1].state = Failed. probeState.State = Succeeded.
 		// So policy[0] is matchedPolicy, policy[1] is oppositePolicy
@@ -328,7 +325,6 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 	if len(probeConditions) == 0 && len(probeMetadata.Labels) == 0 && len(probeMetadata.Annotations) == 0 {
 		return nil
 	}
-
 	//update pod metadata and status condition
 	podClone := pod.DeepCopy()
 	if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -336,7 +332,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			klog.Errorf("error getting updated pod(%s/%s) from client", pod.Namespace, pod.Name)
 			return err
 		}
-		oldStatus := podClone.DeepCopy()
+		oldStatus := podClone.Status.DeepCopy()
 		for i := range probeConditions {
 			condition := probeConditions[i]
 			util.SetPodCondition(podClone, condition)
@@ -363,7 +359,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 				podClone.Annotations[k] = v.(string)
 			}
 		}
-		if reflect.DeepEqual(oldStatus, podClone.Status) && reflect.DeepEqual(oldMetadata.Labels, podClone.Labels) &&
+		if reflect.DeepEqual(oldStatus.Conditions, podClone.Status.Conditions) && reflect.DeepEqual(oldMetadata.Labels, podClone.Labels) &&
 			reflect.DeepEqual(oldMetadata.Annotations, podClone.Annotations) {
 			return nil
 		}
@@ -372,6 +368,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		klog.Errorf("NodePodProbe patch pod(%s/%s) status failed: %s", podClone.Namespace, podClone.Name, err.Error())
 		return err
 	}
-	klog.V(3).Infof("NodePodProbe update pod(%s/%s) status conditions(%s) success", podClone.Namespace, podClone.Name, util.DumpJSON(probeConditions))
+	klog.V(3).Infof("NodePodProbe update pod(%s/%s) metadata(%s) conditions(%s) success", podClone.Namespace, podClone.Name,
+		util.DumpJSON(probeMetadata), util.DumpJSON(probeConditions))
 	return nil
 }

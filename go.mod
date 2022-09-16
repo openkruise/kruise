@@ -1,6 +1,6 @@
 module github.com/openkruise/kruise
 
-go 1.17
+go 1.18
 
 require (
 	github.com/alibaba/pouch v0.0.0-20190328125340-37051654f368
