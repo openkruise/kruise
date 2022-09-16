@@ -64,6 +64,7 @@ var (
 							},
 						},
 					},
+					PodConditionType: "game.kruise.io/healthy",
 					MarkerPolicy: []appsv1alpha1.ProbeMarkerPolicy{
 						{
 							State: appsv1alpha1.ProbeSucceeded,
@@ -249,7 +250,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 						Status: corev1.PodStatus{
 							Conditions: []corev1.PodCondition{
 								{
-									Type:   corev1.PodConditionType("PodProbeMarker#ppm-1#healthy"),
+									Type:   corev1.PodConditionType("game.kruise.io/healthy"),
 									Status: corev1.ConditionTrue,
 								},
 							},
@@ -273,7 +274,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 						Status: corev1.PodStatus{
 							Conditions: []corev1.PodCondition{
 								{
-									Type:   corev1.PodConditionType("PodProbeMarker#ppm-1#healthy"),
+									Type:   corev1.PodConditionType("game.kruise.io/healthy"),
 									Status: corev1.ConditionFalse,
 								},
 							},
@@ -320,11 +321,11 @@ func TestSyncNodePodProbe(t *testing.T) {
 						Status: corev1.PodStatus{
 							Conditions: []corev1.PodCondition{
 								{
-									Type:   corev1.PodConditionType("PodProbeMarker#ppm-1#healthy"),
+									Type:   corev1.PodConditionType("game.kruise.io/healthy"),
 									Status: corev1.ConditionTrue,
 								},
 								{
-									Type:   corev1.PodConditionType("PodProbeMarker#ppm-2#other"),
+									Type:   corev1.PodConditionType("game.kruise.io/other"),
 									Status: corev1.ConditionTrue,
 								},
 							},
@@ -372,14 +373,123 @@ func TestSyncNodePodProbe(t *testing.T) {
 						Status: corev1.PodStatus{
 							Conditions: []corev1.PodCondition{
 								{
-									Type:   corev1.PodConditionType("PodProbeMarker#ppm-1#healthy"),
+									Type:   corev1.PodConditionType("game.kruise.io/healthy"),
 									Status: corev1.ConditionFalse,
 								},
 								{
-									Type:   corev1.PodConditionType("PodProbeMarker#ppm-2#other"),
+									Type:   corev1.PodConditionType("game.kruise.io/other"),
 									Status: corev1.ConditionTrue,
 								},
 							},
+						},
+					},
+				}
+				return pods
+			},
+		},
+		{
+			name: "test3, marker policy",
+			req: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name: demoNodePodProbe.Name,
+				},
+			},
+			getNode: func() []*corev1.Node {
+				nodes := []*corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node-1",
+						},
+					},
+				}
+				return nodes
+			},
+			getPods: func() []*corev1.Pod {
+				pods := []*corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-1",
+							UID:  types.UID("pod-1-uid"),
+							Labels: map[string]string{
+								"app":            "test",
+								"server-healthy": "true",
+								"success":        "true",
+							},
+							Annotations: map[string]string{
+								"controller.kubernetes.io/pod-deletion-cost": "10",
+								"success": "true",
+							},
+						},
+						Spec: corev1.PodSpec{
+							NodeName: "node-1",
+						},
+					},
+				}
+				return pods
+			},
+			getPodProbeMarkers: func() []*appsv1alpha1.PodProbeMarker {
+				demo := demoPodProbeMarker.DeepCopy()
+				demo.Spec.Probes[0].PodConditionType = ""
+				demo.Spec.Probes[0].MarkerPolicy = []appsv1alpha1.ProbeMarkerPolicy{
+					{
+						State: appsv1alpha1.ProbeSucceeded,
+						Annotations: map[string]string{
+							"controller.kubernetes.io/pod-deletion-cost": "10",
+							"success": "true",
+						},
+						Labels: map[string]string{
+							"server-healthy": "true",
+							"success":        "true",
+						},
+					},
+					{
+						State: appsv1alpha1.ProbeFailed,
+						Annotations: map[string]string{
+							"controller.kubernetes.io/pod-deletion-cost": "-10",
+							"failed": "true",
+						},
+						Labels: map[string]string{
+							"failed": "true",
+						},
+					},
+				}
+				return []*appsv1alpha1.PodProbeMarker{demo}
+			},
+			getNodePodProbes: func() []*appsv1alpha1.NodePodProbe {
+				demo := demoNodePodProbe.DeepCopy()
+				demo.Status = appsv1alpha1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+						{
+							Name: "pod-1",
+							UID:  "pod-1-uid",
+							ProbeStates: []appsv1alpha1.ContainerProbeState{
+								{
+									Name:  "ppm-1#healthy",
+									State: appsv1alpha1.ProbeFailed,
+								},
+							},
+						},
+					},
+				}
+				return []*appsv1alpha1.NodePodProbe{demo}
+			},
+			expectPods: func() []*corev1.Pod {
+				pods := []*corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-1",
+							UID:  types.UID("pod-1-uid"),
+							Labels: map[string]string{
+								"app":    "test",
+								"failed": "true",
+							},
+							Annotations: map[string]string{
+								"controller.kubernetes.io/pod-deletion-cost": "-10",
+								"failed": "true",
+							},
+						},
+						Spec: corev1.PodSpec{
+							NodeName: "node-1",
 						},
 					},
 				}

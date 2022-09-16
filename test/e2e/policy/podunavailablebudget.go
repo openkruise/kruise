@@ -110,13 +110,13 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			}
 			ginkgo.By(fmt.Sprintf("Creating PodUnavailableBudget(%s/%s)", pub.Namespace, pub.Name))
 			tester.CreatePub(pub)
+			time.Sleep(time.Second * 3)
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
 			deployment.Spec.Replicas = utilpointer.Int32Ptr(1)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
-			time.Sleep(time.Second * 3)
 
 			ginkgo.By(fmt.Sprintf("check PodUnavailableBudget(%s/%s) Status", pub.Namespace, pub.Name))
 			expectStatus := &policyv1alpha1.PodUnavailableBudgetStatus{

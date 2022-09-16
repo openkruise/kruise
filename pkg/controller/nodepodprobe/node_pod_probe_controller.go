@@ -19,10 +19,11 @@ package nodepodprobe
 import (
 	"context"
 	"flag"
-	"fmt"
 	"reflect"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -235,6 +236,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 	// pod status condition record probe result
 	var probeConditions []corev1.PodCondition
 	var err error
+	validConditionTypes := sets.NewString()
 	for i := range status.ProbeStates {
 		probeState := status.ProbeStates[i]
 		// ignore the probe state
@@ -242,23 +244,8 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			continue
 		}
 
-		var conStatus corev1.ConditionStatus
-		if probeState.State == appsv1alpha1.ProbeSucceeded {
-			conStatus = corev1.ConditionTrue
-		} else {
-			conStatus = corev1.ConditionFalse
-		}
+		// fetch podProbeMarker
 		ppmName, probeName := strings.Split(probeState.Name, "#")[0], strings.Split(probeState.Name, "#")[1]
-		probeConditions = append(probeConditions, corev1.PodCondition{
-			// type -> PodProbeMarker#podProbeMarker.Name#probe.Name
-			Type:               corev1.PodConditionType(fmt.Sprintf("PodProbeMarker#%s#%s", ppmName, probeName)),
-			Status:             conStatus,
-			LastProbeTime:      probeState.LastProbeTime,
-			LastTransitionTime: probeState.LastTransitionTime,
-			Message:            probeState.Message,
-		})
-		// marker pod labels & annotations according to probe state
-		// fetch NodePodProbe
 		ppm := &appsv1alpha1.PodProbeMarker{}
 		err = r.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: ppmName}, ppm)
 		if err != nil {
@@ -272,24 +259,62 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			continue
 		}
 		var policy []appsv1alpha1.ProbeMarkerPolicy
+		var conditionType string
 		for _, probe := range ppm.Spec.Probes {
 			if probe.Name == probeName {
 				policy = probe.MarkerPolicy
+				conditionType = probe.PodConditionType
 				break
 			}
 		}
+
+		if conditionType != "" && validConditionTypes.Has(conditionType) {
+			klog.Warningf("NodePodProbe(%s) pod(%s/%s) condition(%s) is conflict", ppmName, pod.Namespace, pod.Name, conditionType)
+			// patch pod condition
+		} else if conditionType != "" {
+			validConditionTypes.Insert(conditionType)
+			var conStatus corev1.ConditionStatus
+			if probeState.State == appsv1alpha1.ProbeSucceeded {
+				conStatus = corev1.ConditionTrue
+			} else {
+				conStatus = corev1.ConditionFalse
+			}
+			probeConditions = append(probeConditions, corev1.PodCondition{
+				Type:               corev1.PodConditionType(conditionType),
+				Status:             conStatus,
+				LastProbeTime:      probeState.LastProbeTime,
+				LastTransitionTime: probeState.LastTransitionTime,
+				Message:            probeState.Message,
+			})
+		}
+
 		if len(policy) == 0 {
 			continue
 		}
-		// patch pod labels & annotations
-		var matchedPolicy *appsv1alpha1.ProbeMarkerPolicy
+
+		// matchedPolicy is when policy.state is equal to probeState.State, otherwise oppositePolicy
+		// 1. If policy[0].state = Succeeded, policy[1].state = Failed. probeState.State = Succeeded.
+		// So policy[0] is matchedPolicy, policy[1] is oppositePolicy
+		// 2. If policy[0].state = Succeeded, and policy[1] does not exist. probeState.State = Succeeded.
+		// So policy[0] is matchedPolicy, oppositePolicy is nil
+		// 3. If policy[0].state = Succeeded, and policy[1] does not exist. probeState.State = Failed.
+		// So policy[0] is oppositePolicy, matchedPolicy is nil
+		var matchedPolicy, oppositePolicy *appsv1alpha1.ProbeMarkerPolicy
 		for j := range policy {
 			if policy[j].State == probeState.State {
 				matchedPolicy = &policy[j]
-				break
+			} else {
+				oppositePolicy = &policy[j]
 			}
 		}
-		// find matched policy
+		if oppositePolicy != nil {
+			for k := range oppositePolicy.Labels {
+				probeMetadata.Labels[k] = nil
+			}
+			for k := range oppositePolicy.Annotations {
+				probeMetadata.Annotations[k] = nil
+			}
+		}
 		if matchedPolicy != nil {
 			for k, v := range matchedPolicy.Labels {
 				probeMetadata.Labels[k] = v
@@ -297,20 +322,10 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			for k, v := range matchedPolicy.Annotations {
 				probeMetadata.Annotations[k] = v
 			}
-			continue
-		}
-		// If only one Marker Policy is defined, for example: only define State=Succeeded, Patch Labels[healthy]='true'.
-		// When the probe execution success, kruise will patch labels[healthy]='true' to pod.
-		// And when the probe execution fails, Label[healthy] will be deleted.
-		for k := range policy[0].Labels {
-			probeMetadata.Labels[k] = nil
-		}
-		for k := range policy[0].Annotations {
-			probeMetadata.Annotations[k] = nil
 		}
 	}
 	// probe condition no changed, continue
-	if len(probeConditions) == 0 {
+	if len(probeConditions) == 0 && len(probeMetadata.Labels) == 0 && len(probeMetadata.Annotations) == 0 {
 		return nil
 	}
 
