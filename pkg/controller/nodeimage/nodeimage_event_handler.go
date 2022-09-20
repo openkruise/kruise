@@ -33,6 +33,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	VirtualKubelet = "virtual-kubelet"
+)
+
 type nodeHandler struct {
 	client.Reader
 }
@@ -41,6 +45,9 @@ var _ handler.EventHandler = &nodeHandler{}
 
 func (e *nodeHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	node := evt.Object.(*v1.Node)
+	if node.Labels["type"] == VirtualKubelet {
+		return
+	}
 	if node.DeletionTimestamp != nil {
 		e.nodeDelete(node, q)
 		return
@@ -53,6 +60,9 @@ func (e *nodeHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingIn
 
 func (e *nodeHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	node := evt.ObjectNew.(*v1.Node)
+	if node.Labels["type"] == VirtualKubelet {
+		return
+	}
 	if node.DeletionTimestamp != nil {
 		e.nodeDelete(node, q)
 	} else {
@@ -62,6 +72,9 @@ func (e *nodeHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInte
 
 func (e *nodeHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	node := evt.Object.(*v1.Node)
+	if node.Labels["type"] == VirtualKubelet {
+		return
+	}
 	e.nodeDelete(node, q)
 }
 

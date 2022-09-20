@@ -26,7 +26,9 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/ephemeraljob"
 	"github.com/openkruise/kruise/pkg/controller/imagepulljob"
 	"github.com/openkruise/kruise/pkg/controller/nodeimage"
+	"github.com/openkruise/kruise/pkg/controller/nodepodprobe"
 	"github.com/openkruise/kruise/pkg/controller/persistentpodstate"
+	"github.com/openkruise/kruise/pkg/controller/podprobemarker"
 	"github.com/openkruise/kruise/pkg/controller/podreadiness"
 	"github.com/openkruise/kruise/pkg/controller/podunavailablebudget"
 	"github.com/openkruise/kruise/pkg/controller/resourcedistribution"
@@ -59,6 +61,8 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, ephemeraljob.Add)
 	controllerAddFuncs = append(controllerAddFuncs, containerlauchpriority.Add)
 	controllerAddFuncs = append(controllerAddFuncs, persistentpodstate.Add)
+	controllerAddFuncs = append(controllerAddFuncs, podprobemarker.Add)
+	controllerAddFuncs = append(controllerAddFuncs, nodepodprobe.Add)
 }
 
 func SetupWithManager(m manager.Manager) error {

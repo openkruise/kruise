@@ -54,12 +54,7 @@ spec:
                             description: container name
                             type: string
                           name:
-                            description: probe name, unique within the Pod(Even between
-                              different containers, they cannot be the same)
-                            type: string
-                          podProbeMarkerName:
-                            description: Used for NodeProbeProbe to quickly find the
-                              corresponding PodProbeMarker resource.
+                            description: Name is podProbeMarker.Name#probe.Name
                             type: string
                           probe:
                             description: container probe spec
@@ -243,7 +238,7 @@ spec:
                               error message
                             type: string
                           name:
-                            description: probe name
+                            description: Name is podProbeMarker.Name#probe.Name
                             type: string
                           state:
                             description: container probe exec state, True or False
