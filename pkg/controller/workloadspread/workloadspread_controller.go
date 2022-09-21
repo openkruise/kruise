@@ -81,7 +81,7 @@ const (
 	FakeSubsetName = "kruise.io/workloadspread-fake-subset-name"
 
 	// IgnorePatchExistingPodsAnnotation ignore ws.Spec.Subsets[x].Patch for existing pods
-	IgnorePatchExistingPodsAnnotation = "workloadspread.kruise.io/ignore-patch-existing-pods-metadata"
+	IgnorePatchExistingPodsAnnotation = "workloadspreads.kruise.io/ignore-patch-existing-pods-metadata"
 )
 
 var (
