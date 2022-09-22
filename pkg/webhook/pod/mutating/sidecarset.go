@@ -45,9 +45,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		req.AdmissionRequest.Resource.Resource != "pods" {
 		return true, nil
 	}
-	// filter out pods that don't require inject, include the following:
-	// 1. Deletion pod
-	// 2. ignore namespace: "kube-system", "kube-public"
+	// filter out pods that don't require inject
 	if !sidecarcontrol.IsActivePod(pod) {
 		return true, nil
 	}

@@ -62,7 +62,7 @@ const (
 
 var (
 	// SidecarIgnoredNamespaces specifies the namespaces where Pods won't get injected
-	SidecarIgnoredNamespaces = []string{"kube-system", "kube-public"}
+	// SidecarIgnoredNamespaces = []string{"kube-system", "kube-public"}
 	// SubPathExprEnvReg format: $(ODD_NAME)、$(POD_NAME)...
 	SubPathExprEnvReg, _ = regexp.Compile(`\$\(([-._a-zA-Z][-._a-zA-Z0-9]*)\)`)
 )
@@ -95,11 +95,11 @@ func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (
 
 // IsActivePod determines the pod whether need be injected and updated
 func IsActivePod(pod *corev1.Pod) bool {
-	for _, namespace := range SidecarIgnoredNamespaces {
+	/*for _, namespace := range SidecarIgnoredNamespaces {
 		if pod.Namespace == namespace {
 			return false
 		}
-	}
+	}*/
 	return kubecontroller.IsPodActive(pod)
 }
 
