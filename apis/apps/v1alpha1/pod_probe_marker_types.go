@@ -43,7 +43,13 @@ type PodContainerProbe struct {
 	Probe ContainerProbeSpec `json:"probe"`
 	// According to the execution result of ContainerProbe, perform specific actions,
 	// such as: patch Pod labels, annotations, ReadinessGate Condition
+	// It cannot be null at the same time as PodConditionType.
 	MarkerPolicy []ProbeMarkerPolicy `json:"markerPolicy,omitempty"`
+	// If it is not empty, the Probe execution result will be recorded on the Pod condition.
+	// It cannot be null at the same time as MarkerPolicy.
+	// For example PodConditionType=game.kruise.io/healthy, pod.status.condition.type = game.kruise.io/healthy.
+	// When probe is Succeeded, pod.status.condition.status = True. Otherwise, when the probe fails to execute, pod.status.condition.status = False.
+	PodConditionType string `json:"podConditionType,omitempty"`
 }
 
 type ContainerProbeSpec struct {

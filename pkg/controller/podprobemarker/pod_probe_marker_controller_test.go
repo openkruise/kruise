@@ -64,6 +64,7 @@ var (
 							},
 						},
 					},
+					PodConditionType: "game.kruise.io/healthy",
 					MarkerPolicy: []appsv1alpha1.ProbeMarkerPolicy{
 						{
 							State: appsv1alpha1.ProbeSucceeded,
