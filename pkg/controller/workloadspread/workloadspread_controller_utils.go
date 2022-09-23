@@ -17,13 +17,17 @@ limitations under the License.
 package workloadspread
 
 import (
+	"encoding/json"
+	"reflect"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	schedulecorev1 "k8s.io/component-helpers/scheduling/corev1"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"k8s.io/klog/v2"
 )
 
 // NewWorkloadSpreadSubsetCondition creates a new WorkloadSpreadSubset condition.
@@ -85,18 +89,60 @@ func filterOutCondition(conditions []appsv1alpha1.WorkloadSpreadSubsetCondition,
 	return newConditions
 }
 
-func matchesSubset(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset) (bool, int64, error) {
+func matchesSubset(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset, missingReplicas int) (bool, int64, error) {
+	// necessary condition
 	matched, err := matchesSubsetRequiredAndToleration(pod, node, subset)
 	if err != nil || !matched {
 		return false, -1, err
 	}
 
-	if len(subset.PreferredNodeSelectorTerms) == 0 {
-		return matched, 0, nil
+	// preferredNodeScore is in [0, total_prefer_weight]
+	preferredNodeScore := int64(0)
+	if subset.PreferredNodeSelectorTerms != nil {
+		nodePreferredTerms, _ := nodeaffinity.NewPreferredSchedulingTerms(subset.PreferredNodeSelectorTerms)
+		preferredNodeScore = nodePreferredTerms.Score(node)
 	}
 
-	nodePreferredTerms, _ := nodeaffinity.NewPreferredSchedulingTerms(subset.PreferredNodeSelectorTerms)
-	return matched, nodePreferredTerms.Score(node), nil
+	// preferredPodScore is in [0, 1]
+	preferredPodScore := int64(0)
+	if subset.Patch.Raw != nil {
+		preferredPodScore = podPreferredScore(subset, pod)
+	}
+
+	// we prefer the subset that still has room for more replicas
+	quotaScore := int64(0)
+	if missingReplicas > 0 {
+		quotaScore = int64(1)
+	}
+
+	// preferredPodScore is in [0, 1], so it cannot affect preferredNodeScore in the following expression
+	preferredScore := preferredNodeScore*100 + preferredPodScore*10 + quotaScore
+	return matched, preferredScore, nil
+}
+
+func podPreferredScore(subset *appsv1alpha1.WorkloadSpreadSubset, pod *corev1.Pod) int64 {
+	podBytes, _ := json.Marshal(pod)
+	modified, err := strategicpatch.StrategicMergePatch(podBytes, subset.Patch.Raw, &corev1.Pod{})
+	if err != nil {
+		klog.Errorf("failed to merge patch raw for pod %v and subset %v", klog.KObj(pod), subset.Name)
+		return 0
+	}
+	patchedPod := &corev1.Pod{}
+	err = json.Unmarshal(modified, patchedPod)
+	if err != nil {
+		klog.Errorf("failed to unmarshal for pod %v and subset %v", klog.KObj(pod), subset.Name)
+		return 0
+	}
+	// TODO: consider json annotation just like `{"json_key": ["value1", "value2"]}`.
+	// currently, we exclude annotations field because annotation may contain some filed we cannot handle.
+	// For example, we cannot judge whether the following two annotations are equal via DeepEqual method:
+	// example.com/list: '["a", "b", "c"]'
+	// example.com/list: '["b", "a", "c"]'
+	patchedPod.Annotations = pod.Annotations
+	if reflect.DeepEqual(pod, patchedPod) {
+		return 1
+	}
+	return 0
 }
 
 func matchesSubsetRequiredAndToleration(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset) (bool, error) {

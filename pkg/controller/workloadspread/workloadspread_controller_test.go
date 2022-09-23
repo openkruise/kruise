@@ -1426,7 +1426,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				if !reflect.DeepEqual(annotation1, annotation2) {
 					fmt.Println(annotation1)
 					fmt.Println(annotation2)
-					t.Fatalf("set Pod deletion-coset annotation failed")
+					t.Fatalf("set Pod deletion-cost annotation failed")
 				}
 			}
 

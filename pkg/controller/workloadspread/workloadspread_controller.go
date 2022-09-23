@@ -364,7 +364,7 @@ func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods
 	// count managed pods for each subset
 	for i := range pods {
 		injectWS := getInjectWorkloadSpreadFromPod(pods[i])
-		if injectWS == nil || injectWS.Name != ws.Name || injectWS.Subset == "" {
+		if isNotMatchedWS(injectWS, ws) {
 			continue
 		}
 		if _, exist := podMap[injectWS.Subset]; !exist {
@@ -393,7 +393,7 @@ func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods
 // getSuitableSubsetNameForPod will return (FakeSubsetName, nil) if not found suitable subset for pod
 func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (string, error) {
 	injectWS := getInjectWorkloadSpreadFromPod(pod)
-	if injectWS == nil || injectWS.Name != ws.Name || injectWS.Subset == "" {
+	if isNotMatchedWS(injectWS, ws) {
 		// process the pods that were created before workloadSpread
 		matchedSubset, err := r.getAndUpdateSuitableSubsetName(ws, pod, subsetMissingReplicas)
 		if err != nil {
@@ -426,23 +426,17 @@ func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1alpha
 	for i := range ws.Spec.Subsets {
 		subset := &ws.Spec.Subsets[i]
 		// in case of that this pod was scheduled to the node which matches a subset of workloadSpread
-		matched, preferredScore, err := matchesSubset(pod, node, subset)
+		matched, preferredScore, err := matchesSubset(pod, node, subset, subsetMissingReplicas[subset.Name])
 		if err != nil {
 			// requiredSelectorTerm field was validated at webhook stage, so this error should not occur
 			// this error should not be returned, because it is a non-transient error
 			klog.Errorf("unexpected error occurred when matching pod (%s/%s) with subset, please check requiredSelectorTerm field of subset (%s) in WorkloadSpread (%s/%s), err: %s",
 				pod.Namespace, pod.Name, subset.Name, ws.Namespace, ws.Name, err.Error())
 		}
-		quotaScore := int64(0)
-		// we prefer the subset that still has room for more replicas
-		if subsetMissingReplicas[subset.Name] > 0 {
-			quotaScore = int64(1)
-		}
-		finalScore := preferredScore*10 + quotaScore
 		// select the most favorite subsets for the pod by subset.PreferredNodeSelectorTerms
-		if matched && finalScore > maxPreferredScore {
+		if matched && preferredScore > maxPreferredScore {
 			favoriteSubset = subset
-			maxPreferredScore = finalScore
+			maxPreferredScore = preferredScore
 		}
 	}
 
@@ -752,4 +746,11 @@ func (r *ReconcileWorkloadSpread) writeWorkloadSpreadStatus(ws *appsv1alpha1.Wor
 
 func getWorkloadSpreadKey(o metav1.Object) string {
 	return o.GetNamespace() + "/" + o.GetName()
+}
+
+func isNotMatchedWS(injectWS *wsutil.InjectWorkloadSpread, ws *appsv1alpha1.WorkloadSpread) bool {
+	if injectWS == nil || injectWS.Name != ws.Name || injectWS.Subset == "" {
+		return true
+	}
+	return false
 }
