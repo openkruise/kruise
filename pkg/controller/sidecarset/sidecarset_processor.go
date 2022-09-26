@@ -269,9 +269,8 @@ func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, 
 	}
 
 	// filter out pods that don't require updated, include the following:
-	// 1. Deletion pod
-	// 2. ignore namespace: "kube-system", "kube-public"
-	// 3. never be injected sidecar container
+	// 1. inActive pod
+	// 2. never be injected sidecar container
 	var filteredPods []*corev1.Pod
 	for _, pod := range selectedPods {
 		if sidecarcontrol.IsActivePod(pod) && sidecarcontrol.IsPodInjectedSidecarSet(pod, s) &&
