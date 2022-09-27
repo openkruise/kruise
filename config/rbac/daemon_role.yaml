@@ -72,3 +72,19 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - nodepodprobes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - nodepodprobes/status
+  verbs:
+  - get
+  - patch
+  - update

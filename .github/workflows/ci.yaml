@@ -48,6 +48,7 @@ jobs:
           version: ${{ env.GOLANGCI_VERSION }}
           args: --verbose
           skip-pkg-cache: true
+          mod: readonly
 
   markdownlint-misspell-shellcheck:
     runs-on: ubuntu-18.04
