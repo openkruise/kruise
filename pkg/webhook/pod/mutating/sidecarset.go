@@ -163,7 +163,7 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 	switch operation {
 	case admissionv1.Update:
 		// optimization: quickly return if newPod matched the latest sidecarSet
-		if sidecarcontrol.GetPodSidecarSetRevision(sidecarSet.Name, newPod) == sidecarcontrol.GetSidecarSetRevision(sidecarSet) {
+		if sidecarcontrol.GetPodSidecarSetHash(sidecarSet.Name, newPod) == sidecarcontrol.GetSidecarSetHash(sidecarSet) {
 			return sidecarSet.DeepCopy(), nil
 		}
 
@@ -207,18 +207,25 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 }
 
 func (h *PodCreateHandler) getSpecificRevisionSidecarSetForPod(sidecarSet *appsv1alpha1.SidecarSet, revisions []*apps.ControllerRevision, pod *corev1.Pod) (*appsv1alpha1.SidecarSet, error) {
-	var err error
-	var matchedSidecarSet *appsv1alpha1.SidecarSet
+	// ControllerRevision contains much more history information of SidecarSet than Hash:
+	// - ControllerRevision contains Containers, InitContainers, Volumes, ImagePullSecrets and so on.
+	//   It is designed for version control when injection.
+	// - Hash is only related with Containers field of SidecarSet.
+	//   It is designed to judge whether pod need to be upgraded.
 	for _, revision := range revisions {
+		// ControllerRevision name will be recorded in Pod when inject Pod in Webhook (Since v1.3.0) or upgrade Pod in Controller (Since v1.0.0).
 		if sidecarcontrol.GetPodSidecarSetControllerRevision(sidecarSet.Name, pod) == revision.Name {
-			matchedSidecarSet, err = h.getSpecificHistorySidecarSet(sidecarSet, &appsv1alpha1.SidecarSetInjectRevision{RevisionName: &revision.Name})
-			if err != nil {
-				return nil, err
-			}
-			break
+			return h.getSpecificHistorySidecarSet(sidecarSet, &appsv1alpha1.SidecarSetInjectRevision{RevisionName: &revision.Name})
 		}
 	}
-	return matchedSidecarSet, nil
+	// Hash-matched sidecarSet is much better than those unmatched :)
+	for _, revision := range revisions {
+		// If the Hash is matched, this revision and Pod  matched, so we can use this condition to be compatible with other scenes.
+		if sidecarcontrol.GetPodSidecarSetHash(sidecarSet.Name, pod) == sidecarcontrol.GetSidecarSetHash(sidecarSet) {
+			return h.getSpecificHistorySidecarSet(sidecarSet, &appsv1alpha1.SidecarSetInjectRevision{RevisionName: &revision.Name})
+		}
+	}
+	return nil, nil
 }
 
 func (h *PodCreateHandler) getSpecificHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, revisionInfo *appsv1alpha1.SidecarSetInjectRevision) (*appsv1alpha1.SidecarSet, error) {
@@ -340,13 +347,13 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		// process sidecarset hash
 		setUpgrade1 := sidecarcontrol.SidecarSetUpgradeSpec{
 			UpdateTimestamp:              metav1.Now(),
-			SidecarSetHash:               sidecarcontrol.GetSidecarSetRevision(sidecarSet),
+			SidecarSetHash:               sidecarcontrol.GetSidecarSetHash(sidecarSet),
 			SidecarSetName:               sidecarSet.Name,
 			SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,
 		}
 		setUpgrade2 := sidecarcontrol.SidecarSetUpgradeSpec{
 			UpdateTimestamp: metav1.Now(),
-			SidecarSetHash:  sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSet),
+			SidecarSetHash:  sidecarcontrol.GetSidecarSetHashWithoutImage(sidecarSet),
 			SidecarSetName:  sidecarSet.Name,
 		}
 

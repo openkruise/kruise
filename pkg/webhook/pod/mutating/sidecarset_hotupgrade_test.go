@@ -58,10 +58,10 @@ func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1alpha1.Sideca
 	if podOut.Spec.Containers[1].Image != sidecarSetIn.Spec.Containers[0].UpgradeStrategy.HotUpgradeEmptyImage {
 		t.Fatalf("expect image busy:hotupgrade-empty but got %v", podOut.Spec.Containers[1].Image)
 	}
-	if sidecarcontrol.GetPodSidecarSetRevision("sidecarset1", podOut) != sidecarcontrol.GetSidecarSetRevision(sidecarSetIn) {
-		t.Fatalf("pod sidecarset revision(%s) error", sidecarcontrol.GetPodSidecarSetRevision("sidecarset1", podOut))
+	if sidecarcontrol.GetPodSidecarSetHash("sidecarset1", podOut) != sidecarcontrol.GetSidecarSetHash(sidecarSetIn) {
+		t.Fatalf("pod sidecarset revision(%s) error", sidecarcontrol.GetPodSidecarSetHash("sidecarset1", podOut))
 	}
-	if sidecarcontrol.GetPodSidecarSetWithoutImageRevision("sidecarset1", podOut) != sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSetIn) {
+	if sidecarcontrol.GetPodSidecarSetWithoutImageRevision("sidecarset1", podOut) != sidecarcontrol.GetSidecarSetHashWithoutImage(sidecarSetIn) {
 		t.Fatalf("pod sidecarset without image revision(%s) error", sidecarcontrol.GetPodSidecarSetWithoutImageRevision("sidecarset1", podOut))
 	}
 	if podOut.Annotations[sidecarcontrol.SidecarSetListAnnotation] != "sidecarset1" {

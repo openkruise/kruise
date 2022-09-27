@@ -27,7 +27,7 @@ var (
 type revisionAdapterImpl struct{}
 
 func (r *revisionAdapterImpl) EqualToRevisionHash(sidecarSetName string, obj metav1.Object, hash string) bool {
-	return GetPodSidecarSetRevision(sidecarSetName, obj) == hash
+	return GetPodSidecarSetHash(sidecarSetName, obj) == hash
 }
 
 func (r *revisionAdapterImpl) WriteRevisionHash(obj metav1.Object, hash string) {

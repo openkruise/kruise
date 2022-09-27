@@ -891,7 +891,7 @@ func testSidecarSetHashInject(t *testing.T, sidecarSetIn1 *appsv1alpha1.SidecarS
 		"sidecarset3": "gm967682cm",
 	}
 	for k, v := range expectedRevision {
-		if sidecarcontrol.GetPodSidecarSetRevision(k, podOut) != v {
+		if sidecarcontrol.GetPodSidecarSetHash(k, podOut) != v {
 			t.Errorf("except sidecarset(%s:%s), but get in pod annotations(%s)", k, v, podOut.Annotations[hashKey])
 		}
 	}

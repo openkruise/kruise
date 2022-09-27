@@ -110,7 +110,7 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	inPlaceUpdateState, ok := sidecarUpdateStates[sidecarSet.Name]
 	if !ok {
 		inPlaceUpdateState = &pub.InPlaceUpdateState{
-			Revision:        GetSidecarSetRevision(sidecarSet),
+			Revision:        GetSidecarSetHash(sidecarSet),
 			UpdateTimestamp: metav1.Now(),
 		}
 	}
@@ -186,7 +186,7 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 // only when annotations[SidecarSetHashWithoutImageAnnotation] is the same, sidecarSet can upgrade pods
 func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
 	sidecarSet := c.GetSidecarset()
-	if GetPodSidecarSetWithoutImageRevision(sidecarSet.Name, pod) != GetSidecarSetWithoutImageRevision(sidecarSet) {
+	if GetPodSidecarSetWithoutImageRevision(sidecarSet.Name, pod) != GetSidecarSetHashWithoutImage(sidecarSet) {
 		return false
 	}
 

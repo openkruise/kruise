@@ -103,15 +103,15 @@ func IsActivePod(pod *corev1.Pod) bool {
 	return kubecontroller.IsPodActive(pod)
 }
 
-func GetSidecarSetRevision(sidecarSet *appsv1alpha1.SidecarSet) string {
+func GetSidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) string {
 	return sidecarSet.Annotations[SidecarSetHashAnnotation]
 }
 
-func GetSidecarSetWithoutImageRevision(sidecarSet *appsv1alpha1.SidecarSet) string {
+func GetSidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) string {
 	return sidecarSet.Annotations[SidecarSetHashWithoutImageAnnotation]
 }
 
-func GetPodSidecarSetRevision(sidecarSetName string, pod metav1.Object) string {
+func GetPodSidecarSetHash(sidecarSetName string, pod metav1.Object) string {
 	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, SidecarSetHashAnnotation, pod)
 	return upgradeSpec.SidecarSetHash
 }
@@ -154,7 +154,7 @@ func GetPodSidecarSetWithoutImageRevision(sidecarSetName string, pod metav1.Obje
 
 // whether this pod has been updated based on the latest sidecarSet
 func IsPodSidecarUpdated(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
-	return GetSidecarSetRevision(sidecarSet) == GetPodSidecarSetRevision(sidecarSet.Name, pod)
+	return GetSidecarSetHash(sidecarSet) == GetPodSidecarSetHash(sidecarSet.Name, pod)
 }
 
 // UpdatePodSidecarSetHash when sidecarSet in-place update sidecar container, Update sidecarSet hash in Pod annotations[kruise.io/sidecarset-hash]
@@ -197,7 +197,7 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 
 	sidecarSetHash[sidecarSet.Name] = SidecarSetUpgradeSpec{
 		UpdateTimestamp:              metav1.Now(),
-		SidecarSetHash:               GetSidecarSetRevision(sidecarSet),
+		SidecarSetHash:               GetSidecarSetHash(sidecarSet),
 		SidecarSetName:               sidecarSet.Name,
 		SidecarList:                  sidecarList.List(),
 		SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,

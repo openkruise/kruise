@@ -326,7 +326,7 @@ func TestGetPodSidecarSetRevision(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			revison := GetPodSidecarSetRevision("test-sidecarset", cs.getPod())
+			revison := GetPodSidecarSetHash("test-sidecarset", cs.getPod())
 			if cs.exceptRevision != revison {
 				t.Fatalf("except sidecar container test-sidecarset revison %s, but get %s", cs.exceptRevision, revison)
 			}
