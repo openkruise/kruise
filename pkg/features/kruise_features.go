@@ -43,7 +43,7 @@ const (
 	// Otherwise, it will only be injected to Pods created by Kruise workloads.
 	KruisePodReadinessGate featuregate.Feature = "KruisePodReadinessGate"
 
-	// PreDownloadImageForInPlaceUpdate enables cloneset-controller to create ImagePullJobs to
+	// PreDownloadImageForInPlaceUpdate enables cloneset/statefulset controllers to create ImagePullJobs to
 	// pre-download images for in-place update.
 	PreDownloadImageForInPlaceUpdate featuregate.Feature = "PreDownloadImageForInPlaceUpdate"
 
@@ -89,6 +89,10 @@ const (
 	// PodProbeMarkerGate enable Kruise provide the ability to execute custom Probes.
 	// Note: custom probe execution requires kruise daemon, so currently only traditional Kubelet is supported, not virtual-kubelet.
 	PodProbeMarkerGate featuregate.Feature = "PodProbeMarkerGate"
+
+	// PreDownloadImageForDaemonSetUpdate enables daemonset-controller to create ImagePullJobs to
+	// pre-download images for update.
+	PreDownloadImageForDaemonSetUpdate featuregate.Feature = "PreDownloadImageForDaemonSetUpdate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -109,6 +113,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	StatefulSetAutoDeletePVC:                  {Default: false, PreRelease: featuregate.Alpha},
 	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
 	PodProbeMarkerGate:                        {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
