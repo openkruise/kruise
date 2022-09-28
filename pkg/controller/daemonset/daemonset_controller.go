@@ -136,7 +136,7 @@ func Add(mgr manager.Manager) error {
 	}
 	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForDaemonSetUpdate) {
 		isPreDownloadDisabled = true
 	}
 	r, err := newReconciler(mgr)
