@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -65,10 +67,13 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
@@ -91,6 +96,8 @@ var (
 	onceBackoffGC sync.Once
 	// this is a short cut for any sub-functions to notify the reconcile how long to wait to requeue
 	durationStore = requeueduration.DurationStore{}
+
+	isPreDownloadDisabled bool
 )
 
 const (
@@ -127,7 +134,11 @@ func Add(mgr manager.Manager) error {
 	if !utildiscovery.DiscoverGVK(controllerKind) {
 		return nil
 	}
-
+	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
+		isPreDownloadDisabled = true
+	}
 	r, err := newReconciler(mgr)
 	if err != nil {
 		return err
@@ -171,6 +182,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 
 	cli := utilclient.NewClientFromManager(mgr, "daemonset-controller")
 	dsc := &ReconcileDaemonSet{
+		Client:        cli,
 		kubeClient:    genericClient.KubeClient,
 		kruiseClient:  genericClient.KruiseClient,
 		eventRecorder: recorder,
@@ -254,6 +266,7 @@ var _ reconcile.Reconciler = &ReconcileDaemonSet{}
 
 // ReconcileDaemonSet reconciles a DaemonSet object
 type ReconcileDaemonSet struct {
+	runtimeclient.Client
 	kubeClient       clientset.Interface
 	kruiseClient     kruiseclientset.Interface
 	eventRecorder    record.EventRecorder
@@ -388,6 +401,32 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 
 	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
 		return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
+	}
+
+	if !isPreDownloadDisabled && dsc.Client != nil {
+		if ds.Status.UpdatedNumberScheduled != ds.Status.DesiredNumberScheduled ||
+			hash != ds.Status.DaemonSetHash {
+			// get ads pre-download annotation
+			minUpdatedReadyPodsCount := 0
+			if minUpdatedReadyPods, ok := ds.Annotations[appsv1alpha1.ImagePreDownloadMinUpdatedReadyPods]; ok {
+				minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
+				minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(ds.Status.DesiredNumberScheduled), true)
+				if err != nil {
+					klog.Errorf("Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for %s: %v", request, err)
+				}
+			}
+			// todo: check whether the updatedReadyPodsCount greater than minUpdatedReadyPodsCount
+			_ = minUpdatedReadyPodsCount
+			// pre-download images for new revision
+			if err := dsc.createImagePullJobsForInPlaceUpdate(ds, old, cur); err != nil {
+				klog.Errorf("Failed to create ImagePullJobs for %s: %v", request, err)
+			}
+		} else {
+			// delete ImagePullJobs if revisions have been consistent
+			if err := imagejobutilfunc.DeleteJobsForWorkload(dsc.Client, ds); err != nil {
+				klog.Errorf("Failed to delete imagepulljobs for %s: %v", request, err)
+			}
+		}
 	}
 
 	err = dsc.manage(ds, nodeList, hash)
