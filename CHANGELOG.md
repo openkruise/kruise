@@ -1,5 +1,61 @@
 # Change Log
 
+## v1.3.0
+
+> Change log since v1.2.0
+
+### New CRD and Controller: PodProbeMarker
+
+Kubernetes provides three Pod lifecycle management:
+- **Readiness Probe** Used to determine whether the business container is ready to respond to user requests. If the probe fails, the Pod will be removed from Service Endpoints.
+- **Liveness Probe** Used to determine the health status of the container. If the probe fails, the kubelet will restart the container.
+- **Startup Probe** Used to know when a container application has started. If such a probe is configured, it disables liveness and readiness checks until it succeeds.
+
+So the Probe capabilities provided in Kubernetes have defined specific semantics and related behaviors.
+**In addition, there is actually a need to customize Probe semantics and related behaviors**, such as:
+- **GameServer defines Idle Probe to determine whether the Pod currently has a game match**, if not, from the perspective of cost optimization, the Pod can be scaled down.
+- **K8S Operator defines the main-secondary probe to determine the role of the current Pod (main or secondary)**. When upgrading, the secondary can be upgraded first,
+so as to achieve the behavior of selecting the main only once during the upgrade process, reducing the service interruption time during the upgrade process.
+
+So we provides the ability to customize the Probe and return the result to the Pod yaml.
+
+For more detail, please refer to its [documentation](https://openkruise.io/docs/user-manuals/podprobemarker) and [proposal](https://github.com/openkruise/kruise/blob/master/docs/proposals/20220728-pod-probe-marker.md).
+
+### SidecarSet
+- SidecarSet support to inject pods under kube-system,kube-public namespace. ([#1084](https://github.com/openkruise/kruise/pull/1084), [@zmberg](https://github.com/zmberg))
+- SidecarSet support to inject specific history sidecar container to Pods. ([#1021](https://github.com/openkruise/kruise/pull/1021), [@veophi](https://github.com/veophi))
+- SidecarSet support to inject pod annotations.([#992](https://github.com/openkruise/kruise/pull/992), [@zmberg](https://github.com/zmberg))
+
+### AdvancedCronJob
+- TimeZone support for AdvancedCronJob from [upstream](https://github.com/kubernetes/kubernetes/pull/108032). ([#1070](https://github.com/openkruise/kruise/pull/1070), [@FillZpp](https://github.com/FillZpp))
+
+### WorkloadSpread
+- WorkloadSpread support Native StatefulSet and Kruise Advanced StatefulSet. ([#1056](https://github.com/openkruise/kruise/pull/1056), [@veophi](https://github.com/veophi))
+
+### CloneSet
+- CloneSet supports to calculate scale number excluding Pods in PreparingDelete. ([#1024](https://github.com/openkruise/kruise/pull/1024), [@FillZpp](https://github.com/FillZpp))
+- Optimize CloneSet queuing when cache has just synced. ([#1026](https://github.com/openkruise/kruise/pull/1026), [@FillZpp](https://github.com/FillZpp))
+
+### PodUnavailableBudget
+- Optimize event handler performance for PodUnavailableBudget. ([#1027](https://github.com/openkruise/kruise/pull/1027), [@FillZpp](https://github.com/FillZpp))
+
+### Advanced DaemonSet
+- Allow optional filed max unavilable in ads, and set default value 1. ([#1007](https://github.com/openkruise/kruise/pull/1007), [@ABNER-1](https://github.com/ABNER-1))
+- Fix DaemonSet surging with minReadySeconds. ([#1014](https://github.com/openkruise/kruise/pull/1014), [@FillZpp](https://github.com/FillZpp))
+- Optimize Advanced DaemonSet internal new pod for imitating scheduling. ([#1011](https://github.com/openkruise/kruise/pull/1011), [@FillZpp](https://github.com/FillZpp))
+- Advanced DaemonSet support pre-download image. ([#1057](https://github.com/openkruise/kruise/pull/1057), [@ABNER-1](https://github.com/ABNER-1))
+
+### Advanced StatefulSet
+- Fix panic cased by statefulset pvc auto deletion. ([#999](https://github.com/openkruise/kruise/pull/999), [@veophi](https://github.com/veophi))
+
+### Others
+- Optimize performance of LabelSelector conversion. ([#1068](https://github.com/openkruise/kruise/pull/1068), [@FillZpp](https://github.com/FillZpp))
+- Reduce kruise-manager memory allocation. ([#1015](https://github.com/openkruise/kruise/pull/1015), [@FillZpp](https://github.com/FillZpp))
+- Pod state from updating to Normal should all hooked. ([#1022](https://github.com/openkruise/kruise/pull/1022), [@shiyan2016](https://github.com/shiyan2016))
+- Fix go get in Makefile with go 1.18. ([#1036](https://github.com/openkruise/kruise/pull/1036), [@astraw99](https://github.com/astraw99))
+- Fix EphemeralJob spec.replicas nil panic bug. ([#1016](https://github.com/openkruise/kruise/pull/1016), [@hellolijj](https://github.com/openkruise/kruise/pull/1016))
+- Fix UnitedDeployment reconcile don't return err bug. ([#991](https://github.com/openkruise/kruise/pull/991), [@huiwq1990](https://github.com/huiwq1990))
+
 ## v1.2.0
 
 > Change log since v1.1.0
