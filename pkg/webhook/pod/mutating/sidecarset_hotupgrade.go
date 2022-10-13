@@ -26,11 +26,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func injectHotUpgradeContainers(pod *corev1.Pod, sidecarContainer *appsv1alpha1.SidecarContainer) (
+func injectHotUpgradeContainers(hotUpgradeWorkInfo map[string]string, sidecarContainer *appsv1alpha1.SidecarContainer) (
 	sidecarContainers []*appsv1alpha1.SidecarContainer, injectedAnnotations map[string]string) {
 
 	injectedAnnotations = make(map[string]string)
-	hotUpgradeWorkContainer := sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(pod)
 	// container1 is current worked container
 	// container2 is empty container, and don't work now
 	container1, container2 := generateHotUpgradeContainers(sidecarContainer)
@@ -45,9 +44,9 @@ func injectHotUpgradeContainers(pod *corev1.Pod, sidecarContainer *appsv1alpha1.
 	injectedAnnotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(container2.Name)] = "1"
 	// used to mark which container is currently working, first is container1
 	// format: map[container.name] = pod.spec.container[x].name
-	hotUpgradeWorkContainer[sidecarContainer.Name] = container1.Name
+	hotUpgradeWorkInfo[sidecarContainer.Name] = container1.Name
 	// store working HotUpgrade container in pod annotations
-	by, _ := json.Marshal(hotUpgradeWorkContainer)
+	by, _ := json.Marshal(hotUpgradeWorkInfo)
 	injectedAnnotations[sidecarcontrol.SidecarSetWorkingHotUpgradeContainer] = string(by)
 
 	return sidecarContainers, injectedAnnotations
