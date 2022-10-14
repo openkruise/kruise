@@ -288,15 +288,16 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 	sidecarContainers, sidecarInitContainers []*appsv1alpha1.SidecarContainer, sidecarSecrets []corev1.LocalObjectReference,
 	volumesInSidecars []corev1.Volume, injectedAnnotations map[string]string, err error) {
 
-	// injected into pod
+	// injected annotations
 	injectedAnnotations = make(map[string]string)
-	// format: sidecarset.name -> sidecarset hash
+	// get sidecarSet annotations from pods
+	// sidecarSet.name -> sidecarSet hash struct
 	sidecarSetHash := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
-	// format: sidecarset.name -> sidecarset hash(without image)
+	// sidecarSet.name -> sidecarSet hash(without image) struct
 	sidecarSetHashWithoutImage := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
 	// parse sidecar hash in pod annotations
 	if oldHashStr := pod.Annotations[sidecarcontrol.SidecarSetHashAnnotation]; len(oldHashStr) > 0 {
-		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHash); err != nil {
+		if err = json.Unmarshal([]byte(oldHashStr), &sidecarSetHash); err != nil {
 			// to be compatible with older sidecarSet hash struct, map[string]string
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
@@ -312,7 +313,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		}
 	}
 	if oldHashStr := pod.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation]; len(oldHashStr) > 0 {
-		if err := json.Unmarshal([]byte(oldHashStr), &sidecarSetHashWithoutImage); err != nil {
+		if err = json.Unmarshal([]byte(oldHashStr), &sidecarSetHashWithoutImage); err != nil {
 			// to be compatible with older sidecarSet hash struct, map[string]string
 			olderSidecarSetHash := make(map[string]string)
 			if err = json.Unmarshal([]byte(oldHashStr), &olderSidecarSetHash); err != nil {
@@ -327,14 +328,20 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			}
 		}
 	}
+	// hotUpgrade work info, sidecarSet.spec.container[x].name -> pod.spec.container[x].name
+	// for example: mesh -> mesh-1, envoy -> envoy-2
+	hotUpgradeWorkInfo := sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(pod)
+	// SidecarSet Name List, for example: log-sidecarset,envoy-sidecarset
+	sidecarSetNames := sets.NewString()
+	if sidecarSetListStr := pod.Annotations[sidecarcontrol.SidecarSetListAnnotation]; sidecarSetListStr != "" {
+		sidecarSetNames.Insert(strings.Split(sidecarSetListStr, ",")...)
+	}
 
-	//matched SidecarSet.Name list
-	sidecarSetNames := make([]string, 0)
 	for _, control := range matchedSidecarSets {
 		sidecarSet := control.GetSidecarset()
 		klog.V(3).Infof("build pod(%s/%s) sidecar containers for sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
 		// sidecarSet List
-		sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
+		sidecarSetNames.Insert(sidecarSet.Name)
 		// pre-process volumes only in sidecar
 		volumesMap := getVolumesMapInSidecarSet(sidecarSet)
 		// process sidecarset hash
@@ -365,12 +372,12 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
 				}
 			}
-
 			//process imagePullSecrets
 			sidecarSecrets = append(sidecarSecrets, sidecarSet.Spec.ImagePullSecrets...)
 		}
 
 		sidecarList := sets.NewString()
+		isInjecting := false
 		//process containers
 		for i := range sidecarSet.Spec.Containers {
 			sidecarContainer := &sidecarSet.Spec.Containers[i]
@@ -401,7 +408,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				klog.V(3).Infof("inject new sidecar container %v during creation in pod %v/%v",
 					sidecarContainer.Name, pod.Namespace, pod.Name)
 			}
-
+			isInjecting = true
 			// insert volume that sidecar container used
 			for _, mount := range sidecarContainer.VolumeMounts {
 				volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
@@ -415,7 +422,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 
 			// when sidecar container UpgradeStrategy is HotUpgrade
 			if sidecarcontrol.IsHotUpgradeContainer(sidecarContainer) {
-				hotContainers, annotations := injectHotUpgradeContainers(pod, sidecarContainer)
+				hotContainers, annotations := injectHotUpgradeContainers(hotUpgradeWorkInfo, sidecarContainer)
 				sidecarContainers = append(sidecarContainers, hotContainers...)
 				for k, v := range annotations {
 					injectedAnnotations[k] = v
@@ -424,11 +431,13 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				sidecarContainers = append(sidecarContainers, sidecarContainer)
 			}
 		}
-
-		setUpgrade1.SidecarList = sidecarList.List()
-		setUpgrade2.SidecarList = sidecarList.List()
-		sidecarSetHash[sidecarSet.Name] = setUpgrade1
-		sidecarSetHashWithoutImage[sidecarSet.Name] = setUpgrade2
+		// the container was (re)injected and the annotations need to be updated
+		if isInjecting {
+			setUpgrade1.SidecarList = sidecarList.List()
+			setUpgrade2.SidecarList = sidecarList.List()
+			sidecarSetHash[sidecarSet.Name] = setUpgrade1
+			sidecarSetHashWithoutImage[sidecarSet.Name] = setUpgrade2
+		}
 	}
 
 	// store sidecarset hash in pod annotations
@@ -436,7 +445,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 	injectedAnnotations[sidecarcontrol.SidecarSetHashAnnotation] = string(by)
 	by, _ = json.Marshal(sidecarSetHashWithoutImage)
 	injectedAnnotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = string(by)
-	sidecarSetNameList := strings.Join(sidecarSetNames, ",")
+	sidecarSetNameList := strings.Join(sidecarSetNames.List(), ",")
 	// store matched sidecarset list in pod annotations
 	injectedAnnotations[sidecarcontrol.SidecarSetListAnnotation] = sidecarSetNameList
 	return sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecars, injectedAnnotations, nil
