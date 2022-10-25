@@ -391,7 +391,7 @@ func wrapEnvGetter(criRuntime criapi.RuntimeService, containerID, logID string) 
 			}
 			lines := strings.Split(strings.TrimSpace(string(stdout)), "\n")
 			for _, l := range lines {
-				words := strings.Split(strings.TrimSpace(l), "=")
+				words := strings.SplitN(strings.TrimSpace(l), "=", 2)
 				if len(words) == 2 {
 					envMap[words[0]] = words[1]
 				}
