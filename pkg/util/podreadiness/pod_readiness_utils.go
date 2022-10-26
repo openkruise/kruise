@@ -46,7 +46,7 @@ func addNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v
 		if condition == nil {
 			_, messages := addMessage("", msg)
 			newPod.Status.Conditions = append(newPod.Status.Conditions, v1.PodCondition{
-				Type:               appspub.KruisePodReadyConditionType,
+				Type:               condType,
 				Message:            messages.dump(),
 				LastTransitionTime: metav1.Now(),
 			})

@@ -82,8 +82,8 @@ spec:
             description: CloneSetSpec defines the desired state of CloneSet
             properties:
               lifecycle:
-                description: Lifecycle defines the lifecycle hooks for Pods pre-delete,
-                  in-place update.
+                description: Lifecycle defines the lifecycle hooks for Pods pre-available(pre-normal),
+                  pre-delete, in-place update.
                 properties:
                   inPlaceUpdate:
                     description: InPlaceUpdate is the hook before Pod to update and
@@ -101,8 +101,9 @@ spec:
                         description: 'MarkPodNotReady = true means: - Pod will be
                           set to ''NotReady'' at preparingDelete/preparingUpdate state.
                           - Pod will be restored to ''Ready'' at Updated state if
-                          it was set to ''NotReady'' at preparingUpdate state. Default
-                          to false.'
+                          it was set to ''NotReady'' at preparingUpdate state. Currently,
+                          MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete
+                          hook. Default to false.'
                         type: boolean
                     type: object
                   preDelete:
@@ -120,8 +121,30 @@ spec:
                         description: 'MarkPodNotReady = true means: - Pod will be
                           set to ''NotReady'' at preparingDelete/preparingUpdate state.
                           - Pod will be restored to ''Ready'' at Updated state if
-                          it was set to ''NotReady'' at preparingUpdate state. Default
-                          to false.'
+                          it was set to ''NotReady'' at preparingUpdate state. Currently,
+                          MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete
+                          hook. Default to false.'
+                        type: boolean
+                    type: object
+                  preNormal:
+                    description: PreNormal is the hook after Pod to be created and
+                      ready to be Normal.
+                    properties:
+                      finalizersHandler:
+                        items:
+                          type: string
+                        type: array
+                      labelsHandler:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      markPodNotReady:
+                        description: 'MarkPodNotReady = true means: - Pod will be
+                          set to ''NotReady'' at preparingDelete/preparingUpdate state.
+                          - Pod will be restored to ''Ready'' at Updated state if
+                          it was set to ''NotReady'' at preparingUpdate state. Currently,
+                          MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete
+                          hook. Default to false.'
                         type: boolean
                     type: object
                 type: object

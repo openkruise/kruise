@@ -168,6 +168,12 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
+	case appspub.LifecycleStatePreparingNormal:
+		if cs.Spec.Lifecycle == nil ||
+			cs.Spec.Lifecycle.PreNormal == nil ||
+			lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.PreNormal, pod) {
+			state = appspub.LifecycleStateNormal
+		}
 	case appspub.LifecycleStateUpdating:
 		if opts.CheckPodUpdateCompleted(pod) == nil {
 			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
@@ -235,7 +241,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 
 		if c.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, coreControl.GetUpdateOptions()) {
 			switch state := lifecycle.GetPodLifecycleState(pod); state {
-			case "", appspub.LifecycleStateNormal:
+			case "", appspub.LifecycleStatePreparingNormal, appspub.LifecycleStateNormal:
 				var err error
 				var updated bool
 				var gotPod *v1.Pod

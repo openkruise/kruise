@@ -172,9 +172,9 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 			continue
 		}
 
-		klog.V(3).Infof("CloneSet %s patch pod %s lifecycle from PreparingDelete to Normal",
+		klog.V(3).Infof("CloneSet %s patch pod %s lifecycle from PreparingDelete to Creating",
 			clonesetutils.GetControllerKey(cs), pod.Name)
-		if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStateNormal, false); err != nil {
+		if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingNormal, false); err != nil {
 			return modified, err
 		} else if updated {
 			modified = true
@@ -214,7 +214,7 @@ func (r *realControl) createPods(
 		if clonesetutils.EqualToRevisionHash("", pod, currentRevision) {
 			cs = currentCS
 		}
-		lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(pod)
+		lifecycle.SetPodLifecycle(appspub.LifecycleStatePreparingNormal)(pod)
 
 		var createErr error
 		if createErr = r.createOnePod(cs, pod, existingPVCNames); createErr != nil {

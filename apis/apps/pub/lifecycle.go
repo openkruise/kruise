@@ -20,6 +20,7 @@ const (
 	LifecycleStateKey     = "lifecycle.apps.kruise.io/state"
 	LifecycleTimestampKey = "lifecycle.apps.kruise.io/timestamp"
 
+	LifecycleStatePreparingNormal LifecycleStateType = "PreparingNormal"
 	LifecycleStateNormal          LifecycleStateType = "Normal"
 	LifecycleStatePreparingUpdate LifecycleStateType = "PreparingUpdate"
 	LifecycleStateUpdating        LifecycleStateType = "Updating"
@@ -35,6 +36,8 @@ type Lifecycle struct {
 	PreDelete *LifecycleHook `json:"preDelete,omitempty"`
 	// InPlaceUpdate is the hook before Pod to update and after Pod has been updated.
 	InPlaceUpdate *LifecycleHook `json:"inPlaceUpdate,omitempty"`
+	// PreNormal is the hook after Pod to be created and ready to be Normal.
+	PreNormal *LifecycleHook `json:"preNormal,omitempty"`
 }
 
 type LifecycleHook struct {
@@ -43,6 +46,7 @@ type LifecycleHook struct {
 	// MarkPodNotReady = true means:
 	// - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
 	// - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+	// Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
 	// Default to false.
 	MarkPodNotReady bool `json:"markPodNotReady,omitempty"`
 }
