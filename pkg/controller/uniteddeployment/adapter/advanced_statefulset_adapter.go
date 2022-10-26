@@ -169,6 +169,7 @@ func (a *AdvancedStatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeploy
 	set.Spec.PodManagementPolicy = ud.Spec.Template.AdvancedStatefulSetTemplate.Spec.PodManagementPolicy
 	set.Spec.ServiceName = ud.Spec.Template.AdvancedStatefulSetTemplate.Spec.ServiceName
 	set.Spec.VolumeClaimTemplates = ud.Spec.Template.AdvancedStatefulSetTemplate.Spec.VolumeClaimTemplates
+	set.Spec.PersistentVolumeClaimRetentionPolicy = ud.Spec.Template.AdvancedStatefulSetTemplate.Spec.PersistentVolumeClaimRetentionPolicy
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
