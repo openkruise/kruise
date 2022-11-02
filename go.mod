@@ -36,6 +36,7 @@ require (
 	k8s.io/component-base v0.22.6
 	k8s.io/component-helpers v0.22.6
 	k8s.io/cri-api v0.22.6
+	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20211109043538-20434351676c
 	k8s.io/kubernetes v1.22.6
@@ -130,7 +131,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	k8s.io/cloud-provider v0.22.6 // indirect
-	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027 // indirect
 	k8s.io/kube-scheduler v0.0.0 // indirect
 	k8s.io/mount-utils v0.22.6 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
