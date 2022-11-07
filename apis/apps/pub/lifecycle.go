@@ -20,11 +20,22 @@ const (
 	LifecycleStateKey     = "lifecycle.apps.kruise.io/state"
 	LifecycleTimestampKey = "lifecycle.apps.kruise.io/timestamp"
 
+	// LifecycleStatePreparingNormal means the Pod is created but unavailable.
+	// It will translate to Normal state if Lifecycle.PreNormal is hooked.
 	LifecycleStatePreparingNormal LifecycleStateType = "PreparingNormal"
-	LifecycleStateNormal          LifecycleStateType = "Normal"
+	// LifecycleStateNormal is a necessary condition for Pod to be available.
+	LifecycleStateNormal LifecycleStateType = "Normal"
+	// LifecycleStatePreparingUpdate means pod is being prepared to update.
+	// It will translate to Updating state if Lifecycle.InPlaceUpdate is Not hooked.
 	LifecycleStatePreparingUpdate LifecycleStateType = "PreparingUpdate"
-	LifecycleStateUpdating        LifecycleStateType = "Updating"
-	LifecycleStateUpdated         LifecycleStateType = "Updated"
+	// LifecycleStateUpdating means the Pod is being updated.
+	// It will translate to Updated state if the in-place update of the Pod is done.
+	LifecycleStateUpdating LifecycleStateType = "Updating"
+	// LifecycleStateUpdated means the Pod is updated, but unavailable.
+	// It will translate to Normal state if Lifecycle.InPlaceUpdate is hooked.
+	LifecycleStateUpdated LifecycleStateType = "Updated"
+	// LifecycleStatePreparingDelete means the Pod is prepared to delete.
+	// The Pod will be deleted by workload if Lifecycle.PreDelete is Not hooked.
 	LifecycleStatePreparingDelete LifecycleStateType = "PreparingDelete"
 )
 

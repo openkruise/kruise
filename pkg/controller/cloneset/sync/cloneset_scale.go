@@ -172,7 +172,7 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 			continue
 		}
 
-		klog.V(3).Infof("CloneSet %s patch pod %s lifecycle from PreparingDelete to Creating",
+		klog.V(3).Infof("CloneSet %s cancel deletion of pod %s, and patch lifecycle from PreparingDelete to PreparingNormal",
 			clonesetutils.GetControllerKey(cs), pod.Name)
 		if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingNormal, false); err != nil {
 			return modified, err
