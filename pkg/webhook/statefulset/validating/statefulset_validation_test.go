@@ -21,9 +21,11 @@ import (
 	"strings"
 	"testing"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilpointer "k8s.io/utils/pointer"
@@ -470,6 +472,231 @@ func TestValidateStatefulSet(t *testing.T) {
 					field != "spec.template.spec.readinessGates" &&
 					field != "spec.podManagementPolicy" &&
 					field != "spec.template.spec.activeDeadlineSeconds" {
+					t.Errorf("%s: missing prefix for: %v", k, errs[i])
+				}
+			}
+		})
+	}
+}
+
+func TestValidateStatefulSetUpdate(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	validPodTemplate1 := v1.PodTemplate{
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				DNSPolicy:     v1.DNSClusterFirst,
+				Containers:    []v1.Container{{Name: "abc", Image: "image:v1", ImagePullPolicy: "IfNotPresent"}},
+			},
+		},
+	}
+	validPodTemplate2 := v1.PodTemplate{
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				DNSPolicy:     v1.DNSClusterFirst,
+				Containers:    []v1.Container{{Name: "abc", Image: "image:v2", ImagePullPolicy: "IfNotPresent"}},
+			},
+		},
+	}
+
+	validVolumeClaimTemplate := func(size string) v1.PersistentVolumeClaim {
+		return v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				StorageClassName: utilpointer.String("foo/bar"),
+				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{Requests: map[v1.ResourceName]resource.Quantity{
+					v1.ResourceStorage: resource.MustParse(size),
+				}},
+			},
+		}
+	}
+
+	successCases := []struct {
+		old *appsv1beta1.StatefulSet
+		new *appsv1beta1.StatefulSet
+	}{
+		{
+			old: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:             utilpointer.Int32Ptr(5),
+					RevisionHistoryLimit: utilpointer.Int32Ptr(5),
+					ReserveOrdinals:      []int{1},
+					Lifecycle:            &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{FinalizersHandler: []string{"foo/bar"}}},
+					Template:             validPodTemplate1.Template,
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("30Gi")},
+					ScaleStrategy:        &appsv1beta1.StatefulSetScaleStrategy{MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{Partition: utilpointer.Int32Ptr(5)},
+					},
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+			new: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:             utilpointer.Int32Ptr(10),
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+					ReserveOrdinals:      []int{2},
+					Lifecycle:            &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{FinalizersHandler: []string{"foo/hello"}}},
+					Template:             validPodTemplate2.Template,
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("60Gi")},
+					ScaleStrategy:        &appsv1beta1.StatefulSetScaleStrategy{MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 2}},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type:          apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{Partition: utilpointer.Int32Ptr(10)},
+					},
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+		},
+	}
+
+	for i, successCase := range successCases {
+		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
+			if errs := ValidateStatefulSetUpdate(successCase.new, successCase.old); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	errorCases := map[string]struct {
+		old *appsv1beta1.StatefulSet
+		new *appsv1beta1.StatefulSet
+	}{
+		"selector changed": {
+			old: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					PodManagementPolicy: "",
+					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Template:            validPodTemplate1.Template,
+					Replicas:            utilpointer.Int32Ptr(1),
+					UpdateStrategy:      appsv1beta1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			new: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					PodManagementPolicy: "",
+					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "bar"}},
+					Template:            validPodTemplate1.Template,
+					Replicas:            utilpointer.Int32Ptr(1),
+					UpdateStrategy:      appsv1beta1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+		},
+		"serviceName changed": {
+			old: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					PodManagementPolicy: "",
+					ServiceName:         "foo",
+					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Template:            validPodTemplate1.Template,
+					Replicas:            utilpointer.Int32Ptr(1),
+					UpdateStrategy:      appsv1beta1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			new: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					PodManagementPolicy: "",
+					ServiceName:         "bar",
+					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Template:            validPodTemplate1.Template,
+					Replicas:            utilpointer.Int32Ptr(1),
+					UpdateStrategy:      appsv1beta1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+		},
+		"podManagementPolicy changed": {
+			old: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					ServiceName:         "bar",
+					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Template:            validPodTemplate1.Template,
+					Replicas:            utilpointer.Int32Ptr(1),
+					UpdateStrategy:      appsv1beta1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			new: &appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "foo",
+					Namespace:       "bar",
+					ResourceVersion: "1",
+				},
+				Spec: appsv1beta1.StatefulSetSpec{
+					PodManagementPolicy: apps.ParallelPodManagement,
+					ServiceName:         "bar",
+					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Template:            validPodTemplate1.Template,
+					Replicas:            utilpointer.Int32Ptr(1),
+					UpdateStrategy:      appsv1beta1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+		},
+	}
+
+	for k, v := range errorCases {
+		t.Run(k, func(t *testing.T) {
+			setTestDefault(v.old)
+			setTestDefault(v.new)
+			errs := ValidateStatefulSetUpdate(v.new, v.old)
+			if len(errs) == 0 {
+				t.Errorf("expected failure for %s", k)
+			}
+
+			for i := range errs {
+				field := errs[i].Field
+				if field != "spec" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
 			}

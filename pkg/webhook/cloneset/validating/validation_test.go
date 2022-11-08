@@ -10,9 +10,11 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -71,6 +73,21 @@ func TestValidate(t *testing.T) {
 				Labels: invalidLabels,
 			},
 		},
+	}
+
+	validVolumeClaimTemplate := func(size string) v1.PersistentVolumeClaim {
+		return v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				StorageClassName: utilpointer.String("foo/bar"),
+				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{Requests: map[v1.ResourceName]resource.Quantity{
+					v1.ResourceStorage: resource.MustParse(size),
+				}},
+			},
+		}
 	}
 
 	var valTrue = true
@@ -171,6 +188,7 @@ func TestValidate(t *testing.T) {
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0"},
 				},
+				VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("30Gi")},
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
@@ -185,7 +203,7 @@ func TestValidate(t *testing.T) {
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p1"},
 				},
-
+				VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("60Gi")},
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
@@ -203,6 +221,7 @@ func TestValidate(t *testing.T) {
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0"},
 				},
+				VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("30Gi")},
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
@@ -217,7 +236,6 @@ func TestValidate(t *testing.T) {
 				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
 					PodsToDelete: []string{},
 				},
-
 				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
