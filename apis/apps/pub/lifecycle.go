@@ -20,10 +20,22 @@ const (
 	LifecycleStateKey     = "lifecycle.apps.kruise.io/state"
 	LifecycleTimestampKey = "lifecycle.apps.kruise.io/timestamp"
 
-	LifecycleStateNormal          LifecycleStateType = "Normal"
+	// LifecycleStatePreparingNormal means the Pod is created but unavailable.
+	// It will translate to Normal state if Lifecycle.PreNormal is hooked.
+	LifecycleStatePreparingNormal LifecycleStateType = "PreparingNormal"
+	// LifecycleStateNormal is a necessary condition for Pod to be available.
+	LifecycleStateNormal LifecycleStateType = "Normal"
+	// LifecycleStatePreparingUpdate means pod is being prepared to update.
+	// It will translate to Updating state if Lifecycle.InPlaceUpdate is Not hooked.
 	LifecycleStatePreparingUpdate LifecycleStateType = "PreparingUpdate"
-	LifecycleStateUpdating        LifecycleStateType = "Updating"
-	LifecycleStateUpdated         LifecycleStateType = "Updated"
+	// LifecycleStateUpdating means the Pod is being updated.
+	// It will translate to Updated state if the in-place update of the Pod is done.
+	LifecycleStateUpdating LifecycleStateType = "Updating"
+	// LifecycleStateUpdated means the Pod is updated, but unavailable.
+	// It will translate to Normal state if Lifecycle.InPlaceUpdate is hooked.
+	LifecycleStateUpdated LifecycleStateType = "Updated"
+	// LifecycleStatePreparingDelete means the Pod is prepared to delete.
+	// The Pod will be deleted by workload if Lifecycle.PreDelete is Not hooked.
 	LifecycleStatePreparingDelete LifecycleStateType = "PreparingDelete"
 )
 
@@ -35,6 +47,8 @@ type Lifecycle struct {
 	PreDelete *LifecycleHook `json:"preDelete,omitempty"`
 	// InPlaceUpdate is the hook before Pod to update and after Pod has been updated.
 	InPlaceUpdate *LifecycleHook `json:"inPlaceUpdate,omitempty"`
+	// PreNormal is the hook after Pod to be created and ready to be Normal.
+	PreNormal *LifecycleHook `json:"preNormal,omitempty"`
 }
 
 type LifecycleHook struct {
@@ -43,6 +57,7 @@ type LifecycleHook struct {
 	// MarkPodNotReady = true means:
 	// - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
 	// - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+	// Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
 	// Default to false.
 	MarkPodNotReady bool `json:"markPodNotReady,omitempty"`
 }

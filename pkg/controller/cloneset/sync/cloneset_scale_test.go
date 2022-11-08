@@ -84,7 +84,7 @@ func TestCreatePods(t *testing.T) {
 					apps.ControllerRevisionHashLabelKey:  "revision_abc",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_abc",
 					"foo":                                "bar",
-					appspub.LifecycleStateKey:            string(appspub.LifecycleStateNormal),
+					appspub.LifecycleStateKey:            string(appspub.LifecycleStatePreparingNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -141,7 +141,7 @@ func TestCreatePods(t *testing.T) {
 					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
 					"foo":                                "bar",
-					appspub.LifecycleStateKey:            string(appspub.LifecycleStateNormal),
+					appspub.LifecycleStateKey:            string(appspub.LifecycleStatePreparingNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -199,7 +199,7 @@ func TestCreatePods(t *testing.T) {
 					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
 					"foo":                                "bar",
-					appspub.LifecycleStateKey:            string(appspub.LifecycleStateNormal),
+					appspub.LifecycleStateKey:            string(appspub.LifecycleStatePreparingNormal),
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{

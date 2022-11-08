@@ -79,7 +79,7 @@ type CloneSetSpec struct {
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 
-	// Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
+	// Lifecycle defines the lifecycle hooks for Pods pre-available(pre-normal), pre-delete, in-place update.
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
 }
 
