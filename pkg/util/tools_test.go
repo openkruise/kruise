@@ -285,6 +285,20 @@ func TestCalculatePartitionReplicas(t *testing.T) {
 			expectedValue: 0,
 			succeeded:     false,
 		},
+		{
+			name:          `replicas=9, partition=0.01%, expected=1, err==nil`,
+			replicas:      pointer.Int32(9),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "0.01%"},
+			expectedValue: 1,
+			succeeded:     true,
+		},
+		{
+			name:          `replicas=999, partition=99.99%, expected=998, err==nil`,
+			replicas:      pointer.Int32(999),
+			partition:     &intstr.IntOrString{Type: intstr.String, StrVal: "99.99%"},
+			expectedValue: 998,
+			succeeded:     true,
+		},
 	}
 
 	for _, cs := range cases {
@@ -297,5 +311,102 @@ func TestCalculatePartitionReplicas(t *testing.T) {
 				t.Errorf("got %#v, expect %#v", calculated, cs.expectedValue)
 			}
 		})
+	}
+}
+
+func TestGetScaledValueFromIntOrPercent(t *testing.T) {
+	tests := []struct {
+		input     intstr.IntOrString
+		total     int
+		roundUp   bool
+		expectErr bool
+		expectVal int
+	}{
+		{
+			input:     intstr.FromInt(123),
+			expectErr: false,
+			expectVal: 123,
+		},
+		{
+			input:     intstr.FromString("90%"),
+			total:     100,
+			roundUp:   true,
+			expectErr: false,
+			expectVal: 90,
+		},
+		{
+			input:     intstr.FromString("90%"),
+			total:     95,
+			roundUp:   true,
+			expectErr: false,
+			expectVal: 86,
+		},
+		{
+			input:     intstr.FromString("90%"),
+			total:     95,
+			roundUp:   false,
+			expectErr: false,
+			expectVal: 85,
+		},
+		{
+			input:     intstr.FromString("99.99%"),
+			total:     999,
+			roundUp:   false,
+			expectErr: false,
+			expectVal: 998,
+		},
+		{
+			input:     intstr.FromString("99.99%"),
+			total:     999,
+			roundUp:   true,
+			expectErr: false,
+			expectVal: 999,
+		},
+		{
+			input:     intstr.FromString("0.01%"),
+			total:     95,
+			roundUp:   false,
+			expectErr: false,
+			expectVal: 0,
+		},
+		{
+			input:     intstr.FromString("0.01%"),
+			total:     95,
+			roundUp:   true,
+			expectErr: false,
+			expectVal: 1,
+		},
+		{
+			input:     intstr.FromString("%"),
+			expectErr: true,
+		},
+		{
+			input:     intstr.FromString("90#"),
+			expectErr: true,
+		},
+		{
+			input:     intstr.FromString("#%"),
+			expectErr: true,
+		},
+		{
+			input:     intstr.FromString("90"),
+			expectErr: true,
+		},
+	}
+
+	for i, test := range tests {
+		t.Logf("test case %d", i)
+		value, err := GetScaledValueFromIntOrPercent(&test.input, test.total, test.roundUp)
+		if test.expectErr && err == nil {
+			t.Errorf("expected error, but got none")
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected err: %v", err)
+			continue
+		}
+		if test.expectVal != value {
+			t.Errorf("expected %v, but got %v", test.expectVal, value)
+		}
 	}
 }

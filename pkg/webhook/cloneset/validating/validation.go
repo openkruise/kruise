@@ -138,7 +138,7 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 			appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType)))
 	}
 
-	partition, err := intstrutil.GetValueFromIntOrPercent(strategy.Partition, replicas, true)
+	partition, err := util.GetScaledValueFromIntOrPercent(strategy.Partition, replicas, true)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), strategy.Partition.String(),
 			fmt.Sprintf("failed getValueFromIntOrPercent for partition: %v", err)))
