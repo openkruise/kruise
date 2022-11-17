@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util/podadapter"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,7 +47,7 @@ func TestPodReadiness(t *testing.T) {
 	msg0 := Message{UserAgent: "ua1", Key: "foo"}
 	msg1 := Message{UserAgent: "ua1", Key: "bar"}
 
-	controller := New(fakeClient)
+	controller := NewForAdapter(&podadapter.AdapterRuntimeClient{Client: fakeClient})
 	AddNotReadyKey := controller.AddNotReadyKey
 	RemoveNotReadyKey := controller.RemoveNotReadyKey
 

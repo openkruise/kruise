@@ -39,10 +39,6 @@ const (
 	preparingUpdateHookKey = "preUpdateHook"
 )
 
-func newPodReadinessControl(adp podadapter.Adapter) podreadiness.Interface {
-	return podreadiness.NewForAdapter(adp)
-}
-
 // Interface for managing pods lifecycle.
 type Interface interface {
 	UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType, markPodNotReady bool) (bool, *v1.Pod, error)
@@ -58,7 +54,7 @@ func New(c client.Client) Interface {
 	adp := &podadapter.AdapterRuntimeClient{Client: c}
 	return &realControl{
 		adp:                 adp,
-		podReadinessControl: newPodReadinessControl(adp),
+		podReadinessControl: podreadiness.NewForAdapter(adp),
 	}
 }
 
@@ -66,7 +62,7 @@ func NewForTypedClient(c clientset.Interface) Interface {
 	adp := &podadapter.AdapterTypedClient{Client: c}
 	return &realControl{
 		adp:                 adp,
-		podReadinessControl: newPodReadinessControl(adp),
+		podReadinessControl: podreadiness.NewForAdapter(adp),
 	}
 }
 
@@ -74,7 +70,7 @@ func NewForInformer(informer coreinformers.PodInformer) Interface {
 	adp := &podadapter.AdapterInformer{PodInformer: informer}
 	return &realControl{
 		adp:                 adp,
-		podReadinessControl: newPodReadinessControl(adp),
+		podReadinessControl: podreadiness.NewForAdapter(adp),
 	}
 }
 

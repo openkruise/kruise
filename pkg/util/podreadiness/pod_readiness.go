@@ -23,16 +23,12 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
 	v1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Interface interface {
+	ContainsReadinessGate(pod *v1.Pod) bool
 	AddNotReadyKey(pod *v1.Pod, msg Message) error
 	RemoveNotReadyKey(pod *v1.Pod, msg Message) error
-}
-
-func New(c client.Client) Interface {
-	return &commonControl{adp: &podadapter.AdapterRuntimeClient{Client: c}}
 }
 
 func NewForAdapter(adp podadapter.Adapter) Interface {
@@ -41,6 +37,10 @@ func NewForAdapter(adp podadapter.Adapter) Interface {
 
 type commonControl struct {
 	adp podadapter.Adapter
+}
+
+func (c *commonControl) ContainsReadinessGate(pod *v1.Pod) bool {
+	return containsReadinessGate(pod, appspub.KruisePodReadyConditionType)
 }
 
 func (c *commonControl) AddNotReadyKey(pod *v1.Pod, msg Message) error {

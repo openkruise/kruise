@@ -283,7 +283,7 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 					continue
 				}
 				words := strings.SplitN(op.Path, "/", 4)
-				if len(words) != 4 && words[2] != "labels" && words[2] != "annotations" {
+				if len(words) != 4 || (words[2] != "labels" && words[2] != "annotations") {
 					continue
 				}
 				key := rfc6901Decoder.Replace(words[3])
