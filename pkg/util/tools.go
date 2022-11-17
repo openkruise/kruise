@@ -18,7 +18,10 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/docker/distribution/reference"
@@ -163,7 +166,7 @@ func CalculatePartitionReplicas(partition *intstrutil.IntOrString, replicasPoint
 	}
 
 	// 'roundUp=true' will ensure at least 1 old pod is reserved if partition > "0%" and replicas > 0.
-	pValue, err := intstrutil.GetScaledValueFromIntOrPercent(partition, replicas, true)
+	pValue, err := GetScaledValueFromIntOrPercent(partition, replicas, true)
 	if err != nil {
 		return pValue, err
 	}
@@ -188,4 +191,34 @@ func IsReferenceEqual(ref1, ref2 appsv1alpha1.TargetReference) bool {
 		return false
 	}
 	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
+}
+
+func GetScaledValueFromIntOrPercent(intOrPercent *intstrutil.IntOrString, total int, roundUp bool) (int, error) {
+	if intOrPercent == nil {
+		return 0, fmt.Errorf("nil value for IntOrString")
+	}
+
+	switch intOrPercent.Type {
+	case intstrutil.Int:
+		return intOrPercent.IntValue(), nil
+	case intstrutil.String:
+		s := intOrPercent.StrVal
+		if strings.HasSuffix(s, "%") {
+			s = strings.TrimSuffix(intOrPercent.StrVal, "%")
+		} else {
+			return 0, fmt.Errorf("invalid type: string is not a percentage")
+		}
+		v, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, err
+		}
+		var value int
+		if roundUp {
+			value = int(math.Ceil(v * (float64(total)) / 100))
+		} else {
+			value = int(math.Floor(v * (float64(total)) / 100))
+		}
+		return value, nil
+	}
+	return 0, fmt.Errorf("invalid type: neither int nor percentage")
 }
