@@ -29,6 +29,7 @@ import (
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/podadapter"
 	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	v1 "k8s.io/api/core/v1"
@@ -75,7 +76,7 @@ func newReconciler(mgr manager.Manager) *ReconcileContainerRecreateRequest {
 	return &ReconcileContainerRecreateRequest{
 		Client:              cli,
 		clock:               clock.RealClock{},
-		podReadinessControl: utilpodreadiness.New(cli),
+		podReadinessControl: utilpodreadiness.NewForAdapter(&podadapter.AdapterRuntimeClient{Client: cli}),
 	}
 }
 
@@ -262,7 +263,7 @@ type syncPatchMetadata struct {
 func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
 	// Note that we should add the finalizer first, then update pod condition, finally patch the label
 
-	if utilpodreadiness.ContainsReadinessGate(pod) {
+	if r.podReadinessControl.ContainsReadinessGate(pod) {
 		if !slice.ContainsString(crr.Finalizers, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				newCRR := &appsv1alpha1.ContainerRecreateRequest{}
@@ -290,7 +291,7 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1
 }
 
 func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
-	if pod != nil && pod.DeletionTimestamp == nil && utilpodreadiness.ContainsReadinessGate(pod) {
+	if pod != nil && pod.DeletionTimestamp == nil && r.podReadinessControl.ContainsReadinessGate(pod) {
 		err := r.podReadinessControl.RemoveNotReadyKey(pod, getReadinessMessage(crr))
 		if err != nil {
 			return fmt.Errorf("remove Pod not ready error: %v", err)
