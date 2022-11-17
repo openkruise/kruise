@@ -51,8 +51,6 @@ var ConflictRetry = wait.Backoff{
 }
 
 const (
-	// Marked pods will not be pub-protected, solving the scenario of force pod deletion
-	PodPubNoProtectionAnnotation = "pub.kruise.io/no-protect"
 	// related-pub annotation in pod
 	PodRelatedPubAnnotation = "kruise.io/related-pub"
 )
@@ -64,8 +62,8 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 	klog.V(3).Infof("validating pod(%s/%s) operation(%s) for PodUnavailableBudget", pod.Namespace, pod.Name, operation)
 	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
 	// and will no longer check the pub quota
-	if pod.Annotations[PodPubNoProtectionAnnotation] == "true" {
-		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, PodPubNoProtectionAnnotation)
+	if pod.Annotations[policyv1alpha1.PodPubNoProtectionAnnotation] == "true" {
+		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, policyv1alpha1.PodPubNoProtectionAnnotation)
 		return true, "", nil
 		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
 	} else if !control.IsPodReady(pod) {
