@@ -34,23 +34,11 @@ import (
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets/status,verbs=get;update;patch
 
-var (
-	// IgnoredNamespaces specifies the namespaces where Pods won't get injected
-	IgnoredNamespaces = []string{"kube-system", "kube-public"}
-)
-
 // parameters:
 // 1. allowed(bool) whether to allow this request
 // 2. reason(string)
 // 3. err(error)
 func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context, req admission.Request) (bool, string, error) {
-	// ignore kube-system, kube-public
-	for _, namespace := range IgnoredNamespaces {
-		if req.Namespace == namespace {
-			return true, "", nil
-		}
-	}
-
 	var checkPod *corev1.Pod
 	var dryRun bool
 	var operation policyv1alpha1.PubOperation
@@ -131,7 +119,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		if err = p.Client.Get(ctx, key, checkPod); err != nil {
 			return false, "", err
 		}
-		operation = policyv1alpha1.PubDeleteOperation
+		operation = policyv1alpha1.PubEvictOperation
 	}
 
 	if checkPod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {

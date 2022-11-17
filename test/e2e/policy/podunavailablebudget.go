@@ -27,7 +27,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -154,7 +153,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			if podIn.Annotations == nil {
 				podIn.Annotations = map[string]string{}
 			}
-			podIn.Annotations[pubcontrol.PodPubNoProtectionAnnotation] = "true"
+			podIn.Annotations[policyv1alpha1.PodPubNoProtectionAnnotation] = "true"
 			_, err = c.CoreV1().Pods(deployment.Namespace).Update(context.TODO(), podIn, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second)
