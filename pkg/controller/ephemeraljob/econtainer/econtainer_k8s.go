@@ -5,15 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/openkruise/kruise/pkg/util"
-	"k8s.io/apimachinery/pkg/types"
-
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kubeclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
 )
 
@@ -134,16 +134,41 @@ func (k *k8sControl) GetEphemeralContainers(targetPod *v1.Pod) []v1.EphemeralCon
 }
 
 func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
-	oldPodJS, _ := json.Marshal(targetPod)
-	newPod := targetPod.DeepCopy()
+	var eContainer []v1.EphemeralContainer
 	for i := range k.Spec.Template.EphemeralContainers {
 		ec := k.Spec.Template.EphemeralContainers[i].DeepCopy()
 		ec.Env = append(ec.Env, v1.EnvVar{
 			Name:  appsv1alpha1.EphemeralContainerEnvKey,
 			Value: string(k.UID),
 		})
-		newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, *ec)
+		eContainer = append(eContainer, *ec)
 	}
+
+	err := k.createEphemeralContainer(targetPod, eContainer)
+	if err != nil {
+		// The apiserver will return a 404 when the EphemeralContainers feature is disabled because the `/ephemeralcontainers` subresource
+		// is missing. Unlike the 404 returned by a missing pod, the status details will be empty.
+		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound && serr.ErrStatus.Details.Name == "" {
+			klog.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
+			return nil
+		}
+
+		// The Kind used for the /ephemeralcontainers subresource changed in 1.22. When presented with an unexpected
+		// Kind the api server will respond with a not-registered error. When this happens we can optimistically try
+		// using the old API.
+		if runtime.IsNotRegisteredError(err) {
+			klog.V(1).Infof("Falling back to legacy ephemeral container API because server returned error: %v", err)
+			return k.createEphemeralContainerLegacy(targetPod, eContainer)
+		}
+	}
+	return err
+}
+
+// createEphemeralContainer adds ephemeral containers using the 1.22 or newer /ephemeralcontainers API.
+func (k *k8sControl) createEphemeralContainer(targetPod *v1.Pod, eContainer []v1.EphemeralContainer) error {
+	oldPodJS, _ := json.Marshal(targetPod)
+	newPod := targetPod.DeepCopy()
+	newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, eContainer...)
 	newPodJS, _ := json.Marshal(newPod)
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(oldPodJS, newPodJS, &v1.Pod{})
@@ -156,6 +181,32 @@ func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
 	kubeClient := kubeclient.GetGenericClient().KubeClient
 	_, err = kubeClient.CoreV1().Pods(targetPod.Namespace).
 		Patch(context.TODO(), targetPod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
+	return err
+}
+
+// createEphemeralContainerLegacy adds ephemeral containers using the pre-1.22 /ephemeralcontainers API
+// This may be removed when we no longer wish to support releases prior to 1.22.
+func (k *k8sControl) createEphemeralContainerLegacy(targetPod *v1.Pod, eContainer []v1.EphemeralContainer) error {
+	var body []map[string]interface{}
+	for _, ec := range eContainer {
+		body = append(body, map[string]interface{}{
+			"op":    "add",
+			"path":  "/ephemeralContainers/-",
+			"value": ec,
+		})
+	}
+
+	// We no longer have the v1.EphemeralContainers Kind since it was removed in 1.22, but
+	// we can present a JSON 6902 patch that the api server will apply.
+	patch, err := json.Marshal(body)
+	if err != nil {
+		klog.Errorf("error creating JSON 6902 patch for old /ephemeralcontainers API: %s", err)
+		return nil
+	}
+
+	kubeClient := kubeclient.GetGenericClient().KubeClient
+	_, err = kubeClient.CoreV1().Pods(targetPod.Namespace).
+		Patch(context.TODO(), targetPod.Name, types.JSONPatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
 	return err
 }
 
