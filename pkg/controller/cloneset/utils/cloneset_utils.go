@@ -22,12 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +30,13 @@ import (
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/requeueduration"
 )
 
 var (
@@ -93,20 +94,52 @@ func GetControllerKey(cs *appsv1alpha1.CloneSet) string {
 
 // GetActivePods returns all active pods in this namespace.
 func GetActivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, error) {
-	podList := &v1.PodList{}
-	if err := reader.List(context.TODO(), podList, opts, utilclient.DisableDeepCopy); err != nil {
+	podList, err := GetAllPods(reader, opts)
+	if err != nil {
 		return nil, err
 	}
 
 	// Ignore inactive pods
 	var activePods []*v1.Pod
-	for i, pod := range podList.Items {
+	for i := range podList {
+		pod := podList[i]
 		// Consider all rebuild pod as active pod, should not recreate
-		if kubecontroller.IsPodActive(&pod) {
-			activePods = append(activePods, &podList.Items[i])
+		if kubecontroller.IsPodActive(pod) {
+			activePods = append(activePods, pod)
 		}
 	}
 	return activePods, nil
+}
+
+func GetActiveAndInactivePods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, []*v1.Pod, error) {
+	podList, err := GetAllPods(reader, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	var activePods, inactivePods []*v1.Pod
+	for i := range podList {
+		pod := podList[i]
+		if kubecontroller.IsPodActive(pod) {
+			activePods = append(activePods, pod)
+		} else {
+			inactivePods = append(inactivePods, pod)
+		}
+	}
+	return activePods, inactivePods, nil
+}
+
+// GetAllPods returns all pods in this namespace.
+func GetAllPods(reader client.Reader, opts *client.ListOptions) ([]*v1.Pod, error) {
+	podList := &v1.PodList{}
+	if err := reader.List(context.TODO(), podList, opts, utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+
+	var pods []*v1.Pod
+	for i := range podList.Items {
+		pods = append(pods, &podList.Items[i])
+	}
+	return pods, nil
 }
 
 // NextRevision finds the next valid revision number based on revisions. If the length of revisions
@@ -164,6 +197,10 @@ func UpdateStorage(cs *appsv1alpha1.CloneSet, pod *v1.Pod) {
 		}
 	}
 	pod.Spec.Volumes = newVolumes
+}
+
+func GetInstanceID(obj metav1.Object) string {
+	return obj.GetLabels()[appsv1alpha1.CloneSetInstanceID]
 }
 
 // GetPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The

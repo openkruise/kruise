@@ -23,6 +23,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -30,10 +35,6 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 )
 
 const (
