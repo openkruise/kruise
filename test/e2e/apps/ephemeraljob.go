@@ -32,8 +32,8 @@ var _ = SIGDescribe("EphemeralJob", func() {
 
 		if v, err := c.Discovery().ServerVersion(); err != nil {
 			framework.Logf("Failed to discovery server version: %v", err)
-		} else if minor, err := strconv.Atoi(v.Minor); err != nil || minor < 22 {
-			ginkgo.Skip("Skip EphemeralJob e2e for currently it can only run in K8s >= 1.22, got " + v.String())
+		} else if minor, err := strconv.Atoi(v.Minor); err != nil || minor < 20 {
+			ginkgo.Skip("Skip EphemeralJob e2e for currently it can only run in K8s >= 1.20, got " + v.String())
 		}
 
 		tester = framework.NewEphemeralJobTester(c, kc, ns)
