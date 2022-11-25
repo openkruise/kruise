@@ -70,7 +70,7 @@ func getParentName(pod *v1.Pod) string {
 	return parent
 }
 
-//  getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
+// getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
 func getOrdinal(pod *v1.Pod) int {
 	_, ordinal := getParentNameAndOrdinal(pod)
 	return ordinal
@@ -687,5 +687,5 @@ func decreaseAndCheckMaxUnavailable(maxUnavailable *int) bool {
 	}
 	val := *maxUnavailable - 1
 	*maxUnavailable = val
-	return val <= 0
+	return val < 0
 }
