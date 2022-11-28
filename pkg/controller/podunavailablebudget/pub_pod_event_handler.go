@@ -202,6 +202,7 @@ func (e *SetEnqueueRequestForPUB) Update(evt event.UpdateEvent, q workqueue.Rate
 
 // Delete implements EventHandler
 func (e *SetEnqueueRequestForPUB) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	e.addSetRequest(evt.Object, q)
 }
 
 // Generic implements EventHandler
@@ -240,23 +241,21 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 			targetRef.Name, namespace = obj.Name, obj.Namespace
 			temLabels = obj.Spec.Template.Labels
 		}
-	default:
-		return
 	}
-
 	// fetch matched pub
 	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
 	if err := e.mgr.GetClient().List(context.TODO(), pubList, &client.ListOptions{Namespace: namespace}); err != nil {
 		klog.Errorf("SetEnqueueRequestForPUB list pub failed: %s", err.Error())
 		return
 	}
-	var matchedPubs []policyv1alpha1.PodUnavailableBudget
+	var matched policyv1alpha1.PodUnavailableBudget
 	for _, pub := range pubList.Items {
 		// if targetReference isn't nil, priority to take effect
 		if pub.Spec.TargetReference != nil {
 			// belongs the same workload
 			if pubcontrol.IsReferenceEqual(targetRef, pub.Spec.TargetReference) {
-				matchedPubs = append(matchedPubs, pub)
+				matched = pub
+				break
 			}
 		} else {
 			// This error is irreversible, so continue
@@ -268,18 +267,17 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 			if labelSelector.Empty() || !labelSelector.Matches(labels.Set(temLabels)) {
 				continue
 			}
-			matchedPubs = append(matchedPubs, pub)
+			matched = pub
+			break
 		}
 	}
 
-	for _, pub := range matchedPubs {
-		q.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      pub.Name,
-				Namespace: pub.Namespace,
-			},
-		})
-		klog.V(3).Infof("workload(%s/%s) replicas changed, and reconcile pub(%s/%s)",
-			namespace, targetRef.Name, pub.Namespace, pub.Name)
-	}
+	q.Add(reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      matched.Name,
+			Namespace: matched.Namespace,
+		},
+	})
+	klog.V(3).Infof("workload(%s/%s) changed, and reconcile pub(%s/%s)",
+		namespace, targetRef.Name, matched.Namespace, matched.Name)
 }

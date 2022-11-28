@@ -56,8 +56,9 @@ var (
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "pub-test",
+			Namespace:   "default",
+			Name:        "pub-test",
+			Annotations: map[string]string{},
 		},
 		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
@@ -262,7 +263,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "select matched deployment, selector and maxUnavailable 30%",
+			name: "select matched deployment(Deletion), selector and maxUnavailable 30%",
 			getPods: func() []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; int32(i) < *deploymentDemo.Spec.Replicas; i++ {
@@ -273,7 +274,10 @@ func TestPubReconcile(t *testing.T) {
 				return matchedPods
 			},
 			getDeployment: func() *apps.Deployment {
-				return deploymentDemo.DeepCopy()
+				obj := deploymentDemo.DeepCopy()
+				t := metav1.Now()
+				obj.DeletionTimestamp = &t
+				return obj
 			},
 			getReplicaSet: func() *apps.ReplicaSet {
 				return replicaSetDemo.DeepCopy()
@@ -285,10 +289,10 @@ func TestPubReconcile(t *testing.T) {
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
 				return policyv1alpha1.PodUnavailableBudgetStatus{
-					UnavailableAllowed: 3,
+					UnavailableAllowed: 0,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
-					DesiredAvailable:   7,
-					TotalReplicas:      *deploymentDemo.Spec.Replicas,
+					DesiredAvailable:   0,
+					TotalReplicas:      0,
 				}
 			},
 		},
@@ -353,7 +357,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
 				return policyv1alpha1.PodUnavailableBudgetStatus{
-					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
+					UnavailableAllowed: 0,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
 					TotalReplicas:      *deploymentDemo.Spec.Replicas,
@@ -387,7 +391,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
 				return policyv1alpha1.PodUnavailableBudgetStatus{
-					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
+					UnavailableAllowed: 0,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
 					TotalReplicas:      *deploymentDemo.Spec.Replicas,
@@ -754,6 +758,66 @@ func TestPubReconcile(t *testing.T) {
 				return *status
 			},
 		},
+		{
+			name: "test select matched deployment, 10 UnavailablePods(5 ready), 10 DisruptionPods(5 delay) and 5 deletion",
+			getPods: func() []*corev1.Pod {
+				var matchedPods []*corev1.Pod
+				for i := 0; i < 100; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = nil
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					if i >= 20 && i < 25 {
+						pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+					}
+					matchedPods = append(matchedPods, pod)
+				}
+				return matchedPods
+			},
+			getDeployment: func() *apps.Deployment {
+				object := deploymentDemo.DeepCopy()
+				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				return object
+			},
+			getReplicaSet: func() *apps.ReplicaSet {
+				object := replicaSetDemo.DeepCopy()
+				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				return object
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+
+				pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] = "50"
+				for i := 0; i < 10; i++ {
+					if i >= 0 && i < 5 {
+						pub.Status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Time{Time: time.Now().Add(-10 * time.Second)}
+					} else {
+						pub.Status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
+					}
+				}
+				for i := 10; i < 20; i++ {
+					if i >= 10 && i < 15 {
+						pub.Status.DisruptedPods[fmt.Sprintf("test-pod-%d", i)] = metav1.Time{Time: time.Now().Add(-125 * time.Second)}
+					} else {
+						pub.Status.DisruptedPods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
+					}
+				}
+				return pub
+			},
+			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+				status := pubDemo.Status.DeepCopy()
+				for i := 5; i < 10; i++ {
+					status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
+				}
+				for i := 15; i < 20; i++ {
+					status.DisruptedPods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
+				}
+				status.TotalReplicas = 50
+				status.DesiredAvailable = 35
+				status.CurrentAvailable = 85
+				status.UnavailableAllowed = 50
+				return *status
+			},
+		},
 	}
 
 	for _, cs := range cases {
@@ -774,7 +838,6 @@ func TestPubReconcile(t *testing.T) {
 				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
 				pubControl:       pubcontrol.NewPubControl(fakeClient),
 			}
-
 			_, err := reconciler.syncPodUnavailableBudget(pub)
 			if err != nil {
 				t.Fatalf("sync PodUnavailableBudget failed: %s", err.Error())
@@ -784,7 +847,7 @@ func TestPubReconcile(t *testing.T) {
 				t.Fatalf("getLatestPub failed: %s", err.Error())
 			}
 			if !isPubStatusEqual(cs.expectPubStatus(), newPub.Status) {
-				t.Fatalf("expect pub status(%v) but get(%v)", cs.expectPubStatus(), newPub.Status)
+				t.Fatalf("expect pub status(%s) but get(%s)", util.DumpJSON(cs.expectPubStatus()), util.DumpJSON(newPub.Status))
 			}
 			_ = util.GlobalCache.Delete(pub)
 		})

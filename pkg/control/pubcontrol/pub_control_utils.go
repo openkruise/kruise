@@ -78,6 +78,9 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 		// if there is no matching PodUnavailableBudget, just return true
 	} else if pub == nil {
 		return true, "", nil
+		// if desired available == 0, then allow all request
+	} else if pub.Status.DesiredAvailable == 0 {
+		return true, "", nil
 	} else if !isNeedPubProtection(pub, operation) {
 		klog.V(3).Infof("pod(%s/%s) operation(%s) is not in pub(%s) protection", pod.Namespace, pod.Name, pub.Name)
 		return true, "", nil

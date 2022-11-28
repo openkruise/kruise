@@ -120,9 +120,10 @@ func (r *ControllerFinder) GetExpectedScaleForPods(pods []*corev1.Pod) (int32, e
 		workload, err := r.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, ref.UID)
 		if err != nil && !errors.IsNotFound(err) {
 			return 0, err
-		}
-		if workload != nil && workload.Metadata.DeletionTimestamp.IsZero() {
-			controllerScale[workload.UID] = workload.Scale
+		} else if workload != nil && workload.Metadata.DeletionTimestamp.IsZero() {
+			controllerScale[ref.UID] = workload.Scale
+		} else {
+			controllerScale[ref.UID] = 0
 		}
 	}
 

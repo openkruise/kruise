@@ -44,7 +44,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		if err != nil {
 			return nil, -1, err
 		}
-		if rs == nil {
+		if rs == nil || !rs.DeletionTimestamp.IsZero() {
 			return nil, 0, nil
 		}
 		workloadReplicas = *rs.Spec.Replicas
@@ -54,7 +54,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
 		if err != nil {
 			return nil, -1, err
-		} else if obj == nil {
+		} else if obj == nil || !obj.Metadata.DeletionTimestamp.IsZero() {
 			return nil, 0, nil
 		}
 		workloadReplicas = obj.Scale
@@ -64,7 +64,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
 		if err != nil {
 			return nil, -1, err
-		} else if obj == nil {
+		} else if obj == nil || !obj.Metadata.DeletionTimestamp.IsZero() {
 			return nil, 0, nil
 		}
 		workloadReplicas = obj.Scale

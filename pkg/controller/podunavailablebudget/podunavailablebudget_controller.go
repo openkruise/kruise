@@ -145,6 +145,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 			return false
 		},
+		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+			return true
+		},
 	}); err != nil {
 		return err
 	}
@@ -158,6 +161,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				return true
 			}
 			return false
+		},
+		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+			return true
 		},
 	}); err != nil {
 		return err
@@ -173,6 +179,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 			return false
 		},
+		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+			return true
+		},
 	}); err != nil {
 		return err
 	}
@@ -186,6 +195,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				return true
 			}
 			return false
+		},
+		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+			return true
 		},
 	}); err != nil {
 		return err
@@ -301,7 +313,6 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 			} else {
 				pubClone = pub.DeepCopy()
 			}
-
 			informerCached := &policyv1alpha1.PodUnavailableBudget{}
 			if err := r.Get(context.TODO(), types.NamespacedName{Namespace: pub.Namespace,
 				Name: pub.Name}, informerCached); err == nil {

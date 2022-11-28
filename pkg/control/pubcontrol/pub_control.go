@@ -19,6 +19,7 @@ package pubcontrol
 import (
 	"context"
 	"reflect"
+	"strconv"
 	"strings"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -92,7 +93,6 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 	if err = c.List(context.TODO(), podList, listOptions, utilclient.DisableDeepCopy); err != nil {
 		return nil, 0, err
 	}
-
 	matchedPods := make([]*corev1.Pod, 0, len(podList.Items))
 	for i := range podList.Items {
 		pod := &podList.Items[i]
@@ -103,6 +103,10 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 	expectedCount, err := c.controllerFinder.GetExpectedScaleForPods(matchedPods)
 	if err != nil {
 		return nil, 0, err
+	}
+	if expectedCount == 0 && pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] != "" {
+		expectedCount, _ := strconv.ParseInt(pub.Annotations[policyv1alpha1.PubProtectTotalReplicas], 10, 32)
+		return matchedPods, int32(expectedCount), nil
 	}
 	return matchedPods, expectedCount, nil
 }
