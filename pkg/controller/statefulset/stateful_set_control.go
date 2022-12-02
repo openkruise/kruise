@@ -527,6 +527,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				}
 			}
 
+			// if we find no more Pods can be created, no more work can be done this round
+			if decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				break
+			}
+
 			lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(replicas[i])
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
 				msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
@@ -542,7 +547,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				status.UpdatedReplicas++
 			}
 			// if the set does not allow bursting, return immediately
-			if monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+			if monotonic {
 				return &status, nil
 			}
 			// pod created, no more work possible for this round
