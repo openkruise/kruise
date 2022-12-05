@@ -194,8 +194,9 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneS
 	clone.Spec.MinReadySeconds = oldCloneSet.Spec.MinReadySeconds
 	clone.Spec.Lifecycle = oldCloneSet.Spec.Lifecycle
 	clone.Spec.RevisionHistoryLimit = oldCloneSet.Spec.RevisionHistoryLimit
+	clone.Spec.VolumeClaimTemplates = oldCloneSet.Spec.VolumeClaimTemplates
 	if !apiequality.Semantic.DeepEqual(clone.Spec, oldCloneSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'lifecycle', 'scaleStrategy', 'updateStrategy', 'minReadySeconds' and 'revisionHistoryLimit' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'lifecycle', 'scaleStrategy', 'updateStrategy', 'minReadySeconds', 'volumeClaimTemplates' and 'revisionHistoryLimit' are forbidden"))
 	}
 
 	coreControl := clonesetcore.New(cloneSet)
