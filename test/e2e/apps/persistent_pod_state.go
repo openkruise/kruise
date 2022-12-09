@@ -19,6 +19,9 @@ package apps
 import (
 	"context"
 	"fmt"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -41,14 +44,18 @@ var _ = SIGDescribe("PersistentPodState", func() {
 	f := framework.NewDefaultFramework("persistentpodstates")
 	var ns string
 	var c clientset.Interface
+	var a apiextensionsclientset.Interface
+	var d dynamic.Interface
 	var kc kruiseclientset.Interface
 	var tester *framework.PersistentPodStateTester
 
 	ginkgo.BeforeEach(func() {
+		a = f.ApiExtensionsClientSet
 		c = f.ClientSet
+		d = f.DynamicClient
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
-		tester = framework.NewPersistentPodStateTester(c, kc)
+		tester = framework.NewPersistentPodStateTester(c, kc, d, a)
 	})
 
 	framework.KruiseDescribe("PersistentPodState functionality", func() {
@@ -297,6 +304,61 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			ginkgo.By("statefulset node topology done")
+		})
+
+		ginkgo.It("statefulsetlike node topology", func() {
+			crdExist, err := tester.CheckStatefulsetLikeCRDExist()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			if !crdExist {
+				ginkgo.By("crd statefilsetlike.kruise.io not exist, skip")
+				return
+			}
+			// create statefulset
+			tester.AddStatefulsetLikeClusterRoleConf()
+			sts := tester.NewBaseStatefulsetLikeTest(ns)
+			sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] = "true"
+			sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] = podStateOsTopologyLabel
+			sts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] = podStateNodeTopologyLabel
+			sts.Annotations[appsv1alpha1.AnnotationPersistentPodAnnotations] = "name"
+			ginkgo.By(fmt.Sprintf("Creating Statefulset like %s", sts.Name))
+			tester.CreateStatefulsetLikeCRD(ns)
+			sts = tester.CreateStatefulsetLike(sts)
+			tester.CreateDynamicWatchWhiteList([]schema.GroupVersionKind{schema.GroupVersionKind{
+				Group:   framework.StatefulSetLikeTestKind.Group,
+				Kind:    framework.StatefulSetLikeTestKind.Kind,
+				Version: framework.StatefulSetLikeTestKind.Version,
+			}})
+			tester.CreateStatefulsetLikePods(sts)
+			ginkgo.By(fmt.Sprintf("check PersistentPodState(%s/%s)", sts.Namespace, sts.Name))
+			tester.UpdateStatefulsetLikeStatus(sts)
+			time.Sleep(time.Second * 10)
+
+			// check PersistentPodState in staticIP
+			pods, err := tester.ListPodsInNamespace(sts.Namespace)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
+			staticIP, err := kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
+			currentStates := staticIP.Status.DeepCopy().PodStates
+			for _, pod := range pods {
+				podState, ok := staticIP.Status.PodStates[pod.Name]
+				gomega.Expect(ok).To(gomega.Equal(true))
+				gomega.Expect(podState.NodeTopologyLabels).To(gomega.HaveLen(2))
+				node, err := c.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				for k, v := range podState.NodeTopologyLabels {
+					gomega.Expect(v).To(gomega.Equal(node.Labels[k]))
+				}
+				gomega.Expect(podState.NodeName).To(gomega.Equal(node.Name))
+			}
+
+			gomega.Expect(currentStates).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
+			for _, state := range currentStates {
+				gomega.Expect(state.Annotations).To(gomega.HaveLen(1))
+			}
+
+			ginkgo.By("statefulsetlike node topology done")
 		})
 	})
 })

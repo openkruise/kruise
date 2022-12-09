@@ -23,6 +23,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/openkruise/kruise/pkg/util/configuration"
+
+	ctrlUtil "github.com/openkruise/kruise/pkg/controller/util"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -100,7 +104,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetClient(), client: mgr.GetClient()}); err != nil {
 		return err
 	}
 
@@ -117,6 +121,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// watch for changes to kruise StatefulSet
 	if err = c.Watch(&source.Kind{Type: &appsv1beta1.StatefulSet{}}, &enqueueRequestForKruiseStatefulSet{reader: mgr.GetClient()}); err != nil {
 		return err
+	}
+
+	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(mgr.GetClient())
+	if err != nil {
+		return err
+	}
+	if whiteList != nil {
+		workloadHandler := &enqueueRequestForStatefulSetLike{reader: mgr.GetClient()}
+		for _, workload := range whiteList.Workloads {
+			if _, err := ctrlUtil.AddWatcherDynamically(c, workloadHandler, workload); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -168,10 +185,8 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 		}
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
-	} else if persistentPodState.Spec.TargetReference.Kind != "StatefulSet" {
-		klog.Warningf("persistentPodState(%s/%s) TargetReference is invalid", persistentPodState.Namespace, persistentPodState.Name)
-		return ctrl.Result{}, nil
 	}
+
 	klog.V(3).Infof("begin to reconcile PersistentPodState(%s/%s)", persistentPodState.Namespace, persistentPodState.Name)
 	pods, innerSts, err := r.getPodsAndStatefulset(persistentPodState)
 	if err != nil {
@@ -199,6 +214,12 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 	for _, item := range persistentPodState.Spec.PreferredPersistentTopology {
 		nodeTopologyKeys.Insert(item.Preference.NodeTopologyKeys...)
 	}
+
+	annotationKeys := sets.NewString()
+	for _, item := range persistentPodState.Spec.PersistentPodAnnotations {
+		annotationKeys.Insert(item.Key)
+	}
+
 	// create sts scenario
 	for _, pod := range pods {
 		// 1. pod not ready, continue
@@ -211,13 +232,18 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 			for key := range podState.NodeTopologyLabels {
 				currentKeys.Insert(key)
 			}
+			currentAns := sets.NewString()
+			for _, key := range podState.Annotations {
+				currentAns.Insert(key)
+			}
+
 			// already recorded, no need to regenerate
-			if podState.NodeName == pod.Spec.NodeName && nodeTopologyKeys.Equal(currentKeys) {
+			if podState.NodeName == pod.Spec.NodeName && nodeTopologyKeys.Equal(currentKeys) && annotationKeys.Equal(currentAns) {
 				continue
 			}
 		}
 		// 3. create new pod state
-		newState, err := r.getPodState(pod, nodeTopologyKeys)
+		newState, err := r.getPodState(pod, nodeTopologyKeys, annotationKeys)
 		if err != nil {
 			continue
 		}
@@ -301,10 +327,11 @@ func (p *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *
 	return matchedPods, inner, nil
 }
 
-func (r *ReconcilePersistentPodState) getPodState(pod *corev1.Pod, nodeTopologyKeys sets.String) (appsv1alpha1.PodState, error) {
+func (r *ReconcilePersistentPodState) getPodState(pod *corev1.Pod, nodeTopologyKeys sets.String, annotationKeys sets.String) (appsv1alpha1.PodState, error) {
 	// pod state
 	podState := appsv1alpha1.PodState{
 		NodeTopologyLabels: map[string]string{},
+		Annotations:        map[string]string{},
 	}
 	//get node of pod
 	node := &corev1.Node{}
@@ -317,6 +344,11 @@ func (r *ReconcilePersistentPodState) getPodState(pod *corev1.Pod, nodeTopologyK
 	for _, key := range nodeTopologyKeys.List() {
 		if val, ok := node.Labels[key]; ok {
 			podState.NodeTopologyLabels[key] = val
+		}
+	}
+	for _, key := range annotationKeys.List() {
+		if val, ok := pod.Annotations[key]; ok {
+			podState.Annotations[key] = val
 		}
 	}
 	return podState, nil
@@ -446,6 +478,16 @@ func newStatefulSetPersistentPodState(workload *controllerfinder.ScaleAndSelecto
 			NodeTopologyKeys: requiredTopologyKeys,
 		}
 	}
+
+	// persistent pod annotations
+	if workload.Metadata.Annotations[appsv1alpha1.AnnotationPersistentPodAnnotations] != "" {
+		annotationKeys := strings.Split(workload.Metadata.Annotations[appsv1alpha1.AnnotationPersistentPodAnnotations], ",")
+		for _, key := range annotationKeys {
+			obj.Spec.PersistentPodAnnotations = append(obj.Spec.PersistentPodAnnotations,
+				appsv1alpha1.PersistentPodAnnotation{Key: key})
+		}
+	}
+
 	// preferred topology term
 	if workload.Metadata.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != "" {
 		preferredTopologyKeys := strings.Split(workload.Metadata.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology], ",")
