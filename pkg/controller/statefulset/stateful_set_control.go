@@ -527,7 +527,12 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				}
 			}
 
-			lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(replicas[i])
+			if  set.Spec.Lifecycle != nil && set.Spec.Lifecycle.PreNormal != nil && lifecycle.IsPodAllHooked(set.Spec.Lifecycle.PreNormal, replicas[i]) {
+				lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(replicas[i])
+			} else {
+				lifecycle.SetPodLifecycle(appspub.LifecycleStatePreparingNormal)(replicas[i])
+			}
+
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
 				msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
 				condition := NewStatefulsetCondition(appsv1beta1.FailedCreatePod, v1.ConditionTrue, "", msg)
@@ -832,6 +837,12 @@ func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulS
 
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
+	case appspub.LifecycleStatePreparingNormal:
+		if set.Spec.Lifecycle == nil ||
+			set.Spec.Lifecycle.PreNormal == nil ||
+			lifecycle.IsPodAllHooked(set.Spec.Lifecycle.PreNormal, pod) {
+			state = appspub.LifecycleStateNormal
+		}
 	case appspub.LifecycleStateUpdating:
 		if opts.CheckPodUpdateCompleted(pod) == nil {
 			if set.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
