@@ -527,11 +527,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				}
 			}
 
-			// if we find no more Pods can be created, no more work can be done this round
-			if decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
-				break
-			}
-
 			lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(replicas[i])
 			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
 				msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
@@ -549,19 +544,23 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			// if the set does not allow bursting, return immediately
 			if monotonic {
 				return &status, nil
+			} else if decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				break
 			}
 			// pod created, no more work possible for this round
 			continue
 		}
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
 		// completes before we continue to make progress.
-		if isTerminating(replicas[i]) && (monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable)) {
+		if isTerminating(replicas[i]) && monotonic {
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to Terminate",
 				set.Namespace,
 				set.Name,
 				replicas[i].Name)
 			return &status, nil
+		} else if isTerminating(replicas[i]) && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+			break
 		}
 		// Update InPlaceUpdateReady condition for pod
 		if res := ssc.inplaceControl.Refresh(replicas[i], nil); res.RefreshErr != nil {
@@ -576,7 +575,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// ordinal, are Running and Available.
 		if monotonic || scaleMaxUnavailable != nil {
 			isAvailable, waitTime := isRunningAndAvailable(replicas[i], minReadySeconds)
-			if !isAvailable && (monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable)) {
+			if !isAvailable && monotonic {
 				if waitTime > 0 {
 					// make sure we check later
 					durationStore.Push(getStatefulSetKey(set), waitTime)
@@ -596,6 +595,12 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 						replicas[i].Name)
 				}
 				return &status, nil
+			} else if !isAvailable && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				if waitTime > 0 {
+					// make sure we check later
+					durationStore.Push(getStatefulSetKey(set), waitTime)
+				}
+				break
 			}
 		}
 		// Enforce the StatefulSet invariants

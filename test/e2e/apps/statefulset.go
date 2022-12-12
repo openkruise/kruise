@@ -31,11 +31,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -1030,6 +1032,82 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
+		})
+
+		/*
+			Testname: StatefulSet, ScaleStrategy
+			Description: StatefulSet resource MUST support the MaxUnavailable ScaleStrategy for scaling.
+			It only affects when create new pod, terminating pod and unavailable pod at the Parallel PodManagementPolicy.
+		*/
+		framework.ConformanceIt("Should can update pods when the statefulset scale strategy is set", func() {
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			maxUnavailable := intstr.FromInt(2)
+			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
+			ss.Spec.Template.Spec.Containers[0].Name = "busybox"
+			ss.Spec.Template.Spec.Containers[0].Image = BusyboxImage
+			ss.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "3600"}
+			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
+			ss.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyAlways
+			ss.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{
+				MinReadySeconds: pointer.Int32(3),
+				PodUpdatePolicy: appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
+			}
+			ss.Spec.ScaleStrategy = &appsv1beta1.StatefulSetScaleStrategy{MaxUnavailable: &maxUnavailable}
+			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
+			sst := framework.NewStatefulSetTester(c, kc)
+			// sst.SetHTTPProbe(ss)
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+
+			ginkgo.By("Scaling up stateful set " + ssName + " to 10 replicas and check create new pod equal MaxUnavailable")
+			sst.UpdateReplicas(ss, 10)
+			sst.ConfirmStatefulPodCount(5, ss, time.Second, false)
+			sst.WaitForRunningAndReady(10, ss)
+
+			ginkgo.By("Confirming that stateful can update all pods to be unhealthy")
+			maxUnavailable = intstr.FromString("100%")
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+				update.Spec.ScaleStrategy.MaxUnavailable = &maxUnavailable
+				update.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
+				update.Spec.Template.Spec.Containers[0].Command = []string{}
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			sst.WaitForRunningAndNotReady(10, ss)
+			sst.WaitForStatusReadyReplicas(ss, 0)
+			ss = sst.WaitForStatus(ss)
+
+			ginkgo.By("Confirming that stateful can update all pods if any stateful pod is unhealthy")
+
+			ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+				update.Spec.Template.Labels["test-update"] = "yes"
+				update.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "180"}
+			})
+			sst.WaitForRunningAndReady(10, ss)
+			sst.WaitForStatusReadyReplicas(ss, 10)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			var pods *v1.PodList
+			sst.WaitForState(ss, func(set *appsv1beta1.StatefulSet, pl *v1.PodList) (bool, error) {
+				ss = set
+				pods = pl
+				sst.SortStatefulPods(pods)
+				for i := range pods.Items {
+					if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
+						framework.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+							pods.Items[i].Namespace,
+							pods.Items[i].Name,
+							set.Status.UpdateRevision,
+							pods.Items[i].Labels[apps.StatefulSetRevisionLabel])
+						return false, nil
+					}
+				}
+				return true, nil
+			})
+
+			ginkgo.By("Confirming Pods were updated successful")
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Labels["test-update"]).To(gomega.Equal("yes"))
+			}
 		})
 	})
 

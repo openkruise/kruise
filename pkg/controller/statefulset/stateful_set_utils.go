@@ -687,5 +687,5 @@ func decreaseAndCheckMaxUnavailable(maxUnavailable *int) bool {
 	}
 	val := *maxUnavailable - 1
 	*maxUnavailable = val
-	return val < 0
+	return val <= 0
 }
