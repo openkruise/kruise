@@ -153,7 +153,29 @@ func TestValidatingPub(t *testing.T) {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "DELETE"
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubEvictOperation + "," + policyv1alpha1.PubDeleteOperation)
+				return pub
+			},
+			expectErrList: 0,
+		},
+		{
+			name: "invalid pub feature-gate annotation",
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.MinAvailable = nil
+				pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] = "%%"
+				return pub
+			},
+			expectErrList: 1,
+		},
+		{
+			name: "valid pub feature-gate annotation",
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.MinAvailable = nil
+				pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] = "1000"
 				return pub
 			},
 			expectErrList: 0,

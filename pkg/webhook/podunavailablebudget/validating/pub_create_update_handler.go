@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
@@ -88,11 +89,18 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudget
 	if operationsValue, ok := obj.Annotations[policyv1alpha1.PubProtectOperationAnnotation]; ok {
 		operations := strings.Split(operationsValue, ",")
 		for _, operation := range operations {
-			if operation != string(admissionv1.Update) && operation != string(admissionv1.Delete) {
+			if operation != string(policyv1alpha1.PubUpdateOperation) && operation != string(policyv1alpha1.PubDeleteOperation) &&
+				operation != string(policyv1alpha1.PubEvictOperation) {
 				allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectOperationAnnotation)))
 			}
 		}
 	}
+	if replicasValue, ok := obj.Annotations[policyv1alpha1.PubProtectTotalReplicas]; ok {
+		if _, err := strconv.ParseInt(replicasValue, 10, 32); err != nil {
+			allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectTotalReplicas)))
+		}
+	}
+
 	//validate Pub.Spec
 	allErrs = append(allErrs, validatePodUnavailableBudgetSpec(obj, field.NewPath("spec"))...)
 	// when operation is update, validating whether old and new pub conflict

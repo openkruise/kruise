@@ -35,6 +35,9 @@ const (
 	PubUpdateOperation PubOperation = "UPDATE"
 	PubDeleteOperation PubOperation = "DELETE"
 	PubEvictOperation  PubOperation = "EVICT"
+	// PubProtectTotalReplicas indicates the pub protected total replicas, rather than workload.spec.replicas.
+	// and must be used with pub.spec.selector.
+	PubProtectTotalReplicas = "pub.kruise.io/protect-total-replicas"
 	// Marked the pod will not be pub-protected, solving the scenario of force pod deletion
 	PodPubNoProtectionAnnotation = "pub.kruise.io/no-protect"
 )

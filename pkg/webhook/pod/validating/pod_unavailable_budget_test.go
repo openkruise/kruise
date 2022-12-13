@@ -624,6 +624,43 @@ func TestValidateEvictPodForPub(t *testing.T) {
 				return pubStatus
 			},
 		},
+		{
+			name: "evict pod, allow",
+			eviction: func() *policy.Eviction {
+				return &policy.Eviction{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-0",
+						Namespace: "default",
+					},
+					DeleteOptions: &metav1.DeleteOptions{},
+				}
+			},
+			newPod: func() *corev1.Pod {
+				podIn := podDemo.DeepCopy()
+				return podIn
+			},
+			pub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Status = policyv1alpha1.PodUnavailableBudgetStatus{
+					TotalReplicas:      0,
+					DesiredAvailable:   0,
+					CurrentAvailable:   10,
+					UnavailableAllowed: 0,
+				}
+				return pub
+			},
+			subresource: "eviction",
+			expectAllow: true,
+			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+				pubStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
+					TotalReplicas:      0,
+					DesiredAvailable:   0,
+					CurrentAvailable:   10,
+					UnavailableAllowed: 0,
+				}
+				return pubStatus
+			},
+		},
 	}
 
 	for _, cs := range cases {

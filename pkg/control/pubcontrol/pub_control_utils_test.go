@@ -68,6 +68,7 @@ var (
 			UnavailablePods:    map[string]metav1.Time{},
 			DisruptedPods:      map[string]metav1.Time{},
 			UnavailableAllowed: 0,
+			DesiredAvailable:   1,
 		},
 	}
 

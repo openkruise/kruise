@@ -125,15 +125,5 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	if checkPod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
 		return true, "", nil
 	}
-
-	// Get the workload corresponding to the pod, if it has been deleted then it is not protected
-	if ref := metav1.GetControllerOf(checkPod); ref != nil {
-		workload, err := p.finders.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, checkPod.Namespace, ref.Name, ref.UID)
-		if err != nil {
-			return false, "", err
-		} else if workload == nil || !workload.Metadata.DeletionTimestamp.IsZero() {
-			return true, "", nil
-		}
-	}
 	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, p.pubControl, checkPod, operation, dryRun)
 }
