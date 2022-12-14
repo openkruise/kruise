@@ -560,6 +560,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				replicas[i].Name)
 			return &status, nil
 		} else if isTerminating(replicas[i]) && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+			klog.V(4).Infof(
+				"StatefulSet %s/%s Pod %s is Terminating, and break pods scale",
+				set.Namespace,
+				set.Name,
+				replicas[i].Name)
 			break
 		}
 		// Update InPlaceUpdateReady condition for pod
@@ -596,6 +601,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				}
 				return &status, nil
 			} else if !isAvailable && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				klog.V(4).Infof(
+					"StatefulSet %s/%s Pod %s is unavailable, and break pods scale",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name)
 				if waitTime > 0 {
 					// make sure we check later
 					durationStore.Push(getStatefulSetKey(set), waitTime)
