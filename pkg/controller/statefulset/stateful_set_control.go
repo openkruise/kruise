@@ -545,6 +545,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			if monotonic {
 				return &status, nil
 			} else if decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				klog.V(4).Infof(
+					"StatefulSet %s/%s Pod %s is Creating, and break pods scale",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name)
 				break
 			}
 			// pod created, no more work possible for this round
