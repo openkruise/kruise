@@ -289,7 +289,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
 				return policyv1alpha1.PodUnavailableBudgetStatus{
-					UnavailableAllowed: 0,
+					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
 					TotalReplicas:      0,
@@ -357,7 +357,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
 				return policyv1alpha1.PodUnavailableBudgetStatus{
-					UnavailableAllowed: 0,
+					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
 					TotalReplicas:      *deploymentDemo.Spec.Replicas,
@@ -391,7 +391,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
 				return policyv1alpha1.PodUnavailableBudgetStatus{
-					UnavailableAllowed: 0,
+					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
 					TotalReplicas:      *deploymentDemo.Spec.Replicas,
@@ -823,6 +823,7 @@ func TestPubReconcile(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			pub := cs.getPub()
+			defer util.GlobalCache.Delete(pub)
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), cs.getReplicaSet(), pub).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
@@ -849,7 +850,6 @@ func TestPubReconcile(t *testing.T) {
 			if !isPubStatusEqual(cs.expectPubStatus(), newPub.Status) {
 				t.Fatalf("expect pub status(%s) but get(%s)", util.DumpJSON(cs.expectPubStatus()), util.DumpJSON(newPub.Status))
 			}
-			_ = util.GlobalCache.Delete(pub)
 		})
 	}
 }
