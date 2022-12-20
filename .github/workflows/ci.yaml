@@ -25,7 +25,7 @@ jobs:
   golangci-lint:
     runs-on: ubuntu-18.04
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v3
         with:
           submodules: true
@@ -49,6 +49,18 @@ jobs:
           args: --verbose
           skip-pkg-cache: true
           mod: readonly
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL'
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   markdownlint-misspell-shellcheck:
     runs-on: ubuntu-18.04

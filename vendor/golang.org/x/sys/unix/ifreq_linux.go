@@ -8,7 +8,6 @@
 package unix
 
 import (
-	"bytes"
 	"unsafe"
 )
 
@@ -41,17 +40,51 @@ func NewIfreq(name string) (*Ifreq, error) {
 	return &Ifreq{raw: ifr}, nil
 }
 
-// TODO(mdlayher): get/set methods for sockaddr, char array, etc.
+// TODO(mdlayher): get/set methods for hardware address sockaddr, char array, etc.
 
 // Name returns the interface name associated with the Ifreq.
 func (ifr *Ifreq) Name() string {
-	// BytePtrToString requires a NULL terminator or the program may crash. If
-	// one is not present, just return the empty string.
-	if !bytes.Contains(ifr.raw.Ifrn[:], []byte{0x00}) {
-		return ""
+	return ByteSliceToString(ifr.raw.Ifrn[:])
+}
+
+// According to netdevice(7), only AF_INET addresses are returned for numerous
+// sockaddr ioctls. For convenience, we expose these as Inet4Addr since the Port
+// field and other data is always empty.
+
+// Inet4Addr returns the Ifreq union data from an embedded sockaddr as a C
+// in_addr/Go []byte (4-byte IPv4 address) value. If the sockaddr family is not
+// AF_INET, an error is returned.
+func (ifr *Ifreq) Inet4Addr() ([]byte, error) {
+	raw := *(*RawSockaddrInet4)(unsafe.Pointer(&ifr.raw.Ifru[:SizeofSockaddrInet4][0]))
+	if raw.Family != AF_INET {
+		// Cannot safely interpret raw.Addr bytes as an IPv4 address.
+		return nil, EINVAL
 	}
 
-	return BytePtrToString(&ifr.raw.Ifrn[0])
+	return raw.Addr[:], nil
+}
+
+// SetInet4Addr sets a C in_addr/Go []byte (4-byte IPv4 address) value in an
+// embedded sockaddr within the Ifreq's union data. v must be 4 bytes in length
+// or an error will be returned.
+func (ifr *Ifreq) SetInet4Addr(v []byte) error {
+	if len(v) != 4 {
+		return EINVAL
+	}
+
+	var addr [4]byte
+	copy(addr[:], v)
+
+	ifr.clear()
+	*(*RawSockaddrInet4)(
+		unsafe.Pointer(&ifr.raw.Ifru[:SizeofSockaddrInet4][0]),
+	) = RawSockaddrInet4{
+		// Always set IP family as ioctls would require it anyway.
+		Family: AF_INET,
+		Addr:   addr,
+	}
+
+	return nil
 }
 
 // Uint16 returns the Ifreq union data as a C short/Go uint16 value.
