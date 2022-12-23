@@ -7,7 +7,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,7 +25,8 @@ import (
 var _ handler.EventHandler = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct {
-	reader client.Reader
+	reader            client.Reader
+	sidecarSetControl sidecarcontrol.SidecarControl
 }
 
 func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -87,7 +88,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		//check whether pod status is changed
 		if isChanged = isPodStatusChanged(oldPod, newPod); !isChanged {
 			//check whether pod consistent is changed
-			isChanged, enqueueDelayTime = isPodConsistentChanged(oldPod, newPod, sidecarSet)
+			isChanged, enqueueDelayTime = p.isPodConsistentChanged(oldPod, newPod, sidecarSet)
 		}
 		if isChanged {
 			q.AddAfter(reconcile.Request{
@@ -167,12 +168,11 @@ func isPodStatusChanged(oldPod, newPod *corev1.Pod) bool {
 	return false
 }
 
-func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, time.Duration) {
-	control := sidecarcontrol.New(sidecarSet)
+func (p *enqueueRequestForPod) isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, time.Duration) {
 	var enqueueDelayTime time.Duration
 	// contain sidecar empty container
-	oldConsistent := control.IsPodStateConsistent(oldPod, nil)
-	newConsistent := control.IsPodStateConsistent(newPod, nil)
+	oldConsistent := p.sidecarSetControl.IsPodStateConsistent(oldPod, sidecarSet, nil)
+	newConsistent := p.sidecarSetControl.IsPodStateConsistent(newPod, sidecarSet, nil)
 	if oldConsistent != newConsistent {
 		klog.V(3).Infof("pod(%s/%s) sidecar containers consistent changed(from %v to %v), and reconcile sidecarSet(%s)",
 			newPod.Namespace, newPod.Name, oldConsistent, newConsistent, sidecarSet.Name)

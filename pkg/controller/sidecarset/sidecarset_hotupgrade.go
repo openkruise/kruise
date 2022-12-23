@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,9 +31,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (p *Processor) flipHotUpgradingContainers(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) error {
+func (p *Processor) flipHotUpgradingContainers(sidecarSet *appsv1alpha1.SidecarSet, pods []*corev1.Pod) error {
 	for _, pod := range pods {
-		if err := p.flipPodSidecarContainer(control, pod); err != nil {
+		if err := p.flipPodSidecarContainer(sidecarSet, pod); err != nil {
 			p.recorder.Eventf(pod, corev1.EventTypeWarning, "ResetContainerFailed", fmt.Sprintf("reset sidecar container image empty failed: %s", err.Error()))
 			return err
 		}
@@ -42,11 +42,11 @@ func (p *Processor) flipHotUpgradingContainers(control sidecarcontrol.SidecarCon
 	return nil
 }
 
-func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev1.Pod) error {
+func (p *Processor) flipPodSidecarContainer(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) error {
 	podClone := pod.DeepCopy()
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// sidecar container hot upgrade already complete, and flip container
-		flipPodSidecarContainerDo(control, podClone)
+		p.flipPodSidecarContainerDo(sidecarSet, podClone)
 		// update pod in store
 		updateErr := p.Client.Update(context.TODO(), podClone)
 		if updateErr == nil {
@@ -66,8 +66,7 @@ func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarContro
 	return err
 }
 
-func flipPodSidecarContainerDo(control sidecarcontrol.SidecarControl, pod *corev1.Pod) {
-	sidecarSet := control.GetSidecarset()
+func (p *Processor) flipPodSidecarContainerDo(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) {
 	containersInPod := make(map[string]*corev1.Container)
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
@@ -93,7 +92,7 @@ func flipPodSidecarContainerDo(control sidecarcontrol.SidecarControl, pod *corev
 		}
 	}
 	// record the updated container status, to determine if the update is complete
-	control.UpdatePodAnnotationsInUpgrade(changedContainer, pod)
+	p.sidecarSetControl.UpdatePodAnnotationsInUpgrade(changedContainer, pod, sidecarSet)
 }
 
 func isSidecarSetHasHotUpgradeContainer(sidecarSet *appsv1alpha1.SidecarSet) bool {

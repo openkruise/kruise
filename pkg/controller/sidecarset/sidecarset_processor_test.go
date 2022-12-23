@@ -24,14 +24,15 @@ import (
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-
+	"github.com/openkruise/utils/sidecarcontrol"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -178,7 +179,9 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 			pods := cs.getPods()
 			sidecarset := cs.getSidecarset()
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pods[0], pods[1]).Build()
-			processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			k8sclient := &k8sfake.Clientset{}
+			processor := NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10))
 			_, err := processor.UpdateSidecarSet(sidecarset)
 			if err != nil {
 				t.Errorf("processor update sidecarset failed: %s", err.Error())
@@ -254,7 +257,9 @@ func TestScopeNamespacePods(t *testing.T) {
 		fakeClient.Create(context.TODO(), pod)
 	}
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
+	processor := NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10))
 	pods, err := processor.getMatchingPods(sidecarSet)
 	if err != nil {
 		t.Fatalf("getMatchingPods failed: %s", err.Error())
@@ -285,8 +290,9 @@ func TestCanUpgradePods(t *testing.T) {
 		}
 		fakeClient.Create(context.TODO(), pods[i])
 	}
-
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
+	processor := NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10))
 	_, err := processor.UpdateSidecarSet(sidecarSet)
 	if err != nil {
 		t.Errorf("processor update sidecarset failed: %s", err.Error())
@@ -319,7 +325,9 @@ func TestGetActiveRevisions(t *testing.T) {
 	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
+	processor := NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10))
 
 	// case 1
 	latestRevision, _, err := processor.registerLatestRevision(sidecarSet, nil)
@@ -327,7 +335,7 @@ func TestGetActiveRevisions(t *testing.T) {
 		t.Fatalf("in case of create: get active revision failed when the latest revision = 1, err: %v, actual latestRevision: %v",
 			err, latestRevision.Revision)
 	}
-
+	_ = indexer.Add(latestRevision)
 	// case 2
 	newSidecar := sidecarSet.DeepCopy()
 	newSidecar.Spec.InitContainers = []appsv1alpha1.SidecarContainer{
@@ -358,7 +366,7 @@ func TestGetActiveRevisions(t *testing.T) {
 			t.Fatalf("failed to store revision, err: %v", err)
 		}
 	}
-
+	_ = indexer.Add(latestRevision)
 	// case 3
 	for i := 0; i < 5; i++ {
 		latestRevision, _, err = processor.registerLatestRevision(sidecarSet, nil)
@@ -367,18 +375,35 @@ func TestGetActiveRevisions(t *testing.T) {
 				err, latestRevision.Revision)
 		}
 	}
-
+	_ = indexer.Add(latestRevision)
 	// case 4
 	for i := 0; i < 100; i++ {
 		sidecarSet.Spec.Containers[0].Image = fmt.Sprintf("%d", i)
-		if _, _, err = processor.registerLatestRevision(sidecarSet, nil); err != nil {
+		if latestRevision, _, err = processor.registerLatestRevision(sidecarSet, nil); err != nil {
 			t.Fatalf("unexpected error, err: %v", err)
+		} else {
+			_ = indexer.Add(latestRevision)
+			objList := indexer.List()
+			var revisions []*apps.ControllerRevision
+			for _, obj := range objList {
+				revision := obj.(*apps.ControllerRevision)
+				revisions = append(revisions, revision)
+			}
+			history.SortControllerRevisions(revisions)
+			revisionCount := len(revisions)
+			limitation := int(*sidecarSet.Spec.RevisionHistoryLimit)
+			if revisionCount <= limitation {
+				continue
+			}
+			deletionCount := revisionCount - limitation
+			for i := 0; i < revisionCount-1 && deletionCount > 0; i++ {
+				indexer.Delete(revisions[i])
+				deletionCount--
+			}
 		}
 	}
-	revisionList := &apps.ControllerRevisionList{}
-	processor.Client.List(context.TODO(), revisionList)
-	if len(revisionList.Items) != int(*sidecarSet.Spec.RevisionHistoryLimit) {
-		t.Fatalf("in case of maxStoredRevisions: get wrong number of revisions, expected %d, actual %d", *sidecarSet.Spec.RevisionHistoryLimit, len(revisionList.Items))
+	if len(indexer.List()) != int(*sidecarSet.Spec.RevisionHistoryLimit) {
+		t.Fatalf("in case of maxStoredRevisions: get wrong number of revisions, expected %d, actual %d", *sidecarSet.Spec.RevisionHistoryLimit, len(indexer.List()))
 	}
 }
 
@@ -434,7 +459,9 @@ func TestTruncateHistory(t *testing.T) {
 	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
+	processor := NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10))
 
 	getName := func(i int) string {
 		return "sidecar-" + strconv.Itoa(i)
@@ -467,7 +494,7 @@ func TestTruncateHistory(t *testing.T) {
 	// check successful cases
 	for i := 1; i <= 9; i++ {
 		pods, revisions := reset(i)
-		err := processor.truncateHistory(revisions, sidecarSet, pods)
+		_, err := processor.truncateHistory(revisions, sidecarSet, pods)
 		if err != nil {
 			t.Fatalf("expected revision len: %d, err: %v", 10, err)
 		}
@@ -478,7 +505,7 @@ func TestTruncateHistory(t *testing.T) {
 	expectedResults := []int{11, 12, 15, 15, 15}
 	for i := range failedCases {
 		pods, revisions := reset(failedCases[i])
-		err := processor.truncateHistory(revisions, sidecarSet, pods)
+		_, err := processor.truncateHistory(revisions, sidecarSet, pods)
 		if err == nil || err.Error() != stderr(expectedResults[i]) {
 			t.Fatalf("expected revision len: %d, err: %v", expectedResults[i], err)
 		}
@@ -486,25 +513,24 @@ func TestTruncateHistory(t *testing.T) {
 
 	// check revisions exactly
 	pods, revisions := reset(8)
-	for _, rv := range revisions {
-		if err := processor.Client.Create(context.TODO(), rv); err != nil {
-			t.Fatalf("failed to create revisions")
-		}
+	for i := range revisions {
+		_ = indexer.Add(revisions[i])
 	}
-	if err := processor.truncateHistory(revisions, sidecarSet, pods); err != nil {
+	deleteRevisions, err := processor.truncateHistory(revisions, sidecarSet, pods)
+	if err != nil {
 		t.Fatalf("failed to truncate revisions, err %v", err)
 	}
-	list := &apps.ControllerRevisionList{}
-	if err := processor.Client.List(context.TODO(), list); err != nil {
-		t.Fatalf("failed to list revisions, err %v", err)
+	for i := range deleteRevisions {
+		_ = indexer.Delete(deleteRevisions[i])
 	}
-	if len(list.Items) != 10 {
-		t.Fatalf("expected revision len: %d, actual: %d", 10, len(list.Items))
+	if len(indexer.List()) != 10 {
+		t.Fatalf("expected revision len: %d, actual: %d", 10, len(indexer.List()))
 	}
 	// sort history by revision field
 	rvs := make([]*apps.ControllerRevision, 0)
-	for i := range list.Items {
-		rvs = append(rvs, &list.Items[i])
+	for _, obj := range indexer.List() {
+		revision := obj.(*apps.ControllerRevision)
+		rvs = append(rvs, revision)
 	}
 	history.SortControllerRevisions(rvs)
 

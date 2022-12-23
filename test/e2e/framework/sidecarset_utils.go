@@ -22,9 +22,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"

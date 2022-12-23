@@ -32,7 +32,7 @@ func SidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	h := rand.SafeEncodeString(hash(encoded))
+	h := rand.SafeEncodeString(fmt.Sprintf("%x", sha256.Sum256([]byte(encoded))))
 	return h, nil
 }
 
@@ -47,7 +47,7 @@ func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, er
 	if err != nil {
 		return "", err
 	}
-	return rand.SafeEncodeString(hash(encoded)), nil
+	return rand.SafeEncodeString(fmt.Sprintf("%x", sha256.Sum256([]byte(encoded)))), nil
 }
 
 func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
@@ -59,9 +59,4 @@ func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 		return "", err
 	}
 	return string(data), nil
-}
-
-// hash hashes `data` with sha256 and returns the hex string
-func hash(data string) string {
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
 }

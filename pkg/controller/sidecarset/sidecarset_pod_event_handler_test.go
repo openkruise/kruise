@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
@@ -34,7 +34,7 @@ import (
 
 func TestPodEventHandler(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-	handler := enqueueRequestForPod{reader: fakeClient}
+	handler := enqueueRequestForPod{reader: fakeClient, sidecarSetControl: sidecarcontrol.NewCommonControl(nil, "")}
 
 	err := fakeClient.Create(context.TODO(), sidecarSetDemo.DeepCopy())
 	if nil != err {
@@ -160,9 +160,9 @@ func TestGetPodMatchedSidecarSets(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod).Build()
 			sidecarSets := cs.getSidecarSets()
 			for _, sidecarSet := range sidecarSets {
-				fakeClient.Create(context.TODO(), sidecarSet)
+				_ = fakeClient.Create(context.TODO(), sidecarSet)
 			}
-			e := enqueueRequestForPod{fakeClient}
+			e := enqueueRequestForPod{fakeClient, sidecarcontrol.NewCommonControl(nil, "")}
 			matched, err := e.getPodMatchedSidecarSets(pod)
 			if err != nil {
 				t.Fatalf("getPodMatchedSidecarSets failed: %s", err.Error())

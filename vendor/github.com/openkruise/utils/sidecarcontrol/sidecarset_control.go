@@ -21,40 +21,44 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-
+	"github.com/openkruise/utils"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
 
+// NewCommonControl new sidecarSet control
+// indexer is controllerRevision indexer
+// If you need GetSuitableRevisionSidecarSet function, you must set indexer, namespace parameters
+// otherwise you don't need to set any parameters
+func NewCommonControl(indexer cache.Indexer, namespace string) SidecarControl {
+	c := &commonControl{}
+	if indexer != nil {
+		c.historyControl = NewHistoryControl(nil, indexer, namespace)
+	}
+	return c
+}
+
 type commonControl struct {
-	*appsv1alpha1.SidecarSet
+	historyControl HistoryControl
 }
 
-func (c *commonControl) GetSidecarset() *appsv1alpha1.SidecarSet {
-	return c.SidecarSet
-}
-
-func (c *commonControl) IsActiveSidecarSet() bool {
-	return true
-}
-
-func (c *commonControl) UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container {
+func (c *commonControl) UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) *v1.Container {
 	var nameToUpgrade, otherContainer, oldImage string
 	if IsHotUpgradeContainer(sidecarContainer) {
-		nameToUpgrade, otherContainer = findContainerToHotUpgrade(sidecarContainer, pod, c)
-		oldImage = util.GetContainer(otherContainer, pod).Image
+		nameToUpgrade, otherContainer = c.FindContainerToHotUpgrade(sidecarContainer, pod, sidecarSet)
+		oldImage = utils.GetContainer(otherContainer, pod).Image
 	} else {
 		nameToUpgrade = sidecarContainer.Name
-		oldImage = util.GetContainer(nameToUpgrade, pod).Image
+		oldImage = utils.GetContainer(nameToUpgrade, pod).Image
 	}
 	// community in-place upgrades are only allowed to update image
 	if sidecarContainer.Image == oldImage {
 		return nil
 	}
-	container := util.GetContainer(nameToUpgrade, pod)
+	container := utils.GetContainer(nameToUpgrade, pod)
 	container.Image = sidecarContainer.Image
 	klog.V(3).Infof("upgrade pod(%s/%s) container(%s) Image from(%s) -> to(%s)", pod.Namespace, pod.Name, nameToUpgrade, oldImage, container.Image)
 	return container
@@ -70,8 +74,7 @@ func (c *commonControl) NeedToInjectInUpdatedPod(pod, oldPod *v1.Pod, sidecarCon
 	return false, nil, nil
 }
 
-func (c *commonControl) IsPodReady(pod *v1.Pod) bool {
-	sidecarSet := c.GetSidecarset()
+func (c *commonControl) IsPodReady(pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) bool {
 	// check whether hot upgrade is complete
 	// map[string]string: {empty container name}->{sidecarSet.spec.containers[x].upgradeStrategy.HotUpgradeEmptyImage}
 	emptyContainers := map[string]string{}
@@ -92,11 +95,10 @@ func (c *commonControl) IsPodReady(pod *v1.Pod) bool {
 
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
-	return util.IsRunningAndReady(pod)
+	return utils.IsRunningAndReady(pod)
 }
 
-func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod) {
-	sidecarSet := c.GetSidecarset()
+func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) {
 	// record the ImageID, before update pod sidecar container
 	// if it is changed, indicates the update is complete.
 	//format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
@@ -140,18 +142,16 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 }
 
 // only check sidecar container is consistent
-func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets.String) bool {
+func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet, sidecarContainers sets.String) bool {
 	if len(pod.Spec.Containers) != len(pod.Status.ContainerStatuses) {
 		return false
 	}
-
-	sidecarset := c.GetSidecarset()
 	if sidecarContainers.Len() == 0 {
-		sidecarContainers = GetSidecarContainersInPod(sidecarset)
+		sidecarContainers = GetSidecarContainersInPod(sidecarSet)
 	}
 
 	allDigestImage := true
-	cImageIDs := util.GetPodContainerImageIDs(pod)
+	cImageIDs := utils.GetPodContainerImageIDs(pod)
 	for _, container := range pod.Spec.Containers {
 		// only check whether sidecar container is consistent
 		if !sidecarContainers.Has(container.Name) {
@@ -160,7 +160,7 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 
 		//whether image is digest format,
 		//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
-		if !util.IsImageDigest(container.Image) {
+		if !utils.IsImageDigest(container.Image) {
 			allDigestImage = false
 			break
 		}
@@ -169,7 +169,7 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 		if !ok {
 			return false
 		}
-		if !util.IsContainerImageEqual(container.Image, imageID) {
+		if !utils.IsContainerImageEqual(container.Image, imageID) {
 			return false
 		}
 	}
@@ -179,17 +179,15 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 	}
 
 	// check container InpalceUpdate status
-	return IsSidecarContainerUpdateCompleted(pod, sets.NewString(sidecarset.Name), sidecarContainers)
+	return IsSidecarContainerUpdateCompleted(pod, sets.NewString(sidecarSet.Name), sidecarContainers)
 }
 
 // k8s only allow modify pod.spec.container[x].image,
 // only when annotations[SidecarSetHashWithoutImageAnnotation] is the same, sidecarSet can upgrade pods
-func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
-	sidecarSet := c.GetSidecarset()
+func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) bool {
 	if GetPodSidecarSetWithoutImageRevision(sidecarSet.Name, pod) != GetSidecarSetWithoutImageRevision(sidecarSet) {
 		return false
 	}
-
 	// cStatus: container.name -> containerStatus.Ready
 	cStatus := map[string]bool{}
 	for _, status := range pod.Status.ContainerStatuses {
@@ -200,7 +198,7 @@ func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
 		// when containerStatus.Ready == true and container non-consistent,
 		// indicates that sidecar container is in the process of being upgraded
 		// wait for the last upgrade to complete before performing this upgrade
-		if cStatus[sidecar] && !c.IsPodStateConsistent(pod, sets.NewString(sidecar)) {
+		if cStatus[sidecar] && !c.IsPodStateConsistent(pod, sidecarSet, sets.NewString(sidecar)) {
 			return false
 		}
 	}
@@ -210,6 +208,37 @@ func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
 
 func (c *commonControl) IsPodAvailabilityChanged(pod, oldPod *v1.Pod) bool {
 	return false
+}
+
+// para1: nameToUpgrade, para2: otherContainer
+func (c *commonControl) FindContainerToHotUpgrade(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (string, string) {
+	containerInPods := make(map[string]v1.Container)
+	for _, containerInPod := range pod.Spec.Containers {
+		containerInPods[containerInPod.Name] = containerInPod
+	}
+	name1, name2 := GetHotUpgradeContainerName(sidecarContainer.Name)
+	c1, c2 := containerInPods[name1], containerInPods[name2]
+
+	// First, empty hot sidecar container will be upgraded with the latest sidecarSet specification
+	if c1.Image == sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage {
+		return c1.Name, c2.Name
+	} else if c2.Image == sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage {
+		return c2.Name, c1.Name
+	}
+
+	// Second, Not ready sidecar container will be upgraded
+	c1Ready := utils.GetContainerStatus(c1.Name, pod).Ready && c.IsPodStateConsistent(pod, sidecarSet, sets.NewString(c1.Name))
+	c2Ready := utils.GetContainerStatus(c2.Name, pod).Ready && c.IsPodStateConsistent(pod, sidecarSet, sets.NewString(c2.Name))
+	klog.V(3).Infof("pod(%s/%s) container(%s) ready(%v) container(%s) ready(%v)", pod.Namespace, pod.Name, c1.Name, c1Ready, c2.Name, c2Ready)
+	if c1Ready && !c2Ready {
+		return c2.Name, c1.Name
+	} else if !c1Ready && c2Ready {
+		return c1.Name, c2.Name
+	}
+
+	// Third, the older sidecar container will be upgraded
+	workContianer, olderContainer := GetPodHotUpgradeContainers(sidecarContainer.Name, pod)
+	return olderContainer, workContianer
 }
 
 // isContainerInplaceUpdateCompleted checks whether imageID in container status has been changed since in-place update.
@@ -264,4 +293,12 @@ func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets
 	}
 
 	return true
+}
+
+func (c *commonControl) GetSuitableRevisionSidecarSet(sidecarSet *appsv1alpha1.SidecarSet, oldPod, newPod *v1.Pod) (*appsv1alpha1.SidecarSet, error) {
+	// If historyControl is nil, then don't support get suitable revision sidecarSet, and return current obj.
+	if c.historyControl == nil {
+		return sidecarSet.DeepCopy(), nil
+	}
+	return c.historyControl.GetSuitableRevisionSidecarSet(sidecarSet, oldPod, newPod)
 }

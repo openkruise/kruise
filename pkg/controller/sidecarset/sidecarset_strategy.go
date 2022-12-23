@@ -4,9 +4,9 @@ import (
 	"sort"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/updatesort"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -22,24 +22,23 @@ type Strategy interface {
 	//2. Sort Pods with default sequence
 	//3. sort waitUpdateIndexes based on the scatter rules
 	//4. calculate max count of pods can update with maxUnavailable
-	GetNextUpgradePods(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) []*corev1.Pod
+	GetNextUpgradePods(sidecarSet *appsv1alpha1.SidecarSet, pods []*corev1.Pod) []*corev1.Pod
 }
 
-type spreadingStrategy struct{}
-
-var (
-	globalSpreadingStrategy = &spreadingStrategy{}
-)
-
-func NewStrategy() Strategy {
-	return globalSpreadingStrategy
+type spreadingStrategy struct {
+	sidecarSetControl sidecarcontrol.SidecarControl
 }
 
-func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) (upgradePods []*corev1.Pod) {
-	sidecarset := control.GetSidecarset()
+func NewStrategy(control sidecarcontrol.SidecarControl) Strategy {
+	return &spreadingStrategy{
+		sidecarSetControl: control,
+	}
+}
+
+func (p *spreadingStrategy) GetNextUpgradePods(sidecarSet *appsv1alpha1.SidecarSet, pods []*corev1.Pod) (upgradePods []*corev1.Pod) {
 	// wait to upgrade pod index
 	var waitUpgradedIndexes []int
-	strategy := sidecarset.Spec.UpdateStrategy
+	strategy := sidecarSet.Spec.UpdateStrategy
 
 	// If selector is not nil, check whether the pods is selected to upgrade
 	isSelected := func(pod *corev1.Pod) bool {
@@ -50,7 +49,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 		// if selector failed, always return false
 		selector, err := util.ValidatedLabelSelectorAsSelector(strategy.Selector)
 		if err != nil {
-			klog.Errorf("sidecarSet(%s) rolling selector error, err: %v", sidecarset.Name, err)
+			klog.Errorf("sidecarSet(%s) rolling selector error, err: %v", sidecarSet.Name, err)
 			return false
 		}
 		//matched
@@ -67,18 +66,18 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 	//  * In kubernetes cluster, when inplace update pod, only fields such as image can be updated for the container.
 	//  * It is to determine whether there are other fields that have been modified for pod.
 	for index, pod := range pods {
-		isUpdated := sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod)
-		if !isUpdated && isSelected(pod) && control.IsSidecarSetUpgradable(pod) {
+		isUpdated := sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod)
+		if !isUpdated && isSelected(pod) && p.sidecarSetControl.IsSidecarSetUpgradable(pod, sidecarSet) {
 			waitUpgradedIndexes = append(waitUpgradedIndexes, index)
 		}
 	}
 
-	klog.V(3).Infof("sidecarSet(%s) matchedPods(%d) waitUpdated(%d)", sidecarset.Name, len(pods), len(waitUpgradedIndexes))
+	klog.V(3).Infof("sidecarSet(%s) matchedPods(%d) waitUpdated(%d)", sidecarSet.Name, len(pods), len(waitUpgradedIndexes))
 	//2. sort Pods with default sequence and scatter
 	waitUpgradedIndexes = SortUpdateIndexes(strategy, pods, waitUpgradedIndexes)
 
 	//3. calculate to be upgraded pods number for the time
-	needToUpgradeCount := calculateUpgradeCount(control, waitUpgradedIndexes, pods)
+	needToUpgradeCount := p.calculateUpgradeCount(sidecarSet, waitUpgradedIndexes, pods)
 	if needToUpgradeCount < len(waitUpgradedIndexes) {
 		waitUpgradedIndexes = waitUpgradedIndexes[:needToUpgradeCount]
 	}
@@ -112,9 +111,8 @@ func SortUpdateIndexes(strategy appsv1alpha1.SidecarSetUpdateStrategy, pods []*c
 	return waitUpdateIndexes
 }
 
-func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdateIndexes []int, pods []*corev1.Pod) int {
+func (p *spreadingStrategy) calculateUpgradeCount(sidecarSet *appsv1alpha1.SidecarSet, waitUpdateIndexes []int, pods []*corev1.Pod) int {
 	totalReplicas := len(pods)
-	sidecarSet := coreControl.GetSidecarset()
 	strategy := sidecarSet.Spec.UpdateStrategy
 
 	// default partition = 0, indicates all pods will been upgraded
@@ -139,14 +137,16 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 		// 1. sidecar containers have been updated to the latest sidecarSet version, for pod.spec.containers
 		// 2. whether pod.spec and pod.status is inconsistent after updating the sidecar containers
 		// 3. whether pod is not ready
-		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) && (!coreControl.IsPodStateConsistent(pod, nil) || !coreControl.IsPodReady(pod)) {
+		if sidecarcontrol.IsPodSidecarUpdated(sidecarSet, pod) &&
+			(!p.sidecarSetControl.IsPodStateConsistent(pod, sidecarSet, nil) ||
+				!p.sidecarSetControl.IsPodReady(pod, sidecarSet)) {
 			upgradeAndNotReadyCount++
 		}
 	}
 	var needUpgradeCount int
 	for _, i := range waitUpdateIndexes {
 		// If pod is not ready, then not included in the calculation of maxUnavailable
-		if !coreControl.IsPodReady(pods[i]) {
+		if !p.sidecarSetControl.IsPodReady(pods[i], sidecarSet) {
 			needUpgradeCount++
 			continue
 		}
