@@ -7,7 +7,7 @@ require (
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
 	github.com/containerd/containerd v1.5.10
-	github.com/docker/distribution v2.8.0+incompatible
+	github.com/docker/distribution v2.8.1+incompatible
 	github.com/docker/docker v20.10.2+incompatible
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
