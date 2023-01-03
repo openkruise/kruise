@@ -19,7 +19,6 @@ package nodepodprobe
 import (
 	"context"
 	"reflect"
-	"time"
 
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -170,6 +169,8 @@ func (e *enqueueRequestForNode) Update(evt event.UpdateEvent, q workqueue.RateLi
 	}
 	if node.DeletionTimestamp != nil {
 		e.nodeDelete(node, q)
+	} else {
+		e.nodeCreate(node, q)
 	}
 }
 
@@ -187,12 +188,8 @@ func (e *enqueueRequestForNode) nodeCreate(node *corev1.Node, q workqueue.RateLi
 		if errors.IsNotFound(err) {
 			klog.Infof("Node create event for nodePodProbe %v", node.Name)
 			namespacedName := types.NamespacedName{Name: node.Name}
-			if isReady, delay := getNodeReadyAndDelayTime(node); !isReady {
+			if !isNodeReady(node) {
 				klog.Infof("Skip to enqueue Node %s with not nodePodProbe, for not ready yet.", node.Name)
-				return
-			} else if delay > 0 {
-				klog.Infof("Enqueue Node %s with not nodePodProbe after %v.", node.Name, delay)
-				q.AddAfter(reconcile.Request{NamespacedName: namespacedName}, delay)
 				return
 			}
 			klog.Infof("Enqueue Node %s with not nodePodProbe.", node.Name)
@@ -211,14 +208,10 @@ func (e *enqueueRequestForNode) nodeDelete(node *corev1.Node, q workqueue.RateLi
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: node.Name}})
 }
 
-func getNodeReadyAndDelayTime(node *corev1.Node) (bool, time.Duration) {
+func isNodeReady(node *corev1.Node) bool {
 	_, condition := nodeutil.GetNodeCondition(&node.Status, corev1.NodeReady)
 	if condition == nil || condition.Status != corev1.ConditionTrue {
-		return false, 0
+		return false
 	}
-	delay := nodePodProbeCreationDelayAfterNodeReady - time.Since(condition.LastTransitionTime.Time)
-	if delay > 0 {
-		return true, delay
-	}
-	return true, 0
+	return true
 }
