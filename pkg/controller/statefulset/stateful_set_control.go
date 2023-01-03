@@ -542,21 +542,35 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				status.UpdatedReplicas++
 			}
 			// if the set does not allow bursting, return immediately
-			if monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+			if monotonic {
 				return &status, nil
+			} else if decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				klog.V(4).Infof(
+					"StatefulSet %s/%s Pod %s is Creating, and break pods scale",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name)
+				break
 			}
 			// pod created, no more work possible for this round
 			continue
 		}
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
 		// completes before we continue to make progress.
-		if isTerminating(replicas[i]) && (monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable)) {
+		if isTerminating(replicas[i]) && monotonic {
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to Terminate",
 				set.Namespace,
 				set.Name,
 				replicas[i].Name)
 			return &status, nil
+		} else if isTerminating(replicas[i]) && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+			klog.V(4).Infof(
+				"StatefulSet %s/%s Pod %s is Terminating, and break pods scale",
+				set.Namespace,
+				set.Name,
+				replicas[i].Name)
+			break
 		}
 		// Update InPlaceUpdateReady condition for pod
 		if res := ssc.inplaceControl.Refresh(replicas[i], nil); res.RefreshErr != nil {
@@ -571,7 +585,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// ordinal, are Running and Available.
 		if monotonic || scaleMaxUnavailable != nil {
 			isAvailable, waitTime := isRunningAndAvailable(replicas[i], minReadySeconds)
-			if !isAvailable && (monotonic || decreaseAndCheckMaxUnavailable(scaleMaxUnavailable)) {
+			if !isAvailable && monotonic {
 				if waitTime > 0 {
 					// make sure we check later
 					durationStore.Push(getStatefulSetKey(set), waitTime)
@@ -591,6 +605,17 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 						replicas[i].Name)
 				}
 				return &status, nil
+			} else if !isAvailable && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				klog.V(4).Infof(
+					"StatefulSet %s/%s Pod %s is unavailable, and break pods scale",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name)
+				if waitTime > 0 {
+					// make sure we check later
+					durationStore.Push(getStatefulSetKey(set), waitTime)
+				}
+				break
 			}
 		}
 		// Enforce the StatefulSet invariants
