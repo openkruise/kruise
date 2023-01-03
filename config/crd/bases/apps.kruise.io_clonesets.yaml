@@ -172,6 +172,10 @@ spec:
                 description: ScaleStrategy indicates the ScaleStrategy that will be
                   employed to create and delete Pods in the CloneSet.
                 properties:
+                  disablePVCReuse:
+                    description: Indicate if cloneset will reuse already existed pvc
+                      to rebuild a new pod
+                    type: boolean
                   maxUnavailable:
                     anyOf:
                     - type: integer
