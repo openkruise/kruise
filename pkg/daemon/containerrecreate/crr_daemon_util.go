@@ -85,28 +85,37 @@ func getCurrentCRRContainersRecreateStates(
 		kubeContainerStatus := podStatus.FindContainerStatusByName(c.Name)
 
 		var currentState appsv1alpha1.ContainerRecreateRequestContainerRecreateState
+
 		if kubeContainerStatus == nil {
 			// not found the real container
 			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-				Name:    c.Name,
-				Phase:   appsv1alpha1.ContainerRecreateRequestPending,
-				Message: "not found container on Node",
+				Name:     c.Name,
+				Phase:    appsv1alpha1.ContainerRecreateRequestPending,
+				IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
+				Message:  "not found container on Node",
 			}
 
-		} else if kubeContainerStatus.State != kubeletcontainer.ContainerStateRunning {
+		} else if kubeContainerStatus.State == kubeletcontainer.ContainerStateExited {
 			// for no-running state, we consider it will be recreated or restarted soon
 			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-				Name:  c.Name,
-				Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				Name:     c.Name,
+				Phase:    appsv1alpha1.ContainerRecreateRequestRecreating,
+				IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
 			}
-
+		} else if crr.Spec.Strategy.ForceRecreate && (previousContainerRecreateState == nil || !previousContainerRecreateState.IsKilled) {
+			// for forceKill scenarios, when the previous recreate state is empty or has not been killed, the current restart requirement will be set immediately
+			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+				Name:  c.Name,
+				Phase: appsv1alpha1.ContainerRecreateRequestPending,
+			}
 		} else if kubeContainerStatus.ID.String() != c.StatusContext.ContainerID ||
 			kubeContainerStatus.RestartCount > int(c.StatusContext.RestartCount) ||
 			kubeContainerStatus.StartedAt.After(crr.CreationTimestamp.Time) {
 			// already recreated or restarted
 			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-				Name:  c.Name,
-				Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				Name:     c.Name,
+				Phase:    appsv1alpha1.ContainerRecreateRequestRecreating,
+				IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
 			}
 			if syncContainerStatus != nil &&
 				syncContainerStatus.ContainerID == kubeContainerStatus.ID.String() &&
@@ -114,11 +123,11 @@ func getCurrentCRRContainersRecreateStates(
 				syncContainerStatus.Ready {
 				currentState.Phase = appsv1alpha1.ContainerRecreateRequestSucceeded
 			}
-
 		} else {
 			currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-				Name:  c.Name,
-				Phase: appsv1alpha1.ContainerRecreateRequestPending,
+				Name:     c.Name,
+				Phase:    appsv1alpha1.ContainerRecreateRequestPending,
+				IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
 			}
 		}
 
@@ -126,6 +135,13 @@ func getCurrentCRRContainersRecreateStates(
 	}
 
 	return statuses
+}
+
+func getPreviousContainerKillState(previousContainerRecreateState *appsv1alpha1.ContainerRecreateRequestContainerRecreateState) bool {
+	if previousContainerRecreateState == nil {
+		return false
+	}
+	return previousContainerRecreateState.IsKilled
 }
 
 func getCRRContainerRecreateState(crr *appsv1alpha1.ContainerRecreateRequest, name string) *appsv1alpha1.ContainerRecreateRequestContainerRecreateState {
