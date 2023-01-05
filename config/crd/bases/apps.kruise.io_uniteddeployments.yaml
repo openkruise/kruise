@@ -671,7 +671,7 @@ spec:
                               CloneSet.
                             properties:
                               disablePVCReuse:
-                                description: Indicate if cloneset will reuse already
+                                description: Indicate if cloneSet will reuse already
                                   existed pvc to rebuild a new pod
                                 type: boolean
                               maxUnavailable:

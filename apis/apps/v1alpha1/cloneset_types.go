@@ -94,7 +94,7 @@ type CloneSetScaleStrategy struct {
 	// MaxUnavailable works only when scaling up.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// Indicate if cloneset will reuse already existed pvc to
+	// Indicate if cloneSet will reuse already existed pvc to
 	// rebuild a new pod
 	DisablePVCReuse bool `json:"disablePVCReuse,omitempty"`
 }
