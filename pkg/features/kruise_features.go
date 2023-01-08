@@ -93,6 +93,9 @@ const (
 	// PreDownloadImageForDaemonSetUpdate enables daemonset-controller to create ImagePullJobs to
 	// pre-download images for update.
 	PreDownloadImageForDaemonSetUpdate featuregate.Feature = "PreDownloadImageForDaemonSetUpdate"
+
+	// Enables a enhanced livenessProbe solution
+	EnhancedLivenessProbe featuregate.Feature = "EnhancedLivenessProbe"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -114,6 +117,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
 	PodProbeMarkerGate:                        {Default: false, PreRelease: featuregate.Alpha},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
+	EnhancedLivenessProbe:                     {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

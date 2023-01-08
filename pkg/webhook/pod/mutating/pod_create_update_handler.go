@@ -103,6 +103,15 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		changed = true
 	}
 
+	// EnhancedLivenessProbe
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnhancedLivenessProbe) {
+		if skip, err := h.enhancedLivenessProbeWhenPodCreate(req, obj); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		} else if !skip {
+			changed = true
+		}
+	}
+
 	if !changed {
 		return admission.Allowed("")
 	}
