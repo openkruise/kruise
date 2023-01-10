@@ -23,6 +23,10 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -777,6 +781,133 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ExpectedUpdatedReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+		})
+
+		ginkgo.It(`CloneSet Update with DisablePVCReuse=true`, func() {
+			updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType}
+			cs := tester.NewCloneSet("clone-"+randStr, 4, updateStrategy)
+			imageConfig := imageutils.GetConfig(imageutils.Nginx)
+			imageConfig.SetRegistry("docker.io/library")
+			imageConfig.SetVersion("alpine")
+			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			cs.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "data-vol1"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "data-vol2"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
+						},
+					},
+				},
+			}
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.RecreateCloneSetUpdateStrategyType))
+
+			ginkgo.By("Wait for replicas satisfied")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(4)))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+
+			pods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(4))
+			instanceIds := sets.NewString()
+			for _, pod := range pods {
+				instanceIds.Insert(pod.Labels[appsv1alpha1.CloneSetInstanceID])
+			}
+			pvcs, err := tester.ListPVCForCloneSet()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pvcs)).Should(gomega.Equal(8))
+			pvcIds := sets.NewString()
+			for _, pvc := range pvcs {
+				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1alpha1.CloneSetInstanceID])).Should(gomega.BeTrue())
+				pvcIds.Insert(pvc.Name)
+				ref := metav1.GetControllerOf(pvc)
+				gomega.Expect(ref).NotTo(gomega.BeNil())
+				gomega.Expect(ref.Kind).To(gomega.Equal("CloneSet"))
+			}
+
+			ginkgo.By("delete pod, and reused pvc")
+			for _, pod := range pods {
+				err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
+			time.Sleep(time.Second * 3)
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+			// check pvc reused
+			pvcs, err = tester.ListPVCForCloneSet()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pvcs)).Should(gomega.Equal(8))
+			for _, pvc := range pvcs {
+				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1alpha1.CloneSetInstanceID])).Should(gomega.BeTrue())
+				gomega.Expect(pvcIds.Has(pvc.Name)).To(gomega.Equal(true))
+				ref := metav1.GetControllerOf(pvc)
+				gomega.Expect(ref).NotTo(gomega.BeNil())
+				gomega.Expect(ref.Kind).To(gomega.Equal("CloneSet"))
+			}
+
+			// update cloneSet again, and DisablePVCReuse=true
+			ginkgo.By("Update cloneSet DisablePVCReuse=true")
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				cs.Spec.ScaleStrategy.DisablePVCReuse = true
+			})
+			time.Sleep(time.Second)
+			ginkgo.By("delete pod, and reused pvc")
+			for _, pod := range pods {
+				err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
+			time.Sleep(time.Second * 3)
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+
+			// check pvc un-reused
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(4))
+			instanceIds = sets.NewString()
+			for _, pod := range pods {
+				instanceIds.Insert(pod.Labels[appsv1alpha1.CloneSetInstanceID])
+			}
+			pvcs, err = tester.ListPVCForCloneSet()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pvcs)).Should(gomega.Equal(8))
+			for _, pvc := range pvcs {
+				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1alpha1.CloneSetInstanceID])).Should(gomega.BeTrue())
+				gomega.Expect(pvcIds.Has(pvc.Name)).To(gomega.Equal(false))
+				ref := metav1.GetControllerOf(pvc)
+				gomega.Expect(ref).NotTo(gomega.BeNil())
+				gomega.Expect(ref.Kind).To(gomega.Equal("CloneSet"))
+			}
 		})
 	})
 

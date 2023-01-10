@@ -173,7 +173,7 @@ spec:
                   employed to create and delete Pods in the CloneSet.
                 properties:
                   disablePVCReuse:
-                    description: Indicate if cloneset will reuse already existed pvc
+                    description: Indicate if cloneSet will reuse already existed pvc
                       to rebuild a new pod
                     type: boolean
                   maxUnavailable:

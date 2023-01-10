@@ -112,6 +112,23 @@ func (t *CloneSetTester) ListPodsForCloneSet(name string) (pods []*v1.Pod, err e
 	return
 }
 
+func (t *CloneSetTester) ListPVCForCloneSet() (pvcs []*v1.PersistentVolumeClaim, err error) {
+	pvcList, err := t.c.CoreV1().PersistentVolumeClaims(t.ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.DeletionTimestamp.IsZero() {
+			pvcs = append(pvcs, pvc)
+		}
+	}
+	sort.SliceStable(pvcs, func(i, j int) bool {
+		return pvcs[i].Name < pvcs[j].Name
+	})
+	return
+}
+
 func (t *CloneSetTester) ListImagePullJobsForCloneSet(name string) (jobs []*appsv1alpha1.ImagePullJob, err error) {
 	jobList, err := t.kc.AppsV1alpha1().ImagePullJobs(t.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {

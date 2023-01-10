@@ -18,6 +18,7 @@ package util
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func HasOwnerRef(target, owner metav1.Object) bool {
@@ -49,13 +50,13 @@ func RemoveOwnerRef(target, owner metav1.Object) bool {
 	return true
 }
 
-func SetOwnerRef(target, owner metav1.Object, ownerType metav1.TypeMeta) bool {
+func SetOwnerRef(target, owner metav1.Object, gvk schema.GroupVersionKind) bool {
 	if HasOwnerRef(target, owner) {
 		return false
 	}
 	ownerRefs := append(
 		target.GetOwnerReferences(),
-		*metav1.NewControllerRef(owner, ownerType.GroupVersionKind()),
+		*metav1.NewControllerRef(owner, gvk),
 	)
 	target.SetOwnerReferences(ownerRefs)
 	return true

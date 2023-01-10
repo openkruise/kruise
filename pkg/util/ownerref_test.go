@@ -19,6 +19,8 @@ package util
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -141,7 +143,7 @@ func TestSetOwnerRef(t *testing.T) {
 		},
 	}
 
-	if !SetOwnerRef(pvc, pod, metav1.TypeMeta{Kind: "Pod", APIVersion: "v1"}) {
+	if !SetOwnerRef(pvc, pod, schema.GroupVersionKind{Version: "v1", Kind: "Pod"}) {
 		t.Fatalf("expect pvc %v has no pod %v ownerref", pvc, pod)
 	}
 

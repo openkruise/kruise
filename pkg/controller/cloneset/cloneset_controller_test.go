@@ -442,7 +442,7 @@ func checkInstances(g *gomega.GomegaWithT, cs *appsv1alpha1.CloneSet, podNum int
 			Namespace:     "default",
 			FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
 		}
-		pods, err = clonesetutils.GetActivePods(c, opts)
+		pods, _, err = clonesetutils.GetActiveAndInactivePods(c, opts)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		return len(pods)
 	}, time.Second*10, time.Millisecond*500).Should(gomega.Equal(podNum))

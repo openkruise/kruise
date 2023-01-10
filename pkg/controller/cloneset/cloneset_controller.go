@@ -45,6 +45,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -237,14 +238,14 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	// filteredPVCS's ownerRef is CloneSet
 	filteredPVCs, err := r.getOwnedPVCs(instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// If mcloneset doesn't want to reuse pvc, clean up
-	// the existing pvc first. Then it looks like the pod
-	// is deleted by controller, new pod can be created.
+	// If cloneSet doesn't want to reuse pvc, clean up
+	// the existing pvc first, which are owned by inactive or deleted pods.
 	if instance.Spec.ScaleStrategy.DisablePVCReuse {
 		filteredPVCs, err = r.cleanupPVCs(instance, filteredPods, filterOutPods, filteredPVCs)
 		if err != nil {
@@ -468,13 +469,7 @@ func (r *ReconcileCloneSet) getOwnedPods(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, 
 		Namespace:     cs.Namespace,
 		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
 	}
-
-	filteredPods, filterOutPods, err := clonesetutils.GetActiveAndInactivePods(r.Client, opts)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return filteredPods, filterOutPods, nil
+	return clonesetutils.GetActiveAndInactivePods(r.Client, opts)
 }
 
 func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1alpha1.CloneSet) ([]*v1.PersistentVolumeClaim, error) {
@@ -488,9 +483,10 @@ func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1alpha1.CloneSet) ([]*v1.Persi
 		return nil, err
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim
-	for i, pvc := range pvcList.Items {
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
 		if pvc.DeletionTimestamp == nil {
-			filteredPVCs = append(filteredPVCs, &pvcList.Items[i])
+			filteredPVCs = append(filteredPVCs, pvc)
 		}
 	}
 
@@ -595,64 +591,72 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 	return claimedPods, nil
 }
 
+// cleanUp unUsed pvcs, and return used pvcs.
+// If pvc owner pod does not exist, the pvc can be deleted directly,
+// else update pvc's ownerReference to pod.
 func (r *ReconcileCloneSet) cleanupPVCs(
 	cs *appsv1alpha1.CloneSet,
-	activePods, filterOutPods []*v1.Pod,
+	activePods, inactivePods []*v1.Pod,
 	pvcs []*v1.PersistentVolumeClaim,
 ) ([]*v1.PersistentVolumeClaim, error) {
-	// If useless pvc owner pod does not exist, the pvc can be deleted directly,
-	// else update pvc's ownerreference to pod.
-	toDeletePVCs, usedPVCs := filterPVCsByIfUsing(activePods, pvcs)
-	if len(toDeletePVCs) == 0 {
-		return usedPVCs, nil
-	}
-
-	klog.V(3).Infof("Begin to clean up mcloneset %s/%s useless PVCs", cs.Namespace, cs.Name)
-	toDeletePVCsMap := generatePodAndPVCsMap(toDeletePVCs)
-	for _, pod := range filterOutPods {
-		instanceID := clonesetutils.GetInstanceID(pod)
-		if pvcs, ok := toDeletePVCsMap[instanceID]; ok {
-			if err := r.updatePVCs(cs, pod, pvcs); err != nil {
-				return nil, err
-			}
-			// Left pvcs will be deleted directly.
-			delete(toDeletePVCsMap, instanceID)
+	activeIds := sets.NewString()
+	for _, pod := range activePods {
+		if id := clonesetutils.GetInstanceID(pod); id != "" {
+			activeIds.Insert(id)
 		}
 	}
-
-	for _, pvcs := range toDeletePVCsMap {
-		// It's safe to delete pvc that has no pod found.
-		if err := r.deletePVCs(cs, pvcs); err != nil {
-			return nil, err
+	inactiveIds := map[string]*v1.Pod{}
+	for i := range inactivePods {
+		pod := inactivePods[i]
+		if id := clonesetutils.GetInstanceID(pod); id != "" {
+			inactiveIds[id] = pod
 		}
 	}
-	return usedPVCs, nil
-}
-
-func (r *ReconcileCloneSet) updatePVCs(cs *appsv1alpha1.CloneSet, pod *v1.Pod, pvcs []*v1.PersistentVolumeClaim) error {
+	var inactivePVCs, toDeletePVCs, activePVCs []*v1.PersistentVolumeClaim
 	for i := range pvcs {
 		pvc := pvcs[i]
-		if updateClaimOwnerRefToPod(pvc, cs, pod) {
-			if err := r.updateOnePVC(cs, pvcs[i]); err != nil && !errors.IsNotFound(err) {
-				return err
-			}
+		if activeIds.Has(clonesetutils.GetInstanceID(pvc)) {
+			activePVCs = append(activePVCs, pvc)
+			continue
+		}
+		_, ok := inactiveIds[clonesetutils.GetInstanceID(pvc)]
+		if ok {
+			inactivePVCs = append(inactivePVCs, pvc.DeepCopy())
+		} else {
+			toDeletePVCs = append(toDeletePVCs, pvc.DeepCopy())
 		}
 	}
-	return nil
+	if len(inactivePVCs) == 0 && len(toDeletePVCs) == 0 {
+		return activePVCs, nil
+	}
+
+	// update useless pvc owner to pod
+	for i := range inactivePVCs {
+		pvc := inactivePVCs[i]
+		pod := inactiveIds[clonesetutils.GetInstanceID(pvc)]
+		// There is no need to judge whether the ownerRef has met expectations
+		// because the pvc(listed in the previous list)'s ownerRef must be CloneSet
+		_ = updateClaimOwnerRefToPod(pvc, cs, pod)
+		if err := r.updateOnePVC(cs, pvc); err != nil && !errors.IsNotFound(err) {
+			return nil, err
+		}
+		klog.V(3).Infof("Update CloneSet(%s/%s) pvc(%s)'s ownerRef to Pod", cs.Namespace, cs.Name, pvc.Name)
+	}
+	// delete pvc directly
+	for i := range toDeletePVCs {
+		pvc := toDeletePVCs[i]
+		if err := r.deleteOnePVC(cs, pvc); err != nil && !errors.IsNotFound(err) {
+			return nil, err
+		}
+		klog.V(3).Infof("Delete CloneSet(%s/%s) pvc(%s) directly", cs.Namespace, cs.Name, pvc.Name)
+	}
+	return activePVCs, nil
 }
 
 func (r *ReconcileCloneSet) updateOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
 	if err := r.Client.Update(context.TODO(), pvc); err != nil {
 		r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdate", "failed to update PVC %s: %v", pvc.Name, err)
 		return err
-	}
-	return nil
-}
-func (r *ReconcileCloneSet) deletePVCs(cs *appsv1alpha1.CloneSet, pvcs []*v1.PersistentVolumeClaim) error {
-	for i := range pvcs {
-		if err := r.deleteOnePVC(cs, pvcs[i]); err != nil && !errors.IsNotFound(err) {
-			return err
-		}
 	}
 	return nil
 }
@@ -668,46 +672,6 @@ func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.Pers
 }
 
 func updateClaimOwnerRefToPod(pvc *v1.PersistentVolumeClaim, cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
-	needsUpdate := false
-	needsUpdate = util.RemoveOwnerRef(pvc, cs)
-	return util.SetOwnerRef(pvc, pod, metav1.TypeMeta{Kind: "Pod", APIVersion: "v1"}) || needsUpdate
-}
-
-func filterPVCsByIfUsing(pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) (toDeletePVCs, usedPVCs []*v1.PersistentVolumeClaim) {
-	activeIDs := getInstanceIDsFromPods(pods)
-	for i := range pvcs {
-		pvc := pvcs[i]
-		id := clonesetutils.GetInstanceID(pvc)
-		if id == "" {
-			continue
-		}
-		if !activeIDs.Has(id) {
-			toDeletePVCs = append(toDeletePVCs, pvc)
-		} else {
-			usedPVCs = append(usedPVCs, pvc)
-		}
-	}
-	return
-}
-
-func generatePodAndPVCsMap(pvcs []*v1.PersistentVolumeClaim) map[string][]*v1.PersistentVolumeClaim {
-	// pod may have multiple pvcs
-	pvcsMap := map[string][]*v1.PersistentVolumeClaim{}
-	for i := range pvcs {
-		pvc := pvcs[i]
-		if id := clonesetutils.GetInstanceID(pvc); id != "" {
-			pvcsMap[id] = append(pvcsMap[id], pvc)
-		}
-	}
-	return pvcsMap
-}
-
-func getInstanceIDsFromPods(pods []*v1.Pod) sets.String {
-	ins := sets.NewString()
-	for _, pod := range pods {
-		if id := clonesetutils.GetInstanceID(pod); id != "" {
-			ins.Insert(id)
-		}
-	}
-	return ins
+	util.RemoveOwnerRef(pvc, cs)
+	return util.SetOwnerRef(pvc, pod, schema.GroupVersionKind{Version: "v1", Kind: "Pod"})
 }
