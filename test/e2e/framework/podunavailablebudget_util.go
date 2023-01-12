@@ -113,7 +113,7 @@ func (s *PodUnavailableBudgetTester) NewBaseDeployment(namespace string) *apps.D
 				RollingUpdate: &apps.RollingUpdateDeployment{
 					MaxUnavailable: &intstr.IntOrString{
 						Type:   intstr.String,
-						StrVal: "100%",
+						StrVal: "50%",
 					},
 					MaxSurge: &intstr.IntOrString{
 						Type:   intstr.Int,

@@ -34,17 +34,15 @@ import (
 
 // GetPodsForRef return target workload's podList and spec.replicas.
 func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, active bool) ([]*corev1.Pod, int32, error) {
-	workloadUIDs := make([]types.UID, 0)
+	var workloadUIDs []types.UID
 	var workloadReplicas int32
-
 	switch kind {
 	// ReplicaSet
 	case ControllerKindRS.Kind:
 		rs, err := r.getReplicaSet(ControllerReference{APIVersion: apiVersion, Kind: kind, Name: name}, ns)
 		if err != nil {
 			return nil, -1, err
-		}
-		if rs == nil || !rs.DeletionTimestamp.IsZero() {
+		} else if rs == nil || !rs.DeletionTimestamp.IsZero() {
 			return nil, 0, nil
 		}
 		workloadReplicas = *rs.Spec.Replicas
@@ -59,7 +57,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		}
 		workloadReplicas = obj.Scale
 		workloadUIDs = append(workloadUIDs, obj.UID)
-	// Deployment, Deployment-like workload, and other workload
+	// Deployment, Deployment-like workload or other custom workload(support scale sub-resources)
 	default:
 		obj, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
 		if err != nil {
@@ -69,11 +67,10 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		}
 		workloadReplicas = obj.Scale
 		// try to get replicaSets
-		rss, err := r.getReplicaSetsForDeployment(apiVersion, kind, ns, name)
+		rss, err := r.getReplicaSetsForObject(obj)
 		if err != nil {
 			return nil, -1, err
 		}
-
 		if len(rss) == 0 {
 			workloadUIDs = append(workloadUIDs, obj.UID)
 		} else {
@@ -81,6 +78,9 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 				workloadUIDs = append(workloadUIDs, rs.UID)
 			}
 		}
+	}
+	if workloadReplicas == 0 {
+		return nil, workloadReplicas, nil
 	}
 
 	// List all Pods owned by workload UID.
@@ -107,29 +107,26 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 	return matchedPods, workloadReplicas, nil
 }
 
-func (r *ControllerFinder) getReplicaSetsForDeployment(apiVersion, kind, ns, name string) ([]appsv1.ReplicaSet, error) {
-	scaleNSelector, err := r.GetScaleAndSelectorForRef(apiVersion, kind, ns, name, "")
-	if err != nil || scaleNSelector == nil {
-		return nil, err
-	}
+func (r *ControllerFinder) getReplicaSetsForObject(scale *ScaleAndSelector) ([]appsv1.ReplicaSet, error) {
 	// List ReplicaSets owned by this Deployment
 	rsList := &appsv1.ReplicaSetList{}
-	selector, err := util.ValidatedLabelSelectorAsSelector(scaleNSelector.Selector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(scale.Selector)
 	if err != nil {
-		klog.Errorf("Deployment (%s/%s) get labelSelector failed: %s", ns, name, err.Error())
+		klog.Warningf("Object (%s/%s) get labelSelector failed: %s", scale.Metadata.Namespace, scale.Metadata.Name, err.Error())
 		return nil, nil
 	}
-	err = r.List(context.TODO(), rsList, &client.ListOptions{Namespace: ns, LabelSelector: selector})
+	err = r.List(context.TODO(), rsList, &client.ListOptions{Namespace: scale.Metadata.Namespace, LabelSelector: selector}, utilclient.DisableDeepCopy)
 	if err != nil {
 		return nil, err
 	}
 	rss := make([]appsv1.ReplicaSet, 0)
 	for i := range rsList.Items {
 		rs := rsList.Items[i]
-		if ref := metav1.GetControllerOf(&rs); ref != nil {
-			if ref.UID == scaleNSelector.UID {
-				rss = append(rss, rs)
-			}
+		if *rs.Spec.Replicas == 0 || !rs.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if ref := metav1.GetControllerOf(&rs); ref != nil && ref.UID == scale.UID {
+			rss = append(rss, rs)
 		}
 	}
 	return rss, nil
