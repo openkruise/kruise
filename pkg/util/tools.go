@@ -121,8 +121,8 @@ func ParseImage(image string) (repo, tag, digest string, err error) {
 	return
 }
 
-//whether image is digest format,
-//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
+// whether image is digest format,
+// for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
 func IsImageDigest(image string) bool {
 	_, _, digest, _ := ParseImage(image)
 	return digest != ""

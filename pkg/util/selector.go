@@ -29,12 +29,13 @@ import (
 
 // whether selector overlaps, the criteria:
 // if exist one same key has different value and not overlap, then it is judged non-overlap, for examples:
-//   * a=b and a=c
-//   * a in [b,c] and a not in [b,c...]
-//   * a not in [b] and a not exist
-//   * a=b,c=d,e=f and a=x,c=d,e=f
+//   - a=b and a=c
+//   - a in [b,c] and a not in [b,c...]
+//   - a not in [b] and a not exist
+//   - a=b,c=d,e=f and a=x,c=d,e=f
+//
 // then others is overlap：
-//   * a=b and c=d
+//   - a=b and c=d
 func IsSelectorOverlapping(selector1, selector2 *metav1.LabelSelector) bool {
 	return !(isDisjoint(selector1, selector2) || isDisjoint(selector2, selector1))
 }
@@ -185,20 +186,20 @@ func newRequirement(key string, op selection.Operator, vals []string) (*labels.R
 // 1. when selector1、selector2 don't have same key, it is considered non-overlap, e.g. selector1(a=b) and selector2(c=d)
 // 2. when selector1、selector2 have same key, and matchLabels & matchExps are intersection, it is considered overlap.
 // For examples:
-//    a In [b,c]    And a Exist
-//                      a In [b,...] [c,...] [Include any b,c,...]
-//                      a NotIn [a,...] [b,....] [c,....] [All other cases are allowed except for the inclusion of both b,c...] [b,c,e]
-//    a Exist       And a Exist
-//                      a In [x,y,Any,...]
-//                      a NotIn [a,b,Any...]
-//    a NotIn [b,c] And a Exist
-//                      a NotExist
-//                      a NotIn [a,b,Any...]
-//                      a In [a,b] [a,c] [e,f] [Any,...] other than [b],[c],[b,c]
-//    a NotExist    And a NotExist
-//                      a NotIn [Any,...]
-//    When selector1 and selector2 contain the same key, except for the above case, they are considered non-overlap
 //
+//	a In [b,c]    And a Exist
+//	                  a In [b,...] [c,...] [Include any b,c,...]
+//	                  a NotIn [a,...] [b,....] [c,....] [All other cases are allowed except for the inclusion of both b,c...] [b,c,e]
+//	a Exist       And a Exist
+//	                  a In [x,y,Any,...]
+//	                  a NotIn [a,b,Any...]
+//	a NotIn [b,c] And a Exist
+//	                  a NotExist
+//	                  a NotIn [a,b,Any...]
+//	                  a In [a,b] [a,c] [e,f] [Any,...] other than [b],[c],[b,c]
+//	a NotExist    And a NotExist
+//	                  a NotIn [Any,...]
+//	When selector1 and selector2 contain the same key, except for the above case, they are considered non-overlap
 func IsSelectorLooseOverlap(selector1, selector2 *metav1.LabelSelector) bool {
 	matchExp1 := convertSelectorToMatchExpressions(selector1)
 	matchExp2 := convertSelectorToMatchExpressions(selector2)

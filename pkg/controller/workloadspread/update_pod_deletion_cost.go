@@ -58,20 +58,20 @@ func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSp
 
 // syncSubsetPodDeletionCost calculates the deletion-cost for the Pods belong to subset and update deletion-cost annotation.
 // We have two conditions for subset's Pod deletion-cost
-// 1. the number of active Pods in this subset <= maxReplicas or maxReplicas = nil, deletion-cost = 100 * (subsets.length - subsetIndex).
-//                 subset-a   subset-b  subset-c
-//    maxReplicas    10          10        nil
-//    pods number    10          10        10
-//    deletion-cost  300         200       100
-//    We delete Pods from back subset to front subset. The deletion order is: c -> b -> a.
-// 2. the number of active Pods in this subset > maxReplicas
-//    two class:
-//    (a) the extra Pods more than maxReplicas: deletion-cost = -100 * (subsetIndex + 1) [Priority Deletion],
-//    (b) deletion-cost = 100 * (subsets.length - subsetIndex) [Reserve].
-//                 subset-a       subset-b     subset-c
-//    maxReplicas    10            10           nil
-//    pods number    20            20           20
-//    deletion-cost (300,-100)    (200,-200)    100
+//  1. the number of active Pods in this subset <= maxReplicas or maxReplicas = nil, deletion-cost = 100 * (subsets.length - subsetIndex).
+//     subset-a   subset-b  subset-c
+//     maxReplicas    10          10        nil
+//     pods number    10          10        10
+//     deletion-cost  300         200       100
+//     We delete Pods from back subset to front subset. The deletion order is: c -> b -> a.
+//  2. the number of active Pods in this subset > maxReplicas
+//     two class:
+//     (a) the extra Pods more than maxReplicas: deletion-cost = -100 * (subsetIndex + 1) [Priority Deletion],
+//     (b) deletion-cost = 100 * (subsets.length - subsetIndex) [Reserve].
+//     subset-a       subset-b     subset-c
+//     maxReplicas    10            10           nil
+//     pods number    20            20           20
+//     deletion-cost (300,-100)    (200,-200)    100
 func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 	ws *appsv1alpha1.WorkloadSpread,
 	subset *appsv1alpha1.WorkloadSpreadSubset,

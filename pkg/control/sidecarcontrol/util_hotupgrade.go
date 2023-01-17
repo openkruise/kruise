@@ -84,7 +84,7 @@ func GetPodHotUpgradeInfoInAnnotations(pod *corev1.Pod) map[string]string {
 // GetPodHotUpgradeContainers return two hot upgrade sidecar containers
 // workContainer: currently working sidecar container, record in pod annotations[kruise.io/sidecarset-working-hotupgrade-container]
 // otherContainer:
-// 	1. empty container
+//  1. empty container
 //  2. when in hot upgrading process, the older sidecar container
 func GetPodHotUpgradeContainers(sidecarName string, pod *corev1.Pod) (workContainer, otherContainer string) {
 	hotUpgradeWorkContainer := GetPodHotUpgradeInfoInAnnotations(pod)
