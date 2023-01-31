@@ -257,7 +257,7 @@ func (c *Controller) sync(key string) (retErr error) {
 
 		unreadyTime, err := time.Parse(time.RFC3339, unreadyTimeStr)
 		if err != nil {
-			klog.Infof("CRR %s/%s failed to parse unready time %s: %v", crr.Namespace, crr.Name, unreadyTimeStr, err)
+			klog.Errorf("CRR %s/%s failed to parse unready time %s: %v", crr.Namespace, crr.Name, unreadyTimeStr, err)
 			return c.completeCRRStatus(crr, fmt.Sprintf("failed to parse unready time %s: %v", unreadyTimeStr, err))
 		}
 
