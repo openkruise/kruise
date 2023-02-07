@@ -1,5 +1,7 @@
 # Build the manager and daemon binaries
-FROM --platform=$BUILDPLATFORM golang:1.18 as builder
+ARG BASE_IMAGE=alpine
+ARG BASE_IMAGE_VERION=3.17
+FROM --platform=$BUILDPLATFORM golang:1.18-alpine3.17 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -14,16 +16,18 @@ COPY pkg/ pkg/
 COPY vendor/ vendor/
 
 # Build
-ARG TARGETOS TARGETARCH
+ARG TARGETOS
+ARG TARGETARCH
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o manager main.go \
   && GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o daemon ./cmd/daemon/main.go
 
-# Use Ubuntu 20.04 LTS as base image to package the binaries
-FROM --platform=$TARGETPLATFORM ubuntu:focal
-# This is required by daemon connnecting with CRI
-RUN ln -s /usr/bin/* /usr/sbin/ && apt-get update -y \
-  && apt-get install --no-install-recommends -y ca-certificates \
-  && apt-get clean && rm -rf /var/log/*log /var/lib/apt/lists/* /var/log/apt/* /var/lib/dpkg/*-old /var/cache/debconf/*-old
+
+ARG BASE_IMAGE
+ARG BASE_IMAGE_VERION
+FROM ${BASE_IMAGE}:${BASE_IMAGE_VERION}
+
+RUN apk add --no-cache ca-certificates=~20220614-r4 bash=~5.2.15-r0 expat=~2.5.0-r0 \
+    && rm -rf /var/cache/apk/*
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
