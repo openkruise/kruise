@@ -738,7 +738,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
-		refreshed, duration, err := ssc.refreshPodState(set, pod)
+		refreshed, duration, err := ssc.refreshPodState(set, pod, updateRevision.Name)
 		if err != nil {
 			return &status, err
 		} else if duration > 0 {
@@ -838,7 +838,7 @@ func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, po
 	return true, nil
 }
 
-func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulSet, pod *v1.Pod) (bool, time.Duration, error) {
+func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulSet, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
 	if set.Spec.UpdateStrategy.RollingUpdate == nil {
 		return false, 0, nil
 	}
@@ -857,6 +857,17 @@ func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulS
 
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
+	case appspub.LifecycleStatePreparingUpdate:
+		// when pod updated to PreparingUpdate state to wait lifecycle blocker to remove,
+		// then rollback, do not need update pod inplace since it is the update revision,
+		// so just update pod lifecycle state. ref: https://github.com/openkruise/kruise/issues/1156
+		if getPodRevision(pod) == updateRevision {
+			if set.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
+				state = appspub.LifecycleStateUpdated
+			} else {
+				state = appspub.LifecycleStateNormal
+			}
+		}
 	case appspub.LifecycleStateUpdating:
 		if opts.CheckPodUpdateCompleted(pod) == nil {
 			if set.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
