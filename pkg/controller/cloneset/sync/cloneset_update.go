@@ -54,7 +54,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	// 1. refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
-		patchedState, duration, err := c.refreshPodState(cs, coreControl, pod)
+		patchedState, duration, err := c.refreshPodState(cs, coreControl, pod, updateRevision.Name)
 		if err != nil {
 			return err
 		} else if duration > 0 {
@@ -155,7 +155,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	return nil
 }
 
-func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod) (bool, time.Duration, error) {
+func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
 	opts := coreControl.GetUpdateOptions()
 	opts = inplaceupdate.SetOptionsDefaults(opts)
 
@@ -173,6 +173,17 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 			cs.Spec.Lifecycle.PreNormal == nil ||
 			lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.PreNormal, pod) {
 			state = appspub.LifecycleStateNormal
+		}
+	case appspub.LifecycleStatePreparingUpdate:
+		// when pod updated to PreparingUpdate state to wait lifecycle blocker to remove,
+		// then rollback, do not need update pod inplace since it is the update revision,
+		// so just update pod lifecycle state. ref: https://github.com/openkruise/kruise/issues/1156
+		if clonesetutils.EqualToRevisionHash("", pod, updateRevision) {
+			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
+				state = appspub.LifecycleStateUpdated
+			} else {
+				state = appspub.LifecycleStateNormal
+			}
 		}
 	case appspub.LifecycleStateUpdating:
 		if opts.CheckPodUpdateCompleted(pod) == nil {
