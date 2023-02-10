@@ -464,7 +464,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	return dsc.updateDaemonSetStatus(ds, nodeList, hash, true)
 }
 
-func (dsc *ReconcileDaemonSet) getDaemonSetsForPod(pod *corev1.Pod) []*appsv1alpha1.DaemonSet {
+func (dsc *ReconcileDaemonSet) getDaemonSetsForPod(pod *corev1.Pod) []*appsv1alpha1.DaemonSet { // TODO: not used
 	sets, err := dsc.GetPodDaemonSets(pod)
 	if err != nil {
 		return nil

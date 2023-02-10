@@ -81,7 +81,7 @@ func setupController(client clientset.Interface, kruiseClient kruiseclientset.In
 	cache.WaitForCacheSync(
 		stop,
 		kruiseInformerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
-		//informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
+		// informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 	)
@@ -671,7 +671,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		cache.WaitForCacheSync(
 			stop,
 			kruiseInformerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
-			//informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
+			// informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
 			informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 		)
@@ -1658,7 +1658,7 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		validate        func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 	}
 	const setSize = 5
-	//originalImage := newStatefulSet(1).Spec.Template.Spec.Containers[0].Image
+	// originalImage := newStatefulSet(1).Spec.Template.Spec.Containers[0].Image
 	newImage := "foo"
 
 	readyPods := func(partition, pauseSecond int) func(om *fakeObjectManager, set *appsv1beta1.StatefulSet,
@@ -2955,7 +2955,7 @@ func (om *fakeObjectManager) setPodReady(set *appsv1beta1.StatefulSet, ordinal i
 	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (om *fakeObjectManager) setPodAvailable(set *appsv1beta1.StatefulSet, ordinal int, lastTransitionTime time.Time) ([]*v1.Pod, error) {
+func (om *fakeObjectManager) setPodAvailable(set *appsv1beta1.StatefulSet, ordinal int, lastTransitionTime time.Time) ([]*v1.Pod, error) { // TODO: not used
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err

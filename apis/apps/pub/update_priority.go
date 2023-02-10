@@ -40,7 +40,7 @@ type UpdatePriorityStrategy struct {
 	WeightPriority []UpdatePriorityWeightTerm `json:"weightPriority,omitempty"`
 }
 
-// UpdatePriorityOrder defines order priority.
+// UpdatePriorityOrderTerm defines order priority.
 type UpdatePriorityOrderTerm struct {
 	// Calculate priority by value of this key.
 	// Values of this key, will be sorted by GetInt(val). GetInt method will find the last int in value,

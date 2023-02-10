@@ -121,13 +121,14 @@ func ParseImage(image string) (repo, tag, digest string, err error) {
 	return
 }
 
-//whether image is digest format,
-//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
+// IsImageDigest indicates whether image is digest format,
+// for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
 func IsImageDigest(image string) bool {
 	_, _, digest, _ := ParseImage(image)
 	return digest != ""
 }
 
+// IsContainerImageEqual indicates whether container images are equal
 // 1. image1, image2 are digest image, compare repo+digest
 // 2. image1, image2 are normal image, compare repo+tag
 // 3. image1, image2 are digest+normal image, don't support compare it, return false
@@ -180,7 +181,7 @@ func CalculatePartitionReplicas(partition *intstrutil.IntOrString, replicasPoint
 	return pValue, nil
 }
 
-// check APIVersion, Kind, Name
+// IsReferenceEqual checks APIVersion, Kind, Name
 func IsReferenceEqual(ref1, ref2 appsv1alpha1.TargetReference) bool {
 	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
 	if err != nil {

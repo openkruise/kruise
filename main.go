@@ -25,7 +25,6 @@ import (
 	"time"
 	_ "time/tzdata" // for AdvancedCronJob Time Zone support
 
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,18 +37,18 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	extclient "github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/features"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
-	"github.com/openkruise/kruise/pkg/webhook"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	extclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/controller"
+	"github.com/openkruise/kruise/pkg/features"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	_ "github.com/openkruise/kruise/pkg/util/metrics/leadership"
+	"github.com/openkruise/kruise/pkg/webhook"
 	// +kubebuilder:scaffold:imports
 )
 

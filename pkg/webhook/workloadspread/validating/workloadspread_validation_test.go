@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -542,7 +542,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			errorSuffix: "spec.subsets[0].maxReplicas",
 		},
 
-		//{
+		// {
 		//	name: "one subset",
 		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 		//		workloadSpread := workloadSpreadDemo.DeepCopy()
@@ -555,7 +555,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		//		return workloadSpread
 		//	},
 		//	errorSuffix: "spec.subsets",
-		//},
+		// },
 		{
 			name: "subset[0]'name is empty",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
@@ -583,7 +583,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 			},
 			errorSuffix: "spec.subsets[1].name",
 		},
-		//{
+		// {
 		//	name: "subset[0]'s requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are all empty",
 		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 		//		workloadSpread := workloadSpreadDemo.DeepCopy()
@@ -593,7 +593,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		//		return workloadSpread
 		//	},
 		//	errorSuffix: "spec.subsets[0].requiredNodeSelectorTerm",
-		//},
+		// },
 		{
 			name: "requiredNodeSelectorTerm are not valid",
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {

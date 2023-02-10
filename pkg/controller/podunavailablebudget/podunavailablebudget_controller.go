@@ -129,8 +129,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//In workload scaling scenario, there is a risk of interception by the pub webhook against the scaled pod.
-	//The solution for this scenario: the pub controller listens to workload replicas changes and adjusts UnavailableAllowed in time.
+	// In workload scaling scenario, there is a risk of interception by the pub webhook against the scaled pod.
+	// The solution for this scenario: the pub controller listens to workload replicas changes and adjusts UnavailableAllowed in time.
 	// Example for:
 	// 1. cloneSet.replicas = 100, pub.MaxUnavailable = 10%, then UnavailableAllowed=10.
 	// 2. at this time the cloneSet.replicas is scaled down to 50, the pub controller listens to the replicas change, triggering reconcile will adjust UnavailableAllowed to 55.
@@ -152,7 +152,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//kruise AdvancedStatefulSet
+	// kruise AdvancedStatefulSet
 	if err = c.Watch(&source.Kind{Type: &kruiseappsv1beta1.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1beta1.StatefulSet)
@@ -169,7 +169,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//CloneSet
+	// CloneSet
 	if err = c.Watch(&source.Kind{Type: &kruiseappsv1alpha1.CloneSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
@@ -186,7 +186,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//StatefulSet
+	// StatefulSet
 	if err = c.Watch(&source.Kind{Type: &apps.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.StatefulSet)
@@ -398,7 +398,8 @@ func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[s
 	return
 }
 
-// This function returns pods using the PodUnavailableBudget object.
+// getPodsForPub returns pods using the PodUnavailableBudget object.
+// TODO: not used
 func (r *ReconcilePodUnavailableBudget) getPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, error) {
 	// if targetReference isn't nil, priority to take effect
 	var listOptions *client.ListOptions
@@ -459,7 +460,7 @@ func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1a
 	return
 }
 
-func (r *ReconcilePodUnavailableBudget) getExpectedScale(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) (int32, error) {
+func (r *ReconcilePodUnavailableBudget) getExpectedScale(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) (int32, error) { // TODO: not used
 	// if spec.targetRef!=nil, expectedCount=targetRef.spec.replicas
 	if pub.Spec.TargetReference != nil {
 		ref := controllerfinder.ControllerReference{
@@ -533,7 +534,7 @@ func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []
 			continue
 		}
 
-		//handle disruption pods which will be eviction or deletion
+		// handle disruption pods which will be eviction or deletion
 		disruptionTime, found := disruptedPods[pod.Name]
 		if found {
 			expectedDeletion := disruptionTime.Time.Add(DeletionTimeout)

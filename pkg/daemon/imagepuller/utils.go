@@ -126,7 +126,7 @@ func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStat
 	return false, err
 }
 
-func (su *statusUpdater) statusChanged(newStatus *appsv1alpha1.NodeImageStatus) bool {
+func (su *statusUpdater) statusChanged(newStatus *appsv1alpha1.NodeImageStatus) bool { // TODO: not used
 	// Can not use imagePullNode.Status to compare because of time accuracy
 	return !reflect.DeepEqual(su.previousStatus, newStatus)
 }
