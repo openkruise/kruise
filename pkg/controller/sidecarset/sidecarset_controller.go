@@ -20,6 +20,16 @@ import (
 	"context"
 	"flag"
 
+	kruiseclient "github.com/openkruise/kruise/pkg/client"
+
+	k8scache "k8s.io/client-go/tools/cache"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+	"github.com/openkruise/utils/sidecarcontrol"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,13 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -68,11 +71,12 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	expectations := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	recorder := mgr.GetEventRecorderFor("sidecarset-controller")
-	cli := utilclient.NewClientFromManager(mgr, "sidecarset-controller")
+	revInformer, _ := mgr.GetCache().GetInformerForKind(context.TODO(), apps.SchemeGroupVersion.WithKind("ControllerRevision"))
+	genericClient := kruiseclient.GetGenericClientWithName("sidecarset-controller")
 	return &ReconcileSidecarSet{
-		Client:    cli,
+		Client:    mgr.GetClient(),
 		scheme:    mgr.GetScheme(),
-		processor: NewSidecarSetProcessor(cli, expectations, recorder),
+		processor: NewSidecarSetProcessor(mgr.GetClient(), genericClient.KubeClient, revInformer.(k8scache.SharedIndexInformer).GetIndexer(), expectations, recorder),
 	}
 }
 
@@ -103,7 +107,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetCache()}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetCache(),
+		sidecarSetControl: sidecarcontrol.NewCommonControl(nil, "")}); err != nil {
 		return err
 	}
 

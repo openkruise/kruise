@@ -4,9 +4,13 @@ import (
 	"context"
 	"testing"
 
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+
+	"k8s.io/client-go/tools/cache"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -183,10 +187,12 @@ func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1alp
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl),
-		processor:          NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10)),
+		processor:          NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10)),
 	}
 	if _, err := reconciler.Reconcile(context.TODO(), request); err != nil {
 		t.Errorf("reconcile failed, err: %v", err)
@@ -218,10 +224,12 @@ func testUpdateWhenSidecarSetPaused(t *testing.T, sidecarSetInput *appsv1alpha1.
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,
-		processor:          NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10)),
+		processor:          NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10)),
 	}
 	if _, err := reconciler.Reconcile(context.TODO(), request); err != nil {
 		t.Errorf("reconcile failed, err: %v", err)
@@ -253,10 +261,12 @@ func testUpdateWhenMaxUnavailableNotZero(t *testing.T, sidecarSetInput *appsv1al
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,
-		processor:          NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10)),
+		processor:          NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10)),
 	}
 	if _, err := reconciler.Reconcile(context.TODO(), request); err != nil {
 		t.Errorf("reconcile failed, err: %v", err)
@@ -289,10 +299,12 @@ func testUpdateWhenPartitionFinished(t *testing.T, sidecarSetInput *appsv1alpha1
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,
-		processor:          NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10)),
+		processor:          NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10)),
 	}
 	if _, err := reconciler.Reconcile(context.TODO(), request); err != nil {
 		t.Errorf("reconcile failed, err: %v", err)
@@ -325,10 +337,12 @@ func testRemoveSidecarSet(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
 	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	k8sclient := &k8sfake.Clientset{}
 	reconciler := ReconcileSidecarSet{
 		Client:             fakeClient,
 		updateExpectations: exps,
-		processor:          NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10)),
+		processor:          NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10)),
 	}
 	if _, err := reconciler.Reconcile(context.TODO(), request); err != nil {
 		t.Errorf("reconcile failed, err: %v", err)

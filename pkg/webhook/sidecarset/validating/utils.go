@@ -18,6 +18,7 @@ package validating
 
 import (
 	"fmt"
+	"regexp"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 
@@ -47,4 +48,13 @@ func isSidecarSetNamespaceDiff(origin *appsv1alpha1.SidecarSet, other *appsv1alp
 	originNamespace := origin.Spec.Namespace
 	otherNamespace := other.Spec.Namespace
 	return originNamespace != "" && otherNamespace != "" && originNamespace != otherNamespace
+}
+
+func matchRegKey(key string, regs []*regexp.Regexp) bool {
+	for _, reg := range regs {
+		if reg.MatchString(key) {
+			return true
+		}
+	}
+	return false
 }

@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mutating
+package sidecarcontrol
 
 import (
 	"encoding/json"
 	"fmt"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -37,23 +35,23 @@ func injectHotUpgradeContainers(hotUpgradeWorkInfo map[string]string, sidecarCon
 	sidecarContainers = append(sidecarContainers, container2)
 	//mark sidecarset.version in annotations
 	// "1" indicates sidecar container is first injected into pod, and not upgrade process
-	injectedAnnotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(container1.Name)] = "1"
-	injectedAnnotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(container1.Name)] = "0"
+	injectedAnnotations[GetPodSidecarSetVersionAnnotation(container1.Name)] = "1"
+	injectedAnnotations[GetPodSidecarSetVersionAltAnnotation(container1.Name)] = "0"
 	// "0" indicates sidecar container is hot upgrade empty container
-	injectedAnnotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(container2.Name)] = "0"
-	injectedAnnotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(container2.Name)] = "1"
+	injectedAnnotations[GetPodSidecarSetVersionAnnotation(container2.Name)] = "0"
+	injectedAnnotations[GetPodSidecarSetVersionAltAnnotation(container2.Name)] = "1"
 	// used to mark which container is currently working, first is container1
 	// format: map[container.name] = pod.spec.container[x].name
 	hotUpgradeWorkInfo[sidecarContainer.Name] = container1.Name
 	// store working HotUpgrade container in pod annotations
 	by, _ := json.Marshal(hotUpgradeWorkInfo)
-	injectedAnnotations[sidecarcontrol.SidecarSetWorkingHotUpgradeContainer] = string(by)
+	injectedAnnotations[SidecarSetWorkingHotUpgradeContainer] = string(by)
 
 	return sidecarContainers, injectedAnnotations
 }
 
 func generateHotUpgradeContainers(container *appsv1alpha1.SidecarContainer) (*appsv1alpha1.SidecarContainer, *appsv1alpha1.SidecarContainer) {
-	name1, name2 := sidecarcontrol.GetHotUpgradeContainerName(container.Name)
+	name1, name2 := GetHotUpgradeContainerName(container.Name)
 	container1, container2 := container.DeepCopy(), container.DeepCopy()
 	container1.Name = name1
 	container2.Name = name2
@@ -70,19 +68,19 @@ func generateHotUpgradeContainers(container *appsv1alpha1.SidecarContainer) (*ap
 func setSidecarContainerVersionEnv(container *corev1.Container) {
 	// inject SIDECARSET_VERSION
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name: sidecarcontrol.SidecarSetVersionEnvKey,
+		Name: SidecarSetVersionEnvKey,
 		ValueFrom: &corev1.EnvVarSource{
 			FieldRef: &corev1.ObjectFieldSelector{
-				FieldPath: fmt.Sprintf("metadata.annotations['%s']", sidecarcontrol.GetPodSidecarSetVersionAnnotation(container.Name)),
+				FieldPath: fmt.Sprintf("metadata.annotations['%s']", GetPodSidecarSetVersionAnnotation(container.Name)),
 			},
 		},
 	})
 	// inject SIDECARSET_VERSION_ALT
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name: sidecarcontrol.SidecarSetVersionAltEnvKey,
+		Name: SidecarSetVersionAltEnvKey,
 		ValueFrom: &corev1.EnvVarSource{
 			FieldRef: &corev1.ObjectFieldSelector{
-				FieldPath: fmt.Sprintf("metadata.annotations['%s']", sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(container.Name)),
+				FieldPath: fmt.Sprintf("metadata.annotations['%s']", GetPodSidecarSetVersionAltAnnotation(container.Name)),
 			},
 		},
 	})

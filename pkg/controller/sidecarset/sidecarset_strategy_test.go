@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +37,7 @@ type FactorySidecarSet func() *appsv1alpha1.SidecarSet
 type FactoryPods func(int, int, int) []*corev1.Pod
 
 func factoryPodsCommon(count, upgraded int, sidecarSet *appsv1alpha1.SidecarSet) []*corev1.Pod {
-	control := sidecarcontrol.New(sidecarSet)
+	control := sidecarcontrol.NewCommonControl(nil, "")
 	pods := make([]*corev1.Pod, 0, count)
 	for i := 0; i < count; i++ {
 		pod := &corev1.Pod{
@@ -92,8 +92,8 @@ func factoryPodsCommon(count, upgraded int, sidecarSet *appsv1alpha1.SidecarSet)
 	}
 	for i := 0; i < upgraded; i++ {
 		pods[i].Spec.Containers[1].Image = "test-image:v2"
-		sidecarcontrol.UpdatePodSidecarSetHash(pods[i], control.GetSidecarset())
-		control.UpdatePodAnnotationsInUpgrade([]string{"test-sidecar"}, pods[i])
+		sidecarcontrol.UpdatePodSidecarSetHash(pods[i], sidecarSet)
+		control.UpdatePodAnnotationsInUpgrade([]string{"test-sidecar"}, pods[i], sidecarSet)
 	}
 	return pods
 }
@@ -319,12 +319,11 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			exceptNeedUpgradeCount: 30,
 		},
 	}
-	strategy := NewStrategy()
+	strategy := NewStrategy(sidecarcontrol.NewCommonControl(nil, ""))
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			control := sidecarcontrol.New(cs.getSidecarset())
 			pods := cs.getPods()
-			upgradePods := strategy.GetNextUpgradePods(control, pods)
+			upgradePods := strategy.GetNextUpgradePods(cs.getSidecarset(), pods)
 			if cs.exceptNeedUpgradeCount != len(upgradePods) {
 				t.Fatalf("except NeedUpgradeCount(%d), but get value(%d)", cs.exceptNeedUpgradeCount, len(upgradePods))
 			}
@@ -519,12 +518,11 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 		},
 	}
 
-	strategy := NewStrategy()
+	strategy := NewStrategy(sidecarcontrol.NewCommonControl(nil, ""))
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			control := sidecarcontrol.New(cs.getSidecarset())
 			pods := cs.getPods()
-			injectedPods := strategy.GetNextUpgradePods(control, pods)
+			injectedPods := strategy.GetNextUpgradePods(cs.getSidecarset(), pods)
 			if len(cs.exceptNextUpgradePods) != len(injectedPods) {
 				t.Fatalf("except NeedUpgradeCount(%d), but get value(%d)", len(cs.exceptNextUpgradePods), len(injectedPods))
 			}

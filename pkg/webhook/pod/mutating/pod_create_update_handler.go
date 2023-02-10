@@ -24,7 +24,12 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/openkruise/utils/sidecarcontrol"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8scache "k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -41,7 +46,9 @@ type PodCreateHandler struct {
 	// Decoder decodes objects
 	Decoder *admission.Decoder
 
-	finder *controllerfinder.ControllerFinder
+	// sidecarSet control
+	sidecarSetControl sidecarcontrol.SidecarControl
+	finder            *controllerfinder.ControllerFinder
 }
 
 var _ admission.Handler = &PodCreateHandler{}
@@ -73,7 +80,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		}
 	}
 
-	if skip, err := h.sidecarsetMutatingPod(ctx, req, obj); err != nil {
+	if skip, err := h.sidecarSetMutatingPod(ctx, req, obj); err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	} else if !skip {
 		changed = true
@@ -119,6 +126,7 @@ var _ inject.Client = &PodCreateHandler{}
 func (h *PodCreateHandler) InjectClient(c client.Client) error {
 	h.Client = c
 	h.finder = controllerfinder.Finder
+
 	return nil
 }
 
@@ -127,5 +135,17 @@ var _ admission.DecoderInjector = &PodCreateHandler{}
 // InjectDecoder injects the decoder into the PodCreateHandler
 func (h *PodCreateHandler) InjectDecoder(d *admission.Decoder) error {
 	h.Decoder = d
+	return nil
+}
+
+var _ inject.Cache = &PodCreateHandler{}
+
+// InjectCache injects the decoder into the PodCreateHandler
+func (h *PodCreateHandler) InjectCache(cacher cache.Cache) error {
+	revInformer, err := cacher.GetInformerForKind(context.TODO(), apps.SchemeGroupVersion.WithKind("ControllerRevision"))
+	if err != nil {
+		return err
+	}
+	h.sidecarSetControl = sidecarcontrol.NewCommonControl(revInformer.(k8scache.SharedIndexInformer).GetIndexer(), webhookutil.GetNamespace())
 	return nil
 }

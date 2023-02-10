@@ -24,10 +24,19 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/configuration"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"k8s.io/apimachinery/pkg/labels"
+
+	k8scache "k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/openkruise/utils/sidecarcontrol"
+	apps "k8s.io/api/apps/v1"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
@@ -71,7 +80,8 @@ type SidecarSetCreateUpdateHandler struct {
 	Client client.Client
 
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder        *admission.Decoder
+	historyControl sidecarcontrol.HistoryControl
 }
 
 func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(ctx context.Context, obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) (bool, string, error) {
@@ -136,7 +146,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1
 	}
 	// validating metadata
 	annotationKeys := sets.NewString()
-	if err := sidecarcontrol.ValidateSidecarSetPatchMetadataWhitelist(h.Client, obj); err != nil {
+	if err := h.validateSidecarSetPatchMetadataWhitelist(obj); err != nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), err.Error()))
 	}
 	for _, patch := range spec.PatchPodMetadata {
@@ -161,6 +171,56 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1
 	return allErrs
 }
 
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetPatchMetadataWhitelist(sidecarSet *appsv1alpha1.SidecarSet) error {
+	if len(sidecarSet.Spec.PatchPodMetadata) == 0 {
+		return nil
+	}
+
+	regAnnotations := make([]*regexp.Regexp, 0)
+	whitelist, err := configuration.GetSidecarSetPatchMetadataWhiteList(h.Client)
+	if err != nil {
+		return err
+	} else if whitelist == nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarSetPatchPodMetadataDefaultsAllowed) {
+			return nil
+		}
+		return fmt.Errorf("SidecarSet patch metadata whitelist not found")
+	}
+
+	for _, rule := range whitelist.Rules {
+		if rule.Selector != nil {
+			selector, err := util.ValidatedLabelSelectorAsSelector(rule.Selector)
+			if err != nil {
+				return err
+			}
+			if !selector.Matches(labels.Set(sidecarSet.Labels)) {
+				continue
+			}
+		}
+		for _, key := range rule.AllowedAnnotationKeyExprs {
+			reg, err := regexp.Compile(key)
+			if err != nil {
+				return err
+			}
+			regAnnotations = append(regAnnotations, reg)
+		}
+	}
+	if len(regAnnotations) == 0 {
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarSetPatchPodMetadataDefaultsAllowed) {
+			return nil
+		}
+		return fmt.Errorf("sidecarSet patch metadata annotation is not allowed")
+	}
+	for _, patch := range sidecarSet.Spec.PatchPodMetadata {
+		for key := range patch.Annotations {
+			if !matchRegKey(key, regAnnotations) {
+				return fmt.Errorf("sidecarSet patch metadata annotation(%s) is not allowed", key)
+			}
+		}
+	}
+	return nil
+}
+
 func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, metavalidation.ValidateLabelSelector(selector, fldPath)...)
@@ -183,7 +243,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj 
 		case revisionInfo.RevisionName == nil && revisionInfo.CustomVersion == nil:
 			errList = append(errList, field.Invalid(field.NewPath("revision"), revisionInfo, "revisionName and customVersion cannot be empty simultaneously"))
 		default:
-			revision, err := sidecarcontrol.NewHistoryControl(h.Client).GetHistorySidecarSet(obj, revisionInfo)
+			revision, err := h.historyControl.GetHistorySidecarSet(obj, revisionInfo)
 			if err != nil || revision == nil {
 				errList = append(errList, field.Invalid(field.NewPath("revision"), revision, fmt.Sprintf("Cannot find specific ControllerRevision, err: %v", err)))
 			}
@@ -496,5 +556,17 @@ var _ admission.DecoderInjector = &SidecarSetCreateUpdateHandler{}
 // InjectDecoder injects the decoder into the SidecarSetCreateUpdateHandler
 func (h *SidecarSetCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
 	h.Decoder = d
+	return nil
+}
+
+var _ inject.Cache = &SidecarSetCreateUpdateHandler{}
+
+// InjectCache injects the decoder into the PodCreateHandler
+func (h *SidecarSetCreateUpdateHandler) InjectCache(cacher cache.Cache) error {
+	revInformer, err := cacher.GetInformerForKind(context.TODO(), apps.SchemeGroupVersion.WithKind("ControllerRevision"))
+	if err != nil {
+		return err
+	}
+	h.historyControl = sidecarcontrol.NewHistoryControl(nil, revInformer.(k8scache.SharedIndexInformer).GetIndexer(), webhookutil.GetNamespace())
 	return nil
 }

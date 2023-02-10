@@ -26,10 +26,10 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	"github.com/openkruise/kruise/test/e2e/framework"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"

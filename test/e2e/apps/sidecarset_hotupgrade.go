@@ -22,9 +22,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -33,7 +33,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-var _ = SIGDescribe("SidecarSet", func() {
+var _ = SIGDescribe("SidecarSet HotUpgrade", func() {
 	f := framework.NewDefaultFramework("sidecarset")
 	var ns string
 	var c clientset.Interface

@@ -25,10 +25,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/configuration"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/fieldpath"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -76,13 +70,13 @@ type SidecarSetUpgradeSpec struct {
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
-func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
+func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, error) {
 	//If matchedNamespace is not empty, sidecarSet will only match the pods in the namespace
 	if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != pod.Namespace {
 		return false, nil
 	}
 	// if selector not matched, then continue
-	selector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.Selector)
+	selector, err := utils.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.Selector)
 	if err != nil {
 		return false, err
 	}
@@ -95,12 +89,9 @@ func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (
 
 // IsActivePod determines the pod whether need be injected and updated
 func IsActivePod(pod *corev1.Pod) bool {
-	/*for _, namespace := range SidecarIgnoredNamespaces {
-		if pod.Namespace == namespace {
-			return false
-		}
-	}*/
-	return kubecontroller.IsPodActive(pod)
+	return corev1.PodSucceeded != pod.Status.Phase &&
+		corev1.PodFailed != pod.Status.Phase &&
+		pod.DeletionTimestamp == nil
 }
 
 func GetSidecarSetRevision(sidecarSet *appsv1alpha1.SidecarSet) string {
@@ -223,7 +214,7 @@ func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet) sets.String 
 func GetPodsSortFunc(pods []*corev1.Pod, waitUpdateIndexes []int) func(i, j int) bool {
 	// not-ready < ready, unscheduled < scheduled, and pending < running
 	return func(i, j int) bool {
-		return kubecontroller.ActivePods(pods).Less(waitUpdateIndexes[i], waitUpdateIndexes[j])
+		return utils.ActivePods(pods).Less(waitUpdateIndexes[i], waitUpdateIndexes[j])
 	}
 }
 
@@ -242,12 +233,12 @@ func IsPodConsistentWithSidecarSet(pod *corev1.Pod, sidecarSet *appsv1alpha1.Sid
 		switch container.UpgradeStrategy.UpgradeType {
 		case appsv1alpha1.SidecarContainerHotUpgrade:
 			_, exist := GetPodHotUpgradeInfoInAnnotations(pod)[container.Name]
-			if !exist || util.GetContainer(fmt.Sprintf("%v-1", container.Name), pod) == nil ||
-				util.GetContainer(fmt.Sprintf("%v-2", container.Name), pod) == nil {
+			if !exist || utils.GetContainer(fmt.Sprintf("%v-1", container.Name), pod) == nil ||
+				utils.GetContainer(fmt.Sprintf("%v-2", container.Name), pod) == nil {
 				return false
 			}
 		default:
-			if util.GetContainer(container.Name, pod) == nil {
+			if utils.GetContainer(container.Name, pod) == nil {
 				return false
 			}
 		}
@@ -257,7 +248,7 @@ func IsPodConsistentWithSidecarSet(pod *corev1.Pod, sidecarSet *appsv1alpha1.Sid
 }
 
 func IsInjectedSidecarContainerInPod(container *corev1.Container) bool {
-	return util.GetContainerEnvValue(container, SidecarEnvKey) == "true"
+	return utils.GetContainerEnvValue(container, SidecarEnvKey) == "true"
 }
 
 func IsSharePodVolumeMounts(container *appsv1alpha1.SidecarContainer) bool {
@@ -292,7 +283,7 @@ func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *ap
 				// $(ODD_NAME) -> ODD_NAME
 				envName := env[2 : len(env)-1]
 				// get envVar in container
-				eVar := util.GetContainerEnvVar(&appContainer, envName)
+				eVar := utils.GetContainerEnvVar(&appContainer, envName)
 				if eVar == nil {
 					klog.Warningf("pod(%s/%s) container(%s) get env(%s) is nil", pod.Namespace, pod.Name, appContainer.Name, envName)
 					continue
@@ -354,7 +345,7 @@ func ExtractContainerNameFromFieldPath(fs *corev1.ObjectFieldSelector, pod *core
 	if err != nil {
 		return "", err
 	}
-	path, subscript, ok := fieldpath.SplitMaybeSubscriptedPath(fieldPath)
+	path, subscript, ok := utils.SplitMaybeSubscriptedPath(fieldPath)
 	if ok {
 		switch path {
 		case "metadata.annotations":
@@ -383,7 +374,7 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 	if version != "v1" {
 		return "", "", fmt.Errorf("unsupported pod version: %s", version)
 	}
-	path, _, ok := fieldpath.SplitMaybeSubscriptedPath(label)
+	path, _, ok := utils.SplitMaybeSubscriptedPath(label)
 	if ok {
 		switch path {
 		case "metadata.annotations", "metadata.labels":
@@ -451,63 +442,4 @@ func mergePatchJsonPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField 
 		}
 	}
 	return nil
-}
-
-func ValidateSidecarSetPatchMetadataWhitelist(c client.Client, sidecarSet *appsv1alpha1.SidecarSet) error {
-	if len(sidecarSet.Spec.PatchPodMetadata) == 0 {
-		return nil
-	}
-
-	regAnnotations := make([]*regexp.Regexp, 0)
-	whitelist, err := configuration.GetSidecarSetPatchMetadataWhiteList(c)
-	if err != nil {
-		return err
-	} else if whitelist == nil {
-		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarSetPatchPodMetadataDefaultsAllowed) {
-			return nil
-		}
-		return fmt.Errorf("SidecarSet patch metadata whitelist not found")
-	}
-
-	for _, rule := range whitelist.Rules {
-		if rule.Selector != nil {
-			selector, err := util.ValidatedLabelSelectorAsSelector(rule.Selector)
-			if err != nil {
-				return err
-			}
-			if !selector.Matches(labels.Set(sidecarSet.Labels)) {
-				continue
-			}
-		}
-		for _, key := range rule.AllowedAnnotationKeyExprs {
-			reg, err := regexp.Compile(key)
-			if err != nil {
-				return err
-			}
-			regAnnotations = append(regAnnotations, reg)
-		}
-	}
-	if len(regAnnotations) == 0 {
-		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarSetPatchPodMetadataDefaultsAllowed) {
-			return nil
-		}
-		return fmt.Errorf("sidecarSet patch metadata annotation is not allowed")
-	}
-	for _, patch := range sidecarSet.Spec.PatchPodMetadata {
-		for key := range patch.Annotations {
-			if !matchRegKey(key, regAnnotations) {
-				return fmt.Errorf("sidecarSet patch metadata annotation(%s) is not allowed", key)
-			}
-		}
-	}
-	return nil
-}
-
-func matchRegKey(key string, regs []*regexp.Regexp) bool {
-	for _, reg := range regs {
-		if reg.MatchString(key) {
-			return true
-		}
-	}
-	return false
 }

@@ -1,19 +1,23 @@
 package validating
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/openkruise/utils/sidecarcontrol"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -37,6 +41,39 @@ var (
 		Spec: appsv1alpha1.SidecarSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
+			},
+		},
+	}
+
+	sidecarSetDemo = &appsv1alpha1.SidecarSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Generation: 123,
+			Name:       "test-sidecarset",
+			Labels: map[string]string{
+				"app": "sidecar",
+			},
+		},
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "cold-sidecar",
+						Image: "cold-image:v1",
+					},
+					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+					},
+				},
+				{
+					Container: corev1.Container{
+						Name:  "hot-sidecar",
+						Image: "hot-image:v1",
+					},
+					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+						UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+						HotUpgradeEmptyImage: "hotupgrade:empty",
+					},
+				},
 			},
 		},
 	}
@@ -367,6 +404,8 @@ func TestValidateSidecarSet(t *testing.T) {
 	for name, sidecarSet := range errorCases {
 		fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(SidecarSetRevisions...).Build()
 		handler.Client = fakeClient
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		handler.historyControl = sidecarcontrol.NewHistoryControl(nil, indexer, webhookutil.GetNamespace())
 		allErrs := handler.validateSidecarSetSpec(&sidecarSet, field.NewPath("spec"))
 		if len(allErrs) != 1 {
 			t.Errorf("%v: expect errors len 1, but got: len %d %v", name, len(allErrs), util.DumpJSON(allErrs))
@@ -374,6 +413,7 @@ func TestValidateSidecarSet(t *testing.T) {
 			fmt.Printf("%v: %v\n", name, allErrs)
 		}
 	}
+	_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", features.SidecarSetPatchPodMetadataDefaultsAllowed))
 }
 
 func TestSidecarSetNameConflict(t *testing.T) {
@@ -812,6 +852,172 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 			errs := validateSidecarConflict(list, sidecar, field.NewPath("spec"))
 			if len(errs) != cs.expectErrLen {
 				t.Fatalf("except ErrLen(%d), but get errs(%d)", cs.expectErrLen, len(errs))
+			}
+		})
+	}
+}
+
+func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
+	cases := []struct {
+		name          string
+		getSidecarSet func() *appsv1alpha1.SidecarSet
+		getKruiseCM   func() *corev1.ConfigMap
+		expectErr     bool
+	}{
+		{
+			name: "validate sidecarSet no patch Metadata",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarSetDemo.DeepCopy()
+				return demo
+			},
+			getKruiseCM: func() *corev1.ConfigMap {
+				return nil
+			},
+			expectErr: false,
+		},
+		{
+			name: "validate sidecarSet whitelist failed-1",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarSetDemo.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+					},
+				}
+				return demo
+			},
+			getKruiseCM: func() *corev1.ConfigMap {
+				return nil
+			},
+			expectErr: true,
+		},
+		{
+			name: "validate sidecarSet whitelist success-1",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarSetDemo.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+					},
+				}
+				return demo
+			},
+			getKruiseCM: func() *corev1.ConfigMap {
+				demo := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configuration.KruiseConfigurationName,
+						Namespace: util.GetKruiseNamespace(),
+					},
+					Data: map[string]string{
+						configuration.SidecarSetPatchPodMetadataWhiteListKey: `{"rules":[{"allowedAnnotationKeyExprs":["key.*"]}]}`,
+					},
+				}
+				return demo
+			},
+			expectErr: false,
+		},
+		{
+			name: "validate sidecarSet whitelist failed-2",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarSetDemo.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+					},
+				}
+				return demo
+			},
+			getKruiseCM: func() *corev1.ConfigMap {
+				demo := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configuration.KruiseConfigurationName,
+						Namespace: util.GetKruiseNamespace(),
+					},
+					Data: map[string]string{
+						configuration.SidecarSetPatchPodMetadataWhiteListKey: `{"rules":[{"allowedAnnotationKeyExprs":["key2"]}]}`,
+					},
+				}
+				return demo
+			},
+			expectErr: true,
+		},
+		{
+			name: "validate sidecarSet whitelist failed-3",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarSetDemo.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+					},
+				}
+				return demo
+			},
+			getKruiseCM: func() *corev1.ConfigMap {
+				demo := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configuration.KruiseConfigurationName,
+						Namespace: util.GetKruiseNamespace(),
+					},
+					Data: map[string]string{
+						configuration.SidecarSetPatchPodMetadataWhiteListKey: `{"rules":[{"allowedAnnotationKeyExprs":["key.*"],"selector":{"matchLabels":{"app":"other"}}}]}`,
+					},
+				}
+				return demo
+			},
+			expectErr: true,
+		},
+		{
+			name: "validate sidecarSet whitelist success-2",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := sidecarSetDemo.DeepCopy()
+				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+					{
+						Annotations: map[string]string{
+							"key1": "value1",
+						},
+					},
+				}
+				return demo
+			},
+			getKruiseCM: func() *corev1.ConfigMap {
+				demo := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configuration.KruiseConfigurationName,
+						Namespace: util.GetKruiseNamespace(),
+					},
+					Data: map[string]string{
+						configuration.SidecarSetPatchPodMetadataWhiteListKey: `{"rules":[{"allowedAnnotationKeyExprs":["key.*"],"selector":{"matchLabels":{"app":"sidecar"}}}]}`,
+					},
+				}
+				return demo
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(testScheme).Build()
+			if cs.getKruiseCM() != nil {
+				err := fakeClient.Create(context.TODO(), cs.getKruiseCM())
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			}
+			handler.Client = fakeClient
+			err := handler.validateSidecarSetPatchMetadataWhitelist(cs.getSidecarSet())
+			if cs.expectErr && err == nil {
+				t.Fatalf("ValidateSidecarSetPatchMetadataWhitelist failed")
+			} else if !cs.expectErr && err != nil {
+				t.Fatalf("ValidateSidecarSetPatchMetadataWhitelist failed: %s", err.Error())
 			}
 		})
 	}

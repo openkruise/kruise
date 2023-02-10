@@ -20,9 +20,13 @@ import (
 	"fmt"
 	"testing"
 
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+
+	"k8s.io/client-go/tools/cache"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/utils/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -249,7 +253,9 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 			pod := cs.getPods()[0]
 			sidecarset := cs.getSidecarset()
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pod).Build()
-			processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			k8sclient := &k8sfake.Clientset{}
+			processor := NewSidecarSetProcessor(fakeClient, k8sclient, indexer, exps, record.NewFakeRecorder(10))
 			_, err := processor.UpdateSidecarSet(sidecarset)
 			if err != nil {
 				t.Errorf("processor update sidecarset failed: %s", err.Error())

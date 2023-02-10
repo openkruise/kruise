@@ -87,7 +87,6 @@ func New(cfg *rest.Config, handlers map[string]admission.Handler) (*Controller, 
 		handlers:   handlers,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "webhook-controller"),
 	}
-
 	c.informerFactory = informers.NewSharedInformerFactory(c.kubeClient, 0)
 
 	secretInformer := coreinformers.New(c.informerFactory, namespace, nil).Secrets()

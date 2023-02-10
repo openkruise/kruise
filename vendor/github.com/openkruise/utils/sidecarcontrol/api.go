@@ -18,20 +18,11 @@ package sidecarcontrol
 
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type SidecarControl interface {
-	//*****common*****//
-	// get sidecarset
-	GetSidecarset() *appsv1alpha1.SidecarSet
-	// when sidecarSet is not active, it will not perform injections and upgrades process.
-	// You can re-implement the function IsActiveSidecarSet to indicate that this sidecarSet is no longer working by adding some sidecarSet flags,
-	// for example: sidecarSet.Annotations[sidecarset.kruise.io/disabled] = "true"
-	IsActiveSidecarSet() bool
-
 	//*****inject portion*****//
 	// whether need inject the volumeMount into container
 	// when ShareVolumePolicy is enabled, the sidecar container will share the other container's VolumeMounts in the pod(don't contains the injected sidecar container).
@@ -47,25 +38,26 @@ type SidecarControl interface {
 
 	//*****upgrade portion*****//
 	// IsPodStateConsistent indicates whether pod.spec and pod.status are consistent after updating the sidecar containers
-	IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets.String) bool
+	IsPodStateConsistent(pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet, sidecarContainers sets.String) bool
 	// IsPodReady indicates whether pod is fully ready
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
 	// 3. whether empty sidecar container is HotUpgradeEmptyImage
-	IsPodReady(pod *v1.Pod) bool
+	IsPodReady(pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) bool
 	// upgrade pod sidecar container to sidecarSet latest version
 	// if container==nil means no change, no need to update, otherwise need to update
-	UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container
+	UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) *v1.Container
 	// When upgrading the pod sidecar container, you need to record some in-place upgrade information in pod annotations,
 	// which is needed by the sidecarset controller to determine whether the upgrade is completed.
-	UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod)
+	UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet)
 	// Is sidecarset can upgrade pods,
 	// In Kubernetes native scenarios, only Container Image upgrades are allowed
 	// When modifying other fields of the container, e.g. volumemounts, the sidecarSet will not depart to upgrade the sidecar container logic in-place,
 	// and needs to be done by rebuilding the pod
-	IsSidecarSetUpgradable(pod *v1.Pod) bool
-}
+	IsSidecarSetUpgradable(pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) bool
 
-func New(cs *appsv1alpha1.SidecarSet) SidecarControl {
-	return &commonControl{SidecarSet: cs}
+	// FindContainerToHotUpgrade
+	FindContainerToHotUpgrade(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (string, string)
+
+	GetSuitableRevisionSidecarSet(sidecarSet *appsv1alpha1.SidecarSet, oldPod, newPod *v1.Pod) (*appsv1alpha1.SidecarSet, error)
 }

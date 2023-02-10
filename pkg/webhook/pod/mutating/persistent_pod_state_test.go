@@ -235,3 +235,19 @@ func TestPersistentPodStateMutatingPod(t *testing.T) {
 		})
 	}
 }
+
+func newAdmission(op admissionv1.Operation, object, oldObject runtime.RawExtension, subResource string) admission.Request {
+	return admission.Request{
+		AdmissionRequest: newAdmissionRequest(op, object, oldObject, subResource),
+	}
+}
+
+func newAdmissionRequest(op admissionv1.Operation, object, oldObject runtime.RawExtension, subResource string) admissionv1.AdmissionRequest {
+	return admissionv1.AdmissionRequest{
+		Resource:    metav1.GroupVersionResource{Group: corev1.SchemeGroupVersion.Group, Version: corev1.SchemeGroupVersion.Version, Resource: "pods"},
+		Operation:   op,
+		Object:      object,
+		OldObject:   oldObject,
+		SubResource: subResource,
+	}
+}
