@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -108,27 +109,24 @@ func (r *ControllerFinder) GetExpectedScaleForPods(pods []*corev1.Pod) (int32, e
 	// 1. Find the controller for each pod.  If any pod has 0 controllers,
 	// that's an error. With ControllerRef, a pod can only have 1 controller.
 	// A mapping from controllers to their scale.
+	podRefs := sets.NewString()
 	controllerScale := map[types.UID]int32{}
 	for _, pod := range pods {
 		ref := metav1.GetControllerOf(pod)
-		if ref == nil {
+		// ref has already been got, so there is no need to get again
+		if ref == nil || podRefs.Has(string(ref.UID)) {
 			continue
 		}
-		// If we already know the scale of the controller there is no need to do anything.
-		if _, found := controllerScale[ref.UID]; found {
-			continue
-		}
+		podRefs.Insert(string(ref.UID))
 		// Check all the supported controllers to find the desired scale.
 		workload, err := r.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, ref.UID)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil {
 			return 0, err
-		} else if workload != nil && workload.Metadata.DeletionTimestamp.IsZero() {
-			controllerScale[ref.UID] = workload.Scale
-		} else {
-			controllerScale[ref.UID] = 0
+		} else if workload == nil || !workload.Metadata.DeletionTimestamp.IsZero() {
+			continue
 		}
+		controllerScale[workload.UID] = workload.Scale
 	}
-
 	// 2. Add up all the controllers.
 	var expectedCount int32
 	for _, count := range controllerScale {
