@@ -2955,39 +2955,6 @@ func (om *fakeObjectManager) setPodReady(set *appsv1beta1.StatefulSet, ordinal i
 	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (om *fakeObjectManager) setPodAvailable(set *appsv1beta1.StatefulSet, ordinal int, lastTransitionTime time.Time) ([]*v1.Pod, error) { // TODO: not used
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		return nil, err
-	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
-	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := pods[ordinal].DeepCopy()
-	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: lastTransitionTime}}
-	_, existingCondition := podutil.GetPodCondition(&pod.Status, condition.Type)
-	if existingCondition != nil {
-		existingCondition.Status = v1.ConditionTrue
-		existingCondition.LastTransitionTime = metav1.Time{Time: lastTransitionTime}
-	} else {
-		existingCondition = &v1.PodCondition{
-			Type:               v1.PodReady,
-			Status:             v1.ConditionTrue,
-			LastTransitionTime: metav1.Time{Time: lastTransitionTime},
-		}
-		pod.Status.Conditions = append(pod.Status.Conditions, *existingCondition)
-	}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
-	fakeResourceVersion(pod)
-	om.podsIndexer.Update(pod)
-	return om.podsLister.Pods(set.Namespace).List(selector)
-}
-
 func (om *fakeObjectManager) addTerminatingPod(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	pod := newStatefulSetPod(set, ordinal)
 	pod.SetUID(types.UID(pod.Name + "-uid")) // To match fakeObjectManager.CreatePod

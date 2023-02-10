@@ -57,14 +57,6 @@ type AdvancedCronJobCreateUpdateHandler struct {
 	Decoder *admission.Decoder
 }
 
-func (h *AdvancedCronJobCreateUpdateHandler) validatingAdvancedCronJobFn(ctx context.Context, obj *appsv1alpha1.AdvancedCronJob) (bool, string, error) { // TODO: not used
-	allErrs := h.validateAdvancedCronJob(obj)
-	if len(allErrs) != 0 {
-		return false, "", allErrs.ToAggregate()
-	}
-	return true, "allowed to be admitted", nil
-}
-
 func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJob(obj *appsv1alpha1.AdvancedCronJob) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, true, validateAdvancedCronJobName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateAdvancedCronJobSpec(&obj.Spec, field.NewPath("spec"))...)

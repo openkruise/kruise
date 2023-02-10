@@ -464,19 +464,6 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	return dsc.updateDaemonSetStatus(ds, nodeList, hash, true)
 }
 
-func (dsc *ReconcileDaemonSet) getDaemonSetsForPod(pod *corev1.Pod) []*appsv1alpha1.DaemonSet { // TODO: not used
-	sets, err := dsc.GetPodDaemonSets(pod)
-	if err != nil {
-		return nil
-	}
-	if len(sets) > 1 {
-		// ControllerRef will ensure we don't do anything crazy, but more than one
-		// item in this list nevertheless constitutes user error.
-		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels))
-	}
-	return sets
-}
-
 // Predicates checks if a DaemonSet's pod can run on a node.
 func Predicates(pod *corev1.Pod, node *corev1.Node, taints []corev1.Taint) (fitsNodeName, fitsNodeAffinity, fitsTaints bool) {
 	fitsNodeName = len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == node.Name
