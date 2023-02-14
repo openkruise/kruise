@@ -18,6 +18,8 @@ package cloneset
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -206,18 +209,29 @@ func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, cur
 	if containsReadinessGate(curPod) {
 		opts := coreControl.GetUpdateOptions()
 		opts = inplaceupdate.SetOptionsDefaults(opts)
-		if err := opts.CheckPodUpdateCompleted(curPod); err == nil {
+		if err := containersUpdateCompleted(curPod, opts.CheckContainersUpdateCompleted); err == nil {
 			if cond := inplaceupdate.GetCondition(curPod); cond == nil || cond.Status != v1.ConditionTrue {
 				return false
 			}
 		}
 	}
 
-	if coreControl.IsPodUpdateReady(oldPod, 0) != coreControl.IsPodUpdateReady(curPod, 0) {
+	if pod.IsPodReady(oldPod) != pod.IsPodReady(curPod) {
 		return false
 	}
 
 	return true
+}
+
+func containersUpdateCompleted(pod *v1.Pod, checkFunc func(pod *v1.Pod, state *appspub.InPlaceUpdateState) error) error {
+	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); ok {
+		state := appspub.InPlaceUpdateState{}
+		if err := json.Unmarshal([]byte(stateStr), &state); err != nil {
+			return err
+		}
+		return checkFunc(pod, &state)
+	}
+	return fmt.Errorf("pod %v has no in-place update state annotation", klog.KObj(pod))
 }
 
 func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
