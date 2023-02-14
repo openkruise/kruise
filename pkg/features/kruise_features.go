@@ -93,6 +93,10 @@ const (
 	// PreDownloadImageForDaemonSetUpdate enables daemonset-controller to create ImagePullJobs to
 	// pre-download images for update.
 	PreDownloadImageForDaemonSetUpdate featuregate.Feature = "PreDownloadImageForDaemonSetUpdate"
+
+	// CloneSetEventHandlerOptimization enable optimization for cloneset-controller to reduce the
+	// queuing frequency cased by pod update.
+	CloneSetEventHandlerOptimization featuregate.Feature = "CloneSetEventHandlerOptimization"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -114,6 +118,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
 	PodProbeMarkerGate:                        {Default: false, PreRelease: featuregate.Alpha},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
