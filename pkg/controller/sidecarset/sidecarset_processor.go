@@ -214,7 +214,7 @@ func (p *Processor) listMatchedSidecarSets(pod *corev1.Pod) string {
 	//matched SidecarSet.Name list
 	sidecarSetNames := make([]string, 0)
 	for _, sidecarSet := range sidecarSetList.Items {
-		if matched, _ := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); matched {
+		if matched, _ := sidecarcontrol.PodMatchedSidecarSet(p.Client, pod, &sidecarSet); matched {
 			sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
 		}
 	}
@@ -260,9 +260,16 @@ func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, 
 	if err != nil {
 		return nil, err
 	}
-
-	// If sidecarSet.Spec.Namespace is empty, then select in cluster
-	scopedNamespaces := []string{s.Spec.Namespace}
+	scopedNamespaces := sets.NewString()
+	if s.Spec.Namespace != "" || s.Spec.NamespaceSelector != nil {
+		if scopedNamespaces, err = sidecarcontrol.FetchSidecarSetMatchedNamespace(p.Client, s); err != nil {
+			return nil, err
+		}
+		// If sidecarSet.Spec.Namespace is empty, then select in cluster
+	} else {
+		// when namespace="", client will list pods in all namespaces
+		scopedNamespaces.Insert("")
+	}
 	selectedPods, err := p.getSelectedPods(scopedNamespaces, selector)
 	if err != nil {
 		return nil, err
@@ -282,10 +289,10 @@ func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, 
 }
 
 // get selected pods(DisableDeepCopy:true, indicates must be deep copy before update pod objection)
-func (p *Processor) getSelectedPods(namespaces []string, selector labels.Selector) (relatedPods []*corev1.Pod, err error) {
+func (p *Processor) getSelectedPods(namespaces sets.String, selector labels.Selector) (relatedPods []*corev1.Pod, err error) {
 	// DisableDeepCopy:true, indicates must be deep copy before update pod objection
 	listOpts := &client.ListOptions{LabelSelector: selector}
-	for _, ns := range namespaces {
+	for _, ns := range namespaces.List() {
 		allPods := &corev1.PodList{}
 		listOpts.Namespace = ns
 		if listErr := p.Client.List(context.TODO(), allPods, listOpts, utilclient.DisableDeepCopy); listErr != nil {

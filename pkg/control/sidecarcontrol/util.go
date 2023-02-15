@@ -17,6 +17,7 @@ limitations under the License.
 package sidecarcontrol
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -27,6 +28,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	corev1 "k8s.io/api/core/v1"
@@ -76,11 +78,20 @@ type SidecarSetUpgradeSpec struct {
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
-func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (bool, error) {
-	//If matchedNamespace is not empty, sidecarSet will only match the pods in the namespace
-	if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != pod.Namespace {
+func PodMatchedSidecarSet(c client.Client, pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, error) {
+	podNamespace := pod.Namespace
+	if podNamespace == "" {
+		podNamespace = "default"
+	}
+	//If Namespace is not empty, sidecarSet will only match the pods in the namespaces
+	if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != podNamespace {
 		return false, nil
 	}
+	if sidecarSet.Spec.NamespaceSelector != nil &&
+		!IsSelectorNamespace(c, podNamespace, sidecarSet.Spec.NamespaceSelector) {
+		return false, nil
+	}
+
 	// if selector not matched, then continue
 	selector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.Selector)
 	if err != nil {
@@ -91,6 +102,41 @@ func PodMatchedSidecarSet(pod *corev1.Pod, sidecarSet appsv1alpha1.SidecarSet) (
 		return true, nil
 	}
 	return false, nil
+}
+
+func IsSelectorNamespace(c client.Client, ns string, nsSelector *metav1.LabelSelector) bool {
+	selector, err := util.ValidatedLabelSelectorAsSelector(nsSelector)
+	if err != nil {
+		return false
+	}
+	nsObj := &corev1.Namespace{}
+	err = c.Get(context.TODO(), client.ObjectKey{Name: ns}, nsObj)
+	if err != nil {
+		return false
+	}
+	return selector.Matches(labels.Set(nsObj.Labels))
+}
+
+// FetchSidecarSetMatchedNamespace fetch sidecarSet matched namespaces
+func FetchSidecarSetMatchedNamespace(c client.Client, sidecarSet *appsv1alpha1.SidecarSet) (sets.String, error) {
+	ns := sets.NewString()
+	//If Namespace is not empty, sidecarSet will only match the pods in the namespaces
+	if sidecarSet.Spec.Namespace != "" {
+		return ns.Insert(sidecarSet.Spec.Namespace), nil
+	}
+	// get more faster selector
+	selector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.NamespaceSelector)
+	if err != nil {
+		return nil, err
+	}
+	nsList := &corev1.NamespaceList{}
+	if err = c.List(context.TODO(), nsList, &client.ListOptions{LabelSelector: selector}, utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+	for _, obj := range nsList.Items {
+		ns.Insert(obj.Name)
+	}
+	return ns, nil
 }
 
 // IsActivePod determines the pod whether need be injected and updated

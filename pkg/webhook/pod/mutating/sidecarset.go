@@ -74,7 +74,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		if sidecarSet.Spec.InjectionStrategy.Paused {
 			continue
 		}
-		if matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet); err != nil {
+		if matched, err := sidecarcontrol.PodMatchedSidecarSet(h.Client, pod, &sidecarSet); err != nil {
 			return false, err
 		} else if !matched {
 			continue

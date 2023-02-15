@@ -670,7 +670,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			ginkgo.By(fmt.Sprintf("sidecarSet update pod annotations done"))
 		})
 
-		framework.ConformanceIt("sidecarSet upgrade cold sidecar container image", func() {
+		framework.ConformanceIt("sidecarSet upgrade cold sidecar container image only", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
@@ -680,8 +680,12 @@ var _ = SIGDescribe("SidecarSet", func() {
 					IntVal: 2,
 				},
 			}
+			sidecarSetIn.Spec.NamespaceSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{"inject": "sidecar"},
+			}
+			sidecarSetIn.Spec.Namespace = ""
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
-			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s %s", sidecarSetIn.Name, util.DumpJSON(sidecarSetIn)))
 			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
@@ -690,10 +694,33 @@ var _ = SIGDescribe("SidecarSet", func() {
 			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
+
 			// check pods
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
+				gomega.Expect(pod.Spec.Containers).Should(gomega.HaveLen(1))
+			}
+
+			// update ns
+			nsObj, err := c.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			nsObj.Labels["inject"] = "sidecar"
+			_, err = c.CoreV1().Namespaces().Update(context.TODO(), nsObj, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// delete pods
+			for _, pod := range pods {
+				err = c.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
+			time.Sleep(time.Second * 5)
+
+			// check pods
+			pods, err = tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				gomega.Expect(pod.Spec.Containers).Should(gomega.HaveLen(2))
 				gomega.Expect(pod.Spec.Containers[0].Image).Should(gomega.Equal(sidecarSetIn.Spec.Containers[0].Image))
 			}
 
