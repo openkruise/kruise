@@ -72,7 +72,6 @@ linters:
   disable-all: true
   enable:
     # TODO Enforce the below linters later
-    - deadcode
     - gofmt
     - govet
     - goimports
@@ -80,6 +79,7 @@ linters:
     - misspell
     - vet
     - unconvert
+    - unused
 issues:
   exclude:
     # staticcheck

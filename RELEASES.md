@@ -6,7 +6,7 @@ Kruise uses semantic versioning so that their users can reliably upgrade accordi
 
 ## Release Cycle
 
-Kruise is using a release schedule of 2 to 3 months and uses [GitHub milestones](https://github.com/openkruise/kruise/milestones) to provide an indiciation of when the next release is planned.
+Kruise is using a release schedule of 2 to 3 months and uses [GitHub milestones](https://github.com/openkruise/kruise/milestones) to provide an indication of when the next release is planned.
 It can, however, happen that releases get delayed which will be reflected on the milestone.
 
 ## Release Process
@@ -33,5 +33,5 @@ Next to that, you can join the conversation for every new release on GitHub Disc
 - [User Documentation](https://openkruise.io/docs/)
 - Community
   - [GitHub Discussions](https://github.com/openkruise/kruise/discussions/new)
-  - [Channel #openkruise in Kubernete Slack](https://kubernetes.slack.com/channels/openkruise) ([registration](http://slack.k8s.io/))
+  - [Channel #openkruise in Kubernetes Slack](https://kubernetes.slack.com/channels/openkruise) ([registration](http://slack.k8s.io/))
   - DingTalk：Search GroupID 23330762 (Chinese)

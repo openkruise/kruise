@@ -30,25 +30,25 @@ import (
 )
 
 const (
-	// record which hot upgrade container is working currently
+	// SidecarSetWorkingHotUpgradeContainer records which hot upgrade container is working currently
 	SidecarSetWorkingHotUpgradeContainer = "kruise.io/sidecarset-working-hotupgrade-container"
 
 	// hotUpgrade container name suffix
 	hotUpgradeNameSuffix1 = "-1"
 	hotUpgradeNameSuffix2 = "-2"
 
-	// sidecar container version in container env(SIDECARSET_VERSION)
+	// SidecarSetVersionEnvKey is sidecar container version in container env(SIDECARSET_VERSION)
 	SidecarSetVersionEnvKey = "SIDECARSET_VERSION"
-	// container version env in the other sidecar container of the same hotupgrade sidecar(SIDECARSET_VERSION_ALT)
+	// SidecarSetVersionAltEnvKey is container version env in the other sidecar container of the same hotupgrade sidecar(SIDECARSET_VERSION_ALT)
 	SidecarSetVersionAltEnvKey = "SIDECARSET_VERSION_ALT"
 )
 
-// return format: mesh-1, mesh-2
+// GetHotUpgradeContainerName returns format: mesh-1, mesh-2
 func GetHotUpgradeContainerName(name string) (string, string) {
 	return name + hotUpgradeNameSuffix1, name + hotUpgradeNameSuffix2
 }
 
-// only used in hot upgrade container
+// GetPodSidecarSetVersionAnnotation is only used in hot upgrade container
 // cName format: mesh-1, mesh-2
 func GetPodSidecarSetVersionAnnotation(cName string) string {
 	return fmt.Sprintf("version.sidecarset.kruise.io/%s", cName)
@@ -58,12 +58,12 @@ func GetPodSidecarSetVersionAltAnnotation(cName string) string {
 	return fmt.Sprintf("versionalt.sidecarset.kruise.io/%s", cName)
 }
 
-// whether sidecar container update strategy is HotUpdate
+// IsHotUpgradeContainer indicates whether sidecar container update strategy is HotUpdate
 func IsHotUpgradeContainer(sidecarContainer *appsv1alpha1.SidecarContainer) bool {
 	return sidecarContainer.UpgradeStrategy.UpgradeType == appsv1alpha1.SidecarContainerHotUpgrade
 }
 
-// which hot upgrade sidecar container is working now
+// GetPodHotUpgradeInfoInAnnotations checks which hot upgrade sidecar container is working now
 // format: sidecarset.spec.container[x].name -> pod.spec.container[x].name
 // for example: mesh -> mesh-1, envoy -> envoy-2
 func GetPodHotUpgradeInfoInAnnotations(pod *corev1.Pod) map[string]string {
@@ -84,7 +84,7 @@ func GetPodHotUpgradeInfoInAnnotations(pod *corev1.Pod) map[string]string {
 // GetPodHotUpgradeContainers return two hot upgrade sidecar containers
 // workContainer: currently working sidecar container, record in pod annotations[kruise.io/sidecarset-working-hotupgrade-container]
 // otherContainer:
-// 	1. empty container
+//  1. empty container
 //  2. when in hot upgrading process, the older sidecar container
 func GetPodHotUpgradeContainers(sidecarName string, pod *corev1.Pod) (workContainer, otherContainer string) {
 	hotUpgradeWorkContainer := GetPodHotUpgradeInfoInAnnotations(pod)

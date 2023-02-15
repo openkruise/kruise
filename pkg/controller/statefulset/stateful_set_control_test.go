@@ -81,7 +81,7 @@ func setupController(client clientset.Interface, kruiseClient kruiseclientset.In
 	cache.WaitForCacheSync(
 		stop,
 		kruiseInformerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
-		//informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
+		// informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 	)
@@ -671,7 +671,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		cache.WaitForCacheSync(
 			stop,
 			kruiseInformerFactory.Apps().V1beta1().StatefulSets().Informer().HasSynced,
-			//informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
+			// informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
 			informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
 		)
@@ -1658,7 +1658,7 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		validate        func(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error
 	}
 	const setSize = 5
-	//originalImage := newStatefulSet(1).Spec.Template.Spec.Containers[0].Image
+	// originalImage := newStatefulSet(1).Spec.Template.Spec.Containers[0].Image
 	newImage := "foo"
 
 	readyPods := func(partition, pauseSecond int) func(om *fakeObjectManager, set *appsv1beta1.StatefulSet,
@@ -2949,39 +2949,6 @@ func (om *fakeObjectManager) setPodReady(set *appsv1beta1.StatefulSet, ordinal i
 	sort.Sort(ascendingOrdinal(pods))
 	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
-	fakeResourceVersion(pod)
-	om.podsIndexer.Update(pod)
-	return om.podsLister.Pods(set.Namespace).List(selector)
-}
-
-func (om *fakeObjectManager) setPodAvailable(set *appsv1beta1.StatefulSet, ordinal int, lastTransitionTime time.Time) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		return nil, err
-	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
-	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := pods[ordinal].DeepCopy()
-	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: lastTransitionTime}}
-	_, existingCondition := podutil.GetPodCondition(&pod.Status, condition.Type)
-	if existingCondition != nil {
-		existingCondition.Status = v1.ConditionTrue
-		existingCondition.LastTransitionTime = metav1.Time{Time: lastTransitionTime}
-	} else {
-		existingCondition = &v1.PodCondition{
-			Type:               v1.PodReady,
-			Status:             v1.ConditionTrue,
-			LastTransitionTime: metav1.Time{Time: lastTransitionTime},
-		}
-		pod.Status.Conditions = append(pod.Status.Conditions, *existingCondition)
-	}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)

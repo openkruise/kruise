@@ -53,20 +53,20 @@ func convertToRegistryAuths(pullSecrets []v1.Secret, repo string) (infos []daemo
 	return infos, nil
 }
 
-//// Auths struct contains an embedded RegistriesStruct of name auths
-//type Auths struct {
+// // Auths struct contains an embedded RegistriesStruct of name auths
+// type Auths struct {
 //	Registries RegistriesStruct `json:"auths"`
-//}
+// }
 //
-//// RegistriesStruct is a map of registries
-//type RegistriesStruct map[string]struct {
+// // RegistriesStruct is a map of registries
+// type RegistriesStruct map[string]struct {
 //	Username string `json:"username"`
 //	Password string `json:"password"`
 //	Email    string `json:"email"`
 //	Auth     string `json:"auth"`
-//}
+// }
 //
-//func convertToRegistryAuthInfo(secret v1.Secret, registry string) (*daemonutil.AuthInfo, error) {
+// func convertToRegistryAuthInfo(secret v1.Secret, registry string) (*daemonutil.AuthInfo, error) {
 //	auths := Auths{}
 //	if secret.Type == v1.SecretTypeOpaque {
 //		return &daemonutil.AuthInfo{
@@ -97,9 +97,9 @@ func convertToRegistryAuths(pullSecrets []v1.Secret, repo string) (infos []daemo
 //		}, nil
 //	}
 //	return nil, fmt.Errorf("imagePullSecret %s/%s contains neither .dockercfg nor .dockerconfigjson", secret.Namespace, secret.Name)
-//}
+// }
 
-//func containsImage(c []ImageInfo, name string, tag string) bool {
+// func containsImage(c []ImageInfo, name string, tag string) bool {
 //	for _, info := range c {
 //		for _, repoTag := range info.RepoTags {
 //			imageRepo, imageTag := daemonutil.ParseRepositoryTag(repoTag)
@@ -109,11 +109,11 @@ func convertToRegistryAuths(pullSecrets []v1.Secret, repo string) (infos []daemo
 //		}
 //	}
 //	return false
-//}
+// }
 
 type layerProgress struct {
 	*dockermessage.JSONProgress
-	Status string `json:"status,omitempty"` //Extracting,Pull complete,Pulling fs layer,Verifying Checksum,Downloading
+	Status string `json:"status,omitempty"` // Extracting,Pull complete,Pulling fs layer,Verifying Checksum,Downloading
 }
 
 type pullingProgress struct {
@@ -201,11 +201,13 @@ func (r *imagePullStatusReader) mainloop() {
 				klog.V(5).Info("runtime read eof")
 				r.seedPullStatus(ImagePullStatus{Process: 100, Finish: true})
 				return
-			} else if err != nil {
+			}
+			if err != nil {
 				klog.V(5).Infof("runtime read err %v", err)
 				r.seedPullStatus(ImagePullStatus{Err: err, Finish: true})
 				return
-			} else if jm.Error != nil {
+			}
+			if jm.Error != nil {
 				klog.V(5).Infof("runtime read err %v", jm.Error)
 				r.seedPullStatus(ImagePullStatus{Err: fmt.Errorf("get error in pull response: %+v", jm.Error), Finish: true})
 				return
@@ -238,8 +240,9 @@ func (c ImageInfo) ContainsImage(name string, tag string) bool {
 
 // parseRepositoryTag gets a repos name and returns the right reposName + tag|digest
 // The tag can be confusing because of a port in a repository name.
-//     Ex: localhost.localdomain:5000/samalba/hipache:latest
-//     Digest ex: localhost:5000/foo/bar@sha256:bc8813ea7b3603864987522f02a76101c17ad122e1c46d790efc0fca78ca7bfb
+//
+//	Ex: localhost.localdomain:5000/samalba/hipache:latest
+//	Digest ex: localhost:5000/foo/bar@sha256:bc8813ea7b3603864987522f02a76101c17ad122e1c46d790efc0fca78ca7bfb
 func parseRepositoryTag(repos string) (string, string) {
 	n := strings.Index(repos, "@")
 	if n >= 0 {
