@@ -53,18 +53,8 @@ var (
 
 // AdvancedCronJobCreateUpdateHandler handles AdvancedCronJob
 type AdvancedCronJobCreateUpdateHandler struct {
-	//Client client.Client
-
 	// Decoder decodes objects
 	Decoder *admission.Decoder
-}
-
-func (h *AdvancedCronJobCreateUpdateHandler) validatingAdvancedCronJobFn(ctx context.Context, obj *appsv1alpha1.AdvancedCronJob) (bool, string, error) {
-	allErrs := h.validateAdvancedCronJob(obj)
-	if len(allErrs) != 0 {
-		return false, "", allErrs.ToAggregate()
-	}
-	return true, "allowed to be admitted", nil
 }
 
 func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJob(obj *appsv1alpha1.AdvancedCronJob) field.ErrorList {
@@ -232,14 +222,6 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 
 	return admission.ValidationResponse(true, "")
 }
-
-//var _ inject.Client = &AdvancedCronJobCreateUpdateHandler{}
-//
-//// InjectClient injects the client into the AdvancedCronJobCreateUpdateHandler
-//func (h *AdvancedCronJobCreateUpdateHandler) InjectClient(c client.Client) error {
-//	h.Client = c
-//	return nil
-//}
 
 var _ admission.DecoderInjector = &AdvancedCronJobCreateUpdateHandler{}
 

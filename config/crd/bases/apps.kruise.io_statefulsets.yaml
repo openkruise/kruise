@@ -238,7 +238,8 @@ spec:
                                   by the value of key2 and put behind those pods have
                                   key1.'
                                 items:
-                                  description: UpdatePriorityOrder defines order priority.
+                                  description: UpdatePriorityOrderTerm defines order
+                                    priority.
                                   properties:
                                     orderedKey:
                                       description: Calculate priority by value of
@@ -779,7 +780,8 @@ spec:
                                   by the value of key2 and put behind those pods have
                                   key1.'
                                 items:
-                                  description: UpdatePriorityOrder defines order priority.
+                                  description: UpdatePriorityOrderTerm defines order
+                                    priority.
                                   properties:
                                     orderedKey:
                                       description: Calculate priority by value of

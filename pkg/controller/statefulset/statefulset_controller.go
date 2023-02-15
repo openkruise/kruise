@@ -305,7 +305,8 @@ func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1beta1.StatefulS
 // It also reconciles ControllerRef by adopting/orphaning.
 //
 // NOTE: Returned Pods are pointers to objects from the cache.
-//       If you need to modify one, you need to copy it first.
+//
+//	If you need to modify one, you need to copy it first.
 func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1beta1.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
 	// List all pods to include the pods that don't match the selector anymore but
 	// has a ControllerRef pointing to this StatefulSet.

@@ -129,8 +129,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//In workload scaling scenario, there is a risk of interception by the pub webhook against the scaled pod.
-	//The solution for this scenario: the pub controller listens to workload replicas changes and adjusts UnavailableAllowed in time.
+	// In workload scaling scenario, there is a risk of interception by the pub webhook against the scaled pod.
+	// The solution for this scenario: the pub controller listens to workload replicas changes and adjusts UnavailableAllowed in time.
 	// Example for:
 	// 1. cloneSet.replicas = 100, pub.MaxUnavailable = 10%, then UnavailableAllowed=10.
 	// 2. at this time the cloneSet.replicas is scaled down to 50, the pub controller listens to the replicas change, triggering reconcile will adjust UnavailableAllowed to 55.
@@ -152,7 +152,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//kruise AdvancedStatefulSet
+	// kruise AdvancedStatefulSet
 	if err = c.Watch(&source.Kind{Type: &kruiseappsv1beta1.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1beta1.StatefulSet)
@@ -169,7 +169,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//CloneSet
+	// CloneSet
 	if err = c.Watch(&source.Kind{Type: &kruiseappsv1alpha1.CloneSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
@@ -186,7 +186,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	//StatefulSet
+	// StatefulSet
 	if err = c.Watch(&source.Kind{Type: &apps.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.StatefulSet)
@@ -398,40 +398,6 @@ func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[s
 	return
 }
 
-// This function returns pods using the PodUnavailableBudget object.
-func (r *ReconcilePodUnavailableBudget) getPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, error) {
-	// if targetReference isn't nil, priority to take effect
-	var listOptions *client.ListOptions
-	if pub.Spec.TargetReference != nil {
-		ref := pub.Spec.TargetReference
-		matchedPods, _, err := r.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
-		return matchedPods, err
-	} else if pub.Spec.Selector == nil {
-		r.recorder.Eventf(pub, corev1.EventTypeWarning, "NoSelector", "Selector cannot be empty")
-		return nil, nil
-	}
-	// get pods for selector
-	labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
-	if err != nil {
-		r.recorder.Eventf(pub, corev1.EventTypeWarning, "Selector", fmt.Sprintf("Label selector failed: %s", err.Error()))
-		return nil, nil
-	}
-	listOptions = &client.ListOptions{Namespace: pub.Namespace, LabelSelector: labelSelector}
-	podList := &corev1.PodList{}
-	if err := r.List(context.TODO(), podList, listOptions); err != nil {
-		return nil, err
-	}
-
-	matchedPods := make([]*corev1.Pod, 0, len(podList.Items))
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		if kubecontroller.IsPodActive(pod) {
-			matchedPods = append(matchedPods, pod)
-		}
-	}
-	return matchedPods, nil
-}
-
 func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1alpha1.PodUnavailableBudget, expectedCount int32) (desiredAvailable int32, err error) {
 	if pub.Spec.MaxUnavailable != nil {
 		var maxUnavailable int
@@ -459,61 +425,6 @@ func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1a
 	return
 }
 
-func (r *ReconcilePodUnavailableBudget) getExpectedScale(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) (int32, error) {
-	// if spec.targetRef!=nil, expectedCount=targetRef.spec.replicas
-	if pub.Spec.TargetReference != nil {
-		ref := controllerfinder.ControllerReference{
-			APIVersion: pub.Spec.TargetReference.APIVersion,
-			Kind:       pub.Spec.TargetReference.Kind,
-			Name:       pub.Spec.TargetReference.Name,
-		}
-		for _, finder := range r.controllerFinder.Finders() {
-			scaleNSelector, err := finder(ref, pub.Namespace)
-			if err != nil {
-				klog.Errorf("podUnavailableBudget(%s/%s) handle TargetReference failed: %s", pub.Namespace, pub.Name, err.Error())
-				return 0, err
-			}
-			if scaleNSelector != nil && scaleNSelector.Metadata.DeletionTimestamp.IsZero() {
-				return scaleNSelector.Scale, nil
-			}
-		}
-
-		// if target reference workload not found, or reference selector is nil
-		return 0, nil
-	}
-
-	// 1. Find the controller for each pod.  If any pod has 0 controllers,
-	// that's an error. With ControllerRef, a pod can only have 1 controller.
-	// A mapping from controllers to their scale.
-	controllerScale := map[types.UID]int32{}
-	for _, pod := range pods {
-		ref := metav1.GetControllerOf(pod)
-		if ref == nil {
-			continue
-		}
-		// If we already know the scale of the controller there is no need to do anything.
-		if _, found := controllerScale[ref.UID]; found {
-			continue
-		}
-		// Check all the supported controllers to find the desired scale.
-		workload, err := r.controllerFinder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, ref.UID)
-		if err != nil && !errors.IsNotFound(err) {
-			return 0, err
-		}
-		if workload != nil && workload.Metadata.DeletionTimestamp.IsZero() {
-			controllerScale[workload.UID] = workload.Scale
-		}
-	}
-
-	// 2. Add up all the controllers.
-	var expectedCount int32
-	for _, count := range controllerScale {
-		expectedCount += count
-	}
-
-	return expectedCount, nil
-}
-
 func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []*corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, currentTime time.Time) (
 	// disruptedPods, unavailablePods, recheckTime
 	map[string]metav1.Time, map[string]metav1.Time, *time.Time) {
@@ -533,7 +444,7 @@ func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []
 			continue
 		}
 
-		//handle disruption pods which will be eviction or deletion
+		// handle disruption pods which will be eviction or deletion
 		disruptionTime, found := disruptedPods[pod.Name]
 		if found {
 			expectedDeletion := disruptionTime.Time.Add(DeletionTimeout)
