@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	schedulecorev1 "k8s.io/component-helpers/scheduling/corev1"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 )
@@ -148,7 +147,7 @@ func podPreferredScore(subset *appsv1alpha1.WorkloadSpreadSubset, pod *corev1.Po
 func matchesSubsetRequiredAndToleration(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset) (bool, error) {
 	// check toleration
 	tolerations := append(pod.Spec.Tolerations, subset.Tolerations...)
-	if _, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil); hasUntoleratedTaint {
+	if _, hasUntoleratedTaint := schedulecorev1.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil); hasUntoleratedTaint {
 		return false, nil
 	}
 
