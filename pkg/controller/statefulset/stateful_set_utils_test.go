@@ -29,11 +29,9 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
@@ -52,7 +50,7 @@ func (r *noopRecorder) AnnotatedEventf(object runtime.Object, annotations map[st
 }
 
 // getClaimPodName gets the name of the Pod associated with the Claim, or an empty string if this doesn't look matching.
-func getClaimPodName(set *appsv1beta1.StatefulSet, claim *v1.PersistentVolumeClaim) string {
+func getClaimPodName(set *appsv1beta1.StatefulSet, claim *corev1.PersistentVolumeClaim) string {
 	podName := ""
 
 	statefulClaimRegex := regexp.MustCompile(fmt.Sprintf(".*-(%s-[0-9]+)$", set.Name))
@@ -97,7 +95,7 @@ func TestGetParentNameAndOrdinal(t *testing.T) {
 func TestGetClaimPodName(t *testing.T) {
 	set := appsv1beta1.StatefulSet{}
 	set.Name = "my-set"
-	claim := v1.PersistentVolumeClaim{}
+	claim := corev1.PersistentVolumeClaim{}
 	claim.Name = "volume-my-set-2"
 	if pod := getClaimPodName(&set, &claim); pod != "my-set-2" {
 		t.Errorf("Expected my-set-2 found %s", pod)
@@ -334,9 +332,9 @@ func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
 		for _, useOtherRefs := range []bool{false, true} {
 			for _, setPodRef := range []bool{false, true} {
 				for _, setSetRef := range []bool{false, true} {
-					claim := v1.PersistentVolumeClaim{}
+					claim := corev1.PersistentVolumeClaim{}
 					claim.Name = "target-claim"
-					pod := v1.Pod{}
+					pod := corev1.Pod{}
 					pod.Name = fmt.Sprintf("pod-%d", tc.ordinal)
 					pod.GetObjectMeta().SetUID("pod-123")
 					set := appsv1beta1.StatefulSet{}
@@ -354,10 +352,10 @@ func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
 						setOwnerRef(&claim, &set, &set.TypeMeta)
 					}
 					if useOtherRefs {
-						randomObject1 := v1.Pod{}
+						randomObject1 := corev1.Pod{}
 						randomObject1.Name = "rand1"
 						randomObject1.GetObjectMeta().SetUID("rand1-abc")
-						randomObject2 := v1.Pod{}
+						randomObject2 := corev1.Pod{}
 						randomObject2.Name = "rand2"
 						randomObject2.GetObjectMeta().SetUID("rand2-def")
 						setOwnerRef(&claim, &randomObject1, &randomObject1.TypeMeta)
@@ -443,14 +441,14 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 					WhenScaled:  tc.scaleDownPolicy,
 					WhenDeleted: tc.setDeletePolicy,
 				}
-				pod := v1.Pod{}
+				pod := corev1.Pod{}
 				if tc.condemned {
 					pod.Name = "pod-8"
 				} else {
 					pod.Name = "pod-1"
 				}
 				pod.SetUID("pod-456")
-				claim := v1.PersistentVolumeClaim{}
+				claim := corev1.PersistentVolumeClaim{}
 				if hasPodRef {
 					setOwnerRef(&claim, &pod, &pod.TypeMeta)
 				}
@@ -474,12 +472,12 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 }
 
 func TestHasOwnerRef(t *testing.T) {
-	target := v1.Pod{}
+	target := corev1.Pod{}
 	target.SetOwnerReferences([]metav1.OwnerReference{
 		{UID: "123"}, {UID: "456"}})
-	ownerA := v1.Pod{}
+	ownerA := corev1.Pod{}
 	ownerA.GetObjectMeta().SetUID("123")
-	ownerB := v1.Pod{}
+	ownerB := corev1.Pod{}
 	ownerB.GetObjectMeta().SetUID("789")
 	if !hasOwnerRef(&target, &ownerA) {
 		t.Error("Missing owner")
@@ -490,16 +488,16 @@ func TestHasOwnerRef(t *testing.T) {
 }
 
 func TestHasStaleOwnerRef(t *testing.T) {
-	target := v1.Pod{}
+	target := corev1.Pod{}
 	target.SetOwnerReferences([]metav1.OwnerReference{
 		{Name: "bob", UID: "123"}, {Name: "shirley", UID: "456"}})
-	ownerA := v1.Pod{}
+	ownerA := corev1.Pod{}
 	ownerA.SetUID("123")
 	ownerA.Name = "bob"
-	ownerB := v1.Pod{}
+	ownerB := corev1.Pod{}
 	ownerB.Name = "shirley"
 	ownerB.SetUID("789")
-	ownerC := v1.Pod{}
+	ownerC := corev1.Pod{}
 	ownerC.Name = "yvonne"
 	ownerC.SetUID("345")
 	if hasStaleOwnerRef(&target, &ownerA) {
@@ -514,8 +512,8 @@ func TestHasStaleOwnerRef(t *testing.T) {
 }
 
 func TestSetOwnerRef(t *testing.T) {
-	target := v1.Pod{}
-	ownerA := v1.Pod{}
+	target := corev1.Pod{}
+	ownerA := corev1.Pod{}
 	ownerA.Name = "A"
 	ownerA.GetObjectMeta().SetUID("ABC")
 	if setOwnerRef(&target, &ownerA, &ownerA.TypeMeta) != true {
@@ -534,7 +532,7 @@ func TestSetOwnerRef(t *testing.T) {
 	if len(target.GetObjectMeta().GetOwnerReferences()) != 1 {
 		t.Error("Unexpected duplicate reference")
 	}
-	ownerB := v1.Pod{}
+	ownerB := corev1.Pod{}
 	ownerB.Name = "B"
 	ownerB.GetObjectMeta().SetUID("BCD")
 	if setOwnerRef(&target, &ownerB, &ownerB.TypeMeta) != true {
@@ -550,8 +548,8 @@ func TestSetOwnerRef(t *testing.T) {
 }
 
 func TestRemoveOwnerRef(t *testing.T) {
-	target := v1.Pod{}
-	ownerA := v1.Pod{}
+	target := corev1.Pod{}
+	ownerA := corev1.Pod{}
 	ownerA.Name = "A"
 	ownerA.GetObjectMeta().SetUID("ABC")
 	if removeOwnerRef(&target, &ownerA) != false {
@@ -565,7 +563,7 @@ func TestRemoveOwnerRef(t *testing.T) {
 		t.Error("Unexpected owner reference remains")
 	}
 
-	ownerB := v1.Pod{}
+	ownerB := corev1.Pod{}
 	ownerB.Name = "B"
 	ownerB.GetObjectMeta().SetUID("BCD")
 
@@ -595,11 +593,11 @@ func TestIsRunningAndReady(t *testing.T) {
 	if isRunningAndReady(pod) {
 		t.Error("isRunningAndReady does not respect Pod phase")
 	}
-	pod.Status.Phase = v1.PodRunning
+	pod.Status.Phase = corev1.PodRunning
 	if isRunningAndReady(pod) {
 		t.Error("isRunningAndReady does not respect Pod condition")
 	}
-	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
+	condition := corev1.PodCondition{Type: corev1.PodReady, Status: corev1.ConditionTrue}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	if !isRunningAndReady(pod) {
 		t.Error("Pod should be running and ready")
@@ -631,11 +629,11 @@ func TestIsRunningAndAvailable(t *testing.T) {
 	if avail, wait := isRunningAndAvailable(pod, 0); avail || wait != 0 {
 		t.Errorf("isRunningAndAvailable does not respect Pod phase, avail = %t, wait = %d", avail, wait)
 	}
-	pod.Status.Phase = v1.PodPending
+	pod.Status.Phase = corev1.PodPending
 	if avail, wait := isRunningAndAvailable(pod, 0); avail || wait != 0 {
 		t.Errorf("isRunningAndAvailable does not respect Pod phase, avail = %t, wait = %d", avail, wait)
 	}
-	pod.Status.Phase = v1.PodRunning
+	pod.Status.Phase = corev1.PodRunning
 	if avail, wait := isRunningAndAvailable(pod, 0); avail || wait != 0 {
 		t.Errorf("isRunningAndAvailable does not respect Pod condition, avail = %t, wait = %d", avail, wait)
 	}
@@ -664,7 +662,7 @@ func TestIsRunningAndAvailable(t *testing.T) {
 
 func TestAscendingOrdinal(t *testing.T) {
 	set := newStatefulSet(10)
-	pods := make([]*v1.Pod, 10)
+	pods := make([]*corev1.Pod, 10)
 	perm := rand.Perm(10)
 	for i, v := range perm {
 		pods[i] = newStatefulSetPod(set, v)
@@ -763,7 +761,7 @@ func TestRollingUpdateApplyRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	set.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
+	set.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{{Name: "foo", Value: "bar"}}
 	updateSet := set.DeepCopy()
 	updateRevision, err := newRevision(set, 2, set.Status.CollisionCount)
 	if err != nil {
@@ -787,44 +785,44 @@ func TestRollingUpdateApplyRevision(t *testing.T) {
 	}
 }
 
-func newPVC(name string) v1.PersistentVolumeClaim {
-	return v1.PersistentVolumeClaim{
+func newPVC(name string) corev1.PersistentVolumeClaim {
+	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      name,
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+		Spec: corev1.PersistentVolumeClaimSpec{
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},
 	}
 }
 
-func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMount, podMounts []v1.VolumeMount) *appsv1beta1.StatefulSet {
+func newStatefulSetWithVolumes(replicas int, name string, petMounts []corev1.VolumeMount, podMounts []corev1.VolumeMount) *appsv1beta1.StatefulSet {
 	mounts := append(petMounts, podMounts...)
-	claims := []v1.PersistentVolumeClaim{}
+	claims := []corev1.PersistentVolumeClaim{}
 	for _, m := range petMounts {
 		claims = append(claims, newPVC(m.Name))
 	}
 
-	vols := []v1.Volume{}
+	vols := []corev1.Volume{}
 	for _, m := range podMounts {
-		vols = append(vols, v1.Volume{
+		vols = append(vols, corev1.Volume{
 			Name: m.Name,
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: fmt.Sprintf("/tmp/%v", m.Name),
 				},
 			},
 		})
 	}
 
-	template := v1.PodTemplateSpec{
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+	template := corev1.PodTemplateSpec{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:         "nginx",
 					Image:        "nginx",
@@ -844,8 +842,8 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.NamespaceDefault,
-			UID:       types.UID("test"),
+			Namespace: corev1.NamespaceDefault,
+			UID:       "test",
 		},
 		Spec: appsv1beta1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -869,85 +867,11 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 }
 
 func newStatefulSet(replicas int) *appsv1beta1.StatefulSet {
-	petMounts := []v1.VolumeMount{
+	petMounts := []corev1.VolumeMount{
 		{Name: "datadir", MountPath: "/tmp/zookeeper"},
 	}
-	podMounts := []v1.VolumeMount{
+	podMounts := []corev1.VolumeMount{
 		{Name: "home", MountPath: "/home"},
 	}
 	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
 }
-
-//func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels map[string]string) *appsv1beta1.StatefulSet {
-//	// Converting all the map-only selectors to set-based selectors.
-//	var testMatchExpressions []metav1.LabelSelectorRequirement
-//	for key, value := range labels {
-//		sel := metav1.LabelSelectorRequirement{
-//			Key:      key,
-//			Operator: metav1.LabelSelectorOpIn,
-//			Values:   []string{value},
-//		}
-//		testMatchExpressions = append(testMatchExpressions, sel)
-//	}
-//	return &appsv1beta1.StatefulSet{
-//		TypeMeta: metav1.TypeMeta{
-//			Kind:       "StatefulSet",
-//			APIVersion: "apps/v1",
-//		},
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      name,
-//			Namespace: v1.NamespaceDefault,
-//			UID:       uid,
-//		},
-//		Spec: appsv1beta1.StatefulSetSpec{
-//			Selector: &metav1.LabelSelector{
-//				// Purposely leaving MatchLabels nil, so to ensure it will break if any link
-//				// in the chain ignores the set-based MatchExpressions.
-//				MatchLabels:      nil,
-//				MatchExpressions: testMatchExpressions,
-//			},
-//			Replicas: func() *int32 { i := int32(replicas); return &i }(),
-//			PersistentVolumeClaimRetentionPolicy: &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
-//				WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
-//				WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
-//			},
-//			Template: v1.PodTemplateSpec{
-//				ObjectMeta: metav1.ObjectMeta{
-//					Labels: labels,
-//				},
-//				Spec: v1.PodSpec{
-//					Containers: []v1.Container{
-//						{
-//							Name:  "nginx",
-//							Image: "nginx",
-//							VolumeMounts: []v1.VolumeMount{
-//								{Name: "datadir", MountPath: "/tmp/"},
-//								{Name: "home", MountPath: "/home"},
-//							},
-//						},
-//					},
-//					Volumes: []v1.Volume{{
-//						Name: "home",
-//						VolumeSource: v1.VolumeSource{
-//							HostPath: &v1.HostPathVolumeSource{
-//								Path: fmt.Sprintf("/tmp/%v", "home"),
-//							},
-//						}}},
-//				},
-//			},
-//			VolumeClaimTemplates: []v1.PersistentVolumeClaim{
-//				{
-//					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "datadir"},
-//					Spec: v1.PersistentVolumeClaimSpec{
-//						Resources: v1.ResourceRequirements{
-//							Requests: v1.ResourceList{
-//								v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
-//							},
-//						},
-//					},
-//				},
-//			},
-//			ServiceName: "governingsvc",
-//		},
-//	}
-//}

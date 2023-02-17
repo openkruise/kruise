@@ -54,7 +54,6 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -251,12 +250,12 @@ func NewDaemonSetController(
 		kubeClient:    kubeClient,
 		kruiseClient:  kruiseClient,
 		eventRecorder: recorder,
-		podControl:    kubecontroller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
-		crControl: kubecontroller.RealControllerRevisionControl{
+		podControl:    controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
 		},
 		lifecycleControl:            lifecycle.NewForInformer(podInformer),
-		expectations:                kubecontroller.NewControllerExpectations(),
+		expectations:                controller.NewControllerExpectations(),
 		resourceVersionExpectations: kruiseExpectations.NewResourceVersionExpectation(),
 		dsLister:                    dsInformer.Lister(),
 		historyLister:               revInformer.Lister(),
