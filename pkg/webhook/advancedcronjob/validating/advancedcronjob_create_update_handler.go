@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -145,7 +144,7 @@ func validateJobTemplateSpec(jobSpec *batchv1.JobTemplateSpec, fldPath *field.Pa
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), jobSpec.Spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
 	}
-	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
+	return append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 }
 
 func validateBroadcastJobTemplateSpec(brJobSpec *appsv1alpha1.BroadcastJobTemplateSpec, fldPath *field.Path) field.ErrorList {
@@ -155,7 +154,7 @@ func validateBroadcastJobTemplateSpec(brJobSpec *appsv1alpha1.BroadcastJobTempla
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), brJobSpec.Spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
 	}
-	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
+	return append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 }
 
 func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {

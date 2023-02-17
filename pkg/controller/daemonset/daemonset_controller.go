@@ -50,7 +50,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
-	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -506,7 +505,7 @@ func NewPod(ds *appsv1alpha1.DaemonSet, nodeName string) *corev1.Pod {
 	// newPod.Spec.NodeName = nodeName
 
 	// Added default tolerations for DaemonSet pods.
-	daemonsetutil.AddOrUpdateDaemonPodTolerations(&newPod.Spec)
+	util.AddOrUpdateDaemonPodTolerations(&newPod.Spec)
 
 	newPodForDSCache.Store(ds.UID, &newPodForDS{generation: ds.Generation, pod: newPod})
 	return newPod

@@ -23,7 +23,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -33,15 +32,15 @@ import (
 
 func TestValidateUnitedDeployment(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
-	validPodTemplate := v1.PodTemplate{
-		Template: v1.PodTemplateSpec{
+	validPodTemplate := corev1.PodTemplate{
+		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: v1.PodSpec{
-				RestartPolicy: v1.RestartPolicyAlways,
-				DNSPolicy:     v1.DNSClusterFirst,
-				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			Spec: corev1.PodSpec{
+				RestartPolicy: corev1.RestartPolicyAlways,
+				DNSPolicy:     corev1.DNSClusterFirst,
+				Containers:    []corev1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 	}
@@ -216,12 +215,12 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				Template: appsv1alpha1.SubsetTemplate{
 					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
 						Spec: apps.StatefulSetSpec{
-							Template: v1.PodTemplateSpec{
+							Template: corev1.PodTemplateSpec{
 								ObjectMeta: metav1.ObjectMeta{},
-								Spec: v1.PodSpec{
-									RestartPolicy: v1.RestartPolicyAlways,
-									DNSPolicy:     v1.DNSClusterFirst,
-									Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+								Spec: corev1.PodSpec{
+									RestartPolicy: corev1.RestartPolicyAlways,
+									DNSPolicy:     corev1.DNSClusterFirst,
+									Containers:    []corev1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 								},
 							},
 						},
@@ -237,12 +236,12 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				Template: appsv1alpha1.SubsetTemplate{
 					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
 						Spec: apps.DeploymentSpec{
-							Template: v1.PodTemplateSpec{
+							Template: corev1.PodTemplateSpec{
 								ObjectMeta: metav1.ObjectMeta{},
-								Spec: v1.PodSpec{
-									RestartPolicy: v1.RestartPolicyAlways,
-									DNSPolicy:     v1.DNSClusterFirst,
-									Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+								Spec: corev1.PodSpec{
+									RestartPolicy: corev1.RestartPolicyAlways,
+									DNSPolicy:     corev1.DNSClusterFirst,
+									Containers:    []corev1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 								},
 							},
 						},
@@ -552,14 +551,14 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				Template: appsv1alpha1.SubsetTemplate{
 					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
 						Spec: apps.DeploymentSpec{
-							Template: v1.PodTemplateSpec{
+							Template: corev1.PodTemplateSpec{
 								ObjectMeta: metav1.ObjectMeta{
 									Labels: validLabels,
 								},
-								Spec: v1.PodSpec{
-									RestartPolicy: v1.RestartPolicyAlways,
-									DNSPolicy:     v1.DNSClusterFirst,
-									Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+								Spec: corev1.PodSpec{
+									RestartPolicy: corev1.RestartPolicyAlways,
+									DNSPolicy:     corev1.DNSClusterFirst,
+									Containers:    []corev1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 								},
 							},
 						},
@@ -600,15 +599,15 @@ type UpdateCase struct {
 
 func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
-	validPodTemplate := v1.PodTemplate{
-		Template: v1.PodTemplateSpec{
+	validPodTemplate := corev1.PodTemplate{
+		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: v1.PodSpec{
-				RestartPolicy: v1.RestartPolicyAlways,
-				DNSPolicy:     v1.DNSClusterFirst,
-				Containers:    []v1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Spec: corev1.PodSpec{
+				RestartPolicy: corev1.RestartPolicyAlways,
+				DNSPolicy:     corev1.DNSClusterFirst,
+				Containers:    []corev1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			},
 		},
 	}
@@ -635,11 +634,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a"},
 										},
 									},
@@ -668,11 +667,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a"},
 										},
 									},
@@ -680,11 +679,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 							},
 							{
 								Name: "subset-b",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"b"},
 										},
 									},
@@ -715,11 +714,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a"},
 										},
 									},
@@ -727,11 +726,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 							},
 							{
 								Name: "subset-b",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"b"},
 										},
 									},
@@ -760,11 +759,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a"},
 										},
 									},
@@ -795,11 +794,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a"},
 										},
 									},
@@ -828,11 +827,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a"},
 										},
 									},
@@ -840,11 +839,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 							},
 							{
 								Name: "subset-b",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"b"},
 										},
 									},
@@ -888,11 +887,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a", "b"},
 										},
 									},
@@ -921,11 +920,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 						Subsets: []appsv1alpha1.Subset{
 							{
 								Name: "subset-a",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"a"},
 										},
 									},
@@ -933,11 +932,11 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 							},
 							{
 								Name: "subset-b",
-								NodeSelectorTerm: v1.NodeSelectorTerm{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+								NodeSelectorTerm: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "domain",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{"b"},
 										},
 									},
