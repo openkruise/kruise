@@ -1,0 +1,7 @@
+[default.extend-words]
+Ded = "Ded"
+ons = "ons"
+ist = "ist"
+WITHO = "WITHO"
+[files]
+extend-exclude = ["vendor/", "go.mod", "CHANGELOG.md"]

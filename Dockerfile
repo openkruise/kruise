@@ -1,6 +1,6 @@
 # Build the manager and daemon binaries
 ARG BASE_IMAGE=alpine
-ARG BASE_IMAGE_VERION=3.17
+ARG BASE_IMAGE_VERSION=3.17
 FROM golang:1.18-alpine3.17 as builder
 
 WORKDIR /workspace
@@ -20,11 +20,11 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o manager main.go \
   && CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o daemon ./cmd/daemon/main.go
 
 ARG BASE_IMAGE
-ARG BASE_IMAGE_VERION
-FROM ${BASE_IMAGE}:${BASE_IMAGE_VERION}
+ARG BASE_IMAGE_VERSION
+FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
 
 RUN apk add --no-cache ca-certificates=~20220614-r4 bash=~5.2.15-r0 expat=~2.5.0-r0 \
-    && rm -rf /var/cache/apk/*
+  && rm -rf /var/cache/apk/*
 
 WORKDIR /
 COPY --from=builder /workspace/manager .

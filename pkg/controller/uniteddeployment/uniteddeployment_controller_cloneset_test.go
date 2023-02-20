@@ -29,7 +29,7 @@ func TestCloneSetAll(t *testing.T) {
 
 	cases := []TestCaseFunc{
 		testCsReconcile,
-		testTemplateTypeSwtichToCS,
+		testTemplateTypeSwitchToCS,
 	}
 
 	for _, f := range cases {
@@ -132,7 +132,7 @@ func testCsReconcile(t *testing.T, g *gomega.GomegaWithT, namespace string, requ
 	expectedCsCount(g, instance, 1)
 }
 
-func testTemplateTypeSwtichToCS(t *testing.T, g *gomega.GomegaWithT, namespace string, requests chan reconcile.Request) {
+func testTemplateTypeSwitchToCS(t *testing.T, g *gomega.GomegaWithT, namespace string, requests chan reconcile.Request) {
 	caseName := "test-template-type-switch-to-cs"
 	instance := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{

@@ -39,7 +39,7 @@ We hope to provide a way to let users recreate(restart) one or more containers i
 It is useful for some user scenarios, such as:
 
 1. Restart the application in app container.
-2. Restart a sidecar contaienr along with app container.
+2. Restart a sidecar container along with app container.
 
 ## Proposal
 

@@ -144,7 +144,7 @@ type ImageTagStatus struct {
 	// Represents the image pulling task phase.
 	Phase ImagePullPhase `json:"phase"`
 
-	// Represents the pulling progress of this tag, which is beetween 0-100. There is no guarantee
+	// Represents the pulling progress of this tag, which is between 0-100. There is no guarantee
 	// of monotonic consistency, and it may be a rollback due to retry during pulling.
 	Progress int32 `json:"progress,omitempty"`
 
@@ -168,7 +168,7 @@ type ImageTagStatus struct {
 	// +optional
 	ImageID string `json:"imageID,omitempty"`
 
-	// Represents the summary informations of this node
+	// Represents the summary information of this node
 	// +optional
 	Message string `json:"message,omitempty"`
 }
