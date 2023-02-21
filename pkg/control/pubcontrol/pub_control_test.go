@@ -45,7 +45,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 			expect: false,
 		},
 		{
-			name: "add unvailable label",
+			name: "add unavailable label",
 			getOldPod: func() *corev1.Pod {
 				demo := podDemo.DeepCopy()
 				return demo

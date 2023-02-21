@@ -663,7 +663,7 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, nodeList []*co
 }
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
-// returns slice with erros if any
+// returns slice with errors if any
 func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
 	if ds.Spec.Lifecycle != nil && ds.Spec.Lifecycle.PreDelete != nil {
 		var err error

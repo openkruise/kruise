@@ -113,7 +113,8 @@ func findContainerToHotUpgrade(sidecarContainer *appsv1alpha1.SidecarContainer, 
 	// First, empty hot sidecar container will be upgraded with the latest sidecarSet specification
 	if c1.Image == sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage {
 		return c1.Name, c2.Name
-	} else if c2.Image == sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage {
+	}
+	if c2.Image == sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage {
 		return c2.Name, c1.Name
 	}
 
@@ -123,11 +124,12 @@ func findContainerToHotUpgrade(sidecarContainer *appsv1alpha1.SidecarContainer, 
 	klog.V(3).Infof("pod(%s/%s) container(%s) ready(%v) container(%s) ready(%v)", pod.Namespace, pod.Name, c1.Name, c1Ready, c2.Name, c2Ready)
 	if c1Ready && !c2Ready {
 		return c2.Name, c1.Name
-	} else if !c1Ready && c2Ready {
+	}
+	if !c1Ready && c2Ready {
 		return c1.Name, c2.Name
 	}
 
 	// Third, the older sidecar container will be upgraded
-	workContianer, olderContainer := GetPodHotUpgradeContainers(sidecarContainer.Name, pod)
-	return olderContainer, workContianer
+	workContainer, olderContainer := GetPodHotUpgradeContainers(sidecarContainer.Name, pod)
+	return olderContainer, workContainer
 }

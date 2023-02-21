@@ -326,13 +326,13 @@ func TestGetPodSidecarSetRevision(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			revison := GetPodSidecarSetRevision("test-sidecarset", cs.getPod())
-			if cs.exceptRevision != revison {
-				t.Fatalf("except sidecar container test-sidecarset revison %s, but get %s", cs.exceptRevision, revison)
+			revision := GetPodSidecarSetRevision("test-sidecarset", cs.getPod())
+			if cs.exceptRevision != revision {
+				t.Fatalf("except sidecar container test-sidecarset revision %s, but get %s", cs.exceptRevision, revision)
 			}
-			withoutRevison := GetPodSidecarSetWithoutImageRevision("test-sidecarset", cs.getPod())
-			if cs.exceptWithoutImageRevision != withoutRevison {
-				t.Fatalf("except sidecar container test-sidecarset WithoutImageRevision %s, but get %s", cs.exceptWithoutImageRevision, withoutRevison)
+			withoutRevision := GetPodSidecarSetWithoutImageRevision("test-sidecarset", cs.getPod())
+			if cs.exceptWithoutImageRevision != withoutRevision {
+				t.Fatalf("except sidecar container test-sidecarset WithoutImageRevision %s, but get %s", cs.exceptWithoutImageRevision, withoutRevision)
 			}
 		})
 	}

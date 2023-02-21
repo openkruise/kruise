@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Interface for managing pods scaleing and updating.
+// Interface for managing pods scaling and updating.
 type Interface interface {
 	Scale(
 		currentCS, updateCS *appsv1alpha1.CloneSet,

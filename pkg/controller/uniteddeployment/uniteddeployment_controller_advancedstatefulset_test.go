@@ -120,7 +120,7 @@ func TestAstsReconcile(t *testing.T) {
 	expectedAstsCount(g, instance, 1)
 }
 
-func TestTemplateTypeSwtich(t *testing.T) {
+func TestTemplateTypeSwitch(t *testing.T) {
 	g, requests, cancel, mgrStopped := setUp(t)
 	defer func() {
 		clean(g, c)
