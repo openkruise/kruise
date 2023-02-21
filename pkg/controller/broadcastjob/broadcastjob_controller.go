@@ -111,7 +111,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Wathc for changes to Pod
+	// Watch for changes to Pod
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{
 		enqueueHandler: handler.EnqueueRequestForOwner{
 			IsController: true,

@@ -496,7 +496,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 			}
 			gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(updateRevision),
-				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revison %s on update completion",
+				fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
 					ss.Namespace,
 					ss.Name,
 					ss.Status.CurrentRevision,
@@ -1736,15 +1736,15 @@ func verifyStatefulSetPVCsExist(c clientset.Interface, ss *appsv1beta1.StatefulS
 }
 
 // verifyStatefulSetPVCsExistWithOwnerRefs works as verifyStatefulSetPVCsExist, but also waits for the ownerRefs to match.
-func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, kc kruiseclientset.Interface, ss *appsv1beta1.StatefulSet, claimIndicies []int, wantSetRef, wantPodRef bool) error {
+func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, kc kruiseclientset.Interface, ss *appsv1beta1.StatefulSet, claimIndices []int, wantSetRef, wantPodRef bool) error {
 	indexSet := map[int]struct{}{}
-	for _, id := range claimIndicies {
+	for _, id := range claimIndices {
 		indexSet[id] = struct{}{}
 	}
 	set, _ := kc.AppsV1beta1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
 	setUID := set.GetUID()
 	if setUID == "" {
-		framework.Failf("Statefulset %s mising UID", ss.Name)
+		framework.Failf("Statefulset %s missing UID", ss.Name)
 	}
 	return wait.PollImmediate(framework.StatefulSetPoll, framework.StatefulSetTimeout, func() (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})

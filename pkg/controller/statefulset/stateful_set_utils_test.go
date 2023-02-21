@@ -120,7 +120,7 @@ func TestIsMemberOf(t *testing.T) {
 	set2.Name = "foo2"
 	pod := newStatefulSetPod(set, 1)
 	if !isMemberOf(set, pod) {
-		t.Error("isMemberOf retruned false negative")
+		t.Error("isMemberOf returned false negative")
 	}
 	if isMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
@@ -153,7 +153,7 @@ func TestStorageMatches(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
 	if !storageMatches(set, pod) {
-		t.Error("Newly created Pod has a invalid stroage")
+		t.Error("Newly created Pod has a invalid storage")
 	}
 	pod.Spec.Volumes = nil
 	if storageMatches(set, pod) {
@@ -207,7 +207,7 @@ func TestUpdateStorage(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
 	if !storageMatches(set, pod) {
-		t.Error("Newly created Pod has a invalid stroage")
+		t.Error("Newly created Pod has a invalid storage")
 	}
 	pod.Spec.Volumes = nil
 	if storageMatches(set, pod) {

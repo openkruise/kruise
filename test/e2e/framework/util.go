@@ -150,7 +150,7 @@ const (
 	RestartPodReadyAgainTimeout = 5 * time.Minute
 
 	// Number of objects that gc can delete in a second.
-	// GC issues 2 requestes for single delete.
+	// GC issues 2 requests for single delete.
 	gcThroughput = 10
 
 	// Minimal number of nodes for the cluster to be considered large.
@@ -376,7 +376,7 @@ func logNamespace(c clientset.Interface, namespace string) {
 		Logf("namespace: %v, unable to get namespace due to error: %v", namespace, err)
 		return
 	}
-	Logf("namespace: %v, DeletionTimetamp: %v, Finalizers: %v, Phase: %v", ns.Name, ns.DeletionTimestamp, ns.Spec.Finalizers, ns.Status.Phase)
+	Logf("namespace: %v, DeletionTimestamp: %v, Finalizers: %v, Phase: %v", ns.Name, ns.DeletionTimestamp, ns.Spec.Finalizers, ns.Status.Phase)
 }
 
 // hasRemainingContent checks if there is remaining content in the namespace via API discovery

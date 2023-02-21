@@ -294,7 +294,7 @@ func (d *containerdImageClient) resolverGenerator(authInfo *daemonutil.AuthInfo)
 
 // createRepoDigestRecord creates digest type record in containerd.
 //
-// NOTE: We don't use CRI-API to pull image but we juse CRI-API to retrieve
+// NOTE: We don't use CRI-API to pull image but we use CRI-API to retrieve
 // image list. For the repo:tag image, the containerd will receive image create
 // event and then update local cache with the mapping between image ID and
 // image name. But there is no mapping between image ID and image digest. We

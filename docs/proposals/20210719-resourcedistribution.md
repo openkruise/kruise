@@ -214,7 +214,7 @@ type ResourceDistributionStatus struct {
 
 1. Create and Distribute
 - Parse and analyze the resource and the target namespaces.
-- Create the resource based on `Resouce` field.
+- Create the resource based on `Resource` field.
 - Replicate and distribute the resource, and set their `OwnerReference` as the `ResourceDistribution`.
 
 2. Update and Synchronize
