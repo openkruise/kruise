@@ -321,9 +321,6 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 		if clone.Annotations == nil {
 			clone.Annotations = map[string]string{}
 		}
-		for _, f := range opts.AdditionalFuncs {
-			f(clone)
-		}
 
 		inPlaceUpdateState := appspub.InPlaceUpdateState{
 			Revision:              spec.Revision,
@@ -342,6 +339,10 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 		} else {
 			inPlaceUpdateSpecJSON, _ := json.Marshal(spec)
 			clone.Annotations[appspub.InPlaceUpdateGraceKey] = string(inPlaceUpdateSpecJSON)
+		}
+
+		for _, f := range opts.AdditionalFuncs {
+			f(clone)
 		}
 
 		newPod, updateErr := c.podAdapter.UpdatePod(clone)
