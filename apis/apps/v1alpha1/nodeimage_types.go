@@ -38,6 +38,10 @@ type ImageSpec struct {
 
 	// Tags is a list of versions of this image
 	Tags []ImageTagSpec `json:"tags"`
+
+	// SandboxConfig support attach metadata in PullImage CRI interface during ImagePulljobs
+	// +optional
+	SandboxConfig *SandboxConfig `json:"sandboxConfig,omitempty"`
 }
 
 // ReferenceObject comprises a resource name, with a mandatory namespace,

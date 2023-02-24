@@ -61,6 +61,10 @@ type ImagePullJobSpec struct {
 	// CompletionPolicy indicates the completion policy of the job.
 	// Default is Always CompletionPolicyType.
 	CompletionPolicy CompletionPolicy `json:"completionPolicy"`
+
+	// SandboxConfig support attach metadata in PullImage CRI interface during ImagePulljobs
+	// +optional
+	SandboxConfig *SandboxConfig `json:"sandboxConfig,omitempty"`
 }
 
 // ImagePullJobPodSelector is a selector over pods

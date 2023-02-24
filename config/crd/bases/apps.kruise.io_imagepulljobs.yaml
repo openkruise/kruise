@@ -175,6 +175,19 @@ spec:
                 items:
                   type: string
                 type: array
+              sandboxConfig:
+                description: SandboxConfig support attach metadata in PullImage CRI
+                  interface during ImagePulljobs
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                type: object
               selector:
                 description: Selector is a query over nodes that should match the
                   job. nil to match all nodes.

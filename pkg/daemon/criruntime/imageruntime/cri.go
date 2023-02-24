@@ -18,6 +18,8 @@ import (
 	"io"
 	"time"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -66,7 +68,7 @@ type commonCRIImageService struct {
 }
 
 // PullImage implements ImageService.PullImage.
-func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (ImagePullStatusReader, error) {
+func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error) {
 	registry := daemonutil.ParseRegistry(imageName)
 	fullImageName := imageName + ":" + tag
 	// Reader
@@ -80,6 +82,12 @@ func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag st
 			Annotations: make(map[string]string),
 		},
 		Auth: auth, //default is nil
+	}
+	if sandboxConfig != nil {
+		pullImageReq.SandboxConfig = &runtimeapi.PodSandboxConfig{
+			Annotations: sandboxConfig.Annotations,
+			Labels:      sandboxConfig.Labels,
+		}
 	}
 	var err error
 	if len(pullSecrets) > 0 {
