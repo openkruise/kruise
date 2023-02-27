@@ -52,6 +52,12 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
+const (
+	defaultLeaseDuration = 15 * time.Second
+	defaultRenewDeadline = 10 * time.Second
+	defaultRetryPeriod   = 2 * time.Second
+)
+
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -79,6 +85,12 @@ func main() {
 	var leaderElectionNamespace string
 	var namespace string
 	var syncPeriodStr string
+	var leaseDuration time.Duration
+	var renewDeadLine time.Duration
+	var leaderElectionResourceLock string
+	var leaderElectionId string
+	var retryPeriod time.Duration
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
 	flag.BoolVar(&allowPrivileged, "allow-privileged", true, "If true, allow privileged containers. It will only work if api-server is also"+
@@ -91,7 +103,16 @@ func main() {
 	flag.BoolVar(&enablePprof, "enable-pprof", true, "Enable pprof for controller manager.")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":8090", "The address the pprof binds to.")
 	flag.StringVar(&syncPeriodStr, "sync-period", "", "Determines the minimum frequency at which watched resources are reconciled.")
-
+	flag.DurationVar(&leaseDuration, "leader-election-lease-duration", defaultLeaseDuration,
+		"leader-election-lease-duration is the duration that non-leader candidates will wait to force acquire leadership. This is measured against time of last observed ack. Default is 15 seconds.")
+	flag.DurationVar(&renewDeadLine, "leader-election-renew-deadline", defaultRenewDeadline,
+		"leader-election-renew-deadline is the duration that the acting controlplane will retry refreshing leadership before giving up. Default is 10 seconds.")
+	flag.StringVar(&leaderElectionResourceLock, "leader-election-resource-lock", resourcelock.ConfigMapsLeasesResourceLock,
+		"leader-election-resource-lock determines which resource lock to use for leader election, defaults to \"configmapsleases\".")
+	flag.StringVar(&leaderElectionId, "leader-election-id", "kruise-manager",
+		"leader-election-id determines the name of the resource that leader election will use for holding the leader lock, Default is kruise-manager.")
+	flag.DurationVar(&retryPeriod, "leader-election-retry-period", defaultRetryPeriod,
+		"leader-election-retry-period is the duration the LeaderElector clients should wait between tries of actions. Default is 2 seconds.")
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
@@ -140,9 +161,12 @@ func main() {
 		MetricsBindAddress:         metricsAddr,
 		HealthProbeBindAddress:     healthProbeAddr,
 		LeaderElection:             enableLeaderElection,
-		LeaderElectionID:           "kruise-manager",
+		LeaderElectionID:           leaderElectionId,
 		LeaderElectionNamespace:    leaderElectionNamespace,
-		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
+		LeaderElectionResourceLock: leaderElectionResourceLock,
+		LeaseDuration:              &leaseDuration,
+		RenewDeadline:              &renewDeadLine,
+		RetryPeriod:                &retryPeriod,
 		Namespace:                  namespace,
 		SyncPeriod:                 syncPeriod,
 		NewCache:                   utilclient.NewCache,
