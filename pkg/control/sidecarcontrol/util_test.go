@@ -1059,3 +1059,206 @@ func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 		})
 	}
 }
+
+func TestPodMatchedSidecarSet(t *testing.T) {
+	cases := []struct {
+		name          string
+		getSidecarSet func() *appsv1alpha1.SidecarSet
+		getPod        func() *corev1.Pod
+		getNs         func() []*corev1.Namespace
+		expect        bool
+	}{
+		{
+			name: "test1",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "nginx"},
+						},
+					},
+				}
+				return demo
+			},
+			getPod: func() *corev1.Pod {
+				demo := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Labels:    map[string]string{"app": "nginx"},
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getNs: func() []*corev1.Namespace {
+				return nil
+			},
+			expect: true,
+		},
+		{
+			name: "test2",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "nginx"},
+						},
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getPod: func() *corev1.Pod {
+				demo := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Labels:    map[string]string{"app": "nginx"},
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getNs: func() []*corev1.Namespace {
+				return nil
+			},
+			expect: true,
+		},
+		{
+			name: "test3",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "nginx"},
+						},
+						Namespace: "app2",
+					},
+				}
+				return demo
+			},
+			getPod: func() *corev1.Pod {
+				demo := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Labels:    map[string]string{"app": "nginx"},
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getNs: func() []*corev1.Namespace {
+				return nil
+			},
+			expect: false,
+		},
+		{
+			name: "test4",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "nginx"},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "app1"},
+						},
+					},
+				}
+				return demo
+			},
+			getPod: func() *corev1.Pod {
+				demo := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Labels:    map[string]string{"app": "nginx"},
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getNs: func() []*corev1.Namespace {
+				demo := []*corev1.Namespace{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "app1",
+							Labels: map[string]string{"app": "app1"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "app2",
+							Labels: map[string]string{"app": "app2"},
+						},
+					},
+				}
+				return demo
+			},
+			expect: true,
+		},
+		{
+			name: "test5",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "nginx"},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "app2"},
+						},
+					},
+				}
+				return demo
+			},
+			getPod: func() *corev1.Pod {
+				demo := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Labels:    map[string]string{"app": "nginx"},
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getNs: func() []*corev1.Namespace {
+				demo := []*corev1.Namespace{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "app1",
+							Labels: map[string]string{"app": "app1"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "app2",
+							Labels: map[string]string{"app": "app2"},
+						},
+					},
+				}
+				return demo
+			},
+			expect: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(sch).Build()
+			for _, ns := range cs.getNs() {
+				_ = fakeClient.Create(context.TODO(), ns)
+			}
+			matched, err := PodMatchedSidecarSet(fakeClient, cs.getPod(), cs.getSidecarSet())
+			if err != nil {
+				t.Fatalf("PodMatchedSidecarSet failed: %s", err.Error())
+			}
+			if cs.expect != matched {
+				t.Fatalf("expect(%v), but get(%v)", cs.expect, matched)
+			}
+		})
+	}
+}
