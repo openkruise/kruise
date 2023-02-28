@@ -41,6 +41,10 @@ type SidecarSetSpec struct {
 	// otherwise, match pods in all namespaces(in cluster)
 	Namespace string `json:"namespace,omitempty"`
 
+	// NamespaceSelector select which namespaces to inject sidecar containers.
+	// Default to the empty LabelSelector, which matches everything.
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+
 	// InitContainers is the list of init containers to be injected into the selected pod
 	// We will inject those containers by their name in ascending order
 	// We only inject init containers when a new pod is created, it does not apply to any existing pod
