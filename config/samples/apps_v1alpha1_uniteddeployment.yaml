@@ -23,7 +23,7 @@ spec:
           spec:
             containers:
               - name: nginx
-                image: nginx:1.0
+                image: nginx
   topology:
     subsets:
       - name: subset-a
