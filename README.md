@@ -17,29 +17,24 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
 ## Key Features
 
-- **Typical Workloads**
+- **Advance Workloads**
 
-  Typical Workloads can help you manage applications of stateless, stateful and daemon.
+  Advance Workloads can help you manage applications of stateless, stateful, daemon and job.
 
   They all support not only the basic features which are similar to the original Workloads in Kubernetes, but also more advanced abilities like **in-place update**, **configurable scale/upgrade strategies**, **parallel operations**.
 
   - [**CloneSet** for stateless applications](https://openkruise.io/docs/user-manuals/cloneset/)
   - [**Advanced StatefulSet** for stateful applications](https://openkruise.io/docs/user-manuals/advancedstatefulset)
   - [**Advanced DaemonSet** for daemon applications](https://openkruise.io/docs/user-manuals/advanceddaemonset)
-
-- **Job Workloads**
-
   - [**BroadcastJob** for deploying jobs over specific nodes](https://openkruise.io/docs/user-manuals/broadcastjob)
   - [**AdvancedCronJob** for creating Job or BroadcastJob periodically](https://openkruise.io/docs/user-manuals/advancedcronjob)
 
 - **Sidecar container Management**
 
-  The Sidecar containers can be simply defined in the **SidecarSet** custom resource and Kruise will inject them into all Pods matched.
-
-  The implementation is done by using Kubernetes mutating webhooks, similar to what [istio](https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/) does.
-  However, it allows you to explicitly manage your own sidecars.
+  Kruise simplify sidecar injection and enable sidecar in-place update. Kruise all also enhance the sidecar startup and termination control.
 
   - [**SidecarSet** for defining and upgrading your own sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
+  - [**Container Launch Priority** to control the container startup orders](https://openkruise.io/docs/user-manuals/containerlaunchpriority)
 
 - **Multi-domain Management**
 

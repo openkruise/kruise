@@ -17,29 +17,24 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
 ## 核心能力
 
-- **通用工作负载**
+- **高级工作负载**
 
-  通用工作负载能帮助你管理 stateless(无状态)、stateful(有状态)、daemon 类型的应用。
+  通用工作负载能帮助你管理 stateless(无状态)、stateful(有状态)、daemon 类型和作业类的应用。
 
   它们不仅支持类似于 Kubernetes 原生 Workloads 的基础功能，还提供了如 **原地升级**、**可配置的扩缩容/发布策略**、**并发操作** 等。
 
   - [**CloneSet** - 无状态应用](https://openkruise.io/zh/docs/user-manuals/cloneset/)
   - [**Advanced StatefulSet** - 有状态应用](https://openkruise.io/zh/docs/user-manuals/advancedstatefulset)
   - [**Advanced DaemonSet** - daemon 类型应用](https://openkruise.io/zh/docs/user-manuals/advanceddaemonset)
-
-- **任务工作负载**
-
   - [**BroadcastJob** - 部署任务到一批特定节点上](https://openkruise.io/zh/docs/user-manuals/broadcastjob)
   - [**AdvancedCronJob** - 周期性地创建 Job 或 BroadcastJob](https://openkruise.io/zh/docs/user-manuals/advancedcronjob)
 
 - **Sidecar 容器管理**
 
-  Sidecar 容器可以很简单地通过 **SidecarSet** 来定义，然后 Kruise 会将它们注入到所有匹配的 Pod 中。
-
-  它是通过 Kubernetes webhook 机制来实现的，和 [istio](https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/) 的注入实现方式类似，
-  但是它允许你指定管理你自己的 sidecar 容器。
+  Kruise通过**SidecarSet**简化了Sidecar的注入， 并提供了sidecar原地升级的能力。另外， Kruise提供了增强的sidecar启动、退出的控制
 
   - [**SidecarSet** - 定义和升级你的 sidecar 容器](https://openkruise.io/zh/docs/user-manuals/sidecarset)
+  - [**Container Launch Priority** 控制sidecar启动顺序](https://openkruise.io/zh/docs/user-manuals/containerlaunchpriority)
 
 - **多区域管理**
 
