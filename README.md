@@ -17,18 +17,15 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
 ## Key Features
 
-- **Typical Workloads**
+- **Advance Workloads**
 
-  Typical Workloads can help you manage applications of stateless, stateful and daemon.
+  Advance Workloads can help you manage applications of stateless, stateful, daemon and Job.
 
   They all support not only the basic features which are similar to the original Workloads in Kubernetes, but also more advanced abilities like **in-place update**, **configurable scale/upgrade strategies**, **parallel operations**.
 
   - [**CloneSet** for stateless applications](https://openkruise.io/docs/user-manuals/cloneset/)
   - [**Advanced StatefulSet** for stateful applications](https://openkruise.io/docs/user-manuals/advancedstatefulset)
   - [**Advanced DaemonSet** for daemon applications](https://openkruise.io/docs/user-manuals/advanceddaemonset)
-
-- **Job Workloads**
-
   - [**BroadcastJob** for deploying jobs over specific nodes](https://openkruise.io/docs/user-manuals/broadcastjob)
   - [**AdvancedCronJob** for creating Job or BroadcastJob periodically](https://openkruise.io/docs/user-manuals/advancedcronjob)
 
