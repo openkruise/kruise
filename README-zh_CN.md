@@ -12,7 +12,7 @@
 
 ## 介绍
 
-OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在 [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) 下的 Sandbox 项目。
+OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Cloud Native Computing Foundation](https://cncf.io/)) 的孵化项目。
 它提供一套在 [Kubernetes核心控制器](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) 之外的扩展工作负载、应用管理能力。
 
 ## 核心能力
