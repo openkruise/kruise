@@ -12,7 +12,7 @@ English | [简体中文](./README-zh_CN.md)
 
 ## Introduction
 
-OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is now hosted by the [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) as a Sandbox Level Project.
+OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is a CNCF([Cloud Native Computing Foundation](https://cncf.io/)) incubating project.
 It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload and application management.
 
 ## Key Features
@@ -31,7 +31,7 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
 - **Sidecar container Management**
 
-  Kruise simplify sidecar injection and enable sidecar in-place update. Kruise all also enhance the sidecar startup and termination control.
+  Kruise simplify sidecar injection and enable sidecar in-place update. Kruise also enhance the sidecar startup and termination control.
 
   - [**SidecarSet** for defining and upgrading your own sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
   - [**Container Launch Priority** to control the container startup orders](https://openkruise.io/docs/user-manuals/containerlaunchpriority)
