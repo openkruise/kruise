@@ -37,7 +37,7 @@ func (p *Processor) flipHotUpgradingContainers(control sidecarcontrol.SidecarCon
 			p.recorder.Eventf(pod, corev1.EventTypeWarning, "ResetContainerFailed", fmt.Sprintf("reset sidecar container image empty failed: %s", err.Error()))
 			return err
 		}
-		p.recorder.Eventf(pod, corev1.EventTypeNormal, "ResetContainerSucceed", fmt.Sprintf("reset sidecar container image empty successfully"))
+		p.recorder.Eventf(pod, corev1.EventTypeNormal, "ResetContainerSucceed", "reset sidecar container image empty successfully")
 	}
 	return nil
 }

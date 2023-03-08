@@ -140,10 +140,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.Deployment)
 			new := e.ObjectNew.(*apps.Deployment)
-			if *old.Spec.Replicas != *new.Spec.Replicas {
-				return true
-			}
-			return false
+			return *old.Spec.Replicas != *new.Spec.Replicas
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
@@ -157,10 +154,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1beta1.StatefulSet)
 			new := e.ObjectNew.(*kruiseappsv1beta1.StatefulSet)
-			if *old.Spec.Replicas != *new.Spec.Replicas {
-				return true
-			}
-			return false
+			return *old.Spec.Replicas != *new.Spec.Replicas
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
@@ -174,10 +168,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
 			new := e.ObjectNew.(*kruiseappsv1alpha1.CloneSet)
-			if *old.Spec.Replicas != *new.Spec.Replicas {
-				return true
-			}
-			return false
+			return *old.Spec.Replicas != *new.Spec.Replicas
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
@@ -191,10 +182,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.StatefulSet)
 			new := e.ObjectNew.(*apps.StatefulSet)
-			if *old.Spec.Replicas != *new.Spec.Replicas {
-				return true
-			}
-			return false
+			return *old.Spec.Replicas != *new.Spec.Replicas
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
