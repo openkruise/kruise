@@ -529,14 +529,9 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 		// there's pod existing on the node
 		if pod, ok := existingNodeToPodMap[node.Name]; ok {
 			canFit, err = checkNodeFitness(pod, &node)
-			if err != nil {
-				klog.Errorf("pod %s failed to checkNodeFitness for node %s, %v", pod.Name, node.Name, err)
-				continue
-			}
-			if !canFit {
-				if pod.DeletionTimestamp == nil {
-					podsToDelete = append(podsToDelete, pod)
-				}
+			if !canFit && pod.DeletionTimestamp == nil {
+				klog.Infof("Pod %s does not fit on node %s due to %v", pod.Name, node.Name, err)
+				podsToDelete = append(podsToDelete, pod)
 				continue
 			}
 			desiredNodes[node.Name] = pod
@@ -545,12 +540,8 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 			// considering nodeName, label affinity and taints
 			mockPod := NewMockPod(job, node.Name)
 			canFit, err = checkNodeFitness(mockPod, &node)
-			if err != nil {
-				klog.Errorf("failed to checkNodeFitness for node %s, %v", node.Name, err)
-				continue
-			}
 			if !canFit {
-				klog.Infof("Pod does not fit on node %s", node.Name)
+				klog.Infof("Pod does not fit on node %s due to %v", node.Name, err)
 				continue
 			}
 			restNodesToRunPod = append(restNodesToRunPod, &nodes.Items[i])
