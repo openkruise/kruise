@@ -18,10 +18,12 @@ package framework
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +46,7 @@ func NewPodProbeMarkerTester(c clientset.Interface, kc kruiseclientset.Interface
 	}
 }
 
-func (s *PodProbeMarkerTester) NewPodProbeMarker(ns string) []appsv1alpha1.PodProbeMarker {
+func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alpha1.PodProbeMarker {
 	nginx := appsv1alpha1.PodProbeMarker{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ppm-nginx",
@@ -53,7 +55,7 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns string) []appsv1alpha1.PodPr
 		Spec: appsv1alpha1.PodProbeMarkerSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "probe",
+					"app": fmt.Sprintf("probe-%s", randStr),
 				},
 			},
 			Probes: []appsv1alpha1.PodContainerProbe{
@@ -91,7 +93,7 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns string) []appsv1alpha1.PodPr
 		Spec: appsv1alpha1.PodProbeMarkerSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "probe",
+					"app": fmt.Sprintf("probe-%s", randStr),
 				},
 			},
 			Probes: []appsv1alpha1.PodContainerProbe{
@@ -130,28 +132,29 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns string) []appsv1alpha1.PodPr
 	return []appsv1alpha1.PodProbeMarker{nginx, main}
 }
 
-func (s *PodProbeMarkerTester) NewBaseStatefulSet(namespace string) *apps.StatefulSet {
-	return &apps.StatefulSet{
+func (s *PodProbeMarkerTester) NewBaseStatefulSet(namespace, randStr string) *appsv1beta1.StatefulSet {
+	return &appsv1beta1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
-			APIVersion: "apps/v1",
+			APIVersion: "apps.kruise.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "deployment-test",
+			Name:      "stateful-test",
 			Namespace: namespace,
 		},
-		Spec: apps.StatefulSetSpec{
-			ServiceName: "fake-service",
-			Replicas:    utilpointer.Int32Ptr(2),
+		Spec: appsv1beta1.StatefulSetSpec{
+			PodManagementPolicy: apps.ParallelPodManagement,
+			ServiceName:         "fake-service",
+			Replicas:            utilpointer.Int32Ptr(2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "probe",
+					"app": fmt.Sprintf("probe-%s", randStr),
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "probe",
+						"app": fmt.Sprintf("probe-%s", randStr),
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -174,17 +177,17 @@ func (s *PodProbeMarkerTester) NewBaseStatefulSet(namespace string) *apps.Statef
 	}
 }
 
-func (s *PodProbeMarkerTester) CreateStatefulSet(sts *apps.StatefulSet) {
+func (s *PodProbeMarkerTester) CreateStatefulSet(sts *appsv1beta1.StatefulSet) {
 	Logf("create sts(%s/%s)", sts.Namespace, sts.Name)
-	_, err := s.c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
+	_, err := s.kc.AppsV1beta1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	s.WaitForStatefulSetRunning(sts)
 }
 
-func (s *PodProbeMarkerTester) WaitForStatefulSetRunning(sts *apps.StatefulSet) {
+func (s *PodProbeMarkerTester) WaitForStatefulSetRunning(sts *appsv1beta1.StatefulSet) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			inner, err := s.c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			inner, err := s.kc.AppsV1beta1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}

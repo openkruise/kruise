@@ -46,8 +46,12 @@ var _ = SIGDescribe("containerpriority", func() {
 	var kc kruiseclientset.Interface
 	var cloneSetTester *framework.CloneSetTester
 	var deploymentTester *framework.DeploymentTester
+	var nodeTester *framework.NodeTester
 	var randStr string
 	var cs *appsv1alpha1.CloneSet
+	var nodes []*v1.Node
+	var err error
+	var replicas int32
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -56,13 +60,15 @@ var _ = SIGDescribe("containerpriority", func() {
 		cloneSetTester = framework.NewCloneSetTester(c, kc, ns)
 		deploymentTester = framework.NewDeploymentTester(c, ns)
 		randStr = rand.String(10)
+		nodeTester = framework.NewNodeTester(c)
+		nodes, err = nodeTester.ListRealNodesWithFake(nil)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		replicas = int32(len(nodes))
 	})
 
 	framework.KruiseDescribe("start a pod with different container priorities", func() {
-		var err error
-
 		framework.ConformanceIt("container priority created by CloneSet", func() {
-			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   WebserverImage,
@@ -80,6 +86,15 @@ var _ = SIGDescribe("containerpriority", func() {
 					},
 				},
 			})
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			cs.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     cs.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
 			cs, err = cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -88,7 +103,7 @@ var _ = SIGDescribe("containerpriority", func() {
 				cs, err = cloneSetTester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)), fmt.Sprintf("current cloneset: %v, pods: %v", util.DumpJSON(cs), func() string {
+			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas), fmt.Sprintf("current cloneset: %v, pods: %v", util.DumpJSON(cs), func() string {
 				pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 				if err != nil {
 					return fmt.Sprintf("failed to list pods: %v", err)
@@ -98,32 +113,34 @@ var _ = SIGDescribe("containerpriority", func() {
 
 			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods[0].Spec.Containers[0].Env[1].Name).To(gomega.Equal(priorityBarrier))
-			gomega.Expect(*pods[0].Spec.Containers[0].Env[1].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
-				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
-				Key:                  "p_0",
-			}))
-			gomega.Expect(pods[0].Spec.Containers[1].Env[2].Name).To(gomega.Equal(priorityBarrier))
-			gomega.Expect(*pods[0].Spec.Containers[1].Env[2].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
-				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
-				Key:                  "p_10",
-			}))
-			var containerStatus1 v1.ContainerStatus
-			var containerStatus2 v1.ContainerStatus
-			for _, container := range pods[0].Status.ContainerStatuses {
-				if container.Name == pods[0].Spec.Containers[0].Name {
-					containerStatus1 = container
-				} else {
-					containerStatus2 = container
-				}
+			for _, pod := range pods {
+				gomega.Expect(pod.Spec.Containers[0].Env[1].Name).To(gomega.Equal(priorityBarrier))
+				gomega.Expect(*pod.Spec.Containers[0].Env[1].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{Name: pod.Name + "-barrier"},
+					Key:                  "p_0",
+				}))
+				gomega.Expect(pod.Spec.Containers[1].Env[2].Name).To(gomega.Equal(priorityBarrier))
+				gomega.Expect(*pod.Spec.Containers[1].Env[2].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{Name: pod.Name + "-barrier"},
+					Key:                  "p_10",
+				}))
+				var containerStatus1 v1.ContainerStatus
+				var containerStatus2 v1.ContainerStatus
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.Name == pod.Spec.Containers[0].Name {
+						containerStatus1 = container
+					} else {
+						containerStatus2 = container
+					}
 
+				}
+				earlierThan := containerStatus1.State.Running.StartedAt.Time.After(containerStatus2.State.Running.StartedAt.Time)
+				gomega.Expect(earlierThan).To(gomega.Equal(true))
 			}
-			earlierThan := containerStatus1.State.Running.StartedAt.Time.After(containerStatus2.State.Running.StartedAt.Time)
-			gomega.Expect(earlierThan).To(gomega.Equal(true))
 		})
 
 		framework.ConformanceIt("container priority created by Deployment", func() {
-			dp := deploymentTester.NewDeployment("deploy-"+randStr, 1)
+			dp := deploymentTester.NewDeployment("deploy-"+randStr, replicas)
 			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   WebserverImage,
@@ -141,6 +158,15 @@ var _ = SIGDescribe("containerpriority", func() {
 					},
 				},
 			})
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			dp.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     dp.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
 			dp, err = deploymentTester.CreateDeployment(dp)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -149,7 +175,7 @@ var _ = SIGDescribe("containerpriority", func() {
 				dp, err = deploymentTester.GetDeployment(dp.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return dp.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)), fmt.Sprintf("current deployment: %v, pods: %v", util.DumpJSON(dp), func() string {
+			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas), fmt.Sprintf("current deployment: %v, pods: %v", util.DumpJSON(dp), func() string {
 				pods, err := deploymentTester.GetSelectorPods(dp.Namespace, dp.Spec.Selector)
 				if err != nil {
 					return fmt.Sprintf("failed to list pods: %v", err)
@@ -159,32 +185,34 @@ var _ = SIGDescribe("containerpriority", func() {
 
 			pods, err := deploymentTester.GetSelectorPods(dp.Namespace, dp.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods[0].Spec.Containers[0].Env[1].Name).To(gomega.Equal(priorityBarrier))
-			gomega.Expect(*pods[0].Spec.Containers[0].Env[1].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
-				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
-				Key:                  "p_0",
-			}))
-			gomega.Expect(pods[0].Spec.Containers[1].Env[2].Name).To(gomega.Equal(priorityBarrier))
-			gomega.Expect(*pods[0].Spec.Containers[1].Env[2].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
-				LocalObjectReference: v1.LocalObjectReference{Name: pods[0].Name + "-barrier"},
-				Key:                  "p_10",
-			}))
-			var containerStatus1 v1.ContainerStatus
-			var containerStatus2 v1.ContainerStatus
-			for _, container := range pods[0].Status.ContainerStatuses {
-				if container.Name == pods[0].Spec.Containers[0].Name {
-					containerStatus1 = container
-				} else {
-					containerStatus2 = container
-				}
+			for _, pod := range pods {
+				gomega.Expect(pod.Spec.Containers[0].Env[1].Name).To(gomega.Equal(priorityBarrier))
+				gomega.Expect(*pod.Spec.Containers[0].Env[1].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{Name: pod.Name + "-barrier"},
+					Key:                  "p_0",
+				}))
+				gomega.Expect(pod.Spec.Containers[1].Env[2].Name).To(gomega.Equal(priorityBarrier))
+				gomega.Expect(*pod.Spec.Containers[1].Env[2].ValueFrom.ConfigMapKeyRef).To(gomega.Equal(v1.ConfigMapKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{Name: pod.Name + "-barrier"},
+					Key:                  "p_10",
+				}))
+				var containerStatus1 v1.ContainerStatus
+				var containerStatus2 v1.ContainerStatus
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.Name == pod.Spec.Containers[0].Name {
+						containerStatus1 = container
+					} else {
+						containerStatus2 = container
+					}
 
+				}
+				earlierThan := containerStatus1.State.Running.StartedAt.Time.After(containerStatus2.State.Running.StartedAt.Time)
+				gomega.Expect(earlierThan).To(gomega.Equal(true))
 			}
-			earlierThan := containerStatus1.State.Running.StartedAt.Time.After(containerStatus2.State.Running.StartedAt.Time)
-			gomega.Expect(earlierThan).To(gomega.Equal(true))
 		})
 
 		framework.ConformanceIt("run with no container priority", func() {
-			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   WebserverImage,
@@ -194,6 +222,15 @@ var _ = SIGDescribe("containerpriority", func() {
 					{Name: "test", Value: "foo"},
 				},
 			})
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			cs.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     cs.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
 			cs, err = cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -202,28 +239,30 @@ var _ = SIGDescribe("containerpriority", func() {
 				cs, err = cloneSetTester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
 
 			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(len(pods[0].Spec.Containers[0].Env)).To(gomega.Equal(1))
-			gomega.Expect(len(pods[0].Spec.Containers[1].Env)).To(gomega.Equal(1))
-			var containerStatus1 v1.ContainerStatus
-			var containerStatus2 v1.ContainerStatus
-			for _, container := range pods[0].Status.ContainerStatuses {
-				if container.Name == pods[0].Spec.Containers[0].Name {
-					containerStatus1 = container
-				} else {
-					containerStatus2 = container
-				}
+			for _, pod := range pods {
+				gomega.Expect(len(pod.Spec.Containers[0].Env)).To(gomega.Equal(1))
+				gomega.Expect(len(pod.Spec.Containers[1].Env)).To(gomega.Equal(1))
+				var containerStatus1 v1.ContainerStatus
+				var containerStatus2 v1.ContainerStatus
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.Name == pod.Spec.Containers[0].Name {
+						containerStatus1 = container
+					} else {
+						containerStatus2 = container
+					}
 
+				}
+				earlierThan := containerStatus1.State.Running.StartedAt.Time.Before(containerStatus2.State.Running.StartedAt.Time) || containerStatus1.State.Running.StartedAt.Time.Equal(containerStatus2.State.Running.StartedAt.Time)
+				gomega.Expect(earlierThan).To(gomega.Equal(true))
 			}
-			earlierThan := containerStatus1.State.Running.StartedAt.Time.Before(containerStatus2.State.Running.StartedAt.Time) || containerStatus1.State.Running.StartedAt.Time.Equal(containerStatus2.State.Running.StartedAt.Time)
-			gomega.Expect(earlierThan).To(gomega.Equal(true))
 		})
 
 		framework.ConformanceIt("run with priorityAnnotation set", func() {
-			cs = cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					Exec: &v1.ExecAction{
@@ -255,6 +294,15 @@ var _ = SIGDescribe("containerpriority", func() {
 					{Name: "test", Value: "foo"},
 				},
 			})
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			cs.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     cs.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
 			cs.Spec.Template.Annotations = map[string]string{priorityAnnotation: priorityOrdered}
 			cs, err = cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -264,28 +312,30 @@ var _ = SIGDescribe("containerpriority", func() {
 				cs, err = cloneSetTester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
 
 			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(len(pods[0].Spec.Containers[0].Env)).To(gomega.Equal(2))
-			gomega.Expect(len(pods[0].Spec.Containers[1].Env)).To(gomega.Equal(2))
-			gomega.Expect(len(pods[0].Spec.Containers[2].Env)).To(gomega.Equal(2))
-			var containerStatus1 v1.ContainerStatus
-			var containerStatus2 v1.ContainerStatus
-			var containerStatus3 v1.ContainerStatus
-			for _, container := range pods[0].Status.ContainerStatuses {
-				if container.Name == pods[0].Spec.Containers[0].Name {
-					containerStatus1 = container
-				} else if container.Name == pods[0].Spec.Containers[1].Name {
-					containerStatus2 = container
-				} else {
-					containerStatus3 = container
+			for _, pod := range pods {
+				gomega.Expect(len(pod.Spec.Containers[0].Env)).To(gomega.Equal(2))
+				gomega.Expect(len(pod.Spec.Containers[1].Env)).To(gomega.Equal(2))
+				gomega.Expect(len(pod.Spec.Containers[2].Env)).To(gomega.Equal(2))
+				var containerStatus1 v1.ContainerStatus
+				var containerStatus2 v1.ContainerStatus
+				var containerStatus3 v1.ContainerStatus
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.Name == pod.Spec.Containers[0].Name {
+						containerStatus1 = container
+					} else if container.Name == pod.Spec.Containers[1].Name {
+						containerStatus2 = container
+					} else {
+						containerStatus3 = container
+					}
 				}
+				earlierThan1 := containerStatus1.State.Running.StartedAt.Time.Before(containerStatus2.State.Running.StartedAt.Time) || containerStatus1.State.Running.StartedAt.Time.Equal(containerStatus2.State.Running.StartedAt.Time)
+				earlierThan2 := containerStatus2.State.Running.StartedAt.Time.Before(containerStatus3.State.Running.StartedAt.Time) || containerStatus2.State.Running.StartedAt.Time.Equal(containerStatus3.State.Running.StartedAt.Time)
+				gomega.Expect(earlierThan1 && earlierThan2).To(gomega.Equal(true))
 			}
-			earlierThan1 := containerStatus1.State.Running.StartedAt.Time.Before(containerStatus2.State.Running.StartedAt.Time) || containerStatus1.State.Running.StartedAt.Time.Equal(containerStatus2.State.Running.StartedAt.Time)
-			earlierThan2 := containerStatus2.State.Running.StartedAt.Time.Before(containerStatus3.State.Running.StartedAt.Time) || containerStatus2.State.Running.StartedAt.Time.Equal(containerStatus3.State.Running.StartedAt.Time)
-			gomega.Expect(earlierThan1 && earlierThan2).To(gomega.Equal(true))
 		})
 	})
 
