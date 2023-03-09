@@ -299,10 +299,10 @@ func parseStsPodIndex(podName string) (int, error) {
 }
 
 // map[string]*corev1.Pod -> map[Pod.Name]*corev1.Pod
-func (p *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *appsv1alpha1.PersistentPodState) (map[string]*corev1.Pod, *innerStatefulset, error) {
+func (r *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *appsv1alpha1.PersistentPodState) (map[string]*corev1.Pod, *innerStatefulset, error) {
 	inner := &innerStatefulset{}
 	ref := persistentPodState.Spec.TargetReference
-	workload, err := p.finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, persistentPodState.Namespace, ref.Name, "")
+	workload, err := r.finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, persistentPodState.Namespace, ref.Name, "")
 	if err != nil {
 		klog.Errorf("persistentPodState(%s/%s) fetch statefulSet(%s) failed: %s", persistentPodState.Namespace, persistentPodState.Name, ref.Name, err.Error())
 		return nil, nil, err
@@ -314,7 +314,7 @@ func (p *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *
 	inner.DeletionTimestamp = workload.Metadata.DeletionTimestamp
 
 	// DisableDeepCopy:true, indicates must be deep copy before update pod objection
-	pods, _, err := p.finder.GetPodsForRef(ref.APIVersion, ref.Kind, persistentPodState.Namespace, ref.Name, true)
+	pods, _, err := r.finder.GetPodsForRef(ref.APIVersion, ref.Kind, persistentPodState.Namespace, ref.Name, true)
 	if err != nil {
 		klog.Errorf("list persistentPodState(%s/%s) pods failed: %s", persistentPodState.Namespace, persistentPodState.Name, err.Error())
 		return nil, nil, err

@@ -101,7 +101,7 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	// if it is changed, indicates the update is complete.
 	// format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
-	if stateStr, _ := pod.Annotations[SidecarsetInplaceUpdateStateKey]; len(stateStr) > 0 {
+	if stateStr := pod.Annotations[SidecarsetInplaceUpdateStateKey]; len(stateStr) > 0 {
 		if err := json.Unmarshal([]byte(stateStr), &sidecarUpdateStates); err != nil {
 			klog.Errorf("parse pod(%s/%s) annotations[%s] value(%s) failed: %s",
 				pod.Namespace, pod.Name, SidecarsetInplaceUpdateStateKey, stateStr, err.Error())
@@ -136,7 +136,6 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	sidecarUpdateStates[sidecarSet.Name] = inPlaceUpdateState
 	by, _ := json.Marshal(sidecarUpdateStates)
 	pod.Annotations[SidecarsetInplaceUpdateStateKey] = string(by)
-	return
 }
 
 // only check sidecar container is consistent

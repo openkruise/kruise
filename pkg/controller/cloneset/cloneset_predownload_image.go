@@ -61,12 +61,12 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 	// ignore if all Pods update in one batch
 	var partition, maxUnavailable int
 	if cs.Spec.UpdateStrategy.Partition != nil {
-		if pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err != nil {
+		pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas)
+		if err != nil {
 			klog.Errorf("CloneSet %s/%s partition value is illegal", cs.Namespace, cs.Name)
 			return err
-		} else {
-			partition = pValue
 		}
+		partition = pValue
 	}
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)
