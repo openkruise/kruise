@@ -73,7 +73,6 @@ spec:
                 description: The number of failed finished jobs to retain. This is
                   a pointer to distinguish between explicit zero and not specified.
                 format: int32
-                minimum: 0
                 type: integer
               paused:
                 description: Paused will pause the cron job.
@@ -87,13 +86,11 @@ spec:
                   it misses scheduled time for any reason.  Missed jobs executions
                   will be counted as failed ones.
                 format: int64
-                minimum: 0
                 type: integer
               successfulJobsHistoryLimit:
                 description: The number of successful finished jobs to retain. This
                   is a pointer to distinguish between explicit zero and not specified.
                 format: int32
-                minimum: 0
                 type: integer
               template:
                 description: Specifies the job that will be created when executing
