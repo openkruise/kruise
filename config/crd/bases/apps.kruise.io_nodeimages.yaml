@@ -80,6 +80,19 @@ spec:
                             type: string
                         type: object
                       type: array
+                    sandboxConfig:
+                      description: SandboxConfig support attach metadata in PullImage
+                        CRI interface during ImagePulljobs
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                      type: object
                     tags:
                       description: Tags is a list of versions of this image
                       items:

@@ -214,7 +214,7 @@ func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, status *appsv1alpha1
 		_, ok := w.pullWorkers[tagSpec.Tag]
 
 		if !ok {
-			worker := newPullWorker(w.name, tagSpec, secrets, w.runtime, w, ref, w.eventRecorder)
+			worker := newPullWorker(w.name, tagSpec, spec.SandboxConfig, secrets, w.runtime, w, ref, w.eventRecorder)
 			w.pullWorkers[tagSpec.Tag] = worker
 		}
 	}
@@ -262,10 +262,11 @@ func (w *realWorkerPool) UpdateStatus(status *appsv1alpha1.ImageTagStatus) {
 	w.tagStatuses[status.Tag] = status
 }
 
-func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
+func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig *appsv1alpha1.SandboxConfig, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
 	o := &pullWorker{
 		name:          name,
 		tagSpec:       tagSpec,
+		sandboxConfig: sandboxConfig,
 		secrets:       secrets,
 		runtime:       runtime,
 		statusUpdater: statusUpdater,
@@ -283,6 +284,7 @@ type pullWorker struct {
 
 	name          string
 	tagSpec       appsv1alpha1.ImageTagSpec
+	sandboxConfig *appsv1alpha1.SandboxConfig
 	secrets       []v1.Secret
 	runtime       runtimeimage.ImageService
 	statusUpdater imageStatusUpdater
@@ -435,7 +437,7 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 	var statusReader runtimeimage.ImagePullStatusReader
 	pullChan := make(chan struct{})
 	go func() {
-		statusReader, err = w.runtime.PullImage(ctx, w.name, tag, w.secrets)
+		statusReader, err = w.runtime.PullImage(ctx, w.name, tag, w.secrets, w.sandboxConfig)
 		close(pullChan)
 	}()
 
