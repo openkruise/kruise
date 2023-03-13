@@ -47,6 +47,9 @@ type Control interface {
 
 	// validation
 	ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneSet) error
+
+	// event handler
+	IgnorePodUpdateEvent(oldPod, newPod *v1.Pod) bool
 }
 
 func New(cs *appsv1alpha1.CloneSet) Control {
