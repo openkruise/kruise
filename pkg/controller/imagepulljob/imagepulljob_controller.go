@@ -253,7 +253,6 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 	ownerRef := getOwnerRef(job)
 	secrets := getSecrets(job)
 	pullPolicy := getImagePullPolicy(job)
-
 	now := metav1.NewTime(r.clock.Now())
 	imageName, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(job.Spec.Image)
 	for i := 0; i < parallelism; i++ {
@@ -267,6 +266,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 				nodeImage.Spec.Images = make(map[string]appsv1alpha1.ImageSpec, 1)
 			}
 			imageSpec := nodeImage.Spec.Images[imageName]
+			imageSpec.SandboxConfig = job.Spec.SandboxConfig
 
 			for _, secret := range secrets {
 				if !containsObject(imageSpec.PullSecrets, secret) {
