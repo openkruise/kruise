@@ -143,7 +143,7 @@ jobs:
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
           set +e
-          ./bin/ginkgo -timeout 60m -v --focus='\[apps\] (PullImage|ContainerRecreateRequest)' test/e2e
+          ./bin/ginkgo -timeout 60m -v --focus='\[apps\] (PullImage|ContainerRecreateRequest|PullImages)' test/e2e
           retVal=$?
           restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
           if [ "${restartCount}" -eq "0" ];then
@@ -502,7 +502,7 @@ jobs:
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
           set +e
-          ./bin/ginkgo -timeout 90m -v --skip='\[apps\] (StatefulSet|PullImage|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' --skip='\[policy\] PodUnavailableBudget' test/e2e
+          ./bin/ginkgo -timeout 90m -v --skip='\[apps\] (StatefulSet|PullImage|PullImages|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' --skip='\[policy\] PodUnavailableBudget' test/e2e
           retVal=$?
           restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
           if [ "${restartCount}" -eq "0" ];then

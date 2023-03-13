@@ -370,3 +370,19 @@ func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
 		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
 	}
 }
+
+// SetDefaultsImageListPullJob  set default values for ImageListPullJob.
+func SetDefaultsImageListPullJob(obj *v1alpha1.ImageListPullJob) {
+	if obj.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.CompletionPolicy.Type = v1alpha1.Always
+	}
+	if obj.Spec.PullPolicy == nil {
+		obj.Spec.PullPolicy = &v1alpha1.PullPolicy{}
+	}
+	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
+		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
+	}
+	if obj.Spec.PullPolicy.BackoffLimit == nil {
+		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
+	}
+}

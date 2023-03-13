@@ -57,12 +57,6 @@ type ImageListPullJobStatus struct {
 	// +optional
 	Succeeded int32 `json:"succeeded"`
 
-	// Phase Indicates the completion progress of the job,the format is Succeeded/Completed
-	// Succeeded: The number of ImagePullJobs which reached status.Succeeded==status.Desired
-	// Completed: The number of ImagePullJobs which are finished
-	// +optional
-	Phase string `json:"phase"`
-
 	// The status of ImagePullJob which has the failed nodes(status.Failed>0) .
 	// +optional
 	FailedImageStatuses []*FailedImageStatus `json:"failedImageStatuses,omitempty"`
@@ -89,7 +83,7 @@ type FailedImageStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="TOTAL",type="integer",JSONPath=".status.desired",description="Number of image pull job"
 // +kubebuilder:printcolumn:name="SUCCEEDED",type="integer",JSONPath=".status.succeeded",description="Number of image pull job succeeded"
-// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status.succeeded/status.completed"
+// +kubebuilder:printcolumn:name="COMPLETED",type="integer",JSONPath=".status.completed",description="Number of ImagePullJobs which are finished"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp",description="CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC."
 
 // ImageListPullJob is the Schema for the imagelistpulljobs API

@@ -25,10 +25,10 @@ spec:
       jsonPath: .status.succeeded
       name: SUCCEEDED
       type: integer
-    - description: status.succeeded/status.completed
-      jsonPath: .status.phase
-      name: STATUS
-      type: string
+    - description: Number of ImagePullJobs which are finished
+      jsonPath: .status.completed
+      name: COMPLETED
+      type: integer
     - description: CreationTimestamp is a timestamp representing the server time when
         this object was created. It is not guaranteed to be set in happens-before
         order across separate operations. Clients may not set this value. It is represented
@@ -277,12 +277,6 @@ spec:
                       type: string
                   type: object
                 type: array
-              phase:
-                description: 'Phase Indicates the completion progress of the job,the
-                  format is Succeeded/Completed Succeeded: The number of ImagePullJobs
-                  which reached status.Succeeded==status.Desired Completed: The number
-                  of ImagePullJobs which are finished'
-                type: string
               startTime:
                 description: Represents time when the job was acknowledged by the
                   job controller. It is not guaranteed to be set in happens-before
