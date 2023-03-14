@@ -22,12 +22,16 @@ import (
 	"regexp"
 
 	"github.com/appscode/jsonpatch"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var (
@@ -164,4 +168,78 @@ func (c *commonControl) ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneS
 
 func (c *commonControl) ExtraStatusCalculation(status *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
 	return nil
+}
+
+func (c *commonControl) IgnorePodUpdateEvent(oldPod, curPod *v1.Pod) bool {
+	if oldPod.Generation != curPod.Generation {
+		return false
+	}
+
+	if lifecycleFinalizerChanged(c.CloneSet, oldPod, curPod) {
+		return false
+	}
+
+	if c.IsPodUpdatePaused(oldPod) != c.IsPodUpdatePaused(curPod) {
+		return false
+	}
+
+	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(curPod) {
+		return false
+	}
+
+	containsReadinessGate := func(pod *v1.Pod) bool {
+		for _, r := range pod.Spec.ReadinessGates {
+			if r.ConditionType == appspub.InPlaceUpdateReady {
+				return true
+			}
+		}
+		return false
+	}
+
+	if containsReadinessGate(curPod) {
+		opts := c.GetUpdateOptions()
+		opts = inplaceupdate.SetOptionsDefaults(opts)
+		if err := containersUpdateCompleted(curPod, opts.CheckContainersUpdateCompleted); err == nil {
+			if cond := inplaceupdate.GetCondition(curPod); cond == nil || cond.Status != v1.ConditionTrue {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func containersUpdateCompleted(pod *v1.Pod, checkFunc func(pod *v1.Pod, state *appspub.InPlaceUpdateState) error) error {
+	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); ok {
+		state := appspub.InPlaceUpdateState{}
+		if err := json.Unmarshal([]byte(stateStr), &state); err != nil {
+			return err
+		}
+		return checkFunc(pod, &state)
+	}
+	return fmt.Errorf("pod %v has no in-place update state annotation", klog.KObj(pod))
+}
+
+func lifecycleFinalizerChanged(cs *appsv1alpha1.CloneSet, oldPod, curPod *v1.Pod) bool {
+	if cs.Spec.Lifecycle == nil {
+		return false
+	}
+
+	if cs.Spec.Lifecycle.PreDelete != nil {
+		for _, f := range cs.Spec.Lifecycle.PreDelete.FinalizersHandler {
+			if controllerutil.ContainsFinalizer(oldPod, f) != controllerutil.ContainsFinalizer(curPod, f) {
+				return true
+			}
+		}
+	}
+
+	if cs.Spec.Lifecycle.InPlaceUpdate != nil {
+		for _, f := range cs.Spec.Lifecycle.InPlaceUpdate.FinalizersHandler {
+			if controllerutil.ContainsFinalizer(oldPod, f) != controllerutil.ContainsFinalizer(curPod, f) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
