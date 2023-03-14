@@ -18,8 +18,6 @@ package cloneset
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -31,21 +29,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
 var (
@@ -179,59 +173,12 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 }
 
 func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, curPod *v1.Pod) bool {
-	if curPod.Generation != oldPod.Generation {
-		return false
-	}
-
 	cs := &appsv1alpha1.CloneSet{}
 	if err := e.Get(context.TODO(), req.NamespacedName, cs); err != nil {
 		return false
 	}
 
-	if lifecycleFinalizerChanged(cs, oldPod, curPod) {
-		return false
-	}
-
-	coreControl := clonesetcore.New(cs)
-	if coreControl.IsPodUpdatePaused(oldPod) != coreControl.IsPodUpdatePaused(curPod) {
-		return false
-	}
-
-	containsReadinessGate := func(pod *v1.Pod) bool {
-		for _, r := range pod.Spec.ReadinessGates {
-			if r.ConditionType == appspub.InPlaceUpdateReady {
-				return true
-			}
-		}
-		return false
-	}
-
-	if containsReadinessGate(curPod) {
-		opts := coreControl.GetUpdateOptions()
-		opts = inplaceupdate.SetOptionsDefaults(opts)
-		if err := containersUpdateCompleted(curPod, opts.CheckContainersUpdateCompleted); err == nil {
-			if cond := inplaceupdate.GetCondition(curPod); cond == nil || cond.Status != v1.ConditionTrue {
-				return false
-			}
-		}
-	}
-
-	if pod.IsPodReady(oldPod) != pod.IsPodReady(curPod) {
-		return false
-	}
-
-	return true
-}
-
-func containersUpdateCompleted(pod *v1.Pod, checkFunc func(pod *v1.Pod, state *appspub.InPlaceUpdateState) error) error {
-	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); ok {
-		state := appspub.InPlaceUpdateState{}
-		if err := json.Unmarshal([]byte(stateStr), &state); err != nil {
-			return err
-		}
-		return checkFunc(pod, &state)
-	}
-	return fmt.Errorf("pod %v has no in-place update state annotation", klog.KObj(pod))
+	return clonesetcore.New(cs).IgnorePodUpdateEvent(oldPod, curPod)
 }
 
 func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
@@ -259,30 +206,6 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 
 func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 
-}
-
-func lifecycleFinalizerChanged(cs *appsv1alpha1.CloneSet, oldPod, curPod *v1.Pod) bool {
-	if cs.Spec.Lifecycle == nil {
-		return false
-	}
-
-	if cs.Spec.Lifecycle.PreDelete != nil {
-		for _, f := range cs.Spec.Lifecycle.PreDelete.FinalizersHandler {
-			if controllerutil.ContainsFinalizer(oldPod, f) != controllerutil.ContainsFinalizer(curPod, f) {
-				return true
-			}
-		}
-	}
-
-	if cs.Spec.Lifecycle.InPlaceUpdate != nil {
-		for _, f := range cs.Spec.Lifecycle.InPlaceUpdate.FinalizersHandler {
-			if controllerutil.ContainsFinalizer(oldPod, f) != controllerutil.ContainsFinalizer(curPod, f) {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 func resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *reconcile.Request {
