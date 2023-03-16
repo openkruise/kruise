@@ -587,7 +587,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded}}))
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
 
 				ginkgo.By("Check Pod containers recreated and started for minStartedSeconds")
 				pod, err = resetartContainerTester.GetPod(pod.Name)

@@ -340,6 +340,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 		}
 
 		if state.Phase == appsv1alpha1.ContainerRecreateRequestRecreating {
+			state.IsKilled = true
 			if crr.Spec.Strategy.OrderedRecreate {
 				break
 			}
@@ -362,6 +363,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 			}
 			return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
 		}
+		state.IsKilled = true
 		state.Phase = appsv1alpha1.ContainerRecreateRequestRecreating
 		break
 	}
