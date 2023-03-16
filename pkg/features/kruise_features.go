@@ -110,18 +110,18 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 
 	CloneSetShortHash:                         {Default: false, PreRelease: featuregate.Alpha},
 	KruisePodReadinessGate:                    {Default: false, PreRelease: featuregate.Alpha},
-	PreDownloadImageForInPlaceUpdate:          {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForInPlaceUpdate:          {Default: true, PreRelease: featuregate.Alpha},
 	CloneSetPartitionRollback:                 {Default: false, PreRelease: featuregate.Alpha},
-	ResourcesDeletionProtection:               {Default: false, PreRelease: featuregate.Alpha},
-	WorkloadSpread:                            {Default: false, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetDeleteGate:            {Default: false, PreRelease: featuregate.Alpha},
+	ResourcesDeletionProtection:               {Default: true, PreRelease: featuregate.Alpha},
+	WorkloadSpread:                            {Default: true, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetDeleteGate:            {Default: true, PreRelease: featuregate.Alpha},
 	PodUnavailableBudgetUpdateGate:            {Default: false, PreRelease: featuregate.Alpha},
 	TemplateNoDefaults:                        {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceUpdateEnvFromMetadata:              {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetAutoDeletePVC:                  {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceUpdateEnvFromMetadata:              {Default: true, PreRelease: featuregate.Alpha},
+	StatefulSetAutoDeletePVC:                  {Default: true, PreRelease: featuregate.Alpha},
 	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
 	SidecarTerminator:                         {Default: false, PreRelease: featuregate.Alpha},
-	PodProbeMarkerGate:                        {Default: false, PreRelease: featuregate.Alpha},
+	PodProbeMarkerGate:                        {Default: true, PreRelease: featuregate.Alpha},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
 }
@@ -150,10 +150,14 @@ func SetDefaultFeatureGates() {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetDeleteGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetUpdateGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", WorkloadSpread))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarSetPatchPodMetadataDefaultsAllowed))
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DaemonWatchingPod))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", InPlaceUpdateEnvFromMetadata))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForDaemonSetUpdate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodProbeMarkerGate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarTerminator))
 	}
 }
