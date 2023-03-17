@@ -142,6 +142,7 @@ var (
 				{Name: "sidecar"},
 			},
 			Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+				ForceRecreate: true,
 				FailurePolicy: appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore,
 			},
 		},

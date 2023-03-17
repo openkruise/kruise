@@ -23,7 +23,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/feature"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
@@ -501,7 +503,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			expectedQueueLen: 1,
+			expectedQueueLen: 0,
 		},
 		{
 			name: "orphan changed",
@@ -721,6 +723,8 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 			expectedQueueLen: 1,
 		},
 	}
+
+	defer feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CloneSetEventHandlerOptimization, true)()
 
 	for _, testCase := range cases {
 		fakeClient := fake.NewClientBuilder().Build()
