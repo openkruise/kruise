@@ -192,6 +192,11 @@ func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectTemplateDefaults 
 	if obj.Spec.FailurePolicy.Type == "" {
 		obj.Spec.FailurePolicy.Type = v1alpha1.FailurePolicyTypeFailFast
 	}
+
+	// Default to 'OnFailure' if no restartPolicy is specified
+	if obj.Spec.Template.Spec.RestartPolicy == "" {
+		obj.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+	}
 }
 
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
