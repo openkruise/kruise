@@ -96,13 +96,7 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue
 			}
-		case ContainerRuntimePouch:
-			imageService, err = runtimeimage.NewPouchImageService(cfg.runtimeURI, accountManager)
-			if err != nil {
-				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
-		case ContainerRuntimeContainerd, ContainerRuntimeCommonCRI:
+		case ContainerRuntimeContainerd, ContainerRuntimeCommonCRI, ContainerRuntimePouch:
 			addr, _, err := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
 			if err != nil {
 				klog.Warningf("Failed to get address for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
