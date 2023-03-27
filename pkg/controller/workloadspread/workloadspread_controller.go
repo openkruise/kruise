@@ -178,6 +178,7 @@ type ReconcileWorkloadSpread struct {
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=workloadspreads,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=workloadspreads/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=workloadspreads/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch

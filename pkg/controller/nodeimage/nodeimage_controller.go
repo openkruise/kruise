@@ -142,6 +142,7 @@ type ReconcileNodeImage struct {
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=nodeimages/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=nodeimages/finalizers,verbs=update
 
 // Reconcile reads that state of the cluster for a NodeImage object and makes changes based on the state read
 // and what is in the NodeImage.Spec

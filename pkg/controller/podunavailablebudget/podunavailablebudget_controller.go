@@ -208,6 +208,7 @@ type ReconcilePodUnavailableBudget struct {
 
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=*,resources=*/scale,verbs=get;list;watch
 
 // pkg/controller/cloneset/cloneset_controller.go Watch for changes to CloneSet
