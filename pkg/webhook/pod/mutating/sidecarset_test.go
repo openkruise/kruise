@@ -238,6 +238,32 @@ var (
 					"app": "suxing-test",
 				},
 			},
+			InitContainers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "dns-e",
+						Image: "dns-e-image:1.0",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "volume-3",
+								MountPath: "/g/h/i",
+							},
+							{
+								Name:      "volume-4",
+								MountPath: "/j/k/l",
+							},
+							{
+								Name:      "volume-staragent",
+								MountPath: "/staragent",
+							},
+						},
+					},
+					PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+					ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+						Type: appsv1alpha1.ShareVolumePolicyEnabled,
+					},
+				},
+			},
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
@@ -288,6 +314,8 @@ var (
 				{Name: "volume-1"},
 				{Name: "volume-2"},
 				{Name: "volume-staragent"},
+				{Name: "volume-3"},
+				{Name: "volume-4"},
 			},
 		},
 	}
@@ -730,11 +758,12 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	// /a/b、/e/f
 	podIn := podWithStaragent.DeepCopy()
 	cases := []struct {
-		name               string
-		getPod             func() *corev1.Pod
-		getSidecarSets     func() *appsv1alpha1.SidecarSet
-		exceptVolumeMounts []string
-		exceptEnvs         []string
+		name                   string
+		getPod                 func() *corev1.Pod
+		getSidecarSets         func() *appsv1alpha1.SidecarSet
+		exceptInitVolumeMounts []string
+		exceptVolumeMounts     []string
+		exceptEnvs             []string
 	}{
 		{
 			name: "append normal volumeMounts",
@@ -744,7 +773,8 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 			getSidecarSets: func() *appsv1alpha1.SidecarSet {
 				return sidecarSetIn.DeepCopy()
 			},
-			exceptVolumeMounts: []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent"},
+			exceptInitVolumeMounts: []string{"/a/b", "/e/f", "/g/h/i", "/j/k/l", "/staragent"},
+			exceptVolumeMounts:     []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent"},
 		},
 		{
 			name: "append volumeMounts SubPathExpr, volumes with expanded subpath",
@@ -768,8 +798,9 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 			getSidecarSets: func() *appsv1alpha1.SidecarSet {
 				return sidecarSetIn.DeepCopy()
 			},
-			exceptVolumeMounts: []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent", "/e/expansion"},
-			exceptEnvs:         []string{"POD_NAME", "OD_NAME"},
+			exceptInitVolumeMounts: []string{"/a/b", "/e/f", "/g/h/i", "/j/k/l", "/staragent", "/e/expansion"},
+			exceptVolumeMounts:     []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent", "/e/expansion"},
+			exceptEnvs:             []string{"POD_NAME", "OD_NAME"},
 		},
 		{
 			name: "append volumeMounts SubPathExpr, subpath with no expansion",
@@ -785,7 +816,8 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 			getSidecarSets: func() *appsv1alpha1.SidecarSet {
 				return sidecarSetIn.DeepCopy()
 			},
-			exceptVolumeMounts: []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent", "/e/expansion"},
+			exceptInitVolumeMounts: []string{"/a/b", "/e/f", "/g/h/i", "/j/k/l", "/staragent", "/e/expansion"},
+			exceptVolumeMounts:     []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent", "/e/expansion"},
 		},
 		{
 			name: "append volumeMounts SubPathExpr, volumes expanded with empty subpath",
@@ -801,7 +833,8 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 			getSidecarSets: func() *appsv1alpha1.SidecarSet {
 				return sidecarSetIn.DeepCopy()
 			},
-			exceptVolumeMounts: []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent", "/e/expansion"},
+			exceptInitVolumeMounts: []string{"/a/b", "/e/f", "/g/h/i", "/j/k/l", "/staragent", "/e/expansion"},
+			exceptVolumeMounts:     []string{"/a/b", "/e/f", "/a/b/c", "/d/e/f", "/staragent", "/e/expansion"},
 		},
 	}
 
@@ -818,15 +851,27 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 				t.Fatalf("inject sidecar into pod failed, err: %v", err)
 			}
 
+			for _, mount := range cs.exceptInitVolumeMounts {
+				if util.GetContainerVolumeMount(&podOut.Spec.InitContainers[0], mount) == nil {
+					t.Fatalf("expect volume mounts in InitContainer %s but got nil", mount)
+				}
+			}
+
+			for _, env := range cs.exceptEnvs {
+				if util.GetContainerEnvVar(&podOut.Spec.InitContainers[0], env) == nil {
+					t.Fatalf("expect env in InitContainer %s but got nil", env)
+				}
+			}
+
 			for _, mount := range cs.exceptVolumeMounts {
 				if util.GetContainerVolumeMount(&podOut.Spec.Containers[1], mount) == nil {
-					t.Fatalf("expect volume mounts %s but got nil", mount)
+					t.Fatalf("expect volume mounts in Container %s but got nil", mount)
 				}
 			}
 
 			for _, env := range cs.exceptEnvs {
 				if util.GetContainerEnvVar(&podOut.Spec.Containers[1], env) == nil {
-					t.Fatalf("expect env %s but got nil", env)
+					t.Fatalf("expect env in Container %s but got nil", env)
 				}
 			}
 		})

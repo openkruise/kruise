@@ -362,15 +362,27 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		if !isUpdated {
 			for i := range sidecarSet.Spec.InitContainers {
 				initContainer := &sidecarSet.Spec.InitContainers[i]
-				//add "IS_INJECTED" env in initContainer's envs
-				initContainer.Env = append(initContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
+				// volumeMounts that injected into sidecar container
+				// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
+				injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, initContainer, pod)
+				// get injected env & mounts explicitly so that can be compared with old ones in pod
 				transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(initContainer, pod)
-				initContainer.Env = append(initContainer.Env, transferEnvs...)
-				sidecarInitContainers = append(sidecarInitContainers, initContainer)
+				// append volumeMounts SubPathExpr environments
+				transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
+				klog.Infof("try to inject initContainer sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
+					initContainer.Name, pod.Namespace, pod.Name, transferEnvs, injectedMounts)
 				// insert volumes that initContainers used
 				for _, mount := range initContainer.VolumeMounts {
 					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
 				}
+				// merge VolumeMounts from sidecar.VolumeMounts and shared VolumeMounts
+				initContainer.VolumeMounts = util.MergeVolumeMounts(initContainer.VolumeMounts, injectedMounts)
+				// add "IS_INJECTED" env in initContainer's envs
+				initContainer.Env = append(initContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
+				// merged Env from sidecar.Env and transfer envs
+				initContainer.Env = util.MergeEnvVar(initContainer.Env, transferEnvs)
+
+				sidecarInitContainers = append(sidecarInitContainers, initContainer)
 			}
 			//process imagePullSecrets
 			sidecarSecrets = append(sidecarSecrets, sidecarSet.Spec.ImagePullSecrets...)
@@ -389,7 +401,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(sidecarContainer, pod)
 			// append volumeMounts SubPathExpr environments
 			transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-			klog.Infof("try to inject sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
+			klog.Infof("try to inject Container sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
 				sidecarContainer.Name, pod.Namespace, pod.Name, transferEnvs, injectedMounts)
 			//when update pod object
 			if isUpdated {
