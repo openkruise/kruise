@@ -316,6 +316,23 @@ func TestValidateSidecarSet(t *testing.T) {
 					{
 						Name: "test-volume",
 					},
+					{
+						Name: "istio-token",
+						VolumeSource: corev1.VolumeSource{
+							Projected: &corev1.ProjectedVolumeSource{
+								DefaultMode: pointer.Int32Ptr(420),
+								Sources: []corev1.VolumeProjection{
+									{
+										ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+											Audience:          "istio-ca",
+											ExpirationSeconds: pointer.Int64Ptr(43200),
+											Path:              "istio-token",
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
