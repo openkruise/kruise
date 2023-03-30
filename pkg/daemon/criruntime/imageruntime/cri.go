@@ -28,6 +28,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 const maxMsgSize = 1024 * 1024 * 16
@@ -71,6 +72,10 @@ type commonCRIImageService struct {
 func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error) {
 	registry := daemonutil.ParseRegistry(imageName)
 	fullImageName := imageName + ":" + tag
+	repoToPull, _, _, err := parsers.ParseImageName(fullImageName)
+	if err != nil {
+		return nil, err
+	}
 	// Reader
 	pipeR, pipeW := io.Pipe()
 	defer pipeW.Close()
@@ -89,10 +94,9 @@ func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag st
 			Labels:      sandboxConfig.Labels,
 		}
 	}
-	var err error
 	if len(pullSecrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
-		authInfos, err = convertToRegistryAuths(pullSecrets, registry)
+		authInfos, err = convertToRegistryAuths(pullSecrets, repoToPull)
 		if err == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {
