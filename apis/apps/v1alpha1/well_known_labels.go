@@ -15,6 +15,8 @@ const (
 
 	// ImagePreDownloadIgnoredKey indicates the images of this revision have been ignored to pre-download
 	ImagePreDownloadIgnoredKey = "apps.kruise.io/image-predownload-ignored"
+	// AnnotationSubsetPatchKey indicates the patch for every subset
+	AnnotationSubsetPatchKey = "apps.kruise.io/subset-patch"
 )
 
 // Sidecar container environment variable definitions which are used to enable SidecarTerminator to take effect on the sidecar container.
