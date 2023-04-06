@@ -8,7 +8,7 @@
 
 > No, really, you must read this before you upgrade
 
-- Enable following feature-gates by default: PreDownloadImageForInPlaceUpdate, ResourcesDeletionProtection, WorkloadSpread, PodUnavailableBudgetDeleteGate, InPlaceUpdateEnvFromMetadata,
+- Enable following feature-gates by default: ResourcesDeletionProtection, WorkloadSpread, PodUnavailableBudgetDeleteGate, InPlaceUpdateEnvFromMetadata,
 StatefulSetAutoDeletePVC, PodProbeMarkerGate. ([#1214](https://github.com/openkruise/kruise/pull/1214), [@zmberg](https://github.com/zmberg))
 - Change Kruise leader election from configmap to configmapsleases, this is a smooth upgrade with no disruption to OpenKruise service.  ([#1184](https://github.com/openkruise/kruise/pull/1184), [@YTGhost](https://github.com/YTGhost))
 
