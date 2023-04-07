@@ -110,7 +110,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 
 	CloneSetShortHash:                         {Default: false, PreRelease: featuregate.Alpha},
 	KruisePodReadinessGate:                    {Default: false, PreRelease: featuregate.Alpha},
-	PreDownloadImageForInPlaceUpdate:          {Default: true, PreRelease: featuregate.Alpha},
+	PreDownloadImageForInPlaceUpdate:          {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetPartitionRollback:                 {Default: false, PreRelease: featuregate.Alpha},
 	ResourcesDeletionProtection:               {Default: true, PreRelease: featuregate.Alpha},
 	WorkloadSpread:                            {Default: true, PreRelease: featuregate.Alpha},
