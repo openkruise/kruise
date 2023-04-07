@@ -161,6 +161,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - advancedcronjobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - advancedcronjobs/status
   verbs:
   - get
@@ -178,6 +184,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - broadcastjobs/finalizers
+  verbs:
+  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -201,6 +213,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - clonesets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - clonesets/status
   verbs:
   - get
@@ -221,6 +239,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - containerrecreaterequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - containerrecreaterequests/status
   verbs:
   - get
@@ -238,6 +262,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - daemonsets/finalizers
+  verbs:
+  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -280,6 +310,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - imagepulljobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - imagepulljobs/status
   verbs:
   - get
@@ -297,6 +333,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - nodeimages/finalizers
+  verbs:
+  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -320,6 +362,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - nodepodprobes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - nodepodprobes/status
   verbs:
   - get
@@ -337,6 +385,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - persistentpodstates/finalizers
+  verbs:
+  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -360,6 +414,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - podprobemarkers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - podprobemarkers/status
   verbs:
   - get
@@ -373,6 +433,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - resourcedistributions/finalizers
+  verbs:
+  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -396,6 +462,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - sidecarsets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - sidecarsets/status
   verbs:
   - get
@@ -413,6 +485,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - statefulsets/finalizers
+  verbs:
+  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -436,6 +514,12 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - uniteddeployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - uniteddeployments/status
   verbs:
   - get
@@ -451,6 +535,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - workloadspreads/finalizers
+  verbs:
+  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -575,6 +665,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - policy.kruise.io
+  resources:
+  - podunavailablebudgets/finalizers
+  verbs:
+  - update
 - apiGroups:
   - policy.kruise.io
   resources:

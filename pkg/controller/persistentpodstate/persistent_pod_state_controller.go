@@ -161,10 +161,9 @@ type ReconcilePersistentPodState struct {
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=persistentpodstates,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=persistentpodstates/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=persistentpodstates/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
 
 // Reconcile reads that state of the cluster for a PersistentPodState object and makes changes based on the state read
 // and what is in the PersistentPodState.Spec
