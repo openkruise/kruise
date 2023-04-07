@@ -35,6 +35,7 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Clo
 
   - [**SidecarSet** - 定义和升级你的 sidecar 容器](https://openkruise.io/zh/docs/user-manuals/sidecarset)
   - [**Container Launch Priority** 控制sidecar启动顺序](https://openkruise.io/zh/docs/user-manuals/containerlaunchpriority)
+  - [**Sidecar Job Terminator** 当 Job 类 Pod 主容器退出后，Terminator Sidecar容器](https://openkruise.io/zh/docs/user-manuals/jobsidecarterminator)
 
 - **多区域管理**
 
@@ -49,6 +50,9 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Clo
 
   - [原地重启 pod 中的容器](https://openkruise.io/zh/docs/user-manuals/containerrecreaterequest)
   - [指定的一批节点上拉取镜像](https://openkruise.io/zh/docs/user-manuals/imagepulljob)
+  - [**ResourceDistribution** 支持 Secret、Configmaps 资源跨 Namespace 分发](https://openkruise.io/zh/docs/user-manuals/resourcedistribution)
+  - [**PersistentPodState** 保持Pod的一些状态，比如："固定IP调度"](https://openkruise.io/zh/docs/user-manuals/persistentpodstate)
+  - [**PodProbeMarker** 提供自定义Probe探测的能力](https://openkruise.io/zh/docs/user-manuals/podprobemarker)
 
 - **应用安全防护**
 
@@ -73,7 +77,8 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Clo
 - Spectro Cloud, 艾佳生活, Arkane Systems, 滴普科技, 火花思维
 - OPPO, 苏宁, 欢聚时代, 汇量科技, 深圳凤凰木网络有限公司
 - 小米, 网易, 美团金融, 虾皮购物, e签宝
-- LinkedIn, 雪球, 兴盛优选, Wholee
+- LinkedIn, 雪球, 兴盛优选, Wholee, LilithGames, Baidu
+- Bilibili, 冠赢互娱, MeiTuan, 同城
 
 ## 贡献
 
