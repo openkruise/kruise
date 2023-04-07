@@ -43,7 +43,9 @@ import (
 func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+	if spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+	}
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
@@ -61,12 +63,13 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 	}
 
 	var sumReplicas int32
-	var expectedReplicas int32 = 1
+	var expectedReplicas int32 = -1
 	if spec.Replicas != nil {
 		expectedReplicas = *spec.Replicas
 	}
-	subSetNames := sets.String{}
 	count := 0
+	subSetNames := sets.String{}
+
 	for i, subset := range spec.Topology.Subsets {
 		if len(subset.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("topology", "subsets").Index(i).Child("name"), ""))
@@ -115,13 +118,18 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		}
 	}
 
-	// sum of subset replicas may be less than uniteddployment replicas
-	if sumReplicas > expectedReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
-	}
+	if expectedReplicas != -1 {
+		// sum of subset replicas may be less than uniteddployment replicas
+		if sumReplicas > expectedReplicas {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+		}
 
-	if count > 0 && count == len(spec.Topology.Subsets) && sumReplicas != expectedReplicas {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+		if count > 0 && count == len(spec.Topology.Subsets) && sumReplicas != expectedReplicas {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+		}
+	} else if count != len(spec.Topology.Subsets) {
+		// validate all of subsets replicas are not nil
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, "if UnitedDeployment replicas is not provided, replicas of all subsets should be provided"))
 	}
 
 	if spec.UpdateStrategy.ManualUpdate != nil {
@@ -146,7 +154,9 @@ func validateUnitedDeployment(unitedDeployment *appsv1alpha1.UnitedDeployment) f
 func ValidateUnitedDeploymentUpdate(unitedDeployment, oldUnitedDeployment *appsv1alpha1.UnitedDeployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&unitedDeployment.ObjectMeta, &oldUnitedDeployment.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateUnitedDeploymentSpecUpdate(&unitedDeployment.Spec, &oldUnitedDeployment.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*unitedDeployment.Spec.Replicas), field.NewPath("spec", "replicas"))...)
+	if unitedDeployment.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*unitedDeployment.Spec.Replicas), field.NewPath("spec", "replicas"))...)
+	}
 	return allErrs
 }
 

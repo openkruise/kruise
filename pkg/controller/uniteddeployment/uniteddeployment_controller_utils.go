@@ -41,6 +41,10 @@ func ParseSubsetReplicas(udReplicas int32, subsetReplicas intstr.IntOrString) (i
 		return subsetReplicas.IntVal, nil
 	}
 
+	if udReplicas < 0 {
+		return 0, fmt.Errorf("subsetReplicas (%v) should not be string when unitedDeployment replicas is empty", subsetReplicas.StrVal)
+	}
+
 	strVal := subsetReplicas.StrVal
 	if !strings.HasSuffix(strVal, "%") {
 		return 0, fmt.Errorf("subset replicas (%s) only support integer value or percentage value with a suffix '%%'", strVal)

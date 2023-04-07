@@ -201,9 +201,6 @@ func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectTemplateDefaults 
 
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateDefaults bool) {
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
-	}
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
 	}
