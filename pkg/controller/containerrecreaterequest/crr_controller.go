@@ -114,6 +114,7 @@ type ReconcileContainerRecreateRequest struct {
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests/finalizers,verbs=update
 
 // Reconcile reads that state of the cluster for a ContainerRecreateRequest object and makes changes based on the state read
 // and what is in the ContainerRecreateRequest.Spec

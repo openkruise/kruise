@@ -121,6 +121,7 @@ type ReconcileImagePullJob struct {
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=imagepulljobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=imagepulljobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=imagepulljobs/finalizers,verbs=update
 
 // Reconcile reads that state of the cluster for a ImagePullJob object and makes changes based on the state read
 // and what is in the ImagePullJob.Spec

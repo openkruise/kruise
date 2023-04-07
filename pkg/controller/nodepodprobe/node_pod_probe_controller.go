@@ -119,6 +119,7 @@ type ReconcileNodePodProbe struct {
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=nodepodprobes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=nodepodprobes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=nodepodprobes/finalizers,verbs=update
 
 // Reconcile reads that state of the cluster for a NodePodProbe object and makes changes based on the state read
 // and what is in the NodePodProbe.Spec

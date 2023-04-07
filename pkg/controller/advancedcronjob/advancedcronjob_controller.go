@@ -125,6 +125,7 @@ type ReconcileAdvancedCronJob struct {
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=advancedcronjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=advancedcronjobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=advancedcronjobs/finalizers,verbs=update
 
 func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()

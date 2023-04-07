@@ -173,6 +173,7 @@ type ReconcileCloneSet struct {
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets/finalizers,verbs=update
 
 // Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
 // and what is in the CloneSet.Spec
