@@ -35,6 +35,7 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
   - [**SidecarSet** for defining and upgrading your own sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
   - [**Container Launch Priority** to control the container startup orders](https://openkruise.io/docs/user-manuals/containerlaunchpriority)
+  - [**Sidecar Job Terminator** terminates sidecar containers for such job-type Pods when its main containers completed.](https://openkruise.io/docs/user-manuals/jobsidecarterminator)
 
 - **Multi-domain Management**
 
@@ -48,8 +49,11 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
 - **Enhanced Operations**
 
-  - [Restart containers in a running pod](https://openkruise.io/docs/user-manuals/containerrecreaterequest)
-  - [Download images on specific nodes](https://openkruise.io/docs/user-manuals/imagepulljob)
+  - [**ContainerRecreateRequest** provides a way to let users restart/recreate containers in a running pod](https://openkruise.io/docs/user-manuals/containerrecreaterequest)
+  - [**ImagePullJob** pre-download images on specific nodes](https://openkruise.io/docs/user-manuals/imagepulljob)
+  - [**ResourceDistribution** support Secret & ConfigMap resource distribution across namespaces](https://openkruise.io/docs/user-manuals/resourcedistribution)
+  - [**PersistentPodState** is able to persistent states of the Pod, such as "IP Retention"](https://openkruise.io/docs/user-manuals/persistentpodstate)
+  - [**PodProbeMarker** provides the ability to customize the Probe and return the result to the Pod](https://openkruise.io/docs/user-manuals/podprobemarker)
 
 - **Application Protection**
 
@@ -74,7 +78,8 @@ Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/
 - Spectro Cloud, ihomefnt, Arkane Systems, Deepexi, 火花思维
 - OPPO, Suning.cn, joyy, Mobvista, 深圳凤凰木网络有限公司
 - xiaomi, Netease, MeiTuan Finance, Shopee, Esign
-- LinkedIn, 雪球, 兴盛优选, Wholee
+- LinkedIn, 雪球, 兴盛优选, Wholee, LilithGames, Baidu
+- Bilibili, 冠赢互娱, MeiTuan, 同城
 
 ## Contributing
 
