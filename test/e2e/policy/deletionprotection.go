@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,6 +111,78 @@ var _ = SIGDescribe("DeletionProtection", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.Replicas
 			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(0)))
+
+			ginkgo.By("Create a PVC in this namespace")
+			pvcName := "pvc-" + randStr
+			storageClassName := ""
+			pvc := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      pvcName,
+				},
+				Spec: v1.PersistentVolumeClaimSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+					},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+					StorageClassName: &storageClassName,
+				},
+			}
+			_, err = c.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Create a PV bound to the PVC just created")
+			pvName := "pv-" + randStr
+			pv := &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pvName,
+				},
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+					},
+					StorageClassName: "",
+					ClaimRef: &v1.ObjectReference{
+						Namespace: ns.Name,
+						Name:      pvcName,
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/mnt",
+						},
+					},
+				},
+			}
+			_, err = framework.CreatePV(c, pv)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() bool {
+				pvc, err := c.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvcName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return pvc.Status.Phase == v1.ClaimBound
+			}, 15*time.Second, time.Second).Should(gomega.BeTrue())
+
+			ginkgo.By("Delete the namespace should be rejected")
+			err = c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
+
+			ginkgo.By("Delete the PV bounded to PVC")
+			err = c.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, metav1.DeleteOptions{})
+			_, err = c.CoreV1().PersistentVolumes().Patch(context.TODO(), pvName, types.StrategicMergePatchType,
+				[]byte(`{"metadata":{"finalizers":null}}`), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Eventually(func() bool {
+				pvc, err := c.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvcName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return pvc.Status.Phase != v1.ClaimBound
+			}, 5*time.Second, time.Second).Should(gomega.BeTrue())
 
 			time.Sleep(time.Second)
 			ginkgo.By("Delete the namespace successfully")
