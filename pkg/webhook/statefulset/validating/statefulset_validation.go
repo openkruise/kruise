@@ -6,21 +6,20 @@ import (
 	"regexp"
 
 	"github.com/appscode/jsonpatch"
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
@@ -280,7 +279,7 @@ func validatePodUpdatePolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.P
 
 func validateMaxUnavailableField(maxUnavailable *intstr.IntOrString, spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := appsvalidation.ValidatePositiveIntOrPercent(*maxUnavailable, fldPath)
-	if maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(maxUnavailable, intstrutil.FromInt(1)), 1, true); err != nil {
+	if maxUnavailable, err := intstr.GetValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt(1)), 1, true); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, maxUnavailable, fmt.Sprintf("getValueFromIntOrPercent error: %v", err)))
 	} else if maxUnavailable < 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath, maxUnavailable, "should not be less than 1"))

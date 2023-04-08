@@ -57,7 +57,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 		return
 	}
 	// deserialize old resource if need
-	var oldResource runtime.Object = nil
+	var oldResource runtime.Object
 	if oldObj != nil {
 		oldResource, errs = DeserializeResource(&oldObj.Spec.Resource, fldPath)
 		allErrs = append(allErrs, errs...)

@@ -1,5 +1,55 @@
 # Change Log
 
+## v1.4.0
+
+> Change log since v1.3.0
+
+### Upgrade Notice
+
+> No, really, you must read this before you upgrade
+
+- Enable following feature-gates by default: ResourcesDeletionProtection, WorkloadSpread, PodUnavailableBudgetDeleteGate, InPlaceUpdateEnvFromMetadata,
+StatefulSetAutoDeletePVC, PodProbeMarkerGate. ([#1214](https://github.com/openkruise/kruise/pull/1214), [@zmberg](https://github.com/zmberg))
+- Change Kruise leader election from configmap to configmapsleases, this is a smooth upgrade with no disruption to OpenKruise service.  ([#1184](https://github.com/openkruise/kruise/pull/1184), [@YTGhost](https://github.com/YTGhost))
+
+### New Feature: JobSidecarTerminator
+
+In the Kubernetes world, it is challenging to use long-running sidecar containers for short-term job because there is no straightforward way to
+terminate the sidecar containers when the main container exits. For instance, when the main container in a Pod finishes its task and exits, it is expected that accompanying sidecars,
+such as a log collection sidecar, will also exit actively, so the Job Controller can accurately determine the completion status of the Pod.
+However most sidecar containers lack the ability to discovery the exit of main container.
+
+For this scenario OpenKruise provides the JobSidecarTerminator capability, which can terminate sidecar containers once the main containers exit.
+
+For more detail, please refer to its [proposal](https://github.com/openkruise/kruise/blob/master/docs/proposals/20230130-job-sidecar-terminator.md).
+
+### Advanced Workloads
+- Optimized CloneSet Event handler to reduce unnecessary reconciliation. The feature is off by default and controlled by CloneSetEventHandlerOptimization feature-gate. ([#1219](https://github.com/openkruise/kruise/pull/1219), [@veophi](https://github.com/veophi))
+- Avoid pod hang in PreparingUpdate state when rollback before update hook. ([#1157](https://github.com/openkruise/kruise/pull/1157), [@shiyan2016](https://github.com/shiyan2016))
+- Fix cloneSet update blocking when spec.scaleStrategy.maxUnavailable is not empty. ([#1136](https://github.com/openkruise/kruise/pull/1136), [@ivanszl](https://github.com/ivanszl))
+- Add 'disablePVCReuse' field to enable recreation of PVCs when rebuilding pods, which can avoid Pod creation failure due to Node exceptions. ([#1113](https://github.com/openkruise/kruise/pull/1113), [@willise](https://github.com/willise))
+- CloneSet 'partition' field support float percent to improve precision. ([#1124](https://github.com/openkruise/kruise/pull/1124), [@shiyan2016](https://github.com/shiyan2016))
+- Add PreNormal Lifecycle Hook for CloneSet. ([#1071](https://github.com/openkruise/kruise/pull/1071), [@veophi](https://github.com/veophi))
+- Allow to mutate PVCTemplate of Advanced StatefulSet & CloneSet. Note, Only works for new Pods, not for existing Pods. ([#1118](https://github.com/openkruise/kruise/pull/1118), [@veophi](https://github.com/veophi))
+- Make ephemeralJob compatible with k8s version 1.20 & 1.21. ([#1127](https://github.com/openkruise/kruise/pull/1127), [@veophi](https://github.com/veophi))
+- UnitedDeployment support advanced StatefulSet 'persistentVolumeClaimRetentionPolicy' field. ([#1110](https://github.com/openkruise/kruise/pull/1110), [@yuexian1234](https://github.com/yuexian1234))
+
+### ContainerRecreateRequest
+- Add 'forceRecreate' field to ensure the immediate recreation of the container even if the container is starting at that point. ([#1182](https://github.com/openkruise/kruise/pull/1182), [@BH4AWS](https://github.com/BH4AWS))
+
+### ImagePullJob
+- Support attach metadata in PullImage CRI interface during ImagePullJob. ([#1190](https://github.com/openkruise/kruise/pull/1190), [@diannaowa](https://github.com/diannaowa))
+
+### SidecarSet
+- SidecarSet support namespace selector. ([#1178](https://github.com/openkruise/kruise/pull/1178), [@zmberg](https://github.com/zmberg))
+
+### Others
+- Simplify some code, mainly comparison and variable declaration. ([#1209](https://github.com/openkruise/kruise/pull/1209), [@hezhizhen](https://github.com/hezhizhen))
+- Update k8s registry references from k8s.gcr.io to registry.k8s.io. ([#1208](https://github.com/openkruise/kruise/pull/1208), [@asa3311](https://github.com/asa3311))
+- Fix config/samples/apps_v1alpha1_uniteddeployment.yaml invalid image. ([#1198](https://github.com/openkruise/kruise/pull/1198), [@chengleqi](https://github.com/chengleqi))
+- Change kruise base image to alpine. ([#1166](https://github.com/openkruise/kruise/pull/1166), [@fengshunli](https://github.com/fengshunli))
+- PersistentPodState support custom workload (like statefulSet). ([#1063](https://github.com/openkruise/kruise/pull/1063), [@baxiaoshi](https://github.com/baxiaoshi))
+
 ## v1.3.0
 
 > Change log since v1.2.0

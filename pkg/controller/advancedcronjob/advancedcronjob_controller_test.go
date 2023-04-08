@@ -200,11 +200,9 @@ func createNode(nodeName string) *v1.Node {
 }
 
 func createJob(jobName string, template appsv1alpha1.CronJobTemplate) *appsv1alpha1.AdvancedCronJob {
-	var historyLimit int32
-	historyLimit = 3
+	var historyLimit int32 = 3
 
-	var paused bool
-	paused = false
+	paused := false
 	job1 := &appsv1alpha1.AdvancedCronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,

@@ -36,8 +36,6 @@ type AdvancedCronJobSpec struct {
 	// +optional
 	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 
-	// +kubebuilder:validation:Minimum=0
-
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
 	// +optional
@@ -55,14 +53,10 @@ type AdvancedCronJobSpec struct {
 	// +optional
 	Paused *bool `json:"paused,omitempty" protobuf:"bytes,4,opt,name=paused"`
 
-	// +kubebuilder:validation:Minimum=0
-
 	// The number of successful finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	// +optional
 	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty" protobuf:"varint,5,opt,name=successfulJobsHistoryLimit"`
-
-	// +kubebuilder:validation:Minimum=0
 
 	// The number of failed finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.

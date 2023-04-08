@@ -12,34 +12,30 @@
 
 ## 介绍
 
-OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在 [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) 下的 Sandbox 项目。
+OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Cloud Native Computing Foundation](https://cncf.io/)) 的孵化项目。
 它提供一套在 [Kubernetes核心控制器](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) 之外的扩展工作负载、应用管理能力。
 
 ## 核心能力
 
-- **通用工作负载**
+- **高级工作负载**
 
-  通用工作负载能帮助你管理 stateless(无状态)、stateful(有状态)、daemon 类型的应用。
+  通用工作负载能帮助你管理 stateless(无状态)、stateful(有状态)、daemon 类型和作业类的应用。
 
   它们不仅支持类似于 Kubernetes 原生 Workloads 的基础功能，还提供了如 **原地升级**、**可配置的扩缩容/发布策略**、**并发操作** 等。
 
   - [**CloneSet** - 无状态应用](https://openkruise.io/zh/docs/user-manuals/cloneset/)
   - [**Advanced StatefulSet** - 有状态应用](https://openkruise.io/zh/docs/user-manuals/advancedstatefulset)
   - [**Advanced DaemonSet** - daemon 类型应用](https://openkruise.io/zh/docs/user-manuals/advanceddaemonset)
-
-- **任务工作负载**
-
   - [**BroadcastJob** - 部署任务到一批特定节点上](https://openkruise.io/zh/docs/user-manuals/broadcastjob)
   - [**AdvancedCronJob** - 周期性地创建 Job 或 BroadcastJob](https://openkruise.io/zh/docs/user-manuals/advancedcronjob)
 
 - **Sidecar 容器管理**
 
-  Sidecar 容器可以很简单地通过 **SidecarSet** 来定义，然后 Kruise 会将它们注入到所有匹配的 Pod 中。
-
-  它是通过 Kubernetes webhook 机制来实现的，和 [istio](https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/) 的注入实现方式类似，
-  但是它允许你指定管理你自己的 sidecar 容器。
+  Kruise通过**SidecarSet**简化了Sidecar的注入， 并提供了sidecar原地升级的能力。另外， Kruise提供了增强的sidecar启动、退出的控制
 
   - [**SidecarSet** - 定义和升级你的 sidecar 容器](https://openkruise.io/zh/docs/user-manuals/sidecarset)
+  - [**Container Launch Priority** 控制sidecar启动顺序](https://openkruise.io/zh/docs/user-manuals/containerlaunchpriority)
+  - [**Sidecar Job Terminator** 当 Job 类 Pod 主容器退出后，Terminator Sidecar容器](https://openkruise.io/zh/docs/user-manuals/jobsidecarterminator)
 
 - **多区域管理**
 
@@ -54,6 +50,9 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 
   - [原地重启 pod 中的容器](https://openkruise.io/zh/docs/user-manuals/containerrecreaterequest)
   - [指定的一批节点上拉取镜像](https://openkruise.io/zh/docs/user-manuals/imagepulljob)
+  - [**ResourceDistribution** 支持 Secret、Configmaps 资源跨 Namespace 分发](https://openkruise.io/zh/docs/user-manuals/resourcedistribution)
+  - [**PersistentPodState** 保持Pod的一些状态，比如："固定IP调度"](https://openkruise.io/zh/docs/user-manuals/persistentpodstate)
+  - [**PodProbeMarker** 提供自定义Probe探测的能力](https://openkruise.io/zh/docs/user-manuals/podprobemarker)
 
 - **应用安全防护**
 
@@ -78,7 +77,8 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是托管在
 - Spectro Cloud, 艾佳生活, Arkane Systems, 滴普科技, 火花思维
 - OPPO, 苏宁, 欢聚时代, 汇量科技, 深圳凤凰木网络有限公司
 - 小米, 网易, 美团金融, 虾皮购物, e签宝
-- LinkedIn, 雪球, 兴盛优选, Wholee
+- LinkedIn, 雪球, 兴盛优选, Wholee, LilithGames, Baidu
+- Bilibili, 冠赢互娱, MeiTuan, 同城
 
 ## 贡献
 

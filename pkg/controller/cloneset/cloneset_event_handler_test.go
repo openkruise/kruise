@@ -23,7 +23,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/feature"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
@@ -501,7 +503,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			expectedQueueLen: 1,
+			expectedQueueLen: 0,
 		},
 		{
 			name: "orphan changed",
@@ -641,7 +643,88 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 			},
 			expectedQueueLen: 3,
 		},
+		{
+			name: "container status invalid change",
+			css: []*appsv1alpha1.CloneSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs01",
+						Namespace: "default",
+						UID:       "001",
+					},
+					Spec: appsv1alpha1.CloneSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v1"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v1"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cs02",
+						Namespace: "default",
+						UID:       "002",
+					},
+					Spec: appsv1alpha1.CloneSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"key": "v2"},
+						},
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"key": "v2"},
+							},
+						},
+					},
+				},
+			},
+			e: event.UpdateEvent{
+				ObjectOld: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "default",
+						ResourceVersion: "01",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "CloneSet",
+								Name:       "cs01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+				},
+				ObjectNew: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "default",
+						ResourceVersion:   "02",
+						DeletionTimestamp: &metav1.Time{Time: time.Now()},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps.kruise.io/v1alpha1",
+								Kind:       "CloneSet",
+								Name:       "cs01",
+								UID:        "001",
+								Controller: &lTrue,
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+			},
+			expectedQueueLen: 1,
+		},
 	}
+
+	defer feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CloneSetEventHandlerOptimization, true)()
 
 	for _, testCase := range cases {
 		fakeClient := fake.NewClientBuilder().Build()

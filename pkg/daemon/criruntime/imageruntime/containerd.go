@@ -27,6 +27,8 @@ import (
 	"net/url"
 	"time"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+
 	"github.com/alibaba/pouch/pkg/jsonstream"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
@@ -85,7 +87,7 @@ type containerdImageClient struct {
 }
 
 // PullImage implements ImageService.PullImage.
-func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret) (ImagePullStatusReader, error) {
+func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, _ *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error) {
 	ctx = namespaces.WithNamespace(ctx, k8sContainerdNamespace)
 
 	if tag == "" {
@@ -294,7 +296,7 @@ func (d *containerdImageClient) resolverGenerator(authInfo *daemonutil.AuthInfo)
 
 // createRepoDigestRecord creates digest type record in containerd.
 //
-// NOTE: We don't use CRI-API to pull image but we juse CRI-API to retrieve
+// NOTE: We don't use CRI-API to pull image but we use CRI-API to retrieve
 // image list. For the repo:tag image, the containerd will receive image create
 // event and then update local cache with the mapping between image ID and
 // image name. But there is no mapping between image ID and image digest. We

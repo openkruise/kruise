@@ -108,12 +108,8 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 	for _, bcj := range jobList.Items {
 		mockPod := NewMockPod(&bcj, node.Name)
 		canFit, err := checkNodeFitness(mockPod, node)
-		if err != nil {
-			klog.Errorf("failed to checkNodeFitness for job %s/%s, on node %s, %v", bcj.Namespace, bcj.Name, node.Name, err)
-			continue
-		}
 		if !canFit {
-			klog.Infof("Job %s/%s does not fit on node %s", bcj.Namespace, bcj.Name, node.Name)
+			klog.Infof("Job %s/%s does not fit on node %s due to %v", bcj.Namespace, bcj.Name, node.Name, err)
 			continue
 		}
 
@@ -138,17 +134,8 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterfac
 	}
 	for _, bcj := range jobList.Items {
 		mockPod := NewMockPod(&bcj, oldNode.Name)
-		canOldNodeFit, err := checkNodeFitness(mockPod, oldNode)
-		if err != nil {
-			klog.Errorf("failed to checkNodeFitness for job %s/%s, on old node %s, %v", bcj.Namespace, bcj.Name, oldNode.Name, err)
-			continue
-		}
-
-		canCurNodeFit, err := checkNodeFitness(mockPod, curNode)
-		if err != nil {
-			klog.Errorf("failed to checkNodeFitness for job %s/%s, on cur node %s, %v", bcj.Namespace, bcj.Name, curNode.Name, err)
-			continue
-		}
+		canOldNodeFit, _ := checkNodeFitness(mockPod, oldNode)
+		canCurNodeFit, _ := checkNodeFitness(mockPod, curNode)
 
 		if canOldNodeFit != canCurNodeFit {
 			// enqueue the broadcast job for matching node

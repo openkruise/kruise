@@ -111,7 +111,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Wathc for changes to Pod
+	// Watch for changes to Pod
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{
 		enqueueHandler: handler.EnqueueRequestForOwner{
 			IsController: true,
@@ -123,10 +123,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Node
-	if err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueBroadcastJobForNode{reader: mgr.GetCache()}); err != nil {
-		return err
-	}
-	return nil
+	return c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueBroadcastJobForNode{reader: mgr.GetCache()})
 }
 
 var _ reconcile.Reconciler = &ReconcileBroadcastJob{}
@@ -145,6 +142,7 @@ type ReconcileBroadcastJob struct {
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=broadcastjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=broadcastjobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=broadcastjobs/finalizers,verbs=update
 
 // Reconcile reads that state of the cluster for a BroadcastJob object and makes changes based on the state read
 // and what is in the BroadcastJob.Spec
@@ -178,7 +176,8 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	addLabelToPodTemplate(job)
 
 	if IsJobFinished(job) {
-		if isPast, leftTime := pastTTLDeadline(job); isPast {
+		isPast, leftTime := pastTTLDeadline(job)
+		if isPast {
 			klog.Infof("deleting the job %s", job.Name)
 			err = r.Delete(context.TODO(), job)
 			if err != nil {
@@ -245,9 +244,8 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	failed := int32(len(failedPods))
 	succeeded := int32(len(succeededPods))
 
-	var desired int32
 	desiredNodes, restNodesToRunPod, podsToDelete := getNodesToRunPod(nodes, job, existingNodeToPodMap)
-	desired = int32(len(desiredNodes))
+	desired := int32(len(desiredNodes))
 	klog.Infof("%s/%s has %d/%d nodes remaining to schedule pods", job.Namespace, job.Name, len(restNodesToRunPod), desired)
 	klog.Infof("Before broadcastjob reconcile %s/%s, desired=%d, active=%d, failed=%d", job.Namespace, job.Name, desired, active, failed)
 	job.Status.Active = active
@@ -302,7 +300,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	} else {
 		// Job is still active
 		if len(podsToDelete) > 0 {
-			//should we remove the pods without nodes associated, the podgc controller will do this if enabled
+			// should we remove the pods without nodes associated, the podgc controller will do this if enabled
 			failed, active, err = r.deleteJobPods(job, podsToDelete, failed, active)
 			if err != nil {
 				klog.Errorf("failed to deleteJobPods for job %s,", job.Name)
@@ -391,13 +389,11 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 	restNodesToRunPod []*corev1.Node, active, desired int32) (int32, error) {
 
 	// max concurrent running pods
-	var parallelism int32
-	var err error
 	parallelismInt, err := intstr.GetValueFromIntOrPercent(intstr.ValueOrDefault(job.Spec.Parallelism, intstr.FromInt(1<<31-1)), int(desired), true)
 	if err != nil {
 		return active, err
 	}
-	parallelism = int32(parallelismInt)
+	parallelism := int32(parallelismInt)
 
 	// The rest pods to run
 	rest := int32(len(restNodesToRunPod))
@@ -405,7 +401,7 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 	if active > parallelism {
 		// exceed parallelism limit
 		r.recorder.Eventf(job, corev1.EventTypeWarning, "TooManyActivePods", "Number of active pods exceed parallelism limit")
-		//TODO should we remove the extra pods ? it may just finish by its own.
+		// TODO should we remove the extra pods ? it may just finish by its own.
 
 	} else if active < parallelism {
 		// diff is the current number of pods to run in this reconcile loop
@@ -529,14 +525,9 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 		// there's pod existing on the node
 		if pod, ok := existingNodeToPodMap[node.Name]; ok {
 			canFit, err = checkNodeFitness(pod, &node)
-			if err != nil {
-				klog.Errorf("pod %s failed to checkNodeFitness for node %s, %v", pod.Name, node.Name, err)
-				continue
-			}
-			if !canFit {
-				if pod.DeletionTimestamp == nil {
-					podsToDelete = append(podsToDelete, pod)
-				}
+			if !canFit && pod.DeletionTimestamp == nil {
+				klog.Infof("Pod %s does not fit on node %s due to %v", pod.Name, node.Name, err)
+				podsToDelete = append(podsToDelete, pod)
 				continue
 			}
 			desiredNodes[node.Name] = pod
@@ -545,12 +536,8 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 			// considering nodeName, label affinity and taints
 			mockPod := NewMockPod(job, node.Name)
 			canFit, err = checkNodeFitness(mockPod, &node)
-			if err != nil {
-				klog.Errorf("failed to checkNodeFitness for node %s, %v", node.Name, err)
-				continue
-			}
 			if !canFit {
-				klog.Infof("Pod does not fit on node %s", node.Name)
+				klog.Infof("Pod does not fit on node %s due to %v", node.Name, err)
 				continue
 			}
 			restNodesToRunPod = append(restNodesToRunPod, &nodes.Items[i])

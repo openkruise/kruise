@@ -127,7 +127,7 @@ This program customizes the PodUnavailableBudget (later referred to as PUB) CRD 
   - When UnavailableAllowed<=0, the request is not allowed, indicates that the modification of the pod will be rejected
 - Pub Controller dynamically calculates Pub.Status according to selected Pods
   - DesiredAvailable indicates that minimum desired number of available pods(according to MaxUnavailable or MinAvailable)
-  - CurrentAvailable indicates that current number of ready pods(condition.Ready=ture)
+  - CurrentAvailable indicates that current number of ready pods(condition.Ready=true)
   - UnavailableAllowed = CurrentAvailable - DesiredAvailable
 
 ### Pub selector cannot overlap

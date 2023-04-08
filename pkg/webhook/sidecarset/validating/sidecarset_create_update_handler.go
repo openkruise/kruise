@@ -96,7 +96,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 	if err := h.Client.List(context.TODO(), sidecarSets, &client.ListOptions{}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other sidecarsets failed, err: %v", err)))
 	}
-	allErrs = append(allErrs, validateSidecarConflict(sidecarSets, obj, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateSidecarConflict(h.Client, sidecarSets, obj, field.NewPath("spec"))...)
 	return allErrs
 }
 
@@ -119,6 +119,11 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), "no selector defined for SidecarSet"))
 	} else {
 		allErrs = append(allErrs, validateSelector(spec.Selector, fldPath.Child("selector"))...)
+	}
+	if spec.Namespace != "" && spec.NamespaceSelector != nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespace, namespaceSelector"), "namespace and namespaceSelector are mutually exclusive"))
+	} else if spec.NamespaceSelector != nil {
+		allErrs = append(allErrs, validateSelector(spec.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
 	//validating SidecarSetInjectionStrategy
 	allErrs = append(allErrs, h.validateSidecarSetInjectionStrategy(obj, fldPath.Child("injectionStrategy"))...)
@@ -273,11 +278,12 @@ func validateContainersForSidecarSet(
 	fakePod = &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
 		Spec: core.PodSpec{
-			DNSPolicy:      core.DNSClusterFirst,
-			RestartPolicy:  core.RestartPolicyAlways,
-			InitContainers: coreInitContainers,
-			Containers:     coreContainers,
-			Volumes:        coreVolumes,
+			DNSPolicy:          core.DNSClusterFirst,
+			RestartPolicy:      core.RestartPolicyAlways,
+			InitContainers:     coreInitContainers,
+			Containers:         coreContainers,
+			Volumes:            coreVolumes,
+			ServiceAccountName: "default",
 		},
 	}
 
@@ -309,7 +315,7 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 }
 
 // validate the sidecarset spec.container.name, spec.initContainer.name, volume.name conflicts with others in cluster
-func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSet *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+func validateSidecarConflict(c client.Client, sidecarSets *appsv1alpha1.SidecarSetList, sidecarSet *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// record initContainer, container, volume name of other sidecarsets in cluster
@@ -325,7 +331,7 @@ func validateSidecarConflict(sidecarSets *appsv1alpha1.SidecarSetList, sidecarSe
 	matchedList := make([]*appsv1alpha1.SidecarSet, 0)
 	for i := range sidecarSets.Items {
 		obj := &sidecarSets.Items[i]
-		if !isSidecarSetNamespaceDiff(sidecarSet, obj) && util.IsSelectorOverlapping(sidecarSet.Spec.Selector, obj.Spec.Selector) {
+		if isSidecarSetNamespaceOverlapping(c, sidecarSet, obj) && util.IsSelectorOverlapping(sidecarSet.Spec.Selector, obj.Spec.Selector) {
 			matchedList = append(matchedList, obj)
 		}
 	}

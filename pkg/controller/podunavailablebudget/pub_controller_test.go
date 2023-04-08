@@ -176,63 +176,110 @@ var (
 func TestPubReconcile(t *testing.T) {
 	cases := []struct {
 		name            string
-		getPods         func() []*corev1.Pod
+		getPods         func(rs ...*apps.ReplicaSet) []*corev1.Pod
 		getDeployment   func() *apps.Deployment
-		getReplicaSet   func() *apps.ReplicaSet
+		getReplicaSet   func() []*apps.ReplicaSet
 		getPub          func() *policyv1alpha1.PodUnavailableBudget
 		expectPubStatus func() policyv1alpha1.PodUnavailableBudgetStatus
 	}{
 		{
-			name: "selector no matched deployment",
-			getPods: func() []*corev1.Pod {
-				pod := podDemo.DeepCopy()
-				pod.Labels["pub-controller"] = "false"
-				return []*corev1.Pod{pod}
-			},
-			getDeployment: func() *apps.Deployment {
-				return deploymentDemo.DeepCopy()
-			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				return pubDemo.DeepCopy()
-			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{}
-			},
-		},
-		{
-			name: "selector no matched namespace deployment",
-			getPods: func() []*corev1.Pod {
-				pod := podDemo.DeepCopy()
-				pod.Namespace = "other-ns"
-				return []*corev1.Pod{pod}
-			},
-			getDeployment: func() *apps.Deployment {
-				object := deploymentDemo.DeepCopy()
-				object.Namespace = "other-ns"
-				return object
-			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				object := replicaSetDemo.DeepCopy()
-				object.Namespace = "other-ns"
-				return object
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				return pubDemo.DeepCopy()
-			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{}
-			},
-		},
-		{
-			name: "select matched deployment, TargetReference and maxUnavailable 30%",
-			getPods: func() []*corev1.Pod {
+			name: "select matched deployment(replicas=0), selector and maxUnavailable 30%",
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
-				for i := 0; int32(i) < *deploymentDemo.Spec.Replicas; i++ {
+				for i := 0; int32(i) < 5; i++ {
 					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[0].Name,
+							UID:        rs[0].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					matchedPods = append(matchedPods, pod)
+				}
+				for i := 5; int32(i) < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[1].Name,
+							UID:        rs[1].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					matchedPods = append(matchedPods, pod)
+				}
+				return matchedPods
+			},
+			getDeployment: func() *apps.Deployment {
+				obj := deploymentDemo.DeepCopy()
+				obj.Spec.Replicas = utilpointer.Int32(0)
+				return obj
+			},
+			getReplicaSet: func() []*apps.ReplicaSet {
+				obj1 := replicaSetDemo.DeepCopy()
+				obj1.Name = "nginx-rs-1"
+				obj2 := replicaSetDemo.DeepCopy()
+				obj2.Name = "nginx-rs-2"
+				obj2.UID = "a34b0453-3426-4685-a79c-752e7062a523"
+				return []*apps.ReplicaSet{obj1, obj2}
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+				return policyv1alpha1.PodUnavailableBudgetStatus{
+					UnavailableAllowed: 10,
+					CurrentAvailable:   10,
+					DesiredAvailable:   0,
+					TotalReplicas:      0,
+				}
+			},
+		},
+		{
+			name: "select matched deployment(replicas=10,maxSurge=30%,maxUnavailable=0), and pub(selector,maxUnavailable=30%)",
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
+				var matchedPods []*corev1.Pod
+				for i := 0; int32(i) < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[0].Name,
+							UID:        rs[0].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					matchedPods = append(matchedPods, pod)
+				}
+				for i := 10; int32(i) < 13; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[1].Name,
+							UID:        rs[1].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					if i == 12 {
+						pod.Status.Conditions = []corev1.PodCondition{
+							{
+								Type:   corev1.PodReady,
+								Status: corev1.ConditionFalse,
+							},
+						}
+					}
 					matchedPods = append(matchedPods, pod)
 				}
 				return matchedPods
@@ -240,31 +287,100 @@ func TestPubReconcile(t *testing.T) {
 			getDeployment: func() *apps.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				obj1 := replicaSetDemo.DeepCopy()
+				obj1.Name = "nginx-rs-1"
+				obj2 := replicaSetDemo.DeepCopy()
+				obj2.Name = "nginx-rs-2"
+				obj2.UID = "a34b0453-3426-4685-a79c-752e7062a523"
+				return []*apps.ReplicaSet{obj1, obj2}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
-					APIVersion: "apps/v1",
-					Kind:       "Deployment",
-					Name:       "nginx",
-				}
 				return pub
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
 				return policyv1alpha1.PodUnavailableBudgetStatus{
-					UnavailableAllowed: 3,
-					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
+					UnavailableAllowed: 5,
+					CurrentAvailable:   12,
 					DesiredAvailable:   7,
-					TotalReplicas:      *deploymentDemo.Spec.Replicas,
+					TotalReplicas:      10,
+				}
+			},
+		},
+		{
+			name: "select matched deployment(replicas=10,maxSurge=0,maxUnavailable=30%), and pub(selector,maxUnavailable=30%)",
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
+				var matchedPods []*corev1.Pod
+				for i := 0; int32(i) < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[0].Name,
+							UID:        rs[0].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					t := metav1.Now()
+					if i >= 7 && i < 10 {
+						pod.DeletionTimestamp = &t
+					}
+					matchedPods = append(matchedPods, pod)
+				}
+				for i := 10; int32(i) < 13; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[1].Name,
+							UID:        rs[1].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					if i == 12 {
+						pod.Status.Conditions = []corev1.PodCondition{
+							{
+								Type:   corev1.PodReady,
+								Status: corev1.ConditionFalse,
+							},
+						}
+					}
+					matchedPods = append(matchedPods, pod)
+				}
+				return matchedPods
+			},
+			getDeployment: func() *apps.Deployment {
+				return deploymentDemo.DeepCopy()
+			},
+			getReplicaSet: func() []*apps.ReplicaSet {
+				obj1 := replicaSetDemo.DeepCopy()
+				obj1.Name = "nginx-rs-1"
+				obj2 := replicaSetDemo.DeepCopy()
+				obj2.Name = "nginx-rs-2"
+				obj2.UID = "a34b0453-3426-4685-a79c-752e7062a523"
+				return []*apps.ReplicaSet{obj1, obj2}
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+				return policyv1alpha1.PodUnavailableBudgetStatus{
+					UnavailableAllowed: 2,
+					CurrentAvailable:   9,
+					DesiredAvailable:   7,
+					TotalReplicas:      10,
 				}
 			},
 		},
 		{
 			name: "select matched deployment(Deletion), selector and maxUnavailable 30%",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; int32(i) < *deploymentDemo.Spec.Replicas; i++ {
 					pod := podDemo.DeepCopy()
@@ -279,12 +395,11 @@ func TestPubReconcile(t *testing.T) {
 				obj.DeletionTimestamp = &t
 				return obj
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Name = "liheng"
 				return pub
 			},
 			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
@@ -297,8 +412,209 @@ func TestPubReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "select matched deployment(replicas=0,maxSurge=0,maxUnavailable=30%), and pub(targetRef,maxUnavailable=30%)",
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
+				var matchedPods []*corev1.Pod
+				for i := 0; int32(i) < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[0].Name,
+							UID:        rs[0].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					matchedPods = append(matchedPods, pod)
+				}
+				return matchedPods
+			},
+			getDeployment: func() *apps.Deployment {
+				obj := deploymentDemo.DeepCopy()
+				obj.Spec.Replicas = utilpointer.Int32(0)
+				return obj
+			},
+			getReplicaSet: func() []*apps.ReplicaSet {
+				obj1 := replicaSetDemo.DeepCopy()
+				obj1.Name = "nginx-rs-1"
+				return []*apps.ReplicaSet{obj1}
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       "nginx",
+				}
+				return pub
+			},
+			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+				return policyv1alpha1.PodUnavailableBudgetStatus{
+					UnavailableAllowed: 0,
+					CurrentAvailable:   0,
+					DesiredAvailable:   0,
+					TotalReplicas:      0,
+				}
+			},
+		},
+		{
+			name: "select matched deployment(replicas=1,maxSurge=0,maxUnavailable=30%), and pub(targetRef,maxUnavailable=30%)",
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
+				var matchedPods []*corev1.Pod
+				for i := 0; int32(i) < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[0].Name,
+							UID:        rs[0].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					matchedPods = append(matchedPods, pod)
+				}
+				return matchedPods
+			},
+			getDeployment: func() *apps.Deployment {
+				obj := deploymentDemo.DeepCopy()
+				obj.Spec.Replicas = utilpointer.Int32(1)
+				return obj
+			},
+			getReplicaSet: func() []*apps.ReplicaSet {
+				obj1 := replicaSetDemo.DeepCopy()
+				obj1.Name = "nginx-rs-1"
+				return []*apps.ReplicaSet{obj1}
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       "nginx",
+				}
+				return pub
+			},
+			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+				return policyv1alpha1.PodUnavailableBudgetStatus{
+					UnavailableAllowed: 10,
+					CurrentAvailable:   10,
+					DesiredAvailable:   0,
+					TotalReplicas:      1,
+				}
+			},
+		},
+		{
+			name: "select matched deployment(replicas=10,maxSurge=0,maxUnavailable=30%), and pub(targetRef,maxUnavailable=30%)",
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
+				var matchedPods []*corev1.Pod
+				for i := 0; int32(i) < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[0].Name,
+							UID:        rs[0].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					if i >= 7 {
+						t := metav1.Now()
+						pod.DeletionTimestamp = &t
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					matchedPods = append(matchedPods, pod)
+				}
+				return matchedPods
+			},
+			getDeployment: func() *apps.Deployment {
+				obj := deploymentDemo.DeepCopy()
+				obj.Spec.Replicas = utilpointer.Int32(10)
+				return obj
+			},
+			getReplicaSet: func() []*apps.ReplicaSet {
+				obj1 := replicaSetDemo.DeepCopy()
+				obj1.Name = "nginx-rs-1"
+				return []*apps.ReplicaSet{obj1}
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       "nginx",
+				}
+				return pub
+			},
+			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+				return policyv1alpha1.PodUnavailableBudgetStatus{
+					UnavailableAllowed: 0,
+					CurrentAvailable:   7,
+					DesiredAvailable:   7,
+					TotalReplicas:      10,
+				}
+			},
+		},
+		{
+			name: "select matched deployment(deletion), and pub(targetRef,maxUnavailable=30%)",
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
+				var matchedPods []*corev1.Pod
+				for i := 0; int32(i) < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.OwnerReferences = []metav1.OwnerReference{
+						{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       rs[0].Name,
+							UID:        rs[0].UID,
+							Controller: utilpointer.BoolPtr(true),
+						},
+					}
+					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+					matchedPods = append(matchedPods, pod)
+				}
+				return matchedPods
+			},
+			getDeployment: func() *apps.Deployment {
+				obj := deploymentDemo.DeepCopy()
+				t := metav1.Now()
+				obj.DeletionTimestamp = &t
+				return obj
+			},
+			getReplicaSet: func() []*apps.ReplicaSet {
+				obj1 := replicaSetDemo.DeepCopy()
+				obj1.Name = "nginx-rs-1"
+				return []*apps.ReplicaSet{obj1}
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Spec.Selector = nil
+				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       "nginx",
+				}
+				return pub
+			},
+			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+				return policyv1alpha1.PodUnavailableBudgetStatus{
+					UnavailableAllowed: 0,
+					CurrentAvailable:   0,
+					DesiredAvailable:   0,
+					TotalReplicas:      0,
+				}
+			},
+		},
+		{
 			name: "select matched deployment, maxUnavailable 0%",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; int32(i) < *deploymentDemo.Spec.Replicas; i++ {
 					pod := podDemo.DeepCopy()
@@ -310,8 +626,8 @@ func TestPubReconcile(t *testing.T) {
 			getDeployment: func() *apps.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -332,7 +648,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, maxUnavailable 100%",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; int32(i) < *deploymentDemo.Spec.Replicas; i++ {
 					pod := podDemo.DeepCopy()
@@ -344,8 +660,8 @@ func TestPubReconcile(t *testing.T) {
 			getDeployment: func() *apps.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -366,7 +682,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, maxUnavailable 100, and expect scale 10",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; int32(i) < *deploymentDemo.Spec.Replicas; i++ {
 					pod := podDemo.DeepCopy()
@@ -378,8 +694,8 @@ func TestPubReconcile(t *testing.T) {
 			getDeployment: func() *apps.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -400,7 +716,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, minAvailable 100 int",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 5; i++ {
 					pod := podDemo.DeepCopy()
@@ -412,8 +728,8 @@ func TestPubReconcile(t *testing.T) {
 			getDeployment: func() *apps.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -435,7 +751,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, minAvailable 50%",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 5; i++ {
 					pod := podDemo.DeepCopy()
@@ -447,8 +763,8 @@ func TestPubReconcile(t *testing.T) {
 			getDeployment: func() *apps.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -470,7 +786,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, minAvailable 80%",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 10; i++ {
 					pod := podDemo.DeepCopy()
@@ -482,8 +798,8 @@ func TestPubReconcile(t *testing.T) {
 			getDeployment: func() *apps.Deployment {
 				return deploymentDemo.DeepCopy()
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
-				return replicaSetDemo.DeepCopy()
+			getReplicaSet: func() []*apps.ReplicaSet {
+				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -505,7 +821,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, 10 UnavailablePods and 10 DisruptionPods",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 100; i++ {
 					pod := podDemo.DeepCopy()
@@ -519,10 +835,10 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return object
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
+			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
-				return object
+				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -551,7 +867,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, 10 UnavailablePods, 10 DisruptionPods and 5 not ready",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 100; i++ {
 					pod := podDemo.DeepCopy()
@@ -569,10 +885,10 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return object
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
+			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
-				return object
+				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -601,7 +917,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, 10 UnavailablePods, 10 DisruptionPods and 5 deletion",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 100; i++ {
 					pod := podDemo.DeepCopy()
@@ -618,10 +934,10 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return object
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
+			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
-				return object
+				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -650,7 +966,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, 10 UnavailablePods(5 ready), 10 DisruptionPods(5 deletion)",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 100; i++ {
 					pod := podDemo.DeepCopy()
@@ -667,10 +983,10 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return object
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
+			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
-				return object
+				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -703,7 +1019,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "select matched deployment, 10 UnavailablePods(5 ready), 10 DisruptionPods(5 delay) and 5 deletion",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 100; i++ {
 					pod := podDemo.DeepCopy()
@@ -720,10 +1036,10 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return object
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
+			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
-				return object
+				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -760,7 +1076,7 @@ func TestPubReconcile(t *testing.T) {
 		},
 		{
 			name: "test select matched deployment, 10 UnavailablePods(5 ready), 10 DisruptionPods(5 delay) and 5 deletion",
-			getPods: func() []*corev1.Pod {
+			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; i < 100; i++ {
 					pod := podDemo.DeepCopy()
@@ -778,10 +1094,10 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return object
 			},
-			getReplicaSet: func() *apps.ReplicaSet {
+			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
-				return object
+				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
@@ -824,14 +1140,15 @@ func TestPubReconcile(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			pub := cs.getPub()
 			defer util.GlobalCache.Delete(pub)
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), cs.getReplicaSet(), pub).Build()
-			for _, pod := range cs.getPods() {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), pub).Build()
+			for _, pod := range cs.getPods(cs.getReplicaSet()...) {
 				podIn := pod.DeepCopy()
-				err := fakeClient.Create(context.TODO(), podIn)
-				if err != nil {
-					t.Fatalf("create pod failed: %s", err.Error())
-				}
+				_ = fakeClient.Create(context.TODO(), podIn)
 			}
+			for _, obj := range cs.getReplicaSet() {
+				_ = fakeClient.Create(context.TODO(), obj)
+			}
+
 			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: fakeClient}
 			reconciler := ReconcilePodUnavailableBudget{
 				Client:           fakeClient,

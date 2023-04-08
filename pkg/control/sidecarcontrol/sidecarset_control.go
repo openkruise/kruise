@@ -99,9 +99,9 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	sidecarSet := c.GetSidecarset()
 	// record the ImageID, before update pod sidecar container
 	// if it is changed, indicates the update is complete.
-	//format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
+	// format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
-	if stateStr, _ := pod.Annotations[SidecarsetInplaceUpdateStateKey]; len(stateStr) > 0 {
+	if stateStr := pod.Annotations[SidecarsetInplaceUpdateStateKey]; len(stateStr) > 0 {
 		if err := json.Unmarshal([]byte(stateStr), &sidecarUpdateStates); err != nil {
 			klog.Errorf("parse pod(%s/%s) annotations[%s] value(%s) failed: %s",
 				pod.Namespace, pod.Name, SidecarsetInplaceUpdateStateKey, stateStr, err.Error())
@@ -128,15 +128,14 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 		updateStatus := pub.InPlaceUpdateContainerStatus{
 			ImageID: cStatus[cName],
 		}
-		//record status.ImageId before update pods in store
+		// record status.ImageId before update pods in store
 		inPlaceUpdateState.LastContainerStatuses[cName] = updateStatus
 	}
 
-	//record sidecar container status information in pod's annotations
+	// record sidecar container status information in pod's annotations
 	sidecarUpdateStates[sidecarSet.Name] = inPlaceUpdateState
 	by, _ := json.Marshal(sidecarUpdateStates)
 	pod.Annotations[SidecarsetInplaceUpdateStateKey] = string(by)
-	return
 }
 
 // only check sidecar container is consistent
@@ -158,8 +157,8 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 			continue
 		}
 
-		//whether image is digest format,
-		//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
+		// whether image is digest format,
+		// for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
 		if !util.IsImageDigest(container.Image) {
 			allDigestImage = false
 			break
@@ -178,7 +177,7 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 		return true
 	}
 
-	// check container InpalceUpdate status
+	// check container InplaceUpdate status
 	return IsSidecarContainerUpdateCompleted(pod, sets.NewString(sidecarset.Name), sidecarContainers)
 }
 
@@ -215,7 +214,7 @@ func (c *commonControl) IsPodAvailabilityChanged(pod, oldPod *v1.Pod) bool {
 // isContainerInplaceUpdateCompleted checks whether imageID in container status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated containers in Pod.
 func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets.String) bool {
-	//format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
+	// format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
 	// when the pod annotation not found, indicates the pod only injected sidecar container, and never inplace update
 	// then always think it update complete

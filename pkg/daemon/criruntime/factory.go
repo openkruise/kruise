@@ -96,24 +96,7 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue
 			}
-		case ContainerRuntimePouch:
-			imageService, err = runtimeimage.NewPouchImageService(cfg.runtimeURI, accountManager)
-			if err != nil {
-				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
-		case ContainerRuntimeContainerd:
-			addr, _, err := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
-			if err != nil {
-				klog.Warningf("Failed to get address for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
-			imageService, err = runtimeimage.NewContainerdImageService(addr, accountManager)
-			if err != nil {
-				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
-		case ContainerRuntimeCommonCRI:
+		case ContainerRuntimeContainerd, ContainerRuntimeCommonCRI, ContainerRuntimePouch:
 			addr, _, err := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
 			if err != nil {
 				klog.Warningf("Failed to get address for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
@@ -125,6 +108,7 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 				continue
 			}
 		}
+
 		if _, err = imageService.ListImages(context.TODO()); err != nil {
 			klog.Warningf("Failed to list images for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 			continue
@@ -227,7 +211,7 @@ func detectRuntime(varRunPath string) (cfgs []runtimeConfig) {
 		}
 	}
 
-	// containerd
+	// containerd, with the same behavior of pullImage as commonCRI
 	{
 		if _, err = os.Stat(fmt.Sprintf("%s/containerd.sock", varRunPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{

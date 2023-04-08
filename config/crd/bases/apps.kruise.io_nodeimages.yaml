@@ -80,6 +80,19 @@ spec:
                             type: string
                         type: object
                       type: array
+                    sandboxConfig:
+                      description: SandboxConfig support attach metadata in PullImage
+                        CRI interface during ImagePulljobs
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                      type: object
                     tags:
                       description: Tags is a list of versions of this image
                       items:
@@ -272,7 +285,7 @@ spec:
                             description: Represents the ID of this image.
                             type: string
                           message:
-                            description: Represents the summary informations of this
+                            description: Represents the summary information of this
                               node
                             type: string
                           phase:
@@ -280,7 +293,7 @@ spec:
                             type: string
                           progress:
                             description: Represents the pulling progress of this tag,
-                              which is beetween 0-100. There is no guarantee of monotonic
+                              which is between 0-100. There is no guarantee of monotonic
                               consistency, and it may be a rollback due to retry during
                               pulling.
                             format: int32

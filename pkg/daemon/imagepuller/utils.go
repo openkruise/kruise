@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -124,9 +123,4 @@ func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStat
 	}
 	su.previousTimestamp = time.Now()
 	return false, err
-}
-
-func (su *statusUpdater) statusChanged(newStatus *appsv1alpha1.NodeImageStatus) bool {
-	// Can not use imagePullNode.Status to compare because of time accuracy
-	return !reflect.DeepEqual(su.previousStatus, newStatus)
 }

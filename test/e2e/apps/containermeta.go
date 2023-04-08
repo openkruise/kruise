@@ -41,6 +41,10 @@ var _ = SIGDescribe("ContainerMeta", func() {
 	var kc kruiseclientset.Interface
 	var tester *framework.CloneSetTester
 	var randStr string
+	var nodeTester *framework.NodeTester
+	var nodes []*v1.Node
+	var err error
+	var replicas int32
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -48,6 +52,10 @@ var _ = SIGDescribe("ContainerMeta", func() {
 		ns = f.Namespace.Name
 		tester = framework.NewCloneSetTester(c, kc, ns)
 		randStr = rand.String(10)
+		nodeTester = framework.NewNodeTester(c)
+		nodes, err = nodeTester.ListRealNodesWithFake(nil)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		replicas = int32(len(nodes))
 	})
 
 	framework.KruiseDescribe("In-place update env from metadata", func() {
@@ -55,8 +63,8 @@ var _ = SIGDescribe("ContainerMeta", func() {
 
 		// This can't be Conformance yet.
 		ginkgo.It("should recreate container when annotations for env changed", func() {
-			ginkgo.By("Create a CloneSet with replicas=2")
-			cs := tester.NewCloneSet("clone-"+randStr, 2, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			ginkgo.By(fmt.Sprintf("Create a CloneSet with replicas=%d", replicas))
+			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			if cs.Spec.Template.ObjectMeta.Annotations == nil {
 				cs.Spec.Template.ObjectMeta.Annotations = map[string]string{}
 			}
@@ -65,6 +73,15 @@ var _ = SIGDescribe("ContainerMeta", func() {
 				Name:      "TEST_ENV",
 				ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.annotations['test-env']"}},
 			})
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			cs.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     cs.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -73,11 +90,11 @@ var _ = SIGDescribe("ContainerMeta", func() {
 				cs, err = tester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
-			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(2)))
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
 
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(len(pods)).Should(gomega.Equal(2))
+			gomega.Expect(len(pods)).Should(gomega.Equal(int(replicas)))
 
 			ginkgo.By("Patch pods[0] annotation to bar")
 			mergePatch := []byte(`{"metadata":{"annotations":{"test-env":"bar"}}}`)
@@ -107,15 +124,14 @@ var _ = SIGDescribe("ContainerMeta", func() {
 					return 0
 				}
 				return cs.Status.UpdatedReadyReplicas
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(2)))
-
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
 			ginkgo.By("Check all pods restarted")
 			newPods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(newPods[0].Status.ContainerStatuses[0].RestartCount).Should(gomega.Equal(int32(1)), fmt.Sprintf("new pod status: %s", util.DumpJSON(newPods[0].Status)))
-			gomega.Expect(newPods[0].Status.ContainerStatuses[0].ContainerID).NotTo(gomega.Equal(pod0.Status.ContainerStatuses[0].ContainerID))
-			gomega.Expect(newPods[0].Status.ContainerStatuses[0].RestartCount).Should(gomega.Equal(int32(1)), fmt.Sprintf("new pod status: %s", util.DumpJSON(newPods[1].Status)))
-			gomega.Expect(newPods[1].Status.ContainerStatuses[0].ContainerID).NotTo(gomega.Equal(pods[1].Status.ContainerStatuses[0].ContainerID))
+			for i := range newPods {
+				gomega.Expect(newPods[i].Status.ContainerStatuses[0].RestartCount).Should(gomega.Equal(int32(1)), fmt.Sprintf("new pod status: %s", util.DumpJSON(newPods[i].Status)))
+				gomega.Expect(newPods[i].Status.ContainerStatuses[0].ContainerID).NotTo(gomega.Equal(pods[i].Status.ContainerStatuses[0].ContainerID))
+			}
 		})
 	})
 })

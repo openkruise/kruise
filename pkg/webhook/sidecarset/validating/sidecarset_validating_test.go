@@ -150,6 +150,85 @@ func TestValidateSidecarSet(t *testing.T) {
 				},
 			},
 		},
+		"wrong-namespaceSelector": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "app-name",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"app-group", "app-risk"},
+						},
+					},
+				},
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "app-name",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"app-group", "app-risk-"},
+						},
+					},
+				},
+				Containers: []appsv1alpha1.SidecarContainer{
+					{
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+							Type: appsv1alpha1.ShareVolumePolicyEnabled,
+						},
+						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+						},
+						Container: corev1.Container{
+							Name:                     "test-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		"wrong-namespace": {
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1alpha1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "app-name",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"app-group", "app-risk"},
+						},
+					},
+				},
+				Namespace: "ns-test",
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+
+				Containers: []appsv1alpha1.SidecarContainer{
+					{
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+							Type: appsv1alpha1.ShareVolumePolicyEnabled,
+						},
+						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+						},
+						Container: corev1.Container{
+							Name:                     "test-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
 		"wrong-initContainer": {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
 			Spec: appsv1alpha1.SidecarSetSpec{
@@ -236,6 +315,23 @@ func TestValidateSidecarSet(t *testing.T) {
 				Volumes: []corev1.Volume{
 					{
 						Name: "test-volume",
+					},
+					{
+						Name: "istio-token",
+						VolumeSource: corev1.VolumeSource{
+							Projected: &corev1.ProjectedVolumeSource{
+								DefaultMode: pointer.Int32Ptr(420),
+								Sources: []corev1.VolumeProjection{
+									{
+										ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+											Audience:          "istio-ca",
+											ExpirationSeconds: pointer.Int64Ptr(43200),
+											Path:              "istio-token",
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -377,61 +473,167 @@ func TestValidateSidecarSet(t *testing.T) {
 }
 
 func TestSidecarSetNameConflict(t *testing.T) {
-	listDemo := &appsv1alpha1.SidecarSetList{
-		Items: []appsv1alpha1.SidecarSet{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
-				Spec: appsv1alpha1.SidecarSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"a": "b"},
-					},
-					Containers: []appsv1alpha1.SidecarContainer{
-						{
-							Container: corev1.Container{Name: "container-name"},
+	cases := []struct {
+		name           string
+		getSidecarSet  func() *appsv1alpha1.SidecarSet
+		getSidecarList func() *appsv1alpha1.SidecarSetList
+		expect         int
+	}{
+		{
+			name: "test1",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				return &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						Containers: []appsv1alpha1.SidecarContainer{
+							{
+								Container: corev1.Container{Name: "container-name"},
+							},
+						},
+						InitContainers: []appsv1alpha1.SidecarContainer{
+							{
+								Container: corev1.Container{Name: "init-name"},
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "volume-name",
+							},
 						},
 					},
-					InitContainers: []appsv1alpha1.SidecarContainer{
-						{
-							Container: corev1.Container{Name: "init-name"},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "volume-name",
-						},
-					},
-				},
+				}
 			},
+			getSidecarList: func() *appsv1alpha1.SidecarSetList {
+				return &appsv1alpha1.SidecarSetList{
+					Items: []appsv1alpha1.SidecarSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
+							Spec: appsv1alpha1.SidecarSetSpec{
+								Selector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"a": "b"},
+								},
+								Containers: []appsv1alpha1.SidecarContainer{
+									{
+										Container: corev1.Container{Name: "container-name"},
+									},
+								},
+								InitContainers: []appsv1alpha1.SidecarContainer{
+									{
+										Container: corev1.Container{Name: "init-name"},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name: "volume-name",
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			expect: 2,
+		},
+		{
+			name: "test2",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				return &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "nginx"},
+						},
+						Containers: []appsv1alpha1.SidecarContainer{
+							{
+								Container: corev1.Container{Name: "container-name"},
+							},
+						},
+					},
+				}
+			},
+			getSidecarList: func() *appsv1alpha1.SidecarSetList {
+				return &appsv1alpha1.SidecarSetList{
+					Items: []appsv1alpha1.SidecarSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
+							Spec: appsv1alpha1.SidecarSetSpec{
+								Selector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"a": "b"},
+								},
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"app": "nginx"},
+								},
+								Containers: []appsv1alpha1.SidecarContainer{
+									{
+										Container: corev1.Container{Name: "container-name"},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			expect: 1,
+		},
+		{
+			name: "test3",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				return &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"a": "b"},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "nginx"},
+						},
+						Containers: []appsv1alpha1.SidecarContainer{
+							{
+								Container: corev1.Container{Name: "container-name"},
+							},
+						},
+					},
+				}
+			},
+			getSidecarList: func() *appsv1alpha1.SidecarSetList {
+				return &appsv1alpha1.SidecarSetList{
+					Items: []appsv1alpha1.SidecarSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
+							Spec: appsv1alpha1.SidecarSetSpec{
+								Selector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"a": "b"},
+								},
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"app": "redis"},
+								},
+								Containers: []appsv1alpha1.SidecarContainer{
+									{
+										Container: corev1.Container{Name: "container-name"},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			expect: 0,
 		},
 	}
-	sidecarDemo := &appsv1alpha1.SidecarSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"a": "b"},
-			},
-			Containers: []appsv1alpha1.SidecarContainer{
-				{
-					Container: corev1.Container{Name: "container-name"},
-				},
-			},
-			InitContainers: []appsv1alpha1.SidecarContainer{
-				{
-					Container: corev1.Container{Name: "init-name"},
-				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "volume-name",
-				},
-			},
-		},
-	}
-	allErrs := validateSidecarConflict(listDemo, sidecarDemo, field.NewPath("spec.containers"))
-	if len(allErrs) != 2 {
-		t.Errorf("expect errors len 2, but got: %v", len(allErrs))
-	} else {
-		fmt.Println(allErrs)
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			allErrs := validateSidecarConflict(nil, cs.getSidecarList(), cs.getSidecarSet(), field.NewPath("spec.containers"))
+			if cs.expect != len(allErrs) {
+				t.Fatalf("expect(%v), but get(%v)", cs.expect, len(allErrs))
+			}
+		})
 	}
 }
 
@@ -684,7 +886,7 @@ func TestSidecarSetPodMetadataConflict(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			sidecar := cs.getSidecarSet()
 			list := cs.getSidecarSetList()
-			errs := validateSidecarConflict(list, sidecar, field.NewPath("spec"))
+			errs := validateSidecarConflict(nil, list, sidecar, field.NewPath("spec"))
 			if len(errs) != cs.expectErrLen {
 				t.Fatalf("except ErrLen(%d), but get errs(%d)", cs.expectErrLen, len(errs))
 			}
@@ -809,7 +1011,7 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			sidecar := cs.getSidecarSet()
 			list := cs.getSidecarSetList()
-			errs := validateSidecarConflict(list, sidecar, field.NewPath("spec"))
+			errs := validateSidecarConflict(nil, list, sidecar, field.NewPath("spec"))
 			if len(errs) != cs.expectErrLen {
 				t.Fatalf("except ErrLen(%d), but get errs(%d)", cs.expectErrLen, len(errs))
 			}

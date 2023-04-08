@@ -43,7 +43,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 
 	// If selector is not nil, check whether the pods is selected to upgrade
 	isSelected := func(pod *corev1.Pod) bool {
-		//when selector is nil, always return ture
+		//when selector is nil, always return true
 		if strategy.Selector == nil {
 			return true
 		}

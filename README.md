@@ -12,34 +12,30 @@ English | [简体中文](./README-zh_CN.md)
 
 ## Introduction
 
-OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is now hosted by the [Cloud Native Computing Foundation](https://cncf.io/) (CNCF) as a Sandbox Level Project.
+OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is a CNCF([Cloud Native Computing Foundation](https://cncf.io/)) incubating project.
 It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload and application management.
 
 ## Key Features
 
-- **Typical Workloads**
+- **Advance Workloads**
 
-  Typical Workloads can help you manage applications of stateless, stateful and daemon.
+  Advance Workloads can help you manage applications of stateless, stateful, daemon and job.
 
   They all support not only the basic features which are similar to the original Workloads in Kubernetes, but also more advanced abilities like **in-place update**, **configurable scale/upgrade strategies**, **parallel operations**.
 
   - [**CloneSet** for stateless applications](https://openkruise.io/docs/user-manuals/cloneset/)
   - [**Advanced StatefulSet** for stateful applications](https://openkruise.io/docs/user-manuals/advancedstatefulset)
   - [**Advanced DaemonSet** for daemon applications](https://openkruise.io/docs/user-manuals/advanceddaemonset)
-
-- **Job Workloads**
-
   - [**BroadcastJob** for deploying jobs over specific nodes](https://openkruise.io/docs/user-manuals/broadcastjob)
   - [**AdvancedCronJob** for creating Job or BroadcastJob periodically](https://openkruise.io/docs/user-manuals/advancedcronjob)
 
 - **Sidecar container Management**
 
-  The Sidecar containers can be simply defined in the **SidecarSet** custom resource and Kruise will inject them into all Pods matched.
-
-  The implementation is done by using Kubernetes mutating webhooks, similar to what [istio](https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/) does.
-  However, it allows you to explicitly manage your own sidecars.
+  Kruise simplify sidecar injection and enable sidecar in-place update. Kruise also enhance the sidecar startup and termination control.
 
   - [**SidecarSet** for defining and upgrading your own sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
+  - [**Container Launch Priority** to control the container startup orders](https://openkruise.io/docs/user-manuals/containerlaunchpriority)
+  - [**Sidecar Job Terminator** terminates sidecar containers for such job-type Pods when its main containers completed.](https://openkruise.io/docs/user-manuals/jobsidecarterminator)
 
 - **Multi-domain Management**
 
@@ -53,8 +49,11 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
 - **Enhanced Operations**
 
-  - [Restart containers in a running pod](https://openkruise.io/docs/user-manuals/containerrecreaterequest)
-  - [Download images on specific nodes](https://openkruise.io/docs/user-manuals/imagepulljob)
+  - [**ContainerRecreateRequest** provides a way to let users restart/recreate containers in a running pod](https://openkruise.io/docs/user-manuals/containerrecreaterequest)
+  - [**ImagePullJob** pre-download images on specific nodes](https://openkruise.io/docs/user-manuals/imagepulljob)
+  - [**ResourceDistribution** support Secret & ConfigMap resource distribution across namespaces](https://openkruise.io/docs/user-manuals/resourcedistribution)
+  - [**PersistentPodState** is able to persistent states of the Pod, such as "IP Retention"](https://openkruise.io/docs/user-manuals/persistentpodstate)
+  - [**PodProbeMarker** provides the ability to customize the Probe and return the result to the Pod](https://openkruise.io/docs/user-manuals/podprobemarker)
 
 - **Application Protection**
 
@@ -79,7 +78,8 @@ Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/
 - Spectro Cloud, ihomefnt, Arkane Systems, Deepexi, 火花思维
 - OPPO, Suning.cn, joyy, Mobvista, 深圳凤凰木网络有限公司
 - xiaomi, Netease, MeiTuan Finance, Shopee, Esign
-- LinkedIn, 雪球, 兴盛优选, Wholee
+- LinkedIn, 雪球, 兴盛优选, Wholee, LilithGames, Baidu
+- Bilibili, 冠赢互娱, MeiTuan, 同城
 
 ## Contributing
 

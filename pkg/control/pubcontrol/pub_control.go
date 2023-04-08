@@ -137,6 +137,7 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 	sidecarSets, sidecars := getSidecarSetsInPod(pod)
 	if sidecarSets.Len() > 0 && sidecars.Len() > 0 {
 		if !sidecarcontrol.IsSidecarContainerUpdateCompleted(pod, sidecarSets, sidecars) {
+			klog.V(5).Infof("PodUnavailableBudget check Pod(%s/%s) is inconsistent", pod.Namespace, pod.Name)
 			return false
 		}
 	}

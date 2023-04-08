@@ -178,6 +178,7 @@ type ReconcileWorkloadSpread struct {
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=workloadspreads,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=workloadspreads/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=workloadspreads/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch
@@ -499,7 +500,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 	// set the generation in the returned status
 	status := appsv1alpha1.WorkloadSpreadStatus{}
 	status.ObservedGeneration = ws.Generation
-	//status.ObservedWorkloadReplicas = workloadReplicas
+	// status.ObservedWorkloadReplicas = workloadReplicas
 	status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, len(ws.Spec.Subsets))
 	scheduleFailedPodMap := make(map[string][]*corev1.Pod)
 
@@ -512,7 +513,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 		oldSubsetStatusMap[oldSubsetStatuses[i].Name] = &oldSubsetStatuses[i]
 	}
 
-	var rescheduleCriticalSeconds int32 = 0
+	var rescheduleCriticalSeconds int32
 	if ws.Spec.ScheduleStrategy.Type == appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType &&
 		ws.Spec.ScheduleStrategy.Adaptive != nil &&
 		ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil {
@@ -590,7 +591,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 		}
 		oldDeletingPods = oldSubsetStatus.DeletingPods
 	}
-	var active int32 = 0
+	var active int32
 
 	for _, pod := range pods {
 		// remove this Pod from creatingPods map because this Pod has been created.
@@ -667,7 +668,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 func (r *ReconcileWorkloadSpread) UpdateWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread,
 	status *appsv1alpha1.WorkloadSpreadStatus) error {
 	if status.ObservedGeneration == ws.Status.ObservedGeneration &&
-		//status.ObservedWorkloadReplicas == ws.Status.ObservedWorkloadReplicas &&
+		// status.ObservedWorkloadReplicas == ws.Status.ObservedWorkloadReplicas &&
 		apiequality.Semantic.DeepEqual(status.SubsetStatuses, ws.Status.SubsetStatuses) {
 		return nil
 	}
