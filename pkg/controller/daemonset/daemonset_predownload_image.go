@@ -79,13 +79,18 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 	}
 	labelMap[history.ControllerRevisionHashLabel] = updateRevision.Labels[history.ControllerRevisionHashLabel]
 
+	annotationMap := make(map[string]string)
+	for k, v := range ds.Spec.Template.Annotations {
+		annotationMap[k] = v
+	}
+
 	containerImages := diffImagesBetweenRevisions(oldRevisions, updateRevision)
 	klog.V(3).Infof("DaemonSet %s/%s begin to create ImagePullJobs for revision %s: %v",
 		ds.Namespace, ds.Name, updateRevision.Name, containerImages)
 	for name, image := range containerImages {
 		// job name is revision name + container name, it can not be more than 255 characters
 		jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
-		err := imagejobutilfunc.CreateJobForWorkload(dsc.Client, ds, controllerKind, jobName, image, labelMap, *selector, pullSecrets)
+		err := imagejobutilfunc.CreateJobForWorkload(dsc.Client, ds, controllerKind, jobName, image, labelMap, annotationMap, *selector, pullSecrets)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				klog.Errorf("DaemonSet %s/%s failed to create ImagePullJob %s: %v", ds.Namespace, ds.Name, jobName, err)
