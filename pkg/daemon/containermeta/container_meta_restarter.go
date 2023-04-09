@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -78,7 +77,7 @@ func (c *restartController) processNextWorkItem() bool {
 func (c *restartController) sync(containerID kubeletcontainer.ContainerID) error {
 	criRuntime := c.runtimeFactory.GetRuntimeServiceByName(containerID.Type)
 	if criRuntime == nil {
-		klog.Errorf("Not found runtime service for %s in daemon", containerID.Type)
+		klog.Warningf("Not found runtime service for %s in daemon", containerID.Type)
 		return nil
 	}
 
