@@ -78,7 +78,7 @@ func (c *restartController) processNextWorkItem() bool {
 func (c *restartController) sync(containerID kubeletcontainer.ContainerID) error {
 	criRuntime := c.runtimeFactory.GetRuntimeServiceByName(containerID.Type)
 	if criRuntime == nil {
-		klog.Errorf("Not found runtime service for %s in daemon", containerID.Type)
+		klog.Warningf("Not found runtime service for %s in daemon", containerID.Type)
 		return nil
 	}
 
