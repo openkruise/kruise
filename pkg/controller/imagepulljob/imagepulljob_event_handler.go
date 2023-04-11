@@ -17,10 +17,14 @@ limitations under the License.
 package imagepulljob
 
 import (
+	"context"
 	"reflect"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	kruiseutil "github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -185,6 +189,102 @@ func (e *podEventHandler) handleUpdate(pod, oldPod *v1.Pod, q workqueue.RateLimi
 	for name := range diffSet {
 		q.Add(reconcile.Request{NamespacedName: name})
 	}
+}
+
+type secretEventHandler struct {
+	client.Reader
+}
+
+var _ handler.EventHandler = &secretEventHandler{}
+
+func (e *secretEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	obj := evt.Object.(*v1.Secret)
+	e.handle(obj, q)
+}
+
+func (e *secretEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	newObj := evt.ObjectNew.(*v1.Secret)
+	oldObj := evt.ObjectOld.(*v1.Secret)
+	e.handleUpdate(newObj, oldObj, q)
+}
+
+func (e *secretEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+}
+
+func (e *secretEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
+
+func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.RateLimitingInterface) {
+	if secret != nil && secret.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
+		jobKeySet := referenceSetFromTarget(secret)
+		klog.V(4).Infof("Observe secret %s/%s created, uid: %s, refs: %s", secret.Namespace, secret.Name, secret.UID, jobKeySet.String())
+		for key := range jobKeySet {
+			scaleExpectations.ObserveScale(key.String(), expectations.Create, secret.Labels[SourceSecretUIDLabelKey])
+		}
+		return
+	}
+
+	if secret == nil || secret.DeletionTimestamp != nil {
+		return
+	}
+	// Get jobs related to this Secret
+	jobKeys, err := e.getActiveJobKeysForSecret(secret)
+	if err != nil {
+		klog.Errorf("Failed to get jobs for Secret %s/%s: %v", secret.Namespace, secret.Name, err)
+	}
+	for _, jKey := range jobKeys {
+		q.Add(reconcile.Request{NamespacedName: jKey})
+	}
+}
+
+func (e *secretEventHandler) handleUpdate(secretNew, secretOld *v1.Secret, q workqueue.RateLimitingInterface) {
+	if secretNew != nil && secretNew.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
+		jobKeySet := referenceSetFromTarget(secretNew)
+		for key := range jobKeySet {
+			scaleExpectations.ObserveScale(key.String(), expectations.Create, secretNew.Labels[SourceSecretUIDLabelKey])
+		}
+		return
+	}
+
+	if secretOld == nil || secretNew == nil || secretNew.DeletionTimestamp != nil ||
+		(reflect.DeepEqual(secretNew.Data, secretOld.Data) && reflect.DeepEqual(secretNew.StringData, secretOld.StringData)) {
+		return
+	}
+	// Get jobs related to this Secret
+	jobKeys, err := e.getActiveJobKeysForSecret(secretNew)
+	if err != nil {
+		klog.Errorf("Failed to get jobs for Secret %s/%s: %v", secretNew.Namespace, secretNew.Name, err)
+	}
+	for _, jKey := range jobKeys {
+		q.Add(reconcile.Request{NamespacedName: jKey})
+	}
+}
+
+func (e *secretEventHandler) getActiveJobKeysForSecret(secret *v1.Secret) ([]types.NamespacedName, error) {
+	jobLister := &appsv1alpha1.ImagePullJobList{}
+	if err := e.List(context.TODO(), jobLister, client.InNamespace(secret.Namespace), utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+	var jobKeys []types.NamespacedName
+	for i := range jobLister.Items {
+		job := &jobLister.Items[i]
+		if job.DeletionTimestamp != nil {
+			continue
+		}
+		if jobContainsSecret(job, secret.Name) {
+			jobKeys = append(jobKeys, keyFromObject(job))
+		}
+	}
+	return jobKeys, nil
+}
+
+func jobContainsSecret(job *appsv1alpha1.ImagePullJob, secretName string) bool {
+	for _, s := range job.Spec.PullSecrets {
+		if secretName == s {
+			return true
+		}
+	}
+	return false
 }
 
 func diffJobs(newJobs, oldJobs []*appsv1alpha1.ImagePullJob) set {

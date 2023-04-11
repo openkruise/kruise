@@ -1,0 +1,29 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: kruise-daemon-secret-role
+  namespace: kruise-daemon-config
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kruise-daemon-secret-rolebinding
+  namespace: kruise-daemon-config
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kruise-daemon-secret-role
+subjects:
+  - kind: ServiceAccount
+    name: kruise-daemon
+    namespace: kruise-system

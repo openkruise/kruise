@@ -24,3 +24,10 @@ func GetKruiseNamespace() string {
 	}
 	return "kruise-system"
 }
+
+func GetKruiseDaemonConfigNamespace() string {
+	if ns := os.Getenv("KRUISE_DAEMON_CONFIG_NS"); len(ns) > 0 {
+		return ns
+	}
+	return "kruise-daemon-config"
+}
