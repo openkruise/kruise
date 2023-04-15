@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.GroupVersionKind, name, image string, labels map[string]string, podSelector metav1.LabelSelector, pullSecrets []string) error {
+func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.GroupVersionKind, name, image string, labels map[string]string, annotations map[string]string, podSelector metav1.LabelSelector, pullSecrets []string) error {
 	var pullTimeoutSeconds int32 = 300
 	if str, ok := owner.GetAnnotations()[appsv1alpha1.ImagePreDownloadTimeoutSecondsKey]; ok {
 		if i, err := strconv.Atoi(str); err == nil {
@@ -60,6 +60,10 @@ func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.Group
 			CompletionPolicy: appsv1alpha1.CompletionPolicy{
 				Type:                    appsv1alpha1.Always,
 				TTLSecondsAfterFinished: utilpointer.Int32Ptr(600),
+			},
+			SandboxConfig: &appsv1alpha1.SandboxConfig{
+				Annotations: annotations,
+				Labels:      labels,
 			},
 		},
 	}

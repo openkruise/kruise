@@ -110,13 +110,18 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	}
 	labelMap[history.ControllerRevisionHashLabel] = updateRevision.Labels[history.ControllerRevisionHashLabel]
 
+	annotationMap := make(map[string]string)
+	for k, v := range sts.Spec.Template.Annotations {
+		annotationMap[k] = v
+	}
+
 	containerImages := diffImagesBetweenRevisions(currentRevision, updateRevision)
 	klog.V(3).Infof("Statefulset %s/%s begin to create ImagePullJobs for revision %s -> %s: %v",
 		sts.Namespace, sts.Name, currentRevision.Name, updateRevision.Name, containerImages)
 	for name, image := range containerImages {
 		// job name is revision name + container name, it can not be more than 255 characters
 		jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
-		err := imagejobutilfunc.CreateJobForWorkload(sigsruntimeClient, sts, controllerKind, jobName, image, labelMap, *selector, pullSecrets)
+		err := imagejobutilfunc.CreateJobForWorkload(sigsruntimeClient, sts, controllerKind, jobName, image, labelMap, annotationMap, *selector, pullSecrets)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				klog.Errorf("Statefulset %s/%s failed to create ImagePullJob %s: %v", sts.Namespace, sts.Name, jobName, err)
