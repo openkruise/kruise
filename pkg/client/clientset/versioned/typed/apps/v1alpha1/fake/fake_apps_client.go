@@ -51,6 +51,10 @@ func (c *FakeAppsV1alpha1) EphemeralJobs(namespace string) v1alpha1.EphemeralJob
 	return &FakeEphemeralJobs{c, namespace}
 }
 
+func (c *FakeAppsV1alpha1) ImageListPullJobs(namespace string) v1alpha1.ImageListPullJobInterface {
+	return &FakeImageListPullJobs{c, namespace}
+}
+
 func (c *FakeAppsV1alpha1) ImagePullJobs(namespace string) v1alpha1.ImagePullJobInterface {
 	return &FakeImagePullJobs{c, namespace}
 }

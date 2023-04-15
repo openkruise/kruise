@@ -65,6 +65,14 @@ type EphemeralJobListerExpansion interface{}
 // EphemeralJobNamespaceLister.
 type EphemeralJobNamespaceListerExpansion interface{}
 
+// ImageListPullJobListerExpansion allows custom methods to be added to
+// ImageListPullJobLister.
+type ImageListPullJobListerExpansion interface{}
+
+// ImageListPullJobNamespaceListerExpansion allows custom methods to be added to
+// ImageListPullJobNamespaceLister.
+type ImageListPullJobNamespaceListerExpansion interface{}
+
 // ImagePullJobListerExpansion allows custom methods to be added to
 // ImagePullJobLister.
 type ImagePullJobListerExpansion interface{}
