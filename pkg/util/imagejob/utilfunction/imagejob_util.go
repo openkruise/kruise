@@ -20,13 +20,14 @@ import (
 	"context"
 	"strconv"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.GroupVersionKind, name, image string, labels map[string]string, annotations map[string]string, podSelector metav1.LabelSelector, pullSecrets []string) error {
@@ -52,18 +53,20 @@ func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.Group
 			Labels:          labels,
 		},
 		Spec: appsv1alpha1.ImagePullJobSpec{
-			Image:       image,
-			PullSecrets: pullSecrets,
-			PodSelector: &appsv1alpha1.ImagePullJobPodSelector{LabelSelector: podSelector},
-			Parallelism: &parallelism,
-			PullPolicy:  &appsv1alpha1.PullPolicy{BackoffLimit: utilpointer.Int32Ptr(1), TimeoutSeconds: &pullTimeoutSeconds},
-			CompletionPolicy: appsv1alpha1.CompletionPolicy{
-				Type:                    appsv1alpha1.Always,
-				TTLSecondsAfterFinished: utilpointer.Int32Ptr(600),
-			},
-			SandboxConfig: &appsv1alpha1.SandboxConfig{
-				Annotations: annotations,
-				Labels:      labels,
+			Image: image,
+			ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+				PullSecrets: pullSecrets,
+				PodSelector: &appsv1alpha1.ImagePullJobPodSelector{LabelSelector: podSelector},
+				Parallelism: &parallelism,
+				PullPolicy:  &appsv1alpha1.PullPolicy{BackoffLimit: utilpointer.Int32Ptr(1), TimeoutSeconds: &pullTimeoutSeconds},
+				CompletionPolicy: appsv1alpha1.CompletionPolicy{
+					Type:                    appsv1alpha1.Always,
+					TTLSecondsAfterFinished: utilpointer.Int32Ptr(600),
+				},
+				SandboxConfig: &appsv1alpha1.SandboxConfig{
+					Annotations: annotations,
+					Labels:      labels,
+				},
 			},
 		},
 	}
