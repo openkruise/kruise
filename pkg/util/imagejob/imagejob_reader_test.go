@@ -25,10 +25,6 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-	"github.com/openkruise/kruise/apis"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,6 +34,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/openkruise/kruise/apis"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
 var c client.Client
@@ -129,25 +130,33 @@ var (
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job2"},
 			Spec: appsv1alpha1.ImagePullJobSpec{
-				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{"node2", "node4"}},
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{"node2", "node4"}},
+				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job3"},
 			Spec: appsv1alpha1.ImagePullJobSpec{
-				Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"arch": "arm64"}}},
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"arch": "arm64"}}},
+				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job4"},
 			Spec: appsv1alpha1.ImagePullJobSpec{
-				Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "arch", Operator: metav1.LabelSelectorOpDoesNotExist}}}},
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "arch", Operator: metav1.LabelSelectorOpDoesNotExist}}}},
+				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job5"},
 			Spec: appsv1alpha1.ImagePullJobSpec{
-				PodSelector: &appsv1alpha1.ImagePullJobPodSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					PodSelector: &appsv1alpha1.ImagePullJobPodSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+				},
 			},
 		},
 		{

@@ -22,16 +22,17 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 var _ = SIGDescribe("PullImage", func() {
@@ -93,18 +94,20 @@ var _ = SIGDescribe("PullImage", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
 				Image: NginxImage,
-				Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-					{Key: framework.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
-				}}},
-				PullPolicy: &appsv1alpha1.PullPolicy{
-					TimeoutSeconds: utilpointer.Int32Ptr(50),
-					BackoffLimit:   utilpointer.Int32Ptr(2),
-				},
-				Parallelism: &intorstr4,
-				CompletionPolicy: appsv1alpha1.CompletionPolicy{
-					Type:                    appsv1alpha1.Always,
-					ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
-					TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+						{Key: framework.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
+					}}},
+					PullPolicy: &appsv1alpha1.PullPolicy{
+						TimeoutSeconds: utilpointer.Int32Ptr(50),
+						BackoffLimit:   utilpointer.Int32Ptr(2),
+					},
+					Parallelism: &intorstr4,
+					CompletionPolicy: appsv1alpha1.CompletionPolicy{
+						Type:                    appsv1alpha1.Always,
+						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
+						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
+					},
 				},
 			}
 			err := testerForImagePullJob.CreateJob(job)
@@ -142,15 +145,17 @@ var _ = SIGDescribe("PullImage", func() {
 		framework.ConformanceIt("create an always job to pull an image on one real node", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image:    NewNginxImage,
-				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
-				PullPolicy: &appsv1alpha1.PullPolicy{
-					TimeoutSeconds: utilpointer.Int32Ptr(50),
-					BackoffLimit:   utilpointer.Int32Ptr(2),
-				},
-				Parallelism: &intorstr4,
-				CompletionPolicy: appsv1alpha1.CompletionPolicy{
-					Type: appsv1alpha1.Always,
+				Image: NewNginxImage,
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+					PullPolicy: &appsv1alpha1.PullPolicy{
+						TimeoutSeconds: utilpointer.Int32Ptr(50),
+						BackoffLimit:   utilpointer.Int32Ptr(2),
+					},
+					Parallelism: &intorstr4,
+					CompletionPolicy: appsv1alpha1.CompletionPolicy{
+						Type: appsv1alpha1.Always,
+					},
 				},
 			}
 			err := testerForImagePullJob.CreateJob(job)
@@ -187,13 +192,15 @@ var _ = SIGDescribe("PullImage", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
 				Image: WebserverImage,
-				PullPolicy: &appsv1alpha1.PullPolicy{
-					TimeoutSeconds: utilpointer.Int32Ptr(50),
-					BackoffLimit:   utilpointer.Int32Ptr(2),
-				},
-				Parallelism: &intorstr4,
-				CompletionPolicy: appsv1alpha1.CompletionPolicy{
-					Type: appsv1alpha1.Never,
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					PullPolicy: &appsv1alpha1.PullPolicy{
+						TimeoutSeconds: utilpointer.Int32Ptr(50),
+						BackoffLimit:   utilpointer.Int32Ptr(2),
+					},
+					Parallelism: &intorstr4,
+					CompletionPolicy: appsv1alpha1.CompletionPolicy{
+						Type: appsv1alpha1.Never,
+					},
 				},
 			}
 			err := testerForImagePullJob.CreateJob(job)
@@ -228,15 +235,17 @@ var _ = SIGDescribe("PullImage", func() {
 			job1 := baseJob.DeepCopy()
 			job1.Name = baseJob.Name + "-1"
 			job1.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image:    NewWebserverImage,
-				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
-				PullPolicy: &appsv1alpha1.PullPolicy{
-					TimeoutSeconds: utilpointer.Int32Ptr(50),
-					BackoffLimit:   utilpointer.Int32Ptr(2),
-				},
-				Parallelism: &intorstr4,
-				CompletionPolicy: appsv1alpha1.CompletionPolicy{
-					Type: appsv1alpha1.Never,
+				Image: NewWebserverImage,
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+					PullPolicy: &appsv1alpha1.PullPolicy{
+						TimeoutSeconds: utilpointer.Int32Ptr(50),
+						BackoffLimit:   utilpointer.Int32Ptr(2),
+					},
+					Parallelism: &intorstr4,
+					CompletionPolicy: appsv1alpha1.CompletionPolicy{
+						Type: appsv1alpha1.Never,
+					},
 				},
 			}
 			err := testerForImagePullJob.CreateJob(job1)
@@ -263,15 +272,17 @@ var _ = SIGDescribe("PullImage", func() {
 			job2 := baseJob.DeepCopy()
 			job2.Name = baseJob.Name + "-2"
 			job2.Spec = appsv1alpha1.ImagePullJobSpec{
-				Image:    NewWebserverImage,
-				Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
-				PullPolicy: &appsv1alpha1.PullPolicy{
-					TimeoutSeconds: utilpointer.Int32Ptr(50),
-					BackoffLimit:   utilpointer.Int32Ptr(2),
-				},
-				Parallelism: &intorstr4,
-				CompletionPolicy: appsv1alpha1.CompletionPolicy{
-					Type: appsv1alpha1.Never,
+				Image: NewWebserverImage,
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+					PullPolicy: &appsv1alpha1.PullPolicy{
+						TimeoutSeconds: utilpointer.Int32Ptr(50),
+						BackoffLimit:   utilpointer.Int32Ptr(2),
+					},
+					Parallelism: &intorstr4,
+					CompletionPolicy: appsv1alpha1.CompletionPolicy{
+						Type: appsv1alpha1.Never,
+					},
 				},
 			}
 			err = testerForImagePullJob.CreateJob(job2)

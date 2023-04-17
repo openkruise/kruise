@@ -30,7 +30,11 @@ const (
 // ImagePullJobSpec defines the desired state of ImagePullJob
 type ImagePullJobSpec struct {
 	// Image is the image to be pulled by the job
-	Image string `json:"image"`
+	Image                string `json:"image"`
+	ImagePullJobTemplate `json:",inline"`
+}
+
+type ImagePullJobTemplate struct {
 
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
