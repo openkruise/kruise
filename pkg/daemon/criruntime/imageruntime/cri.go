@@ -31,7 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
-const maxMsgSize = 1024 * 1024 * 16
+const (
+	maxMsgSize                    = 1024 * 1024 * 16
+	pullingImageSandboxConfigAnno = "apps.kruise.io/pulling-image-by"
+)
 
 // NewCRIImageService create a common CRI runtime
 func NewCRIImageService(runtimeURI string, accountManager daemonutil.ImagePullAccountManager) (ImageService, error) {
@@ -93,7 +96,18 @@ func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag st
 			Annotations: sandboxConfig.Annotations,
 			Labels:      sandboxConfig.Labels,
 		}
+		if pullImageReq.SandboxConfig.Annotations == nil {
+			pullImageReq.SandboxConfig.Annotations = map[string]string{}
+		}
+	} else {
+		pullImageReq.SandboxConfig = &runtimeapi.PodSandboxConfig{
+			Annotations: map[string]string{},
+		}
 	}
+	// Add this default annotation to avoid unexpected panic caused by sandboxConfig is nil
+	// for some runtime implementations.
+	pullImageReq.SandboxConfig.Annotations[pullingImageSandboxConfigAnno] = "kruise-daemon"
+
 	if len(pullSecrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
 		authInfos, err = convertToRegistryAuths(pullSecrets, repoToPull)
