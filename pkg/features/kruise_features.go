@@ -52,10 +52,10 @@ const (
 	CloneSetPartitionRollback featuregate.Feature = "CloneSetPartitionRollback"
 
 	// ResourcesDeletionProtection enables protection for resources deletion, currently supports
-	// Namespace, CustomResourcesDefinition, Deployment, StatefulSet, ReplicaSet, CloneSet, Advanced StatefulSet, UnitedDeployment.
+	// Namespace, Service, Ingress, CustomResourcesDefinition, Deployment, StatefulSet, ReplicaSet, CloneSet, Advanced StatefulSet, UnitedDeployment.
 	// It is only supported for Kubernetes version >= 1.16
 	// Note that if it is enabled during Kruise installation or upgrade, Kruise will require more authorities:
-	// 1. Webhook for deletion operation of namespace, crd, deployment, statefulset, replicaset and workloads in Kruise.
+	// 1. Webhook for deletion operation of namespace, service, ingress, crd, deployment, statefulset, replicaset and workloads in Kruise.
 	// 2. ClusterRole for reading all resource types, because CRD validation needs to list the CRs of this CRD.
 	ResourcesDeletionProtection featuregate.Feature = "ResourcesDeletionProtection"
 

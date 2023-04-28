@@ -39,6 +39,16 @@ webhooks:
     matchExpressions:
     - key: policy.kruise.io/delete-protection
       operator: Exists
+- name: vservice.kb.io
+  objectSelector:
+    matchExpressions:
+      - key: policy.kruise.io/delete-protection
+        operator: Exists
+- name: vingress.kb.io
+  objectSelector:
+    matchExpressions:
+      - key: policy.kruise.io/delete-protection
+        operator: Exists
 - name: vpod.kb.io
   namespaceSelector:
     matchExpressions:

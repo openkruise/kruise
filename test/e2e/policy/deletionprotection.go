@@ -29,6 +29,8 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -368,6 +371,146 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Delete the Deployment should successful")
 			err = c.AppsV1().Deployments(ns).Delete(context.TODO(), deploy.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+	})
+
+	framework.KruiseDescribe("Service deletion", func() {
+		ginkgo.It("should be protected", func() {
+			ginkgo.By("Create a Service with Always")
+			name := "svc-" + randStr
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns,
+					Name:      name,
+					Labels:    map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
+				},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"owner": "foo"},
+					Ports: []v1.ServicePort{
+						{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
+					},
+				},
+			}
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), svc, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Delete the Service should be rejected")
+			err = c.CoreV1().Services(ns).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
+
+			ginkgo.By("Patch the Service deletion to null")
+			_, err = c.CoreV1().Services(ns).Patch(context.TODO(), svc.Name, types.StrategicMergePatchType,
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, policyv1alpha1.DeletionProtectionKey)), metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Delete the Service successfully")
+			err = c.CoreV1().Services(ns).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+	})
+
+	framework.KruiseDescribe("Ingress deletion", func() {
+		ginkgo.It("should be protected", func() {
+			ginkgo.By("Create a Ingress with Always")
+			name := "ing-" + randStr
+			pathType := networkingv1.PathTypePrefix
+			ing := &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: ns,
+					Labels:    map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
+				},
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "foo.bar.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:     "/",
+											PathType: &pathType,
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 80,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			_, err := c.NetworkingV1().Ingresses(ns).Create(context.TODO(), ing, metav1.CreateOptions{})
+
+			// for the cluster using old Kubernetes version, use networking.k8s.io/v1beta1 instead of networking.k8s.io/v1 to create Ingress resource
+			if err != nil && err.Error() == "the server could not find the requested resource" {
+				err = nil
+				pathType := networkingv1beta1.PathTypePrefix
+				ing := &networkingv1beta1.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+						Labels:    map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
+					},
+					Spec: networkingv1beta1.IngressSpec{
+						Rules: []networkingv1beta1.IngressRule{
+							{
+								Host: "foo.bar.com",
+								IngressRuleValue: networkingv1beta1.IngressRuleValue{
+									HTTP: &networkingv1beta1.HTTPIngressRuleValue{
+										Paths: []networkingv1beta1.HTTPIngressPath{
+											{
+												Path:     "/",
+												PathType: &pathType,
+												Backend: networkingv1beta1.IngressBackend{
+													ServiceName: "test",
+													ServicePort: intstr.FromInt(80),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				_, err = c.NetworkingV1beta1().Ingresses(ns).Create(context.TODO(), ing, metav1.CreateOptions{})
+			}
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Delete the Ingress should be rejected")
+			err = c.NetworkingV1().Ingresses(ns).Delete(context.TODO(), ing.Name, metav1.DeleteOptions{})
+			if err != nil && err.Error() == "the server could not find the requested resource" {
+				err = nil
+				err = c.NetworkingV1beta1().Ingresses(ns).Delete(context.TODO(), ing.Name, metav1.DeleteOptions{})
+			}
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
+
+			ginkgo.By("Patch the Ingress deletion to null")
+			_, err = c.NetworkingV1().Ingresses(ns).Patch(context.TODO(), ing.Name, types.StrategicMergePatchType,
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, policyv1alpha1.DeletionProtectionKey)), metav1.PatchOptions{})
+			if err != nil && err.Error() == "the server could not find the requested resource" {
+				err = nil
+				_, err = c.NetworkingV1beta1().Ingresses(ns).Patch(context.TODO(), ing.Name, types.StrategicMergePatchType,
+					[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, policyv1alpha1.DeletionProtectionKey)), metav1.PatchOptions{})
+			}
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Delete the Ingress successfully")
+			err = c.NetworkingV1().Ingresses(ns).Delete(context.TODO(), ing.Name, metav1.DeleteOptions{})
+			if err != nil && err.Error() == "the server could not find the requested resource" {
+				err = nil
+				err = c.NetworkingV1beta1().Ingresses(ns).Delete(context.TODO(), ing.Name, metav1.DeleteOptions{})
+			}
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})

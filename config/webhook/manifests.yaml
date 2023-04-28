@@ -481,6 +481,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-ingress
+  failurePolicy: Fail
+  name: vingress.kb.io
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    apiVersions:
+    - v1
+    - v1beta1
+    operations:
+    - DELETE
+    resources:
+    - ingresses
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-namespace
   failurePolicy: Fail
   name: vnamespace.kb.io
@@ -618,6 +639,26 @@ webhooks:
     - UPDATE
     resources:
     - podunavailablebudgets
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-service
+  failurePolicy: Fail
+  name: vservice.kb.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - DELETE
+    resources:
+    - services
   sideEffects: None
 - admissionReviewVersions:
   - v1
