@@ -122,7 +122,9 @@ func (r *ControllerFinder) getReplicaSetsForObject(scale *ScaleAndSelector) ([]a
 	rss := make([]appsv1.ReplicaSet, 0)
 	for i := range rsList.Items {
 		rs := rsList.Items[i]
-		if *rs.Spec.Replicas == 0 || !rs.DeletionTimestamp.IsZero() {
+		// This method is used to list the pods of the deployment, so the rs of spec.replicas == 0 cannot be ignored,
+		// because even if rs.spec.replicas == 0, rs may still contain pods.
+		if !rs.DeletionTimestamp.IsZero() {
 			continue
 		}
 		if ref := metav1.GetControllerOf(&rs); ref != nil && ref.UID == scale.UID {
