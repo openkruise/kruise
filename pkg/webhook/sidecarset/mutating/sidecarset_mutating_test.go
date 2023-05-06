@@ -1,9 +1,9 @@
 package mutating
 
 import (
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	"testing"
 
-	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
@@ -42,7 +42,7 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 			},
 		},
 	}
-	defaults.SetDefaultsSidecarSet(sidecarSet)
+	defaults.SetDefaultsSidecarSet(sidecarSet, nil)
 	_ = setHashSidecarSet(sidecarSet)
 	if sidecarSet.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateSidecarSetStrategyType {
 		t.Fatalf("update strategy not initialized")
@@ -85,5 +85,58 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 	}
 	if sidecarSet.Spec.InjectionStrategy.Revision.Policy != appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy {
 		t.Fatalf("sidecarset %v InjectionStrategy inilize incorrectly, got %v", sidecarSet.Name, sidecarSet.Spec.InjectionStrategy.Revision.Policy)
+	}
+}
+
+func TestSidecarSetHashSetting(t *testing.T) {
+	sidecarSet := &appsv1alpha1.SidecarSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "sidecarset-test",
+		},
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "app",
+						Image: "nginx",
+					},
+				},
+			},
+		},
+	}
+
+	// create
+	toCreate := sidecarSet.DeepCopy()
+	defaults.SetDefaultsSidecarSet(toCreate, nil)
+	err := setHashSidecarSet(toCreate)
+	if err != nil {
+		t.Fatalf("set hash failed: %v", err)
+	}
+	hashWithImg := toCreate.Annotations[sidecarcontrol.SidecarSetHashAnnotation]
+	if hashWithImg != "4fcz55z67f6w69czcvd5vdbxv2bw9fxd7w75x4c8x6688x7678xw262wbvdfxcff" {
+		t.Fatalf("sidecarset hash initialized incorrectly, got %v", toCreate.Annotations[sidecarcontrol.SidecarSetHashAnnotation])
+	}
+	hashWithoutImg := toCreate.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation]
+	if hashWithoutImg != "c2c27xwzzv626x4d8ddb5544d99d8c4dd49x5c67zd5cbdfx2f5b2726x58b7xzw" {
+		t.Fatalf("sidecarset hash-without-image initialized incorrectly, got %v", toCreate.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation])
+	}
+	defaultImagePullPolicy := toCreate.Spec.Containers[0].ImagePullPolicy
+
+	// update with empty imagePullPolicy
+	toUpdate := sidecarSet.DeepCopy()
+	toUpdate.Spec.Containers[0].Image += ":1.23" // just add a tag
+	defaults.SetDefaultsSidecarSet(toUpdate, toCreate)
+	if toUpdate.Spec.Containers[0].ImagePullPolicy != defaultImagePullPolicy {
+		t.Fatalf("sidecarset imagePullPolicy should not be updated, got %v", toUpdate.Spec.Containers[0].ImagePullPolicy)
+	}
+	err = setHashSidecarSet(toUpdate)
+	if err != nil {
+		t.Fatalf("set hash failed: %v", err)
+	}
+	if toUpdate.Annotations[sidecarcontrol.SidecarSetHashAnnotation] == hashWithImg {
+		t.Fatalf("sidecarset hash should be updated, got %v", toUpdate.Annotations[sidecarcontrol.SidecarSetHashAnnotation])
+	}
+	if toUpdate.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] != hashWithoutImg {
+		t.Fatalf("sidecarset hash-without-image should not be updated, got %v", toUpdate.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation])
 	}
 }

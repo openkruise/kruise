@@ -27,8 +27,25 @@ import (
 )
 
 // SetDefaults_SidecarSet set default values for SidecarSet.
-func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
+func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet, old *v1alpha1.SidecarSet) {
 	setSidecarSetUpdateStrategy(&obj.Spec.UpdateStrategy)
+
+	// preset container's pull policy according to old obj
+	if old != nil {
+		setPullPolicy := func(containers []v1alpha1.SidecarContainer, oldContainers []v1alpha1.SidecarContainer) {
+			pullPolicies := make(map[string]corev1.PullPolicy)
+			for _, c := range oldContainers {
+				pullPolicies[c.Name] = c.ImagePullPolicy
+			}
+			for i, c := range containers {
+				if c.ImagePullPolicy == "" {
+					obj.Spec.Containers[i].ImagePullPolicy = pullPolicies[c.Name]
+				}
+			}
+		}
+		setPullPolicy(obj.Spec.InitContainers, obj.Spec.InitContainers)
+		setPullPolicy(obj.Spec.Containers, old.Spec.Containers)
+	}
 
 	for i := range obj.Spec.InitContainers {
 		setSidecarDefaultContainer(&obj.Spec.InitContainers[i])
