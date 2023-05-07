@@ -117,3 +117,76 @@ func TestMatchRegistryAuths(t *testing.T) {
 		})
 	}
 }
+
+func TestContainsImage(t *testing.T) {
+	cases := []struct {
+		name       string
+		ImageName  string
+		Tag        string
+		ImageInfos []ImageInfo
+		Expect     bool
+	}{
+		{
+			name:      "test_nginx",
+			ImageName: "nginx",
+			Tag:       "latest",
+			ImageInfos: []ImageInfo{{
+				RepoTags: []string{"docker.io/library/nginx:latest"},
+			},
+			},
+			Expect: true,
+		},
+		{
+			name:      "test_test/nginx:1.0",
+			ImageName: "test/nginx",
+			Tag:       "1.0",
+			ImageInfos: []ImageInfo{{
+				RepoTags: []string{"docker.io/test/nginx:1.0"},
+			},
+			},
+			Expect: true,
+		},
+		{
+			name:      "test_test/nginx:1.0_false",
+			ImageName: "test/nginx",
+			Tag:       "1.0",
+			ImageInfos: []ImageInfo{{
+				RepoTags: []string{"docker.io/library/nginx:1.0"},
+			},
+			},
+			Expect: false,
+		},
+
+		{
+			name:      "test_docker.io/library/nginx",
+			ImageName: "docker.io/library/nginx",
+			Tag:       "latest",
+			ImageInfos: []ImageInfo{{
+				RepoTags: []string{"docker.io/library/nginx:latest"},
+			},
+			},
+			Expect: false,
+		},
+		{
+			name:      "test_1.1.1.1:8080/test/nginx",
+			ImageName: "1.1.1.1:8080/test/nginx",
+			Tag:       "latest",
+			ImageInfos: []ImageInfo{{
+				RepoTags: []string{"1.1.1.1:8080/test/nginx:latest"},
+			},
+			},
+			Expect: true,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			for _, info := range cs.ImageInfos {
+				res := info.ContainsImage(cs.ImageName, cs.Tag)
+				if res != cs.Expect {
+					t.Fatalf("ContainsImage failed")
+				}
+			}
+		})
+	}
+}

@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
@@ -230,31 +229,13 @@ func (r *imagePullStatusReader) mainloop() {
 
 func (c ImageInfo) ContainsImage(name string, tag string) bool {
 	for _, repoTag := range c.RepoTags {
-		imageRepo, imageTag := parseRepositoryTag(repoTag)
+		// We should remove defaultDomain and officialRepoName in RepoTags by NormalizeImageRefToNameTag method,
+		// Because if the user needs to download the image from hub.docker.com, CRI.PullImage will automatically add these when downloading the image
+		// Ref: https://github.com/openkruise/kruise/issues/1273
+		imageRepo, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(repoTag)
 		if imageRepo == name && imageTag == tag {
 			return true
 		}
 	}
 	return false
-}
-
-// parseRepositoryTag gets a repos name and returns the right reposName + tag|digest
-// The tag can be confusing because of a port in a repository name.
-//
-//	Ex: localhost.localdomain:5000/samalba/hipache:latest
-//	Digest ex: localhost:5000/foo/bar@sha256:bc8813ea7b3603864987522f02a76101c17ad122e1c46d790efc0fca78ca7bfb
-func parseRepositoryTag(repos string) (string, string) {
-	n := strings.Index(repos, "@")
-	if n >= 0 {
-		parts := strings.Split(repos, "@")
-		return parts[0], parts[1]
-	}
-	n = strings.LastIndex(repos, ":")
-	if n < 0 {
-		return repos, ""
-	}
-	if tag := repos[n+1:]; !strings.Contains(tag, "/") {
-		return repos[:n], tag
-	}
-	return repos, ""
 }
