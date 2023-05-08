@@ -23,7 +23,7 @@ ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
 
-RUN apk add --no-cache ca-certificates=~20220614-r4 bash=~5.2.15-r0 expat=~2.5.0-r0 \
+RUN apk add --no-cache ca-certificates bash expat \
   && rm -rf /var/cache/apk/*
 
 WORKDIR /
