@@ -18,6 +18,7 @@ package cloneset
 
 import (
 	"context"
+	"fmt"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -46,18 +47,19 @@ type realStatusUpdater struct {
 
 func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
 	r.calculateStatus(cs, newStatus, pods)
-	if r.inconsistentStatus(cs, newStatus) {
-		klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions current=%s update=%s",
-			cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.CurrentRevision, newStatus.UpdateRevision)
-		if err := r.updateStatus(cs, newStatus); err != nil {
-			return err
-		}
+	extraStatus, modified, err := clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods)
+	if err != nil {
+		return fmt.Errorf("failed to calculate extra status for cloneSet %s/%s: %v", cs.Namespace, cs.Name, err)
 	}
-
-	return clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods)
+	if !modified && !r.inconsistentStatus(cs, newStatus) {
+		return nil
+	}
+	klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions current=%s update=%s",
+		cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.CurrentRevision, newStatus.UpdateRevision)
+	return r.updateStatus(cs, newStatus, extraStatus)
 }
 
-func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
+func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, extraStatus map[string]string) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clone := &appsv1alpha1.CloneSet{}
 		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, clone); err != nil {
@@ -65,6 +67,12 @@ func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *a
 		}
 		clone.Status = *newStatus
 		clone.Annotations = cs.Annotations
+		if clone.Annotations == nil {
+			clone.Annotations = map[string]string{}
+		}
+		for key, value := range extraStatus {
+			clone.Annotations[key] = value
+		}
 		return r.Status().Update(context.TODO(), clone)
 	})
 }
