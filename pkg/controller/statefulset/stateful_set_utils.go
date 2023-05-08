@@ -391,6 +391,9 @@ func updateIdentity(set *appsv1beta1.StatefulSet, pod *v1.Pod) {
 // return false with zero means it's not ready
 // return false with a positive value means it's not available and should recheck with that time
 func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) (bool, time.Duration) {
+	if lifecycle.GetPodLifecycleState(pod) != appspub.LifecycleStateNormal {
+		return false, 0
+	}
 	if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(pod) {
 		return false, 0
 	}
