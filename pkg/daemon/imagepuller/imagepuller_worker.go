@@ -324,6 +324,13 @@ func (w *pullWorker) Run() {
 		StartTime: &startTime,
 		Version:   w.tagSpec.Version,
 	}
+
+	// We should update the image status when we start pulling images,
+	// which can meet the scenario that some large size images cannot return the result from CRI.PullImage within 60s. For one reason:
+	// For nodeimage controller will mark image:tag task failed (not responded for a long time) if daemon does not report status in 60s.
+	// Ref: https://github.com/openkruise/kruise/issues/1273
+	w.statusUpdater.UpdateStatus(newStatus)
+
 	defer func() {
 		cost := time.Since(startTime.Time)
 		if newStatus.Phase == appsv1alpha1.ImagePhaseFailed {
