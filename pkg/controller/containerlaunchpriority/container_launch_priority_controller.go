@@ -69,12 +69,14 @@ func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 		CreateFunc: func(e event.CreateEvent) bool {
 			pod := e.Object.(*v1.Pod)
 			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			return utilcontainerlaunchpriority.ExistsPriorities(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
+			// If in vk scenario, there will be not containerReady condition
+			return utilcontainerlaunchpriority.ExistsPriorities(pod) && (containersReady == nil || containersReady.Status != v1.ConditionTrue)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			pod := e.ObjectNew.(*v1.Pod)
 			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			return utilcontainerlaunchpriority.ExistsPriorities(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
+			// If in vk scenario, there will be not containerReady condition
+			return utilcontainerlaunchpriority.ExistsPriorities(pod) && (containersReady == nil || containersReady.Status != v1.ConditionTrue)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false
