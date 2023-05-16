@@ -20,7 +20,6 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
@@ -28,6 +27,8 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 const maxMsgSize = 1024 * 1024 * 16
@@ -171,4 +172,25 @@ func (c *commonCRIImageService) ListImages(ctx context.Context) ([]ImageInfo, er
 		})
 	}
 	return collection, nil
+}
+
+func (c *commonCRIImageService) ImageStatus(ctx context.Context, image string) (*ImageInfo, error) {
+	imagesReq := &runtimeapi.ImageStatusRequest{
+		Image: &runtimeapi.ImageSpec{
+			Image: image,
+		},
+	}
+	img, err := c.criImageClient.ImageStatus(ctx, imagesReq)
+	if err != nil {
+		return nil, err
+	}
+
+	info := &ImageInfo{
+		ID:          img.Image.GetId(),
+		RepoTags:    img.Image.GetRepoTags(),
+		RepoDigests: img.Image.GetRepoDigests(),
+		Size:        int64(img.Image.GetSize_()),
+	}
+
+	return info, nil
 }

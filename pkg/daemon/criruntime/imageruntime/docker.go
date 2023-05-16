@@ -18,6 +18,7 @@ package imageruntime
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -25,10 +26,11 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockerapi "github.com/docker/docker/client"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
+
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 // NewDockerImageService create a docker runtime
@@ -144,6 +146,10 @@ func (d *dockerImageService) ListImages(ctx context.Context) ([]ImageInfo, error
 		return nil, err
 	}
 	return newImageCollectionDocker(infos), nil
+}
+
+func (d *dockerImageService) ImageStatus(ctx context.Context, image string) (*ImageInfo, error) {
+	return nil, fmt.Errorf("not impl")
 }
 
 func newImageCollectionDocker(infos []dockertypes.ImageSummary) []ImageInfo {

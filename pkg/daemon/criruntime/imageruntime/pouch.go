@@ -27,10 +27,11 @@ import (
 	pouchfilters "github.com/alibaba/pouch/apis/filters"
 	pouchtypes "github.com/alibaba/pouch/apis/types"
 	pouchapi "github.com/alibaba/pouch/client"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
+
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 // NewPouchImageService create a pouch runtime client
@@ -146,6 +147,10 @@ func (d *pouchImageService) ListImages(ctx context.Context) ([]ImageInfo, error)
 		return nil, err
 	}
 	return newImageCollectionPouch(infos), nil
+}
+
+func (d *pouchImageService) ImageStatus(ctx context.Context, image string) (*ImageInfo, error) {
+	return nil, fmt.Errorf("not impl")
 }
 
 func newImageCollectionPouch(infos []pouchtypes.ImageInfo) []ImageInfo {

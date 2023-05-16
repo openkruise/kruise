@@ -39,7 +39,6 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http/httpproxy"
 	"google.golang.org/grpc"
@@ -47,6 +46,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 const (
@@ -124,6 +125,10 @@ func (d *containerdImageClient) ListImages(ctx context.Context) ([]ImageInfo, er
 		})
 	}
 	return collection, nil
+}
+
+func (d *containerdImageClient) ImageStatus(ctx context.Context, image string) (*ImageInfo, error) {
+	return nil, fmt.Errorf("not impl")
 }
 
 // doPullImage returns pipe reader as ImagePullStatusReader to notify the progressing.

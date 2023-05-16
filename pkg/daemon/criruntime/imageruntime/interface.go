@@ -50,4 +50,5 @@ type ImagePullStatusReader interface {
 type ImageService interface {
 	PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error)
 	ListImages(ctx context.Context) ([]ImageInfo, error)
+	ImageStatus(ctx context.Context, image string) (*ImageInfo, error)
 }
