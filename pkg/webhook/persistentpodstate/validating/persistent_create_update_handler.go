@@ -73,7 +73,7 @@ func (h *PersistentPodStateCreateUpdateHandler) Handle(ctx context.Context, req 
 func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(obj, old *appsv1alpha1.PersistentPodState) field.ErrorList {
 	//validate pps.Spec
 	allErrs := field.ErrorList{}
-	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(h.Client)
+	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(h.Client)
 	if err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("failed to get persistent pod state config white list, error: %v", err)))
 		return allErrs
@@ -105,7 +105,7 @@ func validateUpdateObjImmutable(obj, old *appsv1alpha1.PersistentPodState, fldPa
 	return allErrs
 }
 
-func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPath *field.Path, whiteList *configuration.PPSWatchWatchCustomWorkloadWhiteList) field.ErrorList {
+func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPath *field.Path, whiteList *configuration.CustomWorkloadWhiteList) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	// targetRef

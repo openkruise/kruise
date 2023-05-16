@@ -46,8 +46,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	ctrlUtil "github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
@@ -152,6 +154,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for replicas changes to other CRD
+	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(mgr.GetClient())
+	if err != nil {
+		return err
+	}
+	if len(whiteList.Workloads) > 0 {
+		workloadHandler := &workloadEventHandler{Reader: mgr.GetClient()}
+		for _, workload := range whiteList.Workloads {
+			if _, err := ctrlUtil.AddWatcherDynamically(c, workloadHandler, workload.GroupVersionKind, "WorkloadSpread"); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -272,14 +287,10 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 	targetRef := ws.Spec.TargetReference
 
 	switch targetRef.Kind {
-	case controllerKindDep.Kind, controllerKindRS.Kind, controllerKruiseKindCS.Kind, controllerKindSts.Kind:
-		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, ws.Namespace, targetRef.Name, false)
 	case controllerKindJob.Kind:
 		pods, workloadReplicas, err = r.getPodJob(targetRef, ws.Namespace)
 	default:
-		r.recorder.Eventf(ws, corev1.EventTypeWarning,
-			"TargetReferenceError", "targetReference is not been recognized")
-		return nil, -1, nil
+		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, ws.Namespace, targetRef.Name, false)
 	}
 
 	if err != nil {

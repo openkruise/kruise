@@ -123,14 +123,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(mgr.GetClient())
+	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(mgr.GetClient())
 	if err != nil {
 		return err
 	}
 	if whiteList != nil {
 		workloadHandler := &enqueueRequestForStatefulSetLike{reader: mgr.GetClient()}
 		for _, workload := range whiteList.Workloads {
-			if _, err := ctrlUtil.AddWatcherDynamically(c, workloadHandler, workload); err != nil {
+			if _, err := ctrlUtil.AddWatcherDynamically(c, workloadHandler, workload, "PPS"); err != nil {
 				return err
 			}
 		}

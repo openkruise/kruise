@@ -43,6 +43,8 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/configuration"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -80,11 +82,13 @@ type workload struct {
 
 var (
 	workloads = []workload{
+		{Kind: controllerKindDep.Kind, Groups: []string{controllerKindDep.Group}},
 		{Kind: controllerKruiseKindCS.Kind, Groups: []string{controllerKruiseKindCS.Group}},
 		{Kind: controllerKindRS.Kind, Groups: []string{controllerKindRS.Group}},
 		{Kind: controllerKindJob.Kind, Groups: []string{controllerKindJob.Group}},
 		{Kind: controllerKindSts.Kind, Groups: []string{controllerKindSts.Group, controllerKruiseKindAlphaSts.Group, controllerKruiseKindBetaSts.Group}},
 	}
+	workloadsInWhiteListInitialized = false
 )
 
 type Handler struct {
@@ -172,6 +176,11 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 		return true, nil
 	}
 	ref := metav1.GetControllerOf(pod)
+	if ref == nil {
+		return true, nil
+	}
+
+	initializeWorkloadsInWhiteList(h.Client)
 	matched, err := matchReference(ref)
 	if err != nil || !matched {
 		return true, nil
@@ -635,39 +644,37 @@ func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alph
 }
 
 func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) bool {
+	if owner == nil {
+		return false
+	}
+
 	targetGv, err := schema.ParseGroupVersion(target.APIVersion)
 	if err != nil {
 		klog.Errorf("parse TargetReference apiVersion (%s) failed: %s", target.APIVersion, err.Error())
 		return false
 	}
 
-	var ownerGv schema.GroupVersion
-	if target.Kind == controllerKindDep.Kind {
-		rs := &appsv1.ReplicaSet{}
-		err = h.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: owner.Name}, rs)
-		if err != nil {
-			return false
-		}
-		if rs.UID != owner.UID {
-			return false
-		}
-
-		owner = metav1.GetControllerOf(rs)
-		if owner == nil {
-			return false
-		}
-		ok, err := VerifyGroupKind(owner, controllerKindDep.Kind, []string{controllerKindDep.Group})
-		if !ok || err != nil {
-			return false
-		}
-	}
-	ownerGv, err = schema.ParseGroupVersion(owner.APIVersion)
+	ownerGv, err := schema.ParseGroupVersion(owner.APIVersion)
 	if err != nil {
 		klog.Errorf("parse OwnerReference apiVersion (%s) failed: %s", owner.APIVersion, err.Error())
 		return false
 	}
 
-	return targetGv.Group == ownerGv.Group && target.Kind == owner.Kind && target.Name == owner.Name
+	if targetGv.Group == ownerGv.Group && target.Kind == owner.Kind && target.Name == owner.Name {
+		return true
+	}
+
+	if match, err := matchReference(owner); err != nil || !match {
+		return false
+	}
+
+	ownerObject, err := h.getObjectOf(owner, namespace)
+	if err != nil {
+		klog.Errorf("Failed to get owner object %v: %v", owner, err)
+		return false
+	}
+
+	return h.isReferenceEqual(target, metav1.GetControllerOfNoCopy(ownerObject), namespace)
 }
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -703,4 +710,53 @@ func getSubsetCondition(ws *appsv1alpha1.WorkloadSpread, subsetName string, cond
 		}
 	}
 	return nil
+}
+
+func (h Handler) getObjectOf(owner *metav1.OwnerReference, namespace string) (client.Object, error) {
+	var object client.Object
+	objectKey := types.NamespacedName{Namespace: namespace, Name: owner.Name}
+	objectGvk := schema.FromAPIVersionAndKind(owner.APIVersion, owner.Kind)
+	switch objectGvk {
+	case controllerKindRS:
+		object = &appsv1.ReplicaSet{}
+	case controllerKindDep:
+		object = &appsv1.Deployment{}
+	case controllerKindSts:
+		object = &appsv1.StatefulSet{}
+	case controllerKruiseKindBetaSts, controllerKruiseKindAlphaSts:
+		object = &appsv1beta1.StatefulSet{}
+	case controllerKruiseKindCS:
+		object = &appsv1alpha1.CloneSet{}
+	default:
+		o := unstructured.Unstructured{}
+		o.SetGroupVersionKind(objectGvk)
+		object = &o
+	}
+	if err := h.Get(context.TODO(), objectKey, object); err != nil {
+		return nil, err
+	}
+	return object, nil
+}
+
+func initializeWorkloadsInWhiteList(c client.Client) {
+	if workloadsInWhiteListInitialized {
+		return
+	}
+	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(c)
+	if err != nil {
+		return
+	}
+	for _, wl := range whiteList.Workloads {
+		workloads = append(workloads, workload{
+			Groups: []string{wl.Group},
+			Kind:   wl.Kind,
+		})
+		for _, subWl := range wl.SubResources {
+			workloads = append(workloads, workload{
+				Groups: []string{subWl.Group},
+				Kind:   subWl.Kind,
+			})
+		}
+	}
+	workloadsInWhiteListInitialized = true
 }
