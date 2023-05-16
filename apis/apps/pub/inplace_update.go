@@ -133,6 +133,7 @@ type RuntimeContainerMeta struct {
 	ContainerID  string                 `json:"containerID"`
 	RestartCount int32                  `json:"restartCount"`
 	Hashes       RuntimeContainerHashes `json:"hashes"`
+	ImageID      string                 `json:'imageID'`
 }
 
 // RuntimeContainerHashes contains the hashes of such container.
