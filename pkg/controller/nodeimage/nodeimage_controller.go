@@ -69,7 +69,7 @@ var (
 const (
 	controllerName     = "nodeimage-controller"
 	minRequeueDuration = 3 * time.Second
-	responseTimeout    = time.Minute
+	responseTimeout    = 10 * time.Minute
 
 	// Allow fake NodeImage with no Node related, just for tests
 	fakeLabelKey = "apps.kruise.io/fake-nodeimage"
