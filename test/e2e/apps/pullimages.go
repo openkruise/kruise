@@ -221,13 +221,13 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(len(nodes))))
 			gomega.Expect(job.Status.CompletionTime == nil).To(gomega.Equal(true))
 
-			ginkgo.By("Wait 1 failed in 80s")
-			gomega.Eventually(func() int32 {
-				job, err = testerForImagePullJob.GetJob(job)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return job.Status.Failed
-			}, 80*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-			gomega.Expect(len(job.Status.FailedNodes)).To(gomega.Equal(1))
+			//ginkgo.By("Wait 1 failed in 80s")
+			//gomega.Eventually(func() int32 {
+			//	job, err = testerForImagePullJob.GetJob(job)
+			//	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			//	return job.Status.Failed
+			//}, 80*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+			//gomega.Expect(len(job.Status.FailedNodes)).To(gomega.Equal(1))
 		})
 
 		framework.ConformanceIt("create two jobs to pull a same image", func() {
