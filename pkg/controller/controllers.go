@@ -24,6 +24,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/containerrecreaterequest"
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
 	"github.com/openkruise/kruise/pkg/controller/ephemeraljob"
+	"github.com/openkruise/kruise/pkg/controller/imagelistpulljob"
 	"github.com/openkruise/kruise/pkg/controller/imagepulljob"
 	"github.com/openkruise/kruise/pkg/controller/nodeimage"
 	"github.com/openkruise/kruise/pkg/controller/nodepodprobe"
@@ -65,6 +66,7 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, sidecarterminator.Add)
 	controllerAddFuncs = append(controllerAddFuncs, podprobemarker.Add)
 	controllerAddFuncs = append(controllerAddFuncs, nodepodprobe.Add)
+	controllerAddFuncs = append(controllerAddFuncs, imagelistpulljob.Add)
 }
 
 func SetupWithManager(m manager.Manager) error {
