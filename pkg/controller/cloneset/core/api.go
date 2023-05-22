@@ -43,7 +43,7 @@ type Control interface {
 	IsPodUpdateReady(pod *v1.Pod, minReadySeconds int32) bool
 	GetPodsSortFunc(pods []*v1.Pod, waitUpdateIndexes []int) func(i, j int) bool
 	GetUpdateOptions() *inplaceupdate.UpdateOptions
-	ExtraStatusCalculation(status *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) (map[string]string, bool, error)
+	ExtraStatusCalculation(status *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error
 
 	// validation
 	ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneSet) error
