@@ -26,6 +26,7 @@ import (
 const (
 	SidecarSetPatchPodMetadataWhiteListKey = "SidecarSet_PatchPodMetadata_WhiteList"
 	PPSWatchCustomWorkloadWhiteList        = "PPS_Watch_Custom_Workload_WhiteList"
+	WSWatchCustomWorkloadWhiteList         = "WorkloadSpread_Watch_Custom_Workload_WhiteList"
 )
 
 type SidecarSetPatchMetadataWhiteList struct {
@@ -40,11 +41,11 @@ type SidecarSetPatchMetadataWhiteRule struct {
 	AllowedAnnotationKeyExprs []string `json:"allowedAnnotationKeyExprs"`
 }
 
-type PPSWatchWatchCustomWorkloadWhiteList struct {
+type CustomWorkloadWhiteList struct {
 	Workloads []schema.GroupVersionKind `json:"workloads,omitempty"`
 }
 
-func (p *PPSWatchWatchCustomWorkloadWhiteList) IsValid(gk metav1.GroupKind) bool {
+func (p *CustomWorkloadWhiteList) IsValid(gk metav1.GroupKind) bool {
 	for _, workload := range p.Workloads {
 		if workload.Group == gk.Group && workload.Kind == gk.Kind {
 			return true
@@ -53,7 +54,7 @@ func (p *PPSWatchWatchCustomWorkloadWhiteList) IsValid(gk metav1.GroupKind) bool
 	return false
 }
 
-func (p *PPSWatchWatchCustomWorkloadWhiteList) ValidateAPIVersionAndKind(apiVersion, kind string) bool {
+func (p *CustomWorkloadWhiteList) ValidateAPIVersionAndKind(apiVersion, kind string) bool {
 	if p.IsDefaultSupport(apiVersion, kind) {
 		return true
 	}
@@ -65,7 +66,7 @@ func (p *PPSWatchWatchCustomWorkloadWhiteList) ValidateAPIVersionAndKind(apiVers
 	return p.IsValid(gk)
 }
 
-func (p *PPSWatchWatchCustomWorkloadWhiteList) IsDefaultSupport(apiVersion, kind string) bool {
+func (p *CustomWorkloadWhiteList) IsDefaultSupport(apiVersion, kind string) bool {
 	gv, err := schema.ParseGroupVersion(apiVersion)
 	if err != nil {
 		return false
@@ -74,4 +75,15 @@ func (p *PPSWatchWatchCustomWorkloadWhiteList) IsDefaultSupport(apiVersion, kind
 		return true
 	}
 	return false
+}
+
+type WSCustomWorkloadWhiteList struct {
+	Workloads []CustomWorkload `json:"workloads,omitempty"`
+}
+
+type CustomWorkload struct {
+	schema.GroupVersionKind `json:",inline"`
+	SubResources            []schema.GroupVersionKind `json:"subResources,omitempty"`
+	// ReplicasPath is the replicas field path of this type of workload, such as "spec.replicas"
+	ReplicasPath string `json:"replicasPath,omitempty"`
 }

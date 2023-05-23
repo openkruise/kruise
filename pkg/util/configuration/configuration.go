@@ -51,8 +51,8 @@ func GetSidecarSetPatchMetadataWhiteList(client client.Client) (*SidecarSetPatch
 	return whiteList, nil
 }
 
-func GetPPSWatchWatchCustomWorkloadWhiteList(client client.Client) (*PPSWatchWatchCustomWorkloadWhiteList, error) {
-	whiteList := &PPSWatchWatchCustomWorkloadWhiteList{Workloads: make([]schema.GroupVersionKind, 0)}
+func GetPPSWatchCustomWorkloadWhiteList(client client.Client) (*CustomWorkloadWhiteList, error) {
+	whiteList := &CustomWorkloadWhiteList{Workloads: make([]schema.GroupVersionKind, 0)}
 	data, err := getKruiseConfiguration(client)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,25 @@ func GetPPSWatchWatchCustomWorkloadWhiteList(client client.Client) (*PPSWatchWat
 	return whiteList, nil
 }
 
-func getKruiseConfiguration(c client.Client) (map[string]string, error) {
+func GetWSWatchCustomWorkloadWhiteList(client client.Reader) (WSCustomWorkloadWhiteList, error) {
+	whiteList := WSCustomWorkloadWhiteList{}
+	data, err := getKruiseConfiguration(client)
+	if err != nil {
+		return whiteList, err
+	} else if len(data) == 0 {
+		return whiteList, nil
+	}
+	value, ok := data[WSWatchCustomWorkloadWhiteList]
+	if !ok {
+		return whiteList, nil
+	}
+	if err = json.Unmarshal([]byte(value), &whiteList); err != nil {
+		return whiteList, err
+	}
+	return whiteList, nil
+}
+
+func getKruiseConfiguration(c client.Reader) (map[string]string, error) {
 	cfg := &corev1.ConfigMap{}
 	err := c.Get(context.TODO(), client.ObjectKey{Namespace: util.GetKruiseNamespace(), Name: KruiseConfigurationName}, cfg)
 	if err != nil {

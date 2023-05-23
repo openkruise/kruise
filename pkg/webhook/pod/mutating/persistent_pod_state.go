@@ -43,7 +43,7 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 		return true, nil
 	}
 
-	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(h.Client)
+	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(h.Client)
 	if err != nil {
 		return false, err
 	}

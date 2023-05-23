@@ -36,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsvbeta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 )
 
 const (
@@ -74,7 +75,7 @@ func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, exp
 
 func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *appsv1alpha1.WorkloadSpread) field.ErrorList {
 	// validate ws.spec.
-	allErrs := validateWorkloadSpreadSpec(obj, field.NewPath("spec"))
+	allErrs := h.validateWorkloadSpreadSpec(obj, field.NewPath("spec"))
 
 	// validate whether ws.spec.targetRef is in conflict with others.
 	wsList := &appsv1alpha1.WorkloadSpreadList{}
@@ -87,7 +88,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *apps
 	return allErrs
 }
 
-func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
+func (h *WorkloadSpreadCreateUpdateHandler) validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 
@@ -125,7 +126,20 @@ func validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
 				}
 			default:
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference's GroupKind is not permitted."))
+				whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(h.Client)
+				if err != nil {
+					allErrs = append(allErrs, field.InternalError(fldPath.Child("targetRef"), err))
+				}
+				matched := false
+				for _, wl := range whiteList.Workloads {
+					if ok, _ := verifyGroupKind(spec.TargetReference, wl.Kind, []string{wl.Group}); ok {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference's GroupKind is not permitted."))
+				}
 			}
 		}
 	}
