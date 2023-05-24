@@ -231,6 +231,11 @@ var _ = SIGDescribe("PullImages", func() {
 				return job.Status.Desired
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(job.Spec.Images))))
 
+			// mock a completed imagepulljob
+			time.Sleep(10 * time.Second)
+			err = testerForImageListPullJob.FailNodeImageFast("fake-nodeimage")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			ginkgo.By("Wait completed in 180s")
 			gomega.Eventually(func() bool {
 				job, err = testerForImageListPullJob.GetJob(job)
@@ -272,6 +277,11 @@ var _ = SIGDescribe("PullImages", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Desired
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(job.Spec.Images))))
+
+			// mock a completed imagepulljob
+			time.Sleep(10 * time.Second)
+			err = testerForImageListPullJob.FailNodeImageFast("fake-nodeimage")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait completed in 180s")
 			gomega.Eventually(func() int32 {
