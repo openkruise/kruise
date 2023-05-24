@@ -19,7 +19,6 @@ package sidecarterminator
 import (
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPod{}
@@ -74,12 +75,13 @@ func (p *enqueueRequestForPod) handlePodUpdate(q workqueue.RateLimitingInterface
 
 func isInterestingPod(pod *corev1.Pod) bool {
 	if pod.DeletionTimestamp != nil ||
-		pod.Status.Phase != corev1.PodRunning ||
+		pod.Status.Phase == corev1.PodPending ||
 		pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
 		return false
 	}
 
-	if containersCompleted(pod, getSidecar(pod)) {
+	sidecars := getSidecar(pod)
+	if sidecars.Len() == 0 || containersCompleted(pod, sidecars) {
 		return false
 	}
 

@@ -7,15 +7,16 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 var _ = SIGDescribe("SidecarTerminator", func() {
@@ -44,6 +45,18 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 				Name:            "sidecar",
 				Image:           "nginx:latest",
 				ImagePullPolicy: v1.PullIfNotPresent,
+				Env: []v1.EnvVar{
+					{
+						Name:  appsv1alpha1.KruiseTerminateSidecarEnv,
+						Value: "true",
+					},
+				},
+			}
+			sidecarContainerNeverStop := v1.Container{
+				Name:            "sidecar",
+				Image:           "busybox:latest",
+				ImagePullPolicy: v1.PullIfNotPresent,
+				Command:         []string{"/bin/sh", "-c", "sleep 10000"},
 				Env: []v1.EnvVar{
 					{
 						Name:  appsv1alpha1.KruiseTerminateSidecarEnv,
@@ -86,6 +99,47 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 							if cond.Type == batchv1.JobComplete {
 								return true
 							}
+						}
+						return false
+					},
+				},
+				{
+					name: "native job, restartPolicy=Never, main succeeded, sidecar never stop",
+					createJob: func(str string) metav1.Object {
+						job := &batchv1.Job{
+							ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + str},
+							Spec: batchv1.JobSpec{
+								Template: v1.PodTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"with-sidecar-neverstop": "true"}},
+									Spec: v1.PodSpec{
+										Containers: []v1.Container{
+											*mainContainer.DeepCopy(),
+											*sidecarContainerNeverStop.DeepCopy(),
+										},
+										RestartPolicy: v1.RestartPolicyNever,
+									},
+								},
+							},
+						}
+						job, err := c.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
+						gomega.Expect(err).NotTo(gomega.HaveOccurred())
+						return job
+					},
+					checkStatus: func(object metav1.Object) bool {
+						// assert job status
+						job, err := c.BatchV1().Jobs(object.GetNamespace()).
+							Get(context.TODO(), object.GetName(), metav1.GetOptions{})
+						gomega.Expect(err).NotTo(gomega.HaveOccurred())
+						for _, cond := range job.Status.Conditions {
+							if cond.Type == batchv1.JobComplete {
+								return true
+							}
+						}
+						// assert pod status
+						pods, err := c.CoreV1().Pods(object.GetNamespace()).List(context.TODO(), metav1.ListOptions{LabelSelector: "with-sidecar-neverstop=true"})
+						gomega.Expect(err).NotTo(gomega.HaveOccurred())
+						if len(pods.Items) == 1 && pods.Items[0].Status.Phase == v1.PodSucceeded {
+							return true
 						}
 						return false
 					},

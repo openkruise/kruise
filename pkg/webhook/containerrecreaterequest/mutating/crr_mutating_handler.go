@@ -23,10 +23,6 @@ import (
 	"net/http"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/sidecarterminator"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -123,7 +125,9 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		}
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("failed to find Pod %s: %v", obj.Spec.PodName, err))
 	}
-	if !kubecontroller.IsPodActive(pod) {
+	// check isTerminatedBySidecarTerminator,
+	// because we need create CRR to kill sidecar container after change pod phase to terminal phase in SidecarTerminator Controller.
+	if !kubecontroller.IsPodActive(pod) && !isTerminatedBySidecarTerminator(pod) {
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("not allowed to recreate containers in an inactive Pod"))
 	} else if pod.Spec.NodeName == "" {
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("not allowed to recreate containers in a pending Pod"))
@@ -142,6 +146,15 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+}
+
+func isTerminatedBySidecarTerminator(pod *v1.Pod) bool {
+	for _, c := range pod.Status.Conditions {
+		if c.Type == sidecarterminator.SidecarTerminated {
+			return true
+		}
+	}
+	return false
 }
 
 func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {

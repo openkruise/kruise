@@ -18,19 +18,17 @@ package sidecarterminator
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -39,6 +37,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -46,7 +51,8 @@ func init() {
 }
 
 var (
-	concurrentReconciles = 3
+	concurrentReconciles                         = 3
+	SidecarTerminated    corev1.PodConditionType = "SidecarTerminated"
 )
 
 /**
@@ -131,17 +137,8 @@ func (r *ReconcileSidecarTerminator) doReconcile(pod *corev1.Pod) (reconcile.Res
 		return reconcile.Result{}, nil
 	}
 
-	if containersCompleted(pod, getSidecar(pod)) {
-		klog.V(3).Infof("SidecarTerminator -- all sidecars of pod(%v/%v) have been completed, no need to process", pod.Namespace, pod.Name)
-		return reconcile.Result{}, nil
-	}
-
-	if pod.Spec.RestartPolicy == corev1.RestartPolicyOnFailure && !containersSucceeded(pod, getMain(pod)) {
-		klog.V(3).Infof("SidecarTerminator -- pod(%v/%v) is trying to restart, no need to process", pod.Namespace, pod.Name)
-		return reconcile.Result{}, nil
-	}
-
 	sidecarNeedToExecuteKillContainer, sidecarNeedToExecuteInPlaceUpdate, err := r.groupSidecars(pod)
+
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -150,11 +147,60 @@ func (r *ReconcileSidecarTerminator) doReconcile(pod *corev1.Pod) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
+	if err := r.markJobPodTerminated(pod); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	if err := r.executeKillContainerAction(pod, sidecarNeedToExecuteKillContainer); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// markJobPodTerminated terminate the job pod and skip the state of the sidecar containers
+// This method should only be called before the executeKillContainerAction
+func (r *ReconcileSidecarTerminator) markJobPodTerminated(pod *corev1.Pod) error {
+	if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded {
+		return nil
+	}
+
+	// after the pod is terminated by the sidecar terminator, kubelet will kill the containers that are not in the terminal phase
+	// 1. sidecar container terminate with non-zero exit code
+	// 2. sidecar container is not in a terminal phase (still running or waiting)
+	klog.V(3).Infof("all of the main containers are completed, will terminate the job pod %s/%s", pod.Namespace, pod.Name)
+	// terminate the pod, ignore the status of the sidecar containers.
+	// in kubelet,pods are not allowed to transition out of terminal phases.
+
+	// patch pod condition
+	status := corev1.PodStatus{
+		Conditions: []corev1.PodCondition{
+			{
+				Type:               SidecarTerminated,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Message:            "Terminated by Sidecar Terminator",
+			},
+		},
+	}
+
+	// patch pod phase
+	if containersSucceeded(pod, getMain(pod)) {
+		status.Phase = corev1.PodSucceeded
+	} else {
+		status.Phase = corev1.PodFailed
+	}
+	klog.V(3).Infof("terminate the job pod %s/%s phase=%s", pod.Namespace, pod.Name, status.Phase)
+
+	by, _ := json.Marshal(status)
+	patchCondition := fmt.Sprintf(`{"status":%s}`, string(by))
+	rcvObject := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name}}
+
+	if err := r.Status().Patch(context.TODO(), rcvObject, client.RawPatch(types.StrategicMergePatchType, []byte(patchCondition))); err != nil {
+		return fmt.Errorf("failed to patch pod status: %v", err)
+	}
+
+	return nil
 }
 
 func (r *ReconcileSidecarTerminator) groupSidecars(pod *corev1.Pod) (sets.String, sets.String, error) {
