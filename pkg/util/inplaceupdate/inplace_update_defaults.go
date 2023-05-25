@@ -66,12 +66,7 @@ func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, error) {
 
 	klog.V(5).Infof("Begin to in-place update pod %s/%s with update spec %v, state %v", pod.Namespace, pod.Name, util.DumpJSON(spec), util.DumpJSON(state))
-	if pod.Labels == nil {
-		pod.Labels = make(map[string]string)
-	}
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
+
 	state.NextContainerImages = make(map[string]string)
 	state.NextContainerRefMetadata = make(map[string]metav1.ObjectMeta)
 
@@ -85,6 +80,13 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 		if err = json.Unmarshal(modified, pod); err != nil {
 			return nil, err
 		}
+	}
+
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
 	}
 
 	// prepare containers that should update this time and next time, according to their priorities
