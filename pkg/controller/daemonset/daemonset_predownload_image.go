@@ -107,12 +107,18 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 
 func (dsc *ReconcileDaemonSet) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error {
 	oldRevision := revision.ResourceVersion
+	newRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      revision.Name,
+			Namespace: revision.Namespace,
+		},
+	}
 	body := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value)
-	if err := dsc.Patch(context.TODO(), revision, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
+	if err := dsc.Patch(context.TODO(), newRevision, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
 		return err
 	}
-	if oldRevision != revision.ResourceVersion {
-		clonesetutils.ResourceVersionExpectations.Expect(revision)
+	if oldRevision != newRevision.ResourceVersion {
+		clonesetutils.ResourceVersionExpectations.Expect(newRevision)
 	}
 	return nil
 }
