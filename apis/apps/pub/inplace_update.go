@@ -30,6 +30,10 @@ const (
 	// in-place update is happening.
 	InPlaceUpdateReady v1.PodConditionType = "InPlaceUpdateReady"
 
+	// InPlaceUpdatePredictionAnnoKey is annotation key for Pod. Its value is a JSON string of InPlaceUpdatePrediction,
+	// which predict whether the Pod will be updated with in-place update strategy.
+	InPlaceUpdatePredictionAnnoKey string = "apps.kruise.io/inplace-update-prediction"
+
 	// InPlaceUpdateStateKey records the state of inplace-update.
 	// The value of annotation is InPlaceUpdateState.
 	InPlaceUpdateStateKey string = "apps.kruise.io/inplace-update-state"
@@ -46,6 +50,18 @@ const (
 	// states of runtime containers into its value, which is a structure JSON of RuntimeContainerMetaSet type.
 	RuntimeContainerMetaKey = "apps.kruise.io/runtime-containers-meta"
 )
+
+// InPlaceUpdatePrediction records the prediction about pod in-place update.
+type InPlaceUpdatePrediction struct {
+	// InPlaceUpdate is true if the Pod will be updated with in-place update strategy.
+	InPlaceUpdate bool `json:"inPlaceUpdate,omitempty"`
+
+	// CurrentRevision is the current revision of the Pod before the update.
+	CurrentRevision string `json:"sourceRevision,omitempty"`
+
+	// UpdateRevision is the target revision of the Pod after the update, i.e., UpdateRevision of workload.
+	UpdateRevision string `json:"targetRevision,omitempty"`
+}
 
 // InPlaceUpdateState records latest inplace-update state, including old statuses of containers.
 type InPlaceUpdateState struct {

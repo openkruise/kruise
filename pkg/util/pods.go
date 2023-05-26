@@ -304,6 +304,15 @@ func SetPodCondition(pod *v1.Pod, condition v1.PodCondition) {
 	pod.Status.Conditions = append(pod.Status.Conditions, condition)
 }
 
+func SetPodAnnotations(pod *v1.Pod, annotations map[string]string) {
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	for key, value := range annotations {
+		pod.Annotations[key] = value
+	}
+}
+
 func SetPodReadyCondition(pod *v1.Pod) {
 	podReady := GetCondition(pod, v1.PodReady)
 	if podReady == nil {

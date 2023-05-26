@@ -18,6 +18,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -51,10 +52,19 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	key := clonesetutils.GetControllerKey(cs)
 	coreControl := clonesetcore.New(cs)
 
+	getPodRevision := func(pod *v1.Pod) *apps.ControllerRevision {
+		for _, revision := range revisions {
+			if clonesetutils.EqualToRevisionHash("", pod, revision.Name) {
+				return revision
+			}
+		}
+		return nil
+	}
+
 	// 1. refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
-		patchedState, duration, err := c.refreshPodState(cs, coreControl, pod, updateRevision.Name)
+		patchedState, duration, err := c.refreshPodState(cs, coreControl, pod, updateRevision, getPodRevision(pod))
 		if err != nil {
 			return err
 		} else if duration > 0 {
@@ -143,7 +153,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 				return nil
 			}
 		}
-		duration, err := c.updatePod(cs, coreControl, targetRevision, revisions, pod, pvcs)
+		duration, err := c.updatePod(cs, coreControl, targetRevision, getPodRevision(pod), pod, pvcs)
 		if duration > 0 {
 			clonesetutils.DurationStore.Push(key, duration)
 		}
@@ -155,9 +165,30 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	return nil
 }
 
-func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
+func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod, updateRevision, podRevision *apps.ControllerRevision) (bool, time.Duration, error) {
 	opts := coreControl.GetUpdateOptions()
 	opts = inplaceupdate.SetOptionsDefaults(opts)
+
+	// Predict whether the Pod will be updated in in-place update way
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdatePrediction) {
+		opts.PredictInPlaceUpdate = func(p *v1.Pod) appspub.InPlaceUpdatePrediction {
+			predictionJson, exist := p.Annotations[appspub.InPlaceUpdatePredictionAnnoKey]
+			if exist {
+				prediction := appspub.InPlaceUpdatePrediction{}
+				err := json.Unmarshal([]byte(predictionJson), &prediction)
+				if err == nil && prediction.CurrentRevision == podRevision.Name && prediction.UpdateRevision == updateRevision.Name {
+					return prediction
+				}
+			}
+
+			canInPlaceUpdate := c.inplaceControl.CanUpdateInPlace(updateRevision, podRevision, coreControl.GetUpdateOptions())
+			return appspub.InPlaceUpdatePrediction{
+				InPlaceUpdate:   canInPlaceUpdate,
+				CurrentRevision: podRevision.Name,
+				UpdateRevision:  updateRevision.Name,
+			}
+		}
+	}
 
 	res := c.inplaceControl.Refresh(pod, opts)
 	if res.RefreshErr != nil {
@@ -178,7 +209,7 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 		// when pod updated to PreparingUpdate state to wait lifecycle blocker to remove,
 		// then rollback, do not need update pod inplace since it is the update revision,
 		// so just update pod lifecycle state. ref: https://github.com/openkruise/kruise/issues/1156
-		if clonesetutils.EqualToRevisionHash("", pod, updateRevision) {
+		if clonesetutils.EqualToRevisionHash("", pod, updateRevision.Name) {
 			if cs.Spec.Lifecycle != nil && !lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
 				state = appspub.LifecycleStateUpdated
 			} else {
@@ -236,19 +267,12 @@ func (c *realControl) fixPodTemplateHashLabel(cs *appsv1alpha1.CloneSet, pod *v1
 }
 
 func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control,
-	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
+	updateRevision *apps.ControllerRevision, oldRevision *apps.ControllerRevision,
 	pod *v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (time.Duration, error) {
 
 	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType ||
 		cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
-		var oldRevision *apps.ControllerRevision
-		for _, r := range revisions {
-			if clonesetutils.EqualToRevisionHash("", pod, r.Name) {
-				oldRevision = r
-				break
-			}
-		}
 
 		if c.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, coreControl.GetUpdateOptions()) {
 			switch state := lifecycle.GetPodLifecycleState(pod); state {

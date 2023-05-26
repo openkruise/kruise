@@ -19,6 +19,8 @@ package inplaceupdate
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"regexp"
 	"strings"
 	"time"
@@ -66,6 +68,7 @@ type UpdateOptions struct {
 	CheckPodUpdateCompleted        func(pod *v1.Pod) error
 	CheckContainersUpdateCompleted func(pod *v1.Pod, state *appspub.InPlaceUpdateState) error
 	GetRevision                    func(rev *apps.ControllerRevision) string
+	PredictInPlaceUpdate           func(pod *v1.Pod) appspub.InPlaceUpdatePrediction
 }
 
 // Interface for managing pods in-place update.
@@ -152,27 +155,37 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 		return RefreshResult{}
 	}
 
+	var newAnnotations map[string]string
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdatePrediction) && opts.PredictInPlaceUpdate != nil {
+		prediction := opts.PredictInPlaceUpdate(pod)
+		predictionJSONStr, _ := json.Marshal(prediction)
+		newAnnotations = map[string]string{
+			appspub.InPlaceUpdatePredictionAnnoKey: string(predictionJSONStr),
+		}
+	}
+
 	newCondition := v1.PodCondition{
 		Type:               appspub.InPlaceUpdateReady,
 		Status:             v1.ConditionTrue,
 		LastTransitionTime: metav1.NewTime(Clock.Now()),
 	}
-	err := c.updateCondition(pod, newCondition)
+	err := c.updateConditionAndAnnotations(pod, newCondition, newAnnotations)
 	return RefreshResult{RefreshErr: err}
 }
 
-func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) error {
+func (c *realControl) updateConditionAndAnnotations(pod *v1.Pod, condition v1.PodCondition, annotations map[string]string) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clone, err := c.podAdapter.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
 		}
 
-		if hasEqualCondition(clone, &condition) {
+		if hasEqualCondition(clone, &condition) && hasEqualAnnotation(clone, annotations) {
 			return nil
 		}
 
 		util.SetPodCondition(clone, condition)
+		util.SetPodAnnotations(clone, annotations)
 		// We only update the ready condition to False, and let Kubelet update it to True
 		if condition.Status == v1.ConditionFalse {
 			util.SetPodReadyCondition(clone)
@@ -290,7 +303,7 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 			Status:             v1.ConditionFalse,
 			Reason:             "StartInPlaceUpdate",
 		}
-		if err := c.updateCondition(pod, newCondition); err != nil {
+		if err := c.updateConditionAndAnnotations(pod, newCondition, nil); err != nil {
 			return UpdateResult{InPlaceUpdate: true, UpdateErr: err}
 		}
 	}
@@ -418,4 +431,13 @@ func hasEqualCondition(pod *v1.Pod, newCondition *v1.PodCondition) bool {
 	isEqual := oldCondition != nil && oldCondition.Status == newCondition.Status &&
 		oldCondition.Reason == newCondition.Reason && oldCondition.Message == newCondition.Message
 	return isEqual
+}
+
+func hasEqualAnnotation(pod *v1.Pod, newAnnotations map[string]string) bool {
+	for key, newValue := range newAnnotations {
+		if oldValue, exist := pod.Annotations[key]; !exist || newValue != oldValue {
+			return false
+		}
+	}
+	return true
 }

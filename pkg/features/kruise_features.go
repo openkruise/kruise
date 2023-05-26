@@ -101,6 +101,10 @@ const (
 	// CloneSetEventHandlerOptimization enable optimization for cloneset-controller to reduce the
 	// queuing frequency cased by pod update.
 	CloneSetEventHandlerOptimization featuregate.Feature = "CloneSetEventHandlerOptimization"
+
+	// InPlaceUpdatePrediction enable Kruise patch information to a condition which predict
+	// whether the pod will be upgrade by in-place update strategy.
+	InPlaceUpdatePrediction featuregate.Feature = "InPlaceUpdatePrediction"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
