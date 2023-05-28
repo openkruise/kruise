@@ -8,6 +8,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	sidecarsetutils "github.com/openkruise/kruise/pkg/controller/sidecarset/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +34,7 @@ func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLim
 }
 
 func (p *enqueueRequestForPod) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	p.deletePod(evt.Object)
 }
 
 func (p *enqueueRequestForPod) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
@@ -40,6 +42,22 @@ func (p *enqueueRequestForPod) Generic(evt event.GenericEvent, q workqueue.RateL
 
 func (p *enqueueRequestForPod) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	p.updatePod(q, evt.ObjectOld, evt.ObjectNew)
+}
+
+func (p *enqueueRequestForPod) deletePod(obj runtime.Object) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+
+	sidecarSets, err := p.getPodMatchedSidecarSets(pod)
+	if err != nil {
+		klog.Errorf("unable to get sidecarSets related with pod %s/%s, err: %v", pod.Namespace, pod.Name, err)
+		return
+	}
+	for _, sidecarSet := range sidecarSets {
+		sidecarsetutils.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
+	}
 }
 
 // When a pod is added, figure out what sidecarSets it will be a member of and
@@ -57,6 +75,9 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	}
 
 	for _, sidecarSet := range sidecarSets {
+		if pod.DeletionTimestamp != nil {
+			sidecarsetutils.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
+		}
 		klog.V(3).Infof("Create pod(%s/%s) and reconcile sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -81,6 +102,9 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 	for _, sidecarSet := range matchedSidecarSets {
 		if sidecarSet.Spec.UpdateStrategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
 			continue
+		}
+		if newPod.DeletionTimestamp != nil {
+			sidecarsetutils.UpdateExpectations.DeleteObject(sidecarSet.Name, newPod)
 		}
 		var isChanged bool
 		var enqueueDelayTime time.Duration

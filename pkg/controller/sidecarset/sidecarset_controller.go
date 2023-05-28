@@ -34,10 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
@@ -66,13 +64,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	expectations := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	recorder := mgr.GetEventRecorderFor("sidecarset-controller")
 	cli := utilclient.NewClientFromManager(mgr, "sidecarset-controller")
 	return &ReconcileSidecarSet{
 		Client:    cli,
 		scheme:    mgr.GetScheme(),
-		processor: NewSidecarSetProcessor(cli, expectations, recorder),
+		processor: NewSidecarSetProcessor(cli, recorder),
 	}
 }
 
@@ -115,9 +112,8 @@ var _ reconcile.Reconciler = &ReconcileSidecarSet{}
 // ReconcileSidecarSet reconciles a SidecarSet object
 type ReconcileSidecarSet struct {
 	client.Client
-	scheme             *runtime.Scheme
-	updateExpectations expectations.UpdateExpectations
-	processor          *Processor
+	scheme    *runtime.Scheme
+	processor *Processor
 }
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=sidecarsets,verbs=get;list;watch;create;update;patch;delete
