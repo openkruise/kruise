@@ -138,11 +138,17 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 
 func (dss *defaultStatefulSetControl) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error {
 	oldRevision := revision.ResourceVersion
+	newRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      revision.Name,
+			Namespace: revision.Namespace,
+		},
+	}
 	body := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value)
-	if err := sigsruntimeClient.Patch(context.TODO(), revision, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
+	if err := sigsruntimeClient.Patch(context.TODO(), newRevision, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
 		return err
 	}
-	if oldRevision != revision.ResourceVersion {
+	if oldRevision != newRevision.ResourceVersion {
 		expectations.NewResourceVersionExpectation()
 	}
 	return nil

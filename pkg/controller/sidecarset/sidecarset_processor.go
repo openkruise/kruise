@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
@@ -378,9 +380,14 @@ func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []
 
 func (p *Processor) updateCustomVersionLabel(revision *apps.ControllerRevision, customVersion string) error {
 	if customVersion != "" && customVersion != revision.Labels[appsv1alpha1.SidecarSetCustomVersionLabel] {
-		revisionClone := revision.DeepCopy()
+		newRevision := &apps.ControllerRevision{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      revision.Name,
+				Namespace: revision.Namespace,
+			},
+		}
 		patchBody := fmt.Sprintf(`{"metadata":{"labels":{"%v":"%v"}}}`, appsv1alpha1.SidecarSetCustomVersionLabel, customVersion)
-		err := p.Client.Patch(context.TODO(), revisionClone, client.RawPatch(types.StrategicMergePatchType, []byte(patchBody)))
+		err := p.Client.Patch(context.TODO(), newRevision, client.RawPatch(types.StrategicMergePatchType, []byte(patchBody)))
 		if err != nil {
 			klog.Errorf(`Failed to patch custom revision label "%v" to latest revision %v, err: %v`, revision.Name, customVersion, err)
 			return err
