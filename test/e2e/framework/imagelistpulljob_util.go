@@ -18,12 +18,13 @@ package framework
 
 import (
 	"context"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 )
 
 type ImageListPullJobTester struct {
@@ -57,4 +58,35 @@ func (tester *ImageListPullJobTester) GetJob(job *appsv1alpha1.ImageListPullJob)
 
 func (tester *ImageListPullJobTester) ListJobs(ns string) (*appsv1alpha1.ImageListPullJobList, error) {
 	return tester.kc.AppsV1alpha1().ImageListPullJobs(ns).List(context.TODO(), metav1.ListOptions{})
+}
+
+func (tester *ImageListPullJobTester) FailNodeImageFast(name string) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		nodeImage, err := tester.kc.AppsV1alpha1().NodeImages().Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if nodeImage.Status.ImageStatuses == nil {
+			nodeImage.Status.ImageStatuses = map[string]appsv1alpha1.ImageStatus{}
+		}
+		var desired int32 = 0
+		for image, spec := range nodeImage.Spec.Images {
+			desired += int32(len(nodeImage.Spec.Images))
+			tagStatuses := make([]appsv1alpha1.ImageTagStatus, len(spec.Tags))
+			nodeImage.Status.ImageStatuses[image] = appsv1alpha1.ImageStatus{Tags: tagStatuses}
+			for i, tag := range spec.Tags {
+				nodeImage.Status.ImageStatuses[image].Tags[i] = appsv1alpha1.ImageTagStatus{
+					Tag:            tag.Tag,
+					Phase:          appsv1alpha1.ImagePhaseFailed,
+					CompletionTime: &metav1.Time{Time: time.Now()},
+					Version:        tag.Version,
+					Message:        "node has not responded for a long time",
+				}
+			}
+		}
+		nodeImage.Status.Failed = desired
+		nodeImage.Status.Desired = desired
+		_, err = tester.kc.AppsV1alpha1().NodeImages().UpdateStatus(context.TODO(), nodeImage, metav1.UpdateOptions{})
+		return err
+	})
 }
