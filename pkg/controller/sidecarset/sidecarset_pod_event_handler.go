@@ -74,9 +74,6 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	}
 
 	for _, sidecarSet := range sidecarSets {
-		if pod.DeletionTimestamp != nil {
-			sidecarcontrol.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
-		}
 		klog.V(3).Infof("Create pod(%s/%s) and reconcile sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -102,9 +99,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		if sidecarSet.Spec.UpdateStrategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
 			continue
 		}
-		if newPod.DeletionTimestamp != nil {
-			sidecarcontrol.UpdateExpectations.DeleteObject(sidecarSet.Name, newPod)
-		}
+		sidecarcontrol.UpdateExpectations.ObserveUpdated(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet), newPod)
 		var isChanged bool
 		var enqueueDelayTime time.Duration
 		//check whether pod status is changed
