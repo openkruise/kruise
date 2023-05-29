@@ -8,7 +8,6 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-	sidecarsetutils "github.com/openkruise/kruise/pkg/controller/sidecarset/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -56,7 +55,7 @@ func (p *enqueueRequestForPod) deletePod(obj runtime.Object) {
 		return
 	}
 	for _, sidecarSet := range sidecarSets {
-		sidecarsetutils.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
+		sidecarcontrol.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
 	}
 }
 
@@ -76,7 +75,7 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 
 	for _, sidecarSet := range sidecarSets {
 		if pod.DeletionTimestamp != nil {
-			sidecarsetutils.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
+			sidecarcontrol.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
 		}
 		klog.V(3).Infof("Create pod(%s/%s) and reconcile sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
 		q.Add(reconcile.Request{
@@ -104,7 +103,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 			continue
 		}
 		if newPod.DeletionTimestamp != nil {
-			sidecarsetutils.UpdateExpectations.DeleteObject(sidecarSet.Name, newPod)
+			sidecarcontrol.UpdateExpectations.DeleteObject(sidecarSet.Name, newPod)
 		}
 		var isChanged bool
 		var enqueueDelayTime time.Duration
