@@ -33,6 +33,7 @@ func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLim
 }
 
 func (p *enqueueRequestForPod) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	p.deletePod(evt.Object)
 }
 
 func (p *enqueueRequestForPod) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
@@ -40,6 +41,22 @@ func (p *enqueueRequestForPod) Generic(evt event.GenericEvent, q workqueue.RateL
 
 func (p *enqueueRequestForPod) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	p.updatePod(q, evt.ObjectOld, evt.ObjectNew)
+}
+
+func (p *enqueueRequestForPod) deletePod(obj runtime.Object) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+
+	sidecarSets, err := p.getPodMatchedSidecarSets(pod)
+	if err != nil {
+		klog.Errorf("unable to get sidecarSets related with pod %s/%s, err: %v", pod.Namespace, pod.Name, err)
+		return
+	}
+	for _, sidecarSet := range sidecarSets {
+		sidecarcontrol.UpdateExpectations.DeleteObject(sidecarSet.Name, pod)
+	}
 }
 
 // When a pod is added, figure out what sidecarSets it will be a member of and
@@ -79,6 +96,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		return
 	}
 	for _, sidecarSet := range matchedSidecarSets {
+		sidecarcontrol.UpdateExpectations.ObserveUpdated(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet), newPod)
 		if sidecarSet.Spec.UpdateStrategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
 			continue
 		}

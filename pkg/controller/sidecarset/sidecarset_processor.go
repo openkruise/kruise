@@ -29,7 +29,6 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
@@ -50,18 +49,16 @@ import (
 )
 
 type Processor struct {
-	Client             client.Client
-	recorder           record.EventRecorder
-	historyController  history.Interface
-	updateExpectations expectations.UpdateExpectations
+	Client            client.Client
+	recorder          record.EventRecorder
+	historyController history.Interface
 }
 
-func NewSidecarSetProcessor(cli client.Client, expectations expectations.UpdateExpectations, rec record.EventRecorder) *Processor {
+func NewSidecarSetProcessor(cli client.Client, rec record.EventRecorder) *Processor {
 	return &Processor{
-		Client:             cli,
-		updateExpectations: expectations,
-		recorder:           rec,
-		historyController:  historyutil.NewHistory(cli),
+		Client:            cli,
+		recorder:          rec,
+		historyController: historyutil.NewHistory(cli),
 	}
 }
 
@@ -96,9 +93,9 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 
 	// in case of informer cache latency
 	for _, pod := range pods {
-		p.updateExpectations.ObserveUpdated(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet), pod)
+		sidecarcontrol.UpdateExpectations.ObserveUpdated(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet), pod)
 	}
-	allUpdated, _, inflightPods := p.updateExpectations.SatisfiedExpectations(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet))
+	allUpdated, _, inflightPods := sidecarcontrol.UpdateExpectations.SatisfiedExpectations(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet))
 	if !allUpdated {
 		klog.V(3).Infof("sidecarset %s matched pods has some update in flight: %v, will sync later", sidecarSet.Name, inflightPods)
 		return reconcile.Result{RequeueAfter: time.Second}, nil
@@ -172,7 +169,7 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 			klog.Errorf("updatePodSidecarAndHash error, s:%s, pod:%s, err:%v", sidecarset.Name, pod.Name, err)
 			return err
 		}
-		p.updateExpectations.ExpectUpdated(sidecarset.Name, sidecarcontrol.GetSidecarSetRevision(sidecarset), pod)
+		sidecarcontrol.UpdateExpectations.ExpectUpdated(sidecarset.Name, sidecarcontrol.GetSidecarSetRevision(sidecarset), pod)
 	}
 
 	klog.V(3).Infof("sidecarSet(%s) updated pods(%s)", sidecarset.Name, strings.Join(podNames, ","))
