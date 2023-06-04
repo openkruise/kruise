@@ -153,7 +153,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
-			ginkgo.By("Delete the PV bounded to PVC")
+			ginkgo.By("Delete the PVC just created")
 			err = c.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(3 * time.Second)
