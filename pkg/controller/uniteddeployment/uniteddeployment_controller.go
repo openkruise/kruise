@@ -222,9 +222,10 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
-	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
+	nextUpdate := getNextUpdate(instance, nextReplicas, nextPartitions)
+	klog.V(4).Infof("Get UnitedDeployment %s/%s next update %v", instance.Namespace, instance.Name, nextUpdate)
 
-	newStatus, err := r.manageSubsets(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
+	newStatus, err := r.manageSubsets(instance, nameToSubset, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
@@ -271,6 +272,19 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[str
 	}
 
 	return &partitions
+}
+
+func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32, nextPartitions *map[string]int32) map[string]SubsetUpdate {
+	next := make(map[string]SubsetUpdate)
+	for _, subset := range ud.Spec.Topology.Subsets {
+		t := SubsetUpdate{}
+		t.Replicas = (*nextReplicas)[subset.Name]
+		t.Partition = (*nextPartitions)[subset.Name]
+		t.Patch = string(subset.Patch.Raw)
+
+		next[subset.Name] = t
+	}
+	return next
 }
 
 func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {

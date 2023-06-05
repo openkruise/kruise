@@ -52,6 +52,13 @@ type SubsetUpdateStrategy struct {
 	Partition int32
 }
 
+// SubsetUpdate stores the subset field that may need to be updated
+type SubsetUpdate struct {
+	Replicas  int32
+	Partition int32
+	Patch     string
+}
+
 // ResourceRef stores the Subset resource it represents.
 type ResourceRef struct {
 	Resources []metav1.Object

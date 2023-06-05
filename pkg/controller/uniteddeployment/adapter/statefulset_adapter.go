@@ -18,7 +18,10 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -157,6 +160,26 @@ func (a *StatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, su
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
+	if subSetConfig.Patch.Raw != nil {
+		TemplateSpecBytes, _ := json.Marshal(set.Spec.Template)
+		modified, err := strategicpatch.StrategicMergePatch(TemplateSpecBytes, subSetConfig.Patch.Raw, &corev1.PodTemplateSpec{})
+		if err != nil {
+			klog.Errorf("failed to merge patch raw %s", subSetConfig.Patch.Raw)
+			return err
+		}
+		patchedTemplateSpec := corev1.PodTemplateSpec{}
+		if err = json.Unmarshal(modified, &patchedTemplateSpec); err != nil {
+			klog.Errorf("failed to unmarshal %s to podTemplateSpec", modified)
+			return err
+		}
+
+		set.Spec.Template = patchedTemplateSpec
+		klog.V(2).Infof("StatefulSet [%s/%s] was patched successfully: %s", set.Namespace, set.GenerateName, subSetConfig.Patch.Raw)
+	}
+	if set.Annotations == nil {
+		set.Annotations = make(map[string]string)
+	}
+	set.Annotations[alpha1.AnnotationSubsetPatchKey] = string(subSetConfig.Patch.Raw)
 
 	return nil
 }

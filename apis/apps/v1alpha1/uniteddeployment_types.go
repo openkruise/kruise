@@ -21,6 +21,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -187,6 +188,13 @@ type Subset struct {
 	// Controller will try to keep all the subsets with nil replicas have average pods.
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
+	// Patch indicates patching to the templateSpec.
+	// Patch takes precedence over other fields
+	// If the Patch also modifies the Replicas, NodeSelectorTerm or Tolerations, use value in the Patch
+	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
+	Patch runtime.RawExtension `json:"patch,omitempty"`
 }
 
 // UnitedDeploymentStatus defines the observed state of UnitedDeployment.
