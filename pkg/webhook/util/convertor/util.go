@@ -36,6 +36,15 @@ func ConvertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec
 	return coreTemplate, nil
 }
 
+func ConvertPod(pod *v1.Pod) (*core.Pod, error) {
+	corePod := &core.Pod{}
+	defaults.SetDefaultPodSpec(&pod.Spec)
+	if err := corev1.Convert_v1_Pod_To_core_Pod(pod.DeepCopy(), corePod, nil); err != nil {
+		return nil, err
+	}
+	return corePod, nil
+}
+
 func ConvertCoreVolumes(volumes []v1.Volume) ([]core.Volume, error) {
 	coreVolumes := []core.Volume{}
 	for _, volume := range volumes {

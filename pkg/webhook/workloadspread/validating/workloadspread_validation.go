@@ -18,12 +18,18 @@ package validating
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -75,7 +81,7 @@ func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, exp
 
 func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *appsv1alpha1.WorkloadSpread) field.ErrorList {
 	// validate ws.spec.
-	allErrs := h.validateWorkloadSpreadSpec(obj, field.NewPath("spec"))
+	allErrs := validateWorkloadSpreadSpec(h, obj, field.NewPath("spec"))
 
 	// validate whether ws.spec.targetRef is in conflict with others.
 	wsList := &appsv1alpha1.WorkloadSpreadList{}
@@ -88,9 +94,10 @@ func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *apps
 	return allErrs
 }
 
-func (h *WorkloadSpreadCreateUpdateHandler) validateWorkloadSpreadSpec(obj *appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
+	var workloadTemplate client.Object
 
 	// validate targetRef
 	if spec.TargetReference == nil {
@@ -104,26 +111,51 @@ func (h *WorkloadSpreadCreateUpdateHandler) validateWorkloadSpreadSpec(obj *apps
 				ok, err := verifyGroupKind(spec.TargetReference, controllerKruiseKindCS.Kind, []string{controllerKruiseKindCS.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for CloneSet."))
+				} else {
+					set := &appsv1alpha1.CloneSet{}
+					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+						workloadTemplate = set
+					}
 				}
 			case controllerKindDep.Kind:
 				ok, err := verifyGroupKind(spec.TargetReference, controllerKindDep.Kind, []string{controllerKindDep.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Deployment."))
+				} else {
+					set := &appsv1.Deployment{}
+					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+						workloadTemplate = set
+					}
 				}
 			case controllerKindRS.Kind:
 				ok, err := verifyGroupKind(spec.TargetReference, controllerKindRS.Kind, []string{controllerKindRS.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for ReplicaSet."))
+				} else {
+					set := &appsv1.ReplicaSet{}
+					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+						workloadTemplate = set
+					}
 				}
 			case controllerKindJob.Kind:
 				ok, err := verifyGroupKind(spec.TargetReference, controllerKindJob.Kind, []string{controllerKindJob.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
+				} else {
+					set := &batchv1.Job{}
+					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+						workloadTemplate = set
+					}
 				}
 			case controllerKindSts.Kind:
 				ok, err := verifyGroupKind(spec.TargetReference, controllerKindSts.Kind, []string{controllerKindSts.Group, controllerKruiseKindAlphaSts.Group, controllerKruiseKindBetaSts.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
+				} else {
+					set := &appsv1.StatefulSet{}
+					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, workloadTemplate); getErr == nil {
+						workloadTemplate = set
+					}
 				}
 			default:
 				whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(h.Client)
@@ -145,7 +177,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) validateWorkloadSpreadSpec(obj *apps
 	}
 
 	// validate subsets
-	allErrs = append(allErrs, validateWorkloadSpreadSubsets(obj, spec.Subsets, fldPath.Child("subsets"))...)
+	allErrs = append(allErrs, validateWorkloadSpreadSubsets(obj, spec.Subsets, workloadTemplate, fldPath.Child("subsets"))...)
 
 	// validate scheduleStrategy
 	if spec.ScheduleStrategy.Type != "" &&
@@ -183,7 +215,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) validateWorkloadSpreadSpec(obj *apps
 	return allErrs
 }
 
-func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []appsv1alpha1.WorkloadSpreadSubset, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []appsv1alpha1.WorkloadSpreadSubset, workloadTemplate client.Object, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	//if len(subsets) < 2 {
@@ -254,6 +286,39 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 		}
 
 		//TODO validate patch
+		if subset.Patch.Raw != nil {
+			// In the case the WorkloadSpread is created before the workload,so no workloadTemplate is obtained, skip the remaining checks.
+			if workloadTemplate != nil {
+				// get the PodTemplateSpec from the workload
+				var podSpec v1.PodTemplateSpec
+				switch workloadTemplate.GetObjectKind().GroupVersionKind() {
+				case controllerKruiseKindCS:
+					podSpec = workloadTemplate.(*appsv1alpha1.CloneSet).Spec.Template
+				case controllerKindDep:
+					podSpec = workloadTemplate.(*appsv1.Deployment).Spec.Template
+				case controllerKindRS:
+					podSpec = workloadTemplate.(*appsv1.ReplicaSet).Spec.Template
+				case controllerKindJob:
+					podSpec = workloadTemplate.(*batchv1.Job).Spec.Template
+				case controllerKindSts:
+					podSpec = workloadTemplate.(*appsv1.StatefulSet).Spec.Template
+				}
+				podBytes, _ := json.Marshal(podSpec)
+				modified, err := strategicpatch.StrategicMergePatch(podBytes, subset.Patch.Raw, &v1.Pod{})
+				if err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("patch"), string(subset.Patch.Raw), fmt.Sprintf("failed to merge patch: %v", err)))
+				}
+				newPod := &v1.Pod{}
+				if err = json.Unmarshal(modified, newPod); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("patch"), string(subset.Patch.Raw), fmt.Sprintf("failed to unmarshal: %v", err)))
+				}
+				coreNewPod, CovErr := convertor.ConvertPod(newPod)
+				if CovErr != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("patch"), newPod, fmt.Sprintf("Convert_v1_Pod_To_core_Pod failed: %v", err)))
+				}
+				allErrs = append(allErrs, corevalidation.ValidatePodSpec(&coreNewPod.Spec, &coreNewPod.ObjectMeta, fldPath.Index(i).Child("patch"), webhookutil.DefaultPodValidationOptions)...)
+			}
+		}
 
 		//1. All subset maxReplicas must be the same type: int or percent.
 		//2. Adaptive: the last subset must be not specified.
