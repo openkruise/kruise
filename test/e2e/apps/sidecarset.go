@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -739,6 +740,8 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
 				gomega.Expect(pod.Spec.Containers[0].Image).Should(gomega.Equal(BusyboxImage))
+				_, sidecarSetUpgradable := podutil.GetPodCondition(&pod.Status, sidecarcontrol.SidecarSetUpgradable)
+				gomega.Expect(sidecarSetUpgradable.Status).Should(gomega.Equal(corev1.ConditionTrue))
 			}
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image done"))
 		})
