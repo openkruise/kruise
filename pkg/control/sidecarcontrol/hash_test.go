@@ -21,9 +21,9 @@ func TestSidecarSetHash(t *testing.T) {
 						Image: "test-image",
 					},
 				},
+			},
 		},
-	},
-}
+	}
 
 	hash, err := SidecarSetHash(sidecarSet)
 	if err != nil {
@@ -59,9 +59,9 @@ func TestSidecarSetHashWithoutImage(t *testing.T) {
 						Image: "test-image",
 					},
 				},
+			},
 		},
-	},
-}
+	}
 
 	hash, err := SidecarSetHashWithoutImage(sidecarSet)
 	if err != nil {
