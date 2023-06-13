@@ -59,10 +59,16 @@ func (n subsetInfos) Swap(i, j int) {
 // new replicas indicated from UnitedDeployment.Spec.Topology.Subsets.
 func GetAllocatedReplicas(nameToSubset *map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) (*map[string]int32, error) {
 	subsetInfos := getSubsetInfos(nameToSubset, ud)
-	specifiedReplicas := getSpecifiedSubsetReplicas(ud)
 
+	var expectedReplicas int32 = -1
+	if ud.Spec.Replicas != nil {
+		expectedReplicas = *ud.Spec.Replicas
+	}
+
+	specifiedReplicas := getSpecifiedSubsetReplicas(expectedReplicas, ud)
+	klog.V(4).Infof("UnitedDeployment %s/%s specifiedReplicas: %v", ud.Namespace, ud.Name, specifiedReplicas)
 	// call SortToAllocator to sort all subset by subset.Replicas in order of increment
-	return subsetInfos.SortToAllocator().AllocateReplicas(*ud.Spec.Replicas, specifiedReplicas)
+	return subsetInfos.SortToAllocator().AllocateReplicas(expectedReplicas, specifiedReplicas)
 }
 
 func (n subsetInfos) SortToAllocator() *replicasAllocator {
@@ -84,27 +90,29 @@ func (s *replicasAllocator) validateReplicas(replicas int32, subsetReplicasLimit
 		specifiedReplicas += replicas
 	}
 
-	if specifiedReplicas > replicas {
-		return fmt.Errorf("specified subsets' replica (%d) is greater than UnitedDeployment replica (%d)",
-			specifiedReplicas, replicas)
-	} else if specifiedReplicas < replicas {
-		specifiedCount := 0
-		for _, subset := range *s.subsets {
-			if _, exist := (*subsetReplicasLimits)[subset.SubsetName]; exist {
-				specifiedCount++
-			}
+	specifiedCount := 0
+	for _, subset := range *s.subsets {
+		if _, exist := (*subsetReplicasLimits)[subset.SubsetName]; exist {
+			specifiedCount++
 		}
-
-		if specifiedCount == len(*s.subsets) {
+	}
+	klog.V(4).Infof("specifiedCount: %d, len(*s.subsets): %d", specifiedCount, len(*s.subsets))
+	if replicas != -1 {
+		if specifiedReplicas > replicas {
+			return fmt.Errorf("specified subsets' replica (%d) is greater than UnitedDeployment replica (%d)",
+				specifiedReplicas, replicas)
+		} else if specifiedReplicas < replicas && specifiedCount == len(*s.subsets) {
 			return fmt.Errorf("specified subsets' replica (%d) is less than UnitedDeployment replica (%d)",
 				specifiedReplicas, replicas)
 		}
+	} else if specifiedCount != len(*s.subsets) {
+		return fmt.Errorf("all subsets must be specified when UnitedDeployment replica is unspecified")
 	}
 
 	return nil
 }
 
-func getSpecifiedSubsetReplicas(ud *appsv1alpha1.UnitedDeployment) *map[string]int32 {
+func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1alpha1.UnitedDeployment) *map[string]int32 {
 	replicaLimits := map[string]int32{}
 	if ud.Spec.Topology.Subsets == nil {
 		return &replicaLimits
@@ -115,7 +123,7 @@ func getSpecifiedSubsetReplicas(ud *appsv1alpha1.UnitedDeployment) *map[string]i
 			continue
 		}
 
-		if specifiedReplicas, err := ParseSubsetReplicas(*ud.Spec.Replicas, *subsetDef.Replicas); err == nil {
+		if specifiedReplicas, err := ParseSubsetReplicas(replicas, *subsetDef.Replicas); err == nil {
 			replicaLimits[subsetDef.Name] = specifiedReplicas
 		} else {
 			klog.Warningf("Fail to consider the replicas of subset %s when parsing replicaLimits during managing replicas of UnitedDeployment %s/%s: %s",

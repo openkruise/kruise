@@ -54,6 +54,34 @@ func TestValidateUnitedDeployment(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+				Topology: appsv1alpha1.Topology{
+					Subsets: []appsv1alpha1.Subset{
+						{
+							Name:     "subset1",
+							Replicas: &replicas1,
+						},
+						{
+							Name:     "subset2",
+							Replicas: &replicas1,
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
 				Replicas: &val,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: appsv1alpha1.SubsetTemplate{
@@ -424,6 +452,34 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				},
 			},
 		},
+		"subset replicas type is percent when spec replicas not set": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+						Spec: apps.StatefulSetSpec{
+							Template: validPodTemplate.Template,
+						},
+					},
+				},
+				Topology: appsv1alpha1.Topology{
+					Subsets: []appsv1alpha1.Subset{
+						{
+							Name:     "subset1",
+							Replicas: &replicas2,
+						},
+						{
+							Name:     "subset2",
+							Replicas: &replicas1,
+						},
+					},
+				},
+			},
+		},
 		"partition not exist": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: appsv1alpha1.UnitedDeploymentSpec{
@@ -583,6 +639,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 					field != "spec.topology.subsets" &&
 					field != "spec.topology.subsets[0]" &&
 					field != "spec.topology.subsets[0].name" &&
+					field != "spec.topology.subsets[0].replicas" &&
 					field != "spec.updateStrategy.partitions" &&
 					field != "spec.topology.subsets[0].nodeSelectorTerm.matchExpressions[0].values" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
@@ -974,10 +1031,6 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 }
 
 func setTestDefault(obj *appsv1alpha1.UnitedDeployment) {
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
-	}
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
