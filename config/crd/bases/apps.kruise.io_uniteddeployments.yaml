@@ -1187,6 +1187,10 @@ spec:
                 description: CurrentRevision, if not empty, indicates the current
                   version of the UnitedDeployment.
                 type: string
+              labelSelector:
+                description: LabelSelector is label selectors for query over pods
+                  that should match the replica count used by HPA.
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the most recent generation observed
                   for this UnitedDeployment. It corresponds to the UnitedDeployment's
@@ -1240,7 +1244,7 @@ spec:
     storage: true
     subresources:
       scale:
-        labelSelectorPath: .status.selector
+        labelSelectorPath: .status.labelSelector
         specReplicasPath: .spec.replicas
         statusReplicasPath: .status.replicas
       status: {}

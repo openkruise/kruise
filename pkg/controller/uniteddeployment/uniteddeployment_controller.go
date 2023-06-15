@@ -22,12 +22,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +34,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -231,6 +233,14 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
 		return reconcile.Result{}, err
 	}
+
+	selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
+	if err != nil {
+		klog.Errorf("Error converting UnitedDeployment %s selector: %v", request, err)
+		// This is a non-transient error, so don't retry.
+		return reconcile.Result{}, nil
+	}
+	newStatus.LabelSelector = selector.String()
 
 	return r.updateStatus(instance, newStatus, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount, control)
 }
@@ -426,6 +436,7 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 		oldStatus.UpdatedReadyReplicas == newStatus.UpdatedReadyReplicas &&
 		oldStatus.CurrentRevision == newStatus.CurrentRevision &&
 		oldStatus.CollisionCount == newStatus.CollisionCount &&
+		oldStatus.LabelSelector == newStatus.LabelSelector &&
 		ud.Generation == newStatus.ObservedGeneration &&
 		reflect.DeepEqual(oldStatus.SubsetReplicas, newStatus.SubsetReplicas) &&
 		reflect.DeepEqual(oldStatus.UpdateStatus, newStatus.UpdateStatus) &&

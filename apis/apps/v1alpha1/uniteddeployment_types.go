@@ -17,12 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // UpdateStrategyType is a string enumeration type that enumerates
@@ -238,6 +239,9 @@ type UnitedDeploymentStatus struct {
 	// Records the information of update progress.
 	// +optional
 	UpdateStatus *UpdateStatus `json:"updateStatus,omitempty"`
+
+	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
+	LabelSelector string `json:"labelSelector,omitempty"`
 }
 
 // UnitedDeploymentCondition describes current state of a UnitedDeployment.
@@ -275,7 +279,7 @@ type UpdateStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
 // +kubebuilder:resource:shortName=ud
 // +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".spec.replicas",description="The desired number of pods."
 // +kubebuilder:printcolumn:name="CURRENT",type="integer",JSONPath=".status.replicas",description="The number of currently all pods."
