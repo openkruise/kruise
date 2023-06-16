@@ -403,6 +403,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			status.ReadyReplicas++
 			if getPodRevision(pods[i]) == updateRevision.Name {
 				status.UpdatedReadyReplicas++
+				if avail, _ := isRunningAndAvailable(pods[i], minReadySeconds); avail {
+					status.UpdatedAvailableReplicas++
+				}
 			}
 			if avail, _ := isRunningAndAvailable(pods[i], minReadySeconds); avail {
 				status.AvailableReplicas++
