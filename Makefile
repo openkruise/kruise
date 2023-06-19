@@ -109,8 +109,40 @@ set -e ;\
 TMP_DIR=$$(mktemp -d) ;\
 cd $$TMP_DIR ;\
 go mod init tmp ;\
-echo "Downloading $(2)" ;\
+echo "Downloading $(2) to $(PROJECT_DIR)/bin" ;\
 GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
+
+# create-cluster creates a kube cluster with kind.
+.PHONY: create-cluster
+create-cluster: $(tools/kind)
+	tools/hack/create-cluster.sh
+
+# delete-cluster deletes a kube cluster.
+.PHONY: delete-cluster
+delete-cluster: $(tools/kind) ## Delete kind cluster.
+	$(tools/kind) delete cluster --name ci-testing
+
+# kube-load-image loads a local built docker image into kube cluster.
+.PHONY: kube-load-image
+kube-load-image: $(tools/kind)
+	tools/hack/kind-load-image.sh $(IMG)
+
+# install-kruise install kruise with local build image to kube cluster.
+.PHONY: install-kruise
+install-kruise:
+	tools/hack/install-kruise.sh $(IMG)
+
+# run-kruise-e2e-test starts to run kruise e2e tests.
+.PHONY: run-kruise-e2e-test
+run-kruise-e2e-test:
+	@echo -e "\n\033[36mRunning kruise e2e tests...\033[0m"
+	tools/hack/run-kruise-e2e-test.sh
+
+include tools/tools.mk
+
+# kruise-e2e-test runs kruise e2e tests.
+.PHONY: kruise-e2e-test
+kruise-e2e-test: $(tools/kind) delete-cluster create-cluster docker-build kube-load-image install-kruise run-kruise-e2e-test delete-cluster
