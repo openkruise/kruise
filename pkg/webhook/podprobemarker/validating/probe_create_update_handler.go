@@ -187,9 +187,13 @@ func validateHandler(handler *corev1.Handler, fldPath *field.Path) field.ErrorLi
 		numHandlers++
 		allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
 	}
-	if handler.HTTPGet != nil || handler.TCPSocket != nil {
+	if handler.HTTPGet != nil {
 		numHandlers++
-		allErrors = append(allErrors, field.Forbidden(fldPath.Child("probe"), "current only support exec probe"))
+		allErrors = append(allErrors, validateHTTPGetAction(handler.HTTPGet, fldPath.Child("httpGet"))...)
+	}
+	if handler.TCPSocket != nil {
+		numHandlers++
+		allErrors = append(allErrors, validateTCPSocketAction(handler.TCPSocket, fldPath.Child("tcpSocket"))...)
 	}
 	if numHandlers == 0 {
 		allErrors = append(allErrors, field.Required(fldPath, "must specify a handler type"))
@@ -201,6 +205,25 @@ func validateExecAction(exec *corev1.ExecAction, fldPath *field.Path) field.Erro
 	allErrors := field.ErrorList{}
 	if len(exec.Command) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("command"), ""))
+	}
+	return allErrors
+}
+
+func validateHTTPGetAction(httpGet *corev1.HTTPGetAction, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if httpGet.Port.IntValue() == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("port"), ""))
+	}
+	if httpGet.Path == "" {
+		allErrors = append(allErrors, field.Required(fldPath.Child("path"), ""))
+	}
+	return allErrors
+}
+
+func validateTCPSocketAction(tcpSocket *corev1.TCPSocketAction, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if tcpSocket.Port.IntValue() == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("port"), ""))
 	}
 	return allErrors
 }

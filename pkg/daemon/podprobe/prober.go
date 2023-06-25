@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -28,6 +30,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
+	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
 )
 
@@ -36,6 +40,8 @@ const maxProbeMessageLength = 1024
 // Prober helps to check the probe(exec, http, tcp) of a container.
 type prober struct {
 	exec           execprobe.Prober
+	tcp            tcpprobe.Prober
+	http           httpprobe.Prober
 	runtimeService criapi.RuntimeService
 }
 
@@ -44,13 +50,15 @@ type prober struct {
 func newProber(runtimeService criapi.RuntimeService) *prober {
 	return &prober{
 		exec:           execprobe.New(),
+		tcp:            tcpprobe.New(),
+		http:           httpprobe.New(false),
 		runtimeService: runtimeService,
 	}
 }
 
 // probe probes the container.
-func (pb *prober) probe(p *appsv1alpha1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string) (appsv1alpha1.ProbeState, string, error) {
-	result, msg, err := pb.runProbe(p, container, containerID)
+func (pb *prober) probe(p *appsv1alpha1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string, hostIP string) (appsv1alpha1.ProbeState, string, error) {
+	result, msg, err := pb.runProbe(p, container, containerID, hostIP)
 	if bytes.Count([]byte(msg), nil)-1 > maxProbeMessageLength {
 		msg = msg[:maxProbeMessageLength]
 	}
@@ -60,17 +68,40 @@ func (pb *prober) probe(p *appsv1alpha1.ContainerProbeSpec, container *runtimeap
 	return appsv1alpha1.ProbeSucceeded, msg, nil
 }
 
-func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string) (probe.Result, string, error) {
+func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string, hostIP string) (probe.Result, string, error) {
 	timeSecond := p.TimeoutSeconds
 	if timeSecond <= 0 {
 		timeSecond = 1
 	}
 	timeout := time.Duration(timeSecond) * time.Second
-	// current only support exec
-	// todo: http, tcp
+	// for probing using exec method
 	if p.Exec != nil {
 		return pb.exec.Probe(pb.newExecInContainer(containerID, p.Exec.Command, timeout))
 	}
+
+	// for probing using tcp method
+	if p.TCPSocket.Port.IntVal != 0 {
+		if p.TCPSocket.Host != "" {
+			return pb.tcp.Probe(p.TCPSocket.Host, p.TCPSocket.Port.IntValue(), timeout)
+		} else {
+			return pb.tcp.Probe(hostIP, p.TCPSocket.Port.IntValue(), timeout)
+		}
+	}
+
+	// for probing using http method
+	if p.HTTPGet.Path != "" {
+		var u url.URL
+		var header http.Header
+		u.Scheme = "http"
+		u.Path = p.HTTPGet.Path
+		if p.HTTPGet.Host != "" {
+			u.Host = p.HTTPGet.Host
+		} else {
+			u.Host = hostIP
+		}
+		return pb.http.Probe(&u, header, timeout)
+	}
+
 	klog.InfoS("Failed to find probe builder for container", "containerName", container.Metadata.Name)
 	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s", container.Metadata.Name)
 }

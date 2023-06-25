@@ -119,6 +119,12 @@ func (w *worker) doProbe() (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
 
+	podIp, err := w.probeController.fetchPodIp(w.key.podUID, w.key.podName, w.key.podNs)
+	if err != nil {
+		klog.Errorf("Pod(%s/%s) fetchPodIP failed: %s", w.key.podNs, w.key.podName, err.Error())
+		return true
+	}
+
 	container, _ := w.probeController.fetchLatestPodContainer(w.key.podUID, w.key.containerName)
 	if container == nil {
 		klog.V(5).Infof("Pod(%s/%s) container(%s) Not Found", w.key.podNs, w.key.podName, w.key.containerName)
@@ -152,7 +158,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 
 	// the full container environment here, OR we must make a call to the CRI in order to get those environment
 	// values from the running container.
-	result, msg, err := w.probeController.prober.probe(w.spec, container, w.containerID)
+	result, msg, err := w.probeController.prober.probe(w.spec, container, w.containerID, podIp) //Main Line
 	if err != nil {
 		klog.Errorf("Pod(%s/%s) do container(%s) probe(%s) spec(%s) failed: %s",
 			w.key.podNs, w.key.podName, w.key.containerName, w.key.probeName, util.DumpJSON(w.spec), err.Error())

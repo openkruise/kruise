@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -88,6 +89,8 @@ type Controller struct {
 	nodeName string
 	// kruise daemon start time
 	start time.Time
+	// runtime client
+	runtimeClient runtimeclient.Client
 }
 
 // NewController returns the controller for pod probe
@@ -126,6 +129,7 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 		nodeName:             nodeName,
 		eventRecorder:        recorder,
 		start:                time.Now(),
+		runtimeClient:        opts.RuntimeClient,
 	}
 	c.prober = newProber(c.runtimeFactory.GetRuntimeService())
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -405,6 +409,25 @@ func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.C
 		containerStatus, err = runtimeService.ContainerStatus(container.Id)
 	}
 	return containerStatus, err
+}
+
+func (c *Controller) fetchPodIp(podUID, name, namespace string) (string, error) {
+
+	podList := &corev1.PodList{}
+	err := c.runtimeClient.List(context.TODO(), podList, runtimeclient.MatchingFields{"metadata.name": name, "metadata.namespace": namespace})
+
+	if err != nil {
+		klog.Errorf("Failed to fetch pod list in namespace %s: %v", namespace, err)
+		return "", err
+	}
+
+	for _, pod := range podList.Items {
+		if string(pod.UID) == podUID {
+			klog.Info("pod ip is ", pod.Status.PodIP)
+			return pod.Status.PodIP, nil
+		}
+	}
+	return "", fmt.Errorf("pod %s with Uid %s not found in namespace %s", name, podUID, namespace)
 }
 
 func updateNodePodProbeStatus(update Update, newStatus *appsv1alpha1.NodePodProbeStatus) {
