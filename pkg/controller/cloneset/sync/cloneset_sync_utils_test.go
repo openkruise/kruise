@@ -25,6 +25,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/revision"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		pods               []*v1.Pod
 		revisionConsistent bool
 		disableFeatureGate bool
+		isPodUpdate        IsPodUpdateFunc
 		expectResult       expectationDiffs
 	}{
 		{
@@ -904,7 +906,33 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			},
 			expectResult: expectationDiffs{},
 		},
+		{
+			name:      "[scalingWithPreparingUpdate=true] scaling up when a preparing pod is not updated, and expected-updated is 1",
+			set:       createTestCloneSet(4, intstr.FromString("90%"), intstr.FromInt(1), intstr.FromInt(0)),
+			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStatePreparingUpdate, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			isPodUpdate:  revision.IsPodUpdate,
+			expectResult: expectationDiffs{scaleUpNum: 1, scaleUpLimit: 1, scaleUpNumOldRevision: 1},
+		},
+		{
+			name:      "[scalingWithPreparingUpdate=true] scaling up when a preparing pod is not updated, and expected-updated is 2",
+			set:       createTestCloneSet(4, intstr.FromInt(2), intstr.FromInt(1), intstr.FromInt(0)),
+			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStatePreparingUpdate, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			isPodUpdate:  revision.IsPodUpdate,
+			expectResult: expectationDiffs{scaleUpNum: 1, scaleUpLimit: 1},
+		},
 	}
+
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreparingUpdateAsUpdate, true)()
 
 	for i := range cases {
 		t.Run(cases[i].name, func(t *testing.T) {
@@ -923,7 +951,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				}
 				cases[i].set.Labels[key] = value
 			}
-			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision)
+			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision, cases[i].isPodUpdate)
 			if !reflect.DeepEqual(res, cases[i].expectResult) {
 				t.Errorf("got %#v, expect %#v", res, cases[i].expectResult)
 			}

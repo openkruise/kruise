@@ -147,14 +147,18 @@ func (t *CloneSetTester) DeleteCloneSet(name string) error {
 	return t.kc.AppsV1alpha1().CloneSets(t.ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
-func (s *CloneSetTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]v1.Pod, error) {
+func (t *CloneSetTester) GetSelectorPods(namespace string, selector *metav1.LabelSelector) ([]v1.Pod, error) {
 	faster, err := util.ValidatedLabelSelectorAsSelector(selector)
 	if err != nil {
 		return nil, err
 	}
-	podList, err := s.c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: faster.String()})
+	podList, err := t.c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: faster.String()})
 	if err != nil {
 		return nil, err
 	}
 	return podList.Items, nil
+}
+
+func (t *CloneSetTester) DeletePod(name string) error {
+	return t.c.CoreV1().Pods(t.ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }

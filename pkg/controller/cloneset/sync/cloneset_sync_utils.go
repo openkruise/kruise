@@ -86,9 +86,11 @@ func (e expectationDiffs) isEmpty() bool {
 	return reflect.DeepEqual(e, expectationDiffs{})
 }
 
+type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
+
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string) (res expectationDiffs) {
+func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
@@ -117,18 +119,30 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		}
 		klog.V(1).Infof("Calculate diffs for CloneSet %s/%s, replicas=%d, partition=%d, maxSurge=%d, maxUnavailable=%d,"+
 			" allPods=%d, newRevisionPods=%d, newRevisionActivePods=%d, oldRevisionPods=%d, oldRevisionActivePods=%d,"+
-			" unavailableNewRevisionCount=%d, unavailableOldRevisionCount=%d,"+
-			" preDeletingNewRevisionCount=%d, preDeletingOldRevisionCount=%d, toDeleteNewRevisionCount=%d, toDeleteOldRevisionCount=%d."+
+			" unavailableNewRevisionCount=%d, unavailableOldRevisionCount=%d, preDeletingNewRevisionCount=%d, preDeletingOldRevisionCount=%d,"+
+			" toDeleteNewRevisionCount=%d, toDeleteOldRevisionCount=%d, enabledPreparingUpdateAsUpdate=%v, useDefaultIsPodUpdate=%v."+
 			" Result: %+v",
 			cs.Namespace, cs.Name, replicas, partition, maxSurge, maxUnavailable,
 			len(pods), newRevisionCount, newRevisionActiveCount, oldRevisionCount, oldRevisionActiveCount,
-			unavailableNewRevisionCount, unavailableOldRevisionCount,
-			preDeletingNewRevisionCount, preDeletingOldRevisionCount, toDeleteNewRevisionCount, toDeleteOldRevisionCount,
+			unavailableNewRevisionCount, unavailableOldRevisionCount, preDeletingNewRevisionCount, preDeletingOldRevisionCount,
+			toDeleteNewRevisionCount, toDeleteOldRevisionCount, utilfeature.DefaultFeatureGate.Enabled(features.PreparingUpdateAsUpdate), isPodUpdate == nil,
 			res)
 	}()
 
+	// If PreparingUpdateAsUpdate feature gate is enabled:
+	// - when scaling, we hope the preparing-update pods should be regarded as update-revision pods,
+	//   the isPodUpdate parameter will be IsPodUpdate function in pkg/util/revision/revision.go file;
+	// - when updating, we hope the preparing-update pods should be regarded as current-revision pods,
+	//   the isPodUpdate parameter will be EqualToRevisionHash function by default;
+	if isPodUpdate == nil {
+		isPodUpdate = func(pod *v1.Pod, updateRevision string) bool {
+			return clonesetutils.EqualToRevisionHash("", pod, updateRevision)
+		}
+	}
+
 	for _, p := range pods {
-		if clonesetutils.EqualToRevisionHash("", p, updateRevision) {
+		if isPodUpdate(p, updateRevision) {
+
 			newRevisionCount++
 
 			switch state := lifecycle.GetPodLifecycleState(p); state {
