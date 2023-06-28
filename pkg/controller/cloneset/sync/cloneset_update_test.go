@@ -1217,7 +1217,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 
 		replicas := int32(tc.totalReplicas)
 		cs := &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: &replicas, UpdateStrategy: tc.strategy}}
-		diffRes := calculateDiffsWithExpectation(cs, tc.pods, currentRevision, updateRevision)
+		diffRes := calculateDiffsWithExpectation(cs, tc.pods, currentRevision, updateRevision, nil)
 
 		var waitUpdateIndexes []int
 		var targetRevision string

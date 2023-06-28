@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/revision"
 	"github.com/openkruise/kruise/pkg/util/updatesort"
 )
 
@@ -54,7 +55,7 @@ func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSe
 		}
 		if isTerminating(replicas[target]) {
 			updatedIdxs = append(updatedIdxs, target)
-		} else if getPodRevision(replicas[target]) == updateRevision {
+		} else if revision.IsPodUpdate(replicas[target], updateRevision) {
 			updatedIdxs = append(updatedIdxs, target)
 		} else {
 			waitUpdateIdxs = append(waitUpdateIdxs, target)

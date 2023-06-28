@@ -40,6 +40,7 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/revision"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion)
@@ -486,7 +487,7 @@ func isCurrentRevisionNeeded(set *appsv1beta1.StatefulSet, updateRevision string
 		if pod == nil || i == ordinal {
 			continue
 		}
-		if getPodRevision(pod) != updateRevision {
+		if !revision.IsPodUpdate(pod, updateRevision) {
 			noUpdatedReplicas++
 		}
 	}

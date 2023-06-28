@@ -28,6 +28,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
+	"github.com/openkruise/kruise/pkg/util/revision"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,6 +138,17 @@ func SplitPodsByRevision(pods []*v1.Pod, rev string) (matched, unmatched []*v1.P
 			matched = append(matched, p)
 		} else {
 			unmatched = append(unmatched, p)
+		}
+	}
+	return
+}
+
+func GroupUpdateAndNotUpdatePods(pods []*v1.Pod, updateRevision string) (update, notUpdate []*v1.Pod) {
+	for _, p := range pods {
+		if revision.IsPodUpdate(p, updateRevision) {
+			update = append(update, p)
+		} else {
+			notUpdate = append(notUpdate, p)
 		}
 	}
 	return

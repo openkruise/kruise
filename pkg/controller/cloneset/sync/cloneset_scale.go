@@ -35,6 +35,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/revision"
 )
 
 const (
@@ -68,8 +69,8 @@ func (r *realControl) Scale(
 	}
 
 	// 2. calculate scale numbers
-	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision)
-	updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
+	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision, revision.IsPodUpdate)
+	updatedPods, notUpdatedPods := clonesetutils.GroupUpdateAndNotUpdatePods(pods, updateRevision)
 
 	if diffRes.scaleUpNum > diffRes.scaleUpLimit {
 		r.recorder.Event(updateCS, v1.EventTypeWarning, "ScaleUpLimited", fmt.Sprintf("scaleUp is limited because of scaleStrategy.maxUnavailable, limit: %d", diffRes.scaleUpLimit))
@@ -107,7 +108,7 @@ func (r *realControl) Scale(
 
 	// 5. specified delete
 	if podsToDelete := util.DiffPods(podsSpecifiedToDelete, podsInPreDelete); len(podsToDelete) > 0 {
-		newPodsToDelete, oldPodsToDelete := clonesetutils.SplitPodsByRevision(podsToDelete, updateRevision)
+		newPodsToDelete, oldPodsToDelete := clonesetutils.GroupUpdateAndNotUpdatePods(podsToDelete, updateRevision)
 		klog.V(3).Infof("CloneSet %s try to delete pods specified. Delete ready limit: %d. New Pods: %v, old Pods: %v.",
 			controllerKey, diffRes.deleteReadyLimit, util.GetPodNames(newPodsToDelete).List(), util.GetPodNames(oldPodsToDelete).List())
 

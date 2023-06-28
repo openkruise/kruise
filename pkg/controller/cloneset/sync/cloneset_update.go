@@ -78,7 +78,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	}
 
 	// 2. calculate update diff and the revision to update
-	diffRes := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name)
+	diffRes := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name, nil)
 	if diffRes.updateNum == 0 {
 		return nil
 	}

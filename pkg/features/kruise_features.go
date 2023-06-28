@@ -101,6 +101,10 @@ const (
 	// CloneSetEventHandlerOptimization enable optimization for cloneset-controller to reduce the
 	// queuing frequency cased by pod update.
 	CloneSetEventHandlerOptimization featuregate.Feature = "CloneSetEventHandlerOptimization"
+
+	// PreparingUpdateAsUpdate enable CloneSet/Advanced StatefulSet controller to regard preparing-update Pod
+	// as updated when calculating update/current revision during scaling.
+	PreparingUpdateAsUpdate featuregate.Feature = "PreparingUpdateAsUpdate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -124,6 +128,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PodProbeMarkerGate:                        {Default: true, PreRelease: featuregate.Alpha},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
+	PreparingUpdateAsUpdate:                   {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
