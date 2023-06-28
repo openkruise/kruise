@@ -104,6 +104,10 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	}
 	if cs.Spec.UpdateStrategy.MaxSurge != nil {
 		maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, replicas, true)
+		if cs.Spec.UpdateStrategy.Paused {
+			maxSurge = 0
+			klog.V(3).Infof("Because CloneSet(%s/%s) updateStrategy.paused=true, and Set maxSurge=0", cs.Namespace, cs.Name)
+		}
 	}
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), replicas, maxSurge == 0)

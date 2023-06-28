@@ -930,6 +930,16 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			isPodUpdate:  revision.IsPodUpdate,
 			expectResult: expectationDiffs{scaleUpNum: 1, scaleUpLimit: 1},
 		},
+		{
+			name: "[UpdateStrategyPaused=true] then scale up pods",
+			set:  setUpdateStrategyPaused(createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(0), intstr.FromInt(3)), true),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			expectResult: expectationDiffs{scaleUpNum: 2, scaleUpLimit: 2, updateNum: 3, updateMaxUnavailable: -2},
+		},
 	}
 
 	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreparingUpdateAsUpdate, true)()
@@ -991,4 +1001,14 @@ func createTestPod(revisionHash string, lifecycleState appspub.LifecycleStateTyp
 		pod.Labels[appsv1alpha1.SpecifiedDeleteKey] = "true"
 	}
 	return pod
+}
+
+func setUpdateStrategyPaused(cs *appsv1alpha1.CloneSet, paused bool) *appsv1alpha1.CloneSet {
+	cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+		Partition:      cs.Spec.UpdateStrategy.Partition,
+		MaxSurge:       cs.Spec.UpdateStrategy.MaxSurge,
+		MaxUnavailable: cs.Spec.UpdateStrategy.MaxUnavailable,
+		Paused:         paused,
+	}
+	return cs
 }
