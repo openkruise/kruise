@@ -217,6 +217,9 @@ func validateSidecarSetUpdateStrategy(strategy *appsv1alpha1.SidecarSetUpdateStr
 		if strategy.MaxUnavailable != nil {
 			allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*(strategy.MaxUnavailable), fldPath.Child("maxUnavailable"))...)
 		}
+		if err := strategy.PriorityStrategy.FieldsValidation(); err != nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("priorityStrategy"), err.Error()))
+		}
 		if strategy.ScatterStrategy != nil {
 			if err := strategy.ScatterStrategy.FieldsValidation(); err != nil {
 				allErrs = append(allErrs, field.Required(fldPath.Child("scatterStrategy"), err.Error()))

@@ -101,6 +101,11 @@ func SortUpdateIndexes(strategy appsv1alpha1.SidecarSetUpdateStrategy, pods []*c
 	//	- Empty creation time pods < newer pods < older pods
 	sort.Slice(waitUpdateIndexes, sidecarcontrol.GetPodsSortFunc(pods, waitUpdateIndexes))
 
+	//sort waitUpdateIndexes based on the priority rules
+	if strategy.PriorityStrategy != nil {
+		waitUpdateIndexes = updatesort.NewPrioritySorter(strategy.PriorityStrategy).Sort(pods, waitUpdateIndexes)
+	}
+
 	//sort waitUpdateIndexes based on the scatter rules
 	if strategy.ScatterStrategy != nil {
 		// convert regular terms to scatter terms
