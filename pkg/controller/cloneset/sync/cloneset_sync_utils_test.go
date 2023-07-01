@@ -940,6 +940,18 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			},
 			expectResult: expectationDiffs{scaleUpNum: 2, scaleUpLimit: 2, updateNum: 3, updateMaxUnavailable: -2},
 		},
+		{
+			name: "[UpdateStrategyPaused=true] then scale down pods",
+			set:  setUpdateStrategyPaused(createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(0), intstr.FromInt(3)), true),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			expectResult: expectationDiffs{scaleDownNum: 2, scaleDownNumOldRevision: 5, deleteReadyLimit: 2, updateNum: 3, updateMaxUnavailable: 2},
+		},
 	}
 
 	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreparingUpdateAsUpdate, true)()
