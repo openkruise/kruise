@@ -225,6 +225,9 @@ func CreatesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invarian
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
+	if set.Status.UpdatedAvailableReplicas != 3 {
+		t.Error("Failed to set UpdatedAvailbleReplicas correctly")
+	}
 }
 
 func ScalesUp(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
@@ -256,6 +259,9 @@ func ScalesUp(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFu
 	}
 	if set.Status.UpdatedReplicas != 4 {
 		t.Error("Failed to set updatedReplicas correctly")
+	}
+	if set.Status.UpdatedAvailableReplicas != 4 {
+		t.Error("Failed to set updatedAvailableReplicas correctly")
 	}
 }
 
@@ -294,6 +300,9 @@ func ScalesDown(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariant
 	}
 	if set.Status.UpdatedReplicas != 0 {
 		t.Error("Failed to set updatedReplicas correctly")
+	}
+	if set.Status.UpdatedAvailableReplicas != 0 {
+		t.Error("Failed to set updatedAvailableReplicas correctly")
 	}
 }
 
@@ -459,6 +468,9 @@ func CreatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants inv
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to updatedReplicas correctly")
 	}
+	if set.Status.UpdatedAvailableReplicas != 4 {
+		t.Error("Failed to set updatedAvailableReplicas correctly")
+	}
 }
 
 func UpdatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc) {
@@ -488,6 +500,9 @@ func UpdatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants inv
 	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set updatedReplicas correctly")
+	}
+	if set.Status.UpdatedAvailableReplicas != 3 {
+		t.Error("Failed to set updatedAvailableReplicas correctly")
 	}
 
 	// now mutate a pod's identity
@@ -542,6 +557,9 @@ func UpdateSetStatusFailure(t *testing.T, set *appsv1beta1.StatefulSet, invarian
 	}
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set updatedReplicas to 3")
+	}
+	if set.Status.UpdatedAvailableReplicas != 4 {
+		t.Error("Failed to set updatedAvailableReplicas correctly")
 	}
 }
 
@@ -636,6 +654,9 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 			}
 			if set.Status.UpdatedReplicas != 0 {
 				t.Error("Failed to set updatedReplicas to 0")
+			}
+			if set.Status.UpdatedAvailableReplicas != 0 {
+				t.Error("Failed to set updatedAvailableReplicas to 0")
 			}
 		})
 }
