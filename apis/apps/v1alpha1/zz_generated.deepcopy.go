@@ -2950,6 +2950,11 @@ func (in *SidecarSetUpdateStrategy) DeepCopyInto(out *SidecarSetUpdateStrategy) 
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.PriorityStrategy != nil {
+		in, out := &in.PriorityStrategy, &out.PriorityStrategy
+		*out = new(pub.UpdatePriorityStrategy)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.ScatterStrategy != nil {
 		in, out := &in.ScatterStrategy, &out.ScatterStrategy
 		*out = make(UpdateScatterStrategy, len(*in))

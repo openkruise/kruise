@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -252,7 +253,9 @@ type SidecarSetUpdateStrategy struct {
 	// This cannot be 0.
 	// Default value is 1.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-
+	// Priorities are the rules for calculating the priority of updating pods.
+	// Each pod to be updated, will pass through these terms and get a sum of weights.
+	PriorityStrategy *appspub.UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
 	// ScatterStrategy defines the scatter rules to make pods been scattered when update.
 	// This will avoid pods with the same key-value to be updated in one batch.
 	// - Note that pods will be scattered after priority sort. So, although priority strategy and scatter strategy can be applied together, we suggest to use either one of them.
