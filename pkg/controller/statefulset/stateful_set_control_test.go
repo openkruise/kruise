@@ -226,7 +226,7 @@ func CreatesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invarian
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
 	if set.Status.UpdatedAvailableReplicas != 3 {
-		t.Error("Failed to set UpdatedAvailbleReplicas correctly")
+		t.Error("Failed to set UpdatedAvailableReplicas correctly")
 	}
 }
 
