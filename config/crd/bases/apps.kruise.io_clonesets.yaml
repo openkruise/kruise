@@ -498,6 +498,12 @@ spec:
                 description: UpdateRevision, if not empty, indicates the latest revision
                   of the CloneSet.
                 type: string
+              updatedAvailableReplicas:
+                description: UpdatedAvailableReplicas is the number of Pods created
+                  by the CloneSet controller from the CloneSet version indicated by
+                  updateRevision and have a Ready Condition for at least minReadySeconds.
+                format: int32
+                type: integer
               updatedReadyReplicas:
                 description: UpdatedReadyReplicas is the number of Pods created by
                   the CloneSet controller from the CloneSet version indicated by updateRevision
@@ -513,6 +519,7 @@ spec:
             - availableReplicas
             - readyReplicas
             - replicas
+            - updatedAvailableReplicas
             - updatedReadyReplicas
             - updatedReplicas
             type: object
