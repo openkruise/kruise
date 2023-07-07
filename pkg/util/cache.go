@@ -18,11 +18,22 @@ package util
 
 import (
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
+
+var controllerCacheSyncTimeout time.Duration
+
+func SetControllerCacheSyncTimeout(t time.Duration) {
+	controllerCacheSyncTimeout = t
+}
+
+func GetControllerCacheSyncTimeout() time.Duration {
+	return controllerCacheSyncTimeout
+}
 
 // GlobalCache using GVK/namespace/name as key
 var GlobalCache = cache.NewStore(func(obj interface{}) (string, error) {

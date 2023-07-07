@@ -24,6 +24,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
@@ -79,6 +80,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	c, err := controller.New("sidecarterminator-controller", mgr, controller.Options{
 		Reconciler:              r,
 		MaxConcurrentReconciles: concurrentReconciles,
+		CacheSyncTimeout:        util.GetControllerCacheSyncTimeout(),
 		RateLimiter:             ratelimiter.DefaultControllerRateLimiter()})
 	if err != nil {
 		return err

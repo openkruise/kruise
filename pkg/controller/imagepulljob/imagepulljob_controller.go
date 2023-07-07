@@ -84,7 +84,8 @@ func newReconciler(mgr manager.Manager) *ReconcileImagePullJob {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileImagePullJob) error {
 	// Create a new controller
-	c, err := controller.New("imagepulljob-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
+	c, err := controller.New("imagepulljob-controller", mgr, controller.Options{Reconciler: r,
+		MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout()})
 	if err != nil {
 		return err
 	}
