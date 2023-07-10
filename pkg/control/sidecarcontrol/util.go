@@ -61,6 +61,9 @@ const (
 	// SidecarsetInplaceUpdateStateKey records the state of inplace-update.
 	// The value of annotation is SidecarsetInplaceUpdateStateKey.
 	SidecarsetInplaceUpdateStateKey string = "kruise.io/sidecarset-inplace-update-state"
+
+	// SidecarSetUpgradable is a pod condition to indicate whether the pod's sidecarset is upgradable
+	SidecarSetUpgradable corev1.PodConditionType = "SidecarSetUpgradable"
 )
 
 var (
