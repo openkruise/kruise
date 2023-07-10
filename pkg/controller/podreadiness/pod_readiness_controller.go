@@ -21,6 +21,7 @@ import (
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 	v1 "k8s.io/api/core/v1"
@@ -56,7 +57,8 @@ func newReconciler(mgr manager.Manager) *ReconcilePodReadiness {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcilePodReadiness) error {
 	// Create a new controller
-	c, err := controller.New("pod-readiness-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
+	c, err := controller.New("pod-readiness-controller", mgr, controller.Options{Reconciler: r,
+		MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout()})
 	if err != nil {
 		return err
 	}

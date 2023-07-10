@@ -207,7 +207,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("daemonset-controller", mgr, controller.Options{
-		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles,
+		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: kruiseutil.GetControllerCacheSyncTimeout(),
 		RateLimiter: ratelimiter.DefaultControllerRateLimiter()})
 	if err != nil {
 		return err

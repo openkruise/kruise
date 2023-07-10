@@ -73,7 +73,8 @@ func newReconciler(mgr manager.Manager) *ReconcileEphemeralJob {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileEphemeralJob) error {
 	// Create a new controller
-	c, err := controller.New("ephemeraljob-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
+	c, err := controller.New("ephemeraljob-controller", mgr, controller.Options{Reconciler: r,
+		MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout()})
 	if err != nil {
 		return err
 	}

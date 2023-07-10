@@ -104,7 +104,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New(controllerName, mgr, controller.Options{
-		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles,
+		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
 		RateLimiter: ratelimiter.DefaultControllerRateLimiter()})
 	if err != nil {
 		return err
