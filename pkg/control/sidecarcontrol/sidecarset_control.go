@@ -21,12 +21,19 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+)
+
+const (
+	ContainerNotReady = "NotReady"
+	ContainerReady    = "Ready"
 )
 
 type commonControl struct {
@@ -136,6 +143,25 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	sidecarUpdateStates[sidecarSet.Name] = inPlaceUpdateState
 	by, _ := json.Marshal(sidecarUpdateStates)
 	pod.Annotations[SidecarsetInplaceUpdateStateKey] = string(by)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarsetHotupgradeIgnoreMainContainerReadyStatus) {
+		return
+	}
+	mainContainers := c.GetPodMainContainerStatuses(pod)
+	mainContainerStatuses := make(map[string]string)
+	for _, mainContainer := range mainContainers {
+		if mainContainer.Name == "" {
+			continue
+		}
+		if mainContainer.Ready {
+			mainContainerStatuses[mainContainer.Name] = ContainerReady
+		} else {
+			mainContainerStatuses[mainContainer.Name] = ContainerNotReady
+		}
+	}
+	by, _ = json.Marshal(mainContainerStatuses)
+	pod.Annotations[SidecarSetBeforeHotUpgradeStateKey] = string(by)
+	return
 }
 
 // only check sidecar container is consistent
@@ -263,4 +289,16 @@ func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets
 	}
 
 	return true
+}
+
+func (c *commonControl) GetPodMainContainerStatuses(pod *v1.Pod) []v1.ContainerStatus {
+	sidecarset := c.GetSidecarset()
+	sidecarContainers := GetSidecarContainersInPod(sidecarset)
+	mainContainerStatuses := make([]v1.ContainerStatus, 0)
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if !sidecarContainers.Has(containerStatus.Name) {
+			mainContainerStatuses = append(mainContainerStatuses, containerStatus)
+		}
+	}
+	return mainContainerStatuses
 }

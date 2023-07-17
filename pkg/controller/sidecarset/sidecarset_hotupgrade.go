@@ -18,11 +18,14 @@ package sidecarset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 )
+
+type SidecarsetMainContainerStatus map[string]string
 
 func (p *Processor) flipHotUpgradingContainers(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) error {
 	for _, pod := range pods {
@@ -105,27 +110,63 @@ func isSidecarSetHasHotUpgradeContainer(sidecarSet *appsv1alpha1.SidecarSet) boo
 	return false
 }
 
+func getPreviousMainContainerStatus(pod *corev1.Pod) map[string]bool {
+	result := make(map[string]bool)
+	v, ok := pod.Annotations[sidecarcontrol.SidecarSetBeforeHotUpgradeStateKey]
+	if !ok {
+		return nil
+	}
+	tmp := make(SidecarsetMainContainerStatus)
+	err := json.Unmarshal([]byte(v), &tmp)
+	if err != nil {
+		klog.Errorf("error unmarshaling pod(%s.%s)'s previous main container status, return nil", pod.Namespace, pod.Name)
+		return nil
+	}
+	for k, v := range tmp {
+		if v == sidecarcontrol.ContainerReady {
+			result[k] = true
+		} else {
+			result[k] = false
+		}
+	}
+	return result
+}
+
 func isHotUpgradingReady(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
 	if util.IsRunningAndReady(pod) {
 		return true
 	}
 
+	IgnoreMainContainerReadyStatusEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SidecarsetHotupgradeIgnoreMainContainerReadyStatus)
+
+	sidecarContainers := sets.NewString()
 	emptyContainers := sets.NewString()
 	for _, sidecarContainer := range sidecarSet.Spec.Containers {
 		if sidecarcontrol.IsHotUpgradeContainer(&sidecarContainer) {
-			_, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainer.Name, pod)
+			sidecarContainer, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainer.Name, pod)
+			sidecarContainers.Insert(emptyContainer)
+			sidecarContainers.Insert(sidecarContainer)
 			emptyContainers.Insert(emptyContainer)
 		}
 	}
+
+	previousStatuses := getPreviousMainContainerStatus(pod)
 
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		// ignore empty sidecar container status
 		if emptyContainers.Has(containerStatus.Name) {
 			continue
 		}
-		// if container is not ready, then return false
+
+		// if container is not ready, when IgnoreMainContainerReadyStatusEnabled is on, then need to know if the container is main container
 		if !containerStatus.Ready {
-			return false
+			if IgnoreMainContainerReadyStatusEnabled && !sidecarContainers.Has(containerStatus.Name) {
+				if previousStatuses[containerStatus.Name] && !containerStatus.Ready {
+					return false
+				}
+			} else {
+				return false
+			}
 		}
 	}
 	// all containers with exception of empty sidecar containers are ready, then return true

@@ -22,6 +22,8 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/feature"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -240,6 +242,153 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 				"test-sidecar-2": {"test-image:v2"},
 			},
 			expectedStatus: []int32{1, 1, 1, 1},
+		},
+	}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			pod := cs.getPods()[0]
+			sidecarset := cs.getSidecarset()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pod).Build()
+			processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
+			_, err := processor.UpdateSidecarSet(sidecarset)
+			if err != nil {
+				t.Errorf("processor update sidecarset failed: %s", err.Error())
+			}
+			podOutput, err := getLatestPod(fakeClient, pod)
+			if err != nil {
+				t.Errorf("get latest pod(%s) failed: %s", pod.Name, err.Error())
+			}
+			podInput = podOutput.DeepCopy()
+			for cName, infos := range cs.expectedInfo {
+				sidecarContainer := getPodContainerByName(cName, podOutput)
+				if infos[0] != sidecarContainer.Image {
+					t.Fatalf("expect pod(%s) container(%s) image(%s), but get image(%s)", pod.Name, sidecarContainer.Name, infos[0], sidecarContainer.Image)
+				}
+			}
+
+			sidecarsetOutput, err := getLatestSidecarSet(fakeClient, sidecarset)
+			if err != nil {
+				t.Errorf("get latest sidecarset(%s) failed: %s", sidecarset.Name, err.Error())
+			}
+			sidecarSetInput = sidecarsetOutput.DeepCopy()
+			for k, v := range cs.expectedStatus {
+				var actualValue int32
+				switch k {
+				case 0:
+					actualValue = sidecarsetOutput.Status.MatchedPods
+				case 1:
+					actualValue = sidecarsetOutput.Status.UpdatedPods
+				case 2:
+					actualValue = sidecarsetOutput.Status.ReadyPods
+				case 3:
+					actualValue = sidecarsetOutput.Status.UpdatedReadyPods
+				}
+
+				if v != actualValue {
+					t.Fatalf("except sidecarset status(%d:%d), but get value(%d)", k, v, actualValue)
+				}
+			}
+			//handle potInput
+			if handle, ok := handlers[cs.name]; ok {
+				handle([]*corev1.Pod{podInput})
+			}
+		})
+	}
+}
+
+func TestUpdateHotUpgradeSidecarWithMainContainerNotReady(t *testing.T) {
+	sidecarSetInput := sidecarSetHotUpgrade.DeepCopy()
+	handlers := map[string]HandlePod{
+		"test-sidecar-2 container is upgrading": func(pods []*corev1.Pod) {
+			pods[0].Status.ContainerStatuses[2].Image = "test-image:v2"
+			pods[0].Status.ContainerStatuses[2].ImageID = testImageV2ImageID
+		},
+		"test-sidecar-2 container upgrade complete, and reset test-sidecar-1 empty image": func(pods []*corev1.Pod) {
+			pods[0].Status.ContainerStatuses[1].Image = hotUpgradeEmptyImage
+			pods[0].Status.ContainerStatuses[1].ImageID = hotUpgradeEmptyImageID
+		},
+	}
+	testUpdateHotUpgradeSidecarWithMainContainerNotReady(t, hotUpgradeEmptyImage, sidecarSetInput, handlers)
+}
+
+func testUpdateHotUpgradeSidecarWithMainContainerNotReady(t *testing.T, hotUpgradeEmptyImage string, sidecarSetInput *appsv1alpha1.SidecarSet, handlers map[string]HandlePod) {
+	podInput := podHotUpgrade.DeepCopy()
+	podInput.Name = "juruo-test"
+	podInput.Status.Phase = corev1.PodPending
+	podInput.Status.Conditions[0].Status = corev1.ConditionFalse
+	podInput.Status.ContainerStatuses[0].Ready = false
+	feature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%v=%v", features.SidecarsetHotupgradeIgnoreMainContainerReadyStatus, "true"))
+
+	cases := []struct {
+		name          string
+		getPods       func() []*corev1.Pod
+		getSidecarset func() *appsv1alpha1.SidecarSet
+		// container.name -> infos []string
+		expectedInfo map[string][]string
+		// MatchedPods, UpdatedPods, ReadyPods, AvailablePods, UnavailablePods
+		expectedStatus []int32
+	}{
+		{
+			name: "sidecarset hot update test-sidecar container test-image:v2",
+			getPods: func() []*corev1.Pod {
+				pods := []*corev1.Pod{
+					podInput.DeepCopy(),
+				}
+				return pods
+			},
+			getSidecarset: func() *appsv1alpha1.SidecarSet {
+				return sidecarSetInput.DeepCopy()
+			},
+			expectedInfo: map[string][]string{
+				"test-sidecar-1": {"test-image:v1"},
+				"test-sidecar-2": {"test-image:v2"},
+			},
+			expectedStatus: []int32{1, 0, 0, 0},
+		},
+		{
+			name: "test-sidecar-2 container is upgrading",
+			getPods: func() []*corev1.Pod {
+				pods := []*corev1.Pod{
+					podInput.DeepCopy(),
+				}
+				return pods
+			},
+			getSidecarset: func() *appsv1alpha1.SidecarSet {
+				return sidecarSetInput.DeepCopy()
+			},
+			expectedInfo: map[string][]string{
+				"test-sidecar-1": {"test-image:v1"},
+				"test-sidecar-2": {"test-image:v2"},
+			},
+			expectedStatus: []int32{1, 1, 0, 0},
+		},
+		{
+			name: "test-sidecar-2 container upgrade complete, and reset test-sidecar-1 empty image",
+			getPods: func() []*corev1.Pod {
+				return []*corev1.Pod{podInput.DeepCopy()}
+			},
+			getSidecarset: func() *appsv1alpha1.SidecarSet {
+				return sidecarSetInput.DeepCopy()
+			},
+			expectedInfo: map[string][]string{
+				"test-sidecar-1": {hotUpgradeEmptyImage},
+				"test-sidecar-2": {"test-image:v2"},
+			},
+			expectedStatus: []int32{1, 1, 0, 0},
+		},
+		{
+			name: "sidecarset hot update test-sidecar container test-image:v2 complete",
+			getPods: func() []*corev1.Pod {
+				return []*corev1.Pod{podInput.DeepCopy()}
+			},
+			getSidecarset: func() *appsv1alpha1.SidecarSet {
+				return sidecarSetInput.DeepCopy()
+			},
+			expectedInfo: map[string][]string{
+				"test-sidecar-1": {hotUpgradeEmptyImage},
+				"test-sidecar-2": {"test-image:v2"},
+			},
+			expectedStatus: []int32{1, 1, 0, 0},
 		},
 	}
 	for _, cs := range cases {

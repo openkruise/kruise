@@ -64,6 +64,8 @@ const (
 
 	// SidecarSetUpgradable is a pod condition to indicate whether the pod's sidecarset is upgradable
 	SidecarSetUpgradable corev1.PodConditionType = "SidecarSetUpgradable"
+
+	SidecarSetBeforeHotUpgradeStateKey = "kruise.io/sidecarset-before-hotupgrade-main-container-state"
 )
 
 var (
