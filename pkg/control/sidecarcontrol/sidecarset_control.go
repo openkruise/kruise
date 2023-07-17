@@ -161,7 +161,6 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	}
 	by, _ = json.Marshal(mainContainerStatuses)
 	pod.Annotations[SidecarSetBeforeHotUpgradeStateKey] = string(by)
-	return
 }
 
 // only check sidecar container is consistent

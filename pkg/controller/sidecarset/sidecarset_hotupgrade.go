@@ -119,7 +119,7 @@ func getPreviousMainContainerStatus(pod *corev1.Pod) map[string]bool {
 	tmp := make(SidecarsetMainContainerStatus)
 	err := json.Unmarshal([]byte(v), &tmp)
 	if err != nil {
-		klog.Errorf("error unmarshaling pod(%s.%s)'s previous main container status, return nil", pod.Namespace, pod.Name)
+		klog.Errorf("error unmarshalling pod(%s/%s)'s previous main container status, return nil", pod.Namespace, pod.Name)
 		return nil
 	}
 	for k, v := range tmp {
