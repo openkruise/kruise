@@ -198,16 +198,25 @@ func detectRuntime(varRunPath string) (cfgs []runtimeConfig) {
 	{
 		_, err1 := os.Stat(fmt.Sprintf("%s/docker.sock", varRunPath))
 		_, err2 := os.Stat(fmt.Sprintf("%s/dockershim.sock", varRunPath))
+		_, err3 := os.Stat(fmt.Sprintf("%s/cri-dockerd.sock", varRunPath))
 		if err1 == nil && err2 == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeDocker,
 				runtimeURI:       fmt.Sprintf("unix://%s/docker.sock", varRunPath),
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/dockershim.sock", varRunPath),
 			})
-		} else if err1 == nil && err2 != nil {
-			klog.Errorf("%s/docker.sock exists, but not found %s/dockershim.sock", varRunPath, varRunPath)
+		} else if err1 == nil && err3 == nil {
+			cfgs = append(cfgs, runtimeConfig{
+				runtimeType:      ContainerRuntimeDocker,
+				runtimeURI:       fmt.Sprintf("unix://%s/docker.sock", varRunPath),
+				runtimeRemoteURI: fmt.Sprintf("unix://%s/cri-dockerd.sock", varRunPath),
+			})
+		} else if err1 == nil && err2 != nil && err3 != nil {
+			klog.Errorf("%s/docker.sock exists, but not found %s/dockershim.sock,cri.dockered", varRunPath)
 		} else if err1 != nil && err2 == nil {
 			klog.Errorf("%s/dockershim.sock exists, but not found %s/docker.sock", varRunPath, varRunPath)
+		} else if err1 != nil && err3 == nil {
+			klog.Errorf("%s/cri-dockerd.sock exists, but not found %s/docker.sock", varRunPath, varRunPath)
 		}
 	}
 
