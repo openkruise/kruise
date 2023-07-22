@@ -19,7 +19,6 @@ package sidecarset
 import (
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +35,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
 func (p *Processor) createImagePullJobsForInPlaceUpdate(sidecarset *appsv1alpha1.SidecarSet, pods []*v1.Pod, currentRevision, updateRevision *apps.ControllerRevision) error {
