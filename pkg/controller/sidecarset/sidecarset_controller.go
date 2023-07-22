@@ -34,9 +34,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
@@ -45,8 +47,9 @@ func init() {
 }
 
 var (
-	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("SidecarSet")
+	concurrentReconciles  = 3
+	controllerKind        = appsv1alpha1.SchemeGroupVersion.WithKind("SidecarSet")
+	isPreDownloadDisabled bool
 )
 
 /**
@@ -59,6 +62,11 @@ var (
 func Add(mgr manager.Manager) error {
 	if !utildiscovery.DiscoverGVK(controllerKind) {
 		return nil
+	}
+	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
+		isPreDownloadDisabled = true
 	}
 	return add(mgr, newReconciler(mgr))
 }
@@ -139,5 +147,5 @@ func (r *ReconcileSidecarSet) Reconcile(_ context.Context, request reconcile.Req
 	}
 
 	klog.V(3).Infof("begin to process sidecarset %v for reconcile", sidecarSet.Name)
-	return r.processor.UpdateSidecarSet(sidecarSet)
+	return r.processor.UpdateSidecarSet(sidecarSet, request)
 }

@@ -20,14 +20,16 @@ import (
 	"fmt"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 )
 
 var (
@@ -248,7 +250,13 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 			sidecarset := cs.getSidecarset()
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pod).Build()
 			processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
-			_, err := processor.UpdateSidecarSet(sidecarset)
+			request := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      sidecarset.Name,
+					Namespace: sidecarset.Namespace,
+				},
+			}
+			_, err := processor.UpdateSidecarSet(sidecarset, request)
 			if err != nil {
 				t.Errorf("processor update sidecarset failed: %s", err.Error())
 			}

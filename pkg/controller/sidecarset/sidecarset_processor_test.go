@@ -27,13 +27,16 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/stretchr/testify/assert"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var (
@@ -177,7 +180,13 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 			sidecarset := cs.getSidecarset()
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pods[0], pods[1]).Build()
 			processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
-			_, err := processor.UpdateSidecarSet(sidecarset)
+			request := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      sidecarset.Name,
+					Namespace: sidecarset.Namespace,
+				},
+			}
+			_, err := processor.UpdateSidecarSet(sidecarset, request)
 			if err != nil {
 				t.Errorf("processor update sidecarset failed: %s", err.Error())
 			}
@@ -281,9 +290,14 @@ func TestCanUpgradePods(t *testing.T) {
 		}
 		fakeClient.Create(context.TODO(), pods[i])
 	}
-
 	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
-	_, err := processor.UpdateSidecarSet(sidecarSet)
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      sidecarSet.Name,
+			Namespace: sidecarSet.Namespace,
+		},
+	}
+	_, err := processor.UpdateSidecarSet(sidecarSet, request)
 	if err != nil {
 		t.Errorf("processor update sidecarset failed: %s", err.Error())
 	}
@@ -308,6 +322,7 @@ func TestCanUpgradePods(t *testing.T) {
 
 func TestGetActiveRevisions(t *testing.T) {
 	sidecarSet := factorySidecarSet()
+	control := sidecarcontrol.New(sidecarSet)
 	sidecarSet.SetUID("1223344")
 	kubeSysNs := &corev1.Namespace{}
 	//Note that webhookutil.GetNamespace() return "" here
@@ -317,11 +332,15 @@ func TestGetActiveRevisions(t *testing.T) {
 	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 
 	// case 1
-	latestRevision, _, err := processor.registerLatestRevision(sidecarSet, nil)
+	currentRevision, latestRevision, collisionCount, err := processor.registerLatestRevision(sidecarSet, nil)
 	if err != nil || latestRevision == nil || latestRevision.Revision != int64(1) {
 		t.Fatalf("in case of create: get active revision failed when the latest revision = 1, err: %v, actual latestRevision: %v",
 			err, latestRevision.Revision)
 	}
+	assert.Equal(t, currentRevision, latestRevision)
+
+	status := calculateStatus(control, nil, latestRevision, collisionCount)
+	sidecarSet.Status = *status
 
 	// case 2
 	newSidecar := sidecarSet.DeepCopy()
@@ -335,11 +354,14 @@ func TestGetActiveRevisions(t *testing.T) {
 		{Name: "emptySecret"},
 	}
 	for i := 0; i < 5; i++ {
-		latestRevision, _, err = processor.registerLatestRevision(newSidecar, nil)
+		//todo
+		currentRevision, latestRevision, collisionCount, err = processor.registerLatestRevision(newSidecar, nil)
 		if err != nil || latestRevision == nil || latestRevision.Revision != int64(2) {
 			t.Fatalf("in case of update: get active revision failed when the latest revision = 2, err: %v, actual latestRevision: %v",
 				err, latestRevision.Revision)
 		}
+		assert.Equal(t, currentRevision.Revision, int64(1))
+		assert.Equal(t, latestRevision.Revision, int64(2))
 		revision := make(map[string]interface{})
 		if err := json.Unmarshal(latestRevision.Data.Raw, &revision); err != nil {
 			t.Fatalf("failed to decode revision, err: %v", err)
@@ -354,19 +376,25 @@ func TestGetActiveRevisions(t *testing.T) {
 		}
 	}
 
+	status = calculateStatus(control, nil, latestRevision, collisionCount)
+	sidecarSet.Status = *status
+
 	// case 3
 	for i := 0; i < 5; i++ {
-		latestRevision, _, err = processor.registerLatestRevision(sidecarSet, nil)
+		//todo
+		currentRevision, latestRevision, _, err = processor.registerLatestRevision(sidecarSet, nil)
 		if err != nil || latestRevision == nil || latestRevision.Revision != int64(3) {
 			t.Fatalf("in case of rollback: get active revision failed when the latest revision = 3, err: %v, actual latestRevision: %v",
 				err, latestRevision.Revision)
 		}
+		assert.Equal(t, currentRevision.Revision, int64(2))
+		assert.Equal(t, latestRevision.Revision, int64(3))
 	}
 
 	// case 4
 	for i := 0; i < 100; i++ {
 		sidecarSet.Spec.Containers[0].Image = fmt.Sprintf("%d", i)
-		if _, _, err = processor.registerLatestRevision(sidecarSet, nil); err != nil {
+		if _, _, _, err = processor.registerLatestRevision(sidecarSet, nil); err != nil {
 			t.Fatalf("unexpected error, err: %v", err)
 		}
 	}

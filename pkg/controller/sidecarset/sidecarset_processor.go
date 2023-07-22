@@ -20,10 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"strings"
 	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
@@ -31,18 +30,21 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/integer"
 	"k8s.io/utils/pointer"
@@ -64,7 +66,7 @@ func NewSidecarSetProcessor(cli client.Client, rec record.EventRecorder) *Proces
 	}
 }
 
-func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (reconcile.Result, error) {
+func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet, request reconcile.Request) (reconcile.Result, error) {
 	control := sidecarcontrol.New(sidecarSet)
 	// check whether sidecarSet is active
 	if !control.IsActiveSidecarSet() {
@@ -79,13 +81,44 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 
 	// register new revision if this sidecarSet is the latest;
 	// return the latest revision that corresponds to this sidecarSet.
-	latestRevision, collisionCount, err := p.registerLatestRevision(sidecarSet, pods)
-	if latestRevision == nil {
+	currentRevision, latestRevision, collisionCount, err := p.registerLatestRevision(sidecarSet, pods)
+	if latestRevision == nil || err != nil {
 		klog.Errorf("sidecarSet register the latest revision error, err: %v, name: %s", err, sidecarSet.Name)
 		return reconcile.Result{}, err
 	}
+	// 2. images pre-download
+	if !isPreDownloadDisabled {
+		if currentRevision.Name != latestRevision.Name {
+			// get clone pre-download annotation
+			minUpdatedReadyPodsCount := 0
+			if minUpdatedReadyPods, ok := sidecarSet.Annotations[appsv1alpha1.ImagePreDownloadMinUpdatedReadyPods]; ok {
+				minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
+				minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(sidecarSet.Status.MatchedPods), true)
+				if err != nil {
+					klog.Errorf("Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for %s: %v", request, err)
+				}
+			}
 
-	// 2. calculate SidecarSet status based on pod and revision information
+			updatedReadyReplicas := sidecarSet.Status.UpdatedReadyPods
+			if latestRevision.Name != sidecarSet.Status.LatestRevision {
+				updatedReadyReplicas = 0
+			}
+			if int32(minUpdatedReadyPodsCount) <= updatedReadyReplicas {
+				// pre-download images for new revision
+				if err := p.createImagePullJobsForInPlaceUpdate(sidecarSet, pods, currentRevision, latestRevision); err != nil {
+					klog.Errorf("Failed to create ImagePullJobs for %s: %v", request, err)
+				}
+			}
+
+		} else {
+			// delete ImagePullJobs if revisions have been consistent
+			if err := imagejobutilfunc.DeleteJobsForWorkload(p.Client, sidecarSet); err != nil {
+				klog.Errorf("Failed to delete imagepulljobs for %s: %v", request, err)
+			}
+		}
+	}
+
+	// 3. calculate SidecarSet status based on pod and revision information
 	status := calculateStatus(control, pods, latestRevision, collisionCount)
 	//update sidecarSet status in store
 	if err := p.updateSidecarSetStatus(sidecarSet, status); err != nil {
@@ -103,7 +136,7 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	// 3. If sidecar container hot upgrade complete, then set the other one(empty sidecar container) image to HotUpgradeEmptyImage
+	// 4. If sidecar container hot upgrade complete, then set the other one(empty sidecar container) image to HotUpgradeEmptyImage
 	if isSidecarSetHasHotUpgradeContainer(sidecarSet) {
 		var podsInHotUpgrading []*corev1.Pod
 		for _, pod := range pods {
@@ -130,24 +163,24 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 		}
 	}
 
-	// 4. SidecarSet upgrade strategy type is NotUpdate
+	// 5. SidecarSet upgrade strategy type is NotUpdate
 	if isSidecarSetNotUpdate(sidecarSet) {
 		return reconcile.Result{}, nil
 	}
 
-	// 5. sidecarset already updates all matched pods, then return
+	// 6. sidecarset already updates all matched pods, then return
 	if isSidecarSetUpdateFinish(status) {
 		klog.V(3).Infof("sidecarSet(%s) matched pods(number=%d) are latest, and don't need update", sidecarSet.Name, len(pods))
 		return reconcile.Result{}, nil
 	}
 
-	// 6. Paused indicates that the SidecarSet is paused to update matched pods
+	// 7. Paused indicates that the SidecarSet is paused to update matched pods
 	if sidecarSet.Spec.UpdateStrategy.Paused {
 		klog.V(3).Infof("sidecarSet is paused, name: %s", sidecarSet.Name)
 		return reconcile.Result{}, nil
 	}
 
-	// 7. upgrade pod sidecar
+	// 8. upgrade pod sidecar
 	if err := p.updatePods(control, pods); err != nil {
 		return reconcile.Result{}, err
 	}
@@ -324,17 +357,19 @@ func (p *Processor) getSelectedPods(namespaces sets.String, selector labels.Sele
 	return
 }
 
-func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []*corev1.Pod) (
-	latestRevision *apps.ControllerRevision, collisionCount int32, err error,
-) {
+func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []*corev1.Pod) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
+	var currentRevision, latestRevision *apps.ControllerRevision
+	var collisionCount int32
 	sidecarSet := set.DeepCopy()
+	// currentRevisionName is the name of latest Revision before updating sidecarSet
+	currentRevisionName := sidecarSet.Status.LatestRevision
 	// get revision selector of this sidecarSet
 	hc := sidecarcontrol.NewHistoryControl(p.Client)
 	// list all revisions
 	revisions, err := p.historyController.ListControllerRevisions(sidecarcontrol.MockSidecarSetForRevision(set), hc.GetRevisionSelector(sidecarSet))
 	if err != nil {
 		klog.Errorf("Failed to list history controllerRevisions, err %v, name %v", err, sidecarSet.Name)
-		return nil, collisionCount, err
+		return nil, nil, collisionCount, err
 	}
 
 	// sort revisions by increasing .Revision
@@ -350,7 +385,7 @@ func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []
 	// Here use the namespace of kruise-manager.
 	latestRevision, err = hc.NewRevision(sidecarSet, webhookutil.GetNamespace(), hc.NextRevision(revisions), &collisionCount)
 	if err != nil {
-		return nil, collisionCount, err
+		return nil, nil, collisionCount, err
 	}
 
 	// find any equivalent revisions
@@ -367,7 +402,7 @@ func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []
 		// in case of roll back
 		latestRevision, err = p.historyController.UpdateControllerRevision(equalRevisions[equalCount-1], latestRevision.Revision)
 		if err != nil {
-			return nil, collisionCount, err
+			return nil, nil, collisionCount, err
 		}
 		// the updated revision may be deleted if we don't replace this revision.
 		replaceRevision(revisions, equalRevisions[equalCount-1], latestRevision)
@@ -376,14 +411,25 @@ func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []
 		// in case of the sidecarSet update
 		latestRevision, err = hc.CreateControllerRevision(sidecarSet, latestRevision, &collisionCount)
 		if err != nil {
-			return nil, collisionCount, err
+			return nil, nil, collisionCount, err
 		}
 		revisions = append(revisions, latestRevision)
 	}
 
+	for i := range revisions {
+		if revisions[i].Name == currentRevisionName {
+			currentRevision = revisions[i]
+			break
+		}
+	}
+
+	if currentRevision == nil {
+		currentRevision = latestRevision
+	}
+
 	// update custom revision for the latest controller revision
 	if err = p.updateCustomVersionLabel(latestRevision, sidecarSet.Labels[appsv1alpha1.SidecarSetCustomVersionLabel]); err != nil {
-		return nil, collisionCount, err
+		return nil, nil, collisionCount, err
 	}
 
 	// only store limited history revisions
@@ -391,7 +437,7 @@ func (p *Processor) registerLatestRevision(set *appsv1alpha1.SidecarSet, pods []
 		klog.Errorf("Failed to truncate history for %s: err: %v", sidecarSet.Name, err)
 	}
 
-	return latestRevision, collisionCount, nil
+	return currentRevision, latestRevision, collisionCount, nil
 }
 
 func (p *Processor) updateCustomVersionLabel(revision *apps.ControllerRevision, customVersion string) error {
