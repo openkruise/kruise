@@ -65,7 +65,8 @@ func Add(mgr manager.Manager) error {
 	}
 	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForSidecarsetSetUpdate) {
 		isPreDownloadDisabled = true
 	}
 	return add(mgr, newReconciler(mgr))

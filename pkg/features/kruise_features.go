@@ -113,6 +113,10 @@ const (
 
 	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
 	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
+
+	// PreDownloadImageForSidecarsetSetUpdate enables sidecarset-controller to create ImagePullJobs to
+	// pre-download images for update.
+	PreDownloadImageForSidecarsetSetUpdate featuregate.Feature = "PreDownloadImageForSidecarsetSetUpdate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -140,6 +144,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
 	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate:     {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForSidecarsetSetUpdate:    {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -182,5 +187,6 @@ func SetDefaultFeatureGates() {
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(ResourcesDeletionProtection) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DeletionProtectionForCRDCascadingGate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForSidecarsetSetUpdate))
 	}
 }
