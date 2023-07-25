@@ -131,7 +131,7 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 	}
 
 	// 4. SidecarSet upgrade strategy type is NotUpdate
-	if !isSidecarSetNotUpdate(sidecarSet) {
+	if isSidecarSetNotUpdate(sidecarSet) {
 		return reconcile.Result{}, nil
 	}
 
@@ -535,9 +535,9 @@ func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod, 
 func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
 	if s.Spec.UpdateStrategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
 		klog.V(3).Infof("sidecarSet spreading RollingUpdate config type, name: %s, type: %s", s.Name, s.Spec.UpdateStrategy.Type)
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func updateContainerInPod(container corev1.Container, pod *corev1.Pod) {
