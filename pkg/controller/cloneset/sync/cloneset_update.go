@@ -24,13 +24,9 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
@@ -133,7 +129,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
 		// Determine the pub before updating the pod
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
+		/*if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
 			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pod, policyv1alpha1.PubUpdateOperation, false)
 			if err != nil {
 				return err
@@ -142,7 +138,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 				clonesetutils.DurationStore.Push(key, time.Second)
 				return nil
 			}
-		}
+		}*/
 		duration, err := c.updatePod(cs, coreControl, targetRevision, revisions, pod, pvcs)
 		if duration > 0 {
 			clonesetutils.DurationStore.Push(key, duration)

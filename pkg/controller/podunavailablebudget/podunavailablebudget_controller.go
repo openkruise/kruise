@@ -104,7 +104,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Scheme:           mgr.GetScheme(),
 		recorder:         mgr.GetEventRecorderFor("podunavailablebudget-controller"),
 		controllerFinder: controllerfinder.Finder,
-		pubControl:       pubcontrol.NewPubControl(mgr.GetClient()),
 	}
 }
 
@@ -203,7 +202,6 @@ type ReconcilePodUnavailableBudget struct {
 	Scheme           *runtime.Scheme
 	recorder         record.EventRecorder
 	controllerFinder *controllerfinder.ControllerFinder
-	pubControl       pubcontrol.PubControl
 }
 
 // +kubebuilder:rbac:groups=policy.kruise.io,resources=podunavailablebudgets,verbs=get;list;watch;create;update;patch;delete
@@ -251,7 +249,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 
 func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1alpha1.PodUnavailableBudget) (*time.Time, error) {
 	currentTime := time.Now()
-	pods, expectedCount, err := r.pubControl.GetPodsForPub(pub)
+	pods, expectedCount, err := pubcontrol.PubControl.GetPodsForPub(pub)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +317,7 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 		// unavailablePods contains information about pods whose specification changed(in-place update), in case of informer cache latency, after 5 seconds to remove it.
 		var disruptedPods, unavailablePods map[string]metav1.Time
 		disruptedPods, unavailablePods, recheckTime = r.buildDisruptedAndUnavailablePods(pods, pubClone, currentTime)
-		currentAvailable := countAvailablePods(pods, disruptedPods, unavailablePods, r.pubControl)
+		currentAvailable := countAvailablePods(pods, disruptedPods, unavailablePods)
 
 		start = time.Now()
 		updateErr := r.updatePubStatus(pubClone, currentAvailable, desiredAvailable, expectedCount, disruptedPods, unavailablePods)
@@ -361,7 +359,7 @@ func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *poli
 	return nil
 }
 
-func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[string]metav1.Time, control pubcontrol.PubControl) (currentAvailable int32) {
+func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[string]metav1.Time) (currentAvailable int32) {
 	recordPods := sets.String{}
 	for pName := range disruptedPods {
 		recordPods.Insert(pName)
@@ -379,7 +377,7 @@ func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[s
 			continue
 		}
 		// pod consistent and ready
-		if control.IsPodStateConsistent(pod) && control.IsPodReady(pod) {
+		if pubcontrol.PubControl.IsPodStateConsistent(pod) && pubcontrol.PubControl.IsPodReady(pod) {
 			currentAvailable++
 		}
 	}

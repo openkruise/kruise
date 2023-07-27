@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -276,8 +277,8 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getPub()).Build()
-			control := NewPubControl(fakeClient)
-			allow, _, err := PodUnavailableBudgetValidatePod(fakeClient, control, cs.getPod(), cs.operation, false)
+			InitPubControl(fakeClient, record.NewFakeRecorder(10))
+			allow, _, err := PodUnavailableBudgetValidatePod(cs.getPod(), cs.operation, "fake-user", false)
 			if err != nil {
 				t.Fatalf("PodUnavailableBudgetValidatePod failed: %s", err.Error())
 			}
@@ -383,9 +384,9 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), cs.getReplicaSet(), cs.getPub()).Build()
-			control := NewPubControl(fakeClient)
+			InitPubControl(fakeClient, record.NewFakeRecorder(10))
 			pod := cs.getPod()
-			pub, err := control.GetPubForPod(pod)
+			pub, err := PubControl.GetPubForPod(pod)
 			if err != nil {
 				t.Fatalf("GetPubForPod failed: %s", err.Error())
 			}

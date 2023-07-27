@@ -79,6 +79,7 @@ func (h *WorkloadHandler) Handle(ctx context.Context, req admission.Request) adm
 	}
 
 	if err := deletionprotection.ValidateWorkloadDeletion(metaObj, replicas); err != nil {
+		deletionprotection.WorkloadDeletionProtectionMetrics.WithLabelValues(req.Kind.Kind, metaObj.GetName(), req.UserInfo.Username).Add(1)
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")

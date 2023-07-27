@@ -41,6 +41,7 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	extclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/controller"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -186,6 +187,7 @@ func main() {
 		setupLog.Error(err, "unable to start ControllerFinder")
 		os.Exit(1)
 	}
+	pubcontrol.InitPubControl(mgr.GetClient(), mgr.GetEventRecorderFor("pub-controller"))
 
 	setupLog.Info("register field index")
 	if err := fieldindex.RegisterFieldIndexes(mgr.GetCache()); err != nil {

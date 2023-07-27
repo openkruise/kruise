@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -473,10 +474,10 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 			decoder, _ := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub()).Build()
 			podHandler := PodCreateHandler{
-				Client:     fClient,
-				Decoder:    decoder,
-				pubControl: pubcontrol.NewPubControl(fClient),
+				Client:  fClient,
+				Decoder: decoder,
 			}
+			pubcontrol.InitPubControl(fClient, record.NewFakeRecorder(10))
 			oldPodRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.oldPod())),
 			}
@@ -668,10 +669,10 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			decoder, _ := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).Build()
 			podHandler := PodCreateHandler{
-				Client:     fClient,
-				Decoder:    decoder,
-				pubControl: pubcontrol.NewPubControl(fClient),
+				Client:  fClient,
+				Decoder: decoder,
 			}
+			pubcontrol.InitPubControl(fClient, record.NewFakeRecorder(10))
 			evictionRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.eviction())),
 			}
@@ -824,10 +825,10 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			decoder, _ := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).Build()
 			podHandler := PodCreateHandler{
-				Client:     fClient,
-				Decoder:    decoder,
-				pubControl: pubcontrol.NewPubControl(fClient),
+				Client:  fClient,
+				Decoder: decoder,
 			}
+			pubcontrol.InitPubControl(fClient, record.NewFakeRecorder(10))
 			deletionRaw := runtime.RawExtension{
 				Raw: []byte(util.DumpJSON(cs.deletion())),
 			}

@@ -76,6 +76,7 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		if err := deletionprotection.ValidateWorkloadDeletion(oldObj, oldObj.Spec.Replicas); err != nil {
+			deletionprotection.WorkloadDeletionProtectionMetrics.WithLabelValues(req.Kind.Kind, oldObj.GetName(), req.UserInfo.Username).Add(1)
 			return admission.Errored(http.StatusForbidden, err)
 		}
 	}

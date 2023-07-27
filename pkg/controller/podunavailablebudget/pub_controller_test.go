@@ -1148,13 +1148,12 @@ func TestPubReconcile(t *testing.T) {
 			for _, obj := range cs.getReplicaSet() {
 				_ = fakeClient.Create(context.TODO(), obj)
 			}
-
+			pubcontrol.InitPubControl(fakeClient, record.NewFakeRecorder(10))
 			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: fakeClient}
 			reconciler := ReconcilePodUnavailableBudget{
 				Client:           fakeClient,
 				recorder:         record.NewFakeRecorder(10),
 				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
-				pubControl:       pubcontrol.NewPubControl(fakeClient),
 			}
 			_, err := reconciler.syncPodUnavailableBudget(pub)
 			if err != nil {

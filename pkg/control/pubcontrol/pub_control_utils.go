@@ -25,6 +25,7 @@ import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
@@ -55,10 +56,25 @@ const (
 	PodRelatedPubAnnotation = "kruise.io/related-pub"
 )
 
+var (
+	PodUnavailableBudgetMetrics = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "pod_unavailable_budget",
+			Help: "Pod Unavailable Budget Metrics",
+			// kind = CloneSet, Deployment, StatefulSet, etc.
+			// name = workload.name, if pod don't have workload, then name is pod.name
+		}, []string{"kind", "name", "username"},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(PodUnavailableBudgetMetrics)
+}
+
 // parameters:
 // 1. allowed(bool) indicates whether to allow this update operation
 // 2. err(error)
-func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, pod *corev1.Pod, operation policyv1alpha1.PubOperation, dryRun bool) (allowed bool, reason string, err error) {
+func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.PubOperation, username string, dryRun bool) (allowed bool, reason string, err error) {
 	klog.V(3).Infof("validating pod(%s/%s) operation(%s) for PodUnavailableBudget", pod.Namespace, pod.Name, operation)
 	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
 	// and will no longer check the pub quota
@@ -66,13 +82,13 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, policyv1alpha1.PodPubNoProtectionAnnotation)
 		return true, "", nil
 		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-	} else if !control.IsPodReady(pod) {
+	} else if !PubControl.IsPodReady(pod) {
 		klog.V(3).Infof("pod(%s/%s) is not ready, then don't need check pub", pod.Namespace, pod.Name)
 		return true, "", nil
 	}
 
 	// pub for pod
-	pub, err := control.GetPubForPod(pod)
+	pub, err := PubControl.GetPubForPod(pod)
 	if err != nil {
 		return false, "", err
 		// if there is no matching PodUnavailableBudget, just return true
@@ -119,7 +135,7 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 			}
 
 			informerCached := &policyv1alpha1.PodUnavailableBudget{}
-			if err := client.Get(context.TODO(), types.NamespacedName{Namespace: pub.Namespace,
+			if err := kclient.Get(context.TODO(), types.NamespacedName{Namespace: pub.Namespace,
 				Name: pub.Name}, informerCached); err == nil {
 				var localRV, informerRV int64
 				_ = runtime.Convert_string_To_int64(&pubClone.ResourceVersion, &localRV, nil)
@@ -133,8 +149,18 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 
 		// Try to verify-and-decrement
 		// If it was false already, or if it becomes false during the course of our retries,
-		err := checkAndDecrement(pod.Name, pubClone, operation)
+		err = checkAndDecrement(pod.Name, pubClone, operation)
 		if err != nil {
+			var kind, name string
+			if ref := PubControl.GetPodControllerOf(pod); ref != nil {
+				kind = ref.Kind
+				name = ref.Name
+			} else {
+				kind = "unknown"
+				name = pod.Name
+			}
+			PodUnavailableBudgetMetrics.WithLabelValues(kind, name, username).Add(1)
+			recorder.Eventf(pod, corev1.EventTypeWarning, "PubPreventPodDeletion", fmt.Sprintf("openkruise pub prevents pod deletion"))
 			return err
 		}
 
@@ -147,7 +173,7 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 			pubClone.Namespace, pubClone.Name, len(pubClone.Status.DisruptedPods), len(pubClone.Status.UnavailablePods),
 			pubClone.Status.TotalReplicas, pubClone.Status.DesiredAvailable, pubClone.Status.CurrentAvailable, pubClone.Status.UnavailableAllowed)
 		start = time.Now()
-		err = client.Status().Update(context.TODO(), pubClone)
+		err = kclient.Status().Update(context.TODO(), pubClone)
 		costOfUpdate += time.Since(start)
 		if err == nil {
 			if err = util.GlobalCache.Add(pubClone); err != nil {
@@ -155,7 +181,7 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 			}
 			return nil
 		}
-		// if conflict, then retry
+		// if conflicts, then retry
 		conflictTimes++
 		refresh = true
 		return err
