@@ -18,7 +18,6 @@ package sync
 
 import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
@@ -49,7 +48,6 @@ type realControl struct {
 	inplaceControl   inplaceupdate.Interface
 	recorder         record.EventRecorder
 	controllerFinder *controllerfinder.ControllerFinder
-	pubControl       pubcontrol.PubControl
 }
 
 func New(c client.Client, recorder record.EventRecorder) Interface {
@@ -59,6 +57,5 @@ func New(c client.Client, recorder record.EventRecorder) Interface {
 		lifecycleControl: lifecycle.New(c),
 		recorder:         recorder,
 		controllerFinder: controllerfinder.Finder,
-		pubControl:       pubcontrol.NewPubControl(c),
 	}
 }

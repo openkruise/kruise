@@ -18,6 +18,7 @@ package validating
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
@@ -79,6 +80,7 @@ func (h *WorkloadHandler) Handle(ctx context.Context, req admission.Request) adm
 	}
 
 	if err := deletionprotection.ValidateWorkloadDeletion(metaObj, replicas); err != nil {
+		deletionprotection.WorkloadDeletionProtectionMetrics.WithLabelValues(fmt.Sprintf("%s_%s_%s", req.Kind.Kind, metaObj.GetNamespace(), metaObj.GetName()), req.UserInfo.Username).Add(1)
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")

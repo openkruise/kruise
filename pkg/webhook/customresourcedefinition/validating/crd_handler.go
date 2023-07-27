@@ -85,6 +85,7 @@ func (h *CRDHandler) Handle(ctx context.Context, req admission.Request) admissio
 	}
 
 	if err := deletionprotection.ValidateCRDDeletion(h.Client, metaObj, gvk); err != nil {
+		deletionprotection.CRDDeletionProtectionMetrics.WithLabelValues(metaObj.GetName(), req.UserInfo.Username).Add(1)
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")

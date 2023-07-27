@@ -20,10 +20,16 @@ import (
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type PubControl interface {
+var PubControl pubControl
+var recorder record.EventRecorder
+var kclient client.Client
+
+type pubControl interface {
 	// IsPodReady indicates whether pod is fully ready
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
@@ -41,9 +47,12 @@ type PubControl interface {
 	IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 	// get pub for pod
 	GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error)
+	// get pod controller of
+	GetPodControllerOf(pod *corev1.Pod) *metav1.OwnerReference
 }
 
-func NewPubControl(client client.Client) PubControl {
-	controllerFinder := controllerfinder.Finder
-	return &commonControl{controllerFinder: controllerFinder, Client: client}
+func InitPubControl(cli client.Client, finder *controllerfinder.ControllerFinder, rec record.EventRecorder) {
+	recorder = rec
+	kclient = cli
+	PubControl = &commonControl{controllerFinder: finder, Client: cli}
 }
