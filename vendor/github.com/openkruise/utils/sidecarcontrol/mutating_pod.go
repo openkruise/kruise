@@ -231,9 +231,17 @@ func buildSidecars(control SidecarControl, pod *corev1.Pod, oldPod *corev1.Pod, 
 			SidecarSetName:  sidecarSet.Name,
 		}
 
-		//process initContainers
-		//only when created pod, inject initContainer and pullSecrets
+		// create pod
 		if !isUpdated {
+			// There are other components, e.g. VK, that also call this method for SidecarSet injection,
+			// so the main purpose here is to prevent duplicate injection issues
+			if _, ok := sidecarSetHash[sidecarSet.Name]; ok {
+				klog.V(3).Infof("SidecarSet(%s) already inject pod(%s/%s), then ignore")
+				continue
+			}
+
+			//process initContainers
+			//only when created pod, inject initContainer and pullSecrets
 			for i := range sidecarSet.Spec.InitContainers {
 				initContainer := &sidecarSet.Spec.InitContainers[i]
 				//add "IS_INJECTED" env in initContainer's envs

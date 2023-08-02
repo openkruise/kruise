@@ -19,12 +19,12 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"reflect"
 	"strings"
 	"unsafe"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 )
@@ -33,32 +33,6 @@ import (
 func DumpJSON(o interface{}) string {
 	j, _ := json.Marshal(o)
 	return string(j)
-}
-
-// SplitMaybeSubscriptedPath checks whether the specified fieldPath is
-// subscripted, and
-//  - if yes, this function splits the fieldPath into path and subscript, and
-//    returns (path, subscript, true).
-//  - if no, this function returns (fieldPath, "", false).
-//
-// Example inputs and outputs:
-//  - "metadata.annotations['myKey']" --> ("metadata.annotations", "myKey", true)
-//  - "metadata.annotations['a[b]c']" --> ("metadata.annotations", "a[b]c", true)
-//  - "metadata.labels['']"           --> ("metadata.labels", "", true)
-//  - "metadata.labels"               --> ("metadata.labels", "", false)
-func SplitMaybeSubscriptedPath(fieldPath string) (string, string, bool) {
-	if !strings.HasSuffix(fieldPath, "']") {
-		return fieldPath, "", false
-	}
-	s := strings.TrimSuffix(fieldPath, "']")
-	parts := strings.SplitN(s, "['", 2)
-	if len(parts) < 2 {
-		return fieldPath, "", false
-	}
-	if len(parts[0]) == 0 {
-		return fieldPath, "", false
-	}
-	return parts[0], parts[1], true
 }
 
 func ValidatedLabelSelectorAsSelector(ps *metav1.LabelSelector) (labels.Selector, error) {
@@ -127,4 +101,30 @@ func GetNamespace() string {
 		return ns
 	}
 	return "kruise-system"
+}
+
+// SplitMaybeSubscriptedPath checks whether the specified fieldPath is
+// subscripted, and
+//  - if yes, this function splits the fieldPath into path and subscript, and
+//    returns (path, subscript, true).
+//  - if no, this function returns (fieldPath, "", false).
+//
+// Example inputs and outputs:
+//  - "metadata.annotations['myKey']" --> ("metadata.annotations", "myKey", true)
+//  - "metadata.annotations['a[b]c']" --> ("metadata.annotations", "a[b]c", true)
+//  - "metadata.labels['']"           --> ("metadata.labels", "", true)
+//  - "metadata.labels"               --> ("metadata.labels", "", false)
+func SplitMaybeSubscriptedPath(fieldPath string) (string, string, bool) {
+	if !strings.HasSuffix(fieldPath, "']") {
+		return fieldPath, "", false
+	}
+	s := strings.TrimSuffix(fieldPath, "']")
+	parts := strings.SplitN(s, "['", 2)
+	if len(parts) < 2 {
+		return fieldPath, "", false
+	}
+	if len(parts[0]) == 0 {
+		return fieldPath, "", false
+	}
+	return parts[0], parts[1], true
 }

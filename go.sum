@@ -725,8 +725,8 @@ github.com/opencontainers/selinux v1.8.0/go.mod h1:RScLhm78qiWa2gbVCcGkC7tCGdgk3
 github.com/opencontainers/selinux v1.8.2/go.mod h1:MUIHuUEvKB1wtJjQdOyYRgOnLD2xAPP8dBsCoU0KuF8=
 github.com/opencontainers/selinux v1.10.0 h1:rAiKF8hTcgLI3w0DHm6i0ylVVcOrlgR1kK99DRLDhyU=
 github.com/opencontainers/selinux v1.10.0/go.mod h1:2i0OySw99QjzBBQByd1Gr9gSjvuho1lHsJxIJ3gGbJI=
-github.com/openkruise/utils v0.0.0-20221226104648-0361b39aa451 h1:QoGVisvWGhCeOm4hezilxsSlQTA83Yd/HZ7HwEISPwk=
-github.com/openkruise/utils v0.0.0-20221226104648-0361b39aa451/go.mod h1:T522/yC4wDMdz1UOX9zOYcuXTPbtZm9zqDvtJcPfZ7M=
+github.com/openkruise/utils v0.0.0-20230802021820-e676b4e572f1 h1:Y0+2cBWCumZavqcBBrYLek2jgnfQjgMgOgB06N2Mqqs=
+github.com/openkruise/utils v0.0.0-20230802021820-e676b4e572f1/go.mod h1:T522/yC4wDMdz1UOX9zOYcuXTPbtZm9zqDvtJcPfZ7M=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=

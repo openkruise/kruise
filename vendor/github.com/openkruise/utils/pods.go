@@ -17,15 +17,14 @@ limitations under the License.
 package utils
 
 import (
-	"fmt"
-	"github.com/docker/distribution/reference"
-	"k8s.io/klog/v2"
-	"k8s.io/utils/integer"
 	"strings"
 
+	"github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/integer"
 )
 
 func MergeVolumeMounts(original, additional []v1.VolumeMount) []v1.VolumeMount {
@@ -147,15 +146,6 @@ func GetContainerStatus(name string, pod *v1.Pod) *v1.ContainerStatus {
 	return nil
 }
 
-func GetPodVolume(pod *v1.Pod, volumeName string) *v1.Volume {
-	for idx, v := range pod.Spec.Volumes {
-		if v.Name == volumeName {
-			return &pod.Spec.Volumes[idx]
-		}
-	}
-	return nil
-}
-
 func IsRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && IsPodReady(pod) && pod.DeletionTimestamp.IsZero()
 }
@@ -172,28 +162,6 @@ func GetPodContainerImageIDs(pod *v1.Pod) map[string]string {
 		cImageIDs[c.Name] = imageID
 	}
 	return cImageIDs
-}
-
-func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
-	cImageIDs := GetPodContainerImageIDs(pod)
-
-	for _, container := range pod.Spec.Containers {
-		if !containers.Has(container.Name) {
-			continue
-		}
-		// image must be digest format
-		if !IsImageDigest(container.Image) {
-			return false
-		}
-		imageID, ok := cImageIDs[container.Name]
-		if !ok {
-			return false
-		}
-		if !IsContainerImageEqual(container.Image, imageID) {
-			return false
-		}
-	}
-	return true
 }
 
 // parse container images,
@@ -249,22 +217,6 @@ func IsContainerImageEqual(image1, image2 string) bool {
 	return repo1 == repo2 && tag1 == tag2
 }
 
-func MergeVolumeMountsInContainer(origin *v1.Container, other v1.Container) {
-	mountExist := make(map[string]bool)
-	for _, volume := range origin.VolumeMounts {
-		mountExist[volume.MountPath] = true
-
-	}
-
-	for _, volume := range other.VolumeMounts {
-		if mountExist[volume.MountPath] {
-			continue
-		}
-
-		origin.VolumeMounts = append(origin.VolumeMounts, volume)
-	}
-}
-
 // GetPodCondition extracts the provided condition from the given status and returns that.
 // Returns nil and -1 if the condition is not present, and the index of the located condition.
 func GetPodCondition(status *v1.PodStatus, conditionType v1.PodConditionType) (int, *v1.PodCondition) {
@@ -286,58 +238,6 @@ func GetPodConditionFromList(conditions []v1.PodCondition, conditionType v1.PodC
 		}
 	}
 	return -1, nil
-}
-
-func SetPodCondition(pod *v1.Pod, condition v1.PodCondition) {
-	for i, c := range pod.Status.Conditions {
-		if c.Type == condition.Type {
-			if c.Status != condition.Status {
-				pod.Status.Conditions[i] = condition
-			}
-			return
-		}
-	}
-	pod.Status.Conditions = append(pod.Status.Conditions, condition)
-}
-
-func SetPodReadyCondition(pod *v1.Pod) {
-	_, podReady := GetPodCondition(&pod.Status, v1.PodReady)
-	if podReady == nil {
-		return
-	}
-
-	_, containersReady := GetPodCondition(&pod.Status, v1.ContainersReady)
-	if containersReady == nil || containersReady.Status != v1.ConditionTrue {
-		return
-	}
-
-	var unreadyMessages []string
-	for _, rg := range pod.Spec.ReadinessGates {
-		_, c := GetPodCondition(&pod.Status, rg.ConditionType)
-		if c == nil {
-			unreadyMessages = append(unreadyMessages, fmt.Sprintf("corresponding condition of pod readiness gate %q does not exist.", string(rg.ConditionType)))
-		} else if c.Status != v1.ConditionTrue {
-			unreadyMessages = append(unreadyMessages, fmt.Sprintf("the status of pod readiness gate %q is not \"True\", but %v", string(rg.ConditionType), c.Status))
-		}
-	}
-
-	newPodReady := v1.PodCondition{
-		Type:               v1.PodReady,
-		Status:             v1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-	}
-	// Set "Ready" condition to "False" if any readiness gate is not ready.
-	if len(unreadyMessages) != 0 {
-		unreadyMessage := strings.Join(unreadyMessages, ", ")
-		newPodReady = v1.PodCondition{
-			Type:    v1.PodReady,
-			Status:  v1.ConditionFalse,
-			Reason:  "ReadinessGatesNotReady",
-			Message: unreadyMessage,
-		}
-	}
-
-	SetPodCondition(pod, newPodReady)
 }
 
 // GetPodReadyCondition extracts the pod ready condition from the given status and returns that.

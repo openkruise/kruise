@@ -16,7 +16,7 @@ require (
 	github.com/onsi/gomega v1.15.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.2
-	github.com/openkruise/utils v0.0.0-20221226104648-0361b39aa451
+	github.com/openkruise/utils v0.0.0-20230802021820-e676b4e572f1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.1
 	github.com/robfig/cron/v3 v3.0.1

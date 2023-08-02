@@ -408,7 +408,7 @@ github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
 github.com/opencontainers/selinux/pkg/pwalkdir
-# github.com/openkruise/utils v0.0.0-20221226104648-0361b39aa451
+# github.com/openkruise/utils v0.0.0-20230802021820-e676b4e572f1
 ## explicit; go 1.18
 github.com/openkruise/utils
 github.com/openkruise/utils/sidecarcontrol
