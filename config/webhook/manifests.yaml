@@ -727,3 +727,24 @@ webhooks:
     resources:
     - uniteddeployments
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-ephemeraljob
+  failurePolicy: Fail
+  name: vephemeraljob.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ephemeraljobs
+  sideEffects: None

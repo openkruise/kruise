@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -65,8 +66,9 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileEphemeralJob {
 	return &ReconcileEphemeralJob{
-		Client: utilclient.NewClientFromManager(mgr, "ephemeraljob-controller"),
-		scheme: mgr.GetScheme(),
+		Client:        utilclient.NewClientFromManager(mgr, "ephemeraljob-controller"),
+		scheme:        mgr.GetScheme(),
+		eventRecorder: mgr.GetEventRecorderFor("ephemeraljob-controller"),
 	}
 }
 
@@ -98,7 +100,8 @@ var _ reconcile.Reconciler = &ReconcileEphemeralJob{}
 // ReconcileEphemeralJob reconciles a ImagePullJob object
 type ReconcileEphemeralJob struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme        *runtime.Scheme
+	eventRecorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=ephemeraljobs,verbs=get;list;watch;update;patch;delete
@@ -345,12 +348,15 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 			scaleExpectations.ExpectScale(key, expectations.Create, podEphemeralContainerName)
 		}
 		if err := control.CreateEphemeralContainer(pod); err != nil {
+			r.eventRecorder.Event(job, v1.EventTypeWarning, "CreateFailed",
+				fmt.Sprintf("Failed to create ephemeral container for pod %s: %v", pod.Name, err))
 			for _, podEphemeralContainerName := range getPodEphemeralContainers(pod, job) {
 				scaleExpectations.ObserveScale(key, expectations.Create, podEphemeralContainerName)
 			}
 			return err
 		}
-
+		r.eventRecorder.Event(job, v1.EventTypeNormal, "CreateSuccessfully",
+			fmt.Sprintf("create ephemeral container for pod %s successfully", pod.Name))
 		return nil
 	})
 
@@ -440,12 +446,14 @@ func (r *ReconcileEphemeralJob) removeEphemeralContainers(job *appsv1alpha1.Ephe
 		return err
 	}
 
-	var errors error
+	control := econtainer.New(job)
 	for _, pod := range targetPods {
-		if e := econtainer.New(job).RemoveEphemeralContainer(pod); e != nil {
-			errors = e
+		if err = control.RemoveEphemeralContainer(pod); err != nil {
+			r.eventRecorder.Event(job, v1.EventTypeWarning, "RemoveFailed",
+				fmt.Sprintf("Failed to remove ephemeral container for pod %s: %v", pod.Name, err))
+			return err
 		}
 	}
 
-	return errors
+	return nil
 }
