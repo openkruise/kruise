@@ -40,8 +40,9 @@ import (
 )
 
 var (
-	containerImagePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
-	rfc6901Decoder          = strings.NewReplacer("~1", "/", "~0", "~")
+	containerImagePatchRexp     = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+	containerResourcesPatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/resources/.*$")
+	rfc6901Decoder              = strings.NewReplacer("~1", "/", "~0", "~")
 
 	Clock clock.Clock = clock.RealClock{}
 )
@@ -82,11 +83,12 @@ type Interface interface {
 type UpdateSpec struct {
 	Revision string `json:"revision"`
 
-	ContainerImages       map[string]string            `json:"containerImages,omitempty"`
-	ContainerRefMetadata  map[string]metav1.ObjectMeta `json:"containerRefMetadata,omitempty"`
-	MetaDataPatch         []byte                       `json:"metaDataPatch,omitempty"`
-	UpdateEnvFromMetadata bool                         `json:"updateEnvFromMetadata,omitempty"`
-	GraceSeconds          int32                        `json:"graceSeconds,omitempty"`
+	ContainerImages       map[string]string                  `json:"containerImages,omitempty"`
+	ContainerRefMetadata  map[string]metav1.ObjectMeta       `json:"containerRefMetadata,omitempty"`
+	ContainerResources    map[string]v1.ResourceRequirements `json:"containerResources,omitempty"`
+	MetaDataPatch         []byte                             `json:"metaDataPatch,omitempty"`
+	UpdateEnvFromMetadata bool                               `json:"updateEnvFromMetadata,omitempty"`
+	GraceSeconds          int32                              `json:"graceSeconds,omitempty"`
 
 	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
 	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
@@ -134,7 +136,7 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 		}
 
 		// check if there are containers with lower-priority that have to in-place update in next batch
-		if len(state.NextContainerImages) > 0 || len(state.NextContainerRefMetadata) > 0 {
+		if len(state.NextContainerImages) > 0 || len(state.NextContainerRefMetadata) > 0 || len(state.NextContainerResources) > 0 {
 
 			// pre-check the previous updated containers
 			if checkErr := doPreCheckBeforeNext(pod, state.PreCheckBeforeNext); checkErr != nil {
@@ -257,6 +259,7 @@ func (c *realControl) updateNextBatch(pod *v1.Pod, opts *UpdateOptions) (bool, e
 			ContainerImages:       state.NextContainerImages,
 			ContainerRefMetadata:  state.NextContainerRefMetadata,
 			UpdateEnvFromMetadata: state.UpdateEnvFromMetadata,
+			ContainerResources:    state.NextContainerResources,
 		}
 		if clone, err = opts.PatchSpecToPod(clone, &spec, &state); err != nil {
 			return err
