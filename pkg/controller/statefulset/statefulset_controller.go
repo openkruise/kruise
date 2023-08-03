@@ -145,7 +145,6 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		control: NewDefaultStatefulSetControl(
 			NewStatefulPodControl(
 				genericClient.KubeClient,
-				statefulSetLister,
 				podLister,
 				pvcLister,
 				recorder),
@@ -274,7 +273,7 @@ func (ssc *ReconcileStatefulSet) Reconcile(ctx context.Context, request reconcil
 		return reconcile.Result{}, err
 	}
 
-	err = ssc.syncStatefulSet(set, pods)
+	err = ssc.syncStatefulSet(ctx, set, pods)
 	return reconcile.Result{RequeueAfter: durationStore.Pop(getStatefulSetKey(set))}, err
 }
 
@@ -340,10 +339,10 @@ func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(ctx context.Context, set 
 }
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
-func (ssc *ReconcileStatefulSet) syncStatefulSet(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
+func (ssc *ReconcileStatefulSet) syncStatefulSet(ctx context.Context, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
 	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
 	// TODO: investigate where we mutate the set during the update as it is not obvious.
-	if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil {
+	if err := ssc.control.UpdateStatefulSet(ctx, set.DeepCopy(), pods); err != nil {
 		return err
 	}
 	klog.V(4).Infof("Successfully synced StatefulSet %s/%s", set.Namespace, set.Name)

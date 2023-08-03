@@ -130,7 +130,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ssc.syncStatefulSet(set, pods)
+	ssc.syncStatefulSet(context.TODO(), set, pods)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
@@ -791,7 +791,6 @@ func NewStatefulSetController(
 			control: NewDefaultStatefulSetControl(
 				NewStatefulPodControl(
 					kubeClient,
-					setInformer.Lister(),
 					podInformer.Lister(),
 					pvcInformer.Lister(),
 					recorder),

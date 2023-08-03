@@ -34,7 +34,6 @@ import (
 	"k8s.io/klog/v2"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
@@ -42,7 +41,7 @@ import (
 // StatefulPodControlObjectManager abstracts the manipulation of Pods and PVCs. The real controller implements this
 // with a clientset for writes and listers for reads; for tests we provide stubs.
 type StatefulPodControlObjectManager interface {
-	CreatePod(pod *v1.Pod) error
+	CreatePod(ctx context.Context, pod *v1.Pod) error
 	GetPod(namespace, podName string) (*v1.Pod, error)
 	UpdatePod(pod *v1.Pod) error
 	DeletePod(pod *v1.Pod) error
@@ -62,12 +61,11 @@ type StatefulPodControl struct {
 // clientset, listers and EventRecorder.
 func NewStatefulPodControl(
 	client clientset.Interface,
-	setLister kruiseappslisters.StatefulSetLister,
 	podLister corelisters.PodLister,
 	claimLister corelisters.PersistentVolumeClaimLister,
 	recorder record.EventRecorder,
 ) *StatefulPodControl {
-	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, setLister, podLister, claimLister}, recorder}
+	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, podLister, claimLister}, recorder}
 }
 
 // NewStatefulPodControlFromManager creates a StatefulPodControl using the given StatefulPodControlObjectManager and recorder.
@@ -78,13 +76,12 @@ func NewStatefulPodControlFromManager(om StatefulPodControlObjectManager, record
 // realStatefulPodControlObjectManager uses a clientset.Interface and listers.
 type realStatefulPodControlObjectManager struct {
 	client      clientset.Interface
-	setLister   kruiseappslisters.StatefulSetLister
 	podLister   corelisters.PodLister
 	claimLister corelisters.PersistentVolumeClaimLister
 }
 
-func (om *realStatefulPodControlObjectManager) CreatePod(pod *v1.Pod) error {
-	_, err := om.client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+func (om *realStatefulPodControlObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
+	_, err := om.client.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	return err
 }
 
@@ -115,14 +112,14 @@ func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentV
 	return err
 }
 
-func (spc *StatefulPodControl) CreateStatefulPod(set *appsv1beta1.StatefulSet, pod *v1.Pod) error {
+func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *appsv1beta1.StatefulSet, pod *v1.Pod) error {
 	// Create the Pod's PVCs prior to creating the Pod
 	if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
 		spc.recordPodEvent("create", set, pod, err)
 		return err
 	}
 	// If we created the PVCs attempt to create the Pod
-	err := spc.objectMgr.CreatePod(pod)
+	err := spc.objectMgr.CreatePod(ctx, pod)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
 		return err

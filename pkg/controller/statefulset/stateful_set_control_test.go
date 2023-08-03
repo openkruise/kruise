@@ -18,6 +18,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -356,7 +357,7 @@ func ReplacesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invaria
 		if err != nil {
 			t.Error(err)
 		}
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Errorf("Failed to update StatefulSet : %s", err)
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -366,7 +367,7 @@ func ReplacesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invaria
 		if pods, err = om.setPodRunning(set, i); err != nil {
 			t.Error(err)
 		}
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Errorf("Failed to update StatefulSet : %s", err)
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -381,7 +382,7 @@ func ReplacesPods(t *testing.T, set *appsv1beta1.StatefulSet, invariants invaria
 	if err != nil {
 		t.Error(err)
 	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Errorf("Failed to update StatefulSet : %s", err)
 	}
 	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -406,7 +407,7 @@ func RecreatesFailedPod(t *testing.T, set *appsv1beta1.StatefulSet, invariants i
 	if err != nil {
 		t.Error(err)
 	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
 	if err := invariants(set, om); err != nil {
@@ -418,7 +419,7 @@ func RecreatesFailedPod(t *testing.T, set *appsv1beta1.StatefulSet, invariants i
 	}
 	pods[0].Status.Phase = v1.PodFailed
 	om.podsIndexer.Update(pods[0])
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
 	if err := invariants(set, om); err != nil {
@@ -518,7 +519,7 @@ func UpdatePodFailure(t *testing.T, set *appsv1beta1.StatefulSet, invariants inv
 	om.podsIndexer.Update(pods[0])
 
 	// now it should fail
-	if err := ssc.UpdateStatefulSet(set, pods); !apierrors.IsInternalError(err) {
+	if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); !apierrors.IsInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
 	}
 }
@@ -577,7 +578,7 @@ func PodRecreateDeleteFailure(t *testing.T, set *appsv1beta1.StatefulSet, invari
 	if err != nil {
 		t.Error(err)
 	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
 	if err := invariants(set, om); err != nil {
@@ -590,13 +591,13 @@ func PodRecreateDeleteFailure(t *testing.T, set *appsv1beta1.StatefulSet, invari
 	pods[0].Status.Phase = v1.PodFailed
 	om.podsIndexer.Update(pods[0])
 	om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil && isOrHasInternalError(err) {
+	if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil && isOrHasInternalError(err) {
 		t.Errorf("StatefulSet failed to %s", err)
 	}
 	if err := invariants(set, om); err != nil {
 		t.Error(err)
 	}
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Errorf("Error updating StatefulSet %s", err)
 	}
 	if err := invariants(set, om); err != nil {
@@ -1629,7 +1630,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 		spc, _, ssc, stop := setupController(client, kruiseClient)
 		defer close(stop)
 		// reconcile once, start with no pod
-		if err := ssc.UpdateStatefulSet(set, []*v1.Pod{}); err != nil {
+		if err := ssc.UpdateStatefulSet(context.TODO(), set, []*v1.Pod{}); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		// update the pods
@@ -1651,7 +1652,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		sort.Sort(ascendingOrdinal(pods))
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		// validate the result
@@ -1813,7 +1814,7 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		// update the image
 		set.Spec.Template.Spec.Containers[0].Image = "foo"
 		// reconcile once, start with no pod
-		if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		// get the pods
@@ -1829,14 +1830,14 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		// validate the result
@@ -2051,7 +2052,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	sort.Sort(ascendingOrdinal(originalPods))
 
 	// first update pods 4/5
-	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2064,7 +2065,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	}
 
 	// create new pods 4/5
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2080,7 +2081,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	spc.setPodRunning(set, 5)
 	originalPods, _ = spc.setPodReady(set, 4)
 	sort.Sort(ascendingOrdinal(originalPods))
-	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2093,7 +2094,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	}
 
 	// create new pod 3
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2110,7 +2111,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	spc.setPodReady(set, 5)
 	originalPods, _ = spc.setPodReady(set, 3)
 	sort.Sort(ascendingOrdinal(originalPods))
-	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2171,7 +2172,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	oldRevision := originalPods[2].Labels[apps.StatefulSetRevisionLabel]
 
 	// in-place update pod 2
-	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2197,7 +2198,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	}
 
 	// should not update pod 1, because of pod2 status not changed
-	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2214,7 +2215,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 		Name:    "nginx",
 		ImageID: "imgID2",
 	}}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2225,7 +2226,7 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	if state := lifecycle.GetPodLifecycleState(pods[2]); state != appspub.LifecycleStateNormal {
 		t.Fatalf("Expected lifecycle to be Normal after in-place update: %v", state)
 	}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2256,17 +2257,17 @@ func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 		Name:    "nginx",
 		ImageID: "imgID2",
 	}}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2343,7 +2344,7 @@ func TestStatefulSetControlLifecycleHook(t *testing.T) {
 	oldRevision := originalPods[2].Labels[apps.StatefulSetRevisionLabel]
 
 	// prepare in-place update pod 2
-	if err = ssc.UpdateStatefulSet(set, originalPods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2360,7 +2361,7 @@ func TestStatefulSetControlLifecycleHook(t *testing.T) {
 	pods[2].Labels["unready-block"] = "false"
 
 	// inplace update pod2
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2383,7 +2384,7 @@ func TestStatefulSetControlLifecycleHook(t *testing.T) {
 		Name:    "nginx",
 		ImageID: "imgID2",
 	}}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2398,7 +2399,7 @@ func TestStatefulSetControlLifecycleHook(t *testing.T) {
 
 	// update pod2 to be hooked, pod2 state to Normal
 	pods[2].Labels["unready-block"] = "true"
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2412,7 +2413,7 @@ func TestStatefulSetControlLifecycleHook(t *testing.T) {
 	}
 
 	// should not prepare in-place update pod 1
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		t.Fatal(err)
 	}
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -2502,7 +2503,7 @@ func TestStatefulSetControlLimitsHistory(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
-			err = ssc.UpdateStatefulSet(set, pods)
+			err = ssc.UpdateStatefulSet(context.TODO(), set, pods)
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
@@ -2845,7 +2846,7 @@ func newFakeObjectManager(informerFactory informers.SharedInformerFactory, kruis
 		requestTracker{0, nil, 0}}
 }
 
-func (om *fakeObjectManager) CreatePod(pod *v1.Pod) error {
+func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	defer om.createPodTracker.inc()
 	if om.createPodTracker.errorReady() {
 		defer om.createPodTracker.reset()
@@ -3022,7 +3023,7 @@ func newFakeStatefulSetStatusUpdater(setInformer kruiseappsinformers.StatefulSet
 	}
 }
 
-func (ssu *fakeStatefulSetStatusUpdater) UpdateStatefulSetStatus(set *appsv1beta1.StatefulSet, status *appsv1beta1.StatefulSetStatus) error {
+func (ssu *fakeStatefulSetStatusUpdater) UpdateStatefulSetStatus(ctx context.Context, set *appsv1beta1.StatefulSet, status *appsv1beta1.StatefulSetStatus) error {
 	defer ssu.updateStatusTracker.inc()
 	if ssu.updateStatusTracker.errorReady() {
 		defer ssu.updateStatusTracker.reset()
@@ -3277,7 +3278,7 @@ func scaleUpStatefulSetControl(set *appsv1beta1.StatefulSet,
 		}
 
 		// run the controller once and check invariants
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			return err
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -3304,7 +3305,7 @@ func scaleDownStatefulSetControl(set *appsv1beta1.StatefulSet, ssc StatefulSetCo
 		}
 		sort.Sort(ascendingOrdinal(pods))
 		if ordinal := len(pods) - 1; ordinal >= 0 {
-			if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+			if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 				return err
 			}
 			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -3314,7 +3315,7 @@ func scaleDownStatefulSetControl(set *appsv1beta1.StatefulSet, ssc StatefulSetCo
 			if pods, err = om.addTerminatingPod(set, ordinal); err != nil {
 				return err
 			}
-			if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+			if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 				return err
 			}
 			set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -3331,7 +3332,7 @@ func scaleDownStatefulSetControl(set *appsv1beta1.StatefulSet, ssc StatefulSetCo
 				om.podsIndexer.Delete(pods[len(pods)-1])
 			}
 		}
-		if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			return err
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -3427,7 +3428,7 @@ func updateStatefulSetControl(set *appsv1beta1.StatefulSet,
 	if err != nil {
 		return err
 	}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 		return err
 	}
 
@@ -3475,7 +3476,7 @@ func updateStatefulSetControl(set *appsv1beta1.StatefulSet,
 			}
 		}
 
-		if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+		if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			return err
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -3539,7 +3540,7 @@ func TestScaleUpWithMaxUnavailable(t *testing.T) {
 				}
 			}
 
-			if err = ssc.UpdateStatefulSet(set, pods); err != nil {
+			if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 				t.Fatalf("Failed to reconcile update statefulset: %v", err)
 			}
 		}

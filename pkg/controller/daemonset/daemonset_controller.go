@@ -556,7 +556,7 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ctx context.Context, ds *ap
 	}
 	numberUnavailable := desiredNumberScheduled - numberAvailable
 
-	err = dsc.storeDaemonSetStatus(ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable, updateObservedGen, hash)
+	err = dsc.storeDaemonSetStatus(ctx, ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable, updateObservedGen, hash)
 	if err != nil {
 		return fmt.Errorf("error storing status for DaemonSet %v: %v", ds.Name, err)
 	}
@@ -568,7 +568,18 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ctx context.Context, ds *ap
 	return nil
 }
 
-func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(ds *appsv1alpha1.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int, updateObservedGen bool, hash string) error {
+func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(
+	ctx context.Context,
+	ds *appsv1alpha1.DaemonSet,
+	desiredNumberScheduled,
+	currentNumberScheduled,
+	numberMisscheduled,
+	numberReady,
+	updatedNumberScheduled,
+	numberAvailable,
+	numberUnavailable int,
+	updateObservedGen bool,
+	hash string) error {
 	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
 		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
 		int(ds.Status.NumberMisscheduled) == numberMisscheduled &&
@@ -597,14 +608,14 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(ds *appsv1alpha1.DaemonSet, 
 		toUpdate.Status.NumberUnavailable = int32(numberUnavailable)
 		toUpdate.Status.DaemonSetHash = hash
 
-		if _, updateErr = dsClient.UpdateStatus(context.TODO(), toUpdate, metav1.UpdateOptions{}); updateErr == nil {
+		if _, updateErr = dsClient.UpdateStatus(ctx, toUpdate, metav1.UpdateOptions{}); updateErr == nil {
 			klog.Infof("Updated DaemonSet %s/%s status to %v", ds.Namespace, ds.Name, kruiseutil.DumpJSON(toUpdate.Status))
 			return nil
 		}
 
 		klog.Errorf("Update DaemonSet status %v failed: %v", ds.Status, updateErr)
 		// Update the set with the latest resource version for the next poll
-		if toUpdate, getErr = dsClient.Get(context.TODO(), ds.Name, metav1.GetOptions{}); getErr != nil {
+		if toUpdate, getErr = dsClient.Get(ctx, ds.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			klog.Errorf("Get DaemonSet %v for status update failed: %v", ds.Name, getErr)
@@ -1028,7 +1039,7 @@ func (dsc *ReconcileDaemonSet) cleanupHistory(ctx context.Context, ds *appsv1alp
 			continue
 		}
 		// Clean up
-		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(context.TODO(), history.Name, metav1.DeleteOptions{})
+		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(ctx, history.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
