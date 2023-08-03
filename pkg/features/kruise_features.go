@@ -105,6 +105,9 @@ const (
 	// PreparingUpdateAsUpdate enable CloneSet/Advanced StatefulSet controller to regard preparing-update Pod
 	// as updated when calculating update/current revision during scaling.
 	PreparingUpdateAsUpdate featuregate.Feature = "PreparingUpdateAsUpdate"
+
+	// ImagePullJobGate enable imagepulljob-controller execute ImagePullJob.
+	ImagePullJobGate featuregate.Feature = "ImagePullJobGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -129,6 +132,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
 	PreparingUpdateAsUpdate:                   {Default: false, PreRelease: featuregate.Alpha},
+	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -164,5 +168,10 @@ func SetDefaultFeatureGates() {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForDaemonSetUpdate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodProbeMarkerGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarTerminator))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ImagePullJobGate))
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(ImagePullJobGate) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForDaemonSetUpdate))
 	}
 }

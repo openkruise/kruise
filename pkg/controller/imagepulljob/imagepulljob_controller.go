@@ -66,7 +66,8 @@ const (
 // Add creates a new ImagePullJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !utildiscovery.DiscoverGVK(controllerKind) || !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) {
+	if !utildiscovery.DiscoverGVK(controllerKind) || !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGate) {
 		return nil
 	}
 	return add(mgr, newReconciler(mgr))
