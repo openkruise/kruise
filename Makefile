@@ -115,6 +115,8 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
+include tools/tools.mk
+
 # create-cluster creates a kube cluster with kind.
 .PHONY: create-cluster
 create-cluster: $(tools/kind)
@@ -141,7 +143,6 @@ run-kruise-e2e-test:
 	@echo -e "\n\033[36mRunning kruise e2e tests...\033[0m"
 	tools/hack/run-kruise-e2e-test.sh
 
-include tools/tools.mk
 
 # kruise-e2e-test runs kruise e2e tests.
 .PHONY: kruise-e2e-test
