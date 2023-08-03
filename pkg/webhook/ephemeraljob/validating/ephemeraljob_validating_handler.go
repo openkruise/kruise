@@ -65,6 +65,8 @@ func validateEphemeralJobSpec(spec *appsv1alpha1.EphemeralJobSpec, path *field.P
 				allErrs = append(allErrs, field.Invalid(path.Child("selector"), spec.Selector, err.Error()))
 			}
 		}
+	} else {
+		allErrs = append(allErrs, field.Invalid(path.Child("selector"), spec.Selector, "selector must be not empty"))
 	}
 
 	var ephemeralContainers []v1.EphemeralContainer

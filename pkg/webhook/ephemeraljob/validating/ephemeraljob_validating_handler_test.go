@@ -17,6 +17,7 @@ limitations under the License.
 package validating
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -45,42 +46,44 @@ var (
 		},
 		TargetContainerName: "main",
 	}
+
+	selector = metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}}
 )
 
 func TestValidateEphemeralJobSpec(t *testing.T) {
-	sucessfulCases := map[string]func() *appsv1alpha1.EphemeralJobSpec{
+	successfulCases := map[string]func() *appsv1alpha1.EphemeralJobSpec{
 		"normal case": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"without comm": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.Command = nil
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"without args": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.Args = nil
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"without env": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.Env = nil
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"without volumeMounts": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.VolumeMounts = nil
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"without targetContainer": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.TargetContainerName = ""
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 	}
 
-	for name, cs := range sucessfulCases {
+	for name, cs := range successfulCases {
 		t.Run(name, func(t *testing.T) {
 			allErrs := validateEphemeralJobSpec(cs(), field.NewPath("spec"))
 			if len(allErrs) != 0 {
@@ -90,30 +93,34 @@ func TestValidateEphemeralJobSpec(t *testing.T) {
 	}
 
 	failedCases := map[string]func() *appsv1alpha1.EphemeralJobSpec{
+		"without selector": func() *appsv1alpha1.EphemeralJobSpec {
+			ec := ecDemo.DeepCopy()
+			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+		},
 		"without image": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.Image = ""
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"without name": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.Name = ""
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"with ports": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.Ports = []v1.ContainerPort{{Name: "web", ContainerPort: 80, Protocol: v1.ProtocolTCP}}
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"with resources": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.Resources = v1.ResourceRequirements{Limits: v1.ResourceList{"cpu": *resource.NewQuantity(100000, resource.DecimalSI)}}
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"with subPath": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
 			ec.VolumeMounts[0].SubPath = "sub_path"
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 		"with probe": func() *appsv1alpha1.EphemeralJobSpec {
 			ec := ecDemo.DeepCopy()
@@ -129,7 +136,7 @@ func TestValidateEphemeralJobSpec(t *testing.T) {
 				TimeoutSeconds:      10,
 				PeriodSeconds:       10,
 			}
-			return &appsv1alpha1.EphemeralJobSpec{Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
+			return &appsv1alpha1.EphemeralJobSpec{Selector: &selector, Template: appsv1alpha1.EphemeralContainerTemplateSpec{EphemeralContainers: []v1.EphemeralContainer{*ec}}}
 		},
 	}
 
