@@ -50,7 +50,7 @@ var (
 							ContainerName: "main",
 							Probe: appsv1alpha1.ContainerProbeSpec{
 								Probe: corev1.Probe{
-									Handler: corev1.Handler{
+									ProbeHandler: corev1.ProbeHandler{
 										Exec: &corev1.ExecAction{
 											Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 										},
@@ -70,7 +70,7 @@ var (
 							ContainerName: "main",
 							Probe: appsv1alpha1.ContainerProbeSpec{
 								Probe: corev1.Probe{
-									Handler: corev1.Handler{
+									ProbeHandler: corev1.ProbeHandler{
 										Exec: &corev1.ExecAction{
 											Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 										},
@@ -156,7 +156,7 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 					ContainerName: "main",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "/other.sh"},
 								},
@@ -239,7 +239,7 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 					ContainerName: "main",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "/other.sh"},
 								},
@@ -415,7 +415,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 				key1 := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#check"}
 				c.workers[key1] = newWorker(c, key1, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
 								Command: []string{"/bin/sh", "-c", "/check.sh"},
 							},
@@ -426,7 +426,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 				key2 := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}
 				c.workers[key2] = newWorker(c, key2, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
 								Command: []string{"/bin/sh", "-c", "/healthy2.sh"},
 							},
@@ -440,7 +440,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 				key := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}
 				expect[key] = newWorker(c, key, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
 								Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 							},
@@ -460,7 +460,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 					ContainerName: "nginx",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "/check.sh"},
 								},
@@ -479,7 +479,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 				key1 := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}
 				expect[key1] = newWorker(c, key1, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
 								Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 							},
@@ -490,7 +490,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 				key2 := probeKey{"", "pod-1", "pod-1-uid", "nginx", "ppm-1#check"}
 				expect[key2] = newWorker(c, key2, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
 								Command: []string{"/bin/sh", "-c", "/check.sh"},
 							},
@@ -501,7 +501,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 				key3 := probeKey{"", "pod-0", "pod-0-uid", "main", "ppm-1#healthy"}
 				expect[key3] = newWorker(c, key3, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
 								Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 							},

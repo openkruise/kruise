@@ -18,7 +18,7 @@ limitations under the License.
 package kuberuntime
 
 import (
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 

@@ -35,10 +35,10 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
-func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
+func (dsc *ReconcileDaemonSet) constructHistory(ctx context.Context, ds *appsv1alpha1.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
 	var histories []*apps.ControllerRevision
 	var currentHistories []*apps.ControllerRevision
-	histories, err = dsc.controlledHistories(ds)
+	histories, err = dsc.controlledHistories(ctx, ds)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,7 +75,7 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur
 			return nil, nil, err
 		}
 	default:
-		cur, err = dsc.dedupCurHistories(ds, currentHistories)
+		cur, err = dsc.dedupCurHistories(ctx, ds, currentHistories)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -96,7 +96,7 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned histories are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *ReconcileDaemonSet) controlledHistories(ds *appsv1alpha1.DaemonSet) ([]*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) controlledHistories(ctx context.Context, ds *appsv1alpha1.DaemonSet) ([]*apps.ControllerRevision, error) {
 	selector, err := util.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -110,8 +110,8 @@ func (dsc *ReconcileDaemonSet) controlledHistories(ds *appsv1alpha1.DaemonSet) (
 	}
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kruiseClient.AppsV1alpha1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
+		fresh, err := dsc.kruiseClient.AppsV1alpha1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func (dsc *ReconcileDaemonSet) controlledHistories(ds *appsv1alpha1.DaemonSet) (
 	})
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm := kubecontroller.NewControllerRevisionControllerRefManager(dsc.crControl, ds, selector, controllerKind, canAdoptFunc)
-	return cm.ClaimControllerRevisions(histories)
+	return cm.ClaimControllerRevisions(ctx, histories)
 }
 
 // Match check if the given DaemonSet's template matches the template stored in the given history.
@@ -231,7 +231,7 @@ func (dsc *ReconcileDaemonSet) snapshot(ds *appsv1alpha1.DaemonSet, revision int
 	return history, err
 }
 
-func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *appsv1alpha1.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) dedupCurHistories(ctx context.Context, ds *appsv1alpha1.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	if len(curHistories) == 1 {
 		return curHistories[0], nil
 	}
@@ -244,7 +244,7 @@ func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *appsv1alpha1.DaemonSet, cur
 		}
 	}
 	// Relabel pods before dedup
-	pods, err := dsc.getDaemonPods(ds)
+	pods, err := dsc.getDaemonPods(ctx, ds)
 	if err != nil {
 		return nil, err
 	}

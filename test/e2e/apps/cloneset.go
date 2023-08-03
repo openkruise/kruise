@@ -468,7 +468,7 @@ var _ = SIGDescribe("CloneSet", func() {
 				Image:     RedisImage,
 				Command:   []string{"sleep", "999"},
 				Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
-				Lifecycle: &v1.Lifecycle{PostStart: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
+				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
 			cs, err = tester.CreateCloneSet(cs)
@@ -547,7 +547,7 @@ var _ = SIGDescribe("CloneSet", func() {
 				Name:      "redis",
 				Image:     RedisImage,
 				Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
-				Lifecycle: &v1.Lifecycle{PostStart: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
+				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
 			cs, err = tester.CreateCloneSet(cs)
@@ -630,7 +630,7 @@ var _ = SIGDescribe("CloneSet", func() {
 					{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"},
 					{Name: "CONFIG", ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.annotations['config']"}}},
 				},
-				Lifecycle: &v1.Lifecycle{PostStart: &v1.Handler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
+				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

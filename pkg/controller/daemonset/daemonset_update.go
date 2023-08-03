@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -38,9 +39,9 @@ import (
 
 // rollingUpdate identifies the set of old pods to in-place update, delete, or additional pods to create on nodes,
 // remaining within the constraints imposed by the update strategy.
-func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {
+func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {
 	hash := curRevision.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
@@ -142,7 +143,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeLis
 			}
 		}
 
-		return dsc.syncNodes(ds, oldPodsToDelete, nil, hash)
+		return dsc.syncNodes(ctx, ds, oldPodsToDelete, nil, hash)
 	}
 
 	// When surging, we create new pods whenever an old pod is unavailable, and we can create up
@@ -224,7 +225,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeLis
 	}
 	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
 
-	return dsc.syncNodes(ds, oldPodsToDelete, newNodesToCreate, hash)
+	return dsc.syncNodes(ctx, ds, oldPodsToDelete, newNodesToCreate, hash)
 }
 
 // updatedDesiredNodeCounts calculates the true number of allowed unavailable or surge pods and

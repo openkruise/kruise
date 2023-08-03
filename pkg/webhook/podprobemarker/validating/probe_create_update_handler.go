@@ -171,7 +171,7 @@ func validateProbe(probe *appsv1alpha1.ContainerProbeSpec, fldPath *field.Path) 
 		allErrs = append(allErrs, field.Invalid(fldPath, probe, "probe can't be empty in podProbeMarker."))
 		return allErrs
 	}
-	allErrs = append(allErrs, validateHandler(&probe.Handler, fldPath)...)
+	allErrs = append(allErrs, validateHandler(&probe.ProbeHandler, fldPath)...)
 	allErrs = append(allErrs, validation.ValidateNonnegativeField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
 	allErrs = append(allErrs, validation.ValidateNonnegativeField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
 	allErrs = append(allErrs, validation.ValidateNonnegativeField(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
@@ -180,7 +180,7 @@ func validateProbe(probe *appsv1alpha1.ContainerProbeSpec, fldPath *field.Path) 
 	return allErrs
 }
 
-func validateHandler(handler *corev1.Handler, fldPath *field.Path) field.ErrorList {
+func validateHandler(handler *corev1.ProbeHandler, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
 	if handler.Exec != nil {

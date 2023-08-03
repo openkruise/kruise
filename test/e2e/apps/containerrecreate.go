@@ -182,7 +182,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				{
 					Name:  "app",
 					Image: WebserverImage,
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.Handler{
+					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{
 						Exec: &v1.ExecAction{Command: []string{"sleep", "5"}},
 					}},
 				},
@@ -306,7 +306,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				{
 					Name:  "app",
 					Image: WebserverImage,
-					Lifecycle: &v1.Lifecycle{PreStop: &v1.Handler{
+					Lifecycle: &v1.Lifecycle{PreStop: &v1.LifecycleHandler{
 						Exec: &v1.ExecAction{Command: []string{"sleep", "8"}},
 					}},
 				},
@@ -504,7 +504,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				{
 					Name:  "app",
 					Image: WebserverImage,
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.Handler{
+					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{
 						Exec: &v1.ExecAction{Command: []string{"sleep", "5"}},
 					}},
 				},

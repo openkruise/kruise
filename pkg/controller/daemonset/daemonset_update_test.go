@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -223,7 +224,7 @@ func TestDaemonSetUpdatesAllOldPodsNotReadyMaxSurge(t *testing.T) {
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 3, 0, 0)
 
-	hash, err := currentDSHash(manager, ds)
+	hash, err := currentDSHash(context.TODO(), manager, ds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,9 +344,9 @@ func setPodReadiness(t *testing.T, dsc *daemonSetsController, ready bool, count 
 	}
 }
 
-func currentDSHash(dsc *daemonSetsController, ds *appsv1alpha1.DaemonSet) (string, error) {
+func currentDSHash(ctx context.Context, dsc *daemonSetsController, ds *appsv1alpha1.DaemonSet) (string, error) {
 	// Construct histories of the DaemonSet, and get the hash of current history
-	cur, _, err := dsc.constructHistory(ds)
+	cur, _, err := dsc.constructHistory(ctx, ds)
 	if err != nil {
 		return "", err
 	}

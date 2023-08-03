@@ -323,7 +323,7 @@ func (dsc *ReconcileDaemonSet) Reconcile(ctx context.Context, request reconcile.
 		_ = durationStore.Pop(request.String())
 	}()
 
-	err := dsc.syncDaemonSet(request)
+	err := dsc.syncDaemonSet(ctx, request)
 	return reconcile.Result{RequeueAfter: durationStore.Pop(request.String())}, err
 }
 
@@ -331,7 +331,7 @@ func (dsc *ReconcileDaemonSet) Reconcile(ctx context.Context, request reconcile.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *ReconcileDaemonSet) getDaemonPods(ds *appsv1alpha1.DaemonSet) ([]*corev1.Pod, error) {
+func (dsc *ReconcileDaemonSet) getDaemonPods(ctx context.Context, ds *appsv1alpha1.DaemonSet) ([]*corev1.Pod, error) {
 	selector, err := kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -346,8 +346,8 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ds *appsv1alpha1.DaemonSet) ([]*cor
 
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
-	dsNotDeleted := kubecontroller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kruiseClient.AppsV1alpha1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+	dsNotDeleted := kubecontroller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
+		fresh, err := dsc.kruiseClient.AppsV1alpha1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -359,10 +359,10 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ds *appsv1alpha1.DaemonSet) ([]*cor
 
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm := kubecontroller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind, dsNotDeleted)
-	return cm.ClaimPods(pods)
+	return cm.ClaimPods(ctx, pods)
 }
 
-func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
+func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconcile.Request) error {
 	dsKey := request.NamespacedName.String()
 	ds, err := dsc.dsLister.DaemonSets(request.Namespace).Get(request.Name)
 	if err != nil {
@@ -393,14 +393,14 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	}
 
 	// Construct histories of the DaemonSet, and get the hash of current history
-	cur, old, err := dsc.constructHistory(ds)
+	cur, old, err := dsc.constructHistory(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
-		return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
+	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
+		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
 
 	if !isPreDownloadDisabled && dsc.Client != nil {
@@ -429,17 +429,17 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 		}
 	}
 
-	err = dsc.manage(ds, nodeList, hash)
+	err = dsc.manage(ctx, ds, nodeList, hash)
 	if err != nil {
 		return err
 	}
 
 	// return and wait next reconcile if expectation changed to unsatisfied
-	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
-		return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
+	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
+		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
 
-	if err := dsc.refreshUpdateStates(ds); err != nil {
+	if err := dsc.refreshUpdateStates(ctx, ds); err != nil {
 		return err
 	}
 
@@ -449,19 +449,19 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 		switch ds.Spec.UpdateStrategy.Type {
 		case appsv1alpha1.OnDeleteDaemonSetStrategyType:
 		case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
-			err = dsc.rollingUpdate(ds, nodeList, cur, old)
+			err = dsc.rollingUpdate(ctx, ds, nodeList, cur, old)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	err = dsc.cleanupHistory(ds, old)
+	err = dsc.cleanupHistory(ctx, ds, old)
 	if err != nil {
 		return fmt.Errorf("failed to clean up revisions of DaemonSet: %v", err)
 	}
 
-	return dsc.updateDaemonSetStatus(ds, nodeList, hash, true)
+	return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, true)
 }
 
 // Predicates checks if a DaemonSet's pod can run on a node.
@@ -512,8 +512,8 @@ func NewPod(ds *appsv1alpha1.DaemonSet, nodeName string) *corev1.Pod {
 	return newPod
 }
 
-func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, hash string, updateObservedGen bool) error {
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ctx context.Context, ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, hash string, updateObservedGen bool) error {
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for DaemonSet %q: %v", ds.Name, err)
 	}
@@ -618,9 +618,9 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(ds *appsv1alpha1.DaemonSet, 
 // After figuring out which nodes should run a Pod of ds but not yet running one and
 // which nodes should not run a Pod of ds but currently running one, it calls function
 // syncNodes with a list of pods to remove and a list of nodes to run a Pod of ds.
-func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, hash string) error {
+func (dsc *ReconcileDaemonSet) manage(ctx context.Context, ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, hash string) error {
 	// Find out the pods which are created for the nodes by DaemonSets.
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for DaemonSet %s: %v", ds.Name, err)
 	}
@@ -660,12 +660,12 @@ func (dsc *ReconcileDaemonSet) manage(ds *appsv1alpha1.DaemonSet, nodeList []*co
 	}
 
 	// Label new pods using the hash label value of the current history when creating them
-	return dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash)
+	return dsc.syncNodes(ctx, ds, podsToDelete, nodesNeedingDaemonPods, hash)
 }
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with errors if any
-func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
+func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
 	if ds.Spec.Lifecycle != nil && ds.Spec.Lifecycle.PreDelete != nil {
 		var err error
 		podsToDelete, err = dsc.syncWithPreparingDelete(ds, podsToDelete)
@@ -741,7 +741,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 					podTemplate.Spec.NodeName = nodesNeedingDaemonPods[ix]
 				}
 
-				err = dsc.podControl.CreatePods(ds.Namespace, podTemplate, ds, metav1.NewControllerRef(ds, controllerKind))
+				err = dsc.podControl.CreatePods(ctx, ds.Namespace, podTemplate, ds, metav1.NewControllerRef(ds, controllerKind))
 
 				if err != nil {
 					if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
@@ -776,7 +776,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *appsv1alpha1.DaemonSet, podsToDelet
 	for i := 0; i < deleteDiff; i++ {
 		go func(ix int) {
 			defer deleteWait.Done()
-			if err := dsc.podControl.DeletePod(ds.Namespace, podsToDelete[ix], ds); err != nil {
+			if err := dsc.podControl.DeletePod(ctx, ds.Namespace, podsToDelete[ix], ds); err != nil {
 				dsc.expectations.DeletionObserved(dsKey)
 				if !errors.IsNotFound(err) {
 					klog.V(2).Infof("Failed deletion, decremented expectations for set %q/%q", ds.Namespace, ds.Name)
@@ -949,8 +949,8 @@ func (dsc *ReconcileDaemonSet) podsShouldBeOnNode(
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *ReconcileDaemonSet) getNodesToDaemonPods(ds *appsv1alpha1.DaemonSet) (map[string][]*corev1.Pod, error) {
-	claimedPods, err := dsc.getDaemonPods(ds)
+func (dsc *ReconcileDaemonSet) getNodesToDaemonPods(ctx context.Context, ds *appsv1alpha1.DaemonSet) (map[string][]*corev1.Pod, error) {
+	claimedPods, err := dsc.getDaemonPods(ctx, ds)
 	if err != nil {
 		return nil, err
 	}
@@ -993,8 +993,8 @@ func (o podByCreationTimestampAndPhase) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
-func (dsc *ReconcileDaemonSet) cleanupHistory(ds *appsv1alpha1.DaemonSet, old []*apps.ControllerRevision) error {
-	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+func (dsc *ReconcileDaemonSet) cleanupHistory(ctx context.Context, ds *appsv1alpha1.DaemonSet, old []*apps.ControllerRevision) error {
+	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for DaemonSet %q: %v", ds.Name, err)
 	}
@@ -1037,9 +1037,9 @@ func (dsc *ReconcileDaemonSet) cleanupHistory(ds *appsv1alpha1.DaemonSet, old []
 	return nil
 }
 
-func (dsc *ReconcileDaemonSet) refreshUpdateStates(ds *appsv1alpha1.DaemonSet) error {
+func (dsc *ReconcileDaemonSet) refreshUpdateStates(ctx context.Context, ds *appsv1alpha1.DaemonSet) error {
 	dsKey := keyFunc(ds)
-	pods, err := dsc.getDaemonPods(ds)
+	pods, err := dsc.getDaemonPods(ctx, ds)
 	if err != nil {
 		return err
 	}
@@ -1063,9 +1063,9 @@ func (dsc *ReconcileDaemonSet) refreshUpdateStates(ds *appsv1alpha1.DaemonSet) e
 	return nil
 }
 
-func (dsc *ReconcileDaemonSet) hasPodExpectationsSatisfied(ds *appsv1alpha1.DaemonSet) bool {
+func (dsc *ReconcileDaemonSet) hasPodExpectationsSatisfied(ctx context.Context, ds *appsv1alpha1.DaemonSet) bool {
 	dsKey := keyFunc(ds)
-	pods, err := dsc.getDaemonPods(ds)
+	pods, err := dsc.getDaemonPods(ctx, ds)
 	if err != nil {
 		klog.Errorf("Failed to get pods for DaemonSet")
 		return false

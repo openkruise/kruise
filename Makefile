@@ -22,7 +22,7 @@ all: build
 ##@ Development
 
 go_check:
-	@scripts/check_go_version "1.18.0"
+	@scripts/check_go_version "1.19.0"
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	@scripts/generate_client.sh

@@ -199,7 +199,7 @@ func convertCRRToPod(crr *appsv1alpha1.ContainerRecreateRequest) *v1.Pod {
 			Ports: crrContainer.Ports,
 		}
 		if crrContainer.PreStop != nil {
-			podContainer.Lifecycle = &v1.Lifecycle{PreStop: &v1.Handler{
+			podContainer.Lifecycle = &v1.Lifecycle{PreStop: &v1.LifecycleHandler{
 				Exec:      crrContainer.PreStop.Exec,
 				HTTPGet:   crrContainer.PreStop.HTTPGet,
 				TCPSocket: crrContainer.PreStop.TCPSocket,

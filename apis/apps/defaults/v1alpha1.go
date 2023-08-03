@@ -123,14 +123,14 @@ func setSidecarDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 	v1.SetDefaults_ResourceList(&container.Resources.Requests)
 	if container.LivenessProbe != nil {
 		v1.SetDefaults_Probe(container.LivenessProbe)
-		if container.LivenessProbe.Handler.HTTPGet != nil {
-			v1.SetDefaults_HTTPGetAction(container.LivenessProbe.Handler.HTTPGet)
+		if container.LivenessProbe.ProbeHandler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.LivenessProbe.ProbeHandler.HTTPGet)
 		}
 	}
 	if container.ReadinessProbe != nil {
 		v1.SetDefaults_Probe(container.ReadinessProbe)
-		if container.ReadinessProbe.Handler.HTTPGet != nil {
-			v1.SetDefaults_HTTPGetAction(container.ReadinessProbe.Handler.HTTPGet)
+		if container.ReadinessProbe.ProbeHandler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.ReadinessProbe.ProbeHandler.HTTPGet)
 		}
 	}
 	if container.Lifecycle != nil {
