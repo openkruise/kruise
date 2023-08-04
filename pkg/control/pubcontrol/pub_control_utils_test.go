@@ -168,6 +168,25 @@ var (
 			},
 		},
 	}
+
+	vkNode = &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "virtual-kubelet",
+			Labels: map[string]string{
+				"type": "virtual-kubelet",
+			},
+		},
+	}
+
+	nonVkNode = &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "not-virtual-kubelet",
+			Labels: map[string]string{
+				"ack.aliyun.com": "xxx",
+			},
+		},
+		Spec: corev1.NodeSpec{},
+	}
 )
 
 func TestPodUnavailableBudgetValidatePod(t *testing.T) {
@@ -394,6 +413,96 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 			}
 			if !cs.matchedPub && pub != nil {
 				t.Fatalf("GetPubForPod failed")
+			}
+		})
+	}
+}
+
+func Test_isVirtualKubeletNode(t *testing.T) {
+	cases := []struct {
+		name string
+		node *corev1.Node
+		want bool
+	}{
+		{
+			name: "virtual kubelet node",
+			node: vkNode,
+			want: true,
+		},
+		{
+			name: "not virtual kubelet node",
+			node: nonVkNode,
+			want: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.node).Build()
+			got := isVirtualKubeletNode(fakeClient, cs.node.Name)
+			if got != cs.want {
+				t.Fatalf("isVirtualKubeletNode failed")
+			}
+		})
+	}
+}
+
+func Test_shouldSkipCheckPUBCompleted(t *testing.T) {
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(vkNode, nonVkNode).Build()
+	cases := []struct {
+		name string
+		pod  *corev1.Pod
+		want bool
+	}{
+		{
+			name: "running on virtual kubelet node with enable UpdateEnvFromMetadata",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeName: "virtual-kubelet",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: `{"updateEnvFromMetadata":true}`,
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "running on virtual kubelet node with disable UpdateEnvFromMetadata",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeName: "virtual-kubelet",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: `{"updateEnvFromMetadata":false}`,
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "not running on virtual kubelet node with enable UpdateEnvFromMetadata",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					NodeName: "not-virtual-kubelet",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: `{"updateEnvFromMetadata":true}`,
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			got := shouldSkipCheckPUBCompleted(fakeClient, cs.pod)
+			if got != cs.want {
+				t.Fatalf("shouldSkipCheckPUBCompleted failed")
 			}
 		})
 	}

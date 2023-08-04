@@ -143,7 +143,7 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 	}
 
 	// whether other containers is consistent
-	if err := inplaceupdate.DefaultCheckInPlaceUpdateCompleted(pod); err != nil {
+	if err := inplaceupdate.DefaultCheckInPlaceUpdateCompleted(pod); err != nil && !shouldSkipCheckPUBCompleted(c.Client, pod) {
 		klog.V(5).Infof("check pod(%s/%s) InPlaceUpdate failed: %s", pod.Namespace, pod.Name, err.Error())
 		return false
 	}

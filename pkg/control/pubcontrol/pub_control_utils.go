@@ -18,10 +18,12 @@ package pubcontrol
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
@@ -41,6 +43,11 @@ import (
 const (
 	// MaxUnavailablePodSize is the max size of PUB.DisruptedPods + PUB.UnavailablePods.
 	MaxUnavailablePodSize = 2000
+)
+
+var (
+	labelNodeTypeKey = "type"
+	virtualNodeType  = "virtual-kubelet"
 )
 
 var ConflictRetry = wait.Backoff{
@@ -175,6 +182,19 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 	return true, "", nil
 }
 
+// isVirtualKubeletNode Determine whether the node is virtual kubelet
+func isVirtualKubeletNode(cli client.Client, nodeName string) bool {
+	if len(nodeName) == 0 {
+		return false
+	}
+	node := &corev1.Node{}
+	if err := cli.Get(context.Background(), client.ObjectKey{Name: nodeName}, node); err != nil {
+		klog.Errorf("get node(%s) failed: %s", nodeName, err.Error())
+		return false
+	}
+	return node.Labels[labelNodeTypeKey] == virtualNodeType
+}
+
 func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) error {
 	if pub.Status.UnavailableAllowed <= 0 {
 		return errors.NewForbidden(policyv1alpha1.Resource("podunavailablebudget"), pub.Name, fmt.Errorf("pub unavailable allowed is negative"))
@@ -232,4 +252,19 @@ func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation pol
 	}
 	operations := sets.NewString(strings.Split(operationValue, ",")...)
 	return operations.Has(string(operation))
+}
+
+// shouldSkipCheckPUBCompleted Determine whether the pod should skip check PUB completed
+// if the pod is running on a virtual kubelet node and enable UpdateEnvFromMetadata, do not check inplace update state
+func shouldSkipCheckPUBCompleted(cli client.Client, pod *corev1.Pod) bool {
+	if !isVirtualKubeletNode(cli, pod.Spec.NodeName) {
+		return false
+	}
+	inPlaceUpdateState := appspub.InPlaceUpdateState{}
+	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); !ok {
+		return false
+	} else if err := json.Unmarshal([]byte(stateStr), &inPlaceUpdateState); err != nil {
+		return false
+	}
+	return inPlaceUpdateState.UpdateEnvFromMetadata
 }
