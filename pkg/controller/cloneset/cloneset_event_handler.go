@@ -144,7 +144,7 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.CloneSetEventHandlerOptimization) {
-			if !labelChanged && e.shouldIgnoreUpdate(req, oldPod, curPod) {
+			if !controllerRefChanged && !labelChanged && e.shouldIgnoreUpdate(req, oldPod, curPod) {
 				return
 			}
 		}
