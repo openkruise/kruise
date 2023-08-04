@@ -73,6 +73,7 @@ func NewContainerdImageService(
 		accountManager: accountManager,
 		snapshotter:    snapshotter,
 		client:         client,
+		// TODO: compatible with v1alpha2 cri api
 		criImageClient: runtimeapi.NewImageServiceClient(conn),
 		httpProxy:      httpProxy,
 	}, nil
@@ -325,6 +326,7 @@ func getDefaultValuesFromCRIStatus(conn *grpc.ClientConn) (snapshotter string, h
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
+	// TODO: compatible with v1alpha2 cri api
 	rclient := runtimeapi.NewRuntimeServiceClient(conn)
 	resp, err := rclient.Status(ctx, &runtimeapi.StatusRequest{Verbose: true})
 	if err != nil {

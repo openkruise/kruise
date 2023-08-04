@@ -565,19 +565,20 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
 		// completes before we continue to make progress.
-		if isTerminating(replicas[i]) {
-			if monotonic {
-				klog.V(4).InfoS("StatefulSet is waiting for Pod to Terminate",
-					"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
-				return &status, nil
-			} else if isTerminating(replicas[i]) && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
-				klog.V(4).Infof(
-					"StatefulSet %s/%s Pod %s is Terminating, and break pods scale",
-					set.Namespace,
-					set.Name,
-					replicas[i].Name)
-				break
-			}
+		if isTerminating(replicas[i]) && monotonic {
+			klog.V(4).Infof(
+				"StatefulSet %s/%s is waiting for Pod %s to Terminate",
+				set.Namespace,
+				set.Name,
+				replicas[i].Name)
+			return &status, nil
+		} else if isTerminating(replicas[i]) && decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+			klog.V(4).Infof(
+				"StatefulSet %s/%s Pod %s is Terminating, and break pods scale",
+				set.Namespace,
+				set.Name,
+				replicas[i].Name)
+			break
 		}
 		// Update InPlaceUpdateReady condition for pod
 		if res := ssc.inplaceControl.Refresh(replicas[i], nil); res.RefreshErr != nil {

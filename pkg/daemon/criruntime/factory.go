@@ -90,12 +90,6 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 		var typedVersion *runtimeapi.VersionResponse
 
 		switch cfg.runtimeType {
-		case ContainerRuntimeDocker:
-			imageService, err = runtimeimage.NewDockerImageService(cfg.runtimeURI, accountManager)
-			if err != nil {
-				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
-				continue
-			}
 		case ContainerRuntimeContainerd, ContainerRuntimeCommonCRI, ContainerRuntimePouch:
 			addr, _, err := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
 			if err != nil {
@@ -103,6 +97,12 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 				continue
 			}
 			imageService, err = runtimeimage.NewCRIImageService(addr, accountManager)
+			if err != nil {
+				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
+				continue
+			}
+		case ContainerRuntimeDocker:
+			imageService, err = runtimeimage.NewDockerImageService(cfg.runtimeURI, accountManager)
 			if err != nil {
 				klog.Warningf("Failed to new image service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 				continue

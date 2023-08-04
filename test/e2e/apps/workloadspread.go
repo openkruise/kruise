@@ -77,7 +77,13 @@ var _ = SIGDescribe("workloadspread", func() {
 			// The node-role.kubernetes.io/master will be only set in taints since Kubernetes v1.24
 			var isMaster bool
 			for _, taint := range node.Spec.Taints {
+				// 1.24
 				if taint.Key == "node-role.kubernetes.io/master" {
+					isMaster = true
+					break
+				}
+				// 1.26
+				if taint.Key == "node-role.kubernetes.io/control-plane" {
 					isMaster = true
 					break
 				}

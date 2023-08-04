@@ -10,7 +10,7 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.18'
+  GO_VERSION: '1.19'
   KIND_VERSION: 'v0.14.0'
   KIND_IMAGE: 'kindest/node:v1.16.15'
   KIND_CLUSTER_NAME: 'ci-testing'
