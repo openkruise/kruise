@@ -331,6 +331,12 @@ var _ = SIGDescribe("DaemonSet", func() {
 					v1.ResourceCPU: resource.MustParse("100m"),
 				},
 			}
+			ads.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
+				{
+					Name:  "TEST",
+					Value: "",
+				},
+			}
 			ds, err := tester.CreateDaemonSet(ads)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -349,6 +355,12 @@ var _ = SIGDescribe("DaemonSet", func() {
 				ads.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("120m"),
+					},
+				}
+				ads.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
+					{
+						Name:  "TEST",
+						Value: "TEST",
 					},
 				}
 			})
