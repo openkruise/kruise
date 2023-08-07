@@ -170,8 +170,7 @@ func SetDefaultFeatureGates() {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarTerminator))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ImagePullJobGate))
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(ImagePullJobGate) {
-		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
-		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForDaemonSetUpdate))
+	if utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForInPlaceUpdate) || utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForDaemonSetUpdate) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", ImagePullJobGate))
 	}
 }
