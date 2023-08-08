@@ -92,8 +92,7 @@ spec:
                       description: container probe spec
                       properties:
                         exec:
-                          description: One and only one of the following should be
-                            specified. Exec specifies the action to take.
+                          description: Exec specifies the action to take.
                           properties:
                             command:
                               description: Command is the command line to execute
@@ -114,6 +113,25 @@ spec:
                             to 3. Minimum value is 1.
                           format: int32
                           type: integer
+                        grpc:
+                          description: GRPC specifies an action involving a GRPC port.
+                            This is a beta field and requires enabling GRPCContainerProbe
+                            feature gate.
+                          properties:
+                            port:
+                              description: Port number of the gRPC service. Number
+                                must be in the range 1 to 65535.
+                              format: int32
+                              type: integer
+                            service:
+                              description: "Service is the name of the service to
+                                place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+                                \n If this is not specified, the default behavior
+                                is defined by gRPC."
+                              type: string
+                          required:
+                          - port
+                          type: object
                         httpGet:
                           description: HTTPGet specifies the http request to perform.
                           properties:
@@ -130,7 +148,9 @@ spec:
                                   to be used in HTTP probes
                                 properties:
                                   name:
-                                    description: The header field name
+                                    description: The header field name. This will
+                                      be canonicalized upon output, so case-variant
+                                      names will be understood as the same header.
                                     type: string
                                   value:
                                     description: The header field value
@@ -177,9 +197,8 @@ spec:
                           format: int32
                           type: integer
                         tcpSocket:
-                          description: 'TCPSocket specifies an action involving a
-                            TCP port. TCP hooks not yet supported TODO: implement
-                            a realistic TCP lifecycle hook'
+                          description: TCPSocket specifies an action involving a TCP
+                            port.
                           properties:
                             host:
                               description: 'Optional: Host name to connect to, defaults

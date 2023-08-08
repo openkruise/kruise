@@ -145,7 +145,6 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		control: NewDefaultStatefulSetControl(
 			NewStatefulPodControl(
 				genericClient.KubeClient,
-				statefulSetLister,
 				podLister,
 				pvcLister,
 				recorder),
@@ -229,7 +228,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 // Reconcile reads that state of the cluster for a StatefulSet object and makes changes based on the state read
 // and what is in the StatefulSet.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write Pods
-func (ssc *ReconcileStatefulSet) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, retErr error) {
+func (ssc *ReconcileStatefulSet) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, retErr error) {
 	key := request.NamespacedName.String()
 	namespace := request.Namespace
 	name := request.Name
@@ -269,12 +268,12 @@ func (ssc *ReconcileStatefulSet) Reconcile(_ context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	pods, err := ssc.getPodsForStatefulSet(ctx, set, selector)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	err = ssc.syncStatefulSet(set, pods)
+	err = ssc.syncStatefulSet(ctx, set, pods)
 	return reconcile.Result{RequeueAfter: durationStore.Pop(getStatefulSetKey(set))}, err
 }
 
@@ -309,7 +308,7 @@ func (ssc *ReconcileStatefulSet) adoptOrphanRevisions(set *appsv1beta1.StatefulS
 // NOTE: Returned Pods are pointers to objects from the cache.
 //
 //	If you need to modify one, you need to copy it first.
-func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1beta1.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
+func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(ctx context.Context, set *appsv1beta1.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
 	// List all pods to include the pods that don't match the selector anymore but
 	// has a ControllerRef pointing to this StatefulSet.
 	pods, err := ssc.podLister.Pods(set.Namespace).List(labels.Everything())
@@ -324,8 +323,8 @@ func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1beta1.Stateful
 
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(context.TODO(), set.Name, metav1.GetOptions{})
+	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
+		fresh, err := ssc.kruiseClient.AppsV1beta1().StatefulSets(set.Namespace).Get(ctx, set.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -336,14 +335,14 @@ func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(set *appsv1beta1.Stateful
 	})
 
 	cm := kubecontroller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, canAdoptFunc)
-	return cm.ClaimPods(pods, filter)
+	return cm.ClaimPods(ctx, pods, filter)
 }
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
-func (ssc *ReconcileStatefulSet) syncStatefulSet(set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
+func (ssc *ReconcileStatefulSet) syncStatefulSet(ctx context.Context, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
 	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
 	// TODO: investigate where we mutate the set during the update as it is not obvious.
-	if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil {
+	if err := ssc.control.UpdateStatefulSet(ctx, set.DeepCopy(), pods); err != nil {
 		return err
 	}
 	klog.V(4).Infof("Successfully synced StatefulSet %s/%s", set.Namespace, set.Name)

@@ -25,7 +25,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -187,7 +187,7 @@ func (w *worker) getProbeSpec() *appsv1alpha1.ContainerProbeSpec {
 }
 
 func (w *worker) updateProbeSpec(spec *appsv1alpha1.ContainerProbeSpec) {
-	if !reflect.DeepEqual(w.spec.Handler, spec.Handler) {
+	if !reflect.DeepEqual(w.spec.ProbeHandler, spec.ProbeHandler) {
 		if w.containerID != "" {
 			klog.Infof("Pod(%s) container(%s) probe spec changed", w.key.podUID, w.key.containerName)
 			w.probeController.result.set(w.containerID, w.key, w.initialValue, "")

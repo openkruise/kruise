@@ -117,10 +117,10 @@ func newFakePodControl() *fakePodControl {
 	}
 }
 
-func (f *fakePodControl) CreatePods(namespace string, template *corev1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, template *corev1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.FakePodControl.CreatePods(namespace, template, object, controllerRef); err != nil {
+	if err := f.FakePodControl.CreatePods(ctx, namespace, template, object, controllerRef); err != nil {
 		return fmt.Errorf("failed to create pod for DaemonSet")
 	}
 
@@ -145,10 +145,10 @@ func (f *fakePodControl) CreatePods(namespace string, template *corev1.PodTempla
 	return nil
 }
 
-func (f *fakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.FakePodControl.DeletePod(namespace, podID, object); err != nil {
+	if err := f.FakePodControl.DeletePod(ctx, namespace, podID, object); err != nil {
 		return fmt.Errorf("failed to delete pod %q", podID)
 	}
 	pod, ok := f.podIDMap[podID]
@@ -337,7 +337,7 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1al
 	manager.expectations.DeleteExpectations(key)
 
 	now := manager.failedPodsBackoff.Clock.Now()
-	hash, _ := currentDSHash(manager, ds)
+	hash, _ := currentDSHash(context.TODO(), manager, ds)
 	// log all the pods in the store
 	var lines []string
 	for _, obj := range manager.podStore.List() {

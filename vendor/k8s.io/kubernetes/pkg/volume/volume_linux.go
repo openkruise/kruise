@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -26,9 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -41,36 +40,22 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
+func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
 	if fsGroup == nil {
 		return nil
 	}
 
-	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy)
-
 	timer := time.AfterFunc(30*time.Second, func() {
-		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
+		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
 	})
 	defer timer.Stop()
 
-	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
-	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
-	if !fsGroupPolicyEnabled {
-		err := legacyOwnershipChange(mounter, fsGroup)
-		if completeFunc != nil {
-			completeFunc(types.CompleteFuncParam{
-				Err: &err,
-			})
-		}
-		return err
-	}
-
-	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
-		klog.V(3).InfoS("Skipping permission and ownership change for volume", "path", mounter.GetPath())
+	if skipPermissionChange(mounter, dir, fsGroup, fsGroupChangePolicy) {
+		klog.V(3).InfoS("Skipping permission and ownership change for volume", "path", dir)
 		return nil
 	}
 
-	err := walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+	err := walkDeep(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -82,15 +67,6 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		})
 	}
 	return err
-}
-
-func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
-	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
-	})
 }
 
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
@@ -122,20 +98,18 @@ func changeFilePermission(filename string, fsGroup *int64, readonly bool, info o
 
 	err = os.Chmod(filename, info.Mode()|mask)
 	if err != nil {
-		klog.ErrorS(err, "Chown failed", "path", filename)
+		klog.ErrorS(err, "chmod failed", "path", filename)
 	}
 
 	return nil
 }
 
-func skipPermissionChange(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) bool {
-	dir := mounter.GetPath()
-
+func skipPermissionChange(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) bool {
 	if fsGroupChangePolicy == nil || *fsGroupChangePolicy != v1.FSGroupChangeOnRootMismatch {
 		klog.V(4).InfoS("Perform recursive ownership change for directory", "path", dir)
 		return false
 	}
-	return !requiresPermissionChange(mounter.GetPath(), fsGroup, mounter.GetAttributes().ReadOnly)
+	return !requiresPermissionChange(dir, fsGroup, mounter.GetAttributes().ReadOnly)
 }
 
 func requiresPermissionChange(rootDir string, fsGroup *int64, readonly bool) bool {

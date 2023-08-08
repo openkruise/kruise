@@ -130,7 +130,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ssc.syncStatefulSet(set, pods)
+	ssc.syncStatefulSet(context.TODO(), set, pods)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
@@ -548,7 +548,7 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	pods, err := ssc.getPodsForStatefulSet(context.TODO(), set, selector)
 	if err != nil {
 		t.Fatalf("getPodsForStatefulSet() error: %v", err)
 	}
@@ -585,7 +585,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	pods, err := ssc.getPodsForStatefulSet(context.TODO(), set, selector)
 	if err != nil {
 		t.Fatalf("getPodsForStatefulSet() error: %v", err)
 	}
@@ -791,7 +791,6 @@ func NewStatefulSetController(
 			control: NewDefaultStatefulSetControl(
 				NewStatefulPodControl(
 					kubeClient,
-					setInformer.Lister(),
 					podInformer.Lister(),
 					pvcInformer.Lister(),
 					recorder),

@@ -174,43 +174,43 @@ var (
 		},
 	}
 
-	nativeStatefulSet = appsv1.StatefulSet{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: appsv1.SchemeGroupVersion.String(),
-			Kind:       "StatefulSet",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  "default",
-			Name:       "native-statefulset-demo",
-			Generation: 10,
-			UID:        uuid.NewUUID(),
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas: utilpointer.Int32(10),
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app": "demo",
-				},
-			},
-			Template: template,
-			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition: utilpointer.Int32(5),
-				},
-			},
-		},
-		Status: appsv1.StatefulSetStatus{
-			ObservedGeneration: int64(10),
-			Replicas:           9,
-			ReadyReplicas:      8,
-			UpdatedReplicas:    5,
-			CurrentReplicas:    4,
-			AvailableReplicas:  7,
-			CurrentRevision:    "sts-version1",
-			UpdateRevision:     "sts-version2",
-		},
-	}
+	//nativeStatefulSet = appsv1.StatefulSet{
+	//	TypeMeta: metav1.TypeMeta{
+	//		APIVersion: appsv1.SchemeGroupVersion.String(),
+	//		Kind:       "StatefulSet",
+	//	},
+	//	ObjectMeta: metav1.ObjectMeta{
+	//		Namespace:  "default",
+	//		Name:       "native-statefulset-demo",
+	//		Generation: 10,
+	//		UID:        uuid.NewUUID(),
+	//	},
+	//	Spec: appsv1.StatefulSetSpec{
+	//		Replicas: utilpointer.Int32(10),
+	//		Selector: &metav1.LabelSelector{
+	//			MatchLabels: map[string]string{
+	//				"app": "demo",
+	//			},
+	//		},
+	//		Template: template,
+	//		UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+	//			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+	//			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+	//				Partition: utilpointer.Int32(5),
+	//			},
+	//		},
+	//	},
+	//	Status: appsv1.StatefulSetStatus{
+	//		ObservedGeneration: int64(10),
+	//		Replicas:           9,
+	//		ReadyReplicas:      8,
+	//		UpdatedReplicas:    5,
+	//		CurrentReplicas:    4,
+	//		AvailableReplicas:  7,
+	//		CurrentRevision:    "sts-version1",
+	//		UpdateRevision:     "sts-version2",
+	//	},
+	//}
 
 	advancedStatefulSet = appsv1beta1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{

@@ -64,7 +64,7 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alp
 					ContainerName: "nginx",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "ls /"},
 								},
@@ -102,7 +102,7 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alp
 					ContainerName: "main",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "ps -ef"},
 								},

@@ -35,7 +35,9 @@ import (
 // The serialization format is:
 //
 // <quantity>        ::= <signedNumber><suffix>
-//   (Note that <suffix> may be empty, from the "" case in <decimalSI>.)
+//
+//	(Note that <suffix> may be empty, from the "" case in <decimalSI>.)
+//
 // <digit>           ::= 0 | 1 | ... | 9
 // <digits>          ::= <digit> | <digit><digits>
 // <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits>
@@ -43,9 +45,13 @@ import (
 // <signedNumber>    ::= <number> | <sign><number>
 // <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI>
 // <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei
-//   (International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
+//
+//	(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
+//
 // <decimalSI>       ::= m | "" | k | M | G | T | P | E
-//   (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+//
+//	(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+//
 // <decimalExponent> ::= "e" <signedNumber> | "E" <signedNumber>
 //
 // No matter which of the three exponent forms is used, no quantity may represent
@@ -60,14 +66,17 @@ import (
 // Before serializing, Quantity will be put in "canonical form".
 // This means that Exponent/suffix will be adjusted up or down (with a
 // corresponding increase or decrease in Mantissa) such that:
-//   a. No precision is lost
-//   b. No fractional digits will be emitted
-//   c. The exponent (or suffix) is as large as possible.
+//
+//	a. No precision is lost
+//	b. No fractional digits will be emitted
+//	c. The exponent (or suffix) is as large as possible.
+//
 // The sign will be omitted unless the number is negative.
 //
 // Examples:
-//   1.5 will be serialized as "1500m"
-//   1.5Gi will be serialized as "1536Mi"
+//
+//	1.5 will be serialized as "1500m"
+//	1.5Gi will be serialized as "1536Mi"
 //
 // Note that the quantity will NEVER be internally represented by a
 // floating point number. That is the whole point of this exercise.
@@ -397,13 +406,17 @@ func (_ Quantity) OpenAPISchemaType() []string { return []string{"string"} }
 // the OpenAPI spec of this type.
 func (_ Quantity) OpenAPISchemaFormat() string { return "" }
 
+// OpenAPIV3OneOfTypes is used by the kube-openapi generator when constructing
+// the OpenAPI v3 spec of this type.
+func (Quantity) OpenAPIV3OneOfTypes() []string { return []string{"string", "number"} }
+
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:
-// * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
-//   -1 and +1, it will be emitted as if q.Format were DecimalSI.
-// * Otherwise, if q.Format is set to BinarySI, fractional parts of q.Amount will be
-//   rounded up. (1.1i becomes 2i.)
+//   - If q.Format is set to BinarySI and q.Amount represents a non-zero value between
+//     -1 and +1, it will be emitted as if q.Format were DecimalSI.
+//   - Otherwise, if q.Format is set to BinarySI, fractional parts of q.Amount will be
+//     rounded up. (1.1i becomes 2i.)
 func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	if q.IsZero() {
 		return zeroBytes, nil
@@ -460,17 +473,7 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 		return base
 	}
 
-	// multiply by the appropriate exponential scale
-	switch q.Format {
-	case DecimalExponent, DecimalSI:
-		return base * math.Pow10(exponent)
-	default:
-		// fast path for exponents that can fit in 64 bits
-		if exponent > 0 && exponent < 7 {
-			return base * float64(int64(1)<<(exponent*10))
-		}
-		return base * math.Pow(2, float64(exponent*10))
-	}
+	return base * math.Pow10(exponent)
 }
 
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
@@ -773,4 +776,31 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.s = ""
 	q.d.Dec = nil
 	q.i = int64Amount{value: value, scale: scale}
+}
+
+// QuantityValue makes it possible to use a Quantity as value for a command
+// line parameter.
+//
+// +protobuf=true
+// +protobuf.embed=string
+// +protobuf.options.marshal=false
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:deepcopy-gen=true
+type QuantityValue struct {
+	Quantity
+}
+
+// Set implements pflag.Value.Set and Go flag.Value.Set.
+func (q *QuantityValue) Set(s string) error {
+	quantity, err := ParseQuantity(s)
+	if err != nil {
+		return err
+	}
+	q.Quantity = quantity
+	return nil
+}
+
+// Type implements pflag.Value.Type.
+func (q QuantityValue) Type() string {
+	return "quantity"
 }

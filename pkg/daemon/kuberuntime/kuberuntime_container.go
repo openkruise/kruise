@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -70,11 +70,11 @@ func (m *genericRuntimeManager) getPodContainerStatuses(uid types.UID, name, nam
 	}
 	statuses := make([]*kubeletcontainer.Status, len(containers))
 	for i, c := range containers {
-		status, err := m.runtimeService.ContainerStatus(c.Id)
+		status, err := m.runtimeService.ContainerStatus(c.Id, false)
 		if err != nil {
 			return nil, fmt.Errorf("run ContainerStatus for %s error: %v", c.Id, err)
 		}
-		cStatus := toKubeContainerStatus(status, m.runtimeName)
+		cStatus := toKubeContainerStatus(status.Status, m.runtimeName)
 		// TODO: Populate the termination message if needed.
 		statuses[i] = cStatus
 	}
@@ -193,13 +193,13 @@ func (m *genericRuntimeManager) KillContainer(pod *v1.Pod, containerID kubeletco
 func (m *genericRuntimeManager) restoreSpecsFromContainerLabels(containerID kubeletcontainer.ContainerID) (*v1.Pod, *v1.Container, error) {
 	var pod *v1.Pod
 	var container *v1.Container
-	s, err := m.runtimeService.ContainerStatus(containerID.ID)
+	s, err := m.runtimeService.ContainerStatus(containerID.ID, false)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	l := getContainerInfoFromLabels(s.Labels)
-	a := getContainerInfoFromAnnotations(s.Annotations)
+	l := getContainerInfoFromLabels(s.Status.Labels)
+	a := getContainerInfoFromAnnotations(s.Status.Annotations)
 	// Notice that the followings are not full spec. The container killing code should not use
 	// un-restored fields.
 	pod = &v1.Pod{

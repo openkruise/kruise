@@ -79,7 +79,7 @@ var _ = SIGDescribe("containerpriority", func() {
 					{Name: "test", Value: "foo"},
 				},
 				Lifecycle: &v1.Lifecycle{
-					PostStart: &v1.Handler{
+					PostStart: &v1.LifecycleHandler{
 						Exec: &v1.ExecAction{
 							Command: []string{"/bin/sh", "-c", "sleep 1"},
 						},
@@ -151,7 +151,7 @@ var _ = SIGDescribe("containerpriority", func() {
 					{Name: "test", Value: "foo"},
 				},
 				Lifecycle: &v1.Lifecycle{
-					PostStart: &v1.Handler{
+					PostStart: &v1.LifecycleHandler{
 						Exec: &v1.ExecAction{
 							Command: []string{"/bin/sh", "-c", "sleep 1"},
 						},
@@ -264,7 +264,7 @@ var _ = SIGDescribe("containerpriority", func() {
 		framework.ConformanceIt("run with priorityAnnotation set", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
-				PostStart: &v1.Handler{
+				PostStart: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"/bin/sh", "-c", "sleep 1"},
 					},
@@ -279,7 +279,7 @@ var _ = SIGDescribe("containerpriority", func() {
 					{Name: "test", Value: "foo"},
 				},
 				Lifecycle: &v1.Lifecycle{
-					PostStart: &v1.Handler{
+					PostStart: &v1.LifecycleHandler{
 						Exec: &v1.ExecAction{
 							Command: []string{"/bin/sh", "-c", "sleep 1"},
 						},

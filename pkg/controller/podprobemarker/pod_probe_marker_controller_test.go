@@ -57,7 +57,7 @@ var (
 					ContainerName: "main",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 								},
@@ -105,7 +105,7 @@ var (
 							ContainerName: "main",
 							Probe: appsv1alpha1.ContainerProbeSpec{
 								Probe: corev1.Probe{
-									Handler: corev1.Handler{
+									ProbeHandler: corev1.ProbeHandler{
 										Exec: &corev1.ExecAction{
 											Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 										},
@@ -182,7 +182,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 											ContainerName: "main",
 											Probe: appsv1alpha1.ContainerProbeSpec{
 												Probe: corev1.Probe{
-													Handler: corev1.Handler{
+													ProbeHandler: corev1.ProbeHandler{
 														Exec: &corev1.ExecAction{
 															Command: []string{"/bin/sh", "-c", "/idle.sh"},
 														},
@@ -205,7 +205,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/idle.sh"},
 									},
@@ -218,7 +218,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 									},
@@ -331,7 +331,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/idle.sh"},
 									},
@@ -344,7 +344,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 									},
@@ -363,7 +363,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/idle.sh"},
 									},
@@ -425,7 +425,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 									},
@@ -497,7 +497,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 											ContainerName: "log",
 											Probe: appsv1alpha1.ContainerProbeSpec{
 												Probe: corev1.Probe{
-													Handler: corev1.Handler{
+													ProbeHandler: corev1.ProbeHandler{
 														Exec: &corev1.ExecAction{
 															Command: []string{"/bin/sh", "-c", "/idle.sh"},
 														},
@@ -520,7 +520,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "log",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/idle.sh"},
 									},
@@ -533,7 +533,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 									},
@@ -598,7 +598,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 											ContainerName: "log",
 											Probe: appsv1alpha1.ContainerProbeSpec{
 												Probe: corev1.Probe{
-													Handler: corev1.Handler{
+													ProbeHandler: corev1.ProbeHandler{
 														Exec: &corev1.ExecAction{
 															Command: []string{"/bin/sh", "-c", "/idle.sh"},
 														},
@@ -625,7 +625,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 								ContainerName: "log",
 								Probe: appsv1alpha1.ContainerProbeSpec{
 									Probe: corev1.Probe{
-										Handler: corev1.Handler{
+										ProbeHandler: corev1.ProbeHandler{
 											Exec: &corev1.ExecAction{
 												Command: []string{"/bin/sh", "-c", "/idle.sh"},
 											},
@@ -644,7 +644,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 								ContainerName: "main",
 								Probe: appsv1alpha1.ContainerProbeSpec{
 									Probe: corev1.Probe{
-										Handler: corev1.Handler{
+										ProbeHandler: corev1.ProbeHandler{
 											Exec: &corev1.ExecAction{
 												Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 											},
@@ -711,7 +711,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 											ContainerName: "log",
 											Probe: appsv1alpha1.ContainerProbeSpec{
 												Probe: corev1.Probe{
-													Handler: corev1.Handler{
+													ProbeHandler: corev1.ProbeHandler{
 														Exec: &corev1.ExecAction{
 															Command: []string{"/bin/sh", "-c", "/idle.sh"},
 														},
@@ -724,7 +724,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 											ContainerName: "main",
 											Probe: appsv1alpha1.ContainerProbeSpec{
 												Probe: corev1.Probe{
-													Handler: corev1.Handler{
+													ProbeHandler: corev1.ProbeHandler{
 														Exec: &corev1.ExecAction{
 															Command: []string{"/bin/sh", "-c", "/home/admin/healthy.sh"},
 														},
@@ -747,7 +747,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "log",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/idle.sh"},
 									},
@@ -760,7 +760,7 @@ func TestSyncPodProbeMarker(t *testing.T) {
 						ContainerName: "main",
 						Probe: appsv1alpha1.ContainerProbeSpec{
 							Probe: corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
 										Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 									},
