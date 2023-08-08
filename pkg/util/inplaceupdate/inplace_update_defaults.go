@@ -48,6 +48,8 @@ func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
+		registerVerticalUpdate()
+
 		if opts.CalculateSpec == nil {
 			opts.CalculateSpec = defaultCalculateInPlaceUpdateSpecWithVerticalUpdate
 		}
@@ -63,7 +65,6 @@ func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 		if opts.CheckContainersUpdateCompleted == nil {
 			opts.CheckContainersUpdateCompleted = defaultCheckContainersInPlaceUpdateCompletedWithVerticalUpdate
 		}
-
 	} else {
 		if opts.CalculateSpec == nil {
 			opts.CalculateSpec = defaultCalculateInPlaceUpdateSpec
@@ -80,7 +81,6 @@ func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 		if opts.CheckContainersUpdateCompleted == nil {
 			opts.CheckContainersUpdateCompleted = defaultCheckContainersInPlaceUpdateCompleted
 		}
-
 	}
 
 	return opts
@@ -514,6 +514,8 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 func defaultPatchUpdateSpecToPodWithVerticalUpdate(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, error) {
 	klog.V(5).Infof("Begin to in-place update pod %s/%s with update spec %v, state %v", pod.Namespace, pod.Name, util.DumpJSON(spec), util.DumpJSON(state))
 
+	registerVerticalUpdate()
+
 	state.NextContainerImages = make(map[string]string)
 	state.NextContainerRefMetadata = make(map[string]metav1.ObjectMeta)
 	state.NextContainerResources = make(map[string]v1.ResourceRequirements)
@@ -582,12 +584,7 @@ func defaultPatchUpdateSpecToPodWithVerticalUpdate(pod *v1.Pod, spec *UpdateSpec
 				containersImageChanged.Insert(c.Name)
 			}
 			if resourceExists {
-				for key, quantity := range newResource.Limits {
-					c.Resources.Limits[key] = quantity
-				}
-				for key, quantity := range newResource.Requests {
-					c.Resources.Requests[key] = quantity
-				}
+				verticalUpdateOperator.UpdateContainerResource(c, &newResource)
 				containersResourceChanged.Insert(c.Name)
 			}
 		} else {
@@ -595,15 +592,30 @@ func defaultPatchUpdateSpecToPodWithVerticalUpdate(pod *v1.Pod, spec *UpdateSpec
 			state.NextContainerResources[c.Name] = newResource
 		}
 	}
+
+	// This provides a hook for vertical updates,
+	// so that internal enterprise implementations can update pod resources here at once
+	verticalUpdateOperator.UpdatePodResource(pod)
+
 	for _, c := range pod.Status.ContainerStatuses {
 		if containersImageChanged.Has(c.Name) {
 			if state.LastContainerStatuses == nil {
 				state.LastContainerStatuses = map[string]appspub.InPlaceUpdateContainerStatus{}
 			}
-			state.LastContainerStatuses[c.Name] = appspub.InPlaceUpdateContainerStatus{ImageID: c.ImageID}
+			if cs, ok := state.LastContainerStatuses[c.Name]; !ok {
+				state.LastContainerStatuses[c.Name] = appspub.InPlaceUpdateContainerStatus{ImageID: c.ImageID}
+			} else {
+				cs.ImageID = c.ImageID
+			}
 		}
-		// TODO(LavenderQAQ): The status of resource needs to be printed
+		if containersResourceChanged.Has(c.Name) {
+			verticalUpdateOperator.SyncContainerResource(&c, state)
+		}
 	}
+
+	// This provides a hook for vertical updates,
+	// so that internal enterprise implementations can sync pod resources here at once
+	verticalUpdateOperator.SyncPodResource(pod, state)
 
 	// update annotations and labels for the containers to update
 	for cName, objMeta := range spec.ContainerRefMetadata {
@@ -796,6 +808,8 @@ func defaultCalculateInPlaceUpdateSpecWithVerticalUpdate(oldRevision, newRevisio
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated
 // containers in Pod.
 func DefaultCheckInPlaceUpdateCompletedWithVerticalUpdate(pod *v1.Pod) error {
+	registerVerticalUpdate()
+
 	if _, isInGraceState := appspub.GetInPlaceUpdateGrace(pod); isInGraceState {
 		return fmt.Errorf("still in grace period of in-place update")
 	}
@@ -810,10 +824,16 @@ func DefaultCheckInPlaceUpdateCompletedWithVerticalUpdate(pod *v1.Pod) error {
 		return fmt.Errorf("existing containers to in-place update in next batches")
 	}
 
+	if ok := verticalUpdateOperator.IsPodUpdateCompleted(pod); !ok {
+		return fmt.Errorf("waiting for pod vertical update")
+	}
+
 	return defaultCheckContainersInPlaceUpdateCompletedWithVerticalUpdate(pod, &inPlaceUpdateState)
 }
 
 func defaultCheckContainersInPlaceUpdateCompletedWithVerticalUpdate(pod *v1.Pod, inPlaceUpdateState *appspub.InPlaceUpdateState) error {
+	registerVerticalUpdate()
+
 	runtimeContainerMetaSet, err := appspub.GetRuntimeContainerMetaSet(pod)
 	if err != nil {
 		return err
@@ -838,11 +858,11 @@ func defaultCheckContainersInPlaceUpdateCompletedWithVerticalUpdate(pod *v1.Pod,
 	}
 
 	containerImages := make(map[string]string, len(pod.Spec.Containers))
-	containerResources := make(map[string]v1.ResourceRequirements, len(pod.Spec.Containers))
+	containers := make(map[string]*v1.Container, len(pod.Spec.Containers))
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		containerImages[c.Name] = c.Image
-		containerResources[c.Name] = c.Resources
+		containers[c.Name] = c
 		if len(strings.Split(c.Image, ":")) <= 1 {
 			containerImages[c.Name] = fmt.Sprintf("%s:latest", c.Image)
 		}
@@ -856,7 +876,11 @@ func defaultCheckContainersInPlaceUpdateCompletedWithVerticalUpdate(pod *v1.Pod,
 					return fmt.Errorf("container %s imageID not changed", cs.Name)
 				}
 			}
-			// TODO(LavenderQAQ): Check the vertical updating status of the container
+			// Determine whether the vertical update was successful by the resource values in the pod's spec and status
+			// TODO(LavenderQAQ): The third parameter here should be passed to the resources value in the status field of all containers and will need to be modified after the k8s api upgrade.
+			if !verticalUpdateOperator.IsContainerUpdateCompleted(pod, containers[cs.Name], &cs, inPlaceUpdateState.LastContainerStatuses[cs.Name]) {
+				return fmt.Errorf("container %s resources not changed", cs.Name)
+			}
 			delete(inPlaceUpdateState.LastContainerStatuses, cs.Name)
 		}
 	}
