@@ -51,6 +51,9 @@ func (h *ImageListPullJobCreateUpdateHandler) Handle(ctx context.Context, req ad
 	if !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) {
 		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.KruiseDaemon))
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGate) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ImagePullJobGate))
+	}
 
 	if err := validate(obj); err != nil {
 		klog.Warningf("Error validate ImageListPullJob %s/%s: %v", obj.Namespace, obj.Name, err)

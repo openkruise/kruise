@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -108,11 +109,23 @@ var _ = SIGDescribe("PullImage", func() {
 						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
 					},
+					PullSecrets: []string{"test-pull-secret"},
 				},
 			}
-			err := testerForImagePullJob.CreateJob(job)
+			secret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns,
+					Name:      "test-pull-secret",
+				},
+				Type: v1.SecretTypeDockercfg,
+				Data: map[string][]byte{
+					v1.DockerConfigKey: []byte(`{"auths":{"docker.io/library/nginx":{"username":"echoserver","password":"test","auth":"ZWNob3NlcnZlcjp0ZXN0"}}}`),
+				},
+			}
+			_, err := c.CoreV1().Secrets(ns).Create(context.TODO(), secret, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
+			err = testerForImagePullJob.CreateJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ginkgo.By("Desired should be equal to number of nodes")
 			gomega.Eventually(func() int32 {
 				job, err = testerForImagePullJob.GetJob(job)
