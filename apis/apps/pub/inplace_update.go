@@ -94,7 +94,8 @@ type InPlaceUpdateContainerBatch struct {
 // InPlaceUpdateContainerStatus records the statuses of the container that are mainly used
 // to determine whether the InPlaceUpdate is completed.
 type InPlaceUpdateContainerStatus struct {
-	ImageID string `json:"imageID,omitempty"`
+	ImageID  string                  `json:"imageID,omitempty"`
+	Resource v1.ResourceRequirements `json:"resource,omitempty"`
 }
 
 // InPlaceUpdateStrategy defines the strategies for in-place update.
