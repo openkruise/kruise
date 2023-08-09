@@ -108,6 +108,9 @@ const (
 
 	// ImagePullJobGate enable imagepulljob-controller execute ImagePullJob.
 	ImagePullJobGate featuregate.Feature = "ImagePullJobGate"
+
+	// ResourceDistributionGate enable resourcedistribution-controller execute ResourceDistribution.
+	ResourceDistributionGate featuregate.Feature = "ResourceDistributionGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -133,6 +136,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
 	PreparingUpdateAsUpdate:                   {Default: false, PreRelease: featuregate.Alpha},
 	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
+	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
