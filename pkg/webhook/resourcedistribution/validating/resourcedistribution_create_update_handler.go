@@ -19,6 +19,8 @@ import (
 	"net/http"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -150,6 +152,9 @@ func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, re
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceDistributionGate) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ResourceDistributionGate))
 	}
 	if allErrs := h.validateResourceDistribution(obj, oldObj); len(allErrs) != 0 {
 		klog.V(3).Infof("all errors of validation: %v", allErrs)

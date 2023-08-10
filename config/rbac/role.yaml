@@ -7,36 +7,6 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
   - '*'
   resources:
   - '*'
@@ -622,6 +592,14 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - nodes
   verbs:
   - get
@@ -676,7 +654,6 @@ rules:
   - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
