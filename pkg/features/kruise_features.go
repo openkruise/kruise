@@ -56,7 +56,6 @@ const (
 	// It is only supported for Kubernetes version >= 1.16
 	// Note that if it is enabled during Kruise installation or upgrade, Kruise will require more authorities:
 	// 1. Webhook for deletion operation of namespace, crd, deployment, statefulset, replicaset and workloads in Kruise.
-	// 2. ClusterRole for reading all resource types, because CRD validation needs to list the CRs of this CRD.
 	ResourcesDeletionProtection featuregate.Feature = "ResourcesDeletionProtection"
 
 	// PodUnavailableBudgetDeleteGate enables PUB capability to protect pod from deletion and eviction
@@ -111,6 +110,9 @@ const (
 
 	// ResourceDistributionGate enable resourcedistribution-controller execute ResourceDistribution.
 	ResourceDistributionGate featuregate.Feature = "ResourceDistributionGate"
+
+	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
+	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -137,6 +139,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PreparingUpdateAsUpdate:                   {Default: false, PreRelease: featuregate.Alpha},
 	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
 	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
+	DeletionProtectionForCRDCascadingGate:     {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -176,5 +179,8 @@ func SetDefaultFeatureGates() {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForInPlaceUpdate) || utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForDaemonSetUpdate) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", ImagePullJobGate))
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(ResourcesDeletionProtection) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DeletionProtectionForCRDCascadingGate))
 	}
 }
