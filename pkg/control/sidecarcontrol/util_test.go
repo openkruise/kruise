@@ -1244,6 +1244,32 @@ func TestPodMatchedSidecarSet(t *testing.T) {
 			},
 			expect: false,
 		},
+		{
+			name: "test6",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				demo := &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
+					Spec: appsv1alpha1.SidecarSetSpec{
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getPod: func() *corev1.Pod {
+				demo := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Labels:    map[string]string{"app": "nginx"},
+						Namespace: "app1",
+					},
+				}
+				return demo
+			},
+			getNs: func() []*corev1.Namespace {
+				return nil
+			},
+			expect: true,
+		},
 	}
 
 	for _, cs := range cases {

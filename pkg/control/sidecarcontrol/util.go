@@ -103,6 +103,10 @@ func PodMatchedSidecarSet(c client.Client, pod *corev1.Pod, sidecarSet *appsv1al
 	if err != nil {
 		return false, err
 	}
+	// if no selector set, return true
+	if selector.String() == "" {
+		return true, nil
+	}
 
 	if !selector.Empty() && selector.Matches(labels.Set(pod.Labels)) {
 		return true, nil
