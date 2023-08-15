@@ -115,10 +115,11 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1
 	allErrs := field.ErrorList{}
 
 	//validate spec selector
-	if spec.Selector == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), "no selector defined for SidecarSet"))
-	} else {
+	if spec.Selector != nil {
 		allErrs = append(allErrs, validateSelector(spec.Selector, fldPath.Child("selector"))...)
+	}
+	if spec.Selector == nil && spec.Namespace == "" && spec.NamespaceSelector == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), "no selector defined for SidecarSet"))
 	}
 	if spec.Namespace != "" && spec.NamespaceSelector != nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("namespace, namespaceSelector"), "namespace and namespaceSelector are mutually exclusive"))

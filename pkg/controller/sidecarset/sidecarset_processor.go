@@ -310,6 +310,9 @@ func (p *Processor) getMatchingPods(s *appsv1alpha1.SidecarSet) ([]*corev1.Pod, 
 func (p *Processor) getSelectedPods(namespaces sets.String, selector labels.Selector) (relatedPods []*corev1.Pod, err error) {
 	// DisableDeepCopy:true, indicates must be deep copy before update pod objection
 	listOpts := &client.ListOptions{LabelSelector: selector}
+	if selector.String() == "" {
+		listOpts = &client.ListOptions{}
+	}
 	for _, ns := range namespaces.List() {
 		allPods := &corev1.PodList{}
 		listOpts.Namespace = ns

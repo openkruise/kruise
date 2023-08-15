@@ -261,6 +261,16 @@ func TestScopeNamespacePods(t *testing.T) {
 	if len(pods) != 50 {
 		t.Fatalf("except matching pods count(%d), but get count(%d)", 50, len(pods))
 	}
+	sidecarSet.Spec.Selector = nil
+	pods, err = processor.getMatchingPods(sidecarSet)
+	if err != nil {
+		t.Fatalf("getMatchingPods failed: %s", err.Error())
+		return
+	}
+	if len(pods) != 50 {
+		t.Fatalf("except matching pods count(%d), but get count(%d)", 50, len(pods))
+	}
+
 }
 
 func TestCanUpgradePods(t *testing.T) {

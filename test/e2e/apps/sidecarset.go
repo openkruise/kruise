@@ -151,6 +151,32 @@ var _ = SIGDescribe("SidecarSet", func() {
 			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container done"))
 		})
 
+		framework.ConformanceIt("sidecarSet no Selector inject pod sidecar container", func() {
+			// create sidecarSet
+			sidecarSet := tester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.Selector = nil
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
+			tester.CreateSidecarSet(sidecarSet)
+			time.Sleep(time.Second)
+
+			// create deployment
+			deployment := tester.NewBaseDeployment(ns)
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
+			tester.CreateDeployment(deployment)
+
+			// get pods
+			pods, err := tester.GetSelectorPods(deployment.Namespace, deployment.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			pod := pods[0]
+			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(len(deployment.Spec.Template.Spec.Containers) + len(sidecarSet.Spec.Containers)))
+			gomega.Expect(pod.Spec.InitContainers).To(gomega.HaveLen(len(deployment.Spec.Template.Spec.InitContainers) + len(sidecarSet.Spec.InitContainers)))
+			exceptContainers := []string{"nginx-sidecar", "main", "busybox-sidecar"}
+			for i, except := range exceptContainers {
+				gomega.Expect(except).To(gomega.Equal(pod.Spec.Containers[i].Name))
+			}
+			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container done"))
+		})
+
 		framework.ConformanceIt("sidecarSet inject pod sidecar container volumeMounts", func() {
 			// create sidecarSet
 			sidecarSet := tester.NewBaseSidecarSet(ns)
