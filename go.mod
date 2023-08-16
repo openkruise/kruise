@@ -28,7 +28,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0
 	google.golang.org/grpc v1.40.0
 	k8s.io/api v0.24.16
-	k8s.io/apiextensions-apiserver v0.23.0
+	k8s.io/apiextensions-apiserver v0.24.2
 	k8s.io/apimachinery v0.27.4
 	k8s.io/apiserver v0.24.16
 	k8s.io/client-go v0.27.4
@@ -174,4 +174,5 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.24.16
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.16
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.16
+	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.12.3
 )
