@@ -7,7 +7,7 @@
 
 > No, really, you must read this before you upgrade
 
-- **Disable** following feature-gates by default: PreDownloadImageForInPlaceUpdate([#1244](https://github.com/openkruise/kruise/pull/1224), [@zmberg](https://github.com/zmberg)), ImagePullJobGate([#1357](https://github.com/openkruise/kruise/pull/1357), [@zmberg](https://github.com/zmberg)), and ResourceDistributionGate([#1360](https://github.com/openkruise/kruise/pull/1360/files), [@zmberg](https://github.com/zmberg))
+- **Disable** following feature-gates by default: PreDownloadImageForInPlaceUpdate([#1244](https://github.com/openkruise/kruise/pull/1224), [@zmberg](https://github.com/zmberg)), ImagePullJobGate([#1357](https://github.com/openkruise/kruise/pull/1357), [@zmberg](https://github.com/zmberg)), DeletionProtectionForCRDCascadingGate([#1365](https://github.com/openkruise/kruise/pull/1365), [@zmberg](https://github.com/zmberg)), and ResourceDistributionGate([#1360](https://github.com/openkruise/kruise/pull/1360/files), [@zmberg](https://github.com/zmberg))
 - Bump Kubernetes dependency to 1.24.16, Golang version to 1.19([#1354](https://github.com/openkruise/kruise/pull/1354), [Kuromesi](https://github.com/Kuromesi))
 
 ### Key Features: Enhanced Multi-Domain Management
