@@ -25,6 +25,7 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -99,7 +100,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("broadcastjob-controller", mgr, controller.Options{
-		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles,
+		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
 		RateLimiter: ratelimiter.DefaultControllerRateLimiter()})
 	if err != nil {
 		return err
@@ -492,7 +493,7 @@ func isJobComplete(job *appsv1alpha1.BroadcastJob, desiredNodes map[string]*core
 	return true
 }
 
-// isJobFailed checks if the job CompletionPolicy is not Never, and it has past the backofflimit or ActiveDeadlineSeconds.
+// isJobFailed checks if the job CompletionPolicy is not Never, and it has past ActiveDeadlineSeconds.
 func isJobFailed(job *appsv1alpha1.BroadcastJob, pods []*corev1.Pod) (bool, string, string) {
 	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
 		return false, "", ""
@@ -610,7 +611,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable))
 	}
 
-	insufficientResources := noderesources.Fits(pod, nodeInfo, true)
+	insufficientResources := noderesources.Fits(pod, nodeInfo)
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))

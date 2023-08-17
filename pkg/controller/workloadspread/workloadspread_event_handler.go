@@ -19,10 +19,13 @@ package workloadspread
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,6 +39,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
@@ -125,6 +129,10 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 		oldReplicas = *evt.ObjectOld.(*appsv1beta1.StatefulSet).Spec.Replicas
 		newReplicas = *evt.ObjectNew.(*appsv1beta1.StatefulSet).Spec.Replicas
 		gvk = controllerKruiseKindSts
+	case *unstructured.Unstructured:
+		oldReplicas = w.getReplicasFromUnstructured(evt.ObjectOld.(*unstructured.Unstructured))
+		newReplicas = w.getReplicasFromUnstructured(evt.ObjectNew.(*unstructured.Unstructured))
+		gvk = evt.ObjectNew.(*unstructured.Unstructured).GroupVersionKind()
 	default:
 		return
 	}
@@ -148,6 +156,40 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 			q.Add(reconcile.Request{NamespacedName: nsn})
 		}
 	}
+}
+
+func (w *workloadEventHandler) getReplicasFromUnstructured(object *unstructured.Unstructured) int32 {
+	if object == nil || reflect.ValueOf(object).IsNil() {
+		return 0
+	}
+	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(w.Reader)
+	if err != nil {
+		klog.Errorf("Failed to get workloadSpread custom workload white list from kruise config map")
+		return 0
+	}
+
+	gvk := object.GroupVersionKind()
+	for _, workload := range whiteList.Workloads {
+		if workload.GroupVersionKind.GroupKind() != gvk.GroupKind() {
+			continue
+		}
+		var exists bool
+		var replicas int64
+		path := strings.Split(workload.ReplicasPath, ".")
+		if len(path) > 0 {
+			replicas, exists, err = unstructured.NestedInt64(object.Object, path...)
+			if err != nil || !exists {
+				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, workload.ReplicasPath)
+			}
+		} else {
+			replicas, exists, err = unstructured.NestedInt64(object.Object, "spec", "replicas")
+			if err != nil || !exists {
+				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, workload.ReplicasPath)
+			}
+		}
+		return int32(replicas)
+	}
+	return 0
 }
 
 func (w workloadEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {

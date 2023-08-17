@@ -38,8 +38,6 @@ type resourceAllocationScorer struct {
 	useRequested        bool
 	scorer              func(requested, allocable resourceToValueMap) int64
 	resourceToWeightMap resourceToWeightMap
-
-	enablePodOverhead bool
 }
 
 // resourceToValueMap is keyed with resource name and valued with quantity.
@@ -69,13 +67,10 @@ func (r *resourceAllocationScorer) score(
 
 	score := r.scorer(requested, allocatable)
 
-	if klog.V(10).Enabled() {
-		klog.Infof(
-			"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v ,score %d,",
-			pod.Name, node.Name, r.Name,
-			allocatable, requested, score,
-		)
-	}
+	klog.V(10).InfoS("Listing internal info for allocatable resources, requested resources and score", "pod",
+		klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
+		"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
+	)
 
 	return score, nil
 }
@@ -108,9 +103,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo 
 			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
 		}
 	}
-	if klog.V(10).Enabled() {
-		klog.Infof("requested resource %v not considered for node score calculation", resource)
-	}
+	klog.V(10).InfoS("Requested resource is omitted for node score calculation", "resourceName", resource)
 	return 0, 0
 }
 
@@ -134,7 +127,7 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && r.enablePodOverhead {
+	if pod.Spec.Overhead != nil {
 		if quantity, found := pod.Spec.Overhead[resource]; found {
 			podRequest += quantity.Value()
 		}

@@ -92,7 +92,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 
 func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1alpha1.PersistentPodState {
 	ref := metav1.GetControllerOf(pod)
-	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(p.client)
+	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(p.client)
 	if err != nil {
 		klog.Errorf("Failed to get persistent pod state config white list, error: %v\n", err.Error())
 		return nil

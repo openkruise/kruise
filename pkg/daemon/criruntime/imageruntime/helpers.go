@@ -17,15 +17,21 @@ limitations under the License.
 package imageruntime
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
+	"time"
 
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtimeapiv1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
@@ -230,7 +236,10 @@ func (r *imagePullStatusReader) mainloop() {
 
 func (c ImageInfo) ContainsImage(name string, tag string) bool {
 	for _, repoTag := range c.RepoTags {
-		imageRepo, imageTag := parseRepositoryTag(repoTag)
+		// We should remove defaultDomain and officialRepoName in RepoTags by NormalizeImageRefToNameTag method,
+		// Because if the user needs to download the image from hub.docker.com, CRI.PullImage will automatically add these when downloading the image
+		// Ref: https://github.com/openkruise/kruise/issues/1273
+		imageRepo, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(repoTag)
 		if imageRepo == name && imageTag == tag {
 			return true
 		}
@@ -238,23 +247,22 @@ func (c ImageInfo) ContainsImage(name string, tag string) bool {
 	return false
 }
 
-// parseRepositoryTag gets a repos name and returns the right reposName + tag|digest
-// The tag can be confusing because of a port in a repository name.
-//
-//	Ex: localhost.localdomain:5000/samalba/hipache:latest
-//	Digest ex: localhost:5000/foo/bar@sha256:bc8813ea7b3603864987522f02a76101c17ad122e1c46d790efc0fca78ca7bfb
-func parseRepositoryTag(repos string) (string, string) {
-	n := strings.Index(repos, "@")
-	if n >= 0 {
-		parts := strings.Split(repos, "@")
-		return parts[0], parts[1]
+func determineImageClientAPIVersion(conn *grpc.ClientConn) (runtimeapi.ImageServiceClient, runtimeapiv1alpha2.ImageServiceClient, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	klog.V(4).InfoS("Finding the CRI API image version")
+	imageClientV1 := runtimeapi.NewImageServiceClient(conn)
+
+	_, err := imageClientV1.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{})
+	if err == nil {
+		klog.V(2).InfoS("Using CRI v1 image API")
+		return imageClientV1, nil, nil
+
+	} else if status.Code(err) == codes.Unimplemented {
+		klog.V(2).InfoS("Falling back to CRI v1alpha2 image API (deprecated in k8s 1.24)")
+		return nil, runtimeapiv1alpha2.NewImageServiceClient(conn), nil
 	}
-	n = strings.LastIndex(repos, ":")
-	if n < 0 {
-		return repos, ""
-	}
-	if tag := repos[n+1:]; !strings.Contains(tag, "/") {
-		return repos[:n], tag
-	}
-	return repos, ""
+
+	return nil, nil, fmt.Errorf("unable to determine image API version: %w", err)
 }

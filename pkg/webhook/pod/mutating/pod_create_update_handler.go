@@ -58,7 +58,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if obj.Namespace == "" {
 		obj.Namespace = req.Namespace
 	}
-
+	oriObj := obj.DeepCopy()
 	var changed bool
 
 	if skip := injectPodReadinessGate(req, obj); !skip {
@@ -110,7 +110,11 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	original, err := json.Marshal(oriObj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+	return admission.PatchResponseFromRaw(original, marshalled)
 }
 
 var _ inject.Client = &PodCreateHandler{}

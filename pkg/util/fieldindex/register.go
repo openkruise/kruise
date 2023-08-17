@@ -62,6 +62,11 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		if err = c.IndexField(context.TODO(), &v1.PersistentVolumeClaim{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
+		// ImagePullJob ownerReference
+		if err = c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+			return
+		}
+
 		// pod name
 		if err = indexPodNodeName(c); err != nil {
 			return

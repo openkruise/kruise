@@ -398,7 +398,7 @@ func (r *ControllerFinder) getPodStatefulSetLike(ref ControllerReference, namesp
 	if err != nil {
 		return nil, nil
 	}
-	whiteList, err := configuration.GetPPSWatchWatchCustomWorkloadWhiteList(r.Client)
+	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(r.Client)
 	if err != nil {
 		return nil, err
 	}

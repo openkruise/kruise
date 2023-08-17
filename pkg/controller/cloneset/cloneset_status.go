@@ -18,6 +18,7 @@ package cloneset
 
 import (
 	"context"
+	"fmt"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -46,15 +47,15 @@ type realStatusUpdater struct {
 
 func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
 	r.calculateStatus(cs, newStatus, pods)
-	if r.inconsistentStatus(cs, newStatus) {
-		klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions current=%s update=%s",
-			cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.CurrentRevision, newStatus.UpdateRevision)
-		if err := r.updateStatus(cs, newStatus); err != nil {
-			return err
-		}
+	if err := clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods); err != nil {
+		return fmt.Errorf("failed to calculate extra status for cloneSet %s/%s: %v", cs.Namespace, cs.Name, err)
 	}
-
-	return clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods)
+	if !r.inconsistentStatus(cs, newStatus) {
+		return nil
+	}
+	klog.Infof("To update CloneSet status for  %s/%s, replicas=%d ready=%d available=%d updated=%d updatedReady=%d, revisions current=%s update=%s",
+		cs.Namespace, cs.Name, newStatus.Replicas, newStatus.ReadyReplicas, newStatus.AvailableReplicas, newStatus.UpdatedReplicas, newStatus.UpdatedReadyReplicas, newStatus.CurrentRevision, newStatus.UpdateRevision)
+	return r.updateStatus(cs, newStatus)
 }
 
 func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
@@ -64,7 +65,6 @@ func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *a
 			return err
 		}
 		clone.Status = *newStatus
-		clone.Annotations = cs.Annotations
 		return r.Status().Update(context.TODO(), clone)
 	})
 }
@@ -77,6 +77,7 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.AvailableReplicas != oldStatus.AvailableReplicas ||
 		newStatus.UpdatedReadyReplicas != oldStatus.UpdatedReadyReplicas ||
 		newStatus.UpdatedReplicas != oldStatus.UpdatedReplicas ||
+		newStatus.UpdatedAvailableReplicas != oldStatus.UpdatedAvailableReplicas ||
 		newStatus.ExpectedUpdatedReplicas != oldStatus.ExpectedUpdatedReplicas ||
 		newStatus.UpdateRevision != oldStatus.UpdateRevision ||
 		newStatus.CurrentRevision != oldStatus.CurrentRevision ||
@@ -98,6 +99,9 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 		}
 		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && coreControl.IsPodUpdateReady(pod, 0) {
 			newStatus.UpdatedReadyReplicas++
+		}
+		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
+			newStatus.UpdatedAvailableReplicas++
 		}
 	}
 	// Consider the update revision as stable if revisions of all pods are consistent to it, no need to wait all of them ready

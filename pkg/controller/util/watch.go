@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -51,18 +52,19 @@ func DiscoverGVK(gvk schema.GroupVersionKind) bool {
 	return true
 }
 
-func AddWatcherDynamically(c controller.Controller, h handler.EventHandler, gvk schema.GroupVersionKind) (bool, error) {
-	if _, ok := watcherMap.Load(gvk); ok {
+func AddWatcherDynamically(c controller.Controller, h handler.EventHandler, gvk schema.GroupVersionKind, controllerKey string) (bool, error) {
+	cacheKey := fmt.Sprintf("controller:%s, gvk:%s", controllerKey, gvk.String())
+	if _, ok := watcherMap.Load(cacheKey); ok {
 		return false, nil
 	}
 
 	if !DiscoverGVK(gvk) {
-		klog.Errorf("Failed to find GVK(%v) in cluster", gvk.String())
+		klog.Errorf("Failed to find GVK(%v) in cluster for %s", gvk.String(), controllerKey)
 		return false, nil
 	}
 
 	object := &unstructured.Unstructured{}
 	object.SetGroupVersionKind(gvk)
-	watcherMap.Store(gvk, true)
+	watcherMap.Store(cacheKey, true)
 	return true, c.Watch(&source.Kind{Type: object}, h)
 }

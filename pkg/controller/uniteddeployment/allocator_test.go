@@ -167,6 +167,23 @@ func TestSpecifyValidReplicas(t *testing.T) {
 	if " t1 -> 1; t2 -> 2; t3 -> 3; t4 -> 4;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
+
+	infos = subsetInfos{
+		createSubset("t1", 4),
+		createSubset("t2", 2),
+		createSubset("t3", 2),
+		createSubset("t4", 2),
+	}
+	allocator = infos.SortToAllocator()
+	allocator.AllocateReplicas(-1, &map[string]int32{
+		"t1": 1,
+		"t2": 2,
+		"t3": 3,
+		"t4": 4,
+	})
+	if " t1 -> 1; t2 -> 2; t3 -> 3; t4 -> 4;" != allocator.String() {
+		t.Fatalf("unexpected %s", allocator)
+	}
 }
 
 func TestSpecifyInvalidReplicas(t *testing.T) {

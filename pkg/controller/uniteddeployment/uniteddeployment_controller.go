@@ -22,12 +22,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +34,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -102,7 +104,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New(controllerName, mgr, controller.Options{
-		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles,
+		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
 		RateLimiter: ratelimiter.DefaultControllerRateLimiter()})
 	if err != nil {
 		return err
@@ -222,14 +224,23 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
-	klog.V(4).Infof("Get UnitedDeployment %s/%s next partition %v", instance.Namespace, instance.Name, nextPartitions)
+	nextUpdate := getNextUpdate(instance, nextReplicas, nextPartitions)
+	klog.V(4).Infof("Get UnitedDeployment %s/%s next update %v", instance.Namespace, instance.Name, nextUpdate)
 
-	newStatus, err := r.manageSubsets(instance, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, subsetType)
+	newStatus, err := r.manageSubsets(instance, nameToSubset, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
 		return reconcile.Result{}, err
 	}
+
+	selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
+	if err != nil {
+		klog.Errorf("Error converting UnitedDeployment %s selector: %v", request, err)
+		// This is a non-transient error, so don't retry.
+		return reconcile.Result{}, nil
+	}
+	newStatus.LabelSelector = selector.String()
 
 	return r.updateStatus(instance, newStatus, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount, control)
 }
@@ -271,6 +282,19 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[str
 	}
 
 	return &partitions
+}
+
+func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32, nextPartitions *map[string]int32) map[string]SubsetUpdate {
+	next := make(map[string]SubsetUpdate)
+	for _, subset := range ud.Spec.Topology.Subsets {
+		t := SubsetUpdate{}
+		t.Replicas = (*nextReplicas)[subset.Name]
+		t.Partition = (*nextPartitions)[subset.Name]
+		t.Patch = string(subset.Patch.Raw)
+
+		next[subset.Name] = t
+	}
+	return next
 }
 
 func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {
@@ -412,6 +436,7 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 		oldStatus.UpdatedReadyReplicas == newStatus.UpdatedReadyReplicas &&
 		oldStatus.CurrentRevision == newStatus.CurrentRevision &&
 		oldStatus.CollisionCount == newStatus.CollisionCount &&
+		oldStatus.LabelSelector == newStatus.LabelSelector &&
 		ud.Generation == newStatus.ObservedGeneration &&
 		reflect.DeepEqual(oldStatus.SubsetReplicas, newStatus.SubsetReplicas) &&
 		reflect.DeepEqual(oldStatus.UpdateStatus, newStatus.UpdateStatus) &&

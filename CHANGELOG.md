@@ -1,5 +1,61 @@
 # Change Log
 
+## v1.5.0
+> Change log since v1.4.0
+
+### Upgrade Notice
+
+> No, really, you must read this before you upgrade
+
+- **Disable** following feature-gates by default: PreDownloadImageForInPlaceUpdate([#1244](https://github.com/openkruise/kruise/pull/1224), [@zmberg](https://github.com/zmberg)), ImagePullJobGate([#1357](https://github.com/openkruise/kruise/pull/1357), [@zmberg](https://github.com/zmberg)), DeletionProtectionForCRDCascadingGate([#1365](https://github.com/openkruise/kruise/pull/1365), [@zmberg](https://github.com/zmberg)), and ResourceDistributionGate([#1360](https://github.com/openkruise/kruise/pull/1360/files), [@zmberg](https://github.com/zmberg))
+- Bump Kubernetes dependency to 1.24.16, Golang version to 1.19([#1354](https://github.com/openkruise/kruise/pull/1354), [Kuromesi](https://github.com/Kuromesi))
+
+### Key Features: Enhanced Multi-Domain Management
+- WorkloadSpread:
+  - Support any customized workloads that have `scale` sub-resource. ([#1286](https://github.com/openkruise/kruise/pull/1286), [veophi](https://github.com/veophi))
+  - Add validation for subset patch field. ([#1237](https://github.com/openkruise/kruise/pull/1237), [chengleqi](https://github.com/chengleqi))
+- UnitedDeployment:
+  - Support `scale` sub-resource. ([#1314](https://github.com/openkruise/kruise/pull/1314)), [diannaowa](https://github.com/diannaowa))
+  - Support `patch` field for each subset. ([#1266](https://github.com/openkruise/kruise/pull/1266), [chengleqi](https://github.com/chengleqi))
+  - Optimize UnitedDeployment replicas settings. ([#1247](https://github.com/openkruise/kruise/pull/1247), [y-ykcir](https://github.com/y-ykcir))
+
+### ImagePreDownload
+- ImageListPullJob:
+  - Many users have the need for batch pre-download images, and the current approach, i.e., ImagePullJob, has a relatively high threshold for use, We added a new CRD ImageListPullJob to batch pre-download images.
+    You just write a range of images in one ImageListPullJob CR, its controller will generate corresponding ImagePullJob CR for each image automatically. ([1222](https://github.com/openkruise/kruise/pull/1222), [@diannaowa](https://github.com/diannaowa))
+- ImagePullJob:
+  - Fix the matching logic for the imagePullSecret in ImagePullJob. ([#1241](https://github.com/openkruise/kruise/pull/1241), [#1357](https://github.com/openkruise/kruise/pull/1357))
+  - Advanced Workload pre-download image support attach metadata in ImagePullJob. ([#1246](https://github.com/openkruise/kruise/pull/1246), [YTGhost](https://github.com/YTGhost))
+
+### Advanced Workload
+- SidecarSet:
+  - Add condition and event for not upgradable pods when updating. ([#1309](https://github.com/openkruise/kruise/pull/1309), [MarkLux](https://github.com/MarkLux))
+  - Take effect of shareVolumePolicy on initContainers. ([#1229](https://github.com/openkruise/kruise/pull/1229), [y-ykcir](https://github.com/y-ykcir))
+  - Allow sidecar containers to mount serviceAccountToken type volume. ([#1238](https://github.com/openkruise/kruise/pull/1238), [y-ykcir](https://github.com/y-ykcir))
+  - SidecarSet updateStrategy support priorityStrategy. ([#1325](https://github.com/openkruise/kruise/pull/1325), [y-ykcir](https://github.com/y-ykcir))
+- BroadcastJob:
+  - Make OnFailure as default restartPolicy. ([#1149](https://github.com/openkruise/kruise/pull/1149), [Shubhamurkade](https://github.com/Shubhamurkade))
+  - Fix BroadcastJob doesn't make pod on node that has erased taint. ([#1204](https://github.com/openkruise/kruise/pull/1204), [weldonlwz](https://github.com/weldonlwz))
+- CloneSet & StatefulSet:
+  - Regard the pod at preparing update state as update revision when scaling. ([#1290](https://github.com/openkruise/kruise/pull/1290), [veophi](https://github.com/veophi))
+  - Add `updatedAvailableReplicas` field in status. ([#1317](https://github.com/openkruise/kruise/pull/1317), [nitishchauhan0022](https://github.com/nitishchauhan0022))
+
+### Kruise Daemon
+- Connecting to Pouch runtime via CRI interface. ([#1232](https://github.com/openkruise/kruise/pull/1232), [@zmberg](https://github.com/zmberg))
+- Compatible with v1 and v1alpha2 CRI API version. ([#1354](https://github.com/openkruise/kruise/pull/1354), [veophi](https://github.com/veophi))
+
+### ResourceProtection
+- Reject Namespace deletion when PVCs are included under NS. ([#1228](https://github.com/openkruise/kruise/pull/1228), [kevin1689-cloud](https://github.com/kevin1689-cloud))
+
+And some bugs were fixed by
+([#1238](https://github.com/openkruise/kruise/pull/1238), [y-ykcir](https://github.com/y-ykcir)),
+([#1335](https://github.com/openkruise/kruise/pull/1335), [ls-2018](https://github.com/ls-2018)),
+([#1301](https://github.com/openkruise/kruise/pull/1301), [wangwu50](https://github.com/wangwu50)),
+([#1395](https://github.com/openkruise/kruise/pull/1301), [ywdxz](https://github.com/ywdxz)),
+([#1304](https://github.com/openkruise/kruise/pull/1304), [kevin1689-cloud](https://github.com/kevin1689-cloud)),
+([#1348](https://github.com/openkruise/kruise/pull/1348), [#1343](https://github.com/openkruise/kruise/pull/1343), [Colvin-Y](https://github.com/Colvin-Y)),
+thanks!
+
 ## v1.4.0
 
 > Change log since v1.3.0

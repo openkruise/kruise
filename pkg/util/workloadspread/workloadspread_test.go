@@ -24,20 +24,26 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 var (
@@ -149,12 +155,195 @@ var (
 			},
 		},
 	}
+
+	template = corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "unit-test",
+			Name:      "pod-demo",
+			Labels: map[string]string{
+				"app": "demo",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "main",
+					Image: "busybox:1.32",
+				},
+			},
+		},
+	}
+
+	//nativeStatefulSet = appsv1.StatefulSet{
+	//	TypeMeta: metav1.TypeMeta{
+	//		APIVersion: appsv1.SchemeGroupVersion.String(),
+	//		Kind:       "StatefulSet",
+	//	},
+	//	ObjectMeta: metav1.ObjectMeta{
+	//		Namespace:  "default",
+	//		Name:       "native-statefulset-demo",
+	//		Generation: 10,
+	//		UID:        uuid.NewUUID(),
+	//	},
+	//	Spec: appsv1.StatefulSetSpec{
+	//		Replicas: utilpointer.Int32(10),
+	//		Selector: &metav1.LabelSelector{
+	//			MatchLabels: map[string]string{
+	//				"app": "demo",
+	//			},
+	//		},
+	//		Template: template,
+	//		UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+	//			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+	//			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+	//				Partition: utilpointer.Int32(5),
+	//			},
+	//		},
+	//	},
+	//	Status: appsv1.StatefulSetStatus{
+	//		ObservedGeneration: int64(10),
+	//		Replicas:           9,
+	//		ReadyReplicas:      8,
+	//		UpdatedReplicas:    5,
+	//		CurrentReplicas:    4,
+	//		AvailableReplicas:  7,
+	//		CurrentRevision:    "sts-version1",
+	//		UpdateRevision:     "sts-version2",
+	//	},
+	//}
+
+	advancedStatefulSet = appsv1beta1.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1beta1.SchemeGroupVersion.String(),
+			Kind:       "StatefulSet",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "advanced-statefulset-demo",
+			Generation: 10,
+			UID:        uuid.NewUUID(),
+		},
+		Spec: appsv1beta1.StatefulSetSpec{
+			Replicas: utilpointer.Int32(10),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "demo",
+				},
+			},
+			Template: template,
+			UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+					Partition:      utilpointer.Int32(5),
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
+					UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{
+						PriorityStrategy: &appspub.UpdatePriorityStrategy{
+							OrderPriority: []appspub.UpdatePriorityOrderTerm{
+								{
+									OrderedKey: "order-key",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Status: appsv1beta1.StatefulSetStatus{
+			ObservedGeneration: int64(10),
+			Replicas:           9,
+			ReadyReplicas:      8,
+			UpdatedReplicas:    5,
+			AvailableReplicas:  7,
+			CurrentRevision:    "sts-version1",
+			UpdateRevision:     "sts-version2",
+		},
+	}
+
+	cloneset = appsv1alpha1.CloneSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1alpha1.SchemeGroupVersion.String(),
+			Kind:       "CloneSet",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "cloneset-demo",
+			Generation: 10,
+			UID:        uuid.NewUUID(),
+		},
+		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: utilpointer.Int32(10),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "demo",
+				},
+			},
+			Template: template,
+			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+				Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				Partition:      &intstr.IntOrString{Type: intstr.String, StrVal: "20%"},
+				MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
+				PriorityStrategy: &appspub.UpdatePriorityStrategy{
+					OrderPriority: []appspub.UpdatePriorityOrderTerm{
+						{
+							OrderedKey: "order-key",
+						},
+					},
+				},
+			},
+		},
+		Status: appsv1alpha1.CloneSetStatus{
+			ObservedGeneration:   int64(10),
+			Replicas:             9,
+			ReadyReplicas:        8,
+			UpdatedReplicas:      5,
+			UpdatedReadyReplicas: 4,
+			AvailableReplicas:    7,
+			CurrentRevision:      "sts-version1",
+			UpdateRevision:       "sts-version2",
+		},
+	}
+
+	deployment = appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "deployment-demo",
+			Generation: 10,
+			UID:        uuid.NewUUID(),
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: utilpointer.Int32(10),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "demo",
+				},
+			},
+			Template: template,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
+				},
+			},
+		},
+		Status: appsv1.DeploymentStatus{
+			ObservedGeneration: int64(10),
+			Replicas:           9,
+			ReadyReplicas:      8,
+			UpdatedReplicas:    5,
+			AvailableReplicas:  7,
+		},
+	}
 )
 
 func init() {
 	scheme = runtime.NewScheme()
 	_ = appsv1alpha1.AddToScheme(scheme)
 	_ = appsv1beta1.AddToScheme(scheme)
+	_ = appsv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 }
 
@@ -868,9 +1057,150 @@ func TestIsReferenceEqual(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			h := Handler{}
+			h := Handler{fake.NewClientBuilder().Build()}
 			if h.isReferenceEqual(cs.getTargetRef(), cs.getOwnerRef(), "") != cs.expectEqual {
 				t.Fatalf("isReferenceEqual failed")
+			}
+		})
+	}
+}
+
+func TestIsReferenceEqual2(t *testing.T) {
+	const mockedAPIVersion = "mock.kruise.io/v1"
+	const mockedKindGameServer = "GameServer"
+	const mockedKindGameServerSet = "GameServerSet"
+	const mockedKindUnknownCRD = "unknownCRD"
+	unStruct1, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(&advancedStatefulSet)
+	unStruct2, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(&deployment)
+	cases := []struct {
+		name          string
+		TopologyBuild func() (appsv1alpha1.TargetReference, []client.Object)
+		Expect        bool
+	}{
+		{
+			name: "pod is owned by cloneset directly, target is cloneset",
+			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+				father := cloneset.DeepCopy()
+				son := podDemo.DeepCopy()
+				son.SetOwnerReferences([]metav1.OwnerReference{
+					*metav1.NewControllerRef(father, father.GetObjectKind().GroupVersionKind()),
+				})
+				ref := appsv1alpha1.TargetReference{
+					APIVersion: father.APIVersion,
+					Kind:       father.Kind,
+					Name:       father.Name,
+				}
+				return ref, []client.Object{father, son}
+			},
+			Expect: true,
+		},
+		{
+			name: "pod is owned by unstructured-1, unstructured-1 is owned by unstructured-2, target is unstructured-2",
+			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+				grandfather := &unstructured.Unstructured{Object: unStruct1}
+				grandfather.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServerSet))
+				father := &unstructured.Unstructured{Object: unStruct2}
+				father.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServer))
+				father.SetOwnerReferences([]metav1.OwnerReference{
+					*metav1.NewControllerRef(grandfather, grandfather.GetObjectKind().GroupVersionKind()),
+				})
+				son := podDemo.DeepCopy()
+				son.SetOwnerReferences([]metav1.OwnerReference{
+					*metav1.NewControllerRef(father, father.GetObjectKind().GroupVersionKind()),
+				})
+				ref := appsv1alpha1.TargetReference{
+					APIVersion: grandfather.GetAPIVersion(),
+					Kind:       grandfather.GetKind(),
+					Name:       grandfather.GetName(),
+				}
+				return ref, []client.Object{grandfather, father, son}
+			},
+			Expect: true,
+		},
+		{
+			name: "pod is owned by unstructured-1, unstructured-1 is not owned by unstructured-2, target is unstructured-2",
+			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+				grandfather := &unstructured.Unstructured{Object: unStruct1}
+				grandfather.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServerSet))
+				father := &unstructured.Unstructured{Object: unStruct2}
+				father.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServer))
+				father.SetOwnerReferences([]metav1.OwnerReference{
+					*metav1.NewControllerRef(grandfather, grandfather.GetObjectKind().GroupVersionKind()),
+				})
+				son := podDemo.DeepCopy()
+				son.SetOwnerReferences([]metav1.OwnerReference{
+					*metav1.NewControllerRef(cloneset.DeepCopy(), cloneset.GetObjectKind().GroupVersionKind()),
+				})
+				ref := appsv1alpha1.TargetReference{
+					APIVersion: grandfather.GetAPIVersion(),
+					Kind:       grandfather.GetKind(),
+					Name:       grandfather.GetName(),
+				}
+				return ref, []client.Object{grandfather, father, son}
+			},
+			Expect: false,
+		},
+		{
+			name: "pod is owned by unstructured-1, unstructured-1 is owned by unknown CRD, target is unstructured-2",
+			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+				grandfather := &unstructured.Unstructured{Object: unStruct1}
+				grandfather.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServerSet))
+				father := &unstructured.Unstructured{Object: unStruct2}
+				father.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedKindUnknownCRD, mockedKindUnknownCRD))
+				father.SetOwnerReferences([]metav1.OwnerReference{
+					*metav1.NewControllerRef(grandfather, grandfather.GetObjectKind().GroupVersionKind()),
+				})
+				son := podDemo.DeepCopy()
+				son.SetOwnerReferences([]metav1.OwnerReference{
+					*metav1.NewControllerRef(father.DeepCopy(), father.GetObjectKind().GroupVersionKind()),
+				})
+				ref := appsv1alpha1.TargetReference{
+					APIVersion: grandfather.GetAPIVersion(),
+					Kind:       grandfather.GetKind(),
+					Name:       grandfather.GetName(),
+				}
+				return ref, []client.Object{grandfather, father, son}
+			},
+			Expect: false,
+		},
+	}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			kruiseConfig := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: webhookutil.GetNamespace(),
+					Name:      "kruise-configuration",
+				},
+				Data: map[string]string{
+					"WorkloadSpread_Watch_Custom_Workload_WhiteList": `
+   {
+      "workloads": [
+        {
+          "Group": "mock.kruise.io",
+          "Version": "v1",
+          "Kind": "GameServerSet",
+          "replicasPath": "spec.replicas",
+          "subResources": [
+            {
+              "Group": "mock.kruise.io",
+              "Version": "v1",
+              "Kind": "GameServer"
+            }
+          ]
+        }
+      ]
+    }`,
+				},
+			}
+			ref, objects := cs.TopologyBuild()
+			pod := objects[len(objects)-1]
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithObjects(kruiseConfig).Build()
+			handler := &Handler{Client: cli}
+			workloadsInWhiteListInitialized = false
+			initializeWorkloadsInWhiteList(cli)
+			result := handler.isReferenceEqual(&ref, metav1.GetControllerOf(pod), pod.GetNamespace())
+			if result != cs.Expect {
+				t.Fatalf("got unexpected result")
 			}
 		})
 	}

@@ -1,4 +1,3 @@
-
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -138,6 +137,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-apps-kruise-io-v1alpha1-imagelistpulljob
+  failurePolicy: Fail
+  name: mimagelistpulljob.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - imagelistpulljobs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-apps-kruise-io-v1alpha1-imagepulljob
   failurePolicy: Fail
   name: mimagepulljob.kb.io
@@ -237,7 +257,6 @@ webhooks:
     resources:
     - uniteddeployments
   sideEffects: None
-
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -452,6 +471,27 @@ webhooks:
     - UPDATE
     resources:
     - daemonsets
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kruise-io-v1alpha1-imagelistpulljob
+  failurePolicy: Fail
+  name: vimagelistpulljob.kb.io
+  rules:
+  - apiGroups:
+    - apps.kruise.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - imagelistpulljobs
   sideEffects: None
 - admissionReviewVersions:
   - v1

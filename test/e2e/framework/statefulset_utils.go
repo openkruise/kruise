@@ -497,7 +497,7 @@ func (s *StatefulSetTester) WaitForRunningAndNotReady(numStatefulPods int32, ss 
 }
 
 var httpProbe = &v1.Probe{
-	Handler: v1.Handler{
+	ProbeHandler: v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: "/index.html",
 			Port: intstr.IntOrString{IntVal: 80},
@@ -564,7 +564,7 @@ func (s *StatefulSetTester) RestorePodHTTPProbe(ss *appsv1beta1.StatefulSet, pod
 }
 
 var pauseProbe = &v1.Probe{
-	Handler: v1.Handler{
+	ProbeHandler: v1.ProbeHandler{
 		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
 	},
 	PeriodSeconds:    1,

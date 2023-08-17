@@ -43,6 +43,7 @@ import (
 	extclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/controller"
 	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -53,9 +54,10 @@ import (
 )
 
 const (
-	defaultLeaseDuration = 15 * time.Second
-	defaultRenewDeadline = 10 * time.Second
-	defaultRetryPeriod   = 2 * time.Second
+	defaultLeaseDuration              = 15 * time.Second
+	defaultRenewDeadline              = 10 * time.Second
+	defaultRetryPeriod                = 2 * time.Second
+	defaultControllerCacheSyncTimeout = 2 * time.Minute
 )
 
 var (
@@ -90,6 +92,7 @@ func main() {
 	var leaderElectionResourceLock string
 	var leaderElectionId string
 	var retryPeriod time.Duration
+	var controllerCacheSyncTimeout time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
@@ -113,6 +116,8 @@ func main() {
 		"leader-election-id determines the name of the resource that leader election will use for holding the leader lock, Default is kruise-manager.")
 	flag.DurationVar(&retryPeriod, "leader-election-retry-period", defaultRetryPeriod,
 		"leader-election-retry-period is the duration the LeaderElector clients should wait between tries of actions. Default is 2 seconds.")
+	flag.DurationVar(&controllerCacheSyncTimeout, "controller-cache-sync-timeout", defaultControllerCacheSyncTimeout, "CacheSyncTimeout refers to the time limit set to wait for syncing caches. Defaults to 2 minutes if not set.")
+
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
@@ -120,6 +125,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	ctrl.SetLogger(klogr.New())
 	features.SetDefaultFeatureGates()
+	util.SetControllerCacheSyncTimeout(controllerCacheSyncTimeout)
 
 	if enablePprof {
 		go func() {

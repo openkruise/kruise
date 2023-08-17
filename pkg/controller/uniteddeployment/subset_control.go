@@ -153,7 +153,7 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 		Annotations:                set.GetAnnotations(),
 		OwnerReferences:            set.GetOwnerReferences(),
 		Finalizers:                 set.GetFinalizers(),
-		ClusterName:                set.GetClusterName(),
+		ZZZ_DeprecatedClusterName:  set.GetZZZ_DeprecatedClusterName(),
 	}
 	subset.Spec.SubsetName = subSetName
 

@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
 	v1 "k8s.io/api/core/v1"
@@ -60,7 +61,8 @@ func newReconciler(mgr manager.Manager) *ReconcileContainerLaunchPriority {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 	// Create a new controller
-	c, err := controller.New("container-launch-priority-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
+	c, err := controller.New("container-launch-priority-controller", mgr, controller.Options{Reconciler: r,
+		MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout()})
 	if err != nil {
 		return err
 	}
@@ -69,12 +71,14 @@ func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 		CreateFunc: func(e event.CreateEvent) bool {
 			pod := e.Object.(*v1.Pod)
 			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			return utilcontainerlaunchpriority.ExistsPriorities(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
+			// If in vk scenario, there will be not containerReady condition
+			return utilcontainerlaunchpriority.ExistsPriorities(pod) && (containersReady == nil || containersReady.Status != v1.ConditionTrue)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			pod := e.ObjectNew.(*v1.Pod)
 			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			return utilcontainerlaunchpriority.ExistsPriorities(pod) && containersReady != nil && containersReady.Status != v1.ConditionTrue
+			// If in vk scenario, there will be not containerReady condition
+			return utilcontainerlaunchpriority.ExistsPriorities(pod) && (containersReady == nil || containersReady.Status != v1.ConditionTrue)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false

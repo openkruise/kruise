@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
   name: statefulsets.apps.kruise.io
 spec:
@@ -203,10 +202,10 @@ spec:
                       partition:
                         description: 'Partition indicates the ordinal at which the
                           StatefulSet should be partitioned by default. But if unorderedUpdate
-                          has been set:   - Partition indicates the number of pods
-                          with non-updated revisions when rolling update.   - It means
-                          controller will update $(replicas - partition) number of
-                          pod. Default value is 0.'
+                          has been set: - Partition indicates the number of pods with
+                          non-updated revisions when rolling update. - It means controller
+                          will update $(replicas - partition) number of pod. Default
+                          value is 0.'
                         format: int32
                         type: integer
                       paused:
@@ -611,10 +610,10 @@ spec:
                   be reserved, and the replicas will always be the expectation number
                   of running Pods. For a sts with replicas=3 and its Pods in [0, 1,
                   2]: - If you want to migrate Pod-1 and reserve this ordinal, just
-                  set spec.reserveOrdinal to [1].   Then controller will delete Pod-1
+                  set spec.reserveOrdinal to [1]. Then controller will delete Pod-1
                   and create Pod-3 (existing Pods will be [0, 2, 3]) - If you just
                   want to delete Pod-1, you should set spec.reserveOrdinal to [1]
-                  and spec.replicas to 2.   Then controller will delete Pod-1 (existing
+                  and spec.replicas to 2. Then controller will delete Pod-1 (existing
                   Pods will be [0, 2])'
                 items:
                   type: integer
@@ -745,10 +744,10 @@ spec:
                       partition:
                         description: 'Partition indicates the ordinal at which the
                           StatefulSet should be partitioned by default. But if unorderedUpdate
-                          has been set:   - Partition indicates the number of pods
-                          with non-updated revisions when rolling update.   - It means
-                          controller will update $(replicas - partition) number of
-                          pod. Default value is 0.'
+                          has been set: - Partition indicates the number of pods with
+                          non-updated revisions when rolling update. - It means controller
+                          will update $(replicas - partition) number of pod. Default
+                          value is 0.'
                         format: int32
                         type: integer
                       paused:
@@ -965,6 +964,12 @@ spec:
                 description: updateRevision, if not empty, indicates the version of
                   the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)
                 type: string
+              updatedAvailableReplicas:
+                description: updatedAvailableReplicas is the number of updated Pods
+                  created by the StatefulSet controller that have a Ready condition
+                  for atleast minReadySeconds.
+                format: int32
+                type: integer
               updatedReadyReplicas:
                 description: updatedReadyReplicas is the number of updated Pods created
                   by the StatefulSet controller that have a Ready Condition.
@@ -992,9 +997,3 @@ spec:
         specReplicasPath: .spec.replicas
         statusReplicasPath: .status.replicas
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

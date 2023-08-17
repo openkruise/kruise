@@ -243,7 +243,7 @@ func StandaloneWebhook(hook *Webhook, opts StandaloneOptions) (http.Handler, err
 		return nil, err
 	}
 
-	if opts.Logger == nil {
+	if opts.Logger.GetSink() == nil {
 		opts.Logger = logf.RuntimeLog.WithName("webhook")
 	}
 	hook.log = opts.Logger
@@ -252,4 +252,22 @@ func StandaloneWebhook(hook *Webhook, opts StandaloneOptions) (http.Handler, err
 		return hook, nil
 	}
 	return metrics.InstrumentedHook(opts.MetricsPath, hook), nil
+}
+
+// requestContextKey is how we find the admission.Request in a context.Context.
+type requestContextKey struct{}
+
+// RequestFromContext returns an admission.Request from ctx.
+func RequestFromContext(ctx context.Context) (Request, error) {
+	if v, ok := ctx.Value(requestContextKey{}).(Request); ok {
+		return v, nil
+	}
+
+	return Request{}, errors.New("admission.Request not found in context")
+}
+
+// NewContextWithRequest returns a new Context, derived from ctx, which carries the
+// provided admission.Request.
+func NewContextWithRequest(ctx context.Context, req Request) context.Context {
+	return context.WithValue(ctx, requestContextKey{}, req)
 }

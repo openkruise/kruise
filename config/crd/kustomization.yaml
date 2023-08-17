@@ -19,6 +19,7 @@ resources:
 - bases/apps.kruise.io_persistentpodstates.yaml
 - bases/apps.kruise.io_podprobemarkers.yaml
 - bases/apps.kruise.io_nodepodprobes.yaml
+- bases/apps.kruise.io_imagelistpulljobs.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

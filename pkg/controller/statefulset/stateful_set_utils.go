@@ -40,6 +40,7 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/revision"
 )
 
 var patchCodec = scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion)
@@ -486,7 +487,7 @@ func isCurrentRevisionNeeded(set *appsv1beta1.StatefulSet, updateRevision string
 		if pod == nil || i == ordinal {
 			continue
 		}
-		if getPodRevision(pod) != updateRevision {
+		if !revision.IsPodUpdate(pod, updateRevision) {
 			noUpdatedReplicas++
 		}
 	}
@@ -495,7 +496,10 @@ func isCurrentRevisionNeeded(set *appsv1beta1.StatefulSet, updateRevision string
 
 // Match check if the given StatefulSet's template matches the template stored in the given history.
 func Match(ss *appsv1beta1.StatefulSet, history *apps.ControllerRevision) (bool, error) {
-	patch, err := getPatch(ss)
+	// Encoding the set for the patch may update its GVK metadata, which causes data races if this
+	// set is in an informer cache.
+	clone := ss.DeepCopy()
+	patch, err := getPatch(clone)
 	if err != nil {
 		return false, err
 	}

@@ -56,7 +56,6 @@ const (
 	// It is only supported for Kubernetes version >= 1.16
 	// Note that if it is enabled during Kruise installation or upgrade, Kruise will require more authorities:
 	// 1. Webhook for deletion operation of namespace, service, ingress, crd, deployment, statefulset, replicaset and workloads in Kruise.
-	// 2. ClusterRole for reading all resource types, because CRD validation needs to list the CRs of this CRD.
 	ResourcesDeletionProtection featuregate.Feature = "ResourcesDeletionProtection"
 
 	// PodUnavailableBudgetDeleteGate enables PUB capability to protect pod from deletion and eviction
@@ -101,6 +100,19 @@ const (
 	// CloneSetEventHandlerOptimization enable optimization for cloneset-controller to reduce the
 	// queuing frequency cased by pod update.
 	CloneSetEventHandlerOptimization featuregate.Feature = "CloneSetEventHandlerOptimization"
+
+	// PreparingUpdateAsUpdate enable CloneSet/Advanced StatefulSet controller to regard preparing-update Pod
+	// as updated when calculating update/current revision during scaling.
+	PreparingUpdateAsUpdate featuregate.Feature = "PreparingUpdateAsUpdate"
+
+	// ImagePullJobGate enable imagepulljob-controller execute ImagePullJob.
+	ImagePullJobGate featuregate.Feature = "ImagePullJobGate"
+
+	// ResourceDistributionGate enable resourcedistribution-controller execute ResourceDistribution.
+	ResourceDistributionGate featuregate.Feature = "ResourceDistributionGate"
+
+	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
+	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -124,6 +136,10 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PodProbeMarkerGate:                        {Default: true, PreRelease: featuregate.Alpha},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
+	PreparingUpdateAsUpdate:                   {Default: false, PreRelease: featuregate.Alpha},
+	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
+	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
+	DeletionProtectionForCRDCascadingGate:     {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -159,5 +175,12 @@ func SetDefaultFeatureGates() {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForDaemonSetUpdate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodProbeMarkerGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarTerminator))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ImagePullJobGate))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForInPlaceUpdate) || utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForDaemonSetUpdate) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", ImagePullJobGate))
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(ResourcesDeletionProtection) {
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DeletionProtectionForCRDCascadingGate))
 	}
 }

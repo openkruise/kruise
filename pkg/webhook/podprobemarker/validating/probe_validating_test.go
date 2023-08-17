@@ -51,7 +51,7 @@ var (
 					ContainerName: "main",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "/healthy.sh"},
 								},
@@ -130,7 +130,7 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 					ContainerName: "other",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								TCPSocket: &corev1.TCPSocketAction{
 									Port: intstr.FromInt(80),
 								},
@@ -152,7 +152,7 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 					ContainerName: "other",
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{},
 							},
 						},

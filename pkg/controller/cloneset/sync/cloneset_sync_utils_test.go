@@ -25,6 +25,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/revision"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		pods               []*v1.Pod
 		revisionConsistent bool
 		disableFeatureGate bool
+		isPodUpdate        IsPodUpdateFunc
 		expectResult       expectationDiffs
 	}{
 		{
@@ -904,7 +906,85 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			},
 			expectResult: expectationDiffs{},
 		},
+		{
+			name:      "[scalingWithPreparingUpdate=true] scaling up when a preparing pod is not updated, and expected-updated is 1",
+			set:       createTestCloneSet(4, intstr.FromString("90%"), intstr.FromInt(1), intstr.FromInt(0)),
+			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStatePreparingUpdate, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			isPodUpdate:  revision.IsPodUpdate,
+			expectResult: expectationDiffs{scaleUpNum: 1, scaleUpLimit: 1, scaleUpNumOldRevision: 1},
+		},
+		{
+			name:      "[scalingWithPreparingUpdate=true] scaling up when a preparing pod is not updated, and expected-updated is 2",
+			set:       createTestCloneSet(4, intstr.FromInt(2), intstr.FromInt(1), intstr.FromInt(0)),
+			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStatePreparingUpdate, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			isPodUpdate:  revision.IsPodUpdate,
+			expectResult: expectationDiffs{scaleUpNum: 1, scaleUpLimit: 1},
+		},
+		{
+			name: "[UpdateStrategyPaused=true] scale up pods with maxSurge=3,maxUnavailable=0",
+			set:  setUpdateStrategyPaused(createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(0), intstr.FromInt(3)), true),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			expectResult: expectationDiffs{scaleUpNum: 2, scaleUpLimit: 2, updateNum: 3, updateMaxUnavailable: -2},
+		},
+		{
+			name: "[UpdateStrategyPaused=true] scale down pods with maxSurge=3,maxUnavailable=0",
+			set:  setUpdateStrategyPaused(createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(0), intstr.FromInt(3)), true),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			expectResult: expectationDiffs{scaleDownNum: 2, scaleDownNumOldRevision: 5, deleteReadyLimit: 2, updateNum: 3, updateMaxUnavailable: 2},
+		},
+		{
+			name: "[UpdateStrategyPaused=true] create 0 newRevision pods with maxSurge=3,maxUnavailable=0",
+			set:  setUpdateStrategyPaused(createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(0), intstr.FromInt(3)), true),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+			},
+			expectResult: expectationDiffs{scaleDownNum: 3, scaleDownNumOldRevision: 5, updateNum: 2, updateMaxUnavailable: 3},
+		},
+		{
+			name: "[UpdateStrategyPaused=true] create 0 newRevision pods with maxSurge=3,maxUnavailable=0",
+			set:  setUpdateStrategyPaused(createTestCloneSet(5, intstr.FromInt(2), intstr.FromInt(0), intstr.FromInt(3)), true),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
+			},
+			expectResult: expectationDiffs{scaleDownNum: 3, scaleDownNumOldRevision: 3},
+		},
 	}
+
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreparingUpdateAsUpdate, true)()
 
 	for i := range cases {
 		t.Run(cases[i].name, func(t *testing.T) {
@@ -923,7 +1003,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				}
 				cases[i].set.Labels[key] = value
 			}
-			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision)
+			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision, cases[i].isPodUpdate)
 			if !reflect.DeepEqual(res, cases[i].expectResult) {
 				t.Errorf("got %#v, expect %#v", res, cases[i].expectResult)
 			}
@@ -963,4 +1043,14 @@ func createTestPod(revisionHash string, lifecycleState appspub.LifecycleStateTyp
 		pod.Labels[appsv1alpha1.SpecifiedDeleteKey] = "true"
 	}
 	return pod
+}
+
+func setUpdateStrategyPaused(cs *appsv1alpha1.CloneSet, paused bool) *appsv1alpha1.CloneSet {
+	cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+		Partition:      cs.Spec.UpdateStrategy.Partition,
+		MaxSurge:       cs.Spec.UpdateStrategy.MaxSurge,
+		MaxUnavailable: cs.Spec.UpdateStrategy.MaxUnavailable,
+		Paused:         paused,
+	}
+	return cs
 }

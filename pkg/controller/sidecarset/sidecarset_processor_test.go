@@ -26,7 +26,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	apps "k8s.io/api/apps/v1"
@@ -172,13 +171,12 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 			expectedStatus: []int32{2, 2, 2, 2},
 		},
 	}
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			pods := cs.getPods()
 			sidecarset := cs.getSidecarset()
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pods[0], pods[1]).Build()
-			processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+			processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 			_, err := processor.UpdateSidecarSet(sidecarset)
 			if err != nil {
 				t.Errorf("processor update sidecarset failed: %s", err.Error())
@@ -253,8 +251,7 @@ func TestScopeNamespacePods(t *testing.T) {
 		}
 		fakeClient.Create(context.TODO(), pod)
 	}
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 	pods, err := processor.getMatchingPods(sidecarSet)
 	if err != nil {
 		t.Fatalf("getMatchingPods failed: %s", err.Error())
@@ -275,7 +272,6 @@ func TestCanUpgradePods(t *testing.T) {
 	}
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).Build()
 	pods := factoryPodsCommon(100, 0, sidecarSet)
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
 	for i := range pods {
 		pods[i].Annotations[sidecarcontrol.SidecarSetListAnnotation] = `test-sidecarset`
 		if i < 50 {
@@ -286,7 +282,7 @@ func TestCanUpgradePods(t *testing.T) {
 		fakeClient.Create(context.TODO(), pods[i])
 	}
 
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 	_, err := processor.UpdateSidecarSet(sidecarSet)
 	if err != nil {
 		t.Errorf("processor update sidecarset failed: %s", err.Error())
@@ -318,8 +314,7 @@ func TestGetActiveRevisions(t *testing.T) {
 	kubeSysNs.SetName(webhookutil.GetNamespace())
 	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 
 	// case 1
 	latestRevision, _, err := processor.registerLatestRevision(sidecarSet, nil)
@@ -433,8 +428,7 @@ func TestTruncateHistory(t *testing.T) {
 	kubeSysNs.SetName(webhookutil.GetNamespace()) //Note that util.GetKruiseManagerNamespace() return "" here
 	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
-	exps := expectations.NewUpdateExpectations(sidecarcontrol.RevisionAdapterImpl)
-	processor := NewSidecarSetProcessor(fakeClient, exps, record.NewFakeRecorder(10))
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 
 	getName := func(i int) string {
 		return "sidecar-" + strconv.Itoa(i)

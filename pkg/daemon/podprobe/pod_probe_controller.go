@@ -47,7 +47,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/klog/v2"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -400,11 +400,11 @@ func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.C
 			container = obj
 		}
 	}
-	var containerStatus *runtimeapi.ContainerStatus
+	var containerStatus *runtimeapi.ContainerStatusResponse
 	if container != nil {
-		containerStatus, err = runtimeService.ContainerStatus(container.Id)
+		containerStatus, err = runtimeService.ContainerStatus(container.Id, false)
 	}
-	return containerStatus, err
+	return containerStatus.Status, err
 }
 
 func updateNodePodProbeStatus(update Update, newStatus *appsv1alpha1.NodePodProbeStatus) {

@@ -123,14 +123,14 @@ func setSidecarDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 	v1.SetDefaults_ResourceList(&container.Resources.Requests)
 	if container.LivenessProbe != nil {
 		v1.SetDefaults_Probe(container.LivenessProbe)
-		if container.LivenessProbe.Handler.HTTPGet != nil {
-			v1.SetDefaults_HTTPGetAction(container.LivenessProbe.Handler.HTTPGet)
+		if container.LivenessProbe.ProbeHandler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.LivenessProbe.ProbeHandler.HTTPGet)
 		}
 	}
 	if container.ReadinessProbe != nil {
 		v1.SetDefaults_Probe(container.ReadinessProbe)
-		if container.ReadinessProbe.Handler.HTTPGet != nil {
-			v1.SetDefaults_HTTPGetAction(container.ReadinessProbe.Handler.HTTPGet)
+		if container.ReadinessProbe.ProbeHandler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.ReadinessProbe.ProbeHandler.HTTPGet)
 		}
 	}
 	if container.Lifecycle != nil {
@@ -201,9 +201,6 @@ func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectTemplateDefaults 
 
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateDefaults bool) {
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
-	}
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
 	}
@@ -357,6 +354,22 @@ func SetDefaultsImageTagPullPolicy(obj *v1alpha1.ImageTagPullPolicy) {
 
 // SetDefaults_ImagePullJob set default values for ImagePullJob.
 func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
+	if obj.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.CompletionPolicy.Type = v1alpha1.Always
+	}
+	if obj.Spec.PullPolicy == nil {
+		obj.Spec.PullPolicy = &v1alpha1.PullPolicy{}
+	}
+	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
+		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
+	}
+	if obj.Spec.PullPolicy.BackoffLimit == nil {
+		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
+	}
+}
+
+// SetDefaultsImageListPullJob  set default values for ImageListPullJob.
+func SetDefaultsImageListPullJob(obj *v1alpha1.ImageListPullJob) {
 	if obj.Spec.CompletionPolicy.Type == "" {
 		obj.Spec.CompletionPolicy.Type = v1alpha1.Always
 	}

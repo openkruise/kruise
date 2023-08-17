@@ -69,7 +69,7 @@ var (
 const (
 	controllerName     = "nodeimage-controller"
 	minRequeueDuration = 3 * time.Second
-	responseTimeout    = time.Minute
+	responseTimeout    = 10 * time.Minute
 
 	// Allow fake NodeImage with no Node related, just for tests
 	fakeLabelKey = "apps.kruise.io/fake-nodeimage"
@@ -103,7 +103,8 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: concurrentReconciles})
+	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r,
+		MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout()})
 	if err != nil {
 		return err
 	}

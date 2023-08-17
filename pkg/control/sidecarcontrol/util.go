@@ -30,6 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/configuration"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -60,6 +61,9 @@ const (
 	// SidecarsetInplaceUpdateStateKey records the state of inplace-update.
 	// The value of annotation is SidecarsetInplaceUpdateStateKey.
 	SidecarsetInplaceUpdateStateKey string = "kruise.io/sidecarset-inplace-update-state"
+
+	// SidecarSetUpgradable is a pod condition to indicate whether the pod's sidecarset is upgradable
+	SidecarSetUpgradable corev1.PodConditionType = "SidecarSetUpgradable"
 )
 
 var (
@@ -67,6 +71,8 @@ var (
 	// SidecarIgnoredNamespaces = []string{"kube-system", "kube-public"}
 	// SubPathExprEnvReg format: $(ODD_NAME)、$(POD_NAME)...
 	SubPathExprEnvReg, _ = regexp.Compile(`\$\(([-._a-zA-Z][-._a-zA-Z0-9]*)\)`)
+
+	UpdateExpectations = expectations.NewUpdateExpectations(RevisionAdapterImpl)
 )
 
 type SidecarSetUpgradeSpec struct {

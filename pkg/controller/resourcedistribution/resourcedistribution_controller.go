@@ -41,8 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
 )
@@ -59,7 +62,7 @@ var (
 // Add creates a new ResourceDistribution Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !utildiscovery.DiscoverGVK(controllerKind) {
+	if !utildiscovery.DiscoverGVK(controllerKind) || !utilfeature.DefaultFeatureGate.Enabled(features.ResourceDistributionGate) {
 		return nil
 	}
 	return add(mgr, newReconciler(mgr))
@@ -78,7 +81,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("resourcedistribution-controller", mgr, controller.Options{
-		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles,
+		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
 		RateLimiter: ratelimiter.DefaultControllerRateLimiter()})
 	if err != nil {
 		return err
@@ -160,9 +163,9 @@ type ReconcileResourceDistribution struct {
 //+kubebuilder:rbac:groups=apps.kruise.io,resources=resourcedistributions,verbs=get;list;watch;
 //+kubebuilder:rbac:groups=apps.kruise.io,resources=resourcedistributions/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apps.kruise.io,resources=resourcedistributions/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;delete
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups="core",resources=namespaces,verbs=get;list;watch;
+//+kubebuilder:rbac:groups="core",resources=configmaps,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups="core",resources=secrets,verbs=get;list;watch;create;update;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

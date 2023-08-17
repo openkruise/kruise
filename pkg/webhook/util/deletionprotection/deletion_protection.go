@@ -20,10 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	v1 "k8s.io/api/core/v1"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -124,6 +123,9 @@ func ValidateCRDDeletion(c client.Client, obj metav1.Object, gvk schema.GroupVer
 	case policyv1alpha1.DeletionProtectionTypeAlways:
 		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1alpha1.DeletionProtectionKey, val)
 	case policyv1alpha1.DeletionProtectionTypeCascading:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DeletionProtectionForCRDCascadingGate) {
+			return fmt.Errorf("feature-gate %s is not enabled", features.DeletionProtectionForCRDCascadingGate)
+		}
 		objList := &unstructured.UnstructuredList{}
 		objList.SetAPIVersion(gvk.GroupVersion().String())
 		objList.SetKind(gvk.Kind)

@@ -69,7 +69,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 	})
 
 	framework.KruiseDescribe("namespace deletion", func() {
-		ginkgo.It("should be protected", func() {
+		ginkgo.It("ns should be protected", func() {
 			ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
 				Name:   "kruise-e2e-deletion-protection-" + randStr,
 				Labels: map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
@@ -116,12 +116,19 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(0)))
 
 			ginkgo.By("Create a PVC in this namespace")
+			nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(nodeList.Items)).ShouldNot(gomega.BeZero())
+			nodeName := nodeList.Items[0].Name
 			pvcName := "pvc-" + randStr
-			storageClassName := ""
+			storageClassName := "standard"
 			pvc := &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns.Name,
 					Name:      pvcName,
+					Annotations: map[string]string{
+						"volume.kubernetes.io/selected-node": nodeName,
+					},
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
 					AccessModes: []v1.PersistentVolumeAccessMode{
@@ -129,7 +136,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 					},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							v1.ResourceStorage: resource.MustParse("1Gi"),
+							v1.ResourceStorage: resource.MustParse("50Mi"),
 						},
 					},
 					StorageClassName: &storageClassName,
@@ -138,33 +145,6 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			_, err = c.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Create a PV bound to the PVC just created")
-			pvName := "pv-" + randStr
-			pv := &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pvName,
-				},
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
-					},
-					AccessModes: []v1.PersistentVolumeAccessMode{
-						v1.ReadWriteOnce,
-					},
-					StorageClassName: "",
-					ClaimRef: &v1.ObjectReference{
-						Namespace: ns.Name,
-						Name:      pvcName,
-					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						HostPath: &v1.HostPathVolumeSource{
-							Path: "/mnt",
-						},
-					},
-				},
-			}
-			_, err = framework.CreatePV(c, pv)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() bool {
 				pvc, err := c.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvcName, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -176,18 +156,10 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
-			ginkgo.By("Delete the PV bounded to PVC")
-			err = c.CoreV1().PersistentVolumes().Delete(context.TODO(), pvName, metav1.DeleteOptions{})
-			_, err = c.CoreV1().PersistentVolumes().Patch(context.TODO(), pvName, types.StrategicMergePatchType,
-				[]byte(`{"metadata":{"finalizers":null}}`), metav1.PatchOptions{})
+			ginkgo.By("Delete the PVC just created")
+			err = c.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Eventually(func() bool {
-				pvc, err := c.CoreV1().PersistentVolumeClaims(ns.Name).Get(context.TODO(), pvcName, metav1.GetOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return pvc.Status.Phase != v1.ClaimBound
-			}, 5*time.Second, time.Second).Should(gomega.BeTrue())
-
-			time.Sleep(time.Second)
+			time.Sleep(3 * time.Second)
 			ginkgo.By("Delete the namespace successfully")
 			err = c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

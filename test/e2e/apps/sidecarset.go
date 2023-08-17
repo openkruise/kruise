@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -739,6 +740,8 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
 				gomega.Expect(pod.Spec.Containers[0].Image).Should(gomega.Equal(BusyboxImage))
+				_, sidecarSetUpgradable := podutil.GetPodCondition(&pod.Status, sidecarcontrol.SidecarSetUpgradable)
+				gomega.Expect(sidecarSetUpgradable.Status).Should(gomega.Equal(corev1.ConditionTrue))
 			}
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image done"))
 		})
@@ -831,6 +834,158 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 
 			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container failed image, and only update one pod done"))
+		})
+
+		framework.ConformanceIt("sidecarSet upgrade sidecar container (more than image field), no pod should be updated", func() {
+			// create sidecarSet
+			sidecarSetIn := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			}
+			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
+			time.Sleep(time.Second)
+
+			// create deployment
+			deploymentIn := tester.NewBaseDeployment(ns)
+			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
+			tester.CreateDeployment(deploymentIn)
+
+			sidecarSetIn, err := kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetIn.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			//check pod sidecar upgrade spec annotations
+			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				origin := sets.String{}
+				for _, sidecar := range sidecarSetIn.Spec.Containers {
+					origin.Insert(sidecar.Name)
+				}
+				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
+				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, pod)
+				gomega.Expect(upgradeSpec1.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
+				gomega.Expect(upgradeSpec1.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetRevision(sidecarSetIn)))
+				target1 := sets.NewString(upgradeSpec1.SidecarList...)
+				gomega.Expect(reflect.DeepEqual(origin.List(), target1.List())).To(gomega.Equal(true))
+				// SidecarSetHashWithoutImageAnnotation = "kruise.io/sidecarset-hash-without-image"
+				upgradeSpec2 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashWithoutImageAnnotation, pod)
+				gomega.Expect(upgradeSpec2.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
+				gomega.Expect(upgradeSpec2.SidecarSetHash).To(gomega.Equal(sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarSetIn)))
+				target2 := sets.NewString(upgradeSpec2.SidecarList...)
+				gomega.Expect(reflect.DeepEqual(origin.List(), target2.List())).To(gomega.Equal(true))
+			}
+
+			// modify sidecarSet sidecar field out of image
+			sidecarSetIn.Spec.Containers[0].Command = []string{"sleep", "1000"}
+			tester.UpdateSidecarSet(sidecarSetIn)
+			except := &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      2,
+				UpdatedPods:      0,
+				UpdatedReadyPods: 0,
+				ReadyPods:        2,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
+
+			// check all the pods' condition
+			pods, err = tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				_, condition := podutil.GetPodCondition(&pod.Status, sidecarcontrol.SidecarSetUpgradable)
+				gomega.Expect(condition.Status).Should(gomega.Equal(corev1.ConditionFalse))
+			}
+
+			ginkgo.By("sidecarSet upgrade sidecar container (more than image field), no pod should be updated done")
+		})
+
+		framework.ConformanceIt("multi sidecarSet upgrade sidecar container, check pod condition", func() {
+			// create sidecarSet 1
+			sidecarSetIn1 := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn1.Name = "test-sidecarset-1"
+			sidecarSetIn1.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			}
+			sidecarSetIn1.Spec.Containers = sidecarSetIn1.Spec.Containers[:1]
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn1.Name))
+			sidecarSetIn1, _ = tester.CreateSidecarSet(sidecarSetIn1)
+			time.Sleep(time.Second)
+
+			// create sidecarSet 2
+			sidecarSetIn2 := tester.NewBaseSidecarSet(ns)
+			sidecarSetIn2.Name = "test-sidecarset-2"
+			sidecarSetIn2.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			}
+			sidecarSetIn2.Spec.InitContainers = []appsv1alpha1.SidecarContainer{}
+			sidecarSetIn2.Spec.Containers = sidecarSetIn2.Spec.Containers[1:2]
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn2.Name))
+			sidecarSetIn2, _ = tester.CreateSidecarSet(sidecarSetIn2)
+			time.Sleep(time.Second)
+
+			// create deployment
+			deploymentIn := tester.NewBaseDeployment(ns)
+			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
+			tester.CreateDeployment(deploymentIn)
+
+			sidecarSetIn1, err := kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetIn1.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			sidecarSetIn2, err = kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetIn2.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// modify sidecarSet1 field out of image, should not update pod
+			sidecarSetIn1.Spec.Containers[0].Command = []string{"sleep", "1000"}
+			tester.UpdateSidecarSet(sidecarSetIn1)
+			except := &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      2,
+				UpdatedPods:      0,
+				UpdatedReadyPods: 0,
+				ReadyPods:        2,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn1, except)
+
+			// modify sidecarSet2, only change image
+			sidecarSetIn2.Spec.Containers[0].Image = NginxImage
+			tester.UpdateSidecarSet(sidecarSetIn2)
+			except = &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      2,
+				UpdatedPods:      2,
+				UpdatedReadyPods: 2,
+				ReadyPods:        2,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn2, except)
+
+			// check all the pods' condition, due to sidecarSet1 is not updated, so the condition should be false
+			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				_, condition := podutil.GetPodCondition(&pod.Status, sidecarcontrol.SidecarSetUpgradable)
+				gomega.Expect(condition.Status).Should(gomega.Equal(corev1.ConditionFalse))
+			}
+
+			// then update sidecarSet1, all the pods should be updated
+			sidecarSetIn1.Spec.Containers[0].Image = NewNginxImage
+			sidecarSetIn1.Spec.Containers[0].Command = []string{"tail", "-f", "/dev/null"}
+			tester.UpdateSidecarSet(sidecarSetIn1)
+			except = &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      2,
+				UpdatedPods:      2,
+				UpdatedReadyPods: 2,
+				ReadyPods:        2,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn1, except)
+
+			// all the sidecarset is updated, so the condition should be true
+			pods, err = tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				_, condition := podutil.GetPodCondition(&pod.Status, sidecarcontrol.SidecarSetUpgradable)
+				gomega.Expect(condition.Status).Should(gomega.Equal(corev1.ConditionTrue))
+			}
+
+			ginkgo.By("multi sidecarSet upgrade sidecar container, check pod condition done")
 		})
 
 		framework.ConformanceIt("sidecarSet upgrade cold sidecar container image, and paused", func() {
