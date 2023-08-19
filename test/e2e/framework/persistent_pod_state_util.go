@@ -21,6 +21,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -31,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"time"
 
 	"github.com/onsi/gomega"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"

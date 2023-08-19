@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/pkg/client"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,7 +45,7 @@ var (
 )
 
 func init() {
-	_ = apis.AddToScheme(internalScheme)
+	utilruntime.Must(apis.AddToScheme(internalScheme))
 }
 
 func DiscoverGVK(gvk schema.GroupVersionKind) bool {

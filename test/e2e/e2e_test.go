@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
@@ -73,10 +75,7 @@ func TestMain(m *testing.M) {
 
 func TestE2E(t *testing.T) {
 
-	err := kruiseapis.AddToScheme(scheme.Scheme)
-	if err != nil {
-		t.Fatal(err)
-	}
+	utilruntime.Must(kruiseapis.AddToScheme(scheme.Scheme))
 
 	klog.Infof("Args: %v", os.Args)
 	RunE2ETests(t)

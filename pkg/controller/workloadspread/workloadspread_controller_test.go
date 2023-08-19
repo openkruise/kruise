@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -150,8 +152,8 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = appsv1alpha1.AddToScheme(scheme)
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 }
 
 func TestSubsetPodDeletionCost(t *testing.T) {

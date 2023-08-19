@@ -22,7 +22,7 @@ package broadcastjob
 	//t := &envtest.Environment{
 	//	CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	//}
-	//apis.AddToScheme(scheme.Scheme)
+	//utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 	//
 	//var err error
 	//if cfg, err = t.Start(); err != nil {

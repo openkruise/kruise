@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
@@ -130,11 +132,11 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = appsv1alpha1.AddToScheme(clientgoscheme.Scheme)
-	_ = appsv1.AddToScheme(scheme)
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = corev1.AddToScheme(scheme)
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
 }
 
 func getLatestPod(client client.Client, pod *corev1.Pod) (*corev1.Pod, error) {
