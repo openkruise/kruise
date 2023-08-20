@@ -450,6 +450,14 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			sidecarSetHash[sidecarSet.Name] = setUpgrade1
 			sidecarSetHashWithoutImage[sidecarSet.Name] = setUpgrade2
 		}
+		sidecarSetHash[sidecarSet.Name] = sidecarcontrol.SidecarSetUpgradeSpec{
+			UpdateTimestamp:              metav1.Now(),
+			SidecarSetHash:               sidecarSetHash[sidecarSet.Name].SidecarSetHash,
+			SidecarSetName:               sidecarSet.Name,
+			SidecarList:                  sidecarList.List(),
+			SidecarSetControllerRevision: sidecarSetHash[sidecarSet.Name].SidecarSetControllerRevision,
+			State:                        sidecarcontrol.SidecarSetHashStateUpdating,
+		}
 	}
 
 	// store sidecarset hash in pod annotations

@@ -103,6 +103,13 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
+	// check if pod finish sidecar container upgrade
+	for _, pod := range pods {
+		if sidecarcontrol.IsPodFinishSiderCarContainersUpdate(pod, sidecarSet) && sidecarcontrol.GetPodSidecarSetHashState(pod, sidecarSet) != "Normal" {
+			p.updatePodSidecarHashState(control, pod)
+		}
+	}
+
 	// 3. If sidecar container hot upgrade complete, then set the other one(empty sidecar container) image to HotUpgradeEmptyImage
 	if isSidecarSetHasHotUpgradeContainer(sidecarSet) {
 		var podsInHotUpgrading []*corev1.Pod
@@ -186,6 +193,53 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 	}
 
 	klog.V(3).Infof("sidecarSet(%s) updated pods(%s)", sidecarset.Name, strings.Join(podNames, ","))
+	return nil
+}
+
+func (p *Processor) updatePodSidecarHashState(control sidecarcontrol.SidecarControl, pod *corev1.Pod) error {
+	podClone := &corev1.Pod{}
+	sidecarSet := control.GetSidecarset()
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := p.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, podClone); err != nil {
+			klog.Errorf("sidecarset(%s) error getting updated pod %s/%s from client", control.GetSidecarset().Name, pod.Namespace, pod.Name)
+		}
+
+		hashKey := sidecarcontrol.SidecarSetHashAnnotation
+		sidecarSetHash := make(map[string]sidecarcontrol.SidecarSetUpgradeSpec)
+		if err := json.Unmarshal([]byte(pod.Annotations[hashKey]), &sidecarSetHash); err != nil {
+			klog.Errorf("unmarshal pod(%s/%s) annotations[%s] failed: %s", pod.Namespace, pod.Name, hashKey, err.Error())
+
+			// to be compatible with older sidecarSet hash struct, map[string]string
+			olderSidecarSetHash := make(map[string]string)
+			if err = json.Unmarshal([]byte(pod.Annotations[hashKey]), &olderSidecarSetHash); err == nil {
+				for k, v := range olderSidecarSetHash {
+					sidecarSetHash[k] = sidecarcontrol.SidecarSetUpgradeSpec{
+						SidecarSetHash:  v,
+						UpdateTimestamp: metav1.Now(),
+						SidecarSetName:  sidecarSet.Name,
+					}
+				}
+			}
+		}
+
+		sidecarSetHash[sidecarSet.Name] = sidecarcontrol.SidecarSetUpgradeSpec{
+			UpdateTimestamp:              metav1.Now(),
+			SidecarSetHash:               sidecarSetHash[sidecarSet.Name].SidecarSetHash,
+			SidecarSetName:               sidecarSetHash[sidecarSet.Name].SidecarSetName,
+			SidecarList:                  sidecarSetHash[sidecarSet.Name].SidecarList,
+			SidecarSetControllerRevision: sidecarSetHash[sidecarSet.Name].SidecarSetControllerRevision,
+			State:                        sidecarcontrol.SidecarSetHashStateNormal,
+		}
+		newHash, _ := json.Marshal(sidecarSetHash)
+		podClone.Annotations[hashKey] = string(newHash)
+		// update pod in store
+		return p.Client.Update(context.TODO(), podClone)
+	})
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
