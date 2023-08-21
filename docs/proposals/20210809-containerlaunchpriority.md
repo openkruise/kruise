@@ -75,7 +75,8 @@ Or you can set the annotation in Pod to declare it needs ordered by containers s
 ```yaml
 apiVersion: v1
 kind: Pod
-  labels:
+metadata:
+  annotations:
     apps.kruise.io/container-launch-priority: Ordered
 spec:
   containers:
