@@ -19,6 +19,8 @@ import (
 	"strconv"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -108,7 +110,7 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 }
 
 func TestValidateWorkloadSpreadCreate(t *testing.T) {

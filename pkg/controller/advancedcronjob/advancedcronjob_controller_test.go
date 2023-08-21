@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
@@ -105,8 +107,8 @@ func TestScheduleWithTimeZone(t *testing.T) {
 // Test scenario:
 func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	job1 := createJob("job1", broadcastJobTemplate())
@@ -142,9 +144,9 @@ func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 
 func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = batchv1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(batchv1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	job1 := createJob("job2", jobTemplate())

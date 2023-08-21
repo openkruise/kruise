@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -49,8 +51,8 @@ var (
 
 func init() {
 	testScheme = runtime.NewScheme()
-	apps.AddToScheme(testScheme)
-	corev1.AddToScheme(testScheme)
+	utilruntime.Must(apps.AddToScheme(testScheme))
+	utilruntime.Must(corev1.AddToScheme(testScheme))
 }
 
 func TestValidateSidecarSet(t *testing.T) {

@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/openkruise/kruise/apis"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +31,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	_ = apis.AddToScheme(scheme.Scheme)
+	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 }
 
 func TestCreateApplyRevision(t *testing.T) {

@@ -24,6 +24,8 @@ import (
 	"sync"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +51,7 @@ func TestMain(m *testing.M) {
 	t := &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	}
-	apis.AddToScheme(clientgoscheme.Scheme)
+	utilruntime.Must(apis.AddToScheme(clientgoscheme.Scheme))
 
 	var err error
 	if cfg, err = t.Start(); err != nil {

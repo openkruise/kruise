@@ -25,6 +25,8 @@ import (
 	"time"
 	_ "time/tzdata" // for AdvancedCronJob Time Zone support
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,13 +71,13 @@ var (
 )
 
 func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = appsv1alpha1.AddToScheme(clientgoscheme.Scheme)
-	_ = appsv1beta1.AddToScheme(clientgoscheme.Scheme)
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(clientgoscheme.Scheme))
 
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = appsv1beta1.AddToScheme(scheme)
-	_ = policyv1alpha1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
 	scheme.AddUnversionedTypes(metav1.SchemeGroupVersion, &metav1.UpdateOptions{}, &metav1.DeleteOptions{}, &metav1.CreateOptions{})
 	// +kubebuilder:scaffold:scheme
 }
