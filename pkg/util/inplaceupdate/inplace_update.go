@@ -89,6 +89,7 @@ type UpdateSpec struct {
 	MetaDataPatch         []byte                             `json:"metaDataPatch,omitempty"`
 	UpdateEnvFromMetadata bool                               `json:"updateEnvFromMetadata,omitempty"`
 	GraceSeconds          int32                              `json:"graceSeconds,omitempty"`
+	VerticalUpdateOnly    bool                               `json:"verticalUpdate,omitempty"`
 
 	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
 	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
@@ -289,7 +290,8 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 	// TODO(FillZpp): maybe we should check if the previous in-place update has completed
 
 	// 2. update condition for pod with readiness-gate
-	if containsReadinessGate(pod) {
+	// When only workload resources are updated, they are marked as not needing to remove traffic
+	if !spec.VerticalUpdateOnly && containsReadinessGate(pod) {
 		newCondition := v1.PodCondition{
 			Type:               appspub.InPlaceUpdateReady,
 			LastTransitionTime: metav1.NewTime(Clock.Now()),

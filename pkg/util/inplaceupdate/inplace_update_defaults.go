@@ -281,8 +281,10 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 	updateSpec := &UpdateSpec{
 		Revision:             newRevision.Name,
 		ContainerImages:      make(map[string]string),
+		ContainerResources:   make(map[string]v1.ResourceRequirements),
 		ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 		GraceSeconds:         opts.GracePeriodSeconds,
+		VerticalUpdateOnly:   false,
 	}
 	if opts.GetRevision != nil {
 		updateSpec.Revision = opts.GetRevision(newRevision)
@@ -681,6 +683,7 @@ func defaultCalculateInPlaceUpdateSpecWithVerticalUpdate(oldRevision, newRevisio
 		ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 		ContainerResources:   make(map[string]v1.ResourceRequirements),
 		GraceSeconds:         opts.GracePeriodSeconds,
+		VerticalUpdateOnly:   false,
 	}
 	if opts.GetRevision != nil {
 		updateSpec.Revision = opts.GetRevision(newRevision)
@@ -745,6 +748,11 @@ func defaultCalculateInPlaceUpdateSpecWithVerticalUpdate(oldRevision, newRevisio
 		} else {
 			return nil
 		}
+	}
+
+	// Need to distinguish whether only resources have been updated
+	if len(updateSpec.ContainerResources) > 0 && len(updateSpec.ContainerImages) == 0 {
+		updateSpec.VerticalUpdateOnly = true
 	}
 
 	if len(metadataPatches) > 0 {
