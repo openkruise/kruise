@@ -93,7 +93,7 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Clo
 - 微信：添加用户 `openkruise` 并让机器人拉你入群 (*Chinese*)
 - 社区双周会 (APAC, *Chinese*):
   - 周四 19:30 GMT+8 (Asia/Shanghai)
-  - [进入会议(钉钉)](dingtalk://dingtalkclient/action/open_mini_app?miniAppId=2018112162280005&ddMode=push&mainTask=true&keepAlive=false&newCalendar=1&page=pages%2Fdetail%2Findex%3FuniqueId%3DeG9YMitub2M5elNSM0ZYWDZ6VnlvZz09%26recurrenceId%3D1692790200000%26inviter%3D47874516&fallback_url=dingtalk%3A%2F%2Fdingtalkclient%2Fpage%2Fcalendar_detail%3Fid%3D0%26uniqueId%3DeG9YMitub2M5elNSM0ZYWDZ6VnlvZz09%26recurrenceId%3D1692790200000%26inviter%3D47874516)
+  - 进入会议(钉钉): 搜索群ID `23330762`
   - [会议纪要](https://shimo.im/docs/gXqmeQOYBehZ4vqo)
 - Bi-weekly Community Meeting (*English*): TODO
   - [进入会议(zoom)](https://us02web.zoom.us/j/87059136652?pwd=NlI4UThFWXVRZkxIU0dtR1NINncrQT09)

@@ -94,7 +94,7 @@ Active communication channels:
 - WeChat: Search User `openkruise` and let the robot invite you (*Chinese*)
 - Bi-weekly Community Meeting (APAC, *Chinese*):
   - Thursday 19:30 GMT+8 (Asia/Shanghai), [Calendar](https://calendar.google.com/calendar/u/2?cid=MjdtbDZucXA2bjVpNTFyYTNpazV2dW8ybHNAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)
-  - [Meeting Link(DingTalk))](dingtalk://dingtalkclient/action/open_mini_app?miniAppId=2018112162280005&ddMode=push&mainTask=true&keepAlive=false&newCalendar=1&page=pages%2Fdetail%2Findex%3FuniqueId%3DeG9YMitub2M5elNSM0ZYWDZ6VnlvZz09%26recurrenceId%3D1692790200000%26inviter%3D47874516&fallback_url=dingtalk%3A%2F%2Fdingtalkclient%2Fpage%2Fcalendar_detail%3Fid%3D0%26uniqueId%3DeG9YMitub2M5elNSM0ZYWDZ6VnlvZz09%26recurrenceId%3D1692790200000%26inviter%3D47874516)
+  - Join Meeting(DingTalk): Search GroupID `23330762` (*Chinese*)
   - [Notes and agenda](https://shimo.im/docs/gXqmeQOYBehZ4vqo)
 - Bi-weekly Community Meeting (*English*): TODO
   - [Meeting Link(zoom)](https://us02web.zoom.us/j/87059136652?pwd=NlI4UThFWXVRZkxIU0dtR1NINncrQT09)
