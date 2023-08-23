@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
@@ -38,7 +40,7 @@ var (
 )
 
 func init() {
-	_ = apis.AddToScheme(kruiseScheme)
+	utilruntime.Must(apis.AddToScheme(kruiseScheme))
 }
 
 func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters.CustomResourceDefinitionLister, caBundle []byte) error {

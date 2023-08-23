@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -90,8 +92,8 @@ func TestGetNodeToPodMap(t *testing.T) {
 // 1 new pod created on 1 node
 func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromInt(2)
 	// A job
@@ -146,8 +148,8 @@ func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 // 1 new pod created on 1 node
 func TestReconcileJobCreatePodPercentage(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromString("40%")
 	// A job
@@ -204,8 +206,8 @@ func TestReconcileJobCreatePodPercentage(t *testing.T) {
 // Check only 1 pod is created because the other node is unschedulable
 func TestPodsOnUnschedulableNodes(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromInt(2)
 	// A job
@@ -250,8 +252,8 @@ func TestPodsOnUnschedulableNodes(t *testing.T) {
 // 10 pods created with slow start
 func TestReconcileJobMultipleBatches(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromInt(20)
 	// A job
@@ -295,8 +297,8 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 // Check job state is failed
 func TestJobFailed(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
@@ -347,8 +349,8 @@ func TestJobFailed(t *testing.T) {
 // check job phase is running
 func TestJobFailurePolicyTypeContinue(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
@@ -394,8 +396,8 @@ func TestJobFailurePolicyTypeContinue(t *testing.T) {
 // check job phase is failed
 func TestJobFailurePolicyTypeFailFast(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
@@ -441,8 +443,8 @@ func TestJobFailurePolicyTypeFailFast(t *testing.T) {
 // check job phase is paused
 func TestJobFailurePolicyPause(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
@@ -489,8 +491,8 @@ func TestJobFailurePolicyPause(t *testing.T) {
 // check job phase is paused, and no new pod is created.
 func TestJobSetPaused(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromString("50%")
 	// A job
@@ -532,8 +534,8 @@ func TestJobSetPaused(t *testing.T) {
 // The job should fail after activeDeadline, and active pods will be deleted
 func TestJobFailedAfterActiveDeadline(t *testing.T) {
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
-	_ = v1.AddToScheme(scheme)
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)

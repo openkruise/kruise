@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	apps "k8s.io/api/apps/v1"
@@ -36,9 +38,9 @@ import (
 
 func init() {
 	scheme = runtime.NewScheme()
-	_ = policyv1alpha1.AddToScheme(scheme)
-	_ = corev1.AddToScheme(scheme)
-	_ = apps.AddToScheme(scheme)
+	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(apps.AddToScheme(scheme))
 }
 
 var (

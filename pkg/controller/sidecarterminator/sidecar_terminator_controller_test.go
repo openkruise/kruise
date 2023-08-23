@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -174,8 +176,8 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = appsv1alpha1.AddToScheme(scheme)
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 }
 
 func sidecarContainerFactory(name string, strategy string) corev1.Container {

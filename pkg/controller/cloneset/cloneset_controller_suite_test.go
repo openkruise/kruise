@@ -26,6 +26,8 @@ import (
 	"sync"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/onsi/gomega"
 	"github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -46,8 +48,8 @@ import (
 
 func init() {
 	testscheme = k8sruntime.NewScheme()
-	_ = corev1.AddToScheme(testscheme)
-	_ = appsv1alpha1.AddToScheme(testscheme)
+	utilruntime.Must(corev1.AddToScheme(testscheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(testscheme))
 }
 
 var testscheme *k8sruntime.Scheme
@@ -59,7 +61,7 @@ func TestMain(m *testing.M) {
 	t := &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	}
-	apis.AddToScheme(scheme.Scheme)
+	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 
 	var err error
 	if cfg, err = t.Start(); err != nil {

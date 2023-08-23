@@ -23,6 +23,8 @@ import (
 	"net/http"
 	"sync"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	kruiseapis "github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/daemon/containermeta"
@@ -57,8 +59,8 @@ var (
 )
 
 func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = kruiseapis.AddToScheme(scheme)
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(kruiseapis.AddToScheme(scheme))
 }
 
 // Runnable allows a component to be started.

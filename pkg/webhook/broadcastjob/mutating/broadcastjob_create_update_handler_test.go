@@ -6,6 +6,8 @@ import (
 	"sort"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"gomodules.xyz/jsonpatch/v2"
@@ -16,7 +18,7 @@ import (
 )
 
 func TestHandle(t *testing.T) {
-	_ = apis.AddToScheme(scheme.Scheme)
+	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 
 	oldBroadcastJobStr := `{
     "metadata": {

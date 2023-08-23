@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,8 +45,8 @@ var (
 
 func init() {
 	testscheme = k8sruntime.NewScheme()
-	_ = corev1.AddToScheme(testscheme)
-	_ = appsv1alpha1.AddToScheme(testscheme)
+	utilruntime.Must(corev1.AddToScheme(testscheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(testscheme))
 }
 
 func TestReconcile(t *testing.T) {

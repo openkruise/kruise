@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"github.com/openkruise/kruise/apis"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -81,7 +83,7 @@ func getInt32Pointer(i int32) *int32 {
 }
 
 func TestUpdate(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 	now := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
 	cases := []manageCase{
 		{
