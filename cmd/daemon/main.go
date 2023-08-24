@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
+
 	"flag"
 	"math/rand"
 	"net/http"
@@ -37,11 +39,15 @@ import (
 )
 
 var (
-	bindAddr  = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
-	pprofAddr = flag.String("pprof-addr", ":10222", "The address the pprof binds to.")
+	bindAddr         = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
+	pprofAddr        = flag.String("pprof-addr", ":10222", "The address the pprof binds to.")
+	pluginConfigFile string
+	pluginBinDir     string
 )
 
 func main() {
+	flag.StringVar(&pluginConfigFile, "pluginConfigFile", "/kruise/CredentialProviderPlugin.yaml", "The path of plugin config file.")
+	flag.StringVar(&pluginBinDir, "pluginBinDir", "/kruise/plugins", "The path of directory of plugin binaries.")
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
@@ -65,6 +71,12 @@ func main() {
 	if err != nil {
 		klog.Fatalf("Failed to new daemon: %v", err)
 	}
+
+	err = plugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir)
+	if err != nil {
+		klog.Errorf("Failed to register credential provider plugins: %v", err)
+	}
+
 	if err := d.Run(ctx); err != nil {
 		klog.Fatalf("Failed to start daemon: %v", err)
 	}
