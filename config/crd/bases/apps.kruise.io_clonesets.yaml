@@ -518,7 +518,6 @@ spec:
             - availableReplicas
             - readyReplicas
             - replicas
-            - updatedAvailableReplicas
             - updatedReadyReplicas
             - updatedReplicas
             type: object
