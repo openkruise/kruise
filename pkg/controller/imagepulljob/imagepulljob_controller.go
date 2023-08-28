@@ -20,8 +20,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+
 	"sort"
 	"time"
+
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
@@ -92,7 +97,19 @@ func add(mgr manager.Manager, r *ReconcileImagePullJob) error {
 	}
 
 	// Watch for changes to ImagePullJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ImagePullJob{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ImagePullJob{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldIPJ := e.ObjectOld.(*appsv1alpha1.ImagePullJob)
+			newIPJ := e.ObjectNew.(*appsv1alpha1.ImagePullJob)
+
+			if !apiequality.Semantic.DeepEqual(oldIPJ.Spec, newIPJ.Spec) && oldIPJ.Status.CompletionTime != nil {
+				newIPJ.Status = appsv1alpha1.ImagePullJobStatus{}
+				r.Status().Update(context.TODO(), newIPJ)
+				return false
+			}
+			return true
+		},
+	})
 	if err != nil {
 		return err
 	}
