@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -49,7 +49,7 @@ var _ admission.Handler = &UnitedDeploymentCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.UnitedDeployment{}
+	obj := &appsv1beta1.UnitedDeployment{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -60,7 +60,7 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 	injectTemplateDefaults := false
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
 		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj := &appsv1alpha1.UnitedDeployment{}
+			oldObj := &appsv1beta1.UnitedDeployment{}
 			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
@@ -72,7 +72,7 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 		}
 	}
 	defaults.SetDefaultsUnitedDeployment(obj, injectTemplateDefaults)
-	obj.Status = appsv1alpha1.UnitedDeploymentStatus{}
+	obj.Status = appsv1beta1.UnitedDeploymentStatus{}
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}

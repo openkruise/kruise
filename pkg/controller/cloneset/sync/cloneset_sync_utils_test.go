@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/revision"
@@ -38,7 +38,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		set                *appsv1alpha1.CloneSet
+		set                *appsv1beta1.CloneSet
 		setLabels          map[string]string
 		pods               []*v1.Pod
 		revisionConsistent bool
@@ -739,7 +739,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook (step 1/4)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -750,7 +750,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook (step 2/4)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -761,7 +761,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook (step 3/4)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -773,7 +773,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook (step 4/4)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -785,7 +785,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook and then cancel (step 1/5)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -796,7 +796,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook and then cancel (step 2/5)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -807,7 +807,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook and then cancel (step 3/5)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -819,7 +819,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook and then cancel (step 4/5)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -831,7 +831,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook and then cancel (step 5/5)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -842,7 +842,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific scale down with lifecycle hook, then scale up pods (step 1/6)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -853,7 +853,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific scale down with lifecycle hook, then scale up pods (step 2/6)",
 			set:       createTestCloneSet(2, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -864,7 +864,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific scale down with lifecycle hook, then scale up pods (step 3/6)",
 			set:       createTestCloneSet(2, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -875,7 +875,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific scale down with lifecycle hook, then scale up pods (step 4/6)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -886,7 +886,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific scale down with lifecycle hook, then scale up pods (step 5/6)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -898,7 +898,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific scale down with lifecycle hook, then scale up pods (step 6/6)",
 			set:       createTestCloneSet(3, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
@@ -909,7 +909,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingWithPreparingUpdate=true] scaling up when a preparing pod is not updated, and expected-updated is 1",
 			set:       createTestCloneSet(4, intstr.FromString("90%"), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(oldRevision, appspub.LifecycleStatePreparingUpdate, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
@@ -921,7 +921,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		{
 			name:      "[scalingWithPreparingUpdate=true] scaling up when a preparing pod is not updated, and expected-updated is 2",
 			set:       createTestCloneSet(4, intstr.FromInt(2), intstr.FromInt(1), intstr.FromInt(0)),
-			setLabels: map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"},
+			setLabels: map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"},
 			pods: []*v1.Pod{
 				createTestPod(oldRevision, appspub.LifecycleStatePreparingUpdate, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
@@ -1011,11 +1011,11 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 	}
 }
 
-func createTestCloneSet(replicas int32, partition, maxUnavailable, maxSurge intstr.IntOrString) *appsv1alpha1.CloneSet {
-	return &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
+func createTestCloneSet(replicas int32, partition, maxUnavailable, maxSurge intstr.IntOrString) *appsv1beta1.CloneSet {
+	return &appsv1beta1.CloneSet{
+		Spec: appsv1beta1.CloneSetSpec{
 			Replicas: &replicas,
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+			UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      &partition,
 				MaxSurge:       &maxSurge,
 				MaxUnavailable: &maxUnavailable,
@@ -1024,8 +1024,8 @@ func createTestCloneSet(replicas int32, partition, maxUnavailable, maxSurge ints
 	}
 }
 
-func setScaleStrategy(cs *appsv1alpha1.CloneSet, maxUnavailable intstr.IntOrString) *appsv1alpha1.CloneSet {
-	cs.Spec.ScaleStrategy = appsv1alpha1.CloneSetScaleStrategy{
+func setScaleStrategy(cs *appsv1beta1.CloneSet, maxUnavailable intstr.IntOrString) *appsv1beta1.CloneSet {
+	cs.Spec.ScaleStrategy = appsv1beta1.CloneSetScaleStrategy{
 		MaxUnavailable: &maxUnavailable,
 	}
 	return cs
@@ -1040,13 +1040,13 @@ func createTestPod(revisionHash string, lifecycleState appspub.LifecycleStateTyp
 		pod.Status = v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}}
 	}
 	if specifiedDelete {
-		pod.Labels[appsv1alpha1.SpecifiedDeleteKey] = "true"
+		pod.Labels[appsv1beta1.SpecifiedDeleteKey] = "true"
 	}
 	return pod
 }
 
-func setUpdateStrategyPaused(cs *appsv1alpha1.CloneSet, paused bool) *appsv1alpha1.CloneSet {
-	cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+func setUpdateStrategyPaused(cs *appsv1beta1.CloneSet, paused bool) *appsv1beta1.CloneSet {
+	cs.Spec.UpdateStrategy = appsv1beta1.CloneSetUpdateStrategy{
 		Partition:      cs.Spec.UpdateStrategy.Partition,
 		MaxSurge:       cs.Spec.UpdateStrategy.MaxSurge,
 		MaxUnavailable: cs.Spec.UpdateStrategy.MaxUnavailable,

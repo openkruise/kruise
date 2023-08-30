@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -70,14 +70,14 @@ func TestUpdateColdUpgradeSidecar(t *testing.T) {
 	testUpdateColdUpgradeSidecar(t, podInput, sidecarSetInput, handlers)
 }
 
-func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetInput *appsv1alpha1.SidecarSet, handlers map[string]HandlePod) {
+func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetInput *appsv1beta1.SidecarSet, handlers map[string]HandlePod) {
 	podInput1 := podDemo.DeepCopy()
 	podInput2 := podDemo.DeepCopy()
 	podInput2.Name = "test-pod-2"
 	cases := []struct {
 		name          string
 		getPods       func() []*corev1.Pod
-		getSidecarset func() *appsv1alpha1.SidecarSet
+		getSidecarset func() *appsv1beta1.SidecarSet
 		// pod.name -> infos []string{Image, Env, volumeMounts}
 		expectedInfo map[*corev1.Pod][]string
 		// MatchedPods, UpdatedPods, ReadyPods, AvailablePods, UnavailablePods
@@ -91,7 +91,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -108,7 +108,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -126,7 +126,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -143,7 +143,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -161,7 +161,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -325,7 +325,7 @@ func TestGetActiveRevisions(t *testing.T) {
 
 	// case 2
 	newSidecar := sidecarSet.DeepCopy()
-	newSidecar.Spec.InitContainers = []appsv1alpha1.SidecarContainer{
+	newSidecar.Spec.InitContainers = []appsv1beta1.SidecarContainer{
 		{Container: corev1.Container{Name: "emptyInitC"}},
 	}
 	newSidecar.Spec.Volumes = []corev1.Volume{

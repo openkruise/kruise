@@ -3,18 +3,18 @@ package sidecarcontrol
 import (
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestSidecarSetHash(t *testing.T) {
-	sidecarSet := &appsv1alpha1.SidecarSet{
+	sidecarSet := &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sidecar-set",
 		},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name:  "container1",
@@ -47,12 +47,12 @@ func TestSidecarSetHash(t *testing.T) {
 }
 
 func TestSidecarSetHashWithoutImage(t *testing.T) {
-	sidecarSet := &appsv1alpha1.SidecarSet{
+	sidecarSet := &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sidecar-set",
 		},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name:  "container1",

@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestRevisionManage(t *testing.T) {
@@ -38,20 +38,20 @@ func TestRevisionManage(t *testing.T) {
 		mgrStopped.Wait()
 	}()
 
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": "foo",
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": "foo",
@@ -76,8 +76,8 @@ func TestRevisionManage(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{

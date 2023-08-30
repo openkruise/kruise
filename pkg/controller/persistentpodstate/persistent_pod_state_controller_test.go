@@ -25,7 +25,6 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	appsv1 "k8s.io/api/apps/v1"
@@ -122,31 +121,31 @@ var (
 		},
 	}
 
-	staticIPDemo = appsv1alpha1.PersistentPodState{
+	staticIPDemo = appsv1beta1.PersistentPodState{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-sts",
 			Namespace: "ns-test",
 		},
-		Spec: appsv1alpha1.PersistentPodStateSpec{
-			TargetReference: appsv1alpha1.TargetReference{
+		Spec: appsv1beta1.PersistentPodStateSpec{
+			TargetReference: appsv1beta1.TargetReference{
 				APIVersion: KruiseKindSts.GroupVersion().String(),
 				Kind:       KruiseKindSts.Kind,
 				Name:       "test-sts",
 			},
-			RequiredPersistentTopology: &appsv1alpha1.NodeTopologyTerm{
+			RequiredPersistentTopology: &appsv1beta1.NodeTopologyTerm{
 				NodeTopologyKeys: []string{podStateZoneTopologyLabel},
 			},
-			PreferredPersistentTopology: []appsv1alpha1.PreferredTopologyTerm{
+			PreferredPersistentTopology: []appsv1beta1.PreferredTopologyTerm{
 				{
 					Weight: 10,
-					Preference: appsv1alpha1.NodeTopologyTerm{
+					Preference: appsv1beta1.NodeTopologyTerm{
 						NodeTopologyKeys: []string{podStateNodeTopologyLabel},
 					},
 				},
 			},
 		},
-		Status: appsv1alpha1.PersistentPodStateStatus{
-			PodStates: map[string]appsv1alpha1.PodState{},
+		Status: appsv1beta1.PersistentPodStateStatus{
+			PodStates: map[string]appsv1beta1.PodState{},
 		},
 	}
 
@@ -156,7 +155,7 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(appsv1.AddToScheme(scheme))
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
@@ -168,8 +167,8 @@ func TestReconcilePersistentPodState(t *testing.T) {
 		getSts                   func() (*apps.StatefulSet, *appsv1beta1.StatefulSet)
 		getPods                  func() []*corev1.Pod
 		getNodes                 func() []*corev1.Node
-		getPersistentPodState    func() *appsv1alpha1.PersistentPodState
-		exceptPersistentPodState func() *appsv1alpha1.PersistentPodState
+		getPersistentPodState    func() *appsv1beta1.PersistentPodState
+		exceptPersistentPodState func() *appsv1beta1.PersistentPodState
 	}{
 		{
 			name: "kruise statefulset, 10 ready pod, and create staticIP",
@@ -197,15 +196,15 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				return nodes
 			},
-			getPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			getPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				return staticIP
 			},
-			exceptPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			exceptPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
-					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+					staticIP.Status.PodStates[key] = appsv1beta1.PodState{
 						NodeName: fmt.Sprintf("node-%d", i),
 						NodeTopologyLabels: map[string]string{
 							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
@@ -261,7 +260,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				return nodes
 			},
-			getPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			getPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				staticIP.OwnerReferences = []metav1.OwnerReference{
 					{
@@ -273,7 +272,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				for i := 0; i < 10; i++ {
 					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
-					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+					staticIP.Status.PodStates[key] = appsv1beta1.PodState{
 						NodeName: fmt.Sprintf("node-%d", i),
 						NodeTopologyLabels: map[string]string{
 							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
@@ -283,7 +282,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				return staticIP
 			},
-			exceptPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			exceptPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				staticIP.OwnerReferences = []metav1.OwnerReference{
 					{
@@ -298,7 +297,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 						continue
 					}
 					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
-					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+					staticIP.Status.PodStates[key] = appsv1beta1.PodState{
 						NodeName: fmt.Sprintf("node-%d", i),
 						NodeTopologyLabels: map[string]string{
 							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
@@ -360,7 +359,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				return nodes
 			},
-			getPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			getPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				staticIP.OwnerReferences = []metav1.OwnerReference{
 					{
@@ -376,7 +375,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 						continue
 					}
 					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
-					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+					staticIP.Status.PodStates[key] = appsv1beta1.PodState{
 						NodeName: fmt.Sprintf("node-%d", i),
 						NodeTopologyLabels: map[string]string{
 							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
@@ -386,7 +385,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				return staticIP
 			},
-			exceptPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			exceptPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				staticIP.OwnerReferences = []metav1.OwnerReference{
 					{
@@ -406,7 +405,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 						continue
 					}
 					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
-					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+					staticIP.Status.PodStates[key] = appsv1beta1.PodState{
 						NodeName: fmt.Sprintf("node-%d", i),
 						NodeTopologyLabels: map[string]string{
 							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
@@ -452,14 +451,14 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				return nodes
 			},
-			getPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			getPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					if i == 5 || i == 6 {
 						continue
 					}
 					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
-					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+					staticIP.Status.PodStates[key] = appsv1beta1.PodState{
 						NodeName: fmt.Sprintf("cn-beijing-%d", i),
 						NodeTopologyLabels: map[string]string{
 							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
@@ -469,11 +468,11 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				}
 				return staticIP
 			},
-			exceptPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+			exceptPersistentPodState: func() *appsv1beta1.PersistentPodState {
 				staticIP := staticIPDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
-					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+					staticIP.Status.PodStates[key] = appsv1beta1.PodState{
 						NodeName: fmt.Sprintf("node-%d", i),
 						NodeTopologyLabels: map[string]string{
 							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
@@ -538,8 +537,8 @@ func TestReconcilePersistentPodState(t *testing.T) {
 	}
 }
 
-func getLatestPersistentPodState(client client.Client, staticIP *appsv1alpha1.PersistentPodState) (*appsv1alpha1.PersistentPodState, error) {
-	newPersistentPodState := &appsv1alpha1.PersistentPodState{}
+func getLatestPersistentPodState(client client.Client, staticIP *appsv1beta1.PersistentPodState) (*appsv1beta1.PersistentPodState, error) {
+	newPersistentPodState := &appsv1beta1.PersistentPodState{}
 	Key := types.NamespacedName{
 		Namespace: staticIP.Namespace,
 		Name:      staticIP.Name,

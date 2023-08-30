@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func getSubsetPrefix(controllerName, subsetName string) string {
@@ -34,7 +34,7 @@ func getSubsetPrefix(controllerName, subsetName string) string {
 	return prefix
 }
 
-func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
+func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1beta1.Subset) {
 	if len(subsetConfig.NodeSelectorTerm.MatchExpressions) == 0 {
 		return
 	}
@@ -67,7 +67,7 @@ func attachNodeAffinity(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subs
 	}
 }
 
-func attachTolerations(podSpec *corev1.PodSpec, subsetConfig *appsv1alpha1.Subset) {
+func attachTolerations(podSpec *corev1.PodSpec, subsetConfig *appsv1beta1.Subset) {
 	if subsetConfig.Tolerations == nil {
 		return
 	}
@@ -83,7 +83,7 @@ func getRevision(objMeta metav1.Object) string {
 	if objMeta.GetLabels() == nil {
 		return ""
 	}
-	return objMeta.GetLabels()[appsv1alpha1.ControllerRevisionHashLabelKey]
+	return objMeta.GetLabels()[appsv1beta1.ControllerRevisionHashLabelKey]
 }
 
 // getCurrentPartition calculates current partition by counting the pods not having the updated revision

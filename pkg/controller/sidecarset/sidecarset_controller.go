@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
@@ -46,7 +46,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("SidecarSet")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("SidecarSet")
 )
 
 /**
@@ -85,10 +85,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to SidecarSet
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.SidecarSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.SidecarSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldScS := e.ObjectOld.(*appsv1alpha1.SidecarSet)
-			newScS := e.ObjectNew.(*appsv1alpha1.SidecarSet)
+			oldScS := e.ObjectOld.(*appsv1beta1.SidecarSet)
+			newScS := e.ObjectNew.(*appsv1beta1.SidecarSet)
 			if oldScS.GetGeneration() != newScS.GetGeneration() {
 				klog.V(3).Infof("Observed updated Spec for SidecarSet: %s/%s", newScS.GetNamespace(), newScS.GetName())
 				return true
@@ -126,7 +126,7 @@ type ReconcileSidecarSet struct {
 // and what is in the SidecarSet.Spec
 func (r *ReconcileSidecarSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the SidecarSet instance
-	sidecarSet := &appsv1alpha1.SidecarSet{}
+	sidecarSet := &appsv1beta1.SidecarSet{}
 	err := r.Get(context.TODO(), request.NamespacedName, sidecarSet)
 	if err != nil {
 		if errors.IsNotFound(err) {

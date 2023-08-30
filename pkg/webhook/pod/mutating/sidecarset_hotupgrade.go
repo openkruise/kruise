@@ -20,14 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func injectHotUpgradeContainers(hotUpgradeWorkInfo map[string]string, sidecarContainer *appsv1alpha1.SidecarContainer) (
-	sidecarContainers []*appsv1alpha1.SidecarContainer, injectedAnnotations map[string]string) {
+func injectHotUpgradeContainers(hotUpgradeWorkInfo map[string]string, sidecarContainer *appsv1beta1.SidecarContainer) (
+	sidecarContainers []*appsv1beta1.SidecarContainer, injectedAnnotations map[string]string) {
 
 	injectedAnnotations = make(map[string]string)
 	// container1 is current worked container
@@ -52,7 +52,7 @@ func injectHotUpgradeContainers(hotUpgradeWorkInfo map[string]string, sidecarCon
 	return sidecarContainers, injectedAnnotations
 }
 
-func generateHotUpgradeContainers(container *appsv1alpha1.SidecarContainer) (*appsv1alpha1.SidecarContainer, *appsv1alpha1.SidecarContainer) {
+func generateHotUpgradeContainers(container *appsv1beta1.SidecarContainer) (*appsv1beta1.SidecarContainer, *appsv1beta1.SidecarContainer) {
 	name1, name2 := sidecarcontrol.GetHotUpgradeContainerName(container.Name)
 	container1, container2 := container.DeepCopy(), container.DeepCopy()
 	container1.Name = name1

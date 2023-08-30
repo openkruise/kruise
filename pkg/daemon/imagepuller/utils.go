@@ -22,15 +22,15 @@ import (
 	"math/rand"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"golang.org/x/time/rate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
 
-func logNewImages(oldObj, newObj *appsv1alpha1.NodeImage) {
+func logNewImages(oldObj, newObj *appsv1beta1.NodeImage) {
 	oldImages := make(map[string]struct{})
 	if oldObj != nil {
 		for image, imageSpec := range oldObj.Spec.Images {
@@ -51,12 +51,12 @@ func logNewImages(oldObj, newObj *appsv1alpha1.NodeImage) {
 	}
 }
 
-func isImageInPulling(spec *appsv1alpha1.NodeImageSpec, status *appsv1alpha1.NodeImageStatus) bool {
+func isImageInPulling(spec *appsv1beta1.NodeImageSpec, status *appsv1beta1.NodeImageStatus) bool {
 	if status.Succeeded+status.Failed < status.Desired {
 		return true
 	}
 
-	tagSpecs := make(map[string]appsv1alpha1.ImageTagSpec)
+	tagSpecs := make(map[string]appsv1beta1.ImageTagSpec)
 	for image, imageSpec := range spec.Images {
 		for _, tagSpec := range imageSpec.Tags {
 			fullName := fmt.Sprintf("%v:%v", image, tagSpec.Tag)
@@ -79,7 +79,7 @@ type statusUpdater struct {
 	imagePullNodeClient clientalpha1.NodeImageInterface
 
 	previousTimestamp time.Time
-	previousStatus    *appsv1alpha1.NodeImageStatus
+	previousStatus    *appsv1beta1.NodeImageStatus
 	rateLimiter       *rate.Limiter
 }
 
@@ -91,13 +91,13 @@ const (
 func newStatusUpdater(imagePullNodeClient clientalpha1.NodeImageInterface) *statusUpdater {
 	return &statusUpdater{
 		imagePullNodeClient: imagePullNodeClient,
-		previousStatus:      &appsv1alpha1.NodeImageStatus{},
+		previousStatus:      &appsv1beta1.NodeImageStatus{},
 		previousTimestamp:   time.Now().Add(-time.Hour * 24),
 		rateLimiter:         rate.NewLimiter(statusUpdateQPS, statusUpdateBurst),
 	}
 }
 
-func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStatus *appsv1alpha1.NodeImageStatus) (limited bool, err error) {
+func (su *statusUpdater) updateStatus(nodeImage *appsv1beta1.NodeImage, newStatus *appsv1beta1.NodeImageStatus) (limited bool, err error) {
 	if util.IsJSONObjectEqual(newStatus, su.previousStatus) {
 		// 12h + 0~60min
 		randRefresh := time.Hour*12 + time.Second*time.Duration(rand.Int63n(3600))

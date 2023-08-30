@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -34,13 +34,13 @@ import (
 func TestRevisionHistory(t *testing.T) {
 	var collisionCount int32 = 10
 	var revisionNum int64 = 5
-	parent := &appsv1alpha1.CloneSet{
+	parent := &appsv1beta1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "parent-cs",
 			UID:       uuid.NewUUID(),
 		},
-		Spec: appsv1alpha1.CloneSetSpec{
+		Spec: appsv1beta1.CloneSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "test-app",
@@ -54,13 +54,13 @@ func TestRevisionHistory(t *testing.T) {
 				},
 			},
 		},
-		Status: appsv1alpha1.CloneSetStatus{
+		Status: appsv1beta1.CloneSetStatus{
 			CollisionCount: &collisionCount,
 		},
 	}
 
 	cr, err := history.NewControllerRevision(parent,
-		appsv1alpha1.GroupVersion.WithKind("CloneSet"),
+		appsv1beta1.GroupVersion.WithKind("CloneSet"),
 		parent.Spec.Template.Labels,
 		runtime.RawExtension{Raw: []byte(`{}`)},
 		revisionNum,

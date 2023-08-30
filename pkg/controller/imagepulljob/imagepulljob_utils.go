@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -30,7 +30,7 @@ const (
 	defaultActiveDeadlineSecondsForNever = int64(1800)
 )
 
-func getTTLSecondsForAlways(job *appsv1alpha1.ImagePullJob) *int32 {
+func getTTLSecondsForAlways(job *appsv1beta1.ImagePullJob) *int32 {
 	var ret int32
 	if job.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
 		ret = *job.Spec.CompletionPolicy.TTLSecondsAfterFinished
@@ -51,7 +51,7 @@ func getTTLSecondsForAlways(job *appsv1alpha1.ImagePullJob) *int32 {
 	return &ret
 }
 
-func getOwnerRef(job *appsv1alpha1.ImagePullJob) *v1.ObjectReference {
+func getOwnerRef(job *appsv1beta1.ImagePullJob) *v1.ObjectReference {
 	return &v1.ObjectReference{
 		APIVersion: controllerKind.GroupVersion().String(),
 		Kind:       controllerKind.Kind,
@@ -61,11 +61,11 @@ func getOwnerRef(job *appsv1alpha1.ImagePullJob) *v1.ObjectReference {
 	}
 }
 
-func getSecrets(job *appsv1alpha1.ImagePullJob) []appsv1alpha1.ReferenceObject {
-	var secrets []appsv1alpha1.ReferenceObject
+func getSecrets(job *appsv1beta1.ImagePullJob) []appsv1beta1.ReferenceObject {
+	var secrets []appsv1beta1.ReferenceObject
 	for _, secret := range job.Spec.PullSecrets {
 		secrets = append(secrets,
-			appsv1alpha1.ReferenceObject{
+			appsv1beta1.ReferenceObject{
 				Namespace: job.Namespace,
 				Name:      secret,
 			})
@@ -73,13 +73,13 @@ func getSecrets(job *appsv1alpha1.ImagePullJob) []appsv1alpha1.ReferenceObject {
 	return secrets
 }
 
-func getImagePullPolicy(job *appsv1alpha1.ImagePullJob) *appsv1alpha1.ImageTagPullPolicy {
-	pullPolicy := &appsv1alpha1.ImageTagPullPolicy{}
+func getImagePullPolicy(job *appsv1beta1.ImagePullJob) *appsv1beta1.ImageTagPullPolicy {
+	pullPolicy := &appsv1beta1.ImageTagPullPolicy{}
 	if job.Spec.PullPolicy != nil {
 		pullPolicy.BackoffLimit = job.Spec.PullPolicy.BackoffLimit
 		pullPolicy.TimeoutSeconds = job.Spec.PullPolicy.TimeoutSeconds
 	}
-	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
+	if job.Spec.CompletionPolicy.Type == appsv1beta1.Never {
 		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForNever()
 		pullPolicy.ActiveDeadlineSeconds = getActiveDeadlineSecondsForNever()
 	} else {
@@ -100,7 +100,7 @@ func getActiveDeadlineSecondsForNever() *int64 {
 	return &ret
 }
 
-func containsObject(slice []appsv1alpha1.ReferenceObject, obj appsv1alpha1.ReferenceObject) bool {
+func containsObject(slice []appsv1beta1.ReferenceObject, obj appsv1beta1.ReferenceObject) bool {
 	for _, o := range slice {
 		if o.Namespace == obj.Namespace && o.Name == obj.Name {
 			return true
@@ -109,7 +109,7 @@ func containsObject(slice []appsv1alpha1.ReferenceObject, obj appsv1alpha1.Refer
 	return false
 }
 
-func formatStatusMessage(status *appsv1alpha1.ImagePullJobStatus) (ret string) {
+func formatStatusMessage(status *appsv1beta1.ImagePullJobStatus) (ret string) {
 	if status.CompletionTime != nil {
 		return "job has completed"
 	}

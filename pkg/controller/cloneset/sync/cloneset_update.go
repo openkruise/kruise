@@ -23,8 +23,8 @@ import (
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
+func (c *realControl) Update(cs *appsv1beta1.CloneSet,
 	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) error {
@@ -134,7 +134,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		pod := pods[idx]
 		// Determine the pub before updating the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
-			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pod, policyv1alpha1.PubUpdateOperation, false)
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pod, policyv1beta1.PubUpdateOperation, false)
 			if err != nil {
 				return err
 				// pub check does not pass, try again in seconds
@@ -155,7 +155,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	return nil
 }
 
-func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
+func (c *realControl) refreshPodState(cs *appsv1beta1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
 	opts := coreControl.GetUpdateOptions()
 	opts = inplaceupdate.SetOptionsDefaults(opts)
 
@@ -219,7 +219,7 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 }
 
 // fix the pod-template-hash label for old pods before v1.1
-func (c *realControl) fixPodTemplateHashLabel(cs *appsv1alpha1.CloneSet, pod *v1.Pod) (bool, error) {
+func (c *realControl) fixPodTemplateHashLabel(cs *appsv1beta1.CloneSet, pod *v1.Pod) (bool, error) {
 	if _, exists := pod.Labels[apps.DefaultDeploymentUniqueLabelKey]; exists {
 		return false, nil
 	}
@@ -235,13 +235,13 @@ func (c *realControl) fixPodTemplateHashLabel(cs *appsv1alpha1.CloneSet, pod *v1
 	return true, nil
 }
 
-func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control,
+func (c *realControl) updatePod(cs *appsv1beta1.CloneSet, coreControl clonesetcore.Control,
 	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pod *v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (time.Duration, error) {
 
-	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType ||
-		cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+	if cs.Spec.UpdateStrategy.Type == appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType ||
+		cs.Spec.UpdateStrategy.Type == appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType {
 		var oldRevision *apps.ControllerRevision
 		for _, r := range revisions {
 			if clonesetutils.EqualToRevisionHash("", pod, r.Name) {
@@ -303,7 +303,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			}
 		}
 
-		if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+		if cs.Spec.UpdateStrategy.Type == appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType {
 			return 0, fmt.Errorf("find Pod %s update strategy is InPlaceOnly but can not update in-place", pod.Name)
 		}
 		klog.Warningf("CloneSet %s/%s can not update Pod %s in-place, so it will back off to ReCreate", cs.Namespace, cs.Name, pod.Name)
@@ -325,7 +325,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 }
 
 // SortUpdateIndexes sorts the given oldRevisionIndexes of Pods to update according to the CloneSet strategy.
-func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {
+func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1beta1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {
 	// Sort Pods with default sequence
 	sort.Slice(waitUpdateIndexes, coreControl.GetPodsSortFunc(pods, waitUpdateIndexes))
 

@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 	"github.com/openkruise/kruise/pkg/util"
@@ -50,7 +49,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("UnitedDeployment")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("UnitedDeployment")
 )
 
 const (
@@ -111,14 +110,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to UnitedDeployment
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.UnitedDeployment{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.UnitedDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
+		OwnerType:    &appsv1beta1.UnitedDeployment{},
 	})
 	if err != nil {
 		return err
@@ -126,15 +125,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	err = c.Watch(&source.Kind{Type: &appsv1beta1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
+		OwnerType:    &appsv1beta1.UnitedDeployment{},
 	})
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CloneSet{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.CloneSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
+		OwnerType:    &appsv1beta1.UnitedDeployment{},
 	})
 	if err != nil {
 		return err
@@ -142,7 +141,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
+		OwnerType:    &appsv1beta1.UnitedDeployment{},
 	})
 	if err != nil {
 		return err
@@ -177,7 +176,7 @@ type ReconcileUnitedDeployment struct {
 func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.V(4).Infof("Reconcile UnitedDeployment %s/%s", request.Namespace, request.Name)
 	// Fetch the UnitedDeployment instance
-	instance := &appsv1alpha1.UnitedDeployment{}
+	instance := &appsv1beta1.UnitedDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -245,7 +244,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	return r.updateStatus(instance, newStatus, oldStatus, nameToSubset, nextReplicas, nextPartitions, currentRevision, updatedRevision, collisionCount, control)
 }
 
-func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.UnitedDeployment, control ControlInterface, expectedRevision string) (*map[string]*Subset, error) {
+func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1beta1.UnitedDeployment, control ControlInterface, expectedRevision string) (*map[string]*Subset, error) {
 	subSets, err := control.GetAllSubsets(instance, expectedRevision)
 	if err != nil {
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
@@ -264,11 +263,11 @@ func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.Unite
 	return nameToSubset, nil
 }
 
-func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32) *map[string]int32 {
+func calcNextPartitions(ud *appsv1beta1.UnitedDeployment, nextReplicas *map[string]int32) *map[string]int32 {
 	partitions := map[string]int32{}
 	for _, subset := range ud.Spec.Topology.Subsets {
 		var subsetPartition int32
-		if ud.Spec.UpdateStrategy.Type == appsv1alpha1.ManualUpdateStrategyType && ud.Spec.UpdateStrategy.ManualUpdate != nil && ud.Spec.UpdateStrategy.ManualUpdate.Partitions != nil {
+		if ud.Spec.UpdateStrategy.Type == appsv1beta1.ManualUpdateStrategyType && ud.Spec.UpdateStrategy.ManualUpdate != nil && ud.Spec.UpdateStrategy.ManualUpdate.Partitions != nil {
 			if partition, exist := ud.Spec.UpdateStrategy.ManualUpdate.Partitions[subset.Name]; exist {
 				subsetPartition = partition
 			}
@@ -284,7 +283,7 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[str
 	return &partitions
 }
 
-func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32, nextPartitions *map[string]int32) map[string]SubsetUpdate {
+func getNextUpdate(ud *appsv1beta1.UnitedDeployment, nextReplicas *map[string]int32, nextPartitions *map[string]int32) map[string]SubsetUpdate {
 	next := make(map[string]SubsetUpdate)
 	for _, subset := range ud.Spec.Topology.Subsets {
 		t := SubsetUpdate{}
@@ -297,7 +296,7 @@ func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]i
 	return next
 }
 
-func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {
+func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1beta1.UnitedDeployment, nameToSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {
 	nameToSubset := map[string]*Subset{}
 	for name, subsets := range nameToSubsets {
 		if len(subsets) > 1 {
@@ -321,7 +320,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeplo
 	return &nameToSubset, nil
 }
 
-func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.UnitedDeployment) (ControlInterface, subSetType) {
+func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1beta1.UnitedDeployment) (ControlInterface, subSetType) {
 	if instance.Spec.Template.StatefulSetTemplate != nil {
 		return r.subSetControls[statefulSetSubSetType], statefulSetSubSetType
 	}
@@ -342,7 +341,7 @@ func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.Uni
 	return nil, statefulSetSubSetType
 }
 
-func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1alpha1.UnitedDeployment, subsets []*Subset) map[string][]*Subset {
+func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1beta1.UnitedDeployment, subsets []*Subset) map[string][]*Subset {
 	mapping := map[string][]*Subset{}
 
 	for _, ss := range subsets {
@@ -357,13 +356,13 @@ func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(ud *appsv1alpha1.
 	return mapping
 }
 
-func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1alpha1.UnitedDeployment, newStatus, oldStatus *appsv1alpha1.UnitedDeploymentStatus, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32, control ControlInterface) (reconcile.Result, error) {
+func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1beta1.UnitedDeployment, newStatus, oldStatus *appsv1beta1.UnitedDeploymentStatus, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32, control ControlInterface) (reconcile.Result, error) {
 	newStatus = r.calculateStatus(newStatus, nameToSubset, nextReplicas, nextPartition, currentRevision, updatedRevision, collisionCount, control)
 	_, err := r.updateUnitedDeployment(instance, oldStatus, newStatus)
 	return reconcile.Result{}, err
 }
 
-func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.UnitedDeploymentStatus, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32, control ControlInterface) *appsv1alpha1.UnitedDeploymentStatus {
+func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1beta1.UnitedDeploymentStatus, nameToSubset *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, collisionCount int32, control ControlInterface) *appsv1beta1.UnitedDeploymentStatus {
 	expectedRevision := currentRevision.Name
 	if updatedRevision != nil {
 		expectedRevision = updatedRevision.Name
@@ -391,7 +390,7 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	}
 
 	if newStatus.UpdateStatus == nil {
-		newStatus.UpdateStatus = &appsv1alpha1.UpdateStatus{}
+		newStatus.UpdateStatus = &appsv1beta1.UpdateStatus{}
 	}
 
 	newStatus.UpdateStatus.UpdatedRevision = expectedRevision
@@ -411,9 +410,9 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	}
 
 	if subsetFailure == nil {
-		RemoveUnitedDeploymentCondition(newStatus, appsv1alpha1.SubsetFailure)
+		RemoveUnitedDeploymentCondition(newStatus, appsv1beta1.SubsetFailure)
 	} else {
-		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetFailure, corev1.ConditionTrue, "Error", *subsetFailure))
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1beta1.SubsetFailure, corev1.ConditionTrue, "Error", *subsetFailure))
 	}
 
 	return newStatus
@@ -429,7 +428,7 @@ func replicasStatus(subset *Subset) (replicas, readyReplicas, updatedReplicas, u
 	return
 }
 
-func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.UnitedDeployment, oldStatus, newStatus *appsv1alpha1.UnitedDeploymentStatus) (*appsv1alpha1.UnitedDeployment, error) {
+func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1beta1.UnitedDeployment, oldStatus, newStatus *appsv1beta1.UnitedDeploymentStatus) (*appsv1beta1.UnitedDeployment, error) {
 	if oldStatus.Replicas == newStatus.Replicas &&
 		oldStatus.ReadyReplicas == newStatus.ReadyReplicas &&
 		oldStatus.UpdatedReplicas == newStatus.UpdatedReplicas &&
@@ -464,7 +463,7 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 		if i >= updateRetries {
 			break
 		}
-		tmpObj := &appsv1alpha1.UnitedDeployment{}
+		tmpObj := &appsv1beta1.UnitedDeployment{}
 		if getErr = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, tmpObj); getErr != nil {
 			return nil, getErr
 		}

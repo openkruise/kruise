@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	alpha1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 type Adapter interface {

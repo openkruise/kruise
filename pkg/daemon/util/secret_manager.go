@@ -21,7 +21,7 @@ import (
 	"math/rand"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,20 +30,20 @@ import (
 
 // SecretManager is the interface to get secrets from API Server.
 type SecretManager interface {
-	GetSecrets(secret []appsv1alpha1.ReferenceObject) ([]v1.Secret, error)
+	GetSecrets(secret []appsv1beta1.ReferenceObject) ([]v1.Secret, error)
 }
 
 // NewCacheBasedSecretManager create a cache based SecretManager
 func NewCacheBasedSecretManager(client clientset.Interface) SecretManager {
 	return &cacheBasedSecretManager{
 		client: client,
-		cache:  make(map[appsv1alpha1.ReferenceObject]cacheSecretItem),
+		cache:  make(map[appsv1beta1.ReferenceObject]cacheSecretItem),
 	}
 }
 
 type cacheBasedSecretManager struct {
 	client clientset.Interface
-	cache  map[appsv1alpha1.ReferenceObject]cacheSecretItem
+	cache  map[appsv1beta1.ReferenceObject]cacheSecretItem
 }
 
 type cacheSecretItem struct {
@@ -55,7 +55,7 @@ func (c cacheSecretItem) isExpired() bool {
 	return time.Now().After(c.deadline)
 }
 
-func (c *cacheBasedSecretManager) GetSecrets(secrets []appsv1alpha1.ReferenceObject) (ret []v1.Secret, err error) {
+func (c *cacheBasedSecretManager) GetSecrets(secrets []appsv1beta1.ReferenceObject) (ret []v1.Secret, err error) {
 	for _, secret := range secrets {
 		if item, ok := c.cache[secret]; ok && !item.isExpired() {
 			ret = append(ret, *item.secret)

@@ -20,9 +20,8 @@ import (
 	"context"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -76,7 +75,7 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	if !ok {
 		return
 	}
-	var pub *policyv1alpha1.PodUnavailableBudget
+	var pub *policyv1beta1.PodUnavailableBudget
 	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] != "" {
 		pub, _ = p.pubControl.GetPubForPod(pod)
 	}
@@ -92,7 +91,7 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	})
 }
 
-func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1beta1.PodUnavailableBudget, error) {
 	ref := metav1.GetControllerOf(pod)
 	if ref == nil {
 		return nil, nil
@@ -103,7 +102,7 @@ func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavaila
 	} else if workload == nil {
 		return nil, nil
 	}
-	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	pubList := &policyv1beta1.PodUnavailableBudgetList{}
 	if err = c.List(context.TODO(), pubList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
@@ -112,7 +111,7 @@ func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavaila
 		// if targetReference isn't nil, priority to take effect
 		if pub.Spec.TargetReference != nil {
 			// belongs the same workload
-			if pubcontrol.IsReferenceEqual(&policyv1alpha1.TargetReference{
+			if pubcontrol.IsReferenceEqual(&policyv1beta1.TargetReference{
 				APIVersion: workload.APIVersion,
 				Kind:       workload.Kind,
 				Name:       workload.Name,
@@ -157,7 +156,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 
 }
 
-func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, control pubcontrol.PubControl) (bool, time.Duration) {
+func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1beta1.PodUnavailableBudget, control pubcontrol.PubControl) (bool, time.Duration) {
 	var enqueueDelayTime time.Duration
 	// If the pod's deletion timestamp is set, remove endpoint from ready address.
 	if oldPod.DeletionTimestamp.IsZero() && !newPod.DeletionTimestamp.IsZero() {
@@ -211,7 +210,7 @@ func (e *SetEnqueueRequestForPUB) Generic(evt event.GenericEvent, q workqueue.Ra
 
 func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueue.RateLimitingInterface) {
 	gvk, _ := apiutil.GVKForObject(object, e.mgr.GetScheme())
-	targetRef := &policyv1alpha1.TargetReference{
+	targetRef := &policyv1beta1.TargetReference{
 		APIVersion: gvk.GroupVersion().String(),
 		Kind:       gvk.Kind,
 	}
@@ -220,7 +219,7 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 	switch gvk.Kind {
 	// cloneSet
 	case controllerfinder.ControllerKruiseKindCS.Kind:
-		obj := object.(*appsv1alpha1.CloneSet)
+		obj := object.(*appsv1beta1.CloneSet)
 		targetRef.Name, namespace = obj.Name, obj.Namespace
 		temLabels = obj.Spec.Template.Labels
 	// deployment
@@ -243,12 +242,12 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		}
 	}
 	// fetch matched pub
-	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	pubList := &policyv1beta1.PodUnavailableBudgetList{}
 	if err := e.mgr.GetClient().List(context.TODO(), pubList, &client.ListOptions{Namespace: namespace}); err != nil {
 		klog.Errorf("SetEnqueueRequestForPUB list pub failed: %s", err.Error())
 		return
 	}
-	var matched policyv1alpha1.PodUnavailableBudget
+	var matched policyv1beta1.PodUnavailableBudget
 	for _, pub := range pubList.Items {
 		// if targetReference isn't nil, priority to take effect
 		if pub.Spec.TargetReference != nil {

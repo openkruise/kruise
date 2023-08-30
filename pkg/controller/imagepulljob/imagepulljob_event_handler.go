@@ -19,7 +19,7 @@ package imagepulljob
 import (
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
@@ -40,13 +40,13 @@ type nodeImageEventHandler struct {
 var _ handler.EventHandler = &nodeImageEventHandler{}
 
 func (e *nodeImageEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	obj := evt.Object.(*appsv1alpha1.NodeImage)
+	obj := evt.Object.(*appsv1beta1.NodeImage)
 	e.handle(obj, q)
 }
 
 func (e *nodeImageEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	obj := evt.ObjectNew.(*appsv1alpha1.NodeImage)
-	oldObj := evt.ObjectOld.(*appsv1alpha1.NodeImage)
+	obj := evt.ObjectNew.(*appsv1beta1.NodeImage)
+	oldObj := evt.ObjectOld.(*appsv1beta1.NodeImage)
 	if obj.DeletionTimestamp != nil {
 		e.handle(obj, q)
 	} else {
@@ -55,7 +55,7 @@ func (e *nodeImageEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLi
 }
 
 func (e *nodeImageEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	obj := evt.Object.(*appsv1alpha1.NodeImage)
+	obj := evt.Object.(*appsv1beta1.NodeImage)
 	resourceVersionExpectations.Delete(obj)
 	e.handle(obj, q)
 }
@@ -63,7 +63,7 @@ func (e *nodeImageEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLi
 func (e *nodeImageEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
-func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q workqueue.RateLimitingInterface) {
+func (e *nodeImageEventHandler) handle(nodeImage *appsv1beta1.NodeImage, q workqueue.RateLimitingInterface) {
 	// Get jobs related to this NodeImage
 	jobs, _, err := utilimagejob.GetActiveJobsForNodeImage(e.Reader, nodeImage, nil)
 	if err != nil {
@@ -74,7 +74,7 @@ func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q work
 	}
 }
 
-func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1alpha1.NodeImage, q workqueue.RateLimitingInterface) {
+func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1beta1.NodeImage, q workqueue.RateLimitingInterface) {
 	changedImages := sets.NewString()
 	tmpOldNodeImage := oldNodeImage.DeepCopy()
 	for name, imageSpec := range nodeImage.Spec.Images {
@@ -187,7 +187,7 @@ func (e *podEventHandler) handleUpdate(pod, oldPod *v1.Pod, q workqueue.RateLimi
 	}
 }
 
-func diffJobs(newJobs, oldJobs []*appsv1alpha1.ImagePullJob) set {
+func diffJobs(newJobs, oldJobs []*appsv1beta1.ImagePullJob) set {
 	setNew := make(set, len(newJobs))
 	setOld := make(set, len(oldJobs))
 	for _, j := range newJobs {

@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -64,7 +64,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	}
 
 	// DisableDeepCopy:true, indicates must be deep copy before update sidecarSet objection
-	sidecarsetList := &appsv1alpha1.SidecarSetList{}
+	sidecarsetList := &appsv1beta1.SidecarSetList{}
 	if err = h.Client.List(ctx, sidecarsetList, utilclient.DisableDeepCopy); err != nil {
 		return false, err
 	}
@@ -159,7 +159,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	return false, nil
 }
 
-func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha1.SidecarSet, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) (*appsv1alpha1.SidecarSet, error) {
+func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1beta1.SidecarSet, oldPod, newPod *corev1.Pod, operation admissionv1.Operation) (*appsv1beta1.SidecarSet, error) {
 	switch operation {
 	case admissionv1.Update:
 		// optimization: quickly return if newPod matched the latest sidecarSet
@@ -198,7 +198,7 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 
 		// TODO: support 'PartitionBased' policy to inject old/new revision according to Partition
 		switch sidecarSet.Spec.InjectionStrategy.Revision.Policy {
-		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy:
+		case "", appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy:
 			return h.getSpecificHistorySidecarSet(sidecarSet, revisionInfo)
 		}
 
@@ -206,12 +206,12 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 	}
 }
 
-func (h *PodCreateHandler) getSpecificRevisionSidecarSetForPod(sidecarSet *appsv1alpha1.SidecarSet, revisions []*apps.ControllerRevision, pod *corev1.Pod) (*appsv1alpha1.SidecarSet, error) {
+func (h *PodCreateHandler) getSpecificRevisionSidecarSetForPod(sidecarSet *appsv1beta1.SidecarSet, revisions []*apps.ControllerRevision, pod *corev1.Pod) (*appsv1beta1.SidecarSet, error) {
 	var err error
-	var matchedSidecarSet *appsv1alpha1.SidecarSet
+	var matchedSidecarSet *appsv1beta1.SidecarSet
 	for _, revision := range revisions {
 		if sidecarcontrol.GetPodSidecarSetControllerRevision(sidecarSet.Name, pod) == revision.Name {
-			matchedSidecarSet, err = h.getSpecificHistorySidecarSet(sidecarSet, &appsv1alpha1.SidecarSetInjectRevision{RevisionName: &revision.Name})
+			matchedSidecarSet, err = h.getSpecificHistorySidecarSet(sidecarSet, &appsv1beta1.SidecarSetInjectRevision{RevisionName: &revision.Name})
 			if err != nil {
 				return nil, err
 			}
@@ -221,7 +221,7 @@ func (h *PodCreateHandler) getSpecificRevisionSidecarSetForPod(sidecarSet *appsv
 	return matchedSidecarSet, nil
 }
 
-func (h *PodCreateHandler) getSpecificHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, revisionInfo *appsv1alpha1.SidecarSetInjectRevision) (*appsv1alpha1.SidecarSet, error) {
+func (h *PodCreateHandler) getSpecificHistorySidecarSet(sidecarSet *appsv1beta1.SidecarSet, revisionInfo *appsv1beta1.SidecarSetInjectRevision) (*appsv1beta1.SidecarSet, error) {
 	// else return its corresponding history revision
 	hc := sidecarcontrol.NewHistoryControl(h.Client)
 	historySidecarSet, err := hc.GetHistorySidecarSet(sidecarSet, revisionInfo)
@@ -254,7 +254,7 @@ func mergeSidecarSecrets(secretsInPod, secretsInSidecar []corev1.LocalObjectRefe
 	return allSecrets
 }
 
-func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1alpha1.SidecarContainer) []corev1.Container {
+func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1beta1.SidecarContainer) []corev1.Container {
 	//format: pod.spec.containers[index].name -> index(the index of container in pod)
 	containersInPod := make(map[string]int)
 	for index, container := range origins {
@@ -271,9 +271,9 @@ func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1alpha1
 		}
 
 		switch sidecar.PodInjectPolicy {
-		case appsv1alpha1.BeforeAppContainerType:
+		case appsv1beta1.BeforeAppContainerType:
 			beforeAppContainers = append(beforeAppContainers, sidecar.Container)
-		case appsv1alpha1.AfterAppContainerType:
+		case appsv1beta1.AfterAppContainerType:
 			afterAppContainers = append(afterAppContainers, sidecar.Container)
 		default:
 			beforeAppContainers = append(beforeAppContainers, sidecar.Container)
@@ -285,7 +285,7 @@ func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1alpha1
 }
 
 func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedSidecarSets []sidecarcontrol.SidecarControl) (
-	sidecarContainers, sidecarInitContainers []*appsv1alpha1.SidecarContainer, sidecarSecrets []corev1.LocalObjectReference,
+	sidecarContainers, sidecarInitContainers []*appsv1beta1.SidecarContainer, sidecarSecrets []corev1.LocalObjectReference,
 	volumesInSidecars []corev1.Volume, injectedAnnotations map[string]string, err error) {
 
 	// injected annotations
@@ -463,7 +463,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 	return sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecars, injectedAnnotations, nil
 }
 
-func getVolumesMapInSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) map[string]*corev1.Volume {
+func getVolumesMapInSidecarSet(sidecarSet *appsv1beta1.SidecarSet) map[string]*corev1.Volume {
 	volumesMap := make(map[string]*corev1.Volume)
 	for idx, volume := range sidecarSet.Spec.Volumes {
 		volumesMap[volume.Name] = &sidecarSet.Spec.Volumes[idx]

@@ -30,16 +30,16 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
-func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alpha1.DaemonSet, oldRevisions []*apps.ControllerRevision, updateRevision *apps.ControllerRevision) error {
-	if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadCreatedKey]; ok {
+func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1beta1.DaemonSet, oldRevisions []*apps.ControllerRevision, updateRevision *apps.ControllerRevision) error {
+	if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadCreatedKey]; ok {
 		return nil
-	} else if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadIgnoredKey]; ok {
+	} else if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadIgnoredKey]; ok {
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 	if partition == 0 && maxUnavailable >= dsPodsNumber {
 		klog.V(4).Infof("DaemonSet %s/%s skipped to create ImagePullJob for all Pods update in one batch, replicas=%d, partition=%d, maxUnavailable=%d",
 			ds.Namespace, ds.Name, dsPodsNumber, partition, maxUnavailable)
-		return dsc.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return dsc.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// start to create jobs
@@ -102,7 +102,7 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 		dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)
 	}
 
-	return dsc.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadCreatedKey, "true")
+	return dsc.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadCreatedKey, "true")
 }
 
 func (dsc *ReconcileDaemonSet) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error {

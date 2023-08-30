@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -61,15 +61,15 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 			features.PodUnavailableBudgetDeleteGate, features.PodUnavailableBudgetUpdateGate))
 	}
 
-	obj := &policyv1alpha1.PodUnavailableBudget{}
+	obj := &policyv1beta1.PodUnavailableBudget{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var old *policyv1alpha1.PodUnavailableBudget
+	var old *policyv1beta1.PodUnavailableBudget
 	//when Operation is update, decode older object
 	if req.AdmissionRequest.Operation == admissionv1.Update {
-		old = new(policyv1alpha1.PodUnavailableBudget)
+		old = new(policyv1beta1.PodUnavailableBudget)
 		if err := h.Decoder.Decode(
 			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			old); err != nil {
@@ -83,21 +83,21 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 	return admission.ValidationResponse(true, "")
 }
 
-func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetFn(obj, old *policyv1alpha1.PodUnavailableBudget) field.ErrorList {
+func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetFn(obj, old *policyv1beta1.PodUnavailableBudget) field.ErrorList {
 	// validate pub.annotations
 	allErrs := field.ErrorList{}
-	if operationsValue, ok := obj.Annotations[policyv1alpha1.PubProtectOperationAnnotation]; ok {
+	if operationsValue, ok := obj.Annotations[policyv1beta1.PubProtectOperationAnnotation]; ok {
 		operations := strings.Split(operationsValue, ",")
 		for _, operation := range operations {
-			if operation != string(policyv1alpha1.PubUpdateOperation) && operation != string(policyv1alpha1.PubDeleteOperation) &&
-				operation != string(policyv1alpha1.PubEvictOperation) {
-				allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectOperationAnnotation)))
+			if operation != string(policyv1beta1.PubUpdateOperation) && operation != string(policyv1beta1.PubDeleteOperation) &&
+				operation != string(policyv1beta1.PubEvictOperation) {
+				allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1beta1.PubProtectOperationAnnotation)))
 			}
 		}
 	}
-	if replicasValue, ok := obj.Annotations[policyv1alpha1.PubProtectTotalReplicas]; ok {
+	if replicasValue, ok := obj.Annotations[policyv1beta1.PubProtectTotalReplicas]; ok {
 		if _, err := strconv.ParseInt(replicasValue, 10, 32); err != nil {
-			allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectTotalReplicas)))
+			allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1beta1.PubProtectTotalReplicas)))
 		}
 	}
 
@@ -108,7 +108,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudget
 		allErrs = append(allErrs, validateUpdatePubConflict(obj, old, field.NewPath("spec"))...)
 	}
 	//validate whether pub is in conflict with others
-	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	pubList := &policyv1beta1.PodUnavailableBudgetList{}
 	if err := h.Client.List(context.TODO(), pubList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other podUnavailableBudget failed, err: %v", err)))
 	} else {
@@ -117,7 +117,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudget
 	return allErrs
 }
 
-func validateUpdatePubConflict(obj, old *policyv1alpha1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
+func validateUpdatePubConflict(obj, old *policyv1beta1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// selector and targetRef can't be changed
 	if !reflect.DeepEqual(obj.Spec.Selector, old.Spec.Selector) || !reflect.DeepEqual(obj.Spec.TargetReference, old.Spec.TargetReference) {
@@ -126,7 +126,7 @@ func validateUpdatePubConflict(obj, old *policyv1alpha1.PodUnavailableBudget, fl
 	return allErrs
 }
 
-func validatePodUnavailableBudgetSpec(obj *policyv1alpha1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
+func validatePodUnavailableBudgetSpec(obj *policyv1beta1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 
@@ -167,7 +167,7 @@ func validatePodUnavailableBudgetSpec(obj *policyv1alpha1.PodUnavailableBudget, 
 	return allErrs
 }
 
-func validatePubConflict(pub *policyv1alpha1.PodUnavailableBudget, others []policyv1alpha1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
+func validatePubConflict(pub *policyv1beta1.PodUnavailableBudget, others []policyv1beta1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for _, other := range others {

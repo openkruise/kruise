@@ -20,7 +20,7 @@ import (
 	"sort"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,7 +37,7 @@ import (
 func watchJob(c controller.Controller) error {
 	if err := c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.AdvancedCronJob{},
+		OwnerType:    &appsv1beta1.AdvancedCronJob{},
 	}); err != nil {
 		return err
 	}
@@ -48,8 +48,8 @@ func watchJob(c controller.Controller) error {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get;update;patch
 
-func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Request, advancedCronJob appsv1alpha1.AdvancedCronJob) (ctrl.Result, error) {
-	advancedCronJob.Status.Type = appsv1alpha1.JobTemplate
+func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Request, advancedCronJob appsv1beta1.AdvancedCronJob) (ctrl.Result, error) {
+	advancedCronJob.Status.Type = appsv1beta1.JobTemplate
 	var childJobs batchv1.JobList
 	if err := r.List(ctx, &childJobs, client.InNamespace(advancedCronJob.Namespace), client.MatchingFields{jobOwnerKey: advancedCronJob.Name}); err != nil {
 		klog.Error(err, "unable to list child Jobs", req.NamespacedName)
@@ -209,7 +209,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 		Otherwise, we'll just return the missed runs (of which we'll just use the latest),
 		and the next run, so that we can know when it's time to reconcile again.
 	*/
-	getNextSchedule := func(cronJob *appsv1alpha1.AdvancedCronJob, now time.Time) (lastMissed time.Time, next time.Time, err error) {
+	getNextSchedule := func(cronJob *appsv1beta1.AdvancedCronJob, now time.Time) (lastMissed time.Time, next time.Time, err error) {
 		sched, err := cron.ParseStandard(formatSchedule(cronJob))
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("unparsable schedule %q: %v", cronJob.Spec.Schedule, err)
@@ -306,13 +306,13 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 	*/
 	// figure out how to run this job -- concurrency policy might forbid us from running
 	// multiple at the same time...
-	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1alpha1.ForbidConcurrent && len(activeJobs) > 0 {
+	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1beta1.ForbidConcurrent && len(activeJobs) > 0 {
 		klog.V(1).Info("concurrency policy blocks concurrent runs, skipping", "num active", len(activeJobs), req.NamespacedName)
 		return scheduledResult, nil
 	}
 
 	// ...or instruct us to replace existing ones...
-	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1alpha1.ReplaceConcurrent {
+	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1beta1.ReplaceConcurrent {
 		for _, activeJob := range activeJobs {
 			// we don't care if the job was already deleted
 			if err := r.Delete(ctx, activeJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
@@ -332,7 +332,7 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 		to clean up jobs when we delete the CronJob, and allows controller-runtime to figure out
 		which cronjob needs to be reconciled when a given job changes (is added, deleted, completes, etc).
 	*/
-	constructJobForCronJob := func(advancedCronJob *appsv1alpha1.AdvancedCronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+	constructJobForCronJob := func(advancedCronJob *appsv1beta1.AdvancedCronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 		// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 		name := fmt.Sprintf("%s-%d", advancedCronJob.Name, scheduledTime.Unix())
 

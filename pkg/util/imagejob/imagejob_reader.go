@@ -22,7 +22,7 @@ import (
 	"sort"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	sortingcontrol "github.com/openkruise/kruise/pkg/control/sorting"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -44,7 +44,7 @@ var (
 	cachedNodeImages = make(map[string][]string)
 )
 
-func PopCachedNodeImagesForJob(job *appsv1alpha1.ImagePullJob) []string {
+func PopCachedNodeImagesForJob(job *appsv1beta1.ImagePullJob) []string {
 	cacheLock.Lock()
 	defer cacheLock.Unlock()
 	names, ok := cachedNodeImages[string(job.UID)]
@@ -54,7 +54,7 @@ func PopCachedNodeImagesForJob(job *appsv1alpha1.ImagePullJob) []string {
 	return names
 }
 
-func writeCache(job *appsv1alpha1.ImagePullJob, nodeImages []*appsv1alpha1.NodeImage) {
+func writeCache(job *appsv1beta1.ImagePullJob, nodeImages []*appsv1beta1.NodeImage) {
 	names := make([]string, len(nodeImages))
 	for _, n := range nodeImages {
 		names = append(names, n.Name)
@@ -64,7 +64,7 @@ func writeCache(job *appsv1alpha1.ImagePullJob, nodeImages []*appsv1alpha1.NodeI
 	cachedNodeImages[string(job.UID)] = names
 }
 
-func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (nodeImages []*appsv1alpha1.NodeImage, err error) {
+func GetNodeImagesForJob(reader client.Reader, job *appsv1beta1.ImagePullJob) (nodeImages []*appsv1beta1.NodeImage, err error) {
 	defer func() {
 		if err == nil {
 			writeCache(job, nodeImages)
@@ -107,7 +107,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 				continue
 			}
 			nodeImageNames.Insert(pod.Spec.NodeName)
-			nodeImage := &appsv1alpha1.NodeImage{}
+			nodeImage := &appsv1beta1.NodeImage{}
 			if err := reader.Get(context.TODO(), types.NamespacedName{Name: pod.Spec.NodeName}, nodeImage); err != nil {
 				if errors.IsNotFound(err) {
 					klog.Warningf("Get NodeImages for ImagePullJob %s/%s, find Pod %s on Node %s but NodeImage not found",
@@ -121,7 +121,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 		return nodeImages, nil
 	}
 
-	nodeImageList := &appsv1alpha1.NodeImageList{}
+	nodeImageList := &appsv1beta1.NodeImageList{}
 	if job.Spec.Selector == nil {
 		if err := reader.List(context.TODO(), nodeImageList, utilclient.DisableDeepCopy); err != nil {
 			return nil, err
@@ -131,7 +131,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 
 	if job.Spec.Selector.Names != nil {
 		for _, name := range job.Spec.Selector.Names {
-			var nodeImage appsv1alpha1.NodeImage
+			var nodeImage appsv1beta1.NodeImage
 			if err := reader.Get(context.TODO(), types.NamespacedName{Name: name}, &nodeImage); err != nil {
 				if errors.IsNotFound(err) {
 					continue
@@ -153,17 +153,17 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 	return convertNodeImages(nodeImageList), err
 }
 
-func convertNodeImages(nodeImageList *appsv1alpha1.NodeImageList) []*appsv1alpha1.NodeImage {
-	nodeImages := make([]*appsv1alpha1.NodeImage, 0, len(nodeImageList.Items))
+func convertNodeImages(nodeImageList *appsv1beta1.NodeImageList) []*appsv1beta1.NodeImage {
+	nodeImages := make([]*appsv1beta1.NodeImage, 0, len(nodeImageList.Items))
 	for i := range nodeImageList.Items {
 		nodeImages = append(nodeImages, &nodeImageList.Items[i])
 	}
 	return nodeImages
 }
 
-func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *appsv1alpha1.NodeImage) (newJobs, oldJobs []*appsv1alpha1.ImagePullJob, err error) {
+func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *appsv1beta1.NodeImage) (newJobs, oldJobs []*appsv1beta1.ImagePullJob, err error) {
 	var podsOnNode []*v1.Pod
-	jobList := appsv1alpha1.ImagePullJobList{}
+	jobList := appsv1beta1.ImagePullJobList{}
 	if err = reader.List(context.TODO(), &jobList, client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}, utilclient.DisableDeepCopy); err != nil {
 		return nil, nil, err
 	}
@@ -235,8 +235,8 @@ func getPodsOnNode(reader client.Reader, nodeName string) (pods []*v1.Pod, err e
 	return
 }
 
-func GetActiveJobsForPod(reader client.Reader, pod, oldPod *v1.Pod) (newJobs, oldJobs []*appsv1alpha1.ImagePullJob, err error) {
-	jobList := appsv1alpha1.ImagePullJobList{}
+func GetActiveJobsForPod(reader client.Reader, pod, oldPod *v1.Pod) (newJobs, oldJobs []*appsv1beta1.ImagePullJob, err error) {
+	jobList := appsv1beta1.ImagePullJobList{}
 	if err = reader.List(context.TODO(), &jobList, client.InNamespace(pod.Namespace), client.MatchingFields{fieldindex.IndexNameForIsActive: "true"}, utilclient.DisableDeepCopy); err != nil {
 		return nil, nil, err
 	}
@@ -259,7 +259,7 @@ func GetActiveJobsForPod(reader client.Reader, pod, oldPod *v1.Pod) (newJobs, ol
 	return
 }
 
-func SortSpecImageTags(imageSpec *appsv1alpha1.ImageSpec) {
+func SortSpecImageTags(imageSpec *appsv1beta1.ImageSpec) {
 	if imageSpec == nil || len(imageSpec.Tags) == 0 {
 		return
 	}
@@ -268,7 +268,7 @@ func SortSpecImageTags(imageSpec *appsv1alpha1.ImageSpec) {
 	})
 }
 
-func SortStatusImageTags(imageStatus *appsv1alpha1.ImageStatus) {
+func SortStatusImageTags(imageStatus *appsv1beta1.ImageStatus) {
 	if imageStatus == nil || len(imageStatus.Tags) == 0 {
 		return
 	}

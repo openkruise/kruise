@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,7 +43,7 @@ var _ admission.Handler = &NodeImageCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.NodeImage{}
+	obj := &appsv1beta1.NodeImage{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -61,7 +61,7 @@ func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission
 	return admission.ValidationResponse(true, "allowed")
 }
 
-func validate(obj *appsv1alpha1.NodeImage) error {
+func validate(obj *appsv1beta1.NodeImage) error {
 	if len(obj.Spec.Images) > defaultMaxImagesPerNode {
 		return fmt.Errorf("spec images length %v can not be more than %v", len(obj.Spec.Images), defaultMaxImagesPerNode)
 	}

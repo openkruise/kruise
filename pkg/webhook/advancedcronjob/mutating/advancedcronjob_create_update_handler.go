@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -47,7 +47,7 @@ var _ admission.Handler = &AdvancedCronJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.AdvancedCronJob{}
+	obj := &appsv1beta1.AdvancedCronJob{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -58,7 +58,7 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 	injectTemplateDefaults := false
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
 		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj := &appsv1alpha1.AdvancedCronJob{}
+			oldObj := &appsv1beta1.AdvancedCronJob{}
 			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}

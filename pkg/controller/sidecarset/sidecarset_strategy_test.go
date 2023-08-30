@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,10 +34,10 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-type FactorySidecarSet func() *appsv1alpha1.SidecarSet
+type FactorySidecarSet func() *appsv1beta1.SidecarSet
 type FactoryPods func(int, int, int) []*corev1.Pod
 
-func factoryPodsCommon(count, upgraded int, sidecarSet *appsv1alpha1.SidecarSet) []*corev1.Pod {
+func factoryPodsCommon(count, upgraded int, sidecarSet *appsv1beta1.SidecarSet) []*corev1.Pod {
 	control := sidecarcontrol.New(sidecarSet)
 	pods := make([]*corev1.Pod, 0, count)
 	for i := 0; i < count; i++ {
@@ -110,16 +110,16 @@ func factoryPods(count, upgraded, upgradedAndReady int) []*corev1.Pod {
 	return pods
 }
 
-func factorySidecarSet() *appsv1alpha1.SidecarSet {
+func factorySidecarSet() *appsv1beta1.SidecarSet {
 	return createFactorySidecarSet("bbb", "without-aaa")
 }
 
-func factorySidecarSetNotUpgradable() *appsv1alpha1.SidecarSet {
+func factorySidecarSetNotUpgradable() *appsv1beta1.SidecarSet {
 	return createFactorySidecarSet("bbb", "without-bbb")
 }
 
-func createFactorySidecarSet(sidecarsetHash string, sidecarsetHashWithoutImage string) *appsv1alpha1.SidecarSet {
-	sidecarSet := &appsv1alpha1.SidecarSet{
+func createFactorySidecarSet(sidecarsetHash string, sidecarsetHashWithoutImage string) *appsv1beta1.SidecarSet {
+	sidecarSet := &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				sidecarcontrol.SidecarSetHashAnnotation:             sidecarsetHash,
@@ -128,8 +128,8 @@ func createFactorySidecarSet(sidecarsetHash string, sidecarsetHashWithoutImage s
 			Name:   "test-sidecarset",
 			Labels: map[string]string{},
 		},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name:  "test-sidecar",
@@ -140,8 +140,8 @@ func createFactorySidecarSet(sidecarsetHash string, sidecarsetHashWithoutImage s
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "sidecar"},
 			},
-			UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-				//Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+				//Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
 			},
 			RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 		},
@@ -158,7 +158,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 	cases := []struct {
 		name                     string
 		getPods                  func() []*corev1.Pod
-		getSidecarset            func() *appsv1alpha1.SidecarSet
+		getSidecarset            func() *appsv1beta1.SidecarSet
 		exceptNeedUpgradeCount   int
 		exceptNotUpgradableCount int
 	}{
@@ -168,7 +168,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(100, 30, 26)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -185,7 +185,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(1000, 300, 260)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.String,
@@ -202,7 +202,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(1000, 300, 250)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.String,
@@ -219,7 +219,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(100, 30, 27)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -236,7 +236,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(1000, 800, 760)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -257,7 +257,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(1000, 800, 760)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -278,7 +278,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(1000, 800, 760)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -299,7 +299,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(1000, 800, 760)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -323,7 +323,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				}
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -343,7 +343,7 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 				pods := factoryPods(100, 0, 0)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecarSetNotUpgradable()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -376,8 +376,8 @@ func TestParseUpdateScatterTerms(t *testing.T) {
 	cases := []struct {
 		name                  string
 		getPods               func() []*corev1.Pod
-		getScatterStrategy    func() appsv1alpha1.UpdateScatterStrategy
-		exceptScatterStrategy func() appsv1alpha1.UpdateScatterStrategy
+		getScatterStrategy    func() appsv1beta1.UpdateScatterStrategy
+		exceptScatterStrategy func() appsv1beta1.UpdateScatterStrategy
 	}{
 		{
 			name: "only scatter terms",
@@ -385,8 +385,8 @@ func TestParseUpdateScatterTerms(t *testing.T) {
 				pods := factoryPods(100, 0, 0)
 				return pods
 			},
-			getScatterStrategy: func() appsv1alpha1.UpdateScatterStrategy {
-				scatter := appsv1alpha1.UpdateScatterStrategy{
+			getScatterStrategy: func() appsv1beta1.UpdateScatterStrategy {
+				scatter := appsv1beta1.UpdateScatterStrategy{
 					{
 						Key:   "key-1",
 						Value: "value-1",
@@ -402,8 +402,8 @@ func TestParseUpdateScatterTerms(t *testing.T) {
 				}
 				return scatter
 			},
-			exceptScatterStrategy: func() appsv1alpha1.UpdateScatterStrategy {
-				scatter := appsv1alpha1.UpdateScatterStrategy{
+			exceptScatterStrategy: func() appsv1beta1.UpdateScatterStrategy {
+				scatter := appsv1beta1.UpdateScatterStrategy{
 					{
 						Key:   "key-1",
 						Value: "value-1",
@@ -432,8 +432,8 @@ func TestParseUpdateScatterTerms(t *testing.T) {
 				pods[5].Labels["key-4"] = "value-4"
 				return pods
 			},
-			getScatterStrategy: func() appsv1alpha1.UpdateScatterStrategy {
-				scatter := appsv1alpha1.UpdateScatterStrategy{
+			getScatterStrategy: func() appsv1beta1.UpdateScatterStrategy {
+				scatter := appsv1beta1.UpdateScatterStrategy{
 					{
 						Key:   "key-1",
 						Value: "value-1",
@@ -453,8 +453,8 @@ func TestParseUpdateScatterTerms(t *testing.T) {
 				}
 				return scatter
 			},
-			exceptScatterStrategy: func() appsv1alpha1.UpdateScatterStrategy {
-				scatter := appsv1alpha1.UpdateScatterStrategy{
+			exceptScatterStrategy: func() appsv1beta1.UpdateScatterStrategy {
+				scatter := appsv1beta1.UpdateScatterStrategy{
 					{
 						Key:   "key-1",
 						Value: "value-1",
@@ -520,7 +520,7 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 	cases := []struct {
 		name                  string
 		getPods               func() []*corev1.Pod
-		getSidecarset         func() *appsv1alpha1.SidecarSet
+		getSidecarset         func() *appsv1beta1.SidecarSet
 		exceptNextUpgradePods []string
 	}{
 		{
@@ -529,7 +529,7 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 				pods := factoryPods(20, 10, 5)
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -547,7 +547,7 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 				podutil.GetPodReadyCondition(pods[13].Status).Status = corev1.ConditionFalse
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -565,7 +565,7 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 				pods[16].Labels["test-key"] = "foo"
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -606,7 +606,7 @@ func testSortNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySidec
 				pods[18].Labels["key1"] = "20"
 				return Random(pods)
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				sidecarSet := factorySidecar()
 				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,

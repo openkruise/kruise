@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -47,7 +47,7 @@ var _ admission.Handler = &BroadcastJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *BroadcastJobCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.BroadcastJob{}
+	obj := &appsv1beta1.BroadcastJob{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -57,7 +57,7 @@ func (h *BroadcastJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 	injectTemplateDefaults := false
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
 		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj := &appsv1alpha1.BroadcastJob{}
+			oldObj := &appsv1beta1.BroadcastJob{}
 			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}

@@ -22,7 +22,7 @@ import (
 	"reflect"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
@@ -90,7 +90,7 @@ type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
 
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
+func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
@@ -110,7 +110,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		}
 	}
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
-		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), replicas, maxSurge == 0)
+		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)), replicas, maxSurge == 0)
 	scaleMaxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(cs.Spec.ScaleStrategy.MaxUnavailable, intstrutil.FromInt(math.MaxInt32)), replicas, true)
 
@@ -269,7 +269,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	return
 }
 
-func isSpecifiedDelete(cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
+func isSpecifiedDelete(cs *appsv1beta1.CloneSet, pod *v1.Pod) bool {
 	if specifieddelete.IsSpecifiedDelete(pod) {
 		return true
 	}
@@ -293,6 +293,6 @@ func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySecon
 	return coreControl.IsPodUpdateReady(pod, minReadySeconds)
 }
 
-func shouldScalingExcludePreparingDelete(cs *appsv1alpha1.CloneSet) bool {
-	return scalingExcludePreparingDelete || cs.Labels[appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey] == "true"
+func shouldScalingExcludePreparingDelete(cs *appsv1beta1.CloneSet) bool {
+	return scalingExcludePreparingDelete || cs.Labels[appsv1beta1.CloneSetScalingExcludePreparingDeleteKey] == "true"
 }

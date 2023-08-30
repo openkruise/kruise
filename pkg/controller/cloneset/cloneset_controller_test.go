@@ -25,7 +25,7 @@ import (
 
 	"github.com/onsi/gomega"
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -64,9 +64,9 @@ var (
 
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	instance := &appsv1alpha1.CloneSet{
+	instance := &appsv1beta1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-		Spec: appsv1alpha1.CloneSetSpec{
+		Spec: appsv1beta1.CloneSetSpec{
 			Replicas: getInt32(1),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
@@ -133,7 +133,7 @@ func TestReconcile(t *testing.T) {
 
 	// Check 1 pod and 1 pvc have been created
 	pods, pvcs := checkInstances(g, instance, 1, 1)
-	g.Expect(pods[0].Labels[appsv1alpha1.CloneSetInstanceID]).Should(gomega.Equal(pvcs[0].Labels[appsv1alpha1.CloneSetInstanceID]))
+	g.Expect(pods[0].Labels[appsv1beta1.CloneSetInstanceID]).Should(gomega.Equal(pvcs[0].Labels[appsv1beta1.CloneSetInstanceID]))
 
 	// Test for pods scale
 	testScale(g, instance)
@@ -153,16 +153,16 @@ func TestClaimPods(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	scheme := runtime.NewScheme()
-	appsv1alpha1.AddToScheme(scheme)
+	appsv1beta1.AddToScheme(scheme)
 	v1.AddToScheme(scheme)
 
-	instance := &appsv1alpha1.CloneSet{
+	instance := &appsv1beta1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID(clonesetUID),
 		},
-		Spec: appsv1alpha1.CloneSetSpec{
+		Spec: appsv1beta1.CloneSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: productionLabel},
 		},
 	}
@@ -236,15 +236,15 @@ func podToStringSlice(pods []*v1.Pod) []string {
 	return names
 }
 
-func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
+func testScale(g *gomega.GomegaWithT, instance *appsv1beta1.CloneSet) {
 	// Create orphan and owned pvcs
 	pvc1 := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo-vol-foo-hlfn7",
 			Namespace: "default",
 			Labels: map[string]string{
-				"foo":                           "bar",
-				appsv1alpha1.CloneSetInstanceID: "hlfn7",
+				"foo":                          "bar",
+				appsv1beta1.CloneSetInstanceID: "hlfn7",
 			},
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -259,8 +259,8 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 			Name:      "foo-vol-foo-xub0a",
 			Namespace: "default",
 			Labels: map[string]string{
-				"foo":                           "bar",
-				appsv1alpha1.CloneSetInstanceID: "xub0a",
+				"foo":                          "bar",
+				appsv1beta1.CloneSetInstanceID: "xub0a",
 			},
 			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion:         clonesetutils.ControllerKind.GroupVersion().String(),
@@ -282,16 +282,16 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 	// Check 1 pod and 2 pvc have been created
 	pods, pvcs := checkInstances(g, instance, 1, 2)
 	g.Expect([]string{
-		pods[0].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvc2.Labels[appsv1alpha1.CloneSetInstanceID],
+		pods[0].Labels[appsv1beta1.CloneSetInstanceID],
+		pvc2.Labels[appsv1beta1.CloneSetInstanceID],
 	}).Should(gomega.ConsistOf(
-		pvcs[0].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[1].Labels[appsv1alpha1.CloneSetInstanceID],
+		pvcs[0].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[1].Labels[appsv1beta1.CloneSetInstanceID],
 	))
 
 	// Add replicas to 5, should reuse
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cs := appsv1alpha1.CloneSet{}
+		cs := appsv1beta1.CloneSet{}
 		if err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs); err != nil {
 			return err
 		}
@@ -303,29 +303,29 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 	// Check 5 pod and 5 pvc have been created
 	pods, pvcs = checkInstances(g, instance, 5, 5)
 	g.Expect([]string{
-		pods[0].Labels[appsv1alpha1.CloneSetInstanceID],
-		pods[1].Labels[appsv1alpha1.CloneSetInstanceID],
-		pods[2].Labels[appsv1alpha1.CloneSetInstanceID],
-		pods[3].Labels[appsv1alpha1.CloneSetInstanceID],
-		pods[4].Labels[appsv1alpha1.CloneSetInstanceID],
+		pods[0].Labels[appsv1beta1.CloneSetInstanceID],
+		pods[1].Labels[appsv1beta1.CloneSetInstanceID],
+		pods[2].Labels[appsv1beta1.CloneSetInstanceID],
+		pods[3].Labels[appsv1beta1.CloneSetInstanceID],
+		pods[4].Labels[appsv1beta1.CloneSetInstanceID],
 	}).Should(gomega.ConsistOf(
-		pvcs[0].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[1].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[2].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[3].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[4].Labels[appsv1alpha1.CloneSetInstanceID],
+		pvcs[0].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[1].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[2].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[3].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[4].Labels[appsv1beta1.CloneSetInstanceID],
 	))
-	g.Expect(pvc1.Labels[appsv1alpha1.CloneSetInstanceID]).Should(gomega.And(
-		gomega.Not(gomega.Equal(pods[0].Labels[appsv1alpha1.CloneSetInstanceID])),
-		gomega.Not(gomega.Equal(pods[1].Labels[appsv1alpha1.CloneSetInstanceID])),
-		gomega.Not(gomega.Equal(pods[2].Labels[appsv1alpha1.CloneSetInstanceID])),
-		gomega.Not(gomega.Equal(pods[3].Labels[appsv1alpha1.CloneSetInstanceID])),
-		gomega.Not(gomega.Equal(pods[4].Labels[appsv1alpha1.CloneSetInstanceID])),
+	g.Expect(pvc1.Labels[appsv1beta1.CloneSetInstanceID]).Should(gomega.And(
+		gomega.Not(gomega.Equal(pods[0].Labels[appsv1beta1.CloneSetInstanceID])),
+		gomega.Not(gomega.Equal(pods[1].Labels[appsv1beta1.CloneSetInstanceID])),
+		gomega.Not(gomega.Equal(pods[2].Labels[appsv1beta1.CloneSetInstanceID])),
+		gomega.Not(gomega.Equal(pods[3].Labels[appsv1beta1.CloneSetInstanceID])),
+		gomega.Not(gomega.Equal(pods[4].Labels[appsv1beta1.CloneSetInstanceID])),
 	))
 
 	// Specified delete instance 'xub0a'
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cs := appsv1alpha1.CloneSet{}
+		cs := appsv1beta1.CloneSet{}
 		if err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs); err != nil {
 			return err
 		}
@@ -345,32 +345,32 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 	// Then 'xub0a' should be deleted
 	pods, pvcs = checkInstances(g, instance, 4, 4)
 	g.Expect([]string{
-		pods[0].Labels[appsv1alpha1.CloneSetInstanceID],
-		pods[1].Labels[appsv1alpha1.CloneSetInstanceID],
-		pods[2].Labels[appsv1alpha1.CloneSetInstanceID],
-		pods[3].Labels[appsv1alpha1.CloneSetInstanceID],
+		pods[0].Labels[appsv1beta1.CloneSetInstanceID],
+		pods[1].Labels[appsv1beta1.CloneSetInstanceID],
+		pods[2].Labels[appsv1beta1.CloneSetInstanceID],
+		pods[3].Labels[appsv1beta1.CloneSetInstanceID],
 	}).Should(gomega.ConsistOf(
-		pvcs[0].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[1].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[2].Labels[appsv1alpha1.CloneSetInstanceID],
-		pvcs[3].Labels[appsv1alpha1.CloneSetInstanceID],
+		pvcs[0].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[1].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[2].Labels[appsv1beta1.CloneSetInstanceID],
+		pvcs[3].Labels[appsv1beta1.CloneSetInstanceID],
 	))
 }
 
-func testUpdate(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
+func testUpdate(g *gomega.GomegaWithT, instance *appsv1beta1.CloneSet) {
 	// No way to test maxUnavailable, for this is a k8s cluster with only etcd and kube-apiserver
 	maxUnavailable := intstr.FromString("100%")
 	pods0, pvcs0 := checkInstances(g, instance, 4, 4)
 
 	// default to recreate update
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cs := appsv1alpha1.CloneSet{}
+		cs := appsv1beta1.CloneSet{}
 		if err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs); err != nil {
 			return err
 		}
 		cs.Spec.Template.Spec.Containers[0].Image = images[1]
-		cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
-			Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+		cs.Spec.UpdateStrategy = appsv1beta1.CloneSetUpdateStrategy{
+			Type:           appsv1beta1.RecreateCloneSetUpdateStrategyType,
 			Partition:      util.GetIntOrStrPointer(intstr.FromInt(1)),
 			MaxUnavailable: &maxUnavailable,
 		}
@@ -388,13 +388,13 @@ func testUpdate(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 
 	// inplace update
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cs := appsv1alpha1.CloneSet{}
+		cs := appsv1beta1.CloneSet{}
 		if err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs); err != nil {
 			return err
 		}
 		cs.Spec.Template.Spec.Containers[0].Image = images[2]
-		cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
-			Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+		cs.Spec.UpdateStrategy = appsv1beta1.CloneSetUpdateStrategy{
+			Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 			Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 			MaxUnavailable: &maxUnavailable,
 		}
@@ -434,7 +434,7 @@ func getInt32(i int32) *int32 {
 	return &i
 }
 
-func checkInstances(g *gomega.GomegaWithT, cs *appsv1alpha1.CloneSet, podNum int, pvcNum int) ([]*v1.Pod, []*v1.PersistentVolumeClaim) {
+func checkInstances(g *gomega.GomegaWithT, cs *appsv1beta1.CloneSet, podNum int, pvcNum int) ([]*v1.Pod, []*v1.PersistentVolumeClaim) {
 	var pods []*v1.Pod
 	g.Eventually(func() int {
 		var err error
@@ -470,7 +470,7 @@ func checkInstances(g *gomega.GomegaWithT, cs *appsv1alpha1.CloneSet, podNum int
 
 func checkStatus(g *gomega.GomegaWithT, total, updated int32) {
 	g.Eventually(func() []int32 {
-		cs := appsv1alpha1.CloneSet{}
+		cs := appsv1beta1.CloneSet{}
 		err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		return []int32{cs.Status.Replicas, cs.Status.UpdatedReplicas}

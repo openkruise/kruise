@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -52,7 +52,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("NodePodProbe")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("NodePodProbe")
 )
 
 /**
@@ -90,7 +90,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// watch for changes to NodePodProbe
-	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.NodePodProbe{}}, &enqueueRequestForNodePodProbe{}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &appsv1beta1.NodePodProbe{}}, &enqueueRequestForNodePodProbe{}); err != nil {
 		return err
 	}
 
@@ -133,7 +133,7 @@ func (r *ReconcileNodePodProbe) Reconcile(_ context.Context, req ctrl.Request) (
 
 func (r *ReconcileNodePodProbe) syncNodePodProbe(name string) error {
 	// Fetch the NodePodProbe instance
-	npp := &appsv1alpha1.NodePodProbe{}
+	npp := &appsv1beta1.NodePodProbe{}
 	err := r.Get(context.TODO(), client.ObjectKey{Name: name}, npp)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -169,7 +169,7 @@ func (r *ReconcileNodePodProbe) syncNodePodProbe(name string) error {
 	return nil
 }
 
-func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePodProbe) (map[string]*corev1.Pod, error) {
+func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1beta1.NodePodProbe) (map[string]*corev1.Pod, error) {
 	// map[pod.uid]=Pod
 	matchedPods := map[string]*corev1.Pod{}
 	for _, obj := range npp.Spec.PodProbes {
@@ -185,7 +185,7 @@ func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePo
 		matchedPods[string(pod.UID)] = pod
 	}
 
-	newSpec := appsv1alpha1.NodePodProbeSpec{}
+	newSpec := appsv1beta1.NodePodProbeSpec{}
 	for i := range npp.Spec.PodProbes {
 		obj := npp.Spec.PodProbes[i]
 		if _, ok := matchedPods[obj.UID]; ok {
@@ -196,7 +196,7 @@ func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePo
 		return matchedPods, nil
 	}
 
-	nppClone := &appsv1alpha1.NodePodProbe{}
+	nppClone := &appsv1beta1.NodePodProbe{}
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: npp.Name}, nppClone); err != nil {
 			klog.Errorf("error getting updated npp %s from client", npp.Name)
@@ -215,7 +215,7 @@ func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePo
 	return matchedPods, nil
 }
 
-func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status appsv1alpha1.PodProbeStatus) error {
+func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status appsv1beta1.PodProbeStatus) error {
 	// map[probe.name]->probeState
 	currentConditions := make(map[string]*corev1.PodCondition)
 	for i := range pod.Status.Conditions {
@@ -242,7 +242,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		}
 		// fetch podProbeMarker
 		ppmName, probeName := strings.Split(probeState.Name, "#")[0], strings.Split(probeState.Name, "#")[1]
-		ppm := &appsv1alpha1.PodProbeMarker{}
+		ppm := &appsv1beta1.PodProbeMarker{}
 		err = r.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: ppmName}, ppm)
 		if err != nil {
 			// when NodePodProbe is deleted, should delete probes from NodePodProbe.spec
@@ -254,7 +254,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		} else if !ppm.DeletionTimestamp.IsZero() {
 			continue
 		}
-		var policy []appsv1alpha1.ProbeMarkerPolicy
+		var policy []appsv1beta1.ProbeMarkerPolicy
 		var conditionType string
 		for _, probe := range ppm.Spec.Probes {
 			if probe.Name == probeName {
@@ -269,7 +269,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		} else if conditionType != "" {
 			validConditionTypes.Insert(conditionType)
 			var conStatus corev1.ConditionStatus
-			if probeState.State == appsv1alpha1.ProbeSucceeded {
+			if probeState.State == appsv1beta1.ProbeSucceeded {
 				conStatus = corev1.ConditionTrue
 			} else {
 				conStatus = corev1.ConditionFalse
@@ -292,7 +292,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		// So policy[0] is matchedPolicy, oppositePolicy is nil
 		// 3. If policy[0].state = Succeeded, and policy[1] does not exist. probeState.State = Failed.
 		// So policy[0] is oppositePolicy, matchedPolicy is nil
-		var matchedPolicy, oppositePolicy *appsv1alpha1.ProbeMarkerPolicy
+		var matchedPolicy, oppositePolicy *appsv1beta1.ProbeMarkerPolicy
 		for j := range policy {
 			if policy[j].State == probeState.State {
 				matchedPolicy = &policy[j]

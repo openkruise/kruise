@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestHasOwnerRef(t *testing.T) {
@@ -34,8 +34,8 @@ func TestHasOwnerRef(t *testing.T) {
 			Namespace: "default",
 			Name:      "datadir-foo-id1",
 			Labels: map[string]string{
-				appsv1alpha1.CloneSetInstanceID: "id1",
-				"foo":                           "bar",
+				appsv1beta1.CloneSetInstanceID: "id1",
+				"foo":                          "bar",
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -76,8 +76,8 @@ func TestRemoveOnwer(t *testing.T) {
 			Namespace: "default",
 			Name:      "datadir-foo-id1",
 			Labels: map[string]string{
-				appsv1alpha1.CloneSetInstanceID: "id1",
-				"foo":                           "bar",
+				appsv1beta1.CloneSetInstanceID: "id1",
+				"foo":                          "bar",
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -122,8 +122,8 @@ func TestSetOwnerRef(t *testing.T) {
 			Namespace: "default",
 			Name:      "datadir-foo-id1",
 			Labels: map[string]string{
-				appsv1alpha1.CloneSetInstanceID: "id1",
-				"foo":                           "bar",
+				appsv1beta1.CloneSetInstanceID: "id1",
+				"foo":                          "bar",
 			},
 			ResourceVersion: "1",
 		},

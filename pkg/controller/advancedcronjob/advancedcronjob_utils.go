@@ -5,19 +5,19 @@ import (
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"k8s.io/klog/v2"
 )
 
-func FindTemplateKind(spec appsv1alpha1.AdvancedCronJobSpec) appsv1alpha1.TemplateKind {
+func FindTemplateKind(spec appsv1beta1.AdvancedCronJobSpec) appsv1beta1.TemplateKind {
 	if spec.Template.JobTemplate != nil {
-		return appsv1alpha1.JobTemplate
+		return appsv1beta1.JobTemplate
 	}
 
-	return appsv1alpha1.BroadcastJobTemplate
+	return appsv1beta1.BroadcastJobTemplate
 }
 
-func formatSchedule(acj *appsv1alpha1.AdvancedCronJob) string {
+func formatSchedule(acj *appsv1beta1.AdvancedCronJob) string {
 	if strings.Contains(acj.Spec.Schedule, "TZ") {
 		return acj.Spec.Schedule
 	}

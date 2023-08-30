@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
@@ -105,9 +104,9 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 	var newReplicas int32
 
 	switch evt.ObjectNew.(type) {
-	case *appsv1alpha1.CloneSet:
-		oldReplicas = *evt.ObjectOld.(*appsv1alpha1.CloneSet).Spec.Replicas
-		newReplicas = *evt.ObjectNew.(*appsv1alpha1.CloneSet).Spec.Replicas
+	case *appsv1beta1.CloneSet:
+		oldReplicas = *evt.ObjectOld.(*appsv1beta1.CloneSet).Spec.Replicas
+		newReplicas = *evt.ObjectNew.(*appsv1beta1.CloneSet).Spec.Replicas
 		gvk = controllerKruiseKindCS
 	case *appsv1.Deployment:
 		oldReplicas = *evt.ObjectOld.(*appsv1.Deployment).Spec.Replicas
@@ -203,7 +202,7 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 	obj client.Object, action EventAction) {
 	var gvk schema.GroupVersionKind
 	switch obj.(type) {
-	case *appsv1alpha1.CloneSet:
+	case *appsv1beta1.CloneSet:
 		gvk = controllerKruiseKindCS
 	case *appsv1.Deployment:
 		gvk = controllerKindDep
@@ -239,8 +238,8 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 
 func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
 	workloadNamespaceName types.NamespacedName,
-	gvk schema.GroupVersionKind) (*appsv1alpha1.WorkloadSpread, error) {
-	wsList := &appsv1alpha1.WorkloadSpreadList{}
+	gvk schema.GroupVersionKind) (*appsv1beta1.WorkloadSpread, error) {
+	wsList := &appsv1beta1.WorkloadSpreadList{}
 	listOptions := &client.ListOptions{Namespace: workloadNamespaceName.Namespace}
 	if err := w.List(context.TODO(), wsList, listOptions); err != nil {
 		klog.Errorf("List WorkloadSpread failed: %s", err.Error())

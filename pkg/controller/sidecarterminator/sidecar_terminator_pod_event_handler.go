@@ -19,7 +19,7 @@ package sidecarterminator
 import (
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -114,9 +114,9 @@ func getSidecar(pod *corev1.Pod) sets.String {
 
 func isSidecar(container corev1.Container) bool {
 	for _, env := range container.Env {
-		if env.Name == appsv1alpha1.KruiseTerminateSidecarEnv && strings.EqualFold(env.Value, "true") {
+		if env.Name == appsv1beta1.KruiseTerminateSidecarEnv && strings.EqualFold(env.Value, "true") {
 			return true
-		} else if env.Name == appsv1alpha1.KruiseTerminateSidecarWithImageEnv && env.Value != "" {
+		} else if env.Name == appsv1beta1.KruiseTerminateSidecarWithImageEnv && env.Value != "" {
 			return true
 		}
 	}

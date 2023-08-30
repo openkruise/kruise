@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -23,9 +23,9 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
-func (h *CloneSetCreateUpdateHandler) validateCloneSet(cloneSet, oldCloneSet *appsv1alpha1.CloneSet) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateCloneSet(cloneSet, oldCloneSet *appsv1beta1.CloneSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&cloneSet.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	var oldCloneSetSpec *appsv1alpha1.CloneSetSpec
+	var oldCloneSetSpec *appsv1beta1.CloneSetSpec
 	if oldCloneSet != nil {
 		oldCloneSetSpec = &oldCloneSet.Spec
 	}
@@ -33,7 +33,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSet(cloneSet, oldCloneSet *ap
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1alpha1.CloneSetSpec, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1beta1.CloneSetSpec, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
@@ -84,7 +84,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in cloneset is not Supported"))
 	}
 
-	var oldScaleStrategy *appsv1alpha1.CloneSetScaleStrategy
+	var oldScaleStrategy *appsv1beta1.CloneSetScaleStrategy
 	if oldSpec != nil {
 		oldScaleStrategy = &oldSpec.ScaleStrategy
 	}
@@ -95,7 +95,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy, oldStrategy *appsv1alpha1.CloneSetScaleStrategy, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy, oldStrategy *appsv1beta1.CloneSetScaleStrategy, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if list := util.CheckDuplicate(strategy.PodsToDelete); len(list) > 0 {
@@ -123,19 +123,19 @@ func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy, oldStrateg
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alpha1.CloneSetUpdateStrategy, replicas int, fldPath *field.Path) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1beta1.CloneSetUpdateStrategy, replicas int, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	var err error
 
 	switch strategy.Type {
-	case appsv1alpha1.RecreateCloneSetUpdateStrategyType,
-		appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-		appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType:
+	case appsv1beta1.RecreateCloneSetUpdateStrategyType,
+		appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+		appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType:
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), strategy.Type, fmt.Sprintf("must be '%s', %s or '%s'",
-			appsv1alpha1.RecreateCloneSetUpdateStrategyType,
-			appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
-			appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType)))
+			appsv1beta1.RecreateCloneSetUpdateStrategyType,
+			appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+			appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType)))
 	}
 
 	partition, err := util.GetScaledValueFromIntOrPercent(strategy.Partition, replicas, true)
@@ -169,7 +169,7 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
 				fmt.Sprintf("failed getValueFromIntOrPercent for maxSurge: %v", err)))
 		}
-		if strategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType && maxSurge > 0 {
+		if strategy.Type == appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType && maxSurge > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
 				"can not use maxSurge with strategy type InPlaceOnly"))
 		}
@@ -183,7 +183,7 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneSet *appsv1alpha1.CloneSet) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneSet *appsv1beta1.CloneSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&cloneSet.ObjectMeta, &oldCloneSet.ObjectMeta, field.NewPath("metadata"))
 
 	clone := cloneSet.DeepCopy()

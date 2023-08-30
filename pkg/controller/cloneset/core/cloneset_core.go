@@ -23,7 +23,7 @@ import (
 
 	"github.com/appscode/jsonpatch"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +39,7 @@ var (
 )
 
 type commonControl struct {
-	*appsv1alpha1.CloneSet
+	*appsv1beta1.CloneSet
 }
 
 var _ Control = &commonControl{}
@@ -53,8 +53,8 @@ func (c *commonControl) SetRevisionTemplate(revisionSpec map[string]interface{},
 	template["$patch"] = "replace"
 }
 
-func (c *commonControl) ApplyRevisionPatch(patched []byte) (*appsv1alpha1.CloneSet, error) {
-	restoredSet := &appsv1alpha1.CloneSet{}
+func (c *commonControl) ApplyRevisionPatch(patched []byte) (*appsv1beta1.CloneSet, error) {
+	restoredSet := &appsv1beta1.CloneSet{}
 	if err := json.Unmarshal(patched, restoredSet); err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (c *commonControl) IsReadyToScale() bool {
 	return true
 }
 
-func (c *commonControl) NewVersionedPods(currentCS, updateCS *appsv1alpha1.CloneSet,
+func (c *commonControl) NewVersionedPods(currentCS, updateCS *appsv1beta1.CloneSet,
 	currentRevision, updateRevision string,
 	expectedCreations, expectedCurrentCreations int,
 	availableIDs []string,
@@ -80,7 +80,7 @@ func (c *commonControl) NewVersionedPods(currentCS, updateCS *appsv1alpha1.Clone
 	return newPods, nil
 }
 
-func (c *commonControl) newVersionedPods(cs *appsv1alpha1.CloneSet, revision string, replicas int, availableIDs *[]string) []*v1.Pod {
+func (c *commonControl) newVersionedPods(cs *appsv1beta1.CloneSet, revision string, replicas int, availableIDs *[]string) []*v1.Pod {
 	var newPods []*v1.Pod
 	for i := 0; i < replicas; i++ {
 		if len(*availableIDs) == 0 {
@@ -97,7 +97,7 @@ func (c *commonControl) newVersionedPods(cs *appsv1alpha1.CloneSet, revision str
 
 		pod.Name = fmt.Sprintf("%s-%s", cs.Name, id)
 		pod.Namespace = cs.Namespace
-		pod.Labels[appsv1alpha1.CloneSetInstanceID] = id
+		pod.Labels[appsv1beta1.CloneSetInstanceID] = id
 
 		inplaceupdate.InjectReadinessGate(pod)
 		clonesetutils.UpdateStorage(cs, pod)
@@ -145,8 +145,8 @@ func (c *commonControl) GetUpdateOptions() *inplaceupdate.UpdateOptions {
 	return opts
 }
 
-func (c *commonControl) ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneSet) error {
-	if newCS.Spec.UpdateStrategy.Type != appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+func (c *commonControl) ValidateCloneSetUpdate(oldCS, newCS *appsv1beta1.CloneSet) error {
+	if newCS.Spec.UpdateStrategy.Type != appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType {
 		return nil
 	}
 
@@ -160,13 +160,13 @@ func (c *commonControl) ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneS
 	for _, p := range patches {
 		if p.Operation != "replace" || !inPlaceUpdateTemplateSpecPatchRexp.MatchString(p.Path) {
 			return fmt.Errorf("only allowed to update images in spec for %s, but found %s %s",
-				appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType, p.Operation, p.Path)
+				appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType, p.Operation, p.Path)
 		}
 	}
 	return nil
 }
 
-func (c *commonControl) ExtraStatusCalculation(status *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
+func (c *commonControl) ExtraStatusCalculation(status *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error {
 	return nil
 }
 
@@ -220,7 +220,7 @@ func containersUpdateCompleted(pod *v1.Pod, checkFunc func(pod *v1.Pod, state *a
 	return fmt.Errorf("pod %v has no in-place update state annotation", klog.KObj(pod))
 }
 
-func lifecycleFinalizerChanged(cs *appsv1alpha1.CloneSet, oldPod, curPod *v1.Pod) bool {
+func lifecycleFinalizerChanged(cs *appsv1beta1.CloneSet, oldPod, curPod *v1.Pod) bool {
 	if cs.Spec.Lifecycle == nil {
 		return false
 	}

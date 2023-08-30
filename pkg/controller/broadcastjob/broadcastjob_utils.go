@@ -21,20 +21,20 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
 
 // IsJobFinished returns true when finishing job
-func IsJobFinished(j *appsv1alpha1.BroadcastJob) bool {
-	if j.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
+func IsJobFinished(j *appsv1beta1.BroadcastJob) bool {
+	if j.Spec.CompletionPolicy.Type == appsv1beta1.Never {
 		return false
 	}
 
 	for _, c := range j.Status.Conditions {
-		if (c.Type == appsv1alpha1.JobComplete || c.Type == appsv1alpha1.JobFailed) && c.Status == v1.ConditionTrue {
+		if (c.Type == appsv1beta1.JobComplete || c.Type == appsv1beta1.JobFailed) && c.Status == v1.ConditionTrue {
 			return true
 		}
 	}
@@ -85,7 +85,7 @@ func isPodFailed(restartLimit int32, pod *v1.Pod) bool {
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
-func pastActiveDeadline(job *appsv1alpha1.BroadcastJob) bool {
+func pastActiveDeadline(job *appsv1beta1.BroadcastJob) bool {
 	if job.Spec.CompletionPolicy.ActiveDeadlineSeconds == nil || job.Status.StartTime == nil {
 		return false
 	}
@@ -97,7 +97,7 @@ func pastActiveDeadline(job *appsv1alpha1.BroadcastJob) bool {
 }
 
 // pastTTLDeadline checks if job has past the TTLSecondsAfterFinished deadline
-func pastTTLDeadline(job *appsv1alpha1.BroadcastJob) (bool, time.Duration) {
+func pastTTLDeadline(job *appsv1beta1.BroadcastJob) (bool, time.Duration) {
 	if job.Spec.CompletionPolicy.TTLSecondsAfterFinished == nil || job.Status.CompletionTime == nil {
 		return false, -1
 	}
@@ -108,8 +108,8 @@ func pastTTLDeadline(job *appsv1alpha1.BroadcastJob) (bool, time.Duration) {
 	return duration >= allowedDuration, allowedDuration - duration
 }
 
-func newCondition(conditionType appsv1alpha1.JobConditionType, reason, message string) appsv1alpha1.JobCondition {
-	return appsv1alpha1.JobCondition{
+func newCondition(conditionType appsv1beta1.JobConditionType, reason, message string) appsv1beta1.JobCondition {
+	return appsv1beta1.JobCondition{
 		Type:               conditionType,
 		Status:             v1.ConditionTrue,
 		LastProbeTime:      metav1.Now(),
@@ -119,7 +119,7 @@ func newCondition(conditionType appsv1alpha1.JobConditionType, reason, message s
 	}
 }
 
-func asOwner(job *appsv1alpha1.BroadcastJob) *metav1.OwnerReference {
+func asOwner(job *appsv1beta1.BroadcastJob) *metav1.OwnerReference {
 	return metav1.NewControllerRef(job, controllerKind)
 }
 

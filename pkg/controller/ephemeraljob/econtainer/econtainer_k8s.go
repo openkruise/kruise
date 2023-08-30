@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kubeclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -28,12 +28,12 @@ const (
 )
 
 type k8sControl struct {
-	*appsv1alpha1.EphemeralJob
+	*appsv1beta1.EphemeralJob
 }
 
 var _ EphemeralContainerInterface = &k8sControl{}
 
-func (k *k8sControl) CalculateEphemeralContainerStatus(targetPods []*v1.Pod, status *appsv1alpha1.EphemeralJobStatus) error {
+func (k *k8sControl) CalculateEphemeralContainerStatus(targetPods []*v1.Pod, status *appsv1beta1.EphemeralJobStatus) error {
 
 	var success, failed, running, waiting int32
 	for _, pod := range targetPods {
@@ -89,7 +89,7 @@ func parseEphemeralContainerStatus(status *v1.ContainerStatus) ephemeralContaine
 	return UnknownStatus
 }
 
-func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.ContainerStatus) (v1.PodPhase, error) {
+func parseEphemeralPodStatus(ejob *appsv1beta1.EphemeralJob, statuses []v1.ContainerStatus) (v1.PodPhase, error) {
 	eContainerMap, empty := getEphemeralContainersMaps(ejob.Spec.Template.EphemeralContainers)
 	if empty {
 		klog.Error("ephemeral job spec containers is empty")
@@ -138,7 +138,7 @@ func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
 	for i := range k.Spec.Template.EphemeralContainers {
 		ec := k.Spec.Template.EphemeralContainers[i].DeepCopy()
 		ec.Env = append(ec.Env, v1.EnvVar{
-			Name:  appsv1alpha1.EphemeralContainerEnvKey,
+			Name:  appsv1beta1.EphemeralContainerEnvKey,
 			Value: string(k.UID),
 		})
 		eContainer = append(eContainer, *ec)

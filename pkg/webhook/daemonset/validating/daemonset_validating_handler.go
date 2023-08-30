@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strconv"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 	corev1 "k8s.io/api/core/v1"
@@ -50,7 +50,7 @@ type DaemonSetCreateUpdateHandler struct {
 	Decoder *admission.Decoder
 }
 
-func (h *DaemonSetCreateUpdateHandler) validatingDaemonSetFn(ctx context.Context, obj *appsv1alpha1.DaemonSet) (bool, string, error) {
+func (h *DaemonSetCreateUpdateHandler) validatingDaemonSetFn(ctx context.Context, obj *appsv1beta1.DaemonSet) (bool, string, error) {
 	allErrs := validateDaemonSet(obj)
 	if len(allErrs) != 0 {
 		return false, "", allErrs.ToAggregate()
@@ -58,14 +58,14 @@ func (h *DaemonSetCreateUpdateHandler) validatingDaemonSetFn(ctx context.Context
 	return true, "allowed to be admitted", nil
 }
 
-func validateDaemonSet(ds *appsv1alpha1.DaemonSet) field.ErrorList {
+func validateDaemonSet(ds *appsv1beta1.DaemonSet) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMeta(&ds.ObjectMeta, true, ValidateDaemonSetName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
-func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
+func validateDaemonSetSpec(spec *appsv1beta1.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, metavalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
@@ -116,11 +116,11 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 	return allErrs
 }
 
-func validateDaemonSetUpdateStrategy(strategy *appsv1alpha1.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+func validateDaemonSetUpdateStrategy(strategy *appsv1beta1.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch strategy.Type {
-	case appsv1alpha1.OnDeleteDaemonSetStrategyType:
-	case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
+	case appsv1beta1.OnDeleteDaemonSetStrategyType:
+	case appsv1beta1.RollingUpdateDaemonSetStrategyType:
 		// Make sure RollingUpdate field isn't nil.
 		if strategy.RollingUpdate == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
@@ -128,13 +128,13 @@ func validateDaemonSetUpdateStrategy(strategy *appsv1alpha1.DaemonSetUpdateStrat
 		}
 		allErrs = append(allErrs, validateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
 	default:
-		validValues := []string{string(appsv1alpha1.RollingUpdateDaemonSetStrategyType), string(appsv1alpha1.OnDeleteDaemonSetStrategyType)}
+		validValues := []string{string(appsv1beta1.RollingUpdateDaemonSetStrategyType), string(appsv1beta1.OnDeleteDaemonSetStrategyType)}
 		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
 	}
 	return allErrs
 }
 
-func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
+func validateRollingUpdateDaemonSet(rollingUpdate *appsv1beta1.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	var hasUnavailable, hasSurge bool
@@ -156,17 +156,17 @@ func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDae
 	}
 
 	switch rollingUpdate.Type {
-	case "", appsv1alpha1.StandardRollingUpdateType:
-	case appsv1alpha1.InplaceRollingUpdateType:
+	case "", appsv1beta1.StandardRollingUpdateType:
+	case appsv1beta1.InplaceRollingUpdateType:
 		if hasSurge {
 			allErrs = append(allErrs, field.Required(fldPath.Child("maxSurge"), "must be 0 for InPlaceIfPossible type"))
 		}
-	case appsv1alpha1.DeprecatedSurgingRollingUpdateType:
+	case appsv1beta1.DeprecatedSurgingRollingUpdateType:
 		if hasUnavailable {
 			allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable"), "must be 0 for Surging type"))
 		}
 	default:
-		validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.DeprecatedSurgingRollingUpdateType), string(appsv1alpha1.InplaceRollingUpdateType)}
+		validValues := []string{string(appsv1beta1.StandardRollingUpdateType), string(appsv1beta1.DeprecatedSurgingRollingUpdateType), string(appsv1beta1.InplaceRollingUpdateType)}
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("type"), rollingUpdate.Type, validValues))
 	}
 
@@ -200,7 +200,7 @@ var _ admission.Handler = &DaemonSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.DaemonSet{}
+	obj := &appsv1beta1.DaemonSet{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {

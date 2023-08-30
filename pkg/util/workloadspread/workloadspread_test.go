@@ -42,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -78,7 +77,7 @@ var (
 		},
 	}
 
-	workloadSpreadDemo = &appsv1alpha1.WorkloadSpread{
+	workloadSpreadDemo = &appsv1beta1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps.kruise.io/v1alpha1",
 			Kind:       "WorkloadSpread",
@@ -87,13 +86,13 @@ var (
 			Name:      "test-ws",
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.WorkloadSpreadSpec{
-			TargetReference: &appsv1alpha1.TargetReference{
+		Spec: appsv1beta1.WorkloadSpreadSpec{
+			TargetReference: &appsv1beta1.TargetReference{
 				APIVersion: "apps.kruise.io/v1alpha1",
 				Kind:       "CloneSet",
 				Name:       "cloneset-test",
 			},
-			Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+			Subsets: []appsv1beta1.WorkloadSpreadSubset{
 				{
 					Name: "subset-a",
 					RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
@@ -145,9 +144,9 @@ var (
 				},
 			},
 		},
-		Status: appsv1alpha1.WorkloadSpreadStatus{
+		Status: appsv1beta1.WorkloadSpreadStatus{
 			ObservedGeneration: 10,
-			SubsetStatuses: []appsv1alpha1.WorkloadSpreadSubsetStatus{
+			SubsetStatuses: []appsv1beta1.WorkloadSpreadSubsetStatus{
 				{
 					Name:            "subset-a",
 					MissingReplicas: 5,
@@ -261,9 +260,9 @@ var (
 		},
 	}
 
-	cloneset = appsv1alpha1.CloneSet{
+	cloneset = appsv1beta1.CloneSet{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: appsv1alpha1.SchemeGroupVersion.String(),
+			APIVersion: appsv1beta1.SchemeGroupVersion.String(),
 			Kind:       "CloneSet",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,7 +271,7 @@ var (
 			Generation: 10,
 			UID:        uuid.NewUUID(),
 		},
-		Spec: appsv1alpha1.CloneSetSpec{
+		Spec: appsv1beta1.CloneSetSpec{
 			Replicas: utilpointer.Int32(10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -280,8 +279,8 @@ var (
 				},
 			},
 			Template: template,
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-				Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+			UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+				Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 				Partition:      &intstr.IntOrString{Type: intstr.String, StrVal: "20%"},
 				MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
 				PriorityStrategy: &appspub.UpdatePriorityStrategy{
@@ -293,7 +292,7 @@ var (
 				},
 			},
 		},
-		Status: appsv1alpha1.CloneSetStatus{
+		Status: appsv1beta1.CloneSetStatus{
 			ObservedGeneration:   int64(10),
 			Replicas:             9,
 			ReadyReplicas:        8,
@@ -343,7 +342,7 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(appsv1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
@@ -353,7 +352,7 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 	handler := NewWorkloadSpreadHandler(nil)
 	ws := workloadSpreadDemo.DeepCopy()
 	ws.Status.SubsetStatuses[0].MissingReplicas = 0
-	subset := appsv1alpha1.WorkloadSpreadSubset{
+	subset := appsv1beta1.WorkloadSpreadSubset{
 		Name:        "subset-b",
 		MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
 		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
@@ -367,7 +366,7 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 		},
 	}
 	ws.Spec.Subsets = append(ws.Spec.Subsets, subset)
-	status := appsv1alpha1.WorkloadSpreadSubsetStatus{
+	status := appsv1beta1.WorkloadSpreadSubsetStatus{
 		Name:            "subset-b",
 		MissingReplicas: 2,
 		CreatingPods:    map[string]metav1.Time{},
@@ -389,17 +388,17 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 	cases := []struct {
 		name                 string
 		getPod               func() *corev1.Pod
-		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
+		getWorkloadSpread    func() *appsv1beta1.WorkloadSpread
 		getOperation         func() Operation
 		expectPod            func() *corev1.Pod
-		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1beta1.WorkloadSpread
 	}{
 		{
 			name: "operation = create, matched workloadSpread, MissingReplicas = 5",
 			getPod: func() *corev1.Pod {
 				return podDemo.DeepCopy()
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				return workloadSpreadDemo.DeepCopy()
 			},
 			getOperation: func() Operation {
@@ -467,7 +466,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.ResourceVersion = "1"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
@@ -480,10 +479,10 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			getPod: func() *corev1.Pod {
 				return podDemo.DeepCopy()
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
-				subset := appsv1alpha1.WorkloadSpreadSubset{
+				subset := appsv1beta1.WorkloadSpreadSubset{
 					Name: "subset-b",
 					RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 						MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -496,7 +495,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 					},
 				}
 				demo.Spec.Subsets = append(demo.Spec.Subsets, subset)
-				status := appsv1alpha1.WorkloadSpreadSubsetStatus{
+				status := appsv1beta1.WorkloadSpreadSubsetStatus{
 					Name:            "subset-b",
 					MissingReplicas: -1,
 					CreatingPods:    map[string]metav1.Time{},
@@ -533,10 +532,10 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
-				subset := appsv1alpha1.WorkloadSpreadSubset{
+				subset := appsv1beta1.WorkloadSpreadSubset{
 					Name: "subset-b",
 					RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 						MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -549,7 +548,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 					},
 				}
 				demo.Spec.Subsets = append(demo.Spec.Subsets, subset)
-				status := appsv1alpha1.WorkloadSpreadSubsetStatus{
+				status := appsv1beta1.WorkloadSpreadSubsetStatus{
 					Name:            "subset-b",
 					MissingReplicas: -1,
 					CreatingPods:    map[string]metav1.Time{},
@@ -565,7 +564,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			getPod: func() *corev1.Pod {
 				return podDemo.DeepCopy()
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
@@ -577,7 +576,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				return workloadSpread
@@ -588,7 +587,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			getPod: func() *corev1.Pod {
 				return podDemo.DeepCopy()
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Spec.TargetReference.Name = "not found"
 				return demo
@@ -600,7 +599,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				return workloadSpread
 			},
@@ -610,7 +609,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			getPod: func() *corev1.Pod {
 				return podDemo.DeepCopy()
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = -1
 				return demo
@@ -680,7 +679,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.ResourceVersion = "1"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = -1
@@ -692,7 +691,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			getPod: func() *corev1.Pod {
 				return podDemo.DeepCopy()
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 4
 				demo.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
@@ -763,7 +762,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.ResourceVersion = "1"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
@@ -778,7 +777,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return demo
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
@@ -791,7 +790,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
@@ -805,7 +804,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return demo
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
@@ -818,7 +817,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
@@ -832,7 +831,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				//demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return demo
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
@@ -845,7 +844,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				//pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				return workloadSpread
@@ -858,7 +857,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"Name":"test-ws","Subset":"subset-b"}`
 				return demo
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 0
 				return demo
@@ -871,7 +870,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"Name":"test-ws","Subset":"subset-b"}`
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				return workloadSpread
@@ -884,7 +883,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return demo
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 1
 				demo.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
@@ -898,7 +897,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
@@ -912,7 +911,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				demo.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return demo
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = -1
 				return demo
@@ -925,7 +924,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
 				return pod
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = -1
 				return workloadSpread
@@ -979,14 +978,14 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 func TestIsReferenceEqual(t *testing.T) {
 	cases := []struct {
 		name         string
-		getTargetRef func() *appsv1alpha1.TargetReference
+		getTargetRef func() *appsv1beta1.TargetReference
 		getOwnerRef  func() *metav1.OwnerReference
 		expectEqual  bool
 	}{
 		{
 			name: "ApiVersion, Kind, Name equals",
-			getTargetRef: func() *appsv1alpha1.TargetReference {
-				return &appsv1alpha1.TargetReference{
+			getTargetRef: func() *appsv1beta1.TargetReference {
+				return &appsv1beta1.TargetReference{
 					APIVersion: "apps.kruise.io/v1alpha1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
@@ -1003,8 +1002,8 @@ func TestIsReferenceEqual(t *testing.T) {
 		},
 		{
 			name: "Group, Kind, Name equal, but Version not equal",
-			getTargetRef: func() *appsv1alpha1.TargetReference {
-				return &appsv1alpha1.TargetReference{
+			getTargetRef: func() *appsv1beta1.TargetReference {
+				return &appsv1beta1.TargetReference{
 					APIVersion: "apps.kruise.io/v1alpha1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
@@ -1021,8 +1020,8 @@ func TestIsReferenceEqual(t *testing.T) {
 		},
 		{
 			name: "Kind, Name equals, but ApiVersion not equal",
-			getTargetRef: func() *appsv1alpha1.TargetReference {
-				return &appsv1alpha1.TargetReference{
+			getTargetRef: func() *appsv1beta1.TargetReference {
+				return &appsv1beta1.TargetReference{
 					APIVersion: "apps.kruise.io/v1alpha1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
@@ -1039,8 +1038,8 @@ func TestIsReferenceEqual(t *testing.T) {
 		},
 		{
 			name: "ApiVersion, Kind equals, but name not equal",
-			getTargetRef: func() *appsv1alpha1.TargetReference {
-				return &appsv1alpha1.TargetReference{
+			getTargetRef: func() *appsv1beta1.TargetReference {
+				return &appsv1beta1.TargetReference{
 					APIVersion: "apps.kruise.io/v1alpha1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
@@ -1076,18 +1075,18 @@ func TestIsReferenceEqual2(t *testing.T) {
 	unStruct2, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(&deployment)
 	cases := []struct {
 		name          string
-		TopologyBuild func() (appsv1alpha1.TargetReference, []client.Object)
+		TopologyBuild func() (appsv1beta1.TargetReference, []client.Object)
 		Expect        bool
 	}{
 		{
 			name: "pod is owned by cloneset directly, target is cloneset",
-			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+			TopologyBuild: func() (appsv1beta1.TargetReference, []client.Object) {
 				father := cloneset.DeepCopy()
 				son := podDemo.DeepCopy()
 				son.SetOwnerReferences([]metav1.OwnerReference{
 					*metav1.NewControllerRef(father, father.GetObjectKind().GroupVersionKind()),
 				})
-				ref := appsv1alpha1.TargetReference{
+				ref := appsv1beta1.TargetReference{
 					APIVersion: father.APIVersion,
 					Kind:       father.Kind,
 					Name:       father.Name,
@@ -1098,7 +1097,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 		},
 		{
 			name: "pod is owned by unstructured-1, unstructured-1 is owned by unstructured-2, target is unstructured-2",
-			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+			TopologyBuild: func() (appsv1beta1.TargetReference, []client.Object) {
 				grandfather := &unstructured.Unstructured{Object: unStruct1}
 				grandfather.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServerSet))
 				father := &unstructured.Unstructured{Object: unStruct2}
@@ -1110,7 +1109,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 				son.SetOwnerReferences([]metav1.OwnerReference{
 					*metav1.NewControllerRef(father, father.GetObjectKind().GroupVersionKind()),
 				})
-				ref := appsv1alpha1.TargetReference{
+				ref := appsv1beta1.TargetReference{
 					APIVersion: grandfather.GetAPIVersion(),
 					Kind:       grandfather.GetKind(),
 					Name:       grandfather.GetName(),
@@ -1121,7 +1120,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 		},
 		{
 			name: "pod is owned by unstructured-1, unstructured-1 is not owned by unstructured-2, target is unstructured-2",
-			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+			TopologyBuild: func() (appsv1beta1.TargetReference, []client.Object) {
 				grandfather := &unstructured.Unstructured{Object: unStruct1}
 				grandfather.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServerSet))
 				father := &unstructured.Unstructured{Object: unStruct2}
@@ -1133,7 +1132,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 				son.SetOwnerReferences([]metav1.OwnerReference{
 					*metav1.NewControllerRef(cloneset.DeepCopy(), cloneset.GetObjectKind().GroupVersionKind()),
 				})
-				ref := appsv1alpha1.TargetReference{
+				ref := appsv1beta1.TargetReference{
 					APIVersion: grandfather.GetAPIVersion(),
 					Kind:       grandfather.GetKind(),
 					Name:       grandfather.GetName(),
@@ -1144,7 +1143,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 		},
 		{
 			name: "pod is owned by unstructured-1, unstructured-1 is owned by unknown CRD, target is unstructured-2",
-			TopologyBuild: func() (appsv1alpha1.TargetReference, []client.Object) {
+			TopologyBuild: func() (appsv1beta1.TargetReference, []client.Object) {
 				grandfather := &unstructured.Unstructured{Object: unStruct1}
 				grandfather.SetGroupVersionKind(schema.FromAPIVersionAndKind(mockedAPIVersion, mockedKindGameServerSet))
 				father := &unstructured.Unstructured{Object: unStruct2}
@@ -1156,7 +1155,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 				son.SetOwnerReferences([]metav1.OwnerReference{
 					*metav1.NewControllerRef(father.DeepCopy(), father.GetObjectKind().GroupVersionKind()),
 				})
-				ref := appsv1alpha1.TargetReference{
+				ref := appsv1beta1.TargetReference{
 					APIVersion: grandfather.GetAPIVersion(),
 					Kind:       grandfather.GetKind(),
 					Name:       grandfather.GetName(),
@@ -1334,7 +1333,7 @@ func TestGetParentNameAndOrdinal(t *testing.T) {
 	}
 }
 
-func setWorkloadSpreadSubset(workloadSpread *appsv1alpha1.WorkloadSpread) {
+func setWorkloadSpreadSubset(workloadSpread *appsv1beta1.WorkloadSpread) {
 	for i := range workloadSpread.Status.SubsetStatuses {
 		subset := &workloadSpread.Status.SubsetStatuses[i]
 		if subset.DeletingPods == nil {
@@ -1352,8 +1351,8 @@ func setWorkloadSpreadSubset(workloadSpread *appsv1alpha1.WorkloadSpread) {
 	}
 }
 
-func getLatestWorkloadSpread(client client.Client, workloadSpread *appsv1alpha1.WorkloadSpread) (*appsv1alpha1.WorkloadSpread, error) {
-	newWS := &appsv1alpha1.WorkloadSpread{}
+func getLatestWorkloadSpread(client client.Client, workloadSpread *appsv1beta1.WorkloadSpread) (*appsv1beta1.WorkloadSpread, error) {
+	newWS := &appsv1beta1.WorkloadSpread{}
 	Key := types.NamespacedName{
 		Name:      workloadSpread.Name,
 		Namespace: workloadSpread.Namespace,

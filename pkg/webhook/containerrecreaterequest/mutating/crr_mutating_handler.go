@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -55,7 +55,7 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.KruiseDaemon))
 	}
 
-	obj := &appsv1alpha1.ContainerRecreateRequest{}
+	obj := &appsv1beta1.ContainerRecreateRequest{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
@@ -63,22 +63,22 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 	var copy runtime.Object = obj.DeepCopy()
 
 	if req.AdmissionRequest.Operation == admissionv1.Update {
-		oldObj := &appsv1alpha1.ContainerRecreateRequest{}
+		oldObj := &appsv1beta1.ContainerRecreateRequest{}
 		if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		if !reflect.DeepEqual(obj.Spec, oldObj.Spec) {
 			return admission.Errored(http.StatusForbidden, fmt.Errorf("spec of ContainerRecreateRequest is immutable"))
 		}
-		if obj.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] != oldObj.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] {
-			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1alpha1.ContainerRecreateRequestPodUIDKey))
+		if obj.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey] != oldObj.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey] {
+			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1beta1.ContainerRecreateRequestPodUIDKey))
 		}
-		if obj.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey] != oldObj.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey] {
-			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1alpha1.ContainerRecreateRequestNodeNameKey))
+		if obj.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey] != oldObj.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey] {
+			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1beta1.ContainerRecreateRequestNodeNameKey))
 		}
-		if oldObj.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey] != "" &&
-			obj.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey] != oldObj.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey] {
-			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable annotation %s", appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey))
+		if oldObj.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey] != "" &&
+			obj.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey] != oldObj.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey] {
+			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable annotation %s", appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey))
 		}
 		return admission.Allowed("")
 	}
@@ -91,9 +91,9 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("podName can not be empty"))
 	}
 	if obj.Spec.Strategy == nil {
-		obj.Spec.Strategy = &appsv1alpha1.ContainerRecreateRequestStrategy{}
+		obj.Spec.Strategy = &appsv1beta1.ContainerRecreateRequestStrategy{}
 	}
-	obj.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey] = "true"
+	obj.Labels[appsv1beta1.ContainerRecreateRequestActiveKey] = "true"
 	if len(obj.Spec.Containers) == 0 {
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("containers list can not be null"))
 	}
@@ -110,8 +110,8 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 	// defaults
 	switch obj.Spec.Strategy.FailurePolicy {
 	case "":
-		obj.Spec.Strategy.FailurePolicy = appsv1alpha1.ContainerRecreateRequestFailurePolicyFail
-	case appsv1alpha1.ContainerRecreateRequestFailurePolicyFail, appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore:
+		obj.Spec.Strategy.FailurePolicy = appsv1beta1.ContainerRecreateRequestFailurePolicyFail
+	case appsv1beta1.ContainerRecreateRequestFailurePolicyFail, appsv1beta1.ContainerRecreateRequestFailurePolicyIgnore:
 	default:
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("unknown failurePolicy %s", obj.Spec.Strategy.FailurePolicy))
 	}
@@ -144,9 +144,9 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
 }
 
-func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
-	obj.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey] = pod.Spec.NodeName
-	obj.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] = string(pod.UID)
+func injectPodIntoContainerRecreateRequest(obj *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod) error {
+	obj.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey] = pod.Spec.NodeName
+	obj.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey] = string(pod.UID)
 
 	if obj.Spec.Strategy.TerminationGracePeriodSeconds == nil {
 		obj.Spec.Strategy.TerminationGracePeriodSeconds = pod.Spec.TerminationGracePeriodSeconds
@@ -175,7 +175,7 @@ func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRe
 		}
 
 		if podContainer.Lifecycle != nil && podContainer.Lifecycle.PreStop != nil {
-			c.PreStop = &appsv1alpha1.ProbeHandler{
+			c.PreStop = &appsv1beta1.ProbeHandler{
 				Exec:      podContainer.Lifecycle.PreStop.Exec,
 				HTTPGet:   podContainer.Lifecycle.PreStop.HTTPGet,
 				TCPSocket: podContainer.Lifecycle.PreStop.TCPSocket,
@@ -186,7 +186,7 @@ func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRe
 			c.Ports = podContainer.Ports
 		}
 
-		c.StatusContext = &appsv1alpha1.ContainerRecreateRequestContainerContext{
+		c.StatusContext = &appsv1beta1.ContainerRecreateRequestContainerContext{
 			ContainerID:  podContainerStatus.ContainerID,
 			RestartCount: podContainerStatus.RestartCount,
 		}

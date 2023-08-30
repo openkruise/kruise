@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,15 +48,15 @@ var _ admission.Handler = &PersistentPodStateCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *PersistentPodStateCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.PersistentPodState{}
+	obj := &appsv1beta1.PersistentPodState{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var old *appsv1alpha1.PersistentPodState
+	var old *appsv1beta1.PersistentPodState
 	//when Operation is update, decode older object
 	if req.AdmissionRequest.Operation == admissionv1.Update {
-		old = new(appsv1alpha1.PersistentPodState)
+		old = new(appsv1beta1.PersistentPodState)
 		if err := h.Decoder.Decode(
 			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			old); err != nil {
@@ -70,7 +70,7 @@ func (h *PersistentPodStateCreateUpdateHandler) Handle(ctx context.Context, req 
 	return admission.ValidationResponse(true, "")
 }
 
-func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(obj, old *appsv1alpha1.PersistentPodState) field.ErrorList {
+func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(obj, old *appsv1beta1.PersistentPodState) field.ErrorList {
 	//validate pps.Spec
 	allErrs := field.ErrorList{}
 	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(h.Client)
@@ -87,7 +87,7 @@ func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(o
 		allErrs = append(allErrs, validateUpdateObjImmutable(obj, old, field.NewPath("spec"))...)
 	}
 	//validate whether pps is in conflict with others
-	ppsList := &appsv1alpha1.PersistentPodStateList{}
+	ppsList := &appsv1beta1.PersistentPodStateList{}
 	if err := h.Client.List(context.TODO(), ppsList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other PersistentPodState failed, err: %v", err)))
 	} else {
@@ -96,7 +96,7 @@ func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(o
 	return allErrs
 }
 
-func validateUpdateObjImmutable(obj, old *appsv1alpha1.PersistentPodState, fldPath *field.Path) field.ErrorList {
+func validateUpdateObjImmutable(obj, old *appsv1beta1.PersistentPodState, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// targetRef can't be changed
 	if !reflect.DeepEqual(obj.Spec.TargetReference, old.Spec.TargetReference) {
@@ -105,7 +105,7 @@ func validateUpdateObjImmutable(obj, old *appsv1alpha1.PersistentPodState, fldPa
 	return allErrs
 }
 
-func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPath *field.Path, whiteList *configuration.CustomWorkloadWhiteList) field.ErrorList {
+func validatePersistentPodStateSpec(obj *appsv1beta1.PersistentPodState, fldPath *field.Path, whiteList *configuration.CustomWorkloadWhiteList) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	// targetRef
@@ -125,7 +125,7 @@ func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPat
 	return allErrs
 }
 
-func validatePerConflict(pps *appsv1alpha1.PersistentPodState, others []appsv1alpha1.PersistentPodState, fldPath *field.Path) field.ErrorList {
+func validatePerConflict(pps *appsv1beta1.PersistentPodState, others []appsv1beta1.PersistentPodState, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for _, other := range others {

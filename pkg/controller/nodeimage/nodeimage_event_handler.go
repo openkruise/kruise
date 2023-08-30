@@ -20,7 +20,7 @@ import (
 	"context"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -79,7 +79,7 @@ func (e *nodeHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInte
 }
 
 func (e *nodeHandler) nodeCreateOrUpdate(node *v1.Node, q workqueue.RateLimitingInterface) {
-	nodeImage := &appsv1alpha1.NodeImage{}
+	nodeImage := &appsv1beta1.NodeImage{}
 	namespacedName := types.NamespacedName{Name: node.Name}
 	if err := e.Get(context.TODO(), namespacedName, nodeImage); err != nil {
 		if errors.IsNotFound(err) {
@@ -107,7 +107,7 @@ func (e *nodeHandler) nodeCreateOrUpdate(node *v1.Node, q workqueue.RateLimiting
 }
 
 func (e *nodeHandler) nodeDelete(node *v1.Node, q workqueue.RateLimitingInterface) {
-	nodeImage := &appsv1alpha1.NodeImage{}
+	nodeImage := &appsv1beta1.NodeImage{}
 	namespacedName := types.NamespacedName{Name: node.Name}
 	if err := e.Get(context.TODO(), namespacedName, nodeImage); errors.IsNotFound(err) {
 		return
@@ -130,7 +130,7 @@ func (e *imagePullJobHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 }
 
 func (e *imagePullJobHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	job := evt.Object.(*appsv1alpha1.ImagePullJob)
+	job := evt.Object.(*appsv1beta1.ImagePullJob)
 	nodeImageNames := utilimagejob.PopCachedNodeImagesForJob(job)
 	for _, name := range nodeImageNames {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: name}})

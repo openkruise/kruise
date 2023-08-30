@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 type nameToReplicas struct {
@@ -57,7 +57,7 @@ func (n subsetInfos) Swap(i, j int) {
 // GetAllocatedReplicas returns a mapping from subset to next replicas.
 // Next replicas is allocated by replicasAllocator, which will consider the current replicas of each subset and
 // new replicas indicated from UnitedDeployment.Spec.Topology.Subsets.
-func GetAllocatedReplicas(nameToSubset *map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) (*map[string]int32, error) {
+func GetAllocatedReplicas(nameToSubset *map[string]*Subset, ud *appsv1beta1.UnitedDeployment) (*map[string]int32, error) {
 	subsetInfos := getSubsetInfos(nameToSubset, ud)
 
 	var expectedReplicas int32 = -1
@@ -112,7 +112,7 @@ func (s *replicasAllocator) validateReplicas(replicas int32, subsetReplicasLimit
 	return nil
 }
 
-func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1alpha1.UnitedDeployment) *map[string]int32 {
+func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1beta1.UnitedDeployment) *map[string]int32 {
 	replicaLimits := map[string]int32{}
 	if ud.Spec.Topology.Subsets == nil {
 		return &replicaLimits
@@ -134,7 +134,7 @@ func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1alpha1.UnitedDeploymen
 	return &replicaLimits
 }
 
-func getSubsetInfos(nameToSubset *map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) *subsetInfos {
+func getSubsetInfos(nameToSubset *map[string]*Subset, ud *appsv1beta1.UnitedDeployment) *subsetInfos {
 	infos := make(subsetInfos, len(ud.Spec.Topology.Subsets))
 	for idx, subsetDef := range ud.Spec.Topology.Subsets {
 		var replicas int32

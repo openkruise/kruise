@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
 	appsv1 "k8s.io/api/apps/v1"
@@ -90,7 +89,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 	})
 }
 
-func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1alpha1.PersistentPodState {
+func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1beta1.PersistentPodState {
 	ref := metav1.GetControllerOf(pod)
 	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(p.client)
 	if err != nil {
@@ -102,7 +101,7 @@ func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1a
 	}
 	ppsName := pod.Annotations[mutating.InjectedPersistentPodStateKey]
 	if ppsName != "" {
-		obj := &appsv1alpha1.PersistentPodState{}
+		obj := &appsv1beta1.PersistentPodState{}
 		if err := p.reader.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: ppsName}, obj); err != nil {
 			klog.Errorf("fetch pod(%s/%s) PersistentPodState(%s) failed: %s", pod.Namespace, pod.Name, ppsName, err.Error())
 			return nil
@@ -110,7 +109,7 @@ func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1a
 		return obj
 	}
 
-	return mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+	return mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
 		APIVersion: ref.APIVersion,
 		Kind:       ref.Kind,
 		Name:       ref.Name,
@@ -141,16 +140,16 @@ type enqueueRequestForStatefulSet struct {
 
 func (p *enqueueRequestForStatefulSet) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	sts := evt.Object.(*appsv1.StatefulSet)
-	if sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" &&
-		(sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != "" ||
-			sts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != "") {
+	if sts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] == "true" &&
+		(sts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] != "" ||
+			sts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] != "") {
 		enqueuePersistentPodStateRequest(q, KindSts.GroupVersion().String(), KindSts.Kind, sts.Namespace, sts.Name)
 	}
 }
 
 func (p *enqueueRequestForStatefulSet) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	sts := evt.Object.(*appsv1.StatefulSet)
-	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
 		APIVersion: KruiseKindSts.GroupVersion().String(),
 		Kind:       KruiseKindSts.Kind,
 		Name:       sts.Name,
@@ -170,15 +169,15 @@ func (p *enqueueRequestForStatefulSet) Generic(evt event.GenericEvent, q workque
 func (p *enqueueRequestForStatefulSet) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oSts := evt.ObjectOld.(*appsv1.StatefulSet)
 	nSts := evt.ObjectNew.(*appsv1.StatefulSet)
-	if oSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] != nSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] ||
-		oSts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != nSts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] ||
-		oSts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != nSts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] {
+	if oSts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] != nSts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] ||
+		oSts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] != nSts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] ||
+		oSts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] != nSts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] {
 		enqueuePersistentPodStateRequest(q, KindSts.GroupVersion().String(), KindSts.Kind, nSts.Namespace, nSts.Name)
 	}
 
 	// delete statefulSet scenario
 	if oSts.DeletionTimestamp.IsZero() && !nSts.DeletionTimestamp.IsZero() {
-		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
 			APIVersion: KindSts.GroupVersion().String(),
 			Kind:       KindSts.Kind,
 			Name:       nSts.Name,
@@ -212,16 +211,16 @@ type enqueueRequestForKruiseStatefulSet struct {
 
 func (p *enqueueRequestForKruiseStatefulSet) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	sts := evt.Object.(*appsv1beta1.StatefulSet)
-	if sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" &&
-		(sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != "" ||
-			sts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != "") {
+	if sts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] == "true" &&
+		(sts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] != "" ||
+			sts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] != "") {
 		enqueuePersistentPodStateRequest(q, KruiseKindSts.GroupVersion().String(), KruiseKindSts.Kind, sts.Namespace, sts.Name)
 	}
 }
 
 func (p *enqueueRequestForKruiseStatefulSet) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	sts := evt.Object.(*appsv1beta1.StatefulSet)
-	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
 		APIVersion: KruiseKindSts.GroupVersion().String(),
 		Kind:       KruiseKindSts.Kind,
 		Name:       sts.Name,
@@ -241,15 +240,15 @@ func (p *enqueueRequestForKruiseStatefulSet) Generic(evt event.GenericEvent, q w
 func (p *enqueueRequestForKruiseStatefulSet) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oSts := evt.ObjectOld.(*appsv1beta1.StatefulSet)
 	nSts := evt.ObjectNew.(*appsv1beta1.StatefulSet)
-	if oSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] != nSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] ||
-		oSts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != nSts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] ||
-		oSts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != nSts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] {
+	if oSts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] != nSts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] ||
+		oSts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] != nSts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] ||
+		oSts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] != nSts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] {
 		enqueuePersistentPodStateRequest(q, KruiseKindSts.GroupVersion().String(), KruiseKindSts.Kind, nSts.Namespace, nSts.Name)
 	}
 
 	// delete statefulSet scenario
 	if oSts.DeletionTimestamp.IsZero() && !nSts.DeletionTimestamp.IsZero() {
-		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
 			APIVersion: KruiseKindSts.GroupVersion().String(),
 			Kind:       KruiseKindSts.Kind,
 			Name:       nSts.Name,
@@ -273,9 +272,9 @@ type enqueueRequestForStatefulSetLike struct {
 func (p *enqueueRequestForStatefulSetLike) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	workload := evt.Object.(*unstructured.Unstructured)
 	annotations := workload.GetAnnotations()
-	if annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" &&
-		(annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != "" ||
-			annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != "") {
+	if annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] == "true" &&
+		(annotations[appsv1beta1.AnnotationRequiredPersistentTopology] != "" ||
+			annotations[appsv1beta1.AnnotationPreferredPersistentTopology] != "") {
 		enqueuePersistentPodStateRequest(q, workload.GetAPIVersion(), workload.GetKind(), workload.GetNamespace(), workload.GetName())
 	}
 }
@@ -285,15 +284,15 @@ func (p *enqueueRequestForStatefulSetLike) Update(evt event.UpdateEvent, q workq
 	nWorkload := evt.ObjectNew.(*unstructured.Unstructured)
 	oAnnotations := oWorkload.GetAnnotations()
 	nAnnotations := nWorkload.GetAnnotations()
-	if oAnnotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] != nAnnotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] ||
-		oAnnotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != nAnnotations[appsv1alpha1.AnnotationRequiredPersistentTopology] ||
-		oAnnotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != nAnnotations[appsv1alpha1.AnnotationPreferredPersistentTopology] {
+	if oAnnotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] != nAnnotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] ||
+		oAnnotations[appsv1beta1.AnnotationRequiredPersistentTopology] != nAnnotations[appsv1beta1.AnnotationRequiredPersistentTopology] ||
+		oAnnotations[appsv1beta1.AnnotationPreferredPersistentTopology] != nAnnotations[appsv1beta1.AnnotationPreferredPersistentTopology] {
 		enqueuePersistentPodStateRequest(q, nWorkload.GetAPIVersion(), nWorkload.GetKind(), nWorkload.GetNamespace(), nWorkload.GetName())
 	}
 
 	// delete statefulSet scenario
 	if oWorkload.GetDeletionTimestamp().IsZero() && !nWorkload.GetDeletionTimestamp().IsZero() {
-		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
 			APIVersion: oWorkload.GetAPIVersion(),
 			Kind:       oWorkload.GetKind(),
 			Name:       nWorkload.GetName(),
@@ -310,7 +309,7 @@ func (p *enqueueRequestForStatefulSetLike) Update(evt event.UpdateEvent, q workq
 
 func (p *enqueueRequestForStatefulSetLike) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	workload := evt.Object.(*unstructured.Unstructured)
-	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
+	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
 		APIVersion: workload.GetAPIVersion(),
 		Kind:       workload.GetKind(),
 		Name:       workload.GetName(),

@@ -27,7 +27,7 @@ import (
 	"net/url"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 
 	"github.com/alibaba/pouch/pkg/jsonstream"
 	"github.com/containerd/containerd"
@@ -88,7 +88,7 @@ type containerdImageClient struct {
 }
 
 // PullImage implements ImageService.PullImage.
-func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, _ *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error) {
+func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, _ *appsv1beta1.SandboxConfig) (ImagePullStatusReader, error) {
 	ctx = namespaces.WithNamespace(ctx, k8sContainerdNamespace)
 
 	if tag == "" {

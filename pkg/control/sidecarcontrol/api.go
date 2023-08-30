@@ -17,7 +17,7 @@ limitations under the License.
 package sidecarcontrol
 
 import (
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -26,7 +26,7 @@ import (
 type SidecarControl interface {
 	//*****common*****//
 	// get sidecarset
-	GetSidecarset() *appsv1alpha1.SidecarSet
+	GetSidecarset() *appsv1beta1.SidecarSet
 	// when sidecarSet is not active, it will not perform injections and upgrades process.
 	// You can re-implement the function IsActiveSidecarSet to indicate that this sidecarSet is no longer working by adding some sidecarSet flags,
 	// for example: sidecarSet.Annotations[sidecarset.kruise.io/disabled] = "true"
@@ -39,8 +39,8 @@ type SidecarControl interface {
 	NeedToInjectVolumeMount(volumeMount v1.VolumeMount) bool
 	// when update pod, judge whether inject sidecar container into pod
 	// one can customize validation to allow sidecar addition after pod creation, and reimplement NeedToInjectInUpdatedPod to enable such injection in sidecarset
-	NeedToInjectInUpdatedPod(pod, oldPod *v1.Pod, sidecarContainer *appsv1alpha1.SidecarContainer, injectedEnvs []v1.EnvVar,
-		injectedMounts []v1.VolumeMount) (needInject bool, existSidecars []*appsv1alpha1.SidecarContainer, existVolumes []v1.Volume)
+	NeedToInjectInUpdatedPod(pod, oldPod *v1.Pod, sidecarContainer *appsv1beta1.SidecarContainer, injectedEnvs []v1.EnvVar,
+		injectedMounts []v1.VolumeMount) (needInject bool, existSidecars []*appsv1beta1.SidecarContainer, existVolumes []v1.Volume)
 	// IsPodAvailabilityChanged check whether pod changed on updating trigger re-inject sidecar container
 	// For update pod injection sidecar container scenario, this method can filter out many invalid update events, thus improving the overall webhook performance.
 	IsPodAvailabilityChanged(pod, oldPod *v1.Pod) bool
@@ -55,7 +55,7 @@ type SidecarControl interface {
 	IsPodReady(pod *v1.Pod) bool
 	// upgrade pod sidecar container to sidecarSet latest version
 	// if container==nil means no change, no need to update, otherwise need to update
-	UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container
+	UpgradeSidecarContainer(sidecarContainer *appsv1beta1.SidecarContainer, pod *v1.Pod) *v1.Container
 	// When upgrading the pod sidecar container, you need to record some in-place upgrade information in pod annotations,
 	// which is needed by the sidecarset controller to determine whether the upgrade is completed.
 	UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod)
@@ -66,6 +66,6 @@ type SidecarControl interface {
 	IsSidecarSetUpgradable(pod *v1.Pod) bool
 }
 
-func New(cs *appsv1alpha1.SidecarSet) SidecarControl {
+func New(cs *appsv1beta1.SidecarSet) SidecarControl {
 	return &commonControl{SidecarSet: cs}
 }

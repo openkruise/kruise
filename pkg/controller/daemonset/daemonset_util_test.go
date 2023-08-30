@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -208,7 +208,7 @@ func TestShouldIgnoreNodeUpdate(t *testing.T) {
 
 func Test_getBurstReplicas(t *testing.T) {
 	type args struct {
-		ds *appsv1alpha1.DaemonSet
+		ds *appsv1beta1.DaemonSet
 	}
 	tests := []struct {
 		name string
@@ -218,8 +218,8 @@ func Test_getBurstReplicas(t *testing.T) {
 		{
 			name: "getBurstReplicas",
 			args: args{
-				ds: &appsv1alpha1.DaemonSet{
-					Spec: appsv1alpha1.DaemonSetSpec{
+				ds: &appsv1beta1.DaemonSet{
+					Spec: appsv1beta1.DaemonSetSpec{
 						BurstReplicas: &intstr.IntOrString{IntVal: 10},
 					},
 				},
@@ -296,7 +296,7 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 	}
 }
 
-func newPod(podName string, nodeName string, label map[string]string, ds *appsv1alpha1.DaemonSet) *corev1.Pod {
+func newPod(podName string, nodeName string, label map[string]string, ds *appsv1beta1.DaemonSet) *corev1.Pod {
 	// Add hash unique label to the pod
 	newLabels := label
 	var podSpec corev1.PodSpec
@@ -341,19 +341,19 @@ func newPod(podName string, nodeName string, label map[string]string, ds *appsv1
 func TestCreatePodProgressively(t *testing.T) {
 	cases := []struct {
 		name   string
-		ds     *appsv1alpha1.DaemonSet
+		ds     *appsv1beta1.DaemonSet
 		expect bool
 	}{
 		{
 			name: "ds with no annotation",
-			ds: &appsv1alpha1.DaemonSet{
+			ds: &appsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "ds-with-no-annotation"},
 			},
 			expect: false,
 		},
 		{
 			name: "ds with annotation, does not contains progressive annotation",
-			ds: &appsv1alpha1.DaemonSet{
+			ds: &appsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ds-with-no-annotation",
 					Annotations: map[string]string{
@@ -365,7 +365,7 @@ func TestCreatePodProgressively(t *testing.T) {
 		},
 		{
 			name: "ds with annotation, contains progressive annotation, value is not true",
-			ds: &appsv1alpha1.DaemonSet{
+			ds: &appsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ds-with-no-annotation",
 					Annotations: map[string]string{
@@ -378,7 +378,7 @@ func TestCreatePodProgressively(t *testing.T) {
 		},
 		{
 			name: "ds with annotation, contains progressive annotation, value is true",
-			ds: &appsv1alpha1.DaemonSet{
+			ds: &appsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ds-with-no-annotation",
 					Annotations: map[string]string{
@@ -655,7 +655,7 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 	for _, tt := range []struct {
 		Title    string
 		Node     *corev1.Node
-		Ds       *appsv1alpha1.DaemonSet
+		Ds       *appsv1beta1.DaemonSet
 		Expected bool
 	}{
 		{
@@ -669,7 +669,7 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 			newNode("node1", map[string]string{
 				"key1": "value1",
 			}),
-			func() *appsv1alpha1.DaemonSet {
+			func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("ds1")
 				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
 					"key1": "value2",
@@ -683,7 +683,7 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 			newNode("node1", map[string]string{
 				"key1": "value1",
 			}),
-			func() *appsv1alpha1.DaemonSet {
+			func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("ds1")
 				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
 					"key1": "value1",
@@ -701,14 +701,14 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 	}
 }
 
-func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1alpha1.DaemonSetUpdateStrategy {
+func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1beta1.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
-	strategy := appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+	strategy := appsv1beta1.DaemonSetUpdateStrategy{
+		Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
 			MaxUnavailable: &one,
 			Selector:       nil,
-			Type:           appsv1alpha1.StandardRollingUpdateType,
+			Type:           appsv1beta1.StandardRollingUpdateType,
 		},
 	}
 	if len(matchLabels) > 0 {

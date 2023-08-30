@@ -20,7 +20,7 @@ import (
 	"context"
 	"net/http"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/klog/v2"
@@ -41,8 +41,8 @@ var _ admission.Handler = &CloneSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.CloneSet{}
-	oldObj := &appsv1alpha1.CloneSet{}
+	obj := &appsv1beta1.CloneSet{}
+	oldObj := &appsv1beta1.CloneSet{}
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Create:

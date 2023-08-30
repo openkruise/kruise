@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"net/http"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -50,7 +50,7 @@ var _ admission.Handler = &ResourceDistributionCreateUpdateHandler{}
 // validateResourceDistributionSpec validate Spec when creating and updating
 // (1). validate resource itself
 // (2). validate targets
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(obj, oldObj *appsv1alpha1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(obj, oldObj *appsv1beta1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
 	spec := &obj.Spec
 	// deserialize resource from runtime.rawExtension
 	resource, errs := DeserializeResource(&spec.Resource, fldPath)
@@ -97,7 +97,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 // validateResourceDistributionSpecTargets validate Spec.Targets
 // (1). validate target namespace names
 // (2). validate conflict between existing resources
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecTargets(targets *appsv1alpha1.ResourceDistributionTargets, fldPath *field.Path) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecTargets(targets *appsv1beta1.ResourceDistributionTargets, fldPath *field.Path) (allErrs field.ErrorList) {
 	// 1. validate namespace of IncludedNamespaces.List and ExcludedNamespaces.List
 	conflicted := make([]string, 0)
 	includedNS := sets.NewString()
@@ -133,7 +133,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 // validateResourceDistribution is an entrance to validate ResourceDistribution when creating and updating
 // (1). validate ResourceDistribution ObjectMeta
 // (2). validate ResourceDistribution Spec
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1alpha1.ResourceDistribution) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1beta1.ResourceDistribution) (allErrs field.ErrorList) {
 	// 1. validate metadata
 	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	// 2. validate spec
@@ -142,13 +142,13 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(o
 
 // Handle handles admission requests.
 func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.ResourceDistribution{}
+	obj := &appsv1beta1.ResourceDistribution{}
 	if err := h.Decoder.Decode(req, obj); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var oldObj *appsv1alpha1.ResourceDistribution
+	var oldObj *appsv1beta1.ResourceDistribution
 	if req.AdmissionRequest.Operation == admissionv1.Update {
-		oldObj = &appsv1alpha1.ResourceDistribution{}
+		oldObj = &appsv1beta1.ResourceDistribution{}
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}

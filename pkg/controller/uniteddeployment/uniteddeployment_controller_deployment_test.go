@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestDeploymentReconcile(t *testing.T) {
@@ -44,20 +44,20 @@ func TestDeploymentReconcile(t *testing.T) {
 	}()
 
 	caseName := "deployment-reconcile"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -82,8 +82,8 @@ func TestDeploymentReconcile(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -125,20 +125,20 @@ func TestDeploymentSubsetProvision(t *testing.T) {
 	}()
 
 	caseName := "test-deployment-subset-provision"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -163,8 +163,8 @@ func TestDeploymentSubsetProvision(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -206,7 +206,7 @@ func TestDeploymentSubsetProvision(t *testing.T) {
 	g.Expect(deployment.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("node-a"))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
+	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1beta1.Subset{
 		Name: "subset-b",
 		NodeSelectorTerm: corev1.NodeSelectorTerm{
 			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -375,20 +375,20 @@ func TestDeploymentSubsetPatch(t *testing.T) {
 	imagePatchBytes, _ := json.Marshal(imagePatch)
 	resourcePatchBytes, _ := json.Marshal(resourcePatch)
 	envPatchBytes, _ := json.Marshal(envPatch)
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -413,8 +413,8 @@ func TestDeploymentSubsetPatch(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						Patch: runtime.RawExtension{
@@ -528,20 +528,20 @@ func TestDeploymentSubsetProvisionWithToleration(t *testing.T) {
 	}()
 
 	caseName := "test-deployment-subset-provision-with-tolerationssss"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -566,8 +566,8 @@ func TestDeploymentSubsetProvisionWithToleration(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						Tolerations: []corev1.Toleration{
@@ -634,20 +634,20 @@ func TestDeploymentDupSubset(t *testing.T) {
 	}()
 
 	caseName := "test-deployment-dup-subset"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -672,8 +672,8 @@ func TestDeploymentDupSubset(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -724,20 +724,20 @@ func TestDeploymentScale(t *testing.T) {
 	}()
 
 	caseName := "test-deployment-scale"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -762,8 +762,8 @@ func TestDeploymentScale(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -867,20 +867,20 @@ func TestDeploymentUpdate(t *testing.T) {
 	}()
 
 	caseName := "test-deployment-update"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &two,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -905,8 +905,8 @@ func TestDeploymentUpdate(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -986,20 +986,20 @@ func TestDeploymentOnDelete(t *testing.T) {
 	}()
 
 	caseName := "test-deployment-on-delete"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -1024,11 +1024,11 @@ func TestDeploymentOnDelete(t *testing.T) {
 					},
 				},
 			},
-			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
-				Type: appsv1alpha1.ManualUpdateStrategyType,
+			UpdateStrategy: appsv1beta1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1beta1.ManualUpdateStrategyType,
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -1077,7 +1077,7 @@ func TestDeploymentOnDelete(t *testing.T) {
 
 	// update with partition
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 4,
 			"subset-b": 3,
@@ -1104,7 +1104,7 @@ func TestDeploymentOnDelete(t *testing.T) {
 	}))
 
 	// move on
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 0,
 			"subset-b": 3,
@@ -1127,20 +1127,20 @@ func TestDeploymentSubsetCount(t *testing.T) {
 	}()
 
 	caseName := "test-deployment-subset-count"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -1165,8 +1165,8 @@ func TestDeploymentSubsetCount(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -1244,8 +1244,8 @@ func TestDeploymentSubsetCount(t *testing.T) {
 	percentage = intstr.FromString("30%")
 	instance.Spec.Topology.Subsets[0].Replicas = &percentage
 	instance.Spec.Template.DeploymentTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:3.0"
-	instance.Spec.UpdateStrategy.Type = appsv1alpha1.ManualUpdateStrategyType
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.Type = appsv1beta1.ManualUpdateStrategyType
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 1,
 		},
@@ -1268,7 +1268,7 @@ func TestDeploymentSubsetCount(t *testing.T) {
 	instance.Spec.UpdateStrategy.ManualUpdate.Partitions = map[string]int32{
 		"subset-a": 2,
 	}
-	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
+	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1beta1.Subset{
 		Name: "subset-c",
 		NodeSelectorTerm: corev1.NodeSelectorTerm{
 			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1331,7 +1331,7 @@ func TestDeploymentSubsetCount(t *testing.T) {
 
 func getDeploymentSubsetByName(deploymentList *appsv1.DeploymentList, name string) *appsv1.Deployment {
 	for _, deployment := range deploymentList.Items {
-		if deployment.Labels[appsv1alpha1.SubSetNameLabelKey] == name {
+		if deployment.Labels[appsv1beta1.SubSetNameLabelKey] == name {
 			return &deployment
 		}
 	}
@@ -1339,7 +1339,7 @@ func getDeploymentSubsetByName(deploymentList *appsv1.DeploymentList, name strin
 	return nil
 }
 
-func expectedDeploymentCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, count int) *appsv1.DeploymentList {
+func expectedDeploymentCount(g *gomega.GomegaWithT, ud *appsv1beta1.UnitedDeployment, count int) *appsv1.DeploymentList {
 	deploymentList := &appsv1.DeploymentList{}
 
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)

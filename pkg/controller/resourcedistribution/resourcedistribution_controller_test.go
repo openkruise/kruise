@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
 
 	corev1 "k8s.io/api/core/v1"
@@ -39,7 +39,7 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 }
 
@@ -52,7 +52,7 @@ func TestDoReconcile(t *testing.T) {
 	}
 
 	// 1. check distributor.status
-	mice := &appsv1alpha1.ResourceDistribution{}
+	mice := &appsv1beta1.ResourceDistribution{}
 	reconcileHandler.Client.Get(context.TODO(), types.NamespacedName{Name: distributor.Name}, mice)
 	if len(mice.Status.Conditions) < NumberOfConditionTypes {
 		t.Fatalf("unexpected .status.conditions size, expected %d actual %d", NumberOfConditionTypes, len(mice.Status.Conditions))
@@ -96,7 +96,7 @@ func TestDoReconcile(t *testing.T) {
 	}
 }
 
-func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
+func buildResourceDistributionWithSecret() *appsv1beta1.ResourceDistribution {
 	const resourceJSON = `{
 		"apiVersion": "v1",
 		"data": {
@@ -112,27 +112,27 @@ func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
 	return buildResourceDistribution(raw)
 }
 
-func buildResourceDistribution(raw runtime.RawExtension) *appsv1alpha1.ResourceDistribution {
-	return &appsv1alpha1.ResourceDistribution{
+func buildResourceDistribution(raw runtime.RawExtension) *appsv1beta1.ResourceDistribution {
+	return &appsv1beta1.ResourceDistribution{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: appsv1alpha1.GroupVersion.String(),
+			APIVersion: appsv1beta1.GroupVersion.String(),
 			Kind:       "ResourceDistribution",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-resource-distribution",
 		},
-		Spec: appsv1alpha1.ResourceDistributionSpec{
+		Spec: appsv1beta1.ResourceDistributionSpec{
 			Resource: raw,
-			Targets: appsv1alpha1.ResourceDistributionTargets{
-				ExcludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-					List: []appsv1alpha1.ResourceDistributionNamespace{
+			Targets: appsv1beta1.ResourceDistributionTargets{
+				ExcludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{
 						{
 							Name: "ns-4",
 						},
 					},
 				},
-				IncludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-					List: []appsv1alpha1.ResourceDistributionNamespace{
+				IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{
 						{
 							Name: "ns-1",
 						},

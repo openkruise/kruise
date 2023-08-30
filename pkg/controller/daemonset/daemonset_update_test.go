@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,9 +50,9 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	markPodsReady(podControl.podStore)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
-	ds.Spec.UpdateStrategy.Type = appsv1alpha1.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	manager.dsStore.Update(ds)
 
 	clearExpectations(t, manager, ds, podControl)
@@ -135,9 +135,9 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	markPodsReady(podControl.podStore)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
-	ds.Spec.UpdateStrategy.Type = appsv1alpha1.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	err = manager.dsStore.Update(ds)
 	if err != nil {
 		t.Fatal(err)
@@ -170,9 +170,9 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
-	ds.Spec.UpdateStrategy.Type = appsv1alpha1.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	err = manager.dsStore.Update(ds)
 	if err != nil {
 		t.Fatal(err)
@@ -281,9 +281,9 @@ func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
 	manager.dsStore.Add(ds)
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
-	ds.Spec.UpdateStrategy.Type = appsv1alpha1.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1alpha1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	manager.dsStore.Update(ds)
 
 	// template is not changed no pod should be removed
@@ -344,7 +344,7 @@ func setPodReadiness(t *testing.T, dsc *daemonSetsController, ready bool, count 
 	}
 }
 
-func currentDSHash(ctx context.Context, dsc *daemonSetsController, ds *appsv1alpha1.DaemonSet) (string, error) {
+func currentDSHash(ctx context.Context, dsc *daemonSetsController, ds *appsv1beta1.DaemonSet) (string, error) {
 	// Construct histories of the DaemonSet, and get the hash of current history
 	cur, _, err := dsc.constructHistory(ctx, ds)
 	if err != nil {
@@ -353,21 +353,21 @@ func currentDSHash(ctx context.Context, dsc *daemonSetsController, ds *appsv1alp
 	return cur.Labels[apps.DefaultDaemonSetUniqueLabelKey], nil
 }
 
-func newUpdateSurge(value intstr.IntOrString) appsv1alpha1.DaemonSetUpdateStrategy {
+func newUpdateSurge(value intstr.IntOrString) appsv1beta1.DaemonSetUpdateStrategy {
 	zero := intstr.FromInt(0)
-	return appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+	return appsv1beta1.DaemonSetUpdateStrategy{
+		Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
 			MaxUnavailable: &zero,
 			MaxSurge:       &value,
 		},
 	}
 }
 
-func newUpdateUnavailable(value intstr.IntOrString) appsv1alpha1.DaemonSetUpdateStrategy {
-	return appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+func newUpdateUnavailable(value intstr.IntOrString) appsv1beta1.DaemonSetUpdateStrategy {
+	return appsv1beta1.DaemonSetUpdateStrategy{
+		Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
 			MaxUnavailable: &value,
 		},
 	}
@@ -377,7 +377,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 	cases := []struct {
 		name           string
 		Manager        *daemonSetsController
-		ds             *appsv1alpha1.DaemonSet
+		ds             *appsv1beta1.DaemonSet
 		nodeToPods     map[string][]*corev1.Pod
 		enableSurge    bool
 		maxSurge       int
@@ -394,7 +394,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				}
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt(0))
 				return ds
@@ -413,7 +413,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt(1))
 				return ds
@@ -441,7 +441,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromInt(0))
 				return ds
@@ -466,7 +466,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(0))
 				return ds
@@ -491,7 +491,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromString("50%"))
 				return ds
@@ -519,7 +519,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromString("50%"))
 				return ds
@@ -549,7 +549,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromString("100%"))
 				return ds
@@ -579,7 +579,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 3, nil)
 				return manager
 			}(),
-			ds: func() *appsv1alpha1.DaemonSet {
+			ds: func() *appsv1beta1.DaemonSet {
 				ds := newDaemonSet("x")
 				ds.Spec.UpdateStrategy = newUpdateUnavailable(intstr.FromString("50%"))
 				return ds
@@ -673,7 +673,7 @@ func Test_maxRevision(t *testing.T) {
 
 func TestGetTemplateGeneration(t *testing.T) {
 	type args struct {
-		ds *appsv1alpha1.DaemonSet
+		ds *appsv1beta1.DaemonSet
 	}
 	constNum := int64(1000)
 	tests := []struct {
@@ -685,15 +685,15 @@ func TestGetTemplateGeneration(t *testing.T) {
 		{
 			name: "GetTemplateGeneration",
 			args: args{
-				ds: &appsv1alpha1.DaemonSet{
+				ds: &appsv1beta1.DaemonSet{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
 							apps.DeprecatedTemplateGeneration: "1000",
 						},
 					},
-					Spec:   appsv1alpha1.DaemonSetSpec{},
-					Status: appsv1alpha1.DaemonSetStatus{},
+					Spec:   appsv1beta1.DaemonSetSpec{},
+					Status: appsv1beta1.DaemonSetStatus{},
 				},
 			},
 			want:    &constNum,
@@ -718,7 +718,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 	now := metav1.Now()
 	type testcase struct {
 		name             string
-		rolling          *appsv1alpha1.RollingUpdateDaemonSet
+		rolling          *appsv1beta1.RollingUpdateDaemonSet
 		hash             string
 		nodeToDaemonPods map[string][]*corev1.Pod
 		nodes            []*corev1.Node
@@ -728,8 +728,8 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 	tests := []testcase{
 		{
 			name: "Standard,partition=0",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
+			rolling: &appsv1beta1.RollingUpdateDaemonSet{
+				Type:      appsv1beta1.StandardRollingUpdateType,
 				Partition: utilpointer.Int32Ptr(0),
 			},
 			hash: "v2",
@@ -748,8 +748,8 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 		},
 		{
 			name: "Standard,partition=1",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
+			rolling: &appsv1beta1.RollingUpdateDaemonSet{
+				Type:      appsv1beta1.StandardRollingUpdateType,
 				Partition: utilpointer.Int32Ptr(1),
 			},
 			hash: "v2",
@@ -768,8 +768,8 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 		},
 		{
 			name: "Standard,partition=1,selector=1",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
+			rolling: &appsv1beta1.RollingUpdateDaemonSet{
+				Type:      appsv1beta1.StandardRollingUpdateType,
 				Partition: utilpointer.Int32Ptr(1),
 				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
 			},
@@ -798,8 +798,8 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 		},
 		{
 			name: "Standard,partition=2,selector=3",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
+			rolling: &appsv1beta1.RollingUpdateDaemonSet{
+				Type:      appsv1beta1.StandardRollingUpdateType,
 				Partition: utilpointer.Int32Ptr(2),
 				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
 			},
@@ -828,8 +828,8 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 		},
 		{
 			name: "Standard,partition=0,selector=3,terminating",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
+			rolling: &appsv1beta1.RollingUpdateDaemonSet{
+				Type:      appsv1beta1.StandardRollingUpdateType,
 				Partition: utilpointer.Int32Ptr(0),
 				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
 			},
@@ -868,8 +868,8 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 		nodeLister := corelisters.NewNodeLister(indexer)
 		dsc := &ReconcileDaemonSet{nodeLister: nodeLister}
 
-		ds := &appsv1alpha1.DaemonSet{Spec: appsv1alpha1.DaemonSetSpec{UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
-			Type:          appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+		ds := &appsv1beta1.DaemonSet{Spec: appsv1beta1.DaemonSetSpec{UpdateStrategy: appsv1beta1.DaemonSetUpdateStrategy{
+			Type:          appsv1beta1.RollingUpdateDaemonSetStrategyType,
 			RollingUpdate: test.rolling,
 		}}}
 		got, err := dsc.filterDaemonPodsNodeToUpdate(ds, test.hash, test.nodeToDaemonPods)

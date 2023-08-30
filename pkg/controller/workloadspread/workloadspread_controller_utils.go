@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -30,8 +30,8 @@ import (
 )
 
 // NewWorkloadSpreadSubsetCondition creates a new WorkloadSpreadSubset condition.
-func NewWorkloadSpreadSubsetCondition(condType appsv1alpha1.WorkloadSpreadSubsetConditionType, status corev1.ConditionStatus, reason, message string) *appsv1alpha1.WorkloadSpreadSubsetCondition {
-	return &appsv1alpha1.WorkloadSpreadSubsetCondition{
+func NewWorkloadSpreadSubsetCondition(condType appsv1beta1.WorkloadSpreadSubsetConditionType, status corev1.ConditionStatus, reason, message string) *appsv1beta1.WorkloadSpreadSubsetCondition {
+	return &appsv1beta1.WorkloadSpreadSubsetCondition{
 		Type:               condType,
 		Status:             status,
 		LastTransitionTime: metav1.Now(),
@@ -41,7 +41,7 @@ func NewWorkloadSpreadSubsetCondition(condType appsv1alpha1.WorkloadSpreadSubset
 }
 
 // GetWorkloadSpreadSubsetCondition returns the condition with the provided type.
-func GetWorkloadSpreadSubsetCondition(status *appsv1alpha1.WorkloadSpreadSubsetStatus, condType appsv1alpha1.WorkloadSpreadSubsetConditionType) *appsv1alpha1.WorkloadSpreadSubsetCondition {
+func GetWorkloadSpreadSubsetCondition(status *appsv1beta1.WorkloadSpreadSubsetStatus, condType appsv1beta1.WorkloadSpreadSubsetConditionType) *appsv1beta1.WorkloadSpreadSubsetCondition {
 	if status == nil {
 		return nil
 	}
@@ -56,7 +56,7 @@ func GetWorkloadSpreadSubsetCondition(status *appsv1alpha1.WorkloadSpreadSubsetS
 
 // setWorkloadSpreadSubsetCondition updates the WorkloadSpreadSubset to include the provided condition. If the condition that
 // we are about to add already exists and has the same status, reason and message then we are not going to update.
-func setWorkloadSpreadSubsetCondition(status *appsv1alpha1.WorkloadSpreadSubsetStatus, condition *appsv1alpha1.WorkloadSpreadSubsetCondition) {
+func setWorkloadSpreadSubsetCondition(status *appsv1beta1.WorkloadSpreadSubsetStatus, condition *appsv1beta1.WorkloadSpreadSubsetCondition) {
 	if condition == nil {
 		return
 	}
@@ -73,12 +73,12 @@ func setWorkloadSpreadSubsetCondition(status *appsv1alpha1.WorkloadSpreadSubsetS
 }
 
 // removeWorkloadSpreadSubsetCondition removes the WorkloadSpreadSubset condition with the provided type.
-func removeWorkloadSpreadSubsetCondition(status *appsv1alpha1.WorkloadSpreadSubsetStatus, condType appsv1alpha1.WorkloadSpreadSubsetConditionType) {
+func removeWorkloadSpreadSubsetCondition(status *appsv1beta1.WorkloadSpreadSubsetStatus, condType appsv1beta1.WorkloadSpreadSubsetConditionType) {
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
-func filterOutCondition(conditions []appsv1alpha1.WorkloadSpreadSubsetCondition, condType appsv1alpha1.WorkloadSpreadSubsetConditionType) []appsv1alpha1.WorkloadSpreadSubsetCondition {
-	var newConditions []appsv1alpha1.WorkloadSpreadSubsetCondition
+func filterOutCondition(conditions []appsv1beta1.WorkloadSpreadSubsetCondition, condType appsv1beta1.WorkloadSpreadSubsetConditionType) []appsv1beta1.WorkloadSpreadSubsetCondition {
+	var newConditions []appsv1beta1.WorkloadSpreadSubsetCondition
 	for _, c := range conditions {
 		if c.Type == condType {
 			continue
@@ -88,7 +88,7 @@ func filterOutCondition(conditions []appsv1alpha1.WorkloadSpreadSubsetCondition,
 	return newConditions
 }
 
-func matchesSubset(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset, missingReplicas int) (bool, int64, error) {
+func matchesSubset(pod *corev1.Pod, node *corev1.Node, subset *appsv1beta1.WorkloadSpreadSubset, missingReplicas int) (bool, int64, error) {
 	// necessary condition
 	matched, err := matchesSubsetRequiredAndToleration(pod, node, subset)
 	if err != nil || !matched {
@@ -119,7 +119,7 @@ func matchesSubset(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.Work
 	return matched, preferredScore, nil
 }
 
-func podPreferredScore(subset *appsv1alpha1.WorkloadSpreadSubset, pod *corev1.Pod) int64 {
+func podPreferredScore(subset *appsv1beta1.WorkloadSpreadSubset, pod *corev1.Pod) int64 {
 	podBytes, _ := json.Marshal(pod)
 	modified, err := strategicpatch.StrategicMergePatch(podBytes, subset.Patch.Raw, &corev1.Pod{})
 	if err != nil {
@@ -144,7 +144,7 @@ func podPreferredScore(subset *appsv1alpha1.WorkloadSpreadSubset, pod *corev1.Po
 	return 0
 }
 
-func matchesSubsetRequiredAndToleration(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset) (bool, error) {
+func matchesSubsetRequiredAndToleration(pod *corev1.Pod, node *corev1.Node, subset *appsv1beta1.WorkloadSpreadSubset) (bool, error) {
 	// check toleration
 	tolerations := append(pod.Spec.Tolerations, subset.Tolerations...)
 	if _, hasUntoleratedTaint := schedulecorev1.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil); hasUntoleratedTaint {

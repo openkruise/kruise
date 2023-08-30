@@ -19,7 +19,7 @@ package validating
 import (
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -45,7 +45,7 @@ func getCoreVolumes(volumes []v1.Volume, fldPath *field.Path) ([]core.Volume, fi
 	return coreVolumes, allErrs
 }
 
-func isSidecarSetNamespaceOverlapping(c client.Client, origin *appsv1alpha1.SidecarSet, other *appsv1alpha1.SidecarSet) bool {
+func isSidecarSetNamespaceOverlapping(c client.Client, origin *appsv1beta1.SidecarSet, other *appsv1beta1.SidecarSet) bool {
 	originNamespace := origin.Spec.Namespace
 	otherNamespace := other.Spec.Namespace
 	if originNamespace != "" && otherNamespace != "" && originNamespace != otherNamespace {

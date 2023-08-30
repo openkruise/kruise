@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
@@ -51,7 +51,7 @@ type newPodForDS struct {
 	pod        *corev1.Pod
 }
 
-func loadNewPodForDS(ds *appsv1alpha1.DaemonSet) *corev1.Pod {
+func loadNewPodForDS(ds *appsv1beta1.DaemonSet) *corev1.Pod {
 	if val, ok := newPodForDSCache.Load(ds.UID); ok {
 		newPodCache := val.(*newPodForDS)
 		if newPodCache.generation >= ds.Generation {
@@ -98,7 +98,7 @@ func nodeInSameCondition(old []corev1.NodeCondition, cur []corev1.NodeCondition)
 //   - shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
-func nodeShouldRunDaemonPod(node *corev1.Node, ds *appsv1alpha1.DaemonSet) (bool, bool) {
+func nodeShouldRunDaemonPod(node *corev1.Node, ds *appsv1beta1.DaemonSet) (bool, bool) {
 	pod := NewPod(ds, node.Name)
 
 	// If the daemon set specifies a node name, check that it matches with node.Name.
@@ -132,7 +132,7 @@ func shouldIgnoreNodeUpdate(oldNode, curNode corev1.Node) bool {
 	return apiequality.Semantic.DeepEqual(oldNode, curNode)
 }
 
-func getBurstReplicas(ds *appsv1alpha1.DaemonSet) int {
+func getBurstReplicas(ds *appsv1beta1.DaemonSet) int {
 	// Error caught by validation
 	burstReplicas, _ := intstrutil.GetScaledValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(ds.Spec.BurstReplicas, intstrutil.FromInt(BurstReplicas)),
@@ -144,7 +144,7 @@ func getBurstReplicas(ds *appsv1alpha1.DaemonSet) int {
 // GetPodDaemonSets returns a list of DaemonSets that potentially match a pod.
 // Only the one specified in the Pod's ControllerRef will actually manage it.
 // Returns an error only if no matching DaemonSets are found.
-func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha1.DaemonSet, error) {
+func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1beta1.DaemonSet, error) {
 	if len(pod.Labels) == 0 {
 		return nil, fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
 	}
@@ -155,7 +155,7 @@ func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha
 	}
 
 	var selector labels.Selector
-	var daemonSets []*appsv1alpha1.DaemonSet
+	var daemonSets []*appsv1beta1.DaemonSet
 	for _, ds := range dsList {
 		selector, err = kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
@@ -209,7 +209,7 @@ func ContainsReadinessGate(pod *corev1.Pod) bool {
 }
 
 // isDaemonSetCreationProgressively returns true if and only if the progressive annotation is set to true.
-func isDaemonSetCreationProgressively(ds *appsv1alpha1.DaemonSet) bool {
+func isDaemonSetCreationProgressively(ds *appsv1beta1.DaemonSet) bool {
 	return ds.Annotations[ProgressiveCreatePod] == "true"
 }
 
@@ -238,16 +238,16 @@ func GetNodesNeedingPods(newPodsNum, desire, partition int, progressive bool, no
 	return nodesNeedingPods
 }
 
-func keyFunc(ds *appsv1alpha1.DaemonSet) string {
+func keyFunc(ds *appsv1beta1.DaemonSet) string {
 	return fmt.Sprintf("%s/%s", ds.Namespace, ds.Name)
 }
 
-func isDaemonSetPaused(ds *appsv1alpha1.DaemonSet) bool {
+func isDaemonSetPaused(ds *appsv1beta1.DaemonSet) bool {
 	return ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Paused != nil && *ds.Spec.UpdateStrategy.RollingUpdate.Paused
 }
 
 // allowSurge returns true if the daemonset allows more than a single pod on any node.
-func allowSurge(ds *appsv1alpha1.DaemonSet) bool {
+func allowSurge(ds *appsv1beta1.DaemonSet) bool {
 	maxSurge, err := surgeCount(ds, 1)
 	return err == nil && maxSurge > 0
 }
@@ -255,8 +255,8 @@ func allowSurge(ds *appsv1alpha1.DaemonSet) bool {
 // surgeCount returns 0 if surge is not requested, the expected surge number to allow
 // out of numberToSchedule if surge is configured, or an error if the surge percentage
 // requested is invalid.
-func surgeCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, error) {
-	if ds.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateDaemonSetStrategyType {
+func surgeCount(ds *appsv1beta1.DaemonSet, numberToSchedule int) (int, error) {
+	if ds.Spec.UpdateStrategy.Type != appsv1beta1.RollingUpdateDaemonSetStrategyType {
 		return 0, nil
 	}
 	r := ds.Spec.UpdateStrategy.RollingUpdate
@@ -272,8 +272,8 @@ func surgeCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, error) {
 // unavailableCount returns 0 if unavailability is not requested, the expected
 // unavailability number to allow out of numberToSchedule if requested, or an error if
 // the unavailability percentage requested is invalid.
-func unavailableCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, error) {
-	if ds.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateDaemonSetStrategyType {
+func unavailableCount(ds *appsv1beta1.DaemonSet, numberToSchedule int) (int, error) {
+	if ds.Spec.UpdateStrategy.Type != appsv1beta1.RollingUpdateDaemonSetStrategyType {
 		return 0, nil
 	}
 	r := ds.Spec.UpdateStrategy.RollingUpdate
@@ -310,7 +310,7 @@ func getUnscheduledPodsWithoutNode(runningNodesList []*corev1.Node, nodeToDaemon
 // is at most one of each old and new pods, or false if there are multiples. We can skip
 // processing the particular node in those scenarios and let the manage loop prune the
 // excess pods for our next time around.
-func findUpdatedPodsOnNode(ds *appsv1alpha1.DaemonSet, podsOnNode []*corev1.Pod, hash string) (newPod, oldPod *corev1.Pod, ok bool) {
+func findUpdatedPodsOnNode(ds *appsv1beta1.DaemonSet, podsOnNode []*corev1.Pod, hash string) (newPod, oldPod *corev1.Pod, ok bool) {
 	for _, pod := range podsOnNode {
 		if pod.DeletionTimestamp != nil {
 			continue
@@ -336,11 +336,11 @@ func findUpdatedPodsOnNode(ds *appsv1alpha1.DaemonSet, podsOnNode []*corev1.Pod,
 
 // NodeShouldUpdateBySelector checks if the node is selected to upgrade for ds's gray update selector.
 // This function does not check NodeShouldRunDaemonPod
-func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1alpha1.DaemonSet) bool {
+func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1beta1.DaemonSet) bool {
 	switch ds.Spec.UpdateStrategy.Type {
-	case appsv1alpha1.OnDeleteDaemonSetStrategyType:
+	case appsv1beta1.OnDeleteDaemonSetStrategyType:
 		return false
-	case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
+	case appsv1beta1.RollingUpdateDaemonSetStrategyType:
 		if ds.Spec.UpdateStrategy.RollingUpdate == nil || ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
 			return false
 		}

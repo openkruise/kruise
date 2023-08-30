@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -80,7 +80,7 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id1",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:      "id1",
+					appsv1beta1.CloneSetInstanceID:       "id1",
 					apps.ControllerRevisionHashLabelKey:  "revision_abc",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_abc",
 					"foo":                                "bar",
@@ -137,7 +137,7 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id3",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:      "id3",
+					appsv1beta1.CloneSetInstanceID:       "id3",
 					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
 					"foo":                                "bar",
@@ -195,7 +195,7 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id4",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:      "id4",
+					appsv1beta1.CloneSetInstanceID:       "id4",
 					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
 					"foo":                                "bar",
@@ -277,8 +277,8 @@ func TestCreatePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id1",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id1",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id1",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -305,8 +305,8 @@ func TestCreatePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id4",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id4",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id4",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -345,7 +345,7 @@ func TestCreatePods(t *testing.T) {
 }
 
 func TestDeletePods(t *testing.T) {
-	cs := &appsv1alpha1.CloneSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
+	cs := &appsv1beta1.CloneSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	podsToDelete := []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -353,8 +353,8 @@ func TestDeletePods(t *testing.T) {
 				Name:         "foo-id1",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id1",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id1",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -374,8 +374,8 @@ func TestDeletePods(t *testing.T) {
 				Name:         "foo-id3",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id3",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id3",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -397,8 +397,8 @@ func TestDeletePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id1",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id1",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id1",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -417,8 +417,8 @@ func TestDeletePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id2",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id2",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id2",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -437,8 +437,8 @@ func TestDeletePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id3",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id3",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id3",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
@@ -490,12 +490,12 @@ func TestGetOrGenAvailableIDs(t *testing.T) {
 	pods := []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "a"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "a"},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "b"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "b"},
 			},
 		},
 	}
@@ -503,12 +503,12 @@ func TestGetOrGenAvailableIDs(t *testing.T) {
 	pvcs := []*v1.PersistentVolumeClaim{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "b"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "b"},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "c"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "c"},
 			},
 		},
 	}

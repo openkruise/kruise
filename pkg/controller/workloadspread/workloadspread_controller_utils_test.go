@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +38,7 @@ const (
 )
 
 var (
-	matchSubsetDemo = appsv1alpha1.WorkloadSpreadSubset{
+	matchSubsetDemo = appsv1beta1.WorkloadSpreadSubset{
 		Name:        "subset-a",
 		MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
 		Tolerations: []corev1.Toleration{
@@ -137,7 +137,7 @@ func TestMatchSubset(t *testing.T) {
 		name      string
 		isMatch   bool
 		score     int64
-		getSubset func() *appsv1alpha1.WorkloadSpreadSubset
+		getSubset func() *appsv1beta1.WorkloadSpreadSubset
 		getNode   func() *corev1.Node
 		getPod    func() *corev1.Pod
 	}{
@@ -145,7 +145,7 @@ func TestMatchSubset(t *testing.T) {
 			name:    "match=true, Score=10010",
 			isMatch: true,
 			score:   10010,
-			getSubset: func() *appsv1alpha1.WorkloadSpreadSubset {
+			getSubset: func() *appsv1beta1.WorkloadSpreadSubset {
 				return matchSubsetDemo.DeepCopy()
 			},
 			getNode: func() *corev1.Node {
@@ -159,7 +159,7 @@ func TestMatchSubset(t *testing.T) {
 			name:    "match=true, Score=10000",
 			isMatch: true,
 			score:   10000,
-			getSubset: func() *appsv1alpha1.WorkloadSpreadSubset {
+			getSubset: func() *appsv1beta1.WorkloadSpreadSubset {
 				return matchSubsetDemo.DeepCopy()
 			},
 			getNode: func() *corev1.Node {
@@ -176,7 +176,7 @@ func TestMatchSubset(t *testing.T) {
 			name:    "match=true, Score=10, preferred key not match",
 			isMatch: true,
 			score:   10,
-			getSubset: func() *appsv1alpha1.WorkloadSpreadSubset {
+			getSubset: func() *appsv1beta1.WorkloadSpreadSubset {
 				return matchSubsetDemo.DeepCopy()
 			},
 			getNode: func() *corev1.Node {
@@ -192,7 +192,7 @@ func TestMatchSubset(t *testing.T) {
 			name:    "match=false, Score=-1, required key not match",
 			isMatch: false,
 			score:   -1,
-			getSubset: func() *appsv1alpha1.WorkloadSpreadSubset {
+			getSubset: func() *appsv1beta1.WorkloadSpreadSubset {
 				return matchSubsetDemo.DeepCopy()
 			},
 			getNode: func() *corev1.Node {
@@ -208,7 +208,7 @@ func TestMatchSubset(t *testing.T) {
 			name:    "match=false, Score=-1, toleration key not match",
 			isMatch: false,
 			score:   -1,
-			getSubset: func() *appsv1alpha1.WorkloadSpreadSubset {
+			getSubset: func() *appsv1beta1.WorkloadSpreadSubset {
 				subset := matchSubsetDemo.DeepCopy()
 				subset.Tolerations[0].Value = "false"
 				return subsetDemo.DeepCopy()

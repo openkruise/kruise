@@ -19,7 +19,7 @@ package util
 import (
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,7 @@ func TestGlobalCache(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	}
-	ws1Obj := &appsv1alpha1.WorkloadSpread{
+	ws1Obj := &appsv1beta1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps.kruise.io/v1alpha1",
 			Kind:       "WorkloadSpread",
@@ -49,7 +49,7 @@ func TestGlobalCache(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	}
-	ws2Obj := &appsv1alpha1.WorkloadSpread{
+	ws2Obj := &appsv1beta1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps.kruise.io/v1alpha1",
 			Kind:       "WorkloadSpread",
@@ -60,7 +60,7 @@ func TestGlobalCache(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	}
-	ws3Obj := &appsv1alpha1.WorkloadSpread{
+	ws3Obj := &appsv1beta1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps.kruise.io/v1alpha1",
 			Kind:       "WorkloadSpread",
@@ -97,7 +97,7 @@ func TestGlobalCache(t *testing.T) {
 	}
 
 	// delete
-	if err := GlobalCache.Delete(&appsv1alpha1.WorkloadSpread{
+	if err := GlobalCache.Delete(&appsv1beta1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps.kruise.io/v1alpha1",
 			Kind:       "WorkloadSpread",

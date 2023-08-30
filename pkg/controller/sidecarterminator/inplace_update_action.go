@@ -19,7 +19,7 @@ package sidecarterminator
 import (
 	"context"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -85,7 +85,7 @@ func updateSidecarsForInPlaceUpdate(pod *corev1.Pod, sidecars sets.String) (bool
 // getImageFromEnv return the image set in sidecar env
 func getImageFromEnv(container *corev1.Container) string {
 	for i := range container.Env {
-		if container.Env[i].Name == appsv1alpha1.KruiseTerminateSidecarWithImageEnv {
+		if container.Env[i].Name == appsv1beta1.KruiseTerminateSidecarWithImageEnv {
 			return container.Env[i].Value
 		}
 	}

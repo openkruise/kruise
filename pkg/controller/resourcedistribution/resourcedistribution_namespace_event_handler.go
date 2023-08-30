@@ -20,7 +20,7 @@ import (
 	"context"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +33,7 @@ import (
 
 var _ handler.EventHandler = &enqueueRequestForNamespace{}
 
-type matchFunc func(*corev1.Namespace, *appsv1alpha1.ResourceDistribution) (bool, error)
+type matchFunc func(*corev1.Namespace, *appsv1beta1.ResourceDistribution) (bool, error)
 
 type enqueueRequestForNamespace struct {
 	reader client.Reader
@@ -80,9 +80,9 @@ func (p *enqueueRequestForNamespace) updateNamespace(q workqueue.RateLimitingInt
 }
 
 // getNamespaceMatchedResourceDistributions returns all matched ResourceDistributions via labelSelector
-func (p *enqueueRequestForNamespace) getNamespaceMatchedResourceDistributions(namespace *corev1.Namespace, match matchFunc) ([]*appsv1alpha1.ResourceDistribution, error) {
-	var matchedResourceDistributions []*appsv1alpha1.ResourceDistribution
-	ResourceDistributions := &appsv1alpha1.ResourceDistributionList{}
+func (p *enqueueRequestForNamespace) getNamespaceMatchedResourceDistributions(namespace *corev1.Namespace, match matchFunc) ([]*appsv1beta1.ResourceDistribution, error) {
+	var matchedResourceDistributions []*appsv1beta1.ResourceDistribution
+	ResourceDistributions := &appsv1beta1.ResourceDistributionList{}
 	if err := p.reader.List(context.TODO(), ResourceDistributions); err != nil {
 		return nil, err
 	}

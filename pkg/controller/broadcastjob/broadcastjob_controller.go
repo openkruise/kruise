@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
@@ -73,7 +73,7 @@ const (
 var (
 	concurrentReconciles     = 3
 	scheduleBroadcastJobPods bool
-	controllerKind           = appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
+	controllerKind           = appsv1beta1.SchemeGroupVersion.WithKind("BroadcastJob")
 	scaleExpectations        = expectations.NewScaleExpectations()
 )
 
@@ -107,7 +107,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to BroadcastJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.BroadcastJob{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.BroadcastJob{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{
 		enqueueHandler: handler.EnqueueRequestForOwner{
 			IsController: true,
-			OwnerType:    &appsv1alpha1.BroadcastJob{},
+			OwnerType:    &appsv1beta1.BroadcastJob{},
 		},
 	})
 	if err != nil {
@@ -149,7 +149,7 @@ type ReconcileBroadcastJob struct {
 // and what is in the BroadcastJob.Spec
 func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the BroadcastJob instance
-	job := &appsv1alpha1.BroadcastJob{}
+	job := &appsv1beta1.BroadcastJob{}
 	err := r.Get(context.TODO(), request.NamespacedName, job)
 
 	if err != nil {
@@ -195,7 +195,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	if job.Status.StartTime == nil {
 		now := metav1.Now()
 		job.Status.StartTime = &now
-		if job.Spec.CompletionPolicy.Type == appsv1alpha1.Always &&
+		if job.Spec.CompletionPolicy.Type == appsv1beta1.Always &&
 			job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil {
 			klog.Infof("Job %s has ActiveDeadlineSeconds, will resync after %d seconds",
 				job.Name, *job.Spec.CompletionPolicy.ActiveDeadlineSeconds)
@@ -204,7 +204,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	}
 
 	if job.Status.Phase == "" {
-		job.Status.Phase = appsv1alpha1.PhaseRunning
+		job.Status.Phase = appsv1beta1.PhaseRunning
 	}
 
 	// list pods for this job
@@ -254,16 +254,16 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	job.Status.Succeeded = succeeded
 	job.Status.Desired = desired
 
-	if job.Status.Phase == appsv1alpha1.PhaseFailed {
+	if job.Status.Phase == appsv1beta1.PhaseFailed {
 		return reconcile.Result{RequeueAfter: requeueAfter}, r.updateJobStatus(request, job)
 	}
 
-	if job.Spec.Paused && (job.Status.Phase == appsv1alpha1.PhaseRunning || job.Status.Phase == appsv1alpha1.PhasePaused) {
-		job.Status.Phase = appsv1alpha1.PhasePaused
+	if job.Spec.Paused && (job.Status.Phase == appsv1beta1.PhaseRunning || job.Status.Phase == appsv1beta1.PhasePaused) {
+		job.Status.Phase = appsv1beta1.PhasePaused
 		return reconcile.Result{RequeueAfter: requeueAfter}, r.updateJobStatus(request, job)
 	}
-	if !job.Spec.Paused && job.Status.Phase == appsv1alpha1.PhasePaused {
-		job.Status.Phase = appsv1alpha1.PhaseRunning
+	if !job.Spec.Paused && job.Status.Phase == appsv1beta1.PhasePaused {
+		job.Status.Phase = appsv1beta1.PhaseRunning
 		r.recorder.Event(job, corev1.EventTypeNormal, "Continue", "continue to process job")
 	}
 
@@ -271,16 +271,16 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	var failureReason, failureMessage string
 	if failed > 0 {
 		switch job.Spec.FailurePolicy.Type {
-		case appsv1alpha1.FailurePolicyTypePause:
+		case appsv1beta1.FailurePolicyTypePause:
 			r.recorder.Event(job, corev1.EventTypeWarning, "Paused", "job is paused, due to failed pod")
 			job.Spec.Paused = true
-			job.Status.Phase = appsv1alpha1.PhasePaused
+			job.Status.Phase = appsv1beta1.PhasePaused
 			return reconcile.Result{RequeueAfter: requeueAfter}, r.updateJobStatus(request, job)
-		case appsv1alpha1.FailurePolicyTypeFailFast:
+		case appsv1beta1.FailurePolicyTypeFailFast:
 			// mark the job is failed
 			jobFailed, failureReason, failureMessage = true, "failed pod is found", "failure policy is FailurePolicyTypeFailFast and failed pod is found"
 			r.recorder.Event(job, corev1.EventTypeWarning, failureReason, fmt.Sprintf("%s: %d pods succeeded, %d pods failed", failureMessage, succeeded, failed))
-		case appsv1alpha1.FailurePolicyTypeContinue:
+		case appsv1beta1.FailurePolicyTypeContinue:
 		}
 	}
 
@@ -294,8 +294,8 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 		if err != nil {
 			klog.Errorf("failed to deleteJobPods for job %s,", job.Name)
 		}
-		job.Status.Phase = appsv1alpha1.PhaseFailed
-		requeueAfter = finishJob(job, appsv1alpha1.JobFailed, failureMessage)
+		job.Status.Phase = appsv1beta1.PhaseFailed
+		requeueAfter = finishJob(job, appsv1beta1.JobFailed, failureMessage)
 		r.recorder.Event(job, corev1.EventTypeWarning, failureReason,
 			fmt.Sprintf("%s: %d pods succeeded, %d pods failed", failureMessage, succeeded, failed))
 	} else {
@@ -318,8 +318,8 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 
 		if isJobComplete(job, desiredNodes) {
 			message := fmt.Sprintf("Job completed, %d pods succeeded, %d pods failed", succeeded, failed)
-			job.Status.Phase = appsv1alpha1.PhaseCompleted
-			requeueAfter = finishJob(job, appsv1alpha1.JobComplete, message)
+			job.Status.Phase = appsv1beta1.PhaseCompleted
+			requeueAfter = finishJob(job, appsv1beta1.JobComplete, message)
 			r.recorder.Event(job, corev1.EventTypeNormal, "JobComplete",
 				fmt.Sprintf("Job %s/%s is completed, %d pods succeeded, %d pods failed", job.Namespace, job.Name, succeeded, failed))
 		}
@@ -336,7 +336,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	return reconcile.Result{RequeueAfter: requeueAfter}, err
 }
 
-func (r *ReconcileBroadcastJob) updateJobStatus(request reconcile.Request, job *appsv1alpha1.BroadcastJob) error {
+func (r *ReconcileBroadcastJob) updateJobStatus(request reconcile.Request, job *appsv1beta1.BroadcastJob) error {
 	klog.Infof("Updating job %s status %#v", job.Name, job.Status)
 	jobCopy := job.DeepCopy()
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -345,7 +345,7 @@ func (r *ReconcileBroadcastJob) updateJobStatus(request reconcile.Request, job *
 			return nil
 		}
 
-		updated := &appsv1alpha1.BroadcastJob{}
+		updated := &appsv1beta1.BroadcastJob{}
 		err = r.Get(context.TODO(), request.NamespacedName, updated)
 		if err == nil {
 			jobCopy = updated
@@ -358,7 +358,7 @@ func (r *ReconcileBroadcastJob) updateJobStatus(request reconcile.Request, job *
 }
 
 // finishJob appends the condition to JobStatus, and sets ttl if needed
-func finishJob(job *appsv1alpha1.BroadcastJob, conditionType appsv1alpha1.JobConditionType, message string) time.Duration {
+func finishJob(job *appsv1beta1.BroadcastJob, conditionType appsv1beta1.JobConditionType, message string) time.Duration {
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(conditionType, string(conditionType), message))
 	klog.Infof("job %s/%s is %s: %s", job.Namespace, job.Name, string(conditionType), message)
 
@@ -377,7 +377,7 @@ func finishJob(job *appsv1alpha1.BroadcastJob, conditionType appsv1alpha1.JobCon
 
 // addLabelToPodTemplate will add the pre-defined labels to the pod template so that the pods created will
 // have these labels associated. The labels can be used for querying pods for a specific job
-func addLabelToPodTemplate(job *appsv1alpha1.BroadcastJob) {
+func addLabelToPodTemplate(job *appsv1beta1.BroadcastJob) {
 	if job.Spec.Template.Labels == nil {
 		job.Spec.Template.Labels = make(map[string]string)
 	}
@@ -386,7 +386,7 @@ func addLabelToPodTemplate(job *appsv1alpha1.BroadcastJob) {
 	}
 }
 
-func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
+func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1beta1.BroadcastJob,
 	restNodesToRunPod []*corev1.Node, active, desired int32) (int32, error) {
 
 	// max concurrent running pods
@@ -474,8 +474,8 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 }
 
 // isJobComplete returns true if all pods on all desiredNodes are either succeeded or failed or deletionTimestamp !=nil.
-func isJobComplete(job *appsv1alpha1.BroadcastJob, desiredNodes map[string]*corev1.Pod) bool {
-	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
+func isJobComplete(job *appsv1beta1.BroadcastJob, desiredNodes map[string]*corev1.Pod) bool {
+	if job.Spec.CompletionPolicy.Type == appsv1beta1.Never {
 		// the job will not terminate, if the the completion policy is never
 		return false
 	}
@@ -494,8 +494,8 @@ func isJobComplete(job *appsv1alpha1.BroadcastJob, desiredNodes map[string]*core
 }
 
 // isJobFailed checks if the job CompletionPolicy is not Never, and it has past ActiveDeadlineSeconds.
-func isJobFailed(job *appsv1alpha1.BroadcastJob, pods []*corev1.Pod) (bool, string, string) {
-	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
+func isJobFailed(job *appsv1beta1.BroadcastJob, pods []*corev1.Pod) (bool, string, string) {
+	if job.Spec.CompletionPolicy.Type == appsv1beta1.Never {
 		return false, "", ""
 	}
 	jobFailed := false
@@ -513,7 +513,7 @@ func isJobFailed(job *appsv1alpha1.BroadcastJob, pods []*corev1.Pod) (bool, stri
 // * desiredNodes : the nodes desired to run pods including node with or without running pods
 // * restNodesToRunPod:  the nodes do not have pods running yet, excluding the nodes not satisfying constraints such as affinity, taints
 // * podsToDelete: the pods that do not satisfy the node constraint any more
-func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
+func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1beta1.BroadcastJob,
 	existingNodeToPodMap map[string]*corev1.Pod) (map[string]*corev1.Pod, []*corev1.Node, []*corev1.Pod) {
 
 	var podsToDelete []*corev1.Pod
@@ -550,7 +550,7 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 
 // getNodeToPodMap scans the pods and construct a map : nodeName -> pod.
 // Ideally, each node should have only 1 pod. Else, something is wrong.
-func (r *ReconcileBroadcastJob) getNodeToPodMap(pods []*corev1.Pod, job *appsv1alpha1.BroadcastJob) map[string]*corev1.Pod {
+func (r *ReconcileBroadcastJob) getNodeToPodMap(pods []*corev1.Pod, job *appsv1beta1.BroadcastJob) map[string]*corev1.Pod {
 	nodeToPodMap := make(map[string]*corev1.Pod)
 	for i, pod := range pods {
 		nodeName := getAssignedNode(pod)
@@ -565,7 +565,7 @@ func (r *ReconcileBroadcastJob) getNodeToPodMap(pods []*corev1.Pod, job *appsv1a
 	return nodeToPodMap
 }
 
-func labelsAsMap(job *appsv1alpha1.BroadcastJob) map[string]string {
+func labelsAsMap(job *appsv1beta1.BroadcastJob) map[string]string {
 	return map[string]string{
 		JobNameLabelKey:       job.Name,
 		ControllerUIDLabelKey: string(job.UID),
@@ -635,7 +635,7 @@ func logPredicateFailedReason(node *corev1.Node, status *framework.Status) (bool
 }
 
 // NewMockPod creates a new mock pod
-func NewMockPod(job *appsv1alpha1.BroadcastJob, nodeName string) *corev1.Pod {
+func NewMockPod(job *appsv1beta1.BroadcastJob, nodeName string) *corev1.Pod {
 	newPod := &corev1.Pod{Spec: job.Spec.Template.Spec, ObjectMeta: job.Spec.Template.ObjectMeta}
 	newPod.Namespace = job.Namespace
 	newPod.Spec.NodeName = nodeName
@@ -643,7 +643,7 @@ func NewMockPod(job *appsv1alpha1.BroadcastJob, nodeName string) *corev1.Pod {
 }
 
 // deleteJobPods delete the pods concurrently and wait for them to be done
-func (r *ReconcileBroadcastJob) deleteJobPods(job *appsv1alpha1.BroadcastJob, pods []*corev1.Pod, failed, active int32) (int32, int32, error) {
+func (r *ReconcileBroadcastJob) deleteJobPods(job *appsv1beta1.BroadcastJob, pods []*corev1.Pod, failed, active int32) (int32, int32, error) {
 	errCh := make(chan error, len(pods))
 	wait := sync.WaitGroup{}
 	nbPods := len(pods)

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +34,7 @@ var (
 	hotUpgradeEmptyImage   = "hotupgrade:empty"
 	hotUpgradeEmptyImageID = "docker-pullable://hotupgrade@sha256:91873971hhf0981293480lhhhgsfgs09809085024lddd092jjj44k4h4vv44"
 
-	sidecarSetHotUpgrade = &appsv1alpha1.SidecarSet{
+	sidecarSetHotUpgrade = &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Generation: 123,
 			Annotations: map[string]string{
@@ -45,23 +45,23 @@ var (
 			ResourceVersion: "22",
 			Labels:          map[string]string{},
 		},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name:  "test-sidecar",
 						Image: "test-image:v2",
 					},
-					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+					UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
 						HotUpgradeEmptyImage: hotUpgradeEmptyImage,
-						UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+						UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 					},
 				},
 			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "nginx"},
 			},
-			UpdateStrategy:       appsv1alpha1.SidecarSetUpdateStrategy{},
+			UpdateStrategy:       appsv1beta1.SidecarSetUpdateStrategy{},
 			RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 		},
 	}
@@ -167,13 +167,13 @@ func TestUpdateHotUpgradeSidecar(t *testing.T) {
 	testUpdateHotUpgradeSidecar(t, hotUpgradeEmptyImage, sidecarSetInput, handlers)
 }
 
-func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, sidecarSetInput *appsv1alpha1.SidecarSet, handlers map[string]HandlePod) {
+func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, sidecarSetInput *appsv1beta1.SidecarSet, handlers map[string]HandlePod) {
 	podInput := podHotUpgrade.DeepCopy()
 	podInput.Name = "liheng-test"
 	cases := []struct {
 		name          string
 		getPods       func() []*corev1.Pod
-		getSidecarset func() *appsv1alpha1.SidecarSet
+		getSidecarset func() *appsv1beta1.SidecarSet
 		// container.name -> infos []string
 		expectedInfo map[string][]string
 		// MatchedPods, UpdatedPods, ReadyPods, AvailablePods, UnavailablePods
@@ -187,7 +187,7 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[string][]string{
@@ -204,7 +204,7 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[string][]string{
@@ -218,7 +218,7 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 			getPods: func() []*corev1.Pod {
 				return []*corev1.Pod{podInput.DeepCopy()}
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[string][]string{
@@ -232,7 +232,7 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 			getPods: func() []*corev1.Pod {
 				return []*corev1.Pod{podInput.DeepCopy()}
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[string][]string{

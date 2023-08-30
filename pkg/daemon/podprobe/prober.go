@@ -22,7 +22,7 @@ import (
 	"io"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -49,18 +49,18 @@ func newProber(runtimeService criapi.RuntimeService) *prober {
 }
 
 // probe probes the container.
-func (pb *prober) probe(p *appsv1alpha1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string) (appsv1alpha1.ProbeState, string, error) {
+func (pb *prober) probe(p *appsv1beta1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string) (appsv1beta1.ProbeState, string, error) {
 	result, msg, err := pb.runProbe(p, container, containerID)
 	if bytes.Count([]byte(msg), nil)-1 > maxProbeMessageLength {
 		msg = msg[:maxProbeMessageLength]
 	}
 	if err != nil || (result != probe.Success && result != probe.Warning) {
-		return appsv1alpha1.ProbeFailed, msg, err
+		return appsv1beta1.ProbeFailed, msg, err
 	}
-	return appsv1alpha1.ProbeSucceeded, msg, nil
+	return appsv1beta1.ProbeSucceeded, msg, nil
 }
 
-func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string) (probe.Result, string, error) {
+func (pb *prober) runProbe(p *appsv1beta1.ContainerProbeSpec, container *runtimeapi.ContainerStatus, containerID string) (probe.Result, string, error) {
 	timeSecond := p.TimeoutSeconds
 	if timeSecond <= 0 {
 		timeSecond = 1

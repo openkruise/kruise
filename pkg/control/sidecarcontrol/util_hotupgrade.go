@@ -22,7 +22,7 @@ import (
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -59,8 +59,8 @@ func GetPodSidecarSetVersionAltAnnotation(cName string) string {
 }
 
 // IsHotUpgradeContainer indicates whether sidecar container update strategy is HotUpdate
-func IsHotUpgradeContainer(sidecarContainer *appsv1alpha1.SidecarContainer) bool {
-	return sidecarContainer.UpgradeStrategy.UpgradeType == appsv1alpha1.SidecarContainerHotUpgrade
+func IsHotUpgradeContainer(sidecarContainer *appsv1beta1.SidecarContainer) bool {
+	return sidecarContainer.UpgradeStrategy.UpgradeType == appsv1beta1.SidecarContainerHotUpgrade
 }
 
 // GetPodHotUpgradeInfoInAnnotations checks which hot upgrade sidecar container is working now
@@ -102,7 +102,7 @@ func GetPodHotUpgradeContainers(sidecarName string, pod *corev1.Pod) (workContai
 }
 
 // para1: nameToUpgrade, para2: otherContainer
-func findContainerToHotUpgrade(sidecarContainer *appsv1alpha1.SidecarContainer, pod *corev1.Pod, control SidecarControl) (string, string) {
+func findContainerToHotUpgrade(sidecarContainer *appsv1beta1.SidecarContainer, pod *corev1.Pod, control SidecarControl) (string, string) {
 	containerInPods := make(map[string]corev1.Container)
 	for _, containerInPod := range pod.Spec.Containers {
 		containerInPods[containerInPod.Name] = containerInPod

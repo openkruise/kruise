@@ -22,7 +22,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +39,7 @@ const (
 
 var (
 	registerOnce sync.Once
-	apiGVStr     = appsv1alpha1.GroupVersion.String()
+	apiGVStr     = appsv1beta1.GroupVersion.String()
 )
 
 var ownerIndexFunc = func(obj client.Object) []string {
@@ -63,7 +63,7 @@ func RegisterFieldIndexes(c cache.Cache) error {
 			return
 		}
 		// ImagePullJob ownerReference
-		if err = c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+		if err = c.IndexField(context.TODO(), &appsv1beta1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
 
@@ -76,13 +76,13 @@ func RegisterFieldIndexes(c cache.Cache) error {
 			return
 		}
 		// broadcastjob owner
-		if utildiscovery.DiscoverObject(&appsv1alpha1.BroadcastJob{}) {
+		if utildiscovery.DiscoverObject(&appsv1beta1.BroadcastJob{}) {
 			if err = indexBroadcastCronJob(c); err != nil {
 				return
 			}
 		}
 		// imagepulljob active
-		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
+		if utildiscovery.DiscoverObject(&appsv1beta1.ImagePullJob{}) {
 			if err = indexImagePullJobActive(c); err != nil {
 				return
 			}
@@ -114,7 +114,7 @@ func indexJob(c cache.Cache) error {
 		}
 
 		// ...make sure it's a AdvancedCronJob...
-		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+		if owner.APIVersion != apiGVStr || owner.Kind != appsv1beta1.AdvancedCronJobKind {
 			return nil
 		}
 
@@ -124,16 +124,16 @@ func indexJob(c cache.Cache) error {
 }
 
 func indexBroadcastCronJob(c cache.Cache) error {
-	return c.IndexField(context.TODO(), &appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
+	return c.IndexField(context.TODO(), &appsv1beta1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
-		job := rawObj.(*appsv1alpha1.BroadcastJob)
+		job := rawObj.(*appsv1beta1.BroadcastJob)
 		owner := metav1.GetControllerOf(job)
 		if owner == nil {
 			return nil
 		}
 
 		// ...make sure it's a AdvancedCronJob...
-		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+		if owner.APIVersion != apiGVStr || owner.Kind != appsv1beta1.AdvancedCronJobKind {
 			return nil
 		}
 
@@ -143,8 +143,8 @@ func indexBroadcastCronJob(c cache.Cache) error {
 }
 
 func indexImagePullJobActive(c cache.Cache) error {
-	return c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
-		obj := rawObj.(*appsv1alpha1.ImagePullJob)
+	return c.IndexField(context.TODO(), &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
+		obj := rawObj.(*appsv1beta1.ImagePullJob)
 		isActive := "false"
 		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
 			isActive = "true"

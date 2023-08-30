@@ -22,9 +22,8 @@ import (
 	"fmt"
 	"time"
 
-	kruiseappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/features"
@@ -64,7 +63,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = policyv1alpha1.SchemeGroupVersion.WithKind("PodUnavailableBudget")
+	controllerKind       = policyv1beta1.SchemeGroupVersion.WithKind("PodUnavailableBudget")
 )
 
 const (
@@ -119,7 +118,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to PodUnavailableBudget
-	err = c.Watch(&source.Kind{Type: &policyv1alpha1.PodUnavailableBudget{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &policyv1beta1.PodUnavailableBudget{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -164,10 +163,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// CloneSet
-	if err = c.Watch(&source.Kind{Type: &kruiseappsv1alpha1.CloneSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(&source.Kind{Type: &kruiseappsv1beta1.CloneSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
-			new := e.ObjectNew.(*kruiseappsv1alpha1.CloneSet)
+			old := e.ObjectOld.(*kruiseappsv1beta1.CloneSet)
+			new := e.ObjectNew.(*kruiseappsv1beta1.CloneSet)
 			return *old.Spec.Replicas != *new.Spec.Replicas
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
@@ -214,13 +213,13 @@ type ReconcilePodUnavailableBudget struct {
 // pkg/controller/cloneset/cloneset_controller.go Watch for changes to CloneSet
 func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Fetch the PodUnavailableBudget instance
-	pub := &policyv1alpha1.PodUnavailableBudget{}
+	pub := &policyv1beta1.PodUnavailableBudget{}
 	err := r.Get(context.TODO(), req.NamespacedName, pub)
 	if (err != nil && errors.IsNotFound(err)) || (err == nil && !pub.DeletionTimestamp.IsZero()) {
 		klog.V(3).Infof("pub(%s/%s) is Deletion in this time", req.Namespace, req.Name)
-		if cacheErr := util.GlobalCache.Delete(&policyv1alpha1.PodUnavailableBudget{
+		if cacheErr := util.GlobalCache.Delete(&policyv1beta1.PodUnavailableBudget{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: policyv1alpha1.GroupVersion.String(),
+				APIVersion: policyv1beta1.GroupVersion.String(),
 				Kind:       controllerKind.Kind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -249,7 +248,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
-func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1alpha1.PodUnavailableBudget) (*time.Time, error) {
+func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1beta1.PodUnavailableBudget) (*time.Time, error) {
 	currentTime := time.Now()
 	pods, expectedCount, err := r.pubControl.GetPodsForPub(pub)
 	if err != nil {
@@ -275,7 +274,7 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	// for debug
 	var conflictTimes int
 	var costOfGet, costOfUpdate time.Duration
-	var pubClone *policyv1alpha1.PodUnavailableBudget
+	var pubClone *policyv1beta1.PodUnavailableBudget
 	refresh := false
 	var recheckTime *time.Time
 	err = retry.RetryOnConflict(ConflictRetry, func() error {
@@ -285,7 +284,7 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 		start := time.Now()
 		if refresh {
 			// fetch pub from etcd
-			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1alpha1().
+			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1beta1().
 				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
 			if err != nil {
 				klog.Errorf("Get PodUnavailableBudget(%s/%s) failed from etcd: %s", pub.Namespace, pub.Name, err.Error())
@@ -297,12 +296,12 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 			if err != nil {
 				klog.Errorf("Get PodUnavailableBudget(%s/%s) cache failed: %s", pub.Namespace, pub.Name, err.Error())
 			}
-			if localCached, ok := item.(*policyv1alpha1.PodUnavailableBudget); ok {
+			if localCached, ok := item.(*policyv1beta1.PodUnavailableBudget); ok {
 				pubClone = localCached.DeepCopy()
 			} else {
 				pubClone = pub.DeepCopy()
 			}
-			informerCached := &policyv1alpha1.PodUnavailableBudget{}
+			informerCached := &policyv1beta1.PodUnavailableBudget{}
 			if err := r.Get(context.TODO(), types.NamespacedName{Namespace: pub.Namespace,
 				Name: pub.Name}, informerCached); err == nil {
 				var localRV, informerRV int64
@@ -340,7 +339,7 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	return recheckTime, err
 }
 
-func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) error {
+func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *policyv1beta1.PodUnavailableBudget, pods []*corev1.Pod) error {
 	var updatedPods []*corev1.Pod
 	for i := range pods {
 		if pods[i].Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
@@ -387,7 +386,7 @@ func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[s
 	return
 }
 
-func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1alpha1.PodUnavailableBudget, expectedCount int32) (desiredAvailable int32, err error) {
+func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1beta1.PodUnavailableBudget, expectedCount int32) (desiredAvailable int32, err error) {
 	if pub.Spec.MaxUnavailable != nil {
 		var maxUnavailable int
 		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(pub.Spec.MaxUnavailable, int(expectedCount), true)
@@ -414,7 +413,7 @@ func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1a
 	return
 }
 
-func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []*corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, currentTime time.Time) (
+func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []*corev1.Pod, pub *policyv1beta1.PodUnavailableBudget, currentTime time.Time) (
 	// disruptedPods, unavailablePods, recheckTime
 	map[string]metav1.Time, map[string]metav1.Time, *time.Time) {
 
@@ -467,7 +466,7 @@ func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []
 	return resultDisruptedPods, resultUnavailablePods, recheckTime
 }
 
-func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodUnavailableBudget, currentAvailable, desiredAvailable, expectedCount int32,
+func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1beta1.PodUnavailableBudget, currentAvailable, desiredAvailable, expectedCount int32,
 	disruptedPods, unavailablePods map[string]metav1.Time) error {
 
 	unavailableAllowed := currentAvailable - desiredAvailable
@@ -485,7 +484,7 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 		return nil
 	}
 
-	pub.Status = policyv1alpha1.PodUnavailableBudgetStatus{
+	pub.Status = policyv1beta1.PodUnavailableBudgetStatus{
 		CurrentAvailable:   currentAvailable,
 		DesiredAvailable:   desiredAvailable,
 		TotalReplicas:      expectedCount,

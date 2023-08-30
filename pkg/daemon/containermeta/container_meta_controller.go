@@ -28,7 +28,7 @@ import (
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
@@ -142,7 +142,7 @@ func eventFilter(oldPod, newPod *v1.Pod) bool {
 	var ownedByKruise bool
 	if owner := metav1.GetControllerOf(newPod); owner != nil {
 		if gv, err := schema.ParseGroupVersion(owner.APIVersion); err == nil {
-			ownedByKruise = gv.Group == appsv1alpha1.GroupVersion.Group
+			ownedByKruise = gv.Group == appsv1beta1.GroupVersion.Group
 		}
 	}
 	_, injectedBySidecarSet := newPod.Annotations[sidecarcontrol.SidecarSetHashAnnotation]

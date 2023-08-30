@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -33,12 +33,12 @@ import (
 func TestInjectHotUpgradeSidecar(t *testing.T) {
 	sidecarSetIn := sidecarSet1.DeepCopy()
 	sidecarSetIn.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = "without-c4k2dbb95d"
-	sidecarSetIn.Spec.Containers[0].UpgradeStrategy.UpgradeType = appsv1alpha1.SidecarContainerHotUpgrade
+	sidecarSetIn.Spec.Containers[0].UpgradeStrategy.UpgradeType = appsv1beta1.SidecarContainerHotUpgrade
 	sidecarSetIn.Spec.Containers[0].UpgradeStrategy.HotUpgradeEmptyImage = "busy:hotupgrade-empty"
 	testInjectHotUpgradeSidecar(t, sidecarSetIn)
 }
 
-func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
+func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1beta1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()

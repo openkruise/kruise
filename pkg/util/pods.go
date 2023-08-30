@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -262,7 +262,7 @@ func IsPodOwnedByKruise(pod *v1.Pod) bool {
 		return false
 	}
 	gv, _ := schema.ParseGroupVersion(ownerRef.APIVersion)
-	return gv.Group == appsv1alpha1.GroupVersion.Group
+	return gv.Group == appsv1beta1.GroupVersion.Group
 }
 
 func InjectReadinessGateToPod(pod *v1.Pod, conditionType v1.PodConditionType) {

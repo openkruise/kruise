@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util"
@@ -47,8 +47,8 @@ const (
 )
 
 type puller interface {
-	Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) error
-	GetStatus(imageName string) *appsv1alpha1.ImageStatus
+	Sync(obj *appsv1beta1.NodeImage, ref *v1.ObjectReference) error
+	GetStatus(imageName string) *appsv1beta1.ImageStatus
 }
 
 type realPuller struct {
@@ -73,7 +73,7 @@ func newRealPuller(runtime runtimeimage.ImageService, secretManager daemonutil.S
 }
 
 // Sync all images to pull
-func (p *realPuller) Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) error {
+func (p *realPuller) Sync(obj *appsv1beta1.NodeImage, ref *v1.ObjectReference) error {
 	klog.V(5).Infof("sync puller for spec %v", util.DumpJSON(obj))
 
 	p.Lock()
@@ -95,7 +95,7 @@ func (p *realPuller) Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) 
 			pool = newRealWorkerPool(imageName, p.runtime, p.secretManager, p.eventRecorder)
 			p.workerPools[imageName] = pool
 		}
-		var imageStatus *appsv1alpha1.ImageStatus
+		var imageStatus *appsv1beta1.ImageStatus
 		if s, ok := obj.Status.ImageStatuses[imageName]; ok {
 			imageStatus = &s
 		}
@@ -106,7 +106,7 @@ func (p *realPuller) Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) 
 	return ret
 }
 
-func (p *realPuller) GetStatus(imageName string) *appsv1alpha1.ImageStatus {
+func (p *realPuller) GetStatus(imageName string) *appsv1beta1.ImageStatus {
 	p.Lock()
 	defer p.Unlock()
 	pool, ok := p.workerPools[imageName]
@@ -117,12 +117,12 @@ func (p *realPuller) GetStatus(imageName string) *appsv1alpha1.ImageStatus {
 }
 
 type imageStatusUpdater interface {
-	UpdateStatus(*appsv1alpha1.ImageTagStatus)
+	UpdateStatus(*appsv1beta1.ImageTagStatus)
 }
 
 type workerPool interface {
-	Sync(spec *appsv1alpha1.ImageSpec, status *appsv1alpha1.ImageStatus, ref *v1.ObjectReference) error
-	GetStatus() *appsv1alpha1.ImageStatus
+	Sync(spec *appsv1beta1.ImageSpec, status *appsv1beta1.ImageStatus, ref *v1.ObjectReference) error
+	GetStatus() *appsv1beta1.ImageStatus
 	Stop()
 }
 
@@ -134,10 +134,10 @@ type realWorkerPool struct {
 	secretManager daemonutil.SecretManager
 	eventRecorder record.EventRecorder
 	pullWorkers   map[string]*pullWorker
-	tagStatuses   map[string]*appsv1alpha1.ImageTagStatus
+	tagStatuses   map[string]*appsv1beta1.ImageTagStatus
 	active        bool
 
-	lastSyncSpec *appsv1alpha1.ImageSpec
+	lastSyncSpec *appsv1beta1.ImageSpec
 }
 
 func newRealWorkerPool(name string, runtime runtimeimage.ImageService, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder) *realWorkerPool {
@@ -147,13 +147,13 @@ func newRealWorkerPool(name string, runtime runtimeimage.ImageService, secretMan
 		secretManager: secretManager,
 		eventRecorder: eventRecorder,
 		pullWorkers:   make(map[string]*pullWorker),
-		tagStatuses:   make(map[string]*appsv1alpha1.ImageTagStatus),
+		tagStatuses:   make(map[string]*appsv1beta1.ImageTagStatus),
 		active:        true,
 	}
 	return w
 }
 
-func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, status *appsv1alpha1.ImageStatus, ref *v1.ObjectReference) error {
+func (w *realWorkerPool) Sync(spec *appsv1beta1.ImageSpec, status *appsv1beta1.ImageStatus, ref *v1.ObjectReference) error {
 	if !w.active {
 		klog.Infof("workerPool %v has exited", w.name)
 		return nil
@@ -172,9 +172,9 @@ func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, status *appsv1alpha1
 	w.lastSyncSpec = spec.DeepCopy()
 
 	allTags := sets.NewString()
-	activeTags := make(map[string]appsv1alpha1.ImageTagSpec)
+	activeTags := make(map[string]appsv1beta1.ImageTagSpec)
 	for _, tagSpec := range spec.Tags {
-		var tagStatus *appsv1alpha1.ImageTagStatus
+		var tagStatus *appsv1beta1.ImageTagStatus
 		if status != nil {
 			for i := range status.Tags {
 				if status.Tags[i].Tag == tagSpec.Tag && status.Tags[i].Version == tagSpec.Version {
@@ -222,7 +222,7 @@ func (w *realWorkerPool) Sync(spec *appsv1alpha1.ImageSpec, status *appsv1alpha1
 	return nil
 }
 
-func (w *realWorkerPool) GetStatus() *appsv1alpha1.ImageStatus {
+func (w *realWorkerPool) GetStatus() *appsv1beta1.ImageStatus {
 	w.Lock()
 	defer w.Unlock()
 	if w.lastSyncSpec == nil {
@@ -230,7 +230,7 @@ func (w *realWorkerPool) GetStatus() *appsv1alpha1.ImageStatus {
 	}
 
 	// Keep the order of spec unchanged
-	var tagsStatus []appsv1alpha1.ImageTagStatus
+	var tagsStatus []appsv1beta1.ImageTagStatus
 	for _, tagSpec := range w.lastSyncSpec.Tags {
 		if status, ok := w.tagStatuses[tagSpec.Tag]; ok {
 			tagsStatus = append(tagsStatus, *status)
@@ -239,7 +239,7 @@ func (w *realWorkerPool) GetStatus() *appsv1alpha1.ImageStatus {
 	if tagsStatus == nil {
 		return nil
 	}
-	return &appsv1alpha1.ImageStatus{Tags: tagsStatus}
+	return &appsv1beta1.ImageStatus{Tags: tagsStatus}
 }
 
 func (w *realWorkerPool) Stop() {
@@ -253,7 +253,7 @@ func (w *realWorkerPool) Stop() {
 	}
 }
 
-func (w *realWorkerPool) UpdateStatus(status *appsv1alpha1.ImageTagStatus) {
+func (w *realWorkerPool) UpdateStatus(status *appsv1beta1.ImageTagStatus) {
 	w.Lock()
 	defer w.Unlock()
 	if !w.active {
@@ -262,7 +262,7 @@ func (w *realWorkerPool) UpdateStatus(status *appsv1alpha1.ImageTagStatus) {
 	w.tagStatuses[status.Tag] = status
 }
 
-func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig *appsv1alpha1.SandboxConfig, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
+func newPullWorker(name string, tagSpec appsv1beta1.ImageTagSpec, sandboxConfig *appsv1beta1.SandboxConfig, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
 	o := &pullWorker{
 		name:          name,
 		tagSpec:       tagSpec,
@@ -283,8 +283,8 @@ type pullWorker struct {
 	sync.Mutex
 
 	name          string
-	tagSpec       appsv1alpha1.ImageTagSpec
-	sandboxConfig *appsv1alpha1.SandboxConfig
+	tagSpec       appsv1beta1.ImageTagSpec
+	sandboxConfig *appsv1beta1.SandboxConfig
 	secrets       []v1.Secret
 	runtime       runtimeimage.ImageService
 	statusUpdater imageStatusUpdater
@@ -318,9 +318,9 @@ func (w *pullWorker) Run() {
 
 	tag := w.tagSpec.Tag
 	startTime := metav1.Now()
-	newStatus := &appsv1alpha1.ImageTagStatus{
+	newStatus := &appsv1beta1.ImageTagStatus{
 		Tag:       tag,
-		Phase:     appsv1alpha1.ImagePhasePulling,
+		Phase:     appsv1beta1.ImagePhasePulling,
 		StartTime: &startTime,
 		Version:   w.tagSpec.Version,
 	}
@@ -333,7 +333,7 @@ func (w *pullWorker) Run() {
 
 	defer func() {
 		cost := time.Since(startTime.Time)
-		if newStatus.Phase == appsv1alpha1.ImagePhaseFailed {
+		if newStatus.Phase == appsv1beta1.ImagePhaseFailed {
 			klog.Warningf("Worker failed to pull image %s:%s, cost %v, err: %v", w.name, tag, cost, newStatus.Message)
 		} else {
 			klog.Infof("Successfully pull image %s:%s, cost %vs", w.name, tag, cost)
@@ -394,14 +394,14 @@ func (w *pullWorker) Run() {
 		if imageInfo, err := w.getImageInfo(pullContext); err == nil {
 			newStatus.ImageID = fmt.Sprintf("%v@%v", w.name, imageInfo.ID)
 		}
-		w.finishPulling(newStatus, appsv1alpha1.ImagePhaseSucceeded, "")
+		w.finishPulling(newStatus, appsv1beta1.ImagePhaseSucceeded, "")
 		if w.ref != nil && w.eventRecorder != nil {
 			w.eventRecorder.Eventf(w.ref, v1.EventTypeNormal, PullImageSucceed, "Image %v:%v, ecalpsedTime %v", w.name, w.tagSpec.Tag, time.Since(startTime.Time))
 		}
 		cancel()
 		return
 	}
-	w.finishPulling(newStatus, appsv1alpha1.ImagePhaseFailed, lastError.Error())
+	w.finishPulling(newStatus, appsv1beta1.ImagePhaseFailed, lastError.Error())
 
 	if w.eventRecorder != nil {
 		for _, owner := range w.tagSpec.OwnerReferences {
@@ -428,7 +428,7 @@ func (w *pullWorker) getImageInfo(ctx context.Context) (*runtimeimage.ImageInfo,
 }
 
 // Pulling image and update process in status
-func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.ImageTagStatus) (err error) {
+func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1beta1.ImageTagStatus) (err error) {
 	tag := w.tagSpec.Tag
 	startTime := metav1.Now()
 
@@ -507,7 +507,7 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 	}
 }
 
-func (w *pullWorker) finishPulling(newStatus *appsv1alpha1.ImageTagStatus, phase appsv1alpha1.ImagePullPhase, message string) {
+func (w *pullWorker) finishPulling(newStatus *appsv1beta1.ImageTagStatus, phase appsv1beta1.ImagePullPhase, message string) {
 	newStatus.Phase = phase
 	now := metav1.Now()
 	newStatus.CompletionTime = &now

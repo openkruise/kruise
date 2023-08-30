@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -44,7 +44,7 @@ var _ admission.Handler = &CloneSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.CloneSet{}
+	obj := &appsv1beta1.CloneSet{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -56,7 +56,7 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 	injectTemplateDefaults := false
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
 		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj := &appsv1alpha1.CloneSet{}
+			oldObj := &appsv1beta1.CloneSet{}
 			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}

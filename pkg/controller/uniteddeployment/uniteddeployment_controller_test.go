@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,20 +37,20 @@ var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Nam
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": "foo",
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": "foo",
@@ -75,8 +75,8 @@ func TestReconcile(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{

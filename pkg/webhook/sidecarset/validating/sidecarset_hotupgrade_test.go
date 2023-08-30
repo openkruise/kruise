@@ -20,32 +20,32 @@ import (
 	"fmt"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestSidecarSetUpdateConflict(t *testing.T) {
-	oldSidecarset := appsv1alpha1.SidecarSet{
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+	oldSidecarset := appsv1beta1.SidecarSet{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{Name: "test"},
-					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-						UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+					UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 					},
 				},
 			},
 		},
 	}
-	newSidecarset := &appsv1alpha1.SidecarSet{
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+	newSidecarset := &appsv1beta1.SidecarSet{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{Name: "test"},
-					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-						UpgradeType: appsv1alpha1.SidecarContainerHotUpgrade,
+					UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1beta1.SidecarContainerHotUpgrade,
 					},
 				},
 			},

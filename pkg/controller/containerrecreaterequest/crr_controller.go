@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -58,7 +58,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("ContainerRecreateRequest")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("ContainerRecreateRequest")
 )
 
 // Add creates a new ContainerRecreateRequest Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -90,7 +90,7 @@ func add(mgr manager.Manager, r *ReconcileContainerRecreateRequest) error {
 	}
 
 	// Watch for changes to ContainerRecreateRequest
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		}
 	}()
 
-	crr := &appsv1alpha1.ContainerRecreateRequest{}
+	crr := &appsv1beta1.ContainerRecreateRequest{}
 	err = r.Get(context.TODO(), request.NamespacedName, crr)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -151,7 +151,7 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	}
 
 	if crr.DeletionTimestamp != nil || crr.Status.CompletionTime != nil {
-		if slice.ContainsString(crr.Finalizers, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
+		if slice.ContainsString(crr.Finalizers, appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
 			if err := r.releasePodNotReady(crr, pod); err != nil {
 				return reconcile.Result{}, err
 			}
@@ -161,8 +161,8 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 			return reconcile.Result{}, nil
 		}
 
-		if _, ok := crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]; ok {
-			body := fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, appsv1alpha1.ContainerRecreateRequestActiveKey)
+		if _, ok := crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]; ok {
+			body := fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, appsv1beta1.ContainerRecreateRequestActiveKey)
 			return reconcile.Result{}, r.Patch(context.TODO(), crr, client.RawPatch(types.MergePatchType, []byte(body)))
 		}
 
@@ -180,9 +180,9 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		return reconcile.Result{RequeueAfter: leftTime}, nil
 	}
 
-	if errors.IsNotFound(podErr) || pod.DeletionTimestamp != nil || string(pod.UID) != crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] {
+	if errors.IsNotFound(podErr) || pod.DeletionTimestamp != nil || string(pod.UID) != crr.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey] {
 		klog.Warningf("Complete CRR %s/%s as failure for Pod %s with UID=%s has gone",
-			crr.Namespace, crr.Name, crr.Spec.PodName, crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey])
+			crr.Namespace, crr.Name, crr.Spec.PodName, crr.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey])
 		return reconcile.Result{}, r.completeCRR(crr, "pod has gone")
 	}
 
@@ -208,7 +208,7 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		duration.Update(leftTime)
 	}
 
-	if crr.Status.Phase != appsv1alpha1.ContainerRecreateRequestRecreating {
+	if crr.Status.Phase != appsv1beta1.ContainerRecreateRequestRecreating {
 		return reconcile.Result{RequeueAfter: duration.Get()}, nil
 	}
 
@@ -218,7 +218,7 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	}
 
 	// make Pod not ready if unreadyGracePeriodSeconds has set
-	if crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil && crr.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey] == "" {
+	if crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil && crr.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey] == "" {
 		if err = r.acquirePodNotReady(crr, pod); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -227,8 +227,8 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	return reconcile.Result{RequeueAfter: duration.Get()}, nil
 }
 
-func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
-	syncContainerStatuses := make([]appsv1alpha1.ContainerRecreateRequestSyncContainerStatus, 0, len(crr.Spec.Containers))
+func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod) error {
+	syncContainerStatuses := make([]appsv1beta1.ContainerRecreateRequestSyncContainerStatus, 0, len(crr.Spec.Containers))
 	for i := range crr.Spec.Containers {
 		c := &crr.Spec.Containers[i]
 		containerStatus := util.GetContainerStatus(c.Name, pod)
@@ -239,7 +239,7 @@ func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1alp
 			// ignore non-running and history status
 			continue
 		}
-		syncContainerStatuses = append(syncContainerStatuses, appsv1alpha1.ContainerRecreateRequestSyncContainerStatus{
+		syncContainerStatuses = append(syncContainerStatuses, appsv1beta1.ContainerRecreateRequestSyncContainerStatus{
 			Name:         containerStatus.Name,
 			Ready:        containerStatus.Ready,
 			RestartCount: containerStatus.RestartCount,
@@ -247,8 +247,8 @@ func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1alp
 		})
 	}
 	syncContainerStatusesStr := util.DumpJSON(syncContainerStatuses)
-	if crr.Annotations[appsv1alpha1.ContainerRecreateRequestSyncContainerStatusesKey] != syncContainerStatusesStr {
-		body := util.DumpJSON(syncPatchBody{Metadata: syncPatchMetadata{Annotations: map[string]string{appsv1alpha1.ContainerRecreateRequestSyncContainerStatusesKey: syncContainerStatusesStr}}})
+	if crr.Annotations[appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey] != syncContainerStatusesStr {
+		body := util.DumpJSON(syncPatchBody{Metadata: syncPatchMetadata{Annotations: map[string]string{appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey: syncContainerStatusesStr}}})
 		return r.Patch(context.TODO(), crr, client.RawPatch(types.MergePatchType, []byte(body)))
 	}
 	return nil
@@ -262,17 +262,17 @@ type syncPatchMetadata struct {
 	Annotations map[string]string `json:"annotations"`
 }
 
-func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
+func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod) error {
 	// Note that we should add the finalizer first, then update pod condition, finally patch the label
 
 	if r.podReadinessControl.ContainsReadinessGate(pod) {
-		if !slice.ContainsString(crr.Finalizers, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
+		if !slice.ContainsString(crr.Finalizers, appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				newCRR := &appsv1alpha1.ContainerRecreateRequest{}
+				newCRR := &appsv1beta1.ContainerRecreateRequest{}
 				if err := r.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Name}, newCRR); err != nil {
 					return err
 				}
-				newCRR.Finalizers = append(newCRR.Finalizers, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey)
+				newCRR.Finalizers = append(newCRR.Finalizers, appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey)
 				return r.Update(context.TODO(), newCRR)
 			})
 			if err != nil {
@@ -288,11 +288,11 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1
 		klog.Warningf("CRR %s/%s can not set Pod %s to not ready, because Pod has no %s readinessGate", crr.Namespace, crr.Name, pod.Name, appspub.KruisePodReadyConditionType)
 	}
 
-	body := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey, r.clock.Now().Format(time.RFC3339))
+	body := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey, r.clock.Now().Format(time.RFC3339))
 	return r.Patch(context.TODO(), crr, client.RawPatch(types.MergePatchType, []byte(body)))
 }
 
-func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
+func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod) error {
 	if pod != nil && pod.DeletionTimestamp == nil && r.podReadinessControl.ContainsReadinessGate(pod) {
 		err := r.podReadinessControl.RemoveNotReadyKey(pod, getReadinessMessage(crr))
 		if err != nil {
@@ -300,13 +300,13 @@ func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1alpha1
 		}
 	}
 
-	if slice.ContainsString(crr.Finalizers, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
+	if slice.ContainsString(crr.Finalizers, appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			newCRR := &appsv1alpha1.ContainerRecreateRequest{}
+			newCRR := &appsv1beta1.ContainerRecreateRequest{}
 			if err := r.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Name}, newCRR); err != nil {
 				return err
 			}
-			newCRR.Finalizers = slice.RemoveString(newCRR.Finalizers, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey, nil)
+			newCRR.Finalizers = slice.RemoveString(newCRR.Finalizers, appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey, nil)
 			return r.Update(context.TODO(), newCRR)
 		})
 		if err != nil {
@@ -316,14 +316,14 @@ func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1alpha1
 	return nil
 }
 
-func (r *ReconcileContainerRecreateRequest) completeCRR(crr *appsv1alpha1.ContainerRecreateRequest, msg string) error {
+func (r *ReconcileContainerRecreateRequest) completeCRR(crr *appsv1beta1.ContainerRecreateRequest, msg string) error {
 	now := metav1.NewTime(r.clock.Now())
-	crr.Status.Phase = appsv1alpha1.ContainerRecreateRequestCompleted
+	crr.Status.Phase = appsv1beta1.ContainerRecreateRequestCompleted
 	crr.Status.CompletionTime = &now
 	crr.Status.Message = msg
 	return r.Status().Update(context.TODO(), crr)
 }
 
-func getReadinessMessage(crr *appsv1alpha1.ContainerRecreateRequest) utilpodreadiness.Message {
+func getReadinessMessage(crr *appsv1beta1.ContainerRecreateRequest) utilpodreadiness.Message {
 	return utilpodreadiness.Message{UserAgent: "ContainerRecreateRequest", Key: fmt.Sprintf("%s/%s", crr.Namespace, crr.Name)}
 }

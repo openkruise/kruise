@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
@@ -50,7 +50,7 @@ func init() {
 var (
 	concurrentReconciles = 3
 	jobOwnerKey          = ".metadata.controller"
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("AdvancedCronJob")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("AdvancedCronJob")
 )
 
 // Add creates a new AdvancedCronJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -84,7 +84,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to AdvancedCronJob
-	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.AdvancedCronJob{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &appsv1beta1.AdvancedCronJob{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		klog.Error(err)
 		return err
 	}
@@ -138,7 +138,7 @@ func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request
 		Name:      req.Name,
 	}
 
-	var advancedCronJob appsv1alpha1.AdvancedCronJob
+	var advancedCronJob appsv1beta1.AdvancedCronJob
 
 	if err := r.Get(ctx, namespacedName, &advancedCronJob); err != nil {
 		klog.Error(err, "unable to fetch CronJob", req.NamespacedName)
@@ -149,9 +149,9 @@ func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request
 	}
 
 	switch FindTemplateKind(advancedCronJob.Spec) {
-	case appsv1alpha1.JobTemplate:
+	case appsv1beta1.JobTemplate:
 		return r.reconcileJob(ctx, req, advancedCronJob)
-	case appsv1alpha1.BroadcastJobTemplate:
+	case appsv1beta1.BroadcastJobTemplate:
 		return r.reconcileBroadcastJob(ctx, req, advancedCronJob)
 	default:
 		klog.Info("No template found", req.NamespacedName)
@@ -162,11 +162,11 @@ func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request
 
 func (r *ReconcileAdvancedCronJob) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.AdvancedCronJob{}).
+		For(&appsv1beta1.AdvancedCronJob{}).
 		Complete(r)
 }
 
-func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(request reconcile.Request, advancedCronJob *appsv1alpha1.AdvancedCronJob) error {
+func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(request reconcile.Request, advancedCronJob *appsv1beta1.AdvancedCronJob) error {
 	klog.V(1).Info(fmt.Sprintf("Updating job %s status %#v", advancedCronJob.Name, advancedCronJob.Status))
 	advancedCronJobCopy := advancedCronJob.DeepCopy()
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -175,7 +175,7 @@ func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(request reconcile.Req
 			return nil
 		}
 
-		updated := &appsv1alpha1.AdvancedCronJob{}
+		updated := &appsv1beta1.AdvancedCronJob{}
 		err = r.Get(context.TODO(), request.NamespacedName, updated)
 		if err == nil {
 			advancedCronJobCopy = updated

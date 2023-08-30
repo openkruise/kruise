@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,18 +28,18 @@ import (
 )
 
 func IsSpecifiedDelete(obj metav1.Object) bool {
-	_, ok := obj.GetLabels()[appsv1alpha1.SpecifiedDeleteKey]
+	_, ok := obj.GetLabels()[appsv1beta1.SpecifiedDeleteKey]
 	return ok
 }
 
 func PatchPodSpecifiedDelete(c client.Client, pod *v1.Pod, value string) (bool, error) {
-	if _, ok := pod.Labels[appsv1alpha1.SpecifiedDeleteKey]; ok {
+	if _, ok := pod.Labels[appsv1beta1.SpecifiedDeleteKey]; ok {
 		return false, nil
 	}
 
 	body := fmt.Sprintf(
 		`{"metadata":{"labels":{"%s":"%s"}}}`,
-		appsv1alpha1.SpecifiedDeleteKey,
+		appsv1beta1.SpecifiedDeleteKey,
 		value,
 	)
 	return true, c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))

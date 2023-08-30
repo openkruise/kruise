@@ -33,14 +33,14 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	udctrl "github.com/openkruise/kruise/pkg/controller/uniteddeployment"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
 // validateUnitedDeploymentSpec tests if required fields in the UnitedDeployment spec are set.
-func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
+func validateUnitedDeploymentSpec(spec *appsv1beta1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if spec.Replicas != nil {
@@ -144,14 +144,14 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 }
 
 // validateUnitedDeployment validates a UnitedDeployment.
-func validateUnitedDeployment(unitedDeployment *appsv1alpha1.UnitedDeployment) field.ErrorList {
+func validateUnitedDeployment(unitedDeployment *appsv1beta1.UnitedDeployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&unitedDeployment.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateUnitedDeploymentSpec(&unitedDeployment.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateUnitedDeploymentUpdate tests if required fields in the UnitedDeployment are set.
-func ValidateUnitedDeploymentUpdate(unitedDeployment, oldUnitedDeployment *appsv1alpha1.UnitedDeployment) field.ErrorList {
+func ValidateUnitedDeploymentUpdate(unitedDeployment, oldUnitedDeployment *appsv1beta1.UnitedDeployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&unitedDeployment.ObjectMeta, &oldUnitedDeployment.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateUnitedDeploymentSpecUpdate(&unitedDeployment.Spec, &oldUnitedDeployment.Spec, field.NewPath("spec"))...)
 	if unitedDeployment.Spec.Replicas != nil {
@@ -160,7 +160,7 @@ func ValidateUnitedDeploymentUpdate(unitedDeployment, oldUnitedDeployment *appsv
 	return allErrs
 }
 
-func validateUnitedDeploymentSpecUpdate(spec, oldSpec *appsv1alpha1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
+func validateUnitedDeploymentSpecUpdate(spec, oldSpec *appsv1beta1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateSubsetTemplateUpdate(&spec.Template, &oldSpec.Template, fldPath.Child("template"))...)
 	allErrs = append(allErrs, validateUnitedDeploymentTopology(&spec.Topology, &oldSpec.Topology, fldPath.Child("topology"))...)
@@ -168,13 +168,13 @@ func validateUnitedDeploymentSpecUpdate(spec, oldSpec *appsv1alpha1.UnitedDeploy
 	return allErrs
 }
 
-func validateUnitedDeploymentTopology(topology, oldTopology *appsv1alpha1.Topology, fldPath *field.Path) field.ErrorList {
+func validateUnitedDeploymentTopology(topology, oldTopology *appsv1beta1.Topology, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if topology == nil || oldTopology == nil {
 		return allErrs
 	}
 
-	oldSubsets := map[string]*appsv1alpha1.Subset{}
+	oldSubsets := map[string]*appsv1beta1.Subset{}
 	for i, subset := range oldTopology.Subsets {
 		oldSubsets[subset.Name] = &oldTopology.Subsets[i]
 	}
@@ -201,7 +201,7 @@ func validateUnitedDeploymentTopology(topology, oldTopology *appsv1alpha1.Topolo
 	return allErrs
 }
 
-func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemplate, fldPath *field.Path) field.ErrorList {
+func validateSubsetTemplateUpdate(template, oldTemplate *appsv1beta1.SubsetTemplate, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template.StatefulSetTemplate != nil && oldTemplate.StatefulSetTemplate != nil {
 		allErrs = append(allErrs, validateStatefulSetUpdate(template.StatefulSetTemplate, oldTemplate.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
@@ -214,7 +214,7 @@ func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemp
 	return allErrs
 }
 
-func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labels.Selector, fldPath *field.Path) field.ErrorList {
+func validateSubsetTemplate(template *appsv1beta1.SubsetTemplate, selector labels.Selector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	var templateCount int
@@ -280,7 +280,7 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 	return allErrs
 }
 
-func validateStatefulSet(statefulSet *appsv1alpha1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateStatefulSet(statefulSet *appsv1beta1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if statefulSet.Spec.Replicas != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *statefulSet.Spec.Replicas, "replicas in statefulSetTemplate will not be used"))
@@ -293,7 +293,7 @@ func validateStatefulSet(statefulSet *appsv1alpha1.StatefulSetTemplateSpec, fldP
 	return allErrs
 }
 
-func validateAdvancedStatefulSet(statefulSet *appsv1alpha1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateAdvancedStatefulSet(statefulSet *appsv1beta1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if statefulSet.Spec.Replicas != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *statefulSet.Spec.Replicas, "replicas in advancedStatefulSetTemplate will not be used"))
@@ -307,7 +307,7 @@ func validateAdvancedStatefulSet(statefulSet *appsv1alpha1.AdvancedStatefulSetTe
 	return allErrs
 }
 
-func validateDeployment(deployment *appsv1alpha1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateDeployment(deployment *appsv1beta1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if deployment.Spec.Replicas != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *deployment.Spec.Replicas, "replicas in deploymentTemplate will not be used"))
@@ -316,7 +316,7 @@ func validateDeployment(deployment *appsv1alpha1.DeploymentTemplateSpec, fldPath
 	return allErrs
 }
 
-func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	restoreReplicas := statefulSet.Spec.Replicas
 	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
@@ -340,7 +340,7 @@ func validateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.Statefu
 	return allErrs
 }
 
-func validateAdvancedStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateAdvancedStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	restoreReplicas := statefulSet.Spec.Replicas
 	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
@@ -364,7 +364,7 @@ func validateAdvancedStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1
 	return allErrs
 }
 
-func validateDeploymentUpdate(deployment, oldDeployment *appsv1alpha1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateDeploymentUpdate(deployment, oldDeployment *appsv1beta1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if deployment.Spec.Replicas != nil {

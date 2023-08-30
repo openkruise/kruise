@@ -27,7 +27,6 @@ import (
 
 	ctrlUtil "github.com/openkruise/kruise/pkg/controller/util"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -64,7 +63,7 @@ var (
 	KindSts = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 	// kruise
 	KruiseKindSts = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
-	KruiseKindPps = appsv1alpha1.SchemeGroupVersion.WithKind("PersistentPodState")
+	KruiseKindPps = appsv1beta1.SchemeGroupVersion.WithKind("PersistentPodState")
 	// AutoGeneratePersistentPodStatePrefix auto generate PersistentPodState crd
 	AutoGeneratePersistentPodStatePrefix = "generate#"
 )
@@ -109,7 +108,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// watch for changes to PersistentPodState
-	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.PersistentPodState{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &appsv1beta1.PersistentPodState{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
@@ -174,7 +173,7 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 	}
 
 	// Fetch the Statefulset instance
-	persistentPodState := &appsv1alpha1.PersistentPodState{}
+	persistentPodState := &appsv1beta1.PersistentPodState{}
 	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: req.Namespace, Name: req.Name}, persistentPodState)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -192,7 +191,7 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 		// delete workload scenario
 	} else if innerSts == nil || !innerSts.DeletionTimestamp.IsZero() {
-		newStatus := appsv1alpha1.PersistentPodStateStatus{}
+		newStatus := appsv1beta1.PersistentPodStateStatus{}
 		newStatus.ObservedGeneration = persistentPodState.Generation
 		newStatus.PodStates = nil
 		return ctrl.Result{}, r.updatePersistentPodStateStatus(persistentPodState, newStatus)
@@ -202,7 +201,7 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 	newStatus := persistentPodState.Status.DeepCopy()
 	newStatus.ObservedGeneration = persistentPodState.Generation
 	if newStatus.PodStates == nil {
-		newStatus.PodStates = make(map[string]appsv1alpha1.PodState)
+		newStatus.PodStates = make(map[string]appsv1beta1.PodState)
 	}
 	nodeTopologyKeys := sets.NewString()
 	// required node labels
@@ -251,7 +250,7 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 	}
 
 	// scale down statefulSet scenario
-	if persistentPodState.Spec.PersistentPodStateRetentionPolicy != appsv1alpha1.PersistentPodStateRetentionPolicyWhenDeleted {
+	if persistentPodState.Spec.PersistentPodStateRetentionPolicy != appsv1beta1.PersistentPodStateRetentionPolicyWhenDeleted {
 		for podName := range newStatus.PodStates {
 			index, err := parseStsPodIndex(podName)
 			if err != nil {
@@ -272,12 +271,12 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 	return ctrl.Result{}, r.updatePersistentPodStateStatus(persistentPodState, *newStatus)
 }
 
-func (r *ReconcilePersistentPodState) updatePersistentPodStateStatus(pps *appsv1alpha1.PersistentPodState, newStatus appsv1alpha1.PersistentPodStateStatus) error {
+func (r *ReconcilePersistentPodState) updatePersistentPodStateStatus(pps *appsv1beta1.PersistentPodState, newStatus appsv1beta1.PersistentPodStateStatus) error {
 	if reflect.DeepEqual(pps.Status, newStatus) {
 		return nil
 	}
 	// update PersistentPodState status
-	persistentPodStateClone := &appsv1alpha1.PersistentPodState{}
+	persistentPodStateClone := &appsv1beta1.PersistentPodState{}
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: pps.Namespace, Name: pps.Name}, persistentPodStateClone); err != nil {
 			return err
@@ -298,7 +297,7 @@ func parseStsPodIndex(podName string) (int, error) {
 }
 
 // map[string]*corev1.Pod -> map[Pod.Name]*corev1.Pod
-func (r *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *appsv1alpha1.PersistentPodState) (map[string]*corev1.Pod, *innerStatefulset, error) {
+func (r *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *appsv1beta1.PersistentPodState) (map[string]*corev1.Pod, *innerStatefulset, error) {
 	inner := &innerStatefulset{}
 	ref := persistentPodState.Spec.TargetReference
 	workload, err := r.finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, persistentPodState.Namespace, ref.Name, "")
@@ -326,9 +325,9 @@ func (r *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *
 	return matchedPods, inner, nil
 }
 
-func (r *ReconcilePersistentPodState) getPodState(pod *corev1.Pod, nodeTopologyKeys sets.String, annotationKeys sets.String) (appsv1alpha1.PodState, error) {
+func (r *ReconcilePersistentPodState) getPodState(pod *corev1.Pod, nodeTopologyKeys sets.String, annotationKeys sets.String) (appsv1beta1.PodState, error) {
 	// pod state
-	podState := appsv1alpha1.PodState{
+	podState := appsv1beta1.PodState{
 		NodeTopologyLabels: map[string]string{},
 		Annotations:        map[string]string{},
 	}
@@ -386,7 +385,7 @@ func (r *ReconcilePersistentPodState) autoGeneratePersistentPodState(req ctrl.Re
 		return nil
 	}
 	// fetch persistentPodState crd
-	oldObj := &appsv1alpha1.PersistentPodState{}
+	oldObj := &appsv1beta1.PersistentPodState{}
 	err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: name}, oldObj)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -397,9 +396,9 @@ func (r *ReconcilePersistentPodState) autoGeneratePersistentPodState(req ctrl.Re
 	}
 
 	// auto generate persistentPodState crd object
-	if workload.Metadata.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" {
-		if workload.Metadata.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] == "" &&
-			workload.Metadata.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] == "" {
+	if workload.Metadata.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] == "true" {
+		if workload.Metadata.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] == "" &&
+			workload.Metadata.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] == "" {
 			klog.Warningf("statefulSet(%s/%s) persistentPodState annotation is incomplete", workload.Metadata.Namespace, workload.Name)
 			return nil
 		}
@@ -420,7 +419,7 @@ func (r *ReconcilePersistentPodState) autoGeneratePersistentPodState(req ctrl.Re
 		if reflect.DeepEqual(oldObj.Spec, newObj.Spec) {
 			return nil
 		}
-		objClone := &appsv1alpha1.PersistentPodState{}
+		objClone := &appsv1beta1.PersistentPodState{}
 		if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			if err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: newObj.Namespace, Name: newObj.Name}, objClone); err != nil {
 				return err
@@ -447,8 +446,8 @@ func (r *ReconcilePersistentPodState) autoGeneratePersistentPodState(req ctrl.Re
 	return nil
 }
 
-func newStatefulSetPersistentPodState(workload *controllerfinder.ScaleAndSelector) *appsv1alpha1.PersistentPodState {
-	obj := &appsv1alpha1.PersistentPodState{
+func newStatefulSetPersistentPodState(workload *controllerfinder.ScaleAndSelector) *appsv1beta1.PersistentPodState {
+	obj := &appsv1beta1.PersistentPodState{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      workload.Name,
 			Namespace: workload.Metadata.Namespace,
@@ -462,8 +461,8 @@ func newStatefulSetPersistentPodState(workload *controllerfinder.ScaleAndSelecto
 				},
 			},
 		},
-		Spec: appsv1alpha1.PersistentPodStateSpec{
-			TargetReference: appsv1alpha1.TargetReference{
+		Spec: appsv1beta1.PersistentPodStateSpec{
+			TargetReference: appsv1beta1.TargetReference{
 				APIVersion: workload.APIVersion,
 				Kind:       workload.Kind,
 				Name:       workload.Name,
@@ -471,29 +470,29 @@ func newStatefulSetPersistentPodState(workload *controllerfinder.ScaleAndSelecto
 		},
 	}
 	// required topology term
-	if workload.Metadata.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != "" {
-		requiredTopologyKeys := strings.Split(workload.Metadata.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology], ",")
-		obj.Spec.RequiredPersistentTopology = &appsv1alpha1.NodeTopologyTerm{
+	if workload.Metadata.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] != "" {
+		requiredTopologyKeys := strings.Split(workload.Metadata.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology], ",")
+		obj.Spec.RequiredPersistentTopology = &appsv1beta1.NodeTopologyTerm{
 			NodeTopologyKeys: requiredTopologyKeys,
 		}
 	}
 
 	// persistent pod annotations
-	if workload.Metadata.Annotations[appsv1alpha1.AnnotationPersistentPodAnnotations] != "" {
-		annotationKeys := strings.Split(workload.Metadata.Annotations[appsv1alpha1.AnnotationPersistentPodAnnotations], ",")
+	if workload.Metadata.Annotations[appsv1beta1.AnnotationPersistentPodAnnotations] != "" {
+		annotationKeys := strings.Split(workload.Metadata.Annotations[appsv1beta1.AnnotationPersistentPodAnnotations], ",")
 		for _, key := range annotationKeys {
 			obj.Spec.PersistentPodAnnotations = append(obj.Spec.PersistentPodAnnotations,
-				appsv1alpha1.PersistentPodAnnotation{Key: key})
+				appsv1beta1.PersistentPodAnnotation{Key: key})
 		}
 	}
 
 	// preferred topology term
-	if workload.Metadata.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] != "" {
-		preferredTopologyKeys := strings.Split(workload.Metadata.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology], ",")
-		obj.Spec.PreferredPersistentTopology = []appsv1alpha1.PreferredTopologyTerm{
+	if workload.Metadata.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] != "" {
+		preferredTopologyKeys := strings.Split(workload.Metadata.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology], ",")
+		obj.Spec.PreferredPersistentTopology = []appsv1beta1.PreferredTopologyTerm{
 			{
 				Weight: 100,
-				Preference: appsv1alpha1.NodeTopologyTerm{
+				Preference: appsv1beta1.NodeTopologyTerm{
 					NodeTopologyKeys: preferredTopologyKeys,
 				},
 			},

@@ -28,11 +28,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/openkruise/kruise/apis"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
-	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
+	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1beta1"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	apps "k8s.io/api/apps/v1"
@@ -69,18 +69,18 @@ func init() {
 	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 }
 
-func newDaemonSet(name string) *appsv1alpha1.DaemonSet {
+func newDaemonSet(name string) *appsv1beta1.DaemonSet {
 	two := int32(2)
-	return &appsv1alpha1.DaemonSet{
+	return &appsv1beta1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       uuid.NewUUID(),
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: appsv1alpha1.DaemonSetSpec{
+		Spec: appsv1beta1.DaemonSetSpec{
 			RevisionHistoryLimit: &two,
-			UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
-				Type: appsv1alpha1.OnDeleteDaemonSetStrategyType,
+			UpdateStrategy: appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.OnDeleteDaemonSetStrategyType,
 			},
 			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
 			Template: corev1.PodTemplateSpec{
@@ -140,7 +140,7 @@ func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, templ
 	f.podStore.Update(pod)
 	f.podIDMap[pod.Name] = pod
 
-	ds := object.(*appsv1alpha1.DaemonSet)
+	ds := object.(*appsv1beta1.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
 	f.expectations.CreationObserved(dsKey)
 
@@ -160,7 +160,7 @@ func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID 
 	f.podStore.Delete(pod)
 	delete(f.podIDMap, podID)
 
-	ds := object.(*appsv1alpha1.DaemonSet)
+	ds := object.(*appsv1beta1.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
 	f.expectations.DeletionObserved(dsKey)
 
@@ -190,7 +190,7 @@ func splitObjects(initialObjects []runtime.Object) ([]runtime.Object, []runtime.
 	var kubeObjects []runtime.Object
 	var kruiseObjects []runtime.Object
 	for _, o := range initialObjects {
-		if _, ok := o.(*appsv1alpha1.DaemonSet); ok {
+		if _, ok := o.(*appsv1beta1.DaemonSet); ok {
 			kruiseObjects = append(kruiseObjects, o)
 		} else {
 			kubeObjects = append(kubeObjects, o)
@@ -208,7 +208,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	dsc := NewDaemonSetController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
-		kruiseInformerFactory.Apps().V1alpha1().DaemonSets(),
+		kruiseInformerFactory.Apps().V1beta1().DaemonSets(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		client,
 		kruiseClient,
@@ -296,7 +296,7 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 	return nil
 }
 
-func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *appsv1alpha1.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *appsv1beta1.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
 	t.Helper()
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
@@ -328,7 +328,7 @@ func markPodReady(pod *corev1.Pod) {
 }
 
 // clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
-func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1alpha1.DaemonSet, fakePodControl *fakePodControl) {
+func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1beta1.DaemonSet, fakePodControl *fakePodControl) {
 	fakePodControl.Clear()
 
 	key, err := controller.KeyFunc(ds)

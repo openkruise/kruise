@@ -22,7 +22,7 @@ import (
 	"sort"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
 	"github.com/openkruise/kruise/pkg/util"
@@ -45,7 +45,7 @@ import (
 
 var (
 	concurrentReconciles = 10
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("EphemeralJob")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("EphemeralJob")
 	defaultParallelism   = 1
 	scaleExpectations    = expectations.NewScaleExpectations()
 )
@@ -80,7 +80,7 @@ func add(mgr manager.Manager, r *ReconcileEphemeralJob) error {
 	}
 
 	// Watch for changes to EphemeralJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.EphemeralJob{}}, &ejobHandler{mgr.GetCache()})
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.EphemeralJob{}}, &ejobHandler{mgr.GetCache()})
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 		}
 	}()
 
-	job := &appsv1alpha1.EphemeralJob{}
+	job := &appsv1beta1.EphemeralJob{}
 	err = r.Get(context, request.NamespacedName, job)
 
 	if err != nil {
@@ -211,7 +211,7 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 	klog.Infof("Sync calculate job %s status: (match: %d, success: %d, failed: %d, running: %d, waiting: %d)",
 		job.Name, job.Status.Matches, job.Status.Succeeded, job.Status.Failed, job.Status.Running, job.Status.Waiting)
 
-	if job.Status.Phase == appsv1alpha1.EphemeralJobPause {
+	if job.Status.Phase == appsv1beta1.EphemeralJobPause {
 		return reconcile.Result{RequeueAfter: requeueAfter}, r.updateJobStatus(job)
 	}
 
@@ -222,7 +222,7 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 	return reconcile.Result{RequeueAfter: requeueAfter}, r.updateJobStatus(job)
 }
 
-func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v1.Pod, error) {
+func (r *ReconcileEphemeralJob) filterPods(job *appsv1beta1.EphemeralJob) ([]*v1.Pod, error) {
 	selector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -265,7 +265,7 @@ func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v
 }
 
 // filterInjectedPods will return pods which has injected ephemeral containers
-func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJob) ([]*v1.Pod, error) {
+func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1beta1.EphemeralJob) ([]*v1.Pod, error) {
 	selector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -300,7 +300,7 @@ func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJo
 	return targetPods, nil
 }
 
-func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, targetPods []*v1.Pod) error {
+func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1beta1.EphemeralJob, targetPods []*v1.Pod) error {
 	toCreatePods, _, _ := getSyncPods(job, targetPods)
 	if len(toCreatePods) == 0 {
 		klog.Infoln("there is no target pod to attach")
@@ -357,15 +357,15 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 	return err
 }
 
-func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, targetPods []*v1.Pod) error {
+func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1beta1.EphemeralJob, targetPods []*v1.Pod) error {
 	if job.Status.Conditions == nil {
-		job.Status.Conditions = make([]appsv1alpha1.EphemeralJobCondition, 0)
-		job.Status.Conditions = append(job.Status.Conditions, appsv1alpha1.EphemeralJobCondition{
-			Type:               appsv1alpha1.EJobInitialized,
+		job.Status.Conditions = make([]appsv1beta1.EphemeralJobCondition, 0)
+		job.Status.Conditions = append(job.Status.Conditions, appsv1beta1.EphemeralJobCondition{
+			Type:               appsv1beta1.EJobInitialized,
 			Status:             v1.ConditionTrue,
 			LastProbeTime:      metav1.Now(),
 			LastTransitionTime: metav1.Now(),
-			Reason:             string(appsv1alpha1.EJobInitialized),
+			Reason:             string(appsv1beta1.EJobInitialized),
 			Message:            "",
 		})
 	}
@@ -384,56 +384,56 @@ func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, 
 	}
 
 	if job.Status.Matches == 0 {
-		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
-		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobMatchedEmpty, "MatchEmpty", "job match no pods")
+		job.Status.Phase = appsv1beta1.EphemeralJobWaiting
+		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1beta1.EJobMatchedEmpty, "MatchEmpty", "job match no pods")
 	} else if job.Status.Succeeded == replicas && job.Status.Succeeded > 0 {
 		job.Status.CompletionTime = timeNow()
-		job.Status.Phase = appsv1alpha1.EphemeralJobSucceeded
-		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobSucceeded, "JobSucceeded", "job success to run all tasks")
+		job.Status.Phase = appsv1beta1.EphemeralJobSucceeded
+		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1beta1.EJobSucceeded, "JobSucceeded", "job success to run all tasks")
 	} else if job.Status.Running > 0 {
-		job.Status.Phase = appsv1alpha1.EphemeralJobRunning
+		job.Status.Phase = appsv1beta1.EphemeralJobRunning
 	} else if job.Status.Failed == replicas {
 		job.Status.CompletionTime = timeNow()
-		job.Status.Phase = appsv1alpha1.EphemeralJobFailed
-		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobFailed, "JobFailed", "job failed to run all tasks")
+		job.Status.Phase = appsv1beta1.EphemeralJobFailed
+		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1beta1.EJobFailed, "JobFailed", "job failed to run all tasks")
 	} else if job.Status.Waiting == replicas {
-		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
+		job.Status.Phase = appsv1beta1.EphemeralJobWaiting
 	} else {
-		job.Status.Phase = appsv1alpha1.EphemeralJobUnknown
+		job.Status.Phase = appsv1beta1.EphemeralJobUnknown
 	}
 
 	if job.Spec.Paused {
-		job.Status.Phase = appsv1alpha1.EphemeralJobPause
+		job.Status.Phase = appsv1beta1.EphemeralJobPause
 	}
 
 	if job.Status.Failed > 0 {
 		job.Status.Conditions = addConditions(job.Status.Conditions,
-			appsv1alpha1.EJobFailed, "CreateFailed",
+			appsv1beta1.EJobFailed, "CreateFailed",
 			fmt.Sprintf("EphemeralJob %s/%s failed to create ephemeral container", job.Namespace, job.Name))
 	}
 
-	if (job.Status.Phase == appsv1alpha1.EphemeralJobWaiting || job.Status.Phase == appsv1alpha1.EphemeralJobUnknown ||
-		job.Status.Phase == appsv1alpha1.EphemeralJobRunning) && pastActiveDeadline(job) {
+	if (job.Status.Phase == appsv1beta1.EphemeralJobWaiting || job.Status.Phase == appsv1beta1.EphemeralJobUnknown ||
+		job.Status.Phase == appsv1beta1.EphemeralJobRunning) && pastActiveDeadline(job) {
 		job.Status.CompletionTime = timeNow()
-		job.Status.Phase = appsv1alpha1.EphemeralJobFailed
-		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobFailed, "DeadlineExceeded",
+		job.Status.Phase = appsv1beta1.EphemeralJobFailed
+		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1beta1.EJobFailed, "DeadlineExceeded",
 			fmt.Sprintf("EphemeralJob %s/%s was active longer than specified deadline", job.Namespace, job.Name))
 	}
 
 	if _, empty := getEphemeralContainersMaps(job.Spec.Template.EphemeralContainers); empty {
-		job.Status.Phase = appsv1alpha1.EphemeralJobError
-		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobError, "Error", "job spec invalid fields.")
+		job.Status.Phase = appsv1beta1.EphemeralJobError
+		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1beta1.EJobError, "Error", "job spec invalid fields.")
 	}
 
 	return nil
 }
 
-func (r *ReconcileEphemeralJob) updateJobStatus(job *appsv1alpha1.EphemeralJob) error {
+func (r *ReconcileEphemeralJob) updateJobStatus(job *appsv1beta1.EphemeralJob) error {
 	klog.V(5).Infof("Updating job %s status %#v", job.Name, job.Status)
 	return r.Status().Update(context.TODO(), job)
 }
 
-func (r *ReconcileEphemeralJob) removeEphemeralContainers(job *appsv1alpha1.EphemeralJob) error {
+func (r *ReconcileEphemeralJob) removeEphemeralContainers(job *appsv1beta1.EphemeralJob) error {
 	targetPods, err := r.filterInjectedPods(job)
 	if err != nil {
 		klog.Errorf("Failed to get ephemeral job %s/%s related target pods: %v", job.Namespace, job.Name, err)

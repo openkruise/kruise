@@ -19,7 +19,7 @@ package mutating
 import (
 	"context"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/configuration"
@@ -52,7 +52,7 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 		return true, nil
 	}
 	// selector persistentPodState
-	persistentPodState := SelectorPersistentPodState(h.Client, appsv1alpha1.TargetReference{
+	persistentPodState := SelectorPersistentPodState(h.Client, appsv1beta1.TargetReference{
 		APIVersion: ref.APIVersion,
 		Kind:       ref.Kind,
 		Name:       ref.Name,
@@ -110,7 +110,7 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 // return two parameters:
 // 1. required nodeSelector
 // 2. preferred []PreferredSchedulingTerm
-func createNodeAffinity(spec appsv1alpha1.PersistentPodStateSpec, podState appsv1alpha1.PodState) (map[string]string, []corev1.PreferredSchedulingTerm) {
+func createNodeAffinity(spec appsv1beta1.PersistentPodStateSpec, podState appsv1beta1.PodState) (map[string]string, []corev1.PreferredSchedulingTerm) {
 	// required
 	var nodeSelector map[string]string
 	if spec.RequiredPersistentTopology != nil {
@@ -144,8 +144,8 @@ func createNodeAffinity(spec appsv1alpha1.PersistentPodStateSpec, podState appsv
 	return nodeSelector, preferences
 }
 
-func SelectorPersistentPodState(reader client.Reader, ref appsv1alpha1.TargetReference, ns string) *appsv1alpha1.PersistentPodState {
-	ppsList := &appsv1alpha1.PersistentPodStateList{}
+func SelectorPersistentPodState(reader client.Reader, ref appsv1beta1.TargetReference, ns string) *appsv1beta1.PersistentPodState {
+	ppsList := &appsv1beta1.PersistentPodStateList{}
 	if err := reader.List(context.TODO(), ppsList, &client.ListOptions{Namespace: ns}, utilclient.DisableDeepCopy); err != nil {
 		klog.Errorf("List PersistentPodStateList failed: %s", err.Error())
 		return nil

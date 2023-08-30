@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/openkruise/kruise/apis"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
@@ -75,7 +75,7 @@ func StartTestManager(ctx context.Context, mgr manager.Manager, g *gomega.Gomega
 }
 
 var (
-	initialNodeImages = []*appsv1alpha1.NodeImage{
+	initialNodeImages = []*appsv1beta1.NodeImage{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "node1"},
 		},
@@ -124,46 +124,46 @@ var (
 		},
 	}
 
-	initialJobs = []*appsv1alpha1.ImagePullJob{
+	initialJobs = []*appsv1beta1.ImagePullJob{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job1"},
-			Spec:       appsv1alpha1.ImagePullJobSpec{},
+			Spec:       appsv1beta1.ImagePullJobSpec{},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job2"},
-			Spec: appsv1alpha1.ImagePullJobSpec{
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{"node2", "node4"}},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{Names: []string{"node2", "node4"}},
 				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job3"},
-			Spec: appsv1alpha1.ImagePullJobSpec{
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"arch": "arm64"}}},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"arch": "arm64"}}},
 				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job4"},
-			Spec: appsv1alpha1.ImagePullJobSpec{
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "arch", Operator: metav1.LabelSelectorOpDoesNotExist}}}},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "arch", Operator: metav1.LabelSelectorOpDoesNotExist}}}},
 				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job5"},
-			Spec: appsv1alpha1.ImagePullJobSpec{
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					PodSelector: &appsv1alpha1.ImagePullJobPodSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					PodSelector: &appsv1beta1.ImagePullJobPodSelector{LabelSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}},
 				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "job6", Finalizers: []string{"apps.kruise.io/fake-block"}},
-			Spec:       appsv1alpha1.ImagePullJobSpec{},
+			Spec:       appsv1beta1.ImagePullJobSpec{},
 		},
 	}
 )
@@ -224,7 +224,7 @@ func TestAll(t *testing.T) {
 }
 
 func testGetNodeImagesForJob(g *gomega.GomegaWithT) {
-	getNodeImagesForJob := func(job *appsv1alpha1.ImagePullJob) []string {
+	getNodeImagesForJob := func(job *appsv1beta1.ImagePullJob) []string {
 		nodeNames, err := GetNodeImagesForJob(c, job)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		names := sets.NewString()
@@ -263,7 +263,7 @@ func testGetActiveJobsForPod(g *gomega.GomegaWithT) {
 }
 
 func testGetActiveJobsForNodeImage(g *gomega.GomegaWithT) {
-	getActiveJobsForNodeImage := func(nodeImage *appsv1alpha1.NodeImage) []string {
+	getActiveJobsForNodeImage := func(nodeImage *appsv1beta1.NodeImage) []string {
 		jobs, _, err := GetActiveJobsForNodeImage(c, nodeImage, nil)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		names := sets.NewString()

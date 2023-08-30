@@ -17,7 +17,7 @@ limitations under the License.
 package sync
 
 import (
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -32,12 +32,12 @@ import (
 // Interface for managing pods scaling and updating.
 type Interface interface {
 	Scale(
-		currentCS, updateCS *appsv1alpha1.CloneSet,
+		currentCS, updateCS *appsv1beta1.CloneSet,
 		currentRevision, updateRevision string,
 		pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 	) (bool, error)
 
-	Update(cs *appsv1alpha1.CloneSet,
+	Update(cs *appsv1beta1.CloneSet,
 		currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 		pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 	) error

@@ -20,7 +20,7 @@ import (
 	"context"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -64,8 +64,8 @@ func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimiti
 }
 
 func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.RateLimitingInterface) {
-	crrList := &appsv1alpha1.ContainerRecreateRequestList{}
-	err := e.List(context.TODO(), crrList, client.InNamespace(pod.Namespace), client.MatchingLabels{appsv1alpha1.ContainerRecreateRequestPodUIDKey: string(pod.UID)})
+	crrList := &appsv1beta1.ContainerRecreateRequestList{}
+	err := e.List(context.TODO(), crrList, client.InNamespace(pod.Namespace), client.MatchingLabels{appsv1beta1.ContainerRecreateRequestPodUIDKey: string(pod.UID)})
 	if err != nil {
 		klog.Errorf("Failed to get CRR List for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
 		return

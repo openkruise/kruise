@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -44,7 +44,7 @@ type SidecarSetCreateHandler struct {
 	Decoder *admission.Decoder
 }
 
-func setHashSidecarSet(sidecarset *appsv1alpha1.SidecarSet) error {
+func setHashSidecarSet(sidecarset *appsv1beta1.SidecarSet) error {
 	if sidecarset.Annotations == nil {
 		sidecarset.Annotations = make(map[string]string)
 	}
@@ -68,7 +68,7 @@ var _ admission.Handler = &SidecarSetCreateHandler{}
 
 // Handle handles admission requests.
 func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.SidecarSet{}
+	obj := &appsv1beta1.SidecarSet{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {

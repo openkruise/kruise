@@ -7,7 +7,7 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -19,8 +19,8 @@ import (
 )
 
 type testCase struct {
-	spec    *appsv1alpha1.CloneSetSpec
-	oldSpec *appsv1alpha1.CloneSetSpec
+	spec    *appsv1beta1.CloneSetSpec
+	oldSpec *appsv1beta1.CloneSetSpec
 }
 
 func TestValidate(t *testing.T) {
@@ -109,27 +109,27 @@ func TestValidate(t *testing.T) {
 
 	successCases := []testCase{
 		{
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0"},
 				},
 			},
 		},
 		{
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 					MaxSurge:       &intOrStr1,
@@ -137,12 +137,12 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr0,
 					MaxSurge:       &intOrStr1,
@@ -150,24 +150,24 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &maxUnavailable120Percent,
 				},
 			},
 		},
 		{
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &maxUnavailable120Percent,
 					PriorityStrategy: &appspub.UpdatePriorityStrategy{
@@ -180,32 +180,32 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			// test for all acceptable CloneSetSpec changes
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas:             &val1,
 				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
 				Template:             validPodTemplate.Template,
 				RevisionHistoryLimit: &val1,
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0"},
 				},
 				VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("30Gi")},
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
-			oldSpec: &appsv1alpha1.CloneSetSpec{
+			oldSpec: &appsv1beta1.CloneSetSpec{
 				Replicas:             &val2,
 				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
 				Template:             validPodTemplate1.Template,
 				RevisionHistoryLimit: &val2,
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p1"},
 				},
 				VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("60Gi")},
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.RecreateCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
@@ -213,31 +213,31 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			// test oldSpec not-exits spec exits case
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas:             &val1,
 				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
 				Template:             validPodTemplate.Template,
 				RevisionHistoryLimit: &val1,
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0"},
 				},
 				VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("30Gi")},
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
-			oldSpec: &appsv1alpha1.CloneSetSpec{
+			oldSpec: &appsv1beta1.CloneSetSpec{
 				Replicas:             &val2,
 				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
 				Template:             validPodTemplate1.Template,
 				RevisionHistoryLimit: &val2,
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{},
 				},
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.RecreateCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
@@ -250,7 +250,7 @@ func TestValidate(t *testing.T) {
 			if i == 5 {
 				fmt.Println("------")
 			}
-			obj := appsv1alpha1.CloneSet{
+			obj := appsv1beta1.CloneSet{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%d", i), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "2"},
 				Spec:       *successCase.spec,
 			}
@@ -260,7 +260,7 @@ func TestValidate(t *testing.T) {
 					t.Errorf("expected success: %v", errs)
 				}
 			} else {
-				oldObj := appsv1alpha1.CloneSet{
+				oldObj := appsv1beta1.CloneSet{
 					ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%d", i), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "1"},
 					Spec:       *successCase.oldSpec,
 				}
@@ -275,47 +275,47 @@ func TestValidate(t *testing.T) {
 
 	errorCases := map[string]testCase{
 		"invalid-replicas": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &minus1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
 		"invalid-template": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: invalidPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
 		"invalid-selector": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b", "c": "d"}},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
 		"invalid-update-type": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 					Type:           "",
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
@@ -323,36 +323,36 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		"invalid-partition": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(-1)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
 		},
 		"invalid-maxUnavailable": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr0,
 				},
 			},
 		},
 		"invalid-maxSurge": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr0,
 					MaxSurge:       &intOrStr0,
@@ -360,68 +360,68 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		"invalid-podsToDelete-1": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0", "p0"},
 				},
 			},
 		},
 		"invalid-podsToDelete-2": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p0", "p1"},
 				},
 			},
 		},
 		// test pod-to-delete not-exits case
 		"invalid-podsToDelete-3": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
-				ScaleStrategy: appsv1alpha1.CloneSetScaleStrategy{
+				ScaleStrategy: appsv1beta1.CloneSetScaleStrategy{
 					PodsToDelete: []string{"p1"},
 				},
 			},
 		},
 		"invalid-cloneset-update-1": {
-			spec: &appsv1alpha1.CloneSetSpec{
+			spec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
 			},
-			oldSpec: &appsv1alpha1.CloneSetSpec{
+			oldSpec: &appsv1beta1.CloneSetSpec{
 				Replicas: &val1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate2.Template,
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+					Type:           appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType,
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
 					MaxUnavailable: &intOrStr1,
 				},
@@ -431,7 +431,7 @@ func TestValidate(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			obj := appsv1alpha1.CloneSet{
+			obj := appsv1beta1.CloneSet{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%v", k), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "2"},
 				Spec:       *v.spec,
 			}
@@ -441,7 +441,7 @@ func TestValidate(t *testing.T) {
 					t.Errorf("expected failure for %v", k)
 				}
 			} else {
-				oldObj := appsv1alpha1.CloneSet{
+				oldObj := appsv1beta1.CloneSet{
 					ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%v", k), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "1"},
 					Spec:       *v.oldSpec,
 				}

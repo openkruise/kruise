@@ -1,7 +1,7 @@
 package econtainer
 
 import (
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -18,7 +18,7 @@ type EphemeralContainerInterface interface {
 	RemoveEphemeralContainer(target *v1.Pod) error
 }
 
-func New(job *appsv1alpha1.EphemeralJob) EphemeralContainerInterface {
+func New(job *appsv1beta1.EphemeralJob) EphemeralContainerInterface {
 	return &k8sControl{job}
 }
 

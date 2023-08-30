@@ -9,7 +9,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/openkruise/kruise/apis"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,12 +68,12 @@ func TestHandle(t *testing.T) {
 		{
 			Operation: "add",
 			Path:      "/spec/completionPolicy",
-			Value:     map[string]interface{}{"type": string(appsv1alpha1.Always)},
+			Value:     map[string]interface{}{"type": string(appsv1beta1.Always)},
 		},
 		{
 			Operation: "add",
 			Path:      "/spec/failurePolicy",
-			Value:     map[string]interface{}{"type": string(appsv1alpha1.FailurePolicyTypeFailFast)},
+			Value:     map[string]interface{}{"type": string(appsv1beta1.FailurePolicyTypeFailFast)},
 		},
 		{
 			Operation: "remove",

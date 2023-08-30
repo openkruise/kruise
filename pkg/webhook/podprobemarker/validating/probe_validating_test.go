@@ -21,7 +21,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,27 +31,27 @@ import (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 }
 
 var (
 	scheme *runtime.Scheme
 
-	ppmDemo = appsv1alpha1.PodProbeMarker{
+	ppmDemo = appsv1beta1.PodProbeMarker{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ppm-test",
 		},
-		Spec: appsv1alpha1.PodProbeMarkerSpec{
+		Spec: appsv1beta1.PodProbeMarkerSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "test",
 				},
 			},
-			Probes: []appsv1alpha1.PodContainerProbe{
+			Probes: []appsv1beta1.PodContainerProbe{
 				{
 					Name:          "healthy",
 					ContainerName: "main",
-					Probe: appsv1alpha1.ContainerProbeSpec{
+					Probe: appsv1beta1.ContainerProbeSpec{
 						Probe: corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -61,9 +61,9 @@ var (
 						},
 					},
 					PodConditionType: "game.kruise.io/healthy",
-					MarkerPolicy: []appsv1alpha1.ProbeMarkerPolicy{
+					MarkerPolicy: []appsv1beta1.ProbeMarkerPolicy{
 						{
-							State: appsv1alpha1.ProbeSucceeded,
+							State: appsv1beta1.ProbeSucceeded,
 							Annotations: map[string]string{
 								"controller.kubernetes.io/pod-deletion-cost": "10",
 							},
@@ -72,7 +72,7 @@ var (
 							},
 						},
 						{
-							State: appsv1alpha1.ProbeFailed,
+							State: appsv1beta1.ProbeFailed,
 							Annotations: map[string]string{
 								"controller.kubernetes.io/pod-deletion-cost": "-10",
 							},
@@ -90,12 +90,12 @@ var (
 func TestValidatingPodProbeMarker(t *testing.T) {
 	cases := []struct {
 		name          string
-		getPpm        func() *appsv1alpha1.PodProbeMarker
+		getPpm        func() *appsv1beta1.PodProbeMarker
 		expectErrList int
 	}{
 		{
 			name: "test1, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
 				ppm.Spec.Selector = nil
 				return ppm
@@ -104,7 +104,7 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test2, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
 				ppm.Spec.Probes = nil
 				return ppm
@@ -113,9 +113,9 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test3, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
-				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1alpha1.PodContainerProbe{
+				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1beta1.PodContainerProbe{
 					Name:          "healthy",
 					ContainerName: "other",
 				})
@@ -125,12 +125,12 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test4, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
-				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1alpha1.PodContainerProbe{
+				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1beta1.PodContainerProbe{
 					Name:          "check",
 					ContainerName: "other",
-					Probe: appsv1alpha1.ContainerProbeSpec{
+					Probe: appsv1beta1.ContainerProbeSpec{
 						Probe: corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								TCPSocket: &corev1.TCPSocketAction{
@@ -147,12 +147,12 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test5, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
-				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1alpha1.PodContainerProbe{
+				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1beta1.PodContainerProbe{
 					Name:          "check",
 					ContainerName: "other",
-					Probe: appsv1alpha1.ContainerProbeSpec{
+					Probe: appsv1beta1.ContainerProbeSpec{
 						Probe: corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{},
@@ -167,11 +167,11 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test6, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
-				ppm.Spec.Probes[0].MarkerPolicy = []appsv1alpha1.ProbeMarkerPolicy{
+				ppm.Spec.Probes[0].MarkerPolicy = []appsv1beta1.ProbeMarkerPolicy{
 					{
-						State: appsv1alpha1.ProbeUnknown,
+						State: appsv1beta1.ProbeUnknown,
 						Annotations: map[string]string{
 							"controller.kubernetes.io/pod-deletion-cost": "10",
 						},
@@ -186,11 +186,11 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test7, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
-				ppm.Spec.Probes[0].MarkerPolicy = []appsv1alpha1.ProbeMarkerPolicy{
+				ppm.Spec.Probes[0].MarkerPolicy = []appsv1beta1.ProbeMarkerPolicy{
 					{
-						State: appsv1alpha1.ProbeSucceeded,
+						State: appsv1beta1.ProbeSucceeded,
 						Annotations: map[string]string{
 							"controller.kubernetes.io/pod-deletion-cost": "10",
 						},
@@ -205,7 +205,7 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test8, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
 				ppm.Spec.Probes[0].Name = string(corev1.PodInitialized)
 				return ppm
@@ -214,7 +214,7 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 		{
 			name: "test9, invalid ppm",
-			getPpm: func() *appsv1alpha1.PodProbeMarker {
+			getPpm: func() *appsv1beta1.PodProbeMarker {
 				ppm := ppmDemo.DeepCopy()
 				ppm.Spec.Probes[0].PodConditionType = "#5invalid"
 				return ppm

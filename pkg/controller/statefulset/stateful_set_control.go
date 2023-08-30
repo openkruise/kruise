@@ -35,7 +35,6 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -340,7 +339,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if currentRevision.Name != updateRevision.Name {
 			// get asts pre-download annotation
 			minUpdatedReadyPodsCount := 0
-			if minUpdatedReadyPods, ok := set.Annotations[appsv1alpha1.ImagePreDownloadMinUpdatedReadyPods]; ok {
+			if minUpdatedReadyPods, ok := set.Annotations[appsv1beta1.ImagePreDownloadMinUpdatedReadyPods]; ok {
 				minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
 				minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(*set.Spec.Replicas), true)
 				if err != nil {

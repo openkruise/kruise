@@ -24,7 +24,7 @@ import (
 	"regexp"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -62,15 +62,15 @@ var _ admission.Handler = &PodProbeMarkerCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *PodProbeMarkerCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.PodProbeMarker{}
+	obj := &appsv1beta1.PodProbeMarker{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var old *appsv1alpha1.PodProbeMarker
+	var old *appsv1beta1.PodProbeMarker
 	//when Operation is update, decode older object
 	if req.AdmissionRequest.Operation == admissionv1.Update {
-		old = new(appsv1alpha1.PodProbeMarker)
+		old = new(appsv1beta1.PodProbeMarker)
 		if err := h.Decoder.Decode(
 			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
 			old); err != nil {
@@ -84,7 +84,7 @@ func (h *PodProbeMarkerCreateUpdateHandler) Handle(ctx context.Context, req admi
 	return admission.ValidationResponse(true, "")
 }
 
-func (h *PodProbeMarkerCreateUpdateHandler) validatingPodProbeMarkerFn(obj, old *appsv1alpha1.PodProbeMarker) field.ErrorList {
+func (h *PodProbeMarkerCreateUpdateHandler) validatingPodProbeMarkerFn(obj, old *appsv1beta1.PodProbeMarker) field.ErrorList {
 	//validate ppm.Spec
 	allErrs := validatePodProbeMarkerSpec(obj, field.NewPath("spec"))
 	// when operation is update, validating whether old and new pps conflict
@@ -96,7 +96,7 @@ func (h *PodProbeMarkerCreateUpdateHandler) validatingPodProbeMarkerFn(obj, old 
 	return allErrs
 }
 
-func validatePodProbeMarkerSpec(obj *appsv1alpha1.PodProbeMarker, fldPath *field.Path) field.ErrorList {
+func validatePodProbeMarkerSpec(obj *appsv1beta1.PodProbeMarker, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	// selector
@@ -165,7 +165,7 @@ func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateProbe(probe *appsv1alpha1.ContainerProbeSpec, fldPath *field.Path) field.ErrorList {
+func validateProbe(probe *appsv1beta1.ContainerProbeSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if probe == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, probe, "probe can't be empty in podProbeMarker."))
@@ -205,9 +205,9 @@ func validateExecAction(exec *corev1.ExecAction, fldPath *field.Path) field.Erro
 	return allErrors
 }
 
-func validateProbeMarkerPolicy(policy *appsv1alpha1.ProbeMarkerPolicy, fldPath *field.Path) field.ErrorList {
+func validateProbeMarkerPolicy(policy *appsv1beta1.ProbeMarkerPolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
-	if policy.State != appsv1alpha1.ProbeSucceeded && policy.State != appsv1alpha1.ProbeFailed {
+	if policy.State != appsv1beta1.ProbeSucceeded && policy.State != appsv1beta1.ProbeFailed {
 		allErrors = append(allErrors, field.Required(fldPath.Child("state"), "marker policy state must be 'True' or 'False'"))
 		return allErrors
 	}

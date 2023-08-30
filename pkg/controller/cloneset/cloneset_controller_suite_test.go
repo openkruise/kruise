@@ -30,7 +30,7 @@ import (
 
 	"github.com/onsi/gomega"
 	"github.com/openkruise/kruise/apis"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -49,7 +49,7 @@ import (
 func init() {
 	testscheme = k8sruntime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(testscheme))
-	utilruntime.Must(appsv1alpha1.AddToScheme(testscheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(testscheme))
 }
 
 var testscheme *k8sruntime.Scheme
@@ -87,14 +87,14 @@ func StartTestManager(ctx context.Context, mgr manager.Manager, g *gomega.Gomega
 func TestCleanupPVCs(t *testing.T) {
 	cases := []struct {
 		name       string
-		getCS      func() *appsv1alpha1.CloneSet
+		getCS      func() *appsv1beta1.CloneSet
 		getPods    func() (activePods, inactivePods []*v1.Pod)
 		getPVCs    func() []*v1.PersistentVolumeClaim
 		expectPVCs func() (usedPVCs, uselessPVCs sets.String)
 	}{
 		{
 			name: "test1",
-			getCS: func() *appsv1alpha1.CloneSet {
+			getCS: func() *appsv1beta1.CloneSet {
 				obj := clonesettest.NewCloneSet(5)
 				return obj
 			},
@@ -110,7 +110,7 @@ func TestCleanupPVCs(t *testing.T) {
 							Name: fmt.Sprintf("foo-%d", i),
 							UID:  types.UID(fmt.Sprintf("foo-%d", i)),
 							Labels: map[string]string{
-								appsv1alpha1.CloneSetInstanceID: fmt.Sprintf("instance-%d", i),
+								appsv1beta1.CloneSetInstanceID: fmt.Sprintf("instance-%d", i),
 							},
 							DeletionTimestamp: &ti,
 						},
@@ -127,7 +127,7 @@ func TestCleanupPVCs(t *testing.T) {
 							Name: fmt.Sprintf("foo-%d", i),
 							UID:  types.UID(fmt.Sprintf("foo-%d", i)),
 							Labels: map[string]string{
-								appsv1alpha1.CloneSetInstanceID: fmt.Sprintf("instance-%d", i),
+								appsv1beta1.CloneSetInstanceID: fmt.Sprintf("instance-%d", i),
 							},
 						},
 					}
@@ -147,7 +147,7 @@ func TestCleanupPVCs(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fmt.Sprintf("foo-pvc-%d", i),
 							Labels: map[string]string{
-								appsv1alpha1.CloneSetInstanceID: fmt.Sprintf("instance-%d", i),
+								appsv1beta1.CloneSetInstanceID: fmt.Sprintf("instance-%d", i),
 							},
 						},
 					}

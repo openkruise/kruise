@@ -4,7 +4,7 @@ import (
 	"context"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,7 +54,7 @@ func (e *podHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInter
 }
 
 func (e *podHandler) handle(pod *corev1.Pod, q workqueue.RateLimitingInterface) {
-	ephemeralJobs := appsv1alpha1.EphemeralJobList{}
+	ephemeralJobs := appsv1beta1.EphemeralJobList{}
 	if err := e.List(context.TODO(), &ephemeralJobs, client.InNamespace(pod.Namespace)); err != nil {
 		return
 	}
@@ -76,7 +76,7 @@ type ejobHandler struct {
 }
 
 func (e *ejobHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	ejob, ok := evt.Object.(*appsv1alpha1.EphemeralJob)
+	ejob, ok := evt.Object.(*appsv1beta1.EphemeralJob)
 	if !ok {
 		return
 	}
@@ -91,8 +91,8 @@ func (e *ejobHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingIn
 }
 
 func (e *ejobHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldEJob := evt.ObjectOld.(*appsv1alpha1.EphemeralJob)
-	curEJob := evt.ObjectNew.(*appsv1alpha1.EphemeralJob)
+	oldEJob := evt.ObjectOld.(*appsv1beta1.EphemeralJob)
+	curEJob := evt.ObjectNew.(*appsv1beta1.EphemeralJob)
 	if oldEJob.ResourceVersion == curEJob.ResourceVersion {
 		return
 	}
@@ -107,7 +107,7 @@ func (e *ejobHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInte
 }
 
 func (e *ejobHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	ejob, ok := evt.Object.(*appsv1alpha1.EphemeralJob)
+	ejob, ok := evt.Object.(*appsv1beta1.EphemeralJob)
 	if !ok {
 		return
 	}

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -14,7 +14,7 @@ import (
 )
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
-func pastActiveDeadline(job *appsv1alpha1.EphemeralJob) bool {
+func pastActiveDeadline(job *appsv1beta1.EphemeralJob) bool {
 	if job.Spec.ActiveDeadlineSeconds == nil || job.Status.StartTime == nil {
 		return false
 	}
@@ -24,7 +24,7 @@ func pastActiveDeadline(job *appsv1alpha1.EphemeralJob) bool {
 	return duration >= allowedDuration
 }
 
-func podMatchedEphemeralJob(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) (bool, error) {
+func podMatchedEphemeralJob(pod *v1.Pod, ejob *appsv1beta1.EphemeralJob) (bool, error) {
 	// if selector not matched, then continue
 	if pod.Namespace != ejob.Namespace {
 		return false, nil
@@ -40,10 +40,10 @@ func podMatchedEphemeralJob(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) (bool,
 	return false, nil
 }
 
-func addConditions(conditions []appsv1alpha1.EphemeralJobCondition, conditionType appsv1alpha1.EphemeralJobConditionType, reason, message string) []appsv1alpha1.EphemeralJobCondition {
+func addConditions(conditions []appsv1beta1.EphemeralJobCondition, conditionType appsv1beta1.EphemeralJobConditionType, reason, message string) []appsv1beta1.EphemeralJobCondition {
 	condition := newCondition(conditionType, reason, message)
 	if len(conditions) == 0 {
-		return []appsv1alpha1.EphemeralJobCondition{
+		return []appsv1beta1.EphemeralJobCondition{
 			condition,
 		}
 	}
@@ -59,8 +59,8 @@ func addConditions(conditions []appsv1alpha1.EphemeralJobCondition, conditionTyp
 	return conditions
 }
 
-func newCondition(conditionType appsv1alpha1.EphemeralJobConditionType, reason, message string) appsv1alpha1.EphemeralJobCondition {
-	return appsv1alpha1.EphemeralJobCondition{
+func newCondition(conditionType appsv1beta1.EphemeralJobConditionType, reason, message string) appsv1beta1.EphemeralJobCondition {
+	return appsv1beta1.EphemeralJobCondition{
 		Type:               conditionType,
 		Status:             v1.ConditionTrue,
 		LastProbeTime:      metav1.Now(),
@@ -83,7 +83,7 @@ func getEphemeralContainersMaps(containers []v1.EphemeralContainer) (map[string]
 	return res, len(res) == 0
 }
 
-func getPodEphemeralContainers(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) []string {
+func getPodEphemeralContainers(pod *v1.Pod, ejob *appsv1beta1.EphemeralJob) []string {
 	eContainers := ejob.Spec.Template.EphemeralContainers
 	podEphemeralNames := make([]string, len(eContainers))
 	for i := range ejob.Spec.Template.EphemeralContainers {
@@ -92,7 +92,7 @@ func getPodEphemeralContainers(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) []s
 	return podEphemeralNames
 }
 
-func existEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) (exists, owned bool) {
+func existEphemeralContainer(job *appsv1beta1.EphemeralJob, targetPod *v1.Pod) (exists, owned bool) {
 	ephemeralContainersMaps, _ := getEphemeralContainersMaps(econtainer.New(job).GetEphemeralContainers(targetPod))
 	for _, e := range job.Spec.Template.EphemeralContainers {
 		if targetEC, ok := ephemeralContainersMaps[e.Name]; ok {
@@ -103,7 +103,7 @@ func existEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) 
 	return false, false
 }
 
-func existDuplicatedEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) bool {
+func existDuplicatedEphemeralContainer(job *appsv1beta1.EphemeralJob, targetPod *v1.Pod) bool {
 	ephemeralContainersMaps, _ := getEphemeralContainersMaps(econtainer.New(job).GetEphemeralContainers(targetPod))
 	for _, e := range job.Spec.Template.EphemeralContainers {
 		if targetEC, ok := ephemeralContainersMaps[e.Name]; ok && !isCreatedByEJob(string(job.UID), targetEC) {
@@ -116,14 +116,14 @@ func existDuplicatedEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod
 
 func isCreatedByEJob(jobUid string, container v1.EphemeralContainer) bool {
 	for _, env := range container.Env {
-		if env.Name == appsv1alpha1.EphemeralContainerEnvKey && env.Value == jobUid {
+		if env.Name == appsv1beta1.EphemeralContainerEnvKey && env.Value == jobUid {
 			return true
 		}
 	}
 	return false
 }
 
-func getSyncPods(job *appsv1alpha1.EphemeralJob, pods []*v1.Pod) (toCreate, toUpdate, toDelete []*v1.Pod) {
+func getSyncPods(job *appsv1beta1.EphemeralJob, pods []*v1.Pod) (toCreate, toUpdate, toDelete []*v1.Pod) {
 	eContainersMap, empty := getEphemeralContainersMaps(job.Spec.Template.EphemeralContainers)
 	if empty {
 		return
@@ -148,7 +148,7 @@ func getSyncPods(job *appsv1alpha1.EphemeralJob, pods []*v1.Pod) (toCreate, toUp
 	return
 }
 
-func calculateEphemeralContainerStatus(job *appsv1alpha1.EphemeralJob, pods []*v1.Pod) error {
+func calculateEphemeralContainerStatus(job *appsv1beta1.EphemeralJob, pods []*v1.Pod) error {
 	var success, failed, running, waiting int32
 	for _, pod := range pods {
 		state, err := parseEphemeralPodStatus(job, econtainer.New(job).GetEphemeralContainersStatus(pod))
@@ -176,7 +176,7 @@ func calculateEphemeralContainerStatus(job *appsv1alpha1.EphemeralJob, pods []*v
 	return nil
 }
 
-func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.ContainerStatus) (v1.PodPhase, error) {
+func parseEphemeralPodStatus(ejob *appsv1beta1.EphemeralJob, statuses []v1.ContainerStatus) (v1.PodPhase, error) {
 	eContainerMap, empty := getEphemeralContainersMaps(ejob.Spec.Template.EphemeralContainers)
 	if empty {
 		klog.Error("ephemeral job spec containers is empty")

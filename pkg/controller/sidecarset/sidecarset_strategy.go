@@ -3,7 +3,7 @@ package sidecarset
 import (
 	"sort"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/updatesort"
@@ -103,7 +103,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 }
 
 // SortUpdateIndexes sorts the given waitUpdateIndexes of Pods to update according to the SidecarSet update strategy.
-func SortUpdateIndexes(strategy appsv1alpha1.SidecarSetUpdateStrategy, pods []*corev1.Pod, waitUpdateIndexes []int) []int {
+func SortUpdateIndexes(strategy appsv1beta1.SidecarSetUpdateStrategy, pods []*corev1.Pod, waitUpdateIndexes []int) []int {
 	//Sort Pods with default sequence
 	//	- Unassigned < assigned
 	//	- PodPending < PodUnknown < PodRunning
@@ -176,8 +176,8 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 	return needUpgradeCount
 }
 
-func parseUpdateScatterTerms(scatter appsv1alpha1.UpdateScatterStrategy, pods []*corev1.Pod) appsv1alpha1.UpdateScatterStrategy {
-	newScatter := appsv1alpha1.UpdateScatterStrategy{}
+func parseUpdateScatterTerms(scatter appsv1beta1.UpdateScatterStrategy, pods []*corev1.Pod) appsv1beta1.UpdateScatterStrategy {
+	newScatter := appsv1beta1.UpdateScatterStrategy{}
 	for _, term := range scatter {
 		if term.Value != "*" {
 			newScatter = insertUpdateScatterTerm(newScatter, term)
@@ -193,7 +193,7 @@ func parseUpdateScatterTerms(scatter appsv1alpha1.UpdateScatterStrategy, pods []
 	return newScatter
 }
 
-func insertUpdateScatterTerm(scatter appsv1alpha1.UpdateScatterStrategy, term appsv1alpha1.UpdateScatterTerm) appsv1alpha1.UpdateScatterStrategy {
+func insertUpdateScatterTerm(scatter appsv1beta1.UpdateScatterStrategy, term appsv1beta1.UpdateScatterTerm) appsv1beta1.UpdateScatterStrategy {
 	for _, obj := range scatter {
 		//if term already exist, return
 		if term.Key == obj.Key && term.Value == obj.Value {
@@ -205,14 +205,14 @@ func insertUpdateScatterTerm(scatter appsv1alpha1.UpdateScatterStrategy, term ap
 }
 
 // convert regular terms to scatter terms
-func matchScatterTerms(pods []*corev1.Pod, regularLabel string) []appsv1alpha1.UpdateScatterTerm {
-	var terms []appsv1alpha1.UpdateScatterTerm
+func matchScatterTerms(pods []*corev1.Pod, regularLabel string) []appsv1beta1.UpdateScatterTerm {
+	var terms []appsv1beta1.UpdateScatterTerm
 	for _, pod := range pods {
 		labelValue, ok := pod.Labels[regularLabel]
 		if !ok {
 			continue
 		}
-		terms = append(terms, appsv1alpha1.UpdateScatterTerm{
+		terms = append(terms, appsv1beta1.UpdateScatterTerm{
 			Key:   regularLabel,
 			Value: labelValue,
 		})

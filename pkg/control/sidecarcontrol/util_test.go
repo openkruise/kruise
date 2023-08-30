@@ -24,7 +24,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	corev1 "k8s.io/api/core/v1"
@@ -117,7 +117,7 @@ var (
 		},
 	}
 
-	sidecarSetDemo = &appsv1alpha1.SidecarSet{
+	sidecarSetDemo = &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Generation: 123,
 			Annotations: map[string]string{
@@ -129,15 +129,15 @@ var (
 				"app": "sidecar",
 			},
 		},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name:  "cold-sidecar",
 						Image: "cold-image:v1",
 					},
-					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-						UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+					UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 					},
 				},
 				{
@@ -145,8 +145,8 @@ var (
 						Name:  "hot-sidecar",
 						Image: "hot-image:v1",
 					},
-					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-						UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+					UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+						UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 						HotUpgradeEmptyImage: "hotupgrade:empty",
 					},
 				},
@@ -344,7 +344,7 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 	cases := []struct {
 		name                       string
 		getPod                     func() *corev1.Pod
-		getSidecarSet              func() *appsv1alpha1.SidecarSet
+		getSidecarSet              func() *appsv1beta1.SidecarSet
 		exceptRevision             map[string]SidecarSetUpgradeSpec
 		exceptWithoutImageRevision map[string]SidecarSetUpgradeSpec
 	}{
@@ -356,7 +356,7 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 				pod.Annotations[SidecarSetHashWithoutImageAnnotation] = `{"test-sidecarset":{"hash":"without-image-aaa"}}`
 				return pod
 			},
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				return sidecarSetDemo.DeepCopy()
 			},
 			exceptRevision: map[string]SidecarSetUpgradeSpec{
@@ -378,7 +378,7 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 				pod.Annotations[SidecarSetHashWithoutImageAnnotation] = `{"test-sidecarset": "without-image-aaa"}`
 				return pod
 			},
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				return sidecarSetDemo.DeepCopy()
 			},
 			exceptRevision: map[string]SidecarSetUpgradeSpec{
@@ -400,7 +400,7 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 				pod.Annotations[SidecarSetHashWithoutImageAnnotation] = "failed-sidecarset-hash"
 				return pod
 			},
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				return sidecarSetDemo.DeepCopy()
 			},
 			exceptRevision: map[string]SidecarSetUpgradeSpec{
@@ -580,20 +580,20 @@ func TestExtractContainerNameFromFieldPath(t *testing.T) {
 
 func TestGetSidecarTransferEnvs(t *testing.T) {
 	testCases := []struct {
-		sidecarContainer *appsv1alpha1.SidecarContainer
+		sidecarContainer *appsv1beta1.SidecarContainer
 		pod              *corev1.Pod
 		expectedEnvs     []corev1.EnvVar
 	}{
 		{
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "cold-sidecar",
 					Image: "cold-image:v1",
 				},
-				UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-					UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+				UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+					UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 				},
-				TransferEnv: []appsv1alpha1.TransferEnvVar{
+				TransferEnv: []appsv1beta1.TransferEnvVar{
 					{
 						EnvName:             "test-env",
 						SourceContainerName: "main",
@@ -631,18 +631,18 @@ func TestGetSidecarTransferEnvs(t *testing.T) {
 			},
 		},
 		{
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "cold-sidecar",
 					Image: "cold-image:v1",
 				},
-				UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-					UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+				UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+					UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 				},
-				TransferEnv: []appsv1alpha1.TransferEnvVar{
+				TransferEnv: []appsv1beta1.TransferEnvVar{
 					{
 						EnvName: "test-env",
-						SourceContainerNameFrom: &appsv1alpha1.SourceContainerNameSource{
+						SourceContainerNameFrom: &appsv1beta1.SourceContainerNameSource{
 							FieldRef: &corev1.ObjectFieldSelector{
 								APIVersion: "v1",
 								FieldPath:  "metadata.labels['app']",
@@ -682,18 +682,18 @@ func TestGetSidecarTransferEnvs(t *testing.T) {
 			},
 		},
 		{
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "cold-sidecar",
 					Image: "cold-image:v1",
 				},
-				UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-					UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+				UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+					UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 				},
-				TransferEnv: []appsv1alpha1.TransferEnvVar{
+				TransferEnv: []appsv1beta1.TransferEnvVar{
 					{
 						EnvName: "test-env",
-						SourceContainerNameFrom: &appsv1alpha1.SourceContainerNameSource{
+						SourceContainerNameFrom: &appsv1beta1.SourceContainerNameSource{
 							FieldRef: &corev1.ObjectFieldSelector{
 								APIVersion: "v1",
 								FieldPath:  "metadata.annotations['app']",
@@ -746,7 +746,7 @@ func TestPatchPodMetadata(t *testing.T) {
 	cases := []struct {
 		name              string
 		getPod            func() *corev1.Pod
-		patches           func() []appsv1alpha1.SidecarSetPatchPodMetadata
+		patches           func() []appsv1beta1.SidecarSetPatchPodMetadata
 		expectAnnotations map[string]string
 		expectErr         bool
 		skip              bool
@@ -757,16 +757,16 @@ func TestPatchPodMetadata(t *testing.T) {
 				demo := &corev1.Pod{}
 				return demo
 			},
-			patches: func() []appsv1alpha1.SidecarSetPatchPodMetadata {
-				patch := []appsv1alpha1.SidecarSetPatchPodMetadata{
+			patches: func() []appsv1beta1.SidecarSetPatchPodMetadata {
+				patch := []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetRetainPatchPolicy,
 						Annotations: map[string]string{
 							"key1": "value1",
 						},
 					},
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetOverwritePatchPolicy,
 						Annotations: map[string]string{
 							"key2": "value2",
 						},
@@ -794,16 +794,16 @@ func TestPatchPodMetadata(t *testing.T) {
 				}
 				return demo
 			},
-			patches: func() []appsv1alpha1.SidecarSetPatchPodMetadata {
-				patch := []appsv1alpha1.SidecarSetPatchPodMetadata{
+			patches: func() []appsv1beta1.SidecarSetPatchPodMetadata {
+				patch := []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetRetainPatchPolicy,
 						Annotations: map[string]string{
 							"key1": "value1",
 						},
 					},
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetOverwritePatchPolicy,
 						Annotations: map[string]string{
 							"key2": "value2",
 						},
@@ -831,10 +831,10 @@ func TestPatchPodMetadata(t *testing.T) {
 				}
 				return demo
 			},
-			patches: func() []appsv1alpha1.SidecarSetPatchPodMetadata {
-				patch := []appsv1alpha1.SidecarSetPatchPodMetadata{
+			patches: func() []appsv1beta1.SidecarSetPatchPodMetadata {
+				patch := []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetMergePatchJsonPatchPolicy,
 						Annotations: map[string]string{
 							"key1": `{"log-agent":1}`,
 							"key2": `{"envoy":2}`,
@@ -864,10 +864,10 @@ func TestPatchPodMetadata(t *testing.T) {
 				}
 				return demo
 			},
-			patches: func() []appsv1alpha1.SidecarSetPatchPodMetadata {
-				patch := []appsv1alpha1.SidecarSetPatchPodMetadata{
+			patches: func() []appsv1beta1.SidecarSetPatchPodMetadata {
+				patch := []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetMergePatchJsonPatchPolicy,
 						Annotations: map[string]string{
 							"key1": `{"log-agent":1}`,
 						},
@@ -903,13 +903,13 @@ func TestPatchPodMetadata(t *testing.T) {
 func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 	cases := []struct {
 		name          string
-		getSidecarSet func() *appsv1alpha1.SidecarSet
+		getSidecarSet func() *appsv1beta1.SidecarSet
 		getKruiseCM   func() *corev1.ConfigMap
 		expectErr     bool
 	}{
 		{
 			name: "validate sidecarSet no patch Metadata",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarSetDemo.DeepCopy()
 				return demo
 			},
@@ -920,9 +920,9 @@ func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 		},
 		{
 			name: "validate sidecarSet whitelist failed-1",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarSetDemo.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
 						Annotations: map[string]string{
 							"key1": "value1",
@@ -938,9 +938,9 @@ func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 		},
 		{
 			name: "validate sidecarSet whitelist success-1",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarSetDemo.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
 						Annotations: map[string]string{
 							"key1": "value1",
@@ -965,9 +965,9 @@ func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 		},
 		{
 			name: "validate sidecarSet whitelist failed-2",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarSetDemo.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
 						Annotations: map[string]string{
 							"key1": "value1",
@@ -992,9 +992,9 @@ func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 		},
 		{
 			name: "validate sidecarSet whitelist failed-3",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarSetDemo.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
 						Annotations: map[string]string{
 							"key1": "value1",
@@ -1019,9 +1019,9 @@ func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 		},
 		{
 			name: "validate sidecarSet whitelist success-2",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarSetDemo.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
 						Annotations: map[string]string{
 							"key1": "value1",
@@ -1065,17 +1065,17 @@ func TestValidateSidecarSetPatchMetadataWhitelist(t *testing.T) {
 func TestPodMatchedSidecarSet(t *testing.T) {
 	cases := []struct {
 		name          string
-		getSidecarSet func() *appsv1alpha1.SidecarSet
+		getSidecarSet func() *appsv1beta1.SidecarSet
 		getPod        func() *corev1.Pod
 		getNs         func() []*corev1.Namespace
 		expect        bool
 	}{
 		{
 			name: "test1",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				demo := &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				demo := &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"app": "nginx"},
 						},
@@ -1100,10 +1100,10 @@ func TestPodMatchedSidecarSet(t *testing.T) {
 		},
 		{
 			name: "test2",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				demo := &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				demo := &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"app": "nginx"},
 						},
@@ -1129,10 +1129,10 @@ func TestPodMatchedSidecarSet(t *testing.T) {
 		},
 		{
 			name: "test3",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				demo := &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				demo := &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"app": "nginx"},
 						},
@@ -1158,10 +1158,10 @@ func TestPodMatchedSidecarSet(t *testing.T) {
 		},
 		{
 			name: "test4",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				demo := &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				demo := &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"app": "nginx"},
 						},
@@ -1203,10 +1203,10 @@ func TestPodMatchedSidecarSet(t *testing.T) {
 		},
 		{
 			name: "test5",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				demo := &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				demo := &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset-test"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"app": "nginx"},
 						},

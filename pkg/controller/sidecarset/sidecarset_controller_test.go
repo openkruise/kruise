@@ -6,7 +6,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,7 +28,7 @@ type HandlePod func(pod []*corev1.Pod)
 var (
 	scheme *runtime.Scheme
 
-	sidecarSetDemo = &appsv1alpha1.SidecarSet{
+	sidecarSetDemo = &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			//Generation: 123,
 			Annotations: map[string]string{
@@ -37,8 +37,8 @@ var (
 			Name:   "test-sidecarset",
 			Labels: map[string]string{},
 		},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			Containers: []appsv1alpha1.SidecarContainer{
+		Spec: appsv1beta1.SidecarSetSpec{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name:  "test-sidecar",
@@ -49,9 +49,9 @@ var (
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "nginx"},
 			},
-			UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+			UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
 				// default type=RollingUpdate, Partition=0, MaxUnavailable=1
-				//Type:           appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+				//Type:           appsv1beta1.RollingUpdateSidecarSetStrategyType,
 				//Partition:      &partition,
 				//MaxUnavailable: &maxUnavailable,
 			},
@@ -133,9 +133,9 @@ var (
 func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(appsv1alpha1.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(clientgoscheme.Scheme))
 	utilruntime.Must(appsv1.AddToScheme(scheme))
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 }
 
@@ -149,8 +149,8 @@ func getLatestPod(client client.Client, pod *corev1.Pod) (*corev1.Pod, error) {
 	return newPod, err
 }
 
-func getLatestSidecarSet(client client.Client, sidecarset *appsv1alpha1.SidecarSet) (*appsv1alpha1.SidecarSet, error) {
-	newSidecarSet := &appsv1alpha1.SidecarSet{}
+func getLatestSidecarSet(client client.Client, sidecarset *appsv1beta1.SidecarSet) (*appsv1beta1.SidecarSet, error) {
+	newSidecarSet := &appsv1beta1.SidecarSet{}
 	Key := types.NamespacedName{
 		Name: sidecarset.Name,
 	}
@@ -172,8 +172,8 @@ func TestUpdateWhenUseNotUpdateStrategy(t *testing.T) {
 	testUpdateWhenUseNotUpdateStrategy(t, sidecarSetInput)
 }
 
-func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
-	sidecarSetInput.Spec.UpdateStrategy.Type = appsv1alpha1.NotUpdateSidecarSetStrategyType
+func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1beta1.SidecarSet) {
+	sidecarSetInput.Spec.UpdateStrategy.Type = appsv1beta1.NotUpdateSidecarSetStrategyType
 	podInput := podDemo.DeepCopy()
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -205,7 +205,7 @@ func TestUpdateWhenSidecarSetPaused(t *testing.T) {
 	testUpdateWhenSidecarSetPaused(t, sidecarSetInput)
 }
 
-func testUpdateWhenSidecarSetPaused(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
+func testUpdateWhenSidecarSetPaused(t *testing.T, sidecarSetInput *appsv1beta1.SidecarSet) {
 	sidecarSetInput.Spec.UpdateStrategy.Paused = true
 	podInput := podDemo.DeepCopy()
 	request := reconcile.Request{
@@ -238,7 +238,7 @@ func TestUpdateWhenMaxUnavailableNotZero(t *testing.T) {
 	testUpdateWhenMaxUnavailableNotZero(t, sidecarSetInput)
 }
 
-func testUpdateWhenMaxUnavailableNotZero(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
+func testUpdateWhenMaxUnavailableNotZero(t *testing.T, sidecarSetInput *appsv1beta1.SidecarSet) {
 	podInput := podDemo.DeepCopy()
 	podInput.Status.Phase = corev1.PodPending
 	request := reconcile.Request{
@@ -271,7 +271,7 @@ func TestUpdateWhenPartitionFinished(t *testing.T) {
 	testUpdateWhenPartitionFinished(t, sidecarSetInput)
 }
 
-func testUpdateWhenPartitionFinished(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
+func testUpdateWhenPartitionFinished(t *testing.T, sidecarSetInput *appsv1beta1.SidecarSet) {
 	newPartition := intstr.FromInt(1)
 	sidecarSetInput.Spec.UpdateStrategy.Partition = &newPartition
 	podInput := podDemo.DeepCopy()
@@ -305,7 +305,7 @@ func TestRemoveSidecarSet(t *testing.T) {
 	testRemoveSidecarSet(t, sidecarSetInput)
 }
 
-func testRemoveSidecarSet(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet) {
+func testRemoveSidecarSet(t *testing.T, sidecarSetInput *appsv1beta1.SidecarSet) {
 	podInput := podDemo.DeepCopy()
 	hashKey := sidecarcontrol.SidecarSetHashAnnotation
 	podInput.Annotations[hashKey] = `{"test-sidecarset":{"hash":"bbb"}}`

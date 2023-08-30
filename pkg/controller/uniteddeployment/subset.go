@@ -19,7 +19,7 @@ package uniteddeployment
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // Subset stores the details of a subset resource owned by one UnitedDeployment.
@@ -67,11 +67,11 @@ type ResourceRef struct {
 // ControlInterface defines the interface that UnitedDeployment uses to list, create, update, and delete Subsets.
 type ControlInterface interface {
 	// GetAllSubsets returns the subsets which are managed by the UnitedDeployment.
-	GetAllSubsets(ud *appsv1alpha1.UnitedDeployment, updatedRevision string) ([]*Subset, error)
+	GetAllSubsets(ud *appsv1beta1.UnitedDeployment, updatedRevision string) ([]*Subset, error)
 	// CreateSubset creates the subset depending on the inputs.
-	CreateSubset(ud *appsv1alpha1.UnitedDeployment, unit string, revision string, replicas, partition int32) error
+	CreateSubset(ud *appsv1beta1.UnitedDeployment, unit string, revision string, replicas, partition int32) error
 	// UpdateSubset updates the target subset with the input information.
-	UpdateSubset(subSet *Subset, ud *appsv1alpha1.UnitedDeployment, revision string, replicas, partition int32) error
+	UpdateSubset(subSet *Subset, ud *appsv1beta1.UnitedDeployment, revision string, replicas, partition int32) error
 	// UpdateSubset is used to delete the input subset.
 	DeleteSubset(*Subset) error
 	// GetSubsetFailure extracts the subset failure message to expose on UnitedDeployment status.

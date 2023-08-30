@@ -21,14 +21,14 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func newDaemonset(name string) *appsv1alpha1.DaemonSet {
-	ds := &appsv1alpha1.DaemonSet{}
+func newDaemonset(name string) *appsv1beta1.DaemonSet {
+	ds := &appsv1beta1.DaemonSet{}
 	ds.Name = name
 	ds.Namespace = metav1.NamespaceDefault
 	return ds
@@ -39,12 +39,12 @@ func TestValidateDaemonSet(t *testing.T) {
 
 	for _, c := range []struct {
 		Title             string
-		Ds                *appsv1alpha1.DaemonSet
+		Ds                *appsv1beta1.DaemonSet
 		ExpectAllowResult bool
 	}{
 		{
 			"selector not match",
-			func() *appsv1alpha1.DaemonSet {
+			func() *appsv1beta1.DaemonSet {
 				ds := newDaemonset("ds1")
 				ds.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -65,7 +65,7 @@ func TestValidateDaemonSet(t *testing.T) {
 		},
 		{
 			"selector match",
-			func() *appsv1alpha1.DaemonSet {
+			func() *appsv1beta1.DaemonSet {
 				maxUnavailable := intstr.FromInt(1)
 				ds := newDaemonset("ds1")
 				ds.Spec.Selector = &metav1.LabelSelector{
@@ -82,10 +82,10 @@ func TestValidateDaemonSet(t *testing.T) {
 					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "a", Image: "b"}}},
 				}
 				ds.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyAlways
-				ds.Spec.UpdateStrategy = appsv1alpha1.DaemonSetUpdateStrategy{
-					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-						Type:           appsv1alpha1.StandardRollingUpdateType,
+				ds.Spec.UpdateStrategy = appsv1beta1.DaemonSetUpdateStrategy{
+					Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+						Type:           appsv1beta1.StandardRollingUpdateType,
 						MaxUnavailable: &maxUnavailable,
 					},
 				}

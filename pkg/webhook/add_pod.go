@@ -17,8 +17,8 @@ limitations under the License.
 package webhook
 
 import (
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -33,7 +33,7 @@ func init() {
 		}
 
 		// Currently, if SidecarSet is not installed, we can also disable pod webhook.
-		if !utildiscovery.DiscoverObject(&appsv1alpha1.SidecarSet{}) {
+		if !utildiscovery.DiscoverObject(&appsv1beta1.SidecarSet{}) {
 			return false
 		}
 
@@ -46,7 +46,7 @@ func init() {
 		}
 
 		// Currently, if PodUnavailableBudget is not installed, we can also disable pod webhook.
-		if !utildiscovery.DiscoverObject(&policyv1alpha1.PodUnavailableBudget{}) {
+		if !utildiscovery.DiscoverObject(&policyv1beta1.PodUnavailableBudget{}) {
 			return false
 		}
 

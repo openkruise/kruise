@@ -19,7 +19,7 @@ package podprobe
 import (
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -30,7 +30,7 @@ const maxSyncProbeTime = 600
 type Update struct {
 	ContainerID   string
 	Key           probeKey
-	State         appsv1alpha1.ProbeState
+	State         appsv1beta1.ProbeState
 	Msg           string
 	LastProbeTime metav1.Time
 }
@@ -60,7 +60,7 @@ func (m *resultManager) listResults() []Update {
 	return results
 }
 
-func (m *resultManager) set(id string, key probeKey, result appsv1alpha1.ProbeState, msg string) {
+func (m *resultManager) set(id string, key probeKey, result appsv1beta1.ProbeState, msg string) {
 	currentTime := metav1.Now()
 	prev, exists := m.cache.Load(id)
 	if !exists || prev.(Update).State != result || currentTime.Sub(prev.(Update).LastProbeTime.Time) >= maxSyncProbeTime {

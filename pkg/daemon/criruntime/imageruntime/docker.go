@@ -21,7 +21,7 @@ import (
 	"io"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockerapi "github.com/docker/docker/client"
@@ -70,7 +70,7 @@ func (d *dockerImageService) handleRuntimeError(err error) {
 	}
 }
 
-func (d *dockerImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, _ *appsv1alpha1.SandboxConfig) (reader ImagePullStatusReader, err error) {
+func (d *dockerImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, _ *appsv1beta1.SandboxConfig) (reader ImagePullStatusReader, err error) {
 	if err = d.createRuntimeClientIfNecessary(); err != nil {
 		return nil, err
 	}

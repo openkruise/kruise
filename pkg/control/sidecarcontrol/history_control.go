@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	apps "k8s.io/api/apps/v1"
@@ -40,15 +40,15 @@ import (
 )
 
 var (
-	patchCodec = scheme.Codecs.LegacyCodec(appsv1alpha1.SchemeGroupVersion)
+	patchCodec = scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion)
 )
 
 type HistoryControl interface {
 	CreateControllerRevision(parent metav1.Object, revision *apps.ControllerRevision, collisionCount *int32) (*apps.ControllerRevision, error)
-	NewRevision(s *appsv1alpha1.SidecarSet, namespace string, revision int64, collisionCount *int32) (*apps.ControllerRevision, error)
+	NewRevision(s *appsv1beta1.SidecarSet, namespace string, revision int64, collisionCount *int32) (*apps.ControllerRevision, error)
 	NextRevision(revisions []*apps.ControllerRevision) int64
-	GetRevisionSelector(s *appsv1alpha1.SidecarSet) labels.Selector
-	GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, revisionInfo *appsv1alpha1.SidecarSetInjectRevision) (*appsv1alpha1.SidecarSet, error)
+	GetRevisionSelector(s *appsv1beta1.SidecarSet) labels.Selector
+	GetHistorySidecarSet(sidecarSet *appsv1beta1.SidecarSet, revisionInfo *appsv1beta1.SidecarSetInjectRevision) (*appsv1beta1.SidecarSet, error)
 }
 
 type realControl struct {
@@ -61,7 +61,7 @@ func NewHistoryControl(client client.Client) HistoryControl {
 	}
 }
 
-func (r *realControl) NewRevision(s *appsv1alpha1.SidecarSet, namespace string, revision int64, collisionCount *int32) (
+func (r *realControl) NewRevision(s *appsv1beta1.SidecarSet, namespace string, revision int64, collisionCount *int32) (
 	*apps.ControllerRevision, error,
 ) {
 	patch, err := r.getPatch(s)
@@ -92,8 +92,8 @@ func (r *realControl) NewRevision(s *appsv1alpha1.SidecarSet, namespace string, 
 	if s.Annotations[SidecarSetHashWithoutImageAnnotation] != "" {
 		cr.Annotations[SidecarSetHashWithoutImageAnnotation] = s.Annotations[SidecarSetHashWithoutImageAnnotation]
 	}
-	if s.Labels[appsv1alpha1.SidecarSetCustomVersionLabel] != "" {
-		cr.Labels[appsv1alpha1.SidecarSetCustomVersionLabel] = s.Labels[appsv1alpha1.SidecarSetCustomVersionLabel]
+	if s.Labels[appsv1beta1.SidecarSetCustomVersionLabel] != "" {
+		cr.Labels[appsv1beta1.SidecarSetCustomVersionLabel] = s.Labels[appsv1beta1.SidecarSetCustomVersionLabel]
 	}
 	cr.Labels[SidecarSetKindName] = s.Name
 	for key, value := range s.Annotations {
@@ -106,7 +106,7 @@ func (r *realControl) NewRevision(s *appsv1alpha1.SidecarSet, namespace string, 
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func (r *realControl) getPatch(s *appsv1alpha1.SidecarSet) ([]byte, error) {
+func (r *realControl) getPatch(s *appsv1beta1.SidecarSet) ([]byte, error) {
 	str, err := runtime.Encode(patchCodec, s)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (r *realControl) NextRevision(revisions []*apps.ControllerRevision) int64 {
 	return revisions[count-1].Revision + 1
 }
 
-func (r *realControl) GetRevisionSelector(s *appsv1alpha1.SidecarSet) labels.Selector {
+func (r *realControl) GetRevisionSelector(s *appsv1beta1.SidecarSet) labels.Selector {
 	labelSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			SidecarSetKindName: s.GetName(),
@@ -183,7 +183,7 @@ func (r *realControl) CreateControllerRevision(parent metav1.Object, revision *a
 	}
 }
 
-func (r *realControl) GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, revisionInfo *appsv1alpha1.SidecarSetInjectRevision) (*appsv1alpha1.SidecarSet, error) {
+func (r *realControl) GetHistorySidecarSet(sidecarSet *appsv1beta1.SidecarSet, revisionInfo *appsv1beta1.SidecarSetInjectRevision) (*appsv1beta1.SidecarSet, error) {
 	revision, err := r.getControllerRevision(sidecarSet, revisionInfo)
 	if err != nil || revision == nil {
 		return nil, err
@@ -200,7 +200,7 @@ func (r *realControl) GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, 
 		return nil, err
 	}
 	// restore history from patch
-	restoredSidecarSet := &appsv1alpha1.SidecarSet{}
+	restoredSidecarSet := &appsv1beta1.SidecarSet{}
 	if err := json.Unmarshal(patched, restoredSidecarSet); err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (r *realControl) GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, 
 	return restoredSidecarSet, nil
 }
 
-func (r *realControl) getControllerRevision(set *appsv1alpha1.SidecarSet, revisionInfo *appsv1alpha1.SidecarSetInjectRevision) (*apps.ControllerRevision, error) {
+func (r *realControl) getControllerRevision(set *appsv1beta1.SidecarSet, revisionInfo *appsv1beta1.SidecarSetInjectRevision) (*apps.ControllerRevision, error) {
 	if revisionInfo == nil {
 		return nil, nil
 	}
@@ -232,7 +232,7 @@ func (r *realControl) getControllerRevision(set *appsv1alpha1.SidecarSet, revisi
 		listOpts := []client.ListOption{
 			client.InNamespace(webhookutil.GetNamespace()),
 			&client.ListOptions{LabelSelector: r.GetRevisionSelector(set)},
-			client.MatchingLabels{appsv1alpha1.SidecarSetCustomVersionLabel: *revisionInfo.CustomVersion},
+			client.MatchingLabels{appsv1beta1.SidecarSetCustomVersionLabel: *revisionInfo.CustomVersion},
 		}
 		revisionList := &apps.ControllerRevisionList{}
 		if err := r.Client.List(context.TODO(), revisionList, listOpts...); err != nil {
@@ -267,7 +267,7 @@ func copySidecarSetSpecRevision(dst, src map[string]interface{}) {
 	dst["patchPodMetadata"] = src["patchPodMetadata"]
 }
 
-func restoreRevisionInfo(sidecarSet *appsv1alpha1.SidecarSet, revision *apps.ControllerRevision) error {
+func restoreRevisionInfo(sidecarSet *appsv1beta1.SidecarSet, revision *apps.ControllerRevision) error {
 	if sidecarSet.Annotations == nil {
 		sidecarSet.Annotations = map[string]string{}
 	}
@@ -293,7 +293,7 @@ func restoreRevisionInfo(sidecarSet *appsv1alpha1.SidecarSet, revision *apps.Con
 	return nil
 }
 
-func MockSidecarSetForRevision(set *appsv1alpha1.SidecarSet) metav1.Object {
+func MockSidecarSetForRevision(set *appsv1beta1.SidecarSet) metav1.Object {
 	return &metav1.ObjectMeta{
 		UID:       set.UID,
 		Name:      set.Name,
@@ -301,7 +301,7 @@ func MockSidecarSetForRevision(set *appsv1alpha1.SidecarSet) metav1.Object {
 	}
 }
 
-func generateNotFoundError(set *appsv1alpha1.SidecarSet) error {
+func generateNotFoundError(set *appsv1beta1.SidecarSet) error {
 	return errors.NewNotFound(schema.GroupResource{
 		Group:    apps.GroupName,
 		Resource: "ControllerRevision",

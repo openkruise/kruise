@@ -19,7 +19,7 @@ package validating
 import (
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,7 @@ var valInt32 int32 = 1
 var valInt64 int64 = 2
 
 func TestValidateBroadcastJobSpec(t *testing.T) {
-	bjSpec1 := &appsv1alpha1.BroadcastJobSpec{
+	bjSpec1 := &appsv1beta1.BroadcastJobSpec{
 		Parallelism: nil,
 		Template: v1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -43,13 +43,13 @@ func TestValidateBroadcastJobSpec(t *testing.T) {
 				RestartPolicy: v1.RestartPolicyAlways,
 			},
 		},
-		CompletionPolicy: appsv1alpha1.CompletionPolicy{
-			Type:                    appsv1alpha1.Never,
+		CompletionPolicy: appsv1beta1.CompletionPolicy{
+			Type:                    appsv1beta1.Never,
 			TTLSecondsAfterFinished: &valInt32,
 			ActiveDeadlineSeconds:   &valInt64,
 		},
 		Paused:        false,
-		FailurePolicy: appsv1alpha1.FailurePolicy{},
+		FailurePolicy: appsv1beta1.FailurePolicy{},
 	}
 	fieldErrorList := validateBroadcastJobSpec(bjSpec1, field.NewPath("spec"))
 	assert.NotNil(t, fieldErrorList, nil)

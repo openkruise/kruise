@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
 
@@ -60,7 +60,7 @@ type UnexpectedError struct {
 }
 
 // isInList return true if namespaceName is in namespaceList, else return false
-func isInList(namespaceName string, namespaceList []appsv1alpha1.ResourceDistributionNamespace) bool {
+func isInList(namespaceName string, namespaceList []appsv1beta1.ResourceDistributionNamespace) bool {
 	for _, namespace := range namespaceList {
 		if namespaceName == namespace.Name {
 			return true
@@ -70,7 +70,7 @@ func isInList(namespaceName string, namespaceList []appsv1alpha1.ResourceDistrib
 }
 
 // matchViaIncludedNamespaces return true if namespace is in targets.IncludedNamespaces
-func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
+func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
 	if isInList(namespace.Name, distributor.Spec.Targets.IncludedNamespaces.List) {
 		return true, nil
 	}
@@ -78,7 +78,7 @@ func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1
 }
 
 // matchViaLabelSelector return true if namespace matches with target.NamespacesLabelSelectors
-func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
+func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
 	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
 	if err != nil {
 		return false, err
@@ -90,7 +90,7 @@ func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1alpha
 }
 
 // matchViaTargets check whether Namespace matches ResourceDistribution via spec.targets
-func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
+func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
 	targets := &distributor.Spec.Targets
 	if isInList(namespace.Name, targets.ExcludedNamespaces.List) {
 		return false, nil
@@ -105,7 +105,7 @@ func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1alpha1.Reso
 }
 
 // addMatchedResourceDistributionToWorkQueue adds rds into q
-func addMatchedResourceDistributionToWorkQueue(q workqueue.RateLimitingInterface, rds []*appsv1alpha1.ResourceDistribution) {
+func addMatchedResourceDistributionToWorkQueue(q workqueue.RateLimitingInterface, rds []*appsv1beta1.ResourceDistribution) {
 	for _, rd := range rds {
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -122,7 +122,7 @@ func hashResource(resourceYaml runtime.RawExtension) string {
 }
 
 // setCondition set condition[].Type, .Reason, and .FailedNamespaces
-func setCondition(condition *appsv1alpha1.ResourceDistributionCondition, err error, namespaces ...string) {
+func setCondition(condition *appsv1beta1.ResourceDistributionCondition, err error, namespaces ...string) {
 	if condition == nil || err == nil {
 		return
 	}
@@ -131,21 +131,21 @@ func setCondition(condition *appsv1alpha1.ResourceDistributionCondition, err err
 }
 
 // initConditionType set conditionTypes for .status.conditions
-func initConditionType(conditions []appsv1alpha1.ResourceDistributionCondition) {
+func initConditionType(conditions []appsv1beta1.ResourceDistributionCondition) {
 	if len(conditions) < NumberOfConditionTypes {
 		return
 	}
-	conditions[GetConditionID].Type = appsv1alpha1.ResourceDistributionGetResourceFailed
-	conditions[CreateConditionID].Type = appsv1alpha1.ResourceDistributionCreateResourceFailed
-	conditions[UpdateConditionID].Type = appsv1alpha1.ResourceDistributionUpdateResourceFailed
-	conditions[DeleteConditionID].Type = appsv1alpha1.ResourceDistributionDeleteResourceFailed
-	conditions[ConflictConditionID].Type = appsv1alpha1.ResourceDistributionConflictOccurred
-	conditions[NotExistConditionID].Type = appsv1alpha1.ResourceDistributionNamespaceNotExists
+	conditions[GetConditionID].Type = appsv1beta1.ResourceDistributionGetResourceFailed
+	conditions[CreateConditionID].Type = appsv1beta1.ResourceDistributionCreateResourceFailed
+	conditions[UpdateConditionID].Type = appsv1beta1.ResourceDistributionUpdateResourceFailed
+	conditions[DeleteConditionID].Type = appsv1beta1.ResourceDistributionDeleteResourceFailed
+	conditions[ConflictConditionID].Type = appsv1beta1.ResourceDistributionConflictOccurred
+	conditions[NotExistConditionID].Type = appsv1beta1.ResourceDistributionNamespaceNotExists
 }
 
 // calculateNewStatus returns a complete new status to update distributor.status
-func calculateNewStatus(distributor *appsv1alpha1.ResourceDistribution, newConditions []appsv1alpha1.ResourceDistributionCondition, desired, succeeded int32) *appsv1alpha1.ResourceDistributionStatus {
-	status := &appsv1alpha1.ResourceDistributionStatus{}
+func calculateNewStatus(distributor *appsv1beta1.ResourceDistribution, newConditions []appsv1beta1.ResourceDistributionCondition, desired, succeeded int32) *appsv1beta1.ResourceDistributionStatus {
+	status := &appsv1beta1.ResourceDistributionStatus{}
 	if distributor == nil || len(newConditions) < NumberOfConditionTypes {
 		return status
 	}
@@ -162,9 +162,9 @@ func calculateNewStatus(distributor *appsv1alpha1.ResourceDistribution, newCondi
 		if len(newConditions[i].FailedNamespaces) == 0 {
 			// if no error occurred
 			newConditions[i].Reason = OperationSucceeded
-			newConditions[i].Status = appsv1alpha1.ResourceDistributionConditionFalse
+			newConditions[i].Status = appsv1beta1.ResourceDistributionConditionFalse
 		} else {
-			newConditions[i].Status = appsv1alpha1.ResourceDistributionConditionTrue
+			newConditions[i].Status = appsv1beta1.ResourceDistributionConditionTrue
 		}
 		if len(oldConditions) == 0 || oldConditions[i].Status != newConditions[i].Status {
 			// if .conditions.status changed
@@ -208,7 +208,7 @@ func mergeMetadata(newResource, oldResource *unstructured.Unstructured) {
 }
 
 // makeResourceObject set some necessary information for resource before updating and creating
-func makeResourceObject(distributor *appsv1alpha1.ResourceDistribution, namespace string, resource runtime.Object, hashCode string, oldResource *unstructured.Unstructured) runtime.Object {
+func makeResourceObject(distributor *appsv1beta1.ResourceDistribution, namespace string, resource runtime.Object, hashCode string, oldResource *unstructured.Unstructured) runtime.Object {
 	// convert to unstructured
 	newResource := utils.ConvertToUnstructured(resource.DeepCopyObject())
 	if oldResource != nil {
@@ -275,7 +275,7 @@ func syncItSlowly(namespaces []string, initialBatchSize int, fn func(namespace s
 // listNamespacesForDistributor returns two slices: one contains all matched namespaces, another contains all unmatched.
 // Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceLabelSelector; Then calculate their
 // union; At last ExcludedNamespaces will act on the union to remove the designated namespaces from it.
-func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1alpha1.ResourceDistributionTargets) ([]string, []string, error) {
+func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1beta1.ResourceDistributionTargets) ([]string, []string, error) {
 	matchedSet := sets.NewString()
 	unmatchedSet := sets.NewString()
 
@@ -336,7 +336,7 @@ func needToUpdate(old, new *unstructured.Unstructured) bool {
 	return !reflect.DeepEqual(oldObject, newObject)
 }
 
-func isControlledByDistributor(resource metav1.Object, distributor *appsv1alpha1.ResourceDistribution) bool {
+func isControlledByDistributor(resource metav1.Object, distributor *appsv1beta1.ResourceDistribution) bool {
 	controller := metav1.GetControllerOf(resource)
 	if controller != nil && distributor != nil &&
 		distributor.APIVersion == controller.APIVersion &&

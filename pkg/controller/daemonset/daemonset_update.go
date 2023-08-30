@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
@@ -39,7 +39,7 @@ import (
 
 // rollingUpdate identifies the set of old pods to in-place update, delete, or additional pods to create on nodes,
 // remaining within the constraints imposed by the update strategy.
-func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {
+func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta1.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {
 	hash := curRevision.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
@@ -136,7 +136,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1alph
 		oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
 
 		// Advanced: update pods in-place first and still delete the others
-		if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
+		if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1beta1.InplaceRollingUpdateType {
 			oldPodsToDelete, err = dsc.inPlaceUpdatePods(ds, oldPodsToDelete, curRevision, oldRevisions)
 			if err != nil {
 				return err
@@ -230,7 +230,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1alph
 
 // updatedDesiredNodeCounts calculates the true number of allowed unavailable or surge pods and
 // updates the nodeToDaemonPods array to include an empty array for every node that is not scheduled.
-func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, nodeToDaemonPods map[string][]*corev1.Pod) (int, int, error) {
+func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1beta1.DaemonSet, nodeList []*corev1.Node, nodeToDaemonPods map[string][]*corev1.Pod) (int, int, error) {
 	var desiredNumberScheduled int
 	for i := range nodeList {
 		node := nodeList[i]
@@ -265,7 +265,7 @@ func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1alpha1.DaemonS
 	return maxSurge, maxUnavailable, nil
 }
 
-func GetTemplateGeneration(ds *appsv1alpha1.DaemonSet) (*int64, error) {
+func GetTemplateGeneration(ds *appsv1beta1.DaemonSet) (*int64, error) {
 	annotation, found := ds.Annotations[apps.DeprecatedTemplateGeneration]
 	if !found {
 		return nil, nil
@@ -277,7 +277,7 @@ func GetTemplateGeneration(ds *appsv1alpha1.DaemonSet) (*int64, error) {
 	return &generation, nil
 }
 
-func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, hash string, nodeToDaemonPods map[string][]*corev1.Pod) (map[string][]*corev1.Pod, error) {
+func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *appsv1beta1.DaemonSet, nodeList []*corev1.Node, hash string, nodeToDaemonPods map[string][]*corev1.Pod) (map[string][]*corev1.Pod, error) {
 	existingNodes := sets.NewString()
 	for _, node := range nodeList {
 		existingNodes.Insert(node.Name)
@@ -300,7 +300,7 @@ func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *appsv1alpha1.DaemonS
 	return ret, nil
 }
 
-func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1alpha1.DaemonSet, hash string, nodeToDaemonPods map[string][]*corev1.Pod) ([]string, error) {
+func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1beta1.DaemonSet, hash string, nodeToDaemonPods map[string][]*corev1.Pod) ([]string, error) {
 	var err error
 	var partition int32
 	var selector labels.Selector
@@ -387,7 +387,7 @@ func (dsc *ReconcileDaemonSet) canPodInPlaceUpdate(pod *corev1.Pod, curRevision 
 	return dsc.inplaceControl.CanUpdateInPlace(oldRevision, curRevision, getInPlaceUpdateOptions())
 }
 
-func (dsc *ReconcileDaemonSet) inPlaceUpdatePods(ds *appsv1alpha1.DaemonSet, podNames []string, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) (podsNeedDelete []string, err error) {
+func (dsc *ReconcileDaemonSet) inPlaceUpdatePods(ds *appsv1beta1.DaemonSet, podNames []string, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) (podsNeedDelete []string, err error) {
 	var podsToUpdate []*corev1.Pod
 	for _, name := range podNames {
 		pod, err := dsc.podLister.Pods(ds.Namespace).Get(name)
@@ -410,7 +410,7 @@ func (dsc *ReconcileDaemonSet) inPlaceUpdatePods(ds *appsv1alpha1.DaemonSet, pod
 	updateWait := sync.WaitGroup{}
 	updateWait.Add(updateDiff)
 	for i := 0; i < updateDiff; i++ {
-		go func(ix int, ds *appsv1alpha1.DaemonSet, pod *corev1.Pod) {
+		go func(ix int, ds *appsv1beta1.DaemonSet, pod *corev1.Pod) {
 			defer updateWait.Done()
 
 			var oldRevision *apps.ControllerRevision

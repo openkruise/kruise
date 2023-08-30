@@ -26,7 +26,7 @@ import (
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -37,12 +37,12 @@ func ValidateWorkloadDeletion(obj metav1.Object, replicas *int32) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || obj == nil || obj.GetDeletionTimestamp() != nil {
 		return nil
 	}
-	switch val := obj.GetLabels()[policyv1alpha1.DeletionProtectionKey]; val {
-	case policyv1alpha1.DeletionProtectionTypeAlways:
-		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1alpha1.DeletionProtectionKey, val)
-	case policyv1alpha1.DeletionProtectionTypeCascading:
+	switch val := obj.GetLabels()[policyv1beta1.DeletionProtectionKey]; val {
+	case policyv1beta1.DeletionProtectionTypeAlways:
+		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1beta1.DeletionProtectionKey, val)
+	case policyv1beta1.DeletionProtectionTypeCascading:
 		if replicas != nil && *replicas > 0 {
-			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and replicas %d>0", policyv1alpha1.DeletionProtectionKey, val, *replicas)
+			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and replicas %d>0", policyv1beta1.DeletionProtectionKey, val, *replicas)
 		}
 	default:
 	}
@@ -53,10 +53,10 @@ func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || namespace.DeletionTimestamp != nil {
 		return nil
 	}
-	switch val := namespace.Labels[policyv1alpha1.DeletionProtectionKey]; val {
-	case policyv1alpha1.DeletionProtectionTypeAlways:
-		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1alpha1.DeletionProtectionKey, val)
-	case policyv1alpha1.DeletionProtectionTypeCascading:
+	switch val := namespace.Labels[policyv1beta1.DeletionProtectionKey]; val {
+	case policyv1beta1.DeletionProtectionTypeAlways:
+		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1beta1.DeletionProtectionKey, val)
+	case policyv1beta1.DeletionProtectionTypeCascading:
 		pods := v1.PodList{}
 		if err := c.List(context.TODO(), &pods, client.InNamespace(namespace.Name), utilclient.DisableDeepCopy); err != nil {
 			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for list pods error: %v", err)
@@ -69,7 +69,7 @@ func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
 			}
 		}
 		if activeCount > 0 {
-			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and active pods %d>0", policyv1alpha1.DeletionProtectionKey, val, activeCount)
+			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and active pods %d>0", policyv1beta1.DeletionProtectionKey, val, activeCount)
 		}
 
 		pvcs := v1.PersistentVolumeClaimList{}
@@ -84,7 +84,7 @@ func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
 			}
 		}
 		if boundCount > 0 {
-			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and \"Bound\" status pvc %d>0", policyv1alpha1.DeletionProtectionKey, val, boundCount)
+			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and \"Bound\" status pvc %d>0", policyv1beta1.DeletionProtectionKey, val, boundCount)
 		}
 	default:
 	}
@@ -95,10 +95,10 @@ func ValidateCRDDeletion(c client.Client, obj metav1.Object, gvk schema.GroupVer
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || obj.GetDeletionTimestamp() != nil {
 		return nil
 	}
-	switch val := obj.GetLabels()[policyv1alpha1.DeletionProtectionKey]; val {
-	case policyv1alpha1.DeletionProtectionTypeAlways:
-		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1alpha1.DeletionProtectionKey, val)
-	case policyv1alpha1.DeletionProtectionTypeCascading:
+	switch val := obj.GetLabels()[policyv1beta1.DeletionProtectionKey]; val {
+	case policyv1beta1.DeletionProtectionTypeAlways:
+		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1beta1.DeletionProtectionKey, val)
+	case policyv1beta1.DeletionProtectionTypeCascading:
 		if !utilfeature.DefaultFeatureGate.Enabled(features.DeletionProtectionForCRDCascadingGate) {
 			return fmt.Errorf("feature-gate %s is not enabled", features.DeletionProtectionForCRDCascadingGate)
 		}
@@ -116,7 +116,7 @@ func ValidateCRDDeletion(c client.Client, obj metav1.Object, gvk schema.GroupVer
 			}
 		}
 		if activeCount > 0 {
-			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and active CRs %d>0", policyv1alpha1.DeletionProtectionKey, val, activeCount)
+			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s and active CRs %d>0", policyv1beta1.DeletionProtectionKey, val, activeCount)
 		}
 	default:
 	}

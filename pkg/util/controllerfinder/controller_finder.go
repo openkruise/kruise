@@ -19,7 +19,6 @@ package controllerfinder
 import (
 	"context"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	apps "k8s.io/api/apps/v1"
@@ -163,7 +162,7 @@ var (
 	ControllerKindSS       = apps.SchemeGroupVersion.WithKind("StatefulSet")
 	ControllerKindRC       = corev1.SchemeGroupVersion.WithKind("ReplicationController")
 	ControllerKindDep      = apps.SchemeGroupVersion.WithKind("Deployment")
-	ControllerKruiseKindCS = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	ControllerKruiseKindCS = appsv1beta1.SchemeGroupVersion.WithKind("CloneSet")
 	ControllerKruiseKindSS = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 
 	validWorkloadList = []schema.GroupVersionKind{ControllerKindRS, ControllerKindSS, ControllerKindRC, ControllerKindDep, ControllerKruiseKindCS, ControllerKruiseKindSS}
@@ -331,7 +330,7 @@ func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespa
 	if !ok {
 		return nil, nil
 	}
-	cloneSet := &appsv1alpha1.CloneSet{}
+	cloneSet := &appsv1beta1.CloneSet{}
 	err := r.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: ref.Name}, cloneSet)
 	if err != nil {
 		// when error is NotFound, it is ok here.

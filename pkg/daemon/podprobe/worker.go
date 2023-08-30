@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -41,30 +41,30 @@ type worker struct {
 	key probeKey
 
 	// Describes the probe configuration
-	spec *appsv1alpha1.ContainerProbeSpec
+	spec *appsv1beta1.ContainerProbeSpec
 
 	// The probe value during the initial delay.
-	initialValue appsv1alpha1.ProbeState
+	initialValue appsv1beta1.ProbeState
 
 	probeController *Controller
 
 	// The last known container ID for this worker.
 	containerID string
 	// The last probe result for this worker.
-	lastResult appsv1alpha1.ProbeState
+	lastResult appsv1beta1.ProbeState
 	// How many times in a row the probe has returned the same result.
 	resultRun int
 }
 
 // Creates and starts a new probe worker.
-func newWorker(c *Controller, key probeKey, probe *appsv1alpha1.ContainerProbeSpec) *worker {
+func newWorker(c *Controller, key probeKey, probe *appsv1beta1.ContainerProbeSpec) *worker {
 
 	w := &worker{
 		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
 		key:             key,
 		spec:            probe,
 		probeController: c,
-		initialValue:    appsv1alpha1.ProbeUnknown,
+		initialValue:    appsv1beta1.ProbeUnknown,
 	}
 
 	return w
@@ -135,7 +135,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 	if container.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
 		klog.V(5).Infof("Pod(%s/%s) Non-running container(%s) probed", w.key.podNs, w.key.podName, w.key.containerName)
-		w.probeController.result.set(w.containerID, w.key, appsv1alpha1.ProbeFailed, fmt.Sprintf("Container(%s) is Non-running", w.key.containerName))
+		w.probeController.result.set(w.containerID, w.key, appsv1beta1.ProbeFailed, fmt.Sprintf("Container(%s) is Non-running", w.key.containerName))
 	}
 
 	// Probe disabled for InitialDelaySeconds.
@@ -173,8 +173,8 @@ func (w *worker) doProbe() (keepGoing bool) {
 	if successThreshold <= 0 {
 		successThreshold = 1
 	}
-	if (result == appsv1alpha1.ProbeFailed && w.resultRun < int(failureThreshold)) ||
-		(result == appsv1alpha1.ProbeSucceeded && w.resultRun < int(successThreshold)) {
+	if (result == appsv1beta1.ProbeFailed && w.resultRun < int(failureThreshold)) ||
+		(result == appsv1beta1.ProbeSucceeded && w.resultRun < int(successThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
 		return true
 	}
@@ -182,11 +182,11 @@ func (w *worker) doProbe() (keepGoing bool) {
 	return true
 }
 
-func (w *worker) getProbeSpec() *appsv1alpha1.ContainerProbeSpec {
+func (w *worker) getProbeSpec() *appsv1beta1.ContainerProbeSpec {
 	return w.spec
 }
 
-func (w *worker) updateProbeSpec(spec *appsv1alpha1.ContainerProbeSpec) {
+func (w *worker) updateProbeSpec(spec *appsv1beta1.ContainerProbeSpec) {
 	if !reflect.DeepEqual(w.spec.ProbeHandler, spec.ProbeHandler) {
 		if w.containerID != "" {
 			klog.Infof("Pod(%s) container(%s) probe spec changed", w.key.podUID, w.key.containerName)

@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
@@ -39,9 +38,9 @@ import (
 )
 
 func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *appsv1beta1.StatefulSet, currentRevision, updateRevision *apps.ControllerRevision) error {
-	if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadCreatedKey]; ok {
+	if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadCreatedKey]; ok {
 		return nil
-	} else if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadIgnoredKey]; ok {
+	} else if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadIgnoredKey]; ok {
 		return nil
 	}
 
@@ -50,14 +49,14 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 		string(sts.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy) == string(appsv1beta1.RecreatePodUpdateStrategyType) {
 		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for update type is %s",
 			sts.Namespace, sts.Name, sts.Spec.UpdateStrategy.Type)
-		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return dss.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if replicas <= minimumReplicasToPreDownloadImage
 	if *sts.Spec.Replicas <= minimumReplicasToPreDownloadImage {
 		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for replicas %d <= %d",
 			sts.Namespace, sts.Name, *sts.Spec.Replicas, minimumReplicasToPreDownloadImage)
-		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return dss.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if all Pods update in one batch
@@ -71,7 +70,7 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	if partition == 0 && maxUnavailable >= int(*sts.Spec.Replicas) {
 		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for all Pods update in one batch, replicas=%d, partition=%d, maxUnavailable=%d",
 			sts.Namespace, sts.Name, *sts.Spec.Replicas, partition, maxUnavailable)
-		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return dss.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// opt is update option, this section is to get update option
@@ -85,7 +84,7 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	if !inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, opts) {
 		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for %s -> %s can not update in-place",
 			sts.Namespace, sts.Name, currentRevision.Name, updateRevision.Name)
-		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return dss.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// start to create jobs
@@ -133,7 +132,7 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 		dss.recorder.Eventf(sts, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)
 	}
 
-	return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadCreatedKey, "true")
+	return dss.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadCreatedKey, "true")
 }
 
 func (dss *defaultStatefulSetControl) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error {

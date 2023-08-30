@@ -26,20 +26,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (newStatus *appsv1alpha1.UnitedDeploymentStatus, updateErr error) {
+func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1beta1.UnitedDeployment, nameToSubset *map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (newStatus *appsv1beta1.UnitedDeploymentStatus, updateErr error) {
 	newStatus = ud.Status.DeepCopy()
 	exists, provisioned, err := r.manageSubsetProvision(ud, nameToSubset, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
-		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetProvisioned, corev1.ConditionFalse, "Error", err.Error()))
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1beta1.SubsetProvisioned, corev1.ConditionFalse, "Error", err.Error()))
 		return newStatus, fmt.Errorf("fail to manage Subset provision: %s", err)
 	}
 
 	if provisioned {
-		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetProvisioned, corev1.ConditionTrue, "", ""))
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1beta1.SubsetProvisioned, corev1.ConditionTrue, "", ""))
 	}
 
 	expectedRevision := currentRevision
@@ -53,7 +53,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 		if r.subSetControls[subsetType].IsExpected(subset, expectedRevision.Name) ||
 			subset.Spec.Replicas != nextUpdate[name].Replicas ||
 			subset.Spec.UpdateStrategy.Partition != nextUpdate[name].Partition ||
-			subset.GetAnnotations()[appsv1alpha1.AnnotationSubsetPatchKey] != nextUpdate[name].Patch {
+			subset.GetAnnotations()[appsv1beta1.AnnotationSubsetPatchKey] != nextUpdate[name].Patch {
 			needUpdate = append(needUpdate, name)
 		}
 	}
@@ -75,14 +75,14 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	}
 
 	if updateErr == nil {
-		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetUpdated, corev1.ConditionTrue, "", ""))
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1beta1.SubsetUpdated, corev1.ConditionTrue, "", ""))
 	} else {
-		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetUpdated, corev1.ConditionFalse, "Error", updateErr.Error()))
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1beta1.SubsetUpdated, corev1.ConditionFalse, "Error", updateErr.Error()))
 	}
 	return
 }
 
-func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, bool, error) {
+func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1beta1.UnitedDeployment, nameToSubset *map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, bool, error) {
 	expectedSubsets := sets.String{}
 	gotSubsets := sets.String{}
 

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 var (
@@ -34,7 +34,7 @@ var (
 
 func init() {
 	testScheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(testScheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(testScheme))
 	utilruntime.Must(corev1.AddToScheme(testScheme))
 }
 
@@ -87,7 +87,7 @@ func TestResourceDistributionUpdateValidation(t *testing.T) {
 	// build rd objects
 	oldRD := buildResourceDistributionWithSecret()
 	newRD := oldRD.DeepCopy()
-	newRD.Spec.Targets.IncludedNamespaces.List = append(newRD.Spec.Targets.IncludedNamespaces.List, appsv1alpha1.ResourceDistributionNamespace{Name: "ns-4"})
+	newRD.Spec.Targets.IncludedNamespaces.List = append(newRD.Spec.Targets.IncludedNamespaces.List, appsv1beta1.ResourceDistributionNamespace{Name: "ns-4"})
 
 	makeEnvironment()
 
@@ -99,16 +99,16 @@ func TestResourceDistributionUpdateValidation(t *testing.T) {
 }
 
 func TestValidateResourceDistributionTargets(t *testing.T) {
-	targets := &appsv1alpha1.ResourceDistributionTargets{
+	targets := &appsv1beta1.ResourceDistributionTargets{
 		// error 1
-		ExcludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-			List: []appsv1alpha1.ResourceDistributionNamespace{
+		ExcludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+			List: []appsv1beta1.ResourceDistributionNamespace{
 				{Name: "ns-1"},
 			},
 		},
 		// error 2
-		IncludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-			List: []appsv1alpha1.ResourceDistributionNamespace{
+		IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+			List: []appsv1beta1.ResourceDistributionNamespace{
 				{Name: "ns-1"}, {Name: "ns-2"}, {Name: "kube-system"}, {Name: ""},
 			},
 		},
@@ -160,7 +160,7 @@ func TestResourceDistributionUpdateConflict(t *testing.T) {
 	}
 }
 
-func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
+func buildResourceDistributionWithSecret() *appsv1beta1.ResourceDistribution {
 	const resourceJSON = `{
 		"apiVersion": "v1",
 		"data": {
@@ -175,7 +175,7 @@ func buildResourceDistributionWithSecret() *appsv1alpha1.ResourceDistribution {
 	return buildResourceDistribution(resourceJSON)
 }
 
-func buildResourceDistributionWithConfigMap() *appsv1alpha1.ResourceDistribution {
+func buildResourceDistributionWithConfigMap() *appsv1beta1.ResourceDistribution {
 	const resourceJSON = `{
 		"apiVersion": "v1",
 		"data": {
@@ -192,23 +192,23 @@ func buildResourceDistributionWithConfigMap() *appsv1alpha1.ResourceDistribution
 	return buildResourceDistribution(resourceJSON)
 }
 
-func buildResourceDistribution(resourceYaml string) *appsv1alpha1.ResourceDistribution {
-	return &appsv1alpha1.ResourceDistribution{
+func buildResourceDistribution(resourceYaml string) *appsv1beta1.ResourceDistribution {
+	return &appsv1beta1.ResourceDistribution{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-resource-distribution"},
-		Spec: appsv1alpha1.ResourceDistributionSpec{
+		Spec: appsv1beta1.ResourceDistributionSpec{
 			Resource: runtime.RawExtension{
 				Raw: []byte(resourceYaml),
 			},
-			Targets: appsv1alpha1.ResourceDistributionTargets{
-				ExcludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-					List: []appsv1alpha1.ResourceDistributionNamespace{
+			Targets: appsv1beta1.ResourceDistributionTargets{
+				ExcludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{
 						{
 							Name: "ns-3",
 						},
 					},
 				},
-				IncludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-					List: []appsv1alpha1.ResourceDistributionNamespace{
+				IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{
 						{
 							Name: "ns-1",
 						},

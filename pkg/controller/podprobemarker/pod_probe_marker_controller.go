@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -52,7 +52,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("PodProbeMarker")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("PodProbeMarker")
 )
 
 const (
@@ -95,7 +95,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// watch for changes to PodProbeMarker
-	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.PodProbeMarker{}}, &enqueueRequestForPodProbeMarker{}); err != nil {
+	if err = c.Watch(&source.Kind{Type: &appsv1beta1.PodProbeMarker{}}, &enqueueRequestForPodProbeMarker{}); err != nil {
 		return err
 	}
 	// watch for changes to pod
@@ -132,7 +132,7 @@ func (r *ReconcilePodProbeMarker) Reconcile(_ context.Context, req ctrl.Request)
 
 func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 	// Fetch the PodProbeMarker instance
-	ppm := &appsv1alpha1.PodProbeMarker{}
+	ppm := &appsv1beta1.PodProbeMarker{}
 	err := r.Get(context.TODO(), client.ObjectKey{Namespace: ns, Name: name}, ppm)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -188,7 +188,7 @@ func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 	return nil
 }
 
-func (r *ReconcilePodProbeMarker) handlerPodProbeMarkerFinalizer(ppm *appsv1alpha1.PodProbeMarker, pods []*corev1.Pod) error {
+func (r *ReconcilePodProbeMarker) handlerPodProbeMarkerFinalizer(ppm *appsv1beta1.PodProbeMarker, pods []*corev1.Pod) error {
 	if !controllerutil.ContainsFinalizer(ppm, PodProbeMarkerFinalizer) {
 		return nil
 	}
@@ -206,8 +206,8 @@ func (r *ReconcilePodProbeMarker) handlerPodProbeMarkerFinalizer(ppm *appsv1alph
 	return nil
 }
 
-func (r *ReconcilePodProbeMarker) updateNodePodProbe(ppm *appsv1alpha1.PodProbeMarker, pod *corev1.Pod) error {
-	npp := &appsv1alpha1.NodePodProbe{}
+func (r *ReconcilePodProbeMarker) updateNodePodProbe(ppm *appsv1beta1.PodProbeMarker, pod *corev1.Pod) error {
+	npp := &appsv1beta1.NodePodProbe{}
 	err := r.Get(context.TODO(), client.ObjectKey{Name: pod.Spec.NodeName}, npp)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -233,10 +233,10 @@ func (r *ReconcilePodProbeMarker) updateNodePodProbe(ppm *appsv1alpha1.PodProbeM
 		}
 	}
 	if !exist {
-		podProbe := appsv1alpha1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID)}
+		podProbe := appsv1beta1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID)}
 		for j := range ppm.Spec.Probes {
 			probe := ppm.Spec.Probes[j]
-			podProbe.Probes = append(podProbe.Probes, appsv1alpha1.ContainerProbe{
+			podProbe.Probes = append(podProbe.Probes, appsv1beta1.ContainerProbe{
 				Name:          fmt.Sprintf("%s#%s", ppm.Name, probe.Name),
 				ContainerName: probe.ContainerName,
 				Probe:         probe.Probe,
@@ -258,8 +258,8 @@ func (r *ReconcilePodProbeMarker) updateNodePodProbe(ppm *appsv1alpha1.PodProbeM
 	return nil
 }
 
-func setPodContainerProbes(podProbe *appsv1alpha1.PodProbe, probe appsv1alpha1.PodContainerProbe, ppmName string) {
-	newProbe := appsv1alpha1.ContainerProbe{
+func setPodContainerProbes(podProbe *appsv1beta1.PodProbe, probe appsv1beta1.PodContainerProbe, ppmName string) {
+	newProbe := appsv1beta1.ContainerProbe{
 		Name:          fmt.Sprintf("%s#%s", ppmName, probe.Name),
 		ContainerName: probe.ContainerName,
 		Probe:         probe.Probe,
@@ -276,7 +276,7 @@ func setPodContainerProbes(podProbe *appsv1alpha1.PodProbe, probe appsv1alpha1.P
 }
 
 // If you need update the pod object, you must DeepCopy it
-func (r *ReconcilePodProbeMarker) getMatchingPods(ppm *appsv1alpha1.PodProbeMarker) ([]*corev1.Pod, error) {
+func (r *ReconcilePodProbeMarker) getMatchingPods(ppm *appsv1beta1.PodProbeMarker) ([]*corev1.Pod, error) {
 	// get more faster selector
 	selector, err := util.ValidatedLabelSelectorAsSelector(ppm.Spec.Selector)
 	if err != nil {
@@ -301,7 +301,7 @@ func (r *ReconcilePodProbeMarker) getMatchingPods(ppm *appsv1alpha1.PodProbeMark
 }
 
 func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmName, nppName string) error {
-	npp := &appsv1alpha1.NodePodProbe{}
+	npp := &appsv1beta1.NodePodProbe{}
 	err := r.Get(context.TODO(), client.ObjectKey{Name: nppName}, npp)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -310,9 +310,9 @@ func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmName, nppNam
 		return err
 	}
 
-	newSpec := appsv1alpha1.NodePodProbeSpec{}
+	newSpec := appsv1beta1.NodePodProbeSpec{}
 	for _, podProbe := range npp.Spec.PodProbes {
-		newPodProbe := appsv1alpha1.PodProbe{Name: podProbe.Name, Namespace: podProbe.Namespace, UID: podProbe.UID}
+		newPodProbe := appsv1beta1.PodProbe{Name: podProbe.Name, Namespace: podProbe.Namespace, UID: podProbe.UID}
 		for i := range podProbe.Probes {
 			probe := podProbe.Probes[i]
 			// probe.Name -> podProbeMarker.Name#probe.Name

@@ -23,7 +23,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,27 +37,27 @@ import (
 func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 }
 
 var (
 	scheme *runtime.Scheme
 
-	demoPodProbeMarker = appsv1alpha1.PodProbeMarker{
+	demoPodProbeMarker = appsv1beta1.PodProbeMarker{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ppm-1",
 		},
-		Spec: appsv1alpha1.PodProbeMarkerSpec{
+		Spec: appsv1beta1.PodProbeMarkerSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "test",
 				},
 			},
-			Probes: []appsv1alpha1.PodContainerProbe{
+			Probes: []appsv1beta1.PodContainerProbe{
 				{
 					Name:          "healthy",
 					ContainerName: "main",
-					Probe: appsv1alpha1.ContainerProbeSpec{
+					Probe: appsv1beta1.ContainerProbeSpec{
 						Probe: corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -67,9 +67,9 @@ var (
 						},
 					},
 					PodConditionType: "game.kruise.io/healthy",
-					MarkerPolicy: []appsv1alpha1.ProbeMarkerPolicy{
+					MarkerPolicy: []appsv1beta1.ProbeMarkerPolicy{
 						{
-							State: appsv1alpha1.ProbeSucceeded,
+							State: appsv1beta1.ProbeSucceeded,
 							Annotations: map[string]string{
 								"controller.kubernetes.io/pod-deletion-cost": "10",
 							},
@@ -78,7 +78,7 @@ var (
 							},
 						},
 						{
-							State: appsv1alpha1.ProbeFailed,
+							State: appsv1beta1.ProbeFailed,
 							Annotations: map[string]string{
 								"controller.kubernetes.io/pod-deletion-cost": "-10",
 							},
@@ -92,20 +92,20 @@ var (
 		},
 	}
 
-	demoNodePodProbe = appsv1alpha1.NodePodProbe{
+	demoNodePodProbe = appsv1beta1.NodePodProbe{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-1",
 		},
-		Spec: appsv1alpha1.NodePodProbeSpec{
-			PodProbes: []appsv1alpha1.PodProbe{
+		Spec: appsv1beta1.NodePodProbeSpec{
+			PodProbes: []appsv1beta1.PodProbe{
 				{
 					Name: "pod-1",
 					UID:  "pod-1-uid",
-					Probes: []appsv1alpha1.ContainerProbe{
+					Probes: []appsv1beta1.ContainerProbe{
 						{
 							Name:          "ppm-1#healthy",
 							ContainerName: "main",
-							Probe: appsv1alpha1.ContainerProbeSpec{
+							Probe: appsv1beta1.ContainerProbeSpec{
 								Probe: corev1.Probe{
 									ProbeHandler: corev1.ProbeHandler{
 										Exec: &corev1.ExecAction{
@@ -127,8 +127,8 @@ func TestSyncNodePodProbe(t *testing.T) {
 		name               string
 		req                ctrl.Request
 		getPods            func() []*corev1.Pod
-		getPodProbeMarkers func() []*appsv1alpha1.PodProbeMarker
-		getNodePodProbes   func() []*appsv1alpha1.NodePodProbe
+		getPodProbeMarkers func() []*appsv1beta1.PodProbeMarker
+		getNodePodProbes   func() []*appsv1beta1.NodePodProbe
 		getNode            func() []*corev1.Node
 		expectPods         func() []*corev1.Pod
 	}{
@@ -178,22 +178,22 @@ func TestSyncNodePodProbe(t *testing.T) {
 				}
 				return pods
 			},
-			getPodProbeMarkers: func() []*appsv1alpha1.PodProbeMarker {
-				ppms := []*appsv1alpha1.PodProbeMarker{
+			getPodProbeMarkers: func() []*appsv1beta1.PodProbeMarker {
+				ppms := []*appsv1beta1.PodProbeMarker{
 					demoPodProbeMarker.DeepCopy(),
 				}
 				return ppms
 			},
-			getNodePodProbes: func() []*appsv1alpha1.NodePodProbe {
+			getNodePodProbes: func() []*appsv1beta1.NodePodProbe {
 				demo := demoNodePodProbe.DeepCopy()
-				podProbe2 := appsv1alpha1.PodProbe{
+				podProbe2 := appsv1beta1.PodProbe{
 					Name: "pod-2",
 					UID:  "pod-2-uid",
-					Probes: []appsv1alpha1.ContainerProbe{
+					Probes: []appsv1beta1.ContainerProbe{
 						{
 							Name:          "ppm-1#healthy",
 							ContainerName: "main",
-							Probe: appsv1alpha1.ContainerProbeSpec{
+							Probe: appsv1beta1.ContainerProbeSpec{
 								Probe: corev1.Probe{
 									ProbeHandler: corev1.ProbeHandler{
 										Exec: &corev1.ExecAction{
@@ -206,31 +206,31 @@ func TestSyncNodePodProbe(t *testing.T) {
 					},
 				}
 				demo.Spec.PodProbes = append(demo.Spec.PodProbes, podProbe2)
-				demo.Status = appsv1alpha1.NodePodProbeStatus{
-					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+				demo.Status = appsv1beta1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1beta1.PodProbeStatus{
 						{
 							Name: "pod-1",
 							UID:  "pod-1-uid",
-							ProbeStates: []appsv1alpha1.ContainerProbeState{
+							ProbeStates: []appsv1beta1.ContainerProbeState{
 								{
 									Name:  "ppm-1#healthy",
-									State: appsv1alpha1.ProbeSucceeded,
+									State: appsv1beta1.ProbeSucceeded,
 								},
 							},
 						},
 						{
 							Name: "pod-2",
 							UID:  "pod-2-uid",
-							ProbeStates: []appsv1alpha1.ContainerProbeState{
+							ProbeStates: []appsv1beta1.ContainerProbeState{
 								{
 									Name:  "ppm-1#healthy",
-									State: appsv1alpha1.ProbeFailed,
+									State: appsv1beta1.ProbeFailed,
 								},
 							},
 						},
 					},
 				}
-				return []*appsv1alpha1.NodePodProbe{demo}
+				return []*appsv1beta1.NodePodProbe{demo}
 			},
 			expectPods: func() []*corev1.Pod {
 				pods := []*corev1.Pod{
@@ -336,28 +336,28 @@ func TestSyncNodePodProbe(t *testing.T) {
 				}
 				return pods
 			},
-			getPodProbeMarkers: func() []*appsv1alpha1.PodProbeMarker {
+			getPodProbeMarkers: func() []*appsv1beta1.PodProbeMarker {
 				demo := demoPodProbeMarker.DeepCopy()
 				demo.Spec.Probes[0].MarkerPolicy = demo.Spec.Probes[0].MarkerPolicy[:1]
-				return []*appsv1alpha1.PodProbeMarker{demo}
+				return []*appsv1beta1.PodProbeMarker{demo}
 			},
-			getNodePodProbes: func() []*appsv1alpha1.NodePodProbe {
+			getNodePodProbes: func() []*appsv1beta1.NodePodProbe {
 				demo := demoNodePodProbe.DeepCopy()
-				demo.Status = appsv1alpha1.NodePodProbeStatus{
-					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+				demo.Status = appsv1beta1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1beta1.PodProbeStatus{
 						{
 							Name: "pod-1",
 							UID:  "pod-1-uid",
-							ProbeStates: []appsv1alpha1.ContainerProbeState{
+							ProbeStates: []appsv1beta1.ContainerProbeState{
 								{
 									Name:  "ppm-1#healthy",
-									State: appsv1alpha1.ProbeFailed,
+									State: appsv1beta1.ProbeFailed,
 								},
 							},
 						},
 					},
 				}
-				return []*appsv1alpha1.NodePodProbe{demo}
+				return []*appsv1beta1.NodePodProbe{demo}
 			},
 			expectPods: func() []*corev1.Pod {
 				pods := []*corev1.Pod{
@@ -429,12 +429,12 @@ func TestSyncNodePodProbe(t *testing.T) {
 				}
 				return pods
 			},
-			getPodProbeMarkers: func() []*appsv1alpha1.PodProbeMarker {
+			getPodProbeMarkers: func() []*appsv1beta1.PodProbeMarker {
 				demo := demoPodProbeMarker.DeepCopy()
 				demo.Spec.Probes[0].PodConditionType = ""
-				demo.Spec.Probes[0].MarkerPolicy = []appsv1alpha1.ProbeMarkerPolicy{
+				demo.Spec.Probes[0].MarkerPolicy = []appsv1beta1.ProbeMarkerPolicy{
 					{
-						State: appsv1alpha1.ProbeSucceeded,
+						State: appsv1beta1.ProbeSucceeded,
 						Annotations: map[string]string{
 							"controller.kubernetes.io/pod-deletion-cost": "10",
 							"success": "true",
@@ -445,7 +445,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 						},
 					},
 					{
-						State: appsv1alpha1.ProbeFailed,
+						State: appsv1beta1.ProbeFailed,
 						Annotations: map[string]string{
 							"controller.kubernetes.io/pod-deletion-cost": "-10",
 							"failed": "true",
@@ -455,25 +455,25 @@ func TestSyncNodePodProbe(t *testing.T) {
 						},
 					},
 				}
-				return []*appsv1alpha1.PodProbeMarker{demo}
+				return []*appsv1beta1.PodProbeMarker{demo}
 			},
-			getNodePodProbes: func() []*appsv1alpha1.NodePodProbe {
+			getNodePodProbes: func() []*appsv1beta1.NodePodProbe {
 				demo := demoNodePodProbe.DeepCopy()
-				demo.Status = appsv1alpha1.NodePodProbeStatus{
-					PodProbeStatuses: []appsv1alpha1.PodProbeStatus{
+				demo.Status = appsv1beta1.NodePodProbeStatus{
+					PodProbeStatuses: []appsv1beta1.PodProbeStatus{
 						{
 							Name: "pod-1",
 							UID:  "pod-1-uid",
-							ProbeStates: []appsv1alpha1.ContainerProbeState{
+							ProbeStates: []appsv1beta1.ContainerProbeState{
 								{
 									Name:  "ppm-1#healthy",
-									State: appsv1alpha1.ProbeFailed,
+									State: appsv1beta1.ProbeFailed,
 								},
 							},
 						},
 					},
 				}
-				return []*appsv1alpha1.NodePodProbe{demo}
+				return []*appsv1beta1.NodePodProbe{demo}
 			},
 			expectPods: func() []*corev1.Pod {
 				pods := []*corev1.Pod{
@@ -562,8 +562,8 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 		name               string
 		req                ctrl.Request
 		getPods            func() []*corev1.Pod
-		getNodePodProbe    func() *appsv1alpha1.NodePodProbe
-		expectNodePodProbe func() *appsv1alpha1.NodePodProbe
+		getNodePodProbe    func() *appsv1beta1.NodePodProbe
+		expectNodePodProbe func() *appsv1beta1.NodePodProbe
 		getNode            func() []*corev1.Node
 	}{
 		{
@@ -610,13 +610,13 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 				}
 				return pods
 			},
-			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
-				demo := &appsv1alpha1.NodePodProbe{
+			getNodePodProbe: func() *appsv1beta1.NodePodProbe {
+				demo := &appsv1beta1.NodePodProbe{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
 					},
-					Spec: appsv1alpha1.NodePodProbeSpec{
-						PodProbes: []appsv1alpha1.PodProbe{
+					Spec: appsv1beta1.NodePodProbeSpec{
+						PodProbes: []appsv1beta1.PodProbe{
 							{
 								Name: "pod-1",
 							},
@@ -628,13 +628,13 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 				}
 				return demo
 			},
-			expectNodePodProbe: func() *appsv1alpha1.NodePodProbe {
-				demo := &appsv1alpha1.NodePodProbe{
+			expectNodePodProbe: func() *appsv1beta1.NodePodProbe {
+				demo := &appsv1beta1.NodePodProbe{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
 					},
-					Spec: appsv1alpha1.NodePodProbeSpec{
-						PodProbes: []appsv1alpha1.PodProbe{
+					Spec: appsv1beta1.NodePodProbeSpec{
+						PodProbes: []appsv1beta1.PodProbe{
 							{
 								Name: "pod-1",
 							},
@@ -682,13 +682,13 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 				}
 				return pods
 			},
-			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
-				demo := &appsv1alpha1.NodePodProbe{
+			getNodePodProbe: func() *appsv1beta1.NodePodProbe {
+				demo := &appsv1beta1.NodePodProbe{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
 					},
-					Spec: appsv1alpha1.NodePodProbeSpec{
-						PodProbes: []appsv1alpha1.PodProbe{
+					Spec: appsv1beta1.NodePodProbeSpec{
+						PodProbes: []appsv1beta1.PodProbe{
 							{
 								Name: "pod-1",
 							},
@@ -700,12 +700,12 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 				}
 				return demo
 			},
-			expectNodePodProbe: func() *appsv1alpha1.NodePodProbe {
-				demo := &appsv1alpha1.NodePodProbe{
+			expectNodePodProbe: func() *appsv1beta1.NodePodProbe {
+				demo := &appsv1beta1.NodePodProbe{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
 					},
-					Spec: appsv1alpha1.NodePodProbeSpec{},
+					Spec: appsv1beta1.NodePodProbeSpec{},
 				}
 				return demo
 			},
@@ -741,13 +741,13 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 				}
 				return pods
 			},
-			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
-				demo := &appsv1alpha1.NodePodProbe{
+			getNodePodProbe: func() *appsv1beta1.NodePodProbe {
+				demo := &appsv1beta1.NodePodProbe{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
 					},
-					Spec: appsv1alpha1.NodePodProbeSpec{
-						PodProbes: []appsv1alpha1.PodProbe{
+					Spec: appsv1beta1.NodePodProbeSpec{
+						PodProbes: []appsv1beta1.PodProbe{
 							{
 								Name: "pod-1",
 								UID:  "pod-1-uid-01",
@@ -757,12 +757,12 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 				}
 				return demo
 			},
-			expectNodePodProbe: func() *appsv1alpha1.NodePodProbe {
-				demo := &appsv1alpha1.NodePodProbe{
+			expectNodePodProbe: func() *appsv1beta1.NodePodProbe {
+				demo := &appsv1beta1.NodePodProbe{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "node-1",
 					},
-					Spec: appsv1alpha1.NodePodProbeSpec{},
+					Spec: appsv1beta1.NodePodProbeSpec{},
 				}
 				return demo
 			},
@@ -795,17 +795,17 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Reconcile failed: %s", err.Error())
 			}
-			if !checkNodePodProbeEqual(fakeClient, t, []*appsv1alpha1.NodePodProbe{cs.expectNodePodProbe()}) {
+			if !checkNodePodProbeEqual(fakeClient, t, []*appsv1beta1.NodePodProbe{cs.expectNodePodProbe()}) {
 				t.Fatalf("Reconcile failed")
 			}
 		})
 	}
 }
 
-func checkNodePodProbeEqual(c client.WithWatch, t *testing.T, expect []*appsv1alpha1.NodePodProbe) bool {
+func checkNodePodProbeEqual(c client.WithWatch, t *testing.T, expect []*appsv1beta1.NodePodProbe) bool {
 	for i := range expect {
 		obj := expect[i]
-		npp := &appsv1alpha1.NodePodProbe{}
+		npp := &appsv1beta1.NodePodProbe{}
 		err := c.Get(context.TODO(), client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, npp)
 		if err != nil {
 			t.Fatalf("get NodePodProbe failed: %s", err.Error())

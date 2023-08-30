@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -58,12 +58,12 @@ const (
 // parameters:
 // 1. allowed(bool) indicates whether to allow this update operation
 // 2. err(error)
-func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, pod *corev1.Pod, operation policyv1alpha1.PubOperation, dryRun bool) (allowed bool, reason string, err error) {
+func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, pod *corev1.Pod, operation policyv1beta1.PubOperation, dryRun bool) (allowed bool, reason string, err error) {
 	klog.V(3).Infof("validating pod(%s/%s) operation(%s) for PodUnavailableBudget", pod.Namespace, pod.Name, operation)
 	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
 	// and will no longer check the pub quota
-	if pod.Annotations[policyv1alpha1.PodPubNoProtectionAnnotation] == "true" {
-		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, policyv1alpha1.PodPubNoProtectionAnnotation)
+	if pod.Annotations[policyv1beta1.PodPubNoProtectionAnnotation] == "true" {
+		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, policyv1beta1.PodPubNoProtectionAnnotation)
 		return true, "", nil
 		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
 	} else if !control.IsPodReady(pod) {
@@ -93,14 +93,14 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 	var conflictTimes int
 	var costOfGet, costOfUpdate time.Duration
 	refresh := false
-	var pubClone *policyv1alpha1.PodUnavailableBudget
+	var pubClone *policyv1beta1.PodUnavailableBudget
 	err = retry.RetryOnConflict(ConflictRetry, func() error {
 		unlock := util.GlobalKeyedMutex.Lock(string(pub.UID))
 		defer unlock()
 
 		start := time.Now()
 		if refresh {
-			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1alpha1().
+			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1beta1().
 				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
 			if err != nil {
 				klog.Errorf("Get PodUnavailableBudget(%s/%s) failed form etcd: %s", pub.Namespace, pub.Name, err.Error())
@@ -112,13 +112,13 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 			if err != nil {
 				klog.Errorf("Get cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
 			}
-			if localCached, ok := item.(*policyv1alpha1.PodUnavailableBudget); ok {
+			if localCached, ok := item.(*policyv1beta1.PodUnavailableBudget); ok {
 				pubClone = localCached.DeepCopy()
 			} else {
 				pubClone = pub.DeepCopy()
 			}
 
-			informerCached := &policyv1alpha1.PodUnavailableBudget{}
+			informerCached := &policyv1beta1.PodUnavailableBudget{}
 			if err := client.Get(context.TODO(), types.NamespacedName{Namespace: pub.Namespace,
 				Name: pub.Name}, informerCached); err == nil {
 				var localRV, informerRV int64
@@ -175,12 +175,12 @@ func PodUnavailableBudgetValidatePod(client client.Client, control PubControl, p
 	return true, "", nil
 }
 
-func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) error {
+func checkAndDecrement(podName string, pub *policyv1beta1.PodUnavailableBudget, operation policyv1beta1.PubOperation) error {
 	if pub.Status.UnavailableAllowed <= 0 {
-		return errors.NewForbidden(policyv1alpha1.Resource("podunavailablebudget"), pub.Name, fmt.Errorf("pub unavailable allowed is negative"))
+		return errors.NewForbidden(policyv1beta1.Resource("podunavailablebudget"), pub.Name, fmt.Errorf("pub unavailable allowed is negative"))
 	}
 	if len(pub.Status.DisruptedPods)+len(pub.Status.UnavailablePods) > MaxUnavailablePodSize {
-		return errors.NewForbidden(policyv1alpha1.Resource("podunavailablebudget"), pub.Name, fmt.Errorf("DisruptedPods and UnavailablePods map too big - too many unavailable not confirmed by PUB controller"))
+		return errors.NewForbidden(policyv1beta1.Resource("podunavailablebudget"), pub.Name, fmt.Errorf("DisruptedPods and UnavailablePods map too big - too many unavailable not confirmed by PUB controller"))
 	}
 
 	pub.Status.UnavailableAllowed--
@@ -192,7 +192,7 @@ func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget,
 		pub.Status.UnavailablePods = make(map[string]metav1.Time)
 	}
 
-	if operation == policyv1alpha1.PubUpdateOperation {
+	if operation == policyv1beta1.PubUpdateOperation {
 		pub.Status.UnavailablePods[podName] = metav1.Time{Time: time.Now()}
 		klog.V(3).Infof("pod(%s) is recorded in pub(%s/%s) UnavailablePods", podName, pub.Namespace, pub.Name)
 	} else {
@@ -202,7 +202,7 @@ func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget,
 	return nil
 }
 
-func isPodRecordedInPub(podName string, pub *policyv1alpha1.PodUnavailableBudget) bool {
+func isPodRecordedInPub(podName string, pub *policyv1beta1.PodUnavailableBudget) bool {
 	if _, ok := pub.Status.UnavailablePods[podName]; ok {
 		return true
 	}
@@ -213,7 +213,7 @@ func isPodRecordedInPub(podName string, pub *policyv1alpha1.PodUnavailableBudget
 }
 
 // check APIVersion, Kind, Name
-func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
+func IsReferenceEqual(ref1, ref2 *policyv1beta1.TargetReference) bool {
 	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
 	if err != nil {
 		return false
@@ -225,8 +225,8 @@ func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
 	return gv1.Group == gv2.Group && ref1.Kind == ref2.Kind && ref1.Name == ref2.Name
 }
 
-func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) bool {
-	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
+func isNeedPubProtection(pub *policyv1beta1.PodUnavailableBudget, operation policyv1beta1.PubOperation) bool {
+	operationValue, ok := pub.Annotations[policyv1beta1.PubProtectOperationAnnotation]
 	if !ok || operationValue == "" {
 		return true
 	}

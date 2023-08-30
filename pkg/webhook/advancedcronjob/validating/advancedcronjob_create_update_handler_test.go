@@ -23,7 +23,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/pointer"
 )
@@ -40,17 +40,17 @@ func TestValidateCronJobSpec(t *testing.T) {
 	}
 
 	type testCase struct {
-		acj       *appsv1alpha1.AdvancedCronJobSpec
+		acj       *appsv1beta1.AdvancedCronJobSpec
 		expectErr bool
 	}
 
 	cases := map[string]testCase{
 		"no validation because timeZone is nil": {
-			acj: &appsv1alpha1.AdvancedCronJobSpec{
+			acj: &appsv1beta1.AdvancedCronJobSpec{
 				Schedule:          "0 * * * *",
 				TimeZone:          nil,
-				ConcurrencyPolicy: appsv1alpha1.AllowConcurrent,
-				Template: appsv1alpha1.CronJobTemplate{
+				ConcurrencyPolicy: appsv1beta1.AllowConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
 					JobTemplate: &batchv1.JobTemplateSpec{
 						Spec: batchv1.JobSpec{
 							Template: validPodTemplateSpec,
@@ -60,11 +60,11 @@ func TestValidateCronJobSpec(t *testing.T) {
 			},
 		},
 		"check timeZone is valid": {
-			acj: &appsv1alpha1.AdvancedCronJobSpec{
+			acj: &appsv1beta1.AdvancedCronJobSpec{
 				Schedule:          "0 * * * *",
 				TimeZone:          pointer.String("America/New_York"),
-				ConcurrencyPolicy: appsv1alpha1.AllowConcurrent,
-				Template: appsv1alpha1.CronJobTemplate{
+				ConcurrencyPolicy: appsv1beta1.AllowConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
 					JobTemplate: &batchv1.JobTemplateSpec{
 						Spec: batchv1.JobSpec{
 							Template: validPodTemplateSpec,
@@ -74,11 +74,11 @@ func TestValidateCronJobSpec(t *testing.T) {
 			},
 		},
 		"check timeZone is invalid": {
-			acj: &appsv1alpha1.AdvancedCronJobSpec{
+			acj: &appsv1beta1.AdvancedCronJobSpec{
 				Schedule:          "0 * * * *",
 				TimeZone:          pointer.String("broken"),
-				ConcurrencyPolicy: appsv1alpha1.AllowConcurrent,
-				Template: appsv1alpha1.CronJobTemplate{
+				ConcurrencyPolicy: appsv1beta1.AllowConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
 					JobTemplate: &batchv1.JobTemplateSpec{
 						Spec: batchv1.JobSpec{
 							Template: validPodTemplateSpec,

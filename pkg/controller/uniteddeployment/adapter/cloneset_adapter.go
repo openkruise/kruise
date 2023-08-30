@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
 
-	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	alpha1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 	corev1 "k8s.io/api/core/v1"

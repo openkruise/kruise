@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	alpha1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )

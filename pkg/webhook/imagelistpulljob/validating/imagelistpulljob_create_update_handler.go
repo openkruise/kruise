@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -42,7 +42,7 @@ var _ admission.Handler = &ImageListPullJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *ImageListPullJobCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.ImageListPullJob{}
+	obj := &appsv1beta1.ImageListPullJob{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -63,7 +63,7 @@ func (h *ImageListPullJobCreateUpdateHandler) Handle(ctx context.Context, req ad
 	return admission.ValidationResponse(true, "allowed")
 }
 
-func validate(obj *appsv1alpha1.ImageListPullJob) error {
+func validate(obj *appsv1beta1.ImageListPullJob) error {
 	if obj.Spec.Selector != nil {
 		if obj.Spec.Selector.MatchLabels != nil || obj.Spec.Selector.MatchExpressions != nil {
 			if obj.Spec.Selector.Names != nil {
@@ -112,9 +112,9 @@ func validate(obj *appsv1alpha1.ImageListPullJob) error {
 	}
 
 	switch obj.Spec.CompletionPolicy.Type {
-	case appsv1alpha1.Always:
+	case appsv1beta1.Always:
 	// is a no-op here.No need to do parameter dependency verification in this type.
-	case appsv1alpha1.Never:
+	case appsv1beta1.Never:
 		if obj.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil || obj.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
 			return fmt.Errorf("activeDeadlineSeconds and ttlSecondsAfterFinished can only work with Always CompletionPolicyType")
 		}

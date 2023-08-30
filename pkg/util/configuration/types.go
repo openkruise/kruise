@@ -17,7 +17,7 @@ limitations under the License.
 package configuration
 
 import (
-	"github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,7 +71,7 @@ func (p *CustomWorkloadWhiteList) IsDefaultSupport(apiVersion, kind string) bool
 	if err != nil {
 		return false
 	}
-	if (gv.Group == v1alpha1.GroupVersion.Group || gv.Group == appsv1.GroupName) && kind == "StatefulSet" {
+	if (gv.Group == v1beta1.GroupVersion.Group || gv.Group == appsv1.GroupName) && kind == "StatefulSet" {
 		return true
 	}
 	return false

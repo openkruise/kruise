@@ -47,7 +47,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -95,7 +94,7 @@ func Add(mgr manager.Manager) error {
 		return nil
 	}
 	// check for whether imagepulljob is disabled
-	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+	if !utildiscovery.DiscoverGVK(appsv1beta1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
 		isPreDownloadDisabled = true

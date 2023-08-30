@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 const updateRetries = 5
@@ -68,21 +68,21 @@ func round(x float64) int {
 }
 
 func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
-	name, exist := metaObj.GetLabels()[appsv1alpha1.SubSetNameLabelKey]
+	name, exist := metaObj.GetLabels()[appsv1beta1.SubSetNameLabelKey]
 	if !exist {
-		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: no label %s found", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: no label %s found", metaObj.GetNamespace(), metaObj.GetName(), appsv1beta1.SubSetNameLabelKey)
 	}
 
 	if len(name) == 0 {
-		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: label %s has an empty value", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: label %s has an empty value", metaObj.GetNamespace(), metaObj.GetName(), appsv1beta1.SubSetNameLabelKey)
 	}
 
 	return name, nil
 }
 
 // NewUnitedDeploymentCondition creates a new UnitedDeployment condition.
-func NewUnitedDeploymentCondition(condType appsv1alpha1.UnitedDeploymentConditionType, status corev1.ConditionStatus, reason, message string) *appsv1alpha1.UnitedDeploymentCondition {
-	return &appsv1alpha1.UnitedDeploymentCondition{
+func NewUnitedDeploymentCondition(condType appsv1beta1.UnitedDeploymentConditionType, status corev1.ConditionStatus, reason, message string) *appsv1beta1.UnitedDeploymentCondition {
+	return &appsv1beta1.UnitedDeploymentCondition{
 		Type:               condType,
 		Status:             status,
 		LastTransitionTime: metav1.Now(),
@@ -92,7 +92,7 @@ func NewUnitedDeploymentCondition(condType appsv1alpha1.UnitedDeploymentConditio
 }
 
 // GetUnitedDeploymentCondition returns the condition with the provided type.
-func GetUnitedDeploymentCondition(status appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) *appsv1alpha1.UnitedDeploymentCondition {
+func GetUnitedDeploymentCondition(status appsv1beta1.UnitedDeploymentStatus, condType appsv1beta1.UnitedDeploymentConditionType) *appsv1beta1.UnitedDeploymentCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
@@ -104,7 +104,7 @@ func GetUnitedDeploymentCondition(status appsv1alpha1.UnitedDeploymentStatus, co
 
 // SetUnitedDeploymentCondition updates the UnitedDeployment to include the provided condition. If the condition that
 // we are about to add already exists and has the same status, reason and message then we are not going to update.
-func SetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condition *appsv1alpha1.UnitedDeploymentCondition) {
+func SetUnitedDeploymentCondition(status *appsv1beta1.UnitedDeploymentStatus, condition *appsv1beta1.UnitedDeploymentCondition) {
 	currentCond := GetUnitedDeploymentCondition(*status, condition.Type)
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
@@ -118,12 +118,12 @@ func SetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, c
 }
 
 // RemoveUnitedDeploymentCondition removes the UnitedDeployment condition with the provided type.
-func RemoveUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) {
+func RemoveUnitedDeploymentCondition(status *appsv1beta1.UnitedDeploymentStatus, condType appsv1beta1.UnitedDeploymentConditionType) {
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
-func filterOutCondition(conditions []appsv1alpha1.UnitedDeploymentCondition, condType appsv1alpha1.UnitedDeploymentConditionType) []appsv1alpha1.UnitedDeploymentCondition {
-	var newConditions []appsv1alpha1.UnitedDeploymentCondition
+func filterOutCondition(conditions []appsv1beta1.UnitedDeploymentCondition, condType appsv1beta1.UnitedDeploymentConditionType) []appsv1beta1.UnitedDeploymentCondition {
+	var newConditions []appsv1beta1.UnitedDeploymentCondition
 	for _, c := range conditions {
 		if c.Type == condType {
 			continue

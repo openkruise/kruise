@@ -20,7 +20,7 @@ import (
 	"context"
 	"reflect"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"

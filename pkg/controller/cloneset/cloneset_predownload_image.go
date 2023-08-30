@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -37,25 +37,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1.CloneSet, currentRevision, updateRevision *apps.ControllerRevision) error {
-	if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadCreatedKey]; ok {
+func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1beta1.CloneSet, currentRevision, updateRevision *apps.ControllerRevision) error {
+	if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadCreatedKey]; ok {
 		return nil
-	} else if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadIgnoredKey]; ok {
+	} else if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadIgnoredKey]; ok {
 		return nil
 	}
 
 	// ignore if update type is ReCreate
-	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.RecreateCloneSetUpdateStrategyType {
+	if cs.Spec.UpdateStrategy.Type == appsv1beta1.RecreateCloneSetUpdateStrategyType {
 		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for update type is %s",
 			cs.Namespace, cs.Name, cs.Spec.UpdateStrategy.Type)
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if replicas <= minimumReplicasToPreDownloadImage
 	if *cs.Spec.Replicas <= minimumReplicasToPreDownloadImage {
 		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for replicas %d <= %d",
 			cs.Namespace, cs.Name, *cs.Spec.Replicas, minimumReplicasToPreDownloadImage)
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if all Pods update in one batch
@@ -69,11 +69,11 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 		partition = pValue
 	}
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
-		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)
+		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)
 	if partition == 0 && maxUnavailable >= int(*cs.Spec.Replicas) {
 		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for all Pods update in one batch, replicas=%d, partition=%d, maxUnavailable=%d",
 			cs.Namespace, cs.Name, *cs.Spec.Replicas, partition, maxUnavailable)
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if this revision can not update in-place
@@ -82,7 +82,7 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 	if !inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, coreControl.GetUpdateOptions()) {
 		klog.V(4).Infof("CloneSet %s/%s skipped to create ImagePullJob for %s -> %s can not update in-place",
 			cs.Namespace, cs.Name, currentRevision.Name, updateRevision.Name)
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// start to create jobs
@@ -131,7 +131,7 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 		r.recorder.Eventf(cs, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)
 	}
 
-	return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadCreatedKey, "true")
+	return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadCreatedKey, "true")
 }
 
 func (r *ReconcileCloneSet) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error {

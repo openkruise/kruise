@@ -26,11 +26,11 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
-	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1beta1"
+	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
 	"github.com/openkruise/kruise/pkg/daemon/util"
@@ -121,7 +121,7 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 		workers:              make(map[probeKey]*worker),
 		queue:                queue,
 		updateQueue:          updateQueue,
-		nodePodProbeClient:   genericClient.KruiseClient.AppsV1alpha1().NodePodProbes(),
+		nodePodProbeClient:   genericClient.KruiseClient.AppsV1beta1().NodePodProbes(),
 		result:               newResultManager(updateQueue),
 		nodeName:             nodeName,
 		eventRecorder:        recorder,
@@ -130,14 +130,14 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 	c.prober = newProber(c.runtimeFactory.GetRuntimeService())
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			npp, ok := obj.(*appsv1alpha1.NodePodProbe)
+			npp, ok := obj.(*appsv1beta1.NodePodProbe)
 			if ok {
 				enqueue(queue, npp)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			oldNodePodProbe, oldOK := oldObj.(*appsv1alpha1.NodePodProbe)
-			newNodePodProbe, newOK := newObj.(*appsv1alpha1.NodePodProbe)
+			oldNodePodProbe, oldOK := oldObj.(*appsv1beta1.NodePodProbe)
+			newNodePodProbe, newOK := newObj.(*appsv1beta1.NodePodProbe)
 			if !oldOK || !newOK {
 				return
 			}
@@ -166,20 +166,20 @@ func newNodePodProbeInformer(client kruiseclient.Interface, nodeName string) cac
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().NodePodProbes().List(context.TODO(), options)
+				return client.AppsV1beta1().NodePodProbes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().NodePodProbes().Watch(context.TODO(), options)
+				return client.AppsV1beta1().NodePodProbes().Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.NodePodProbe{},
+		&appsv1beta1.NodePodProbe{},
 		0, // do not resync
 		cache.Indexers{},
 	)
 }
 
-func enqueue(queue workqueue.Interface, obj *appsv1alpha1.NodePodProbe) {
+func enqueue(queue workqueue.Interface, obj *appsv1beta1.NodePodProbe) {
 	if obj.DeletionTimestamp != nil {
 		return
 	}
@@ -317,9 +317,9 @@ func (c *Controller) syncUpdateNodePodProbeStatus() error {
 		}
 	}
 	// If the PodProbe is deleted, the corresponding status will be clear
-	newStatus := &appsv1alpha1.NodePodProbeStatus{}
+	newStatus := &appsv1beta1.NodePodProbeStatus{}
 	for _, probeStatus := range npp.Status.PodProbeStatuses {
-		newProbeStatus := appsv1alpha1.PodProbeStatus{
+		newProbeStatus := appsv1beta1.PodProbeStatus{
 			Namespace: probeStatus.Namespace,
 			Name:      probeStatus.Name,
 			UID:       probeStatus.UID,
@@ -343,7 +343,7 @@ func (c *Controller) syncUpdateNodePodProbeStatus() error {
 		//record probe result in pod event
 		ref := &corev1.ObjectReference{Kind: "Pod", Namespace: update.Key.podNs, Name: update.Key.podName, UID: types.UID(update.Key.podUID),
 			APIVersion: corev1.SchemeGroupVersion.String()}
-		if update.State == appsv1alpha1.ProbeSucceeded {
+		if update.State == appsv1beta1.ProbeSucceeded {
 			c.eventRecorder.Event(ref, corev1.EventTypeNormal, EventKruiseProbeSucceeded, update.Msg)
 		} else {
 			c.eventRecorder.Event(ref, corev1.EventTypeNormal, EventKruiseProbeFailed, update.Msg)
@@ -407,8 +407,8 @@ func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.C
 	return containerStatus.Status, err
 }
 
-func updateNodePodProbeStatus(update Update, newStatus *appsv1alpha1.NodePodProbeStatus) {
-	var probeStatus *appsv1alpha1.PodProbeStatus
+func updateNodePodProbeStatus(update Update, newStatus *appsv1beta1.NodePodProbeStatus) {
+	var probeStatus *appsv1beta1.PodProbeStatus
 	for i := range newStatus.PodProbeStatuses {
 		status := &newStatus.PodProbeStatuses[i]
 		if status.UID == update.Key.podUID {
@@ -417,7 +417,7 @@ func updateNodePodProbeStatus(update Update, newStatus *appsv1alpha1.NodePodProb
 		}
 	}
 	if probeStatus == nil {
-		newStatus.PodProbeStatuses = append(newStatus.PodProbeStatuses, appsv1alpha1.PodProbeStatus{Namespace: update.Key.podNs, Name: update.Key.podName, UID: update.Key.podUID})
+		newStatus.PodProbeStatuses = append(newStatus.PodProbeStatuses, appsv1beta1.PodProbeStatus{Namespace: update.Key.podNs, Name: update.Key.podName, UID: update.Key.podUID})
 		probeStatus = &newStatus.PodProbeStatuses[len(newStatus.PodProbeStatuses)-1]
 	}
 	for i, obj := range probeStatus.ProbeStates {
@@ -431,7 +431,7 @@ func updateNodePodProbeStatus(update Update, newStatus *appsv1alpha1.NodePodProb
 			return
 		}
 	}
-	probeStatus.ProbeStates = append(probeStatus.ProbeStates, appsv1alpha1.ContainerProbeState{
+	probeStatus.ProbeStates = append(probeStatus.ProbeStates, appsv1beta1.ContainerProbeState{
 		Name:               update.Key.probeName,
 		State:              update.State,
 		LastProbeTime:      update.LastProbeTime,

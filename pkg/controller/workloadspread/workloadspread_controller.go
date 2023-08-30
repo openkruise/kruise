@@ -45,7 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	ctrlUtil "github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -87,9 +87,9 @@ const (
 )
 
 var (
-	controllerKruiseKindWS  = appsv1alpha1.SchemeGroupVersion.WithKind("WorkloadSpread")
-	controllerKruiseKindCS  = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	controllerKruiseKindSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKruiseKindWS  = appsv1beta1.SchemeGroupVersion.WithKind("WorkloadSpread")
+	controllerKruiseKindCS  = appsv1beta1.SchemeGroupVersion.WithKind("CloneSet")
+	controllerKruiseKindSts = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 	controllerKindSts       = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
 	controllerKindRS        = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 	controllerKindDep       = appsv1.SchemeGroupVersion.WithKind("Deployment")
@@ -119,7 +119,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch WorkloadSpread
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.WorkloadSpread{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.WorkloadSpread{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for replica changes to CloneSet
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CloneSet{}}, &workloadEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(&source.Kind{Type: &appsv1beta1.CloneSet{}}, &workloadEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
@@ -201,12 +201,12 @@ type ReconcileWorkloadSpread struct {
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch;delete
 
 func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Request) (reconcile.Result, error) {
-	ws := &appsv1alpha1.WorkloadSpread{}
+	ws := &appsv1beta1.WorkloadSpread{}
 	err := r.Get(context.TODO(), req.NamespacedName, ws)
 
 	if (err != nil && errors.IsNotFound(err)) || (err == nil && !ws.DeletionTimestamp.IsZero()) {
 		// delete cache if this workloadSpread has been deleted
-		if cacheErr := util.GlobalCache.Delete(&appsv1alpha1.WorkloadSpread{
+		if cacheErr := util.GlobalCache.Delete(&appsv1beta1.WorkloadSpread{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "apps.kruise.io/v1alpha1",
 				Kind:       "WorkloadSpread",
@@ -231,7 +231,7 @@ func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Req
 	return reconcile.Result{RequeueAfter: durationStore.Pop(getWorkloadSpreadKey(ws))}, err
 }
 
-func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, namespace string) ([]*corev1.Pod, int32, error) {
+func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1beta1.TargetReference, namespace string) ([]*corev1.Pod, int32, error) {
 	ok, err := wsutil.VerifyGroupKind(ref, controllerKindJob.Kind, []string{controllerKindJob.Group})
 	if err != nil || !ok {
 		return nil, -1, err
@@ -276,7 +276,7 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 // return two parameters
 // 1. podList for workloadSpread
 // 2. workloadReplicas
-func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) ([]*corev1.Pod, int32, error) {
+func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1beta1.WorkloadSpread) ([]*corev1.Pod, int32, error) {
 	if ws.Spec.TargetReference == nil {
 		return nil, -1, nil
 	}
@@ -307,7 +307,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 // Lastly, we update the WorkloadSpread's Status and clean up scheduled failed Pods. controller should collaborate with webhook
 // to maintain WorkloadSpread status together. The controller is responsible for calculating the real status, and the webhook
 // mainly counts missingReplicas and records the creation or deletion entry of Pod into map.
-func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) error {
+func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1beta1.WorkloadSpread) error {
 	pods, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)
 	if err != nil || workloadReplicas == -1 {
 		if err != nil {
@@ -363,7 +363,7 @@ func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSprea
 }
 
 // groupPod returns a map, the key is the name of subset and the value represents the Pods of the corresponding subset.
-func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod, replicas int32) (map[string][]*corev1.Pod, error) {
+func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1beta1.WorkloadSpread, pods []*corev1.Pod, replicas int32) (map[string][]*corev1.Pod, error) {
 	podMap := make(map[string][]*corev1.Pod, len(ws.Spec.Subsets)+1)
 	podMap[FakeSubsetName] = []*corev1.Pod{}
 	subsetMissingReplicas := make(map[string]int)
@@ -403,7 +403,7 @@ func (r *ReconcileWorkloadSpread) groupPod(ws *appsv1alpha1.WorkloadSpread, pods
 }
 
 // getSuitableSubsetNameForPod will return (FakeSubsetName, nil) if not found suitable subset for pod
-func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (string, error) {
+func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1beta1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (string, error) {
 	injectWS := getInjectWorkloadSpreadFromPod(pod)
 	if isNotMatchedWS(injectWS, ws) {
 		// process the pods that were created before workloadSpread
@@ -420,7 +420,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.W
 
 // getSuitableSubsetForOldPod returns a suitable subset for the pod which was created before workloadSpread.
 // getSuitableSubsetForOldPod will return (nil, nil) if there is no suitable subset for the pod.
-func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (*appsv1alpha1.WorkloadSpreadSubset, error) {
+func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1beta1.WorkloadSpread, pod *corev1.Pod, subsetMissingReplicas map[string]int) (*appsv1beta1.WorkloadSpreadSubset, error) {
 	if len(pod.Spec.NodeName) == 0 {
 		return nil, nil
 	}
@@ -434,7 +434,7 @@ func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1alpha
 	}
 
 	var maxPreferredScore int64 = -1
-	var favoriteSubset *appsv1alpha1.WorkloadSpreadSubset
+	var favoriteSubset *appsv1beta1.WorkloadSpreadSubset
 	for i := range ws.Spec.Subsets {
 		subset := &ws.Spec.Subsets[i]
 		// in case of that this pod was scheduled to the node which matches a subset of workloadSpread
@@ -465,7 +465,7 @@ func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1alpha
 
 // patchFavoriteSubsetMetadataToPod patch MatchedWorkloadSpreadSubsetAnnotations to the pod,
 // and select labels/annotations form favoriteSubset.patch, then patch them to the pod;
-func (r *ReconcileWorkloadSpread) patchFavoriteSubsetMetadataToPod(pod *corev1.Pod, ws *appsv1alpha1.WorkloadSpread, favoriteSubset *appsv1alpha1.WorkloadSpreadSubset) error {
+func (r *ReconcileWorkloadSpread) patchFavoriteSubsetMetadataToPod(pod *corev1.Pod, ws *appsv1beta1.WorkloadSpread, favoriteSubset *appsv1beta1.WorkloadSpreadSubset) error {
 	patchMetadata := make(map[string]interface{})
 	// decode favoriteSubset.patch.raw and add their labels and annotations to the patch
 	if favoriteSubset.Patch.Raw != nil && !strings.EqualFold(ws.Annotations[IgnorePatchExistingPodsAnnotation], "true") {
@@ -506,26 +506,26 @@ func (r *ReconcileWorkloadSpread) patchFavoriteSubsetMetadataToPod(pod *corev1.P
 // return two parameters
 // 1. current WorkloadSpreadStatus
 // 2. a map, the key is the subsetName, the value is the schedule failed Pods belongs to the subset.
-func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread,
-	podMap map[string][]*corev1.Pod, workloadReplicas int32) (*appsv1alpha1.WorkloadSpreadStatus, map[string][]*corev1.Pod) {
+func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1beta1.WorkloadSpread,
+	podMap map[string][]*corev1.Pod, workloadReplicas int32) (*appsv1beta1.WorkloadSpreadStatus, map[string][]*corev1.Pod) {
 	// set the generation in the returned status
-	status := appsv1alpha1.WorkloadSpreadStatus{}
+	status := appsv1beta1.WorkloadSpreadStatus{}
 	status.ObservedGeneration = ws.Generation
 	// status.ObservedWorkloadReplicas = workloadReplicas
-	status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, len(ws.Spec.Subsets))
+	status.SubsetStatuses = make([]appsv1beta1.WorkloadSpreadSubsetStatus, len(ws.Spec.Subsets))
 	scheduleFailedPodMap := make(map[string][]*corev1.Pod)
 
 	// Using a map to restore name and old status of subset, because user could adjust the spec's subset sequence
 	// to change priority of subset. We guarantee that operation and use subset name to distinguish which subset
 	// from old status.
 	oldSubsetStatuses := ws.Status.SubsetStatuses
-	oldSubsetStatusMap := make(map[string]*appsv1alpha1.WorkloadSpreadSubsetStatus, len(oldSubsetStatuses))
+	oldSubsetStatusMap := make(map[string]*appsv1beta1.WorkloadSpreadSubsetStatus, len(oldSubsetStatuses))
 	for i := range oldSubsetStatuses {
 		oldSubsetStatusMap[oldSubsetStatuses[i].Name] = &oldSubsetStatuses[i]
 	}
 
 	var rescheduleCriticalSeconds int32
-	if ws.Spec.ScheduleStrategy.Type == appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType &&
+	if ws.Spec.ScheduleStrategy.Type == appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType &&
 		ws.Spec.ScheduleStrategy.Adaptive != nil &&
 		ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil {
 		rescheduleCriticalSeconds = *ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds
@@ -547,14 +547,14 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 				pods := r.rescheduleSubset(ws, podMap[subset.Name], subsetStatus, oldSubsetStatusMap[subset.Name])
 				scheduleFailedPodMap[subset.Name] = pods
 			} else {
-				oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatusMap[subset.Name], appsv1alpha1.SubsetSchedulable)
+				oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatusMap[subset.Name], appsv1beta1.SubsetSchedulable)
 				if oldCondition != nil {
 					setWorkloadSpreadSubsetCondition(subsetStatus, oldCondition.DeepCopy())
 				}
-				setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""))
+				setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, corev1.ConditionTrue, "", ""))
 			}
 		} else {
-			removeWorkloadSpreadSubsetCondition(subsetStatus, appsv1alpha1.SubsetSchedulable)
+			removeWorkloadSpreadSubsetCondition(subsetStatus, appsv1beta1.SubsetSchedulable)
 		}
 
 		status.SubsetStatuses[i] = *subsetStatus
@@ -564,13 +564,13 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 }
 
 // calculateWorkloadSpreadSubsetStatus returns the current subsetStatus for subset.
-func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1beta1.WorkloadSpread,
 	pods []*corev1.Pod,
-	subset *appsv1alpha1.WorkloadSpreadSubset,
-	oldSubsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus,
-	workloadReplicas int32) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+	subset *appsv1beta1.WorkloadSpreadSubset,
+	oldSubsetStatus *appsv1beta1.WorkloadSpreadSubsetStatus,
+	workloadReplicas int32) *appsv1beta1.WorkloadSpreadSubsetStatus {
 	// current subsetStatus in this reconcile
-	subsetStatus := &appsv1alpha1.WorkloadSpreadSubsetStatus{}
+	subsetStatus := &appsv1beta1.WorkloadSpreadSubsetStatus{}
 	subsetStatus.Name = subset.Name
 	subsetStatus.CreatingPods = make(map[string]metav1.Time)
 	subsetStatus.DeletingPods = make(map[string]metav1.Time)
@@ -676,8 +676,8 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 	return subsetStatus
 }
 
-func (r *ReconcileWorkloadSpread) UpdateWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread,
-	status *appsv1alpha1.WorkloadSpreadStatus) error {
+func (r *ReconcileWorkloadSpread) UpdateWorkloadSpreadStatus(ws *appsv1beta1.WorkloadSpread,
+	status *appsv1beta1.WorkloadSpreadStatus) error {
 	if status.ObservedGeneration == ws.Status.ObservedGeneration &&
 		// status.ObservedWorkloadReplicas == ws.Status.ObservedWorkloadReplicas &&
 		apiequality.Semantic.DeepEqual(status.SubsetStatuses, ws.Status.SubsetStatuses) {
@@ -694,9 +694,9 @@ func (r *ReconcileWorkloadSpread) UpdateWorkloadSpreadStatus(ws *appsv1alpha1.Wo
 	return err
 }
 
-func makeStatusChangedLog(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.WorkloadSpreadStatus) string {
+func makeStatusChangedLog(ws *appsv1beta1.WorkloadSpread, status *appsv1beta1.WorkloadSpreadStatus) string {
 	oldSubsetStatuses := ws.Status.SubsetStatuses
-	oldSubsetStatusMap := make(map[string]*appsv1alpha1.WorkloadSpreadSubsetStatus, len(oldSubsetStatuses))
+	oldSubsetStatusMap := make(map[string]*appsv1beta1.WorkloadSpreadSubsetStatus, len(oldSubsetStatuses))
 	for i := range oldSubsetStatuses {
 		oldSubsetStatusMap[oldSubsetStatuses[i].Name] = &oldSubsetStatuses[i]
 	}
@@ -742,7 +742,7 @@ func makeStatusChangedLog(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.
 	return log
 }
 
-func (r *ReconcileWorkloadSpread) writeWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread) error {
+func (r *ReconcileWorkloadSpread) writeWorkloadSpreadStatus(ws *appsv1beta1.WorkloadSpread) error {
 	unlock := util.GlobalKeyedMutex.Lock(string(ws.GetUID()))
 	defer unlock()
 	// If this update fails, don't retry it. Allow the failure to get handled &
@@ -760,7 +760,7 @@ func getWorkloadSpreadKey(o metav1.Object) string {
 	return o.GetNamespace() + "/" + o.GetName()
 }
 
-func isNotMatchedWS(injectWS *wsutil.InjectWorkloadSpread, ws *appsv1alpha1.WorkloadSpread) bool {
+func isNotMatchedWS(injectWS *wsutil.InjectWorkloadSpread, ws *appsv1beta1.WorkloadSpread) bool {
 	if injectWS == nil || injectWS.Name != ws.Name || injectWS.Subset == "" {
 		return true
 	}

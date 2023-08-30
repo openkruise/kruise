@@ -29,24 +29,24 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 var (
 	scheme             *runtime.Scheme
-	kruiseKindCloneSet = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
+	kruiseKindCloneSet = appsv1beta1.SchemeGroupVersion.WithKind("CloneSet")
 	handler            = &WorkloadSpreadCreateUpdateHandler{}
 	maxReplicasDemo    = intstr.FromInt(50)
 	patchResource      = []byte(`{"spec":{"containers":[{"name":"main","resources":{"limits":{"cpu":"2","memory":"8000Mi"}}}]}}`)
-	workloadSpreadDemo = &appsv1alpha1.WorkloadSpread{
+	workloadSpreadDemo = &appsv1beta1.WorkloadSpread{
 		ObjectMeta: metav1.ObjectMeta{Name: "workloadSpread", Namespace: metav1.NamespaceDefault},
-		Spec: appsv1alpha1.WorkloadSpreadSpec{
-			TargetReference: &appsv1alpha1.TargetReference{
+		Spec: appsv1beta1.WorkloadSpreadSpec{
+			TargetReference: &appsv1beta1.TargetReference{
 				APIVersion: kruiseKindCloneSet.GroupVersion().String(),
 				Kind:       kruiseKindCloneSet.Kind,
 				Name:       "demo",
 			},
-			Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+			Subsets: []appsv1beta1.WorkloadSpreadSubset{
 				{
 					Name:        "subset-a",
 					MaxReplicas: &maxReplicasDemo,
@@ -110,23 +110,23 @@ var (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 }
 
 func TestValidateWorkloadSpreadCreate(t *testing.T) {
-	targetRef := appsv1alpha1.TargetReference{
+	targetRef := appsv1beta1.TargetReference{
 		APIVersion: kruiseKindCloneSet.GroupVersion().String(),
 		Kind:       kruiseKindCloneSet.Kind,
 		Name:       "test",
 	}
 	replicas1 := intstr.FromInt(50)
 	replicas2 := intstr.FromString("50%")
-	successCases := []appsv1alpha1.WorkloadSpread{
+	successCases := []appsv1beta1.WorkloadSpread{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
-			Spec: appsv1alpha1.WorkloadSpreadSpec{
+			Spec: appsv1beta1.WorkloadSpreadSpec{
 				TargetReference: &targetRef,
-				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+				Subsets: []appsv1beta1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas1,
@@ -172,20 +172,20 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 						},
 					},
 				},
-				ScheduleStrategy: appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType,
+				ScheduleStrategy: appsv1beta1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1beta1.FixedWorkloadSpreadScheduleStrategyType,
 				},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
-			Spec: appsv1alpha1.WorkloadSpreadSpec{
-				TargetReference: &appsv1alpha1.TargetReference{
+			Spec: appsv1beta1.WorkloadSpreadSpec{
+				TargetReference: &appsv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "demo",
 				},
-				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+				Subsets: []appsv1beta1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas1,
@@ -205,13 +205,13 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
-			Spec: appsv1alpha1.WorkloadSpreadSpec{
-				TargetReference: &appsv1alpha1.TargetReference{
+			Spec: appsv1beta1.WorkloadSpreadSpec{
+				TargetReference: &appsv1beta1.TargetReference{
 					APIVersion: "apps.kruise.io/v1alpha1",
 					Kind:       "StatefulSet",
 					Name:       "demo",
 				},
-				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+				Subsets: []appsv1beta1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas1,
@@ -231,13 +231,13 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-1", Namespace: metav1.NamespaceDefault},
-			Spec: appsv1alpha1.WorkloadSpreadSpec{
-				TargetReference: &appsv1alpha1.TargetReference{
+			Spec: appsv1beta1.WorkloadSpreadSpec{
+				TargetReference: &appsv1beta1.TargetReference{
 					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "StatefulSet",
 					Name:       "demo",
 				},
-				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+				Subsets: []appsv1beta1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas1,
@@ -257,13 +257,13 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-2", Namespace: metav1.NamespaceDefault},
-			Spec: appsv1alpha1.WorkloadSpreadSpec{
-				TargetReference: &appsv1alpha1.TargetReference{
+			Spec: appsv1beta1.WorkloadSpreadSpec{
+				TargetReference: &appsv1beta1.TargetReference{
 					APIVersion: controllerKindDep.GroupVersion().String(),
 					Kind:       controllerKindDep.Kind,
 					Name:       "test",
 				},
-				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+				Subsets: []appsv1beta1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas1,
@@ -314,9 +314,9 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 						},
 					},
 				},
-				ScheduleStrategy: appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+				ScheduleStrategy: appsv1beta1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 						RescheduleCriticalSeconds: pointer.Int32Ptr(30),
 						DisableSimulationSchedule: true,
 					},
@@ -325,13 +325,13 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-3", Namespace: metav1.NamespaceDefault},
-			Spec: appsv1alpha1.WorkloadSpreadSpec{
-				TargetReference: &appsv1alpha1.TargetReference{
+			Spec: appsv1beta1.WorkloadSpreadSpec{
+				TargetReference: &appsv1beta1.TargetReference{
 					APIVersion: controllerKindJob.GroupVersion().String(),
 					Kind:       controllerKindJob.Kind,
 					Name:       "test",
 				},
-				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+				Subsets: []appsv1beta1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas2,
@@ -381,13 +381,13 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "ws-4", Namespace: metav1.NamespaceDefault},
-			Spec: appsv1alpha1.WorkloadSpreadSpec{
-				TargetReference: &appsv1alpha1.TargetReference{
+			Spec: appsv1beta1.WorkloadSpreadSpec{
+				TargetReference: &appsv1beta1.TargetReference{
 					APIVersion: controllerKindJob.GroupVersion().String(),
 					Kind:       controllerKindJob.Kind,
 					Name:       "test",
 				},
-				Subsets: []appsv1alpha1.WorkloadSpreadSubset{
+				Subsets: []appsv1beta1.WorkloadSpreadSubset{
 					{
 						Name:        "subset-a",
 						MaxReplicas: &replicas2,
@@ -446,9 +446,9 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 						},
 					},
 				},
-				ScheduleStrategy: appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+				ScheduleStrategy: appsv1beta1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 						RescheduleCriticalSeconds: pointer.Int32Ptr(30),
 						DisableSimulationSchedule: true,
 					},
@@ -468,12 +468,12 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 
 	errorCases := []struct {
 		name              string
-		getWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+		getWorkloadSpread func() *appsv1beta1.WorkloadSpread
 		errorSuffix       string
 	}{
 		{
 			name: "targetRef is nil",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.TargetReference = nil
 				return workloadSpread
@@ -482,7 +482,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "targetRef's APIVersion is nil",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.TargetReference.APIVersion = ""
 				return workloadSpread
@@ -491,7 +491,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "targetRef's Kind is nil",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.TargetReference.APIVersion = ""
 				return workloadSpread
@@ -500,7 +500,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "targetRef's Name is nil",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.TargetReference.APIVersion = ""
 				return workloadSpread
@@ -509,7 +509,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subsets is nil",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets = nil
 				return workloadSpread
@@ -518,9 +518,9 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "statefulset group error",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.TargetReference = &appsv1alpha1.TargetReference{
+				workloadSpread.Spec.TargetReference = &appsv1beta1.TargetReference{
 					APIVersion: "rollouts.kruise.io/v2",
 					Kind:       "StatefulSet",
 					Name:       "demo",
@@ -531,9 +531,9 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "statefulset subset is percentage",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.TargetReference = &appsv1alpha1.TargetReference{
+				workloadSpread.Spec.TargetReference = &appsv1beta1.TargetReference{
 					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "StatefulSet",
 					Name:       "demo",
@@ -546,9 +546,9 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 
 		// {
 		//	name: "one subset",
-		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+		//	getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 		//		workloadSpread := workloadSpreadDemo.DeepCopy()
-		//		workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+		//		workloadSpread.Spec.Subsets = []appsv1beta1.WorkloadSpreadSubset{
 		//			{
 		//				Name:        "subset-a",
 		//				MaxReplicas: nil,
@@ -560,7 +560,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		// },
 		{
 			name: "subset[0]'name is empty",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets[0].Name = ""
 				return workloadSpread
@@ -569,7 +569,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset[1]'name is empty",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets[1].Name = ""
 				return workloadSpread
@@ -578,7 +578,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset[1]'name is conflict with subsets[0]",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets[0].Name = workloadSpread.Spec.Subsets[1].Name
 				return workloadSpread
@@ -587,7 +587,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		// {
 		//	name: "subset[0]'s requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are all empty",
-		//	getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+		//	getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 		//		workloadSpread := workloadSpreadDemo.DeepCopy()
 		//		workloadSpread.Spec.Subsets[0].RequiredNodeSelectorTerm = nil
 		//		workloadSpread.Spec.Subsets[0].PreferredNodeSelectorTerms = nil
@@ -598,7 +598,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		// },
 		{
 			name: "requiredNodeSelectorTerm are not valid",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets[0].RequiredNodeSelectorTerm = &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -615,7 +615,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "preferredSchedulingTerms' weight are not valid",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets[0].PreferredNodeSelectorTerms = []corev1.PreferredSchedulingTerm{
 					{
@@ -637,7 +637,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "preferredSchedulingTerms are not valid",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.Subsets[0].PreferredNodeSelectorTerms = []corev1.PreferredSchedulingTerm{
 					{
@@ -659,7 +659,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset-a's maxReplicas < 0",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				maxReplicas := intstr.FromInt(-100)
 				workloadSpread.Spec.Subsets[0].MaxReplicas = &maxReplicas
@@ -669,7 +669,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset-a's maxReplicas = 0.2%",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				maxReplicas := intstr.FromString("0.2%")
 				workloadSpread.Spec.Subsets[0].MaxReplicas = &maxReplicas
@@ -679,7 +679,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset-a's maxReplicas = 50.2%",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				maxReplicas := intstr.FromString("50.2%")
 				workloadSpread.Spec.Subsets[0].MaxReplicas = &maxReplicas
@@ -689,7 +689,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset-a's maxReplicas = 101%",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				maxReplicas := intstr.FromString("101%")
 				workloadSpread.Spec.Subsets[0].MaxReplicas = &maxReplicas
@@ -699,7 +699,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset-a's maxReplicas = 40%, subset-b's maxReplicas = 70%",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				maxReplicas1 := intstr.FromString("40%")
 				maxReplicas2 := intstr.FromString("70%")
@@ -711,7 +711,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset-a's maxReplicas = 40%, subset-b's maxReplicas = 20%,, subset-c's maxReplicas = 20%",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				maxReplicas1 := intstr.FromString("40%")
 				maxReplicas2 := intstr.FromString("20%")
@@ -724,7 +724,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "subset-a's maxReplicas = -1%",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				maxReplicas := intstr.FromString("-1%")
 				workloadSpread.Spec.Subsets[0].MaxReplicas = &maxReplicas
@@ -734,7 +734,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "scheduleStrategy's type is not valid",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.ScheduleStrategy.Type = "random"
 				return workloadSpread
@@ -743,11 +743,11 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "rescheduleCriticalSeconds = -1",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+				workloadSpread.Spec.ScheduleStrategy = appsv1beta1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 						RescheduleCriticalSeconds: pointer.Int32Ptr(-1),
 						DisableSimulationSchedule: true,
 					},
@@ -758,11 +758,11 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "rescheduleCriticalSeconds < 0",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+				workloadSpread.Spec.ScheduleStrategy = appsv1beta1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 						RescheduleCriticalSeconds: pointer.Int32Ptr(-20),
 						DisableSimulationSchedule: true,
 					},
@@ -773,11 +773,11 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "scheduleStrategy's type is not matched",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType,
-					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+				workloadSpread.Spec.ScheduleStrategy = appsv1beta1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1beta1.FixedWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 						RescheduleCriticalSeconds: pointer.Int32Ptr(20),
 						DisableSimulationSchedule: true,
 					},
@@ -788,11 +788,11 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		},
 		{
 			name: "the last subset's maxReplicas is not nil when using adaptive",
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-					Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-					Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+				workloadSpread.Spec.ScheduleStrategy = appsv1beta1.WorkloadSpreadScheduleStrategy{
+					Type: appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 						RescheduleCriticalSeconds: pointer.Int32Ptr(20),
 						DisableSimulationSchedule: true,
 					},
@@ -841,7 +841,7 @@ func TestValidateWorkloadSpreadTargetRefUpdate(t *testing.T) {
 
 	errorCases := []struct {
 		name              string
-		newWorkloadSpread *appsv1alpha1.WorkloadSpread
+		newWorkloadSpread *appsv1beta1.WorkloadSpread
 	}{
 		{
 			name:              "update group",
@@ -881,15 +881,15 @@ func TestValidateWorkloadSpreadConflict(t *testing.T) {
 
 	successCases := []struct {
 		name              string
-		getOthers         func() []appsv1alpha1.WorkloadSpread
-		getWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+		getOthers         func() []appsv1beta1.WorkloadSpread
+		getWorkloadSpread func() *appsv1beta1.WorkloadSpread
 	}{
 		{
 			name: "group is different",
-			getOthers: func() []appsv1alpha1.WorkloadSpread {
-				return []appsv1alpha1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
+			getOthers: func() []appsv1beta1.WorkloadSpread {
+				return []appsv1beta1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.TargetReference.APIVersion = "apps/v1"
 				return workloadSpread
@@ -897,10 +897,10 @@ func TestValidateWorkloadSpreadConflict(t *testing.T) {
 		},
 		{
 			name: "kind is different",
-			getOthers: func() []appsv1alpha1.WorkloadSpread {
-				return []appsv1alpha1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
+			getOthers: func() []appsv1beta1.WorkloadSpread {
+				return []appsv1beta1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.TargetReference.Kind = "Deployment"
 				return workloadSpread
@@ -908,10 +908,10 @@ func TestValidateWorkloadSpreadConflict(t *testing.T) {
 		},
 		{
 			name: "name is different",
-			getOthers: func() []appsv1alpha1.WorkloadSpread {
-				return []appsv1alpha1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
+			getOthers: func() []appsv1beta1.WorkloadSpread {
+				return []appsv1beta1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Spec.TargetReference.Name = "test"
 				return workloadSpread
@@ -931,7 +931,7 @@ func TestValidateWorkloadSpreadConflict(t *testing.T) {
 	workloadSpread2.Spec.TargetReference.Name = "test1"
 	workloadSpread3.Spec.TargetReference.Name = "test2"
 
-	others := []appsv1alpha1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
+	others := []appsv1beta1.WorkloadSpread{*workloadSpread1, *workloadSpread2, *workloadSpread3}
 	errorSuffix := "spec.targetRef"
 
 	for i := 0; i < 2; i++ {

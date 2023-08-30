@@ -25,7 +25,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -44,7 +44,7 @@ import (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(apps.AddToScheme(scheme))
 }
@@ -52,9 +52,9 @@ func init() {
 var (
 	scheme *runtime.Scheme
 
-	pubDemo = policyv1alpha1.PodUnavailableBudget{
+	pubDemo = policyv1beta1.PodUnavailableBudget{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1alpha1.GroupVersion.String(),
+			APIVersion: policyv1beta1.GroupVersion.String(),
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -62,7 +62,7 @@ var (
 			Name:        "pub-test",
 			Annotations: map[string]string{},
 		},
-		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+		Spec: policyv1beta1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"pub-controller": "true",
@@ -73,7 +73,7 @@ var (
 				StrVal: "30%",
 			},
 		},
-		Status: policyv1alpha1.PodUnavailableBudgetStatus{
+		Status: policyv1beta1.PodUnavailableBudgetStatus{
 			UnavailablePods: map[string]metav1.Time{},
 			DisruptedPods:   map[string]metav1.Time{},
 		},
@@ -181,8 +181,8 @@ func TestPubReconcile(t *testing.T) {
 		getPods         func(rs ...*apps.ReplicaSet) []*corev1.Pod
 		getDeployment   func() *apps.Deployment
 		getReplicaSet   func() []*apps.ReplicaSet
-		getPub          func() *policyv1alpha1.PodUnavailableBudget
-		expectPubStatus func() policyv1alpha1.PodUnavailableBudgetStatus
+		getPub          func() *policyv1beta1.PodUnavailableBudget
+		expectPubStatus func() policyv1beta1.PodUnavailableBudgetStatus
 	}{
 		{
 			name: "select matched deployment(replicas=0), selector and maxUnavailable 30%",
@@ -231,12 +231,12 @@ func TestPubReconcile(t *testing.T) {
 				obj2.UID = "a34b0453-3426-4685-a79c-752e7062a523"
 				return []*apps.ReplicaSet{obj1, obj2}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 10,
 					CurrentAvailable:   10,
 					DesiredAvailable:   0,
@@ -297,12 +297,12 @@ func TestPubReconcile(t *testing.T) {
 				obj2.UID = "a34b0453-3426-4685-a79c-752e7062a523"
 				return []*apps.ReplicaSet{obj1, obj2}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 5,
 					CurrentAvailable:   12,
 					DesiredAvailable:   7,
@@ -367,12 +367,12 @@ func TestPubReconcile(t *testing.T) {
 				obj2.UID = "a34b0453-3426-4685-a79c-752e7062a523"
 				return []*apps.ReplicaSet{obj1, obj2}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 2,
 					CurrentAvailable:   9,
 					DesiredAvailable:   7,
@@ -400,12 +400,12 @@ func TestPubReconcile(t *testing.T) {
 			getReplicaSet: func() []*apps.ReplicaSet {
 				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
@@ -443,18 +443,18 @@ func TestPubReconcile(t *testing.T) {
 				obj1.Name = "nginx-rs-1"
 				return []*apps.ReplicaSet{obj1}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "Deployment",
 					Name:       "nginx",
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 0,
 					CurrentAvailable:   0,
 					DesiredAvailable:   0,
@@ -492,18 +492,18 @@ func TestPubReconcile(t *testing.T) {
 				obj1.Name = "nginx-rs-1"
 				return []*apps.ReplicaSet{obj1}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "Deployment",
 					Name:       "nginx",
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 10,
 					CurrentAvailable:   10,
 					DesiredAvailable:   0,
@@ -545,18 +545,18 @@ func TestPubReconcile(t *testing.T) {
 				obj1.Name = "nginx-rs-1"
 				return []*apps.ReplicaSet{obj1}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "Deployment",
 					Name:       "nginx",
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 0,
 					CurrentAvailable:   7,
 					DesiredAvailable:   7,
@@ -595,18 +595,18 @@ func TestPubReconcile(t *testing.T) {
 				obj1.Name = "nginx-rs-1"
 				return []*apps.ReplicaSet{obj1}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "Deployment",
 					Name:       "nginx",
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 0,
 					CurrentAvailable:   0,
 					DesiredAvailable:   0,
@@ -631,7 +631,7 @@ func TestPubReconcile(t *testing.T) {
 			getReplicaSet: func() []*apps.ReplicaSet {
 				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.String,
@@ -639,8 +639,8 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 0,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   *deploymentDemo.Spec.Replicas,
@@ -665,7 +665,7 @@ func TestPubReconcile(t *testing.T) {
 			getReplicaSet: func() []*apps.ReplicaSet {
 				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.String,
@@ -673,8 +673,8 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
@@ -699,7 +699,7 @@ func TestPubReconcile(t *testing.T) {
 			getReplicaSet: func() []*apps.ReplicaSet {
 				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.Int,
@@ -707,8 +707,8 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: *deploymentDemo.Spec.Replicas,
 					CurrentAvailable:   *deploymentDemo.Spec.Replicas,
 					DesiredAvailable:   0,
@@ -733,7 +733,7 @@ func TestPubReconcile(t *testing.T) {
 			getReplicaSet: func() []*apps.ReplicaSet {
 				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MaxUnavailable = nil
 				pub.Spec.MinAvailable = &intstr.IntOrString{
@@ -742,8 +742,8 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 0,
 					CurrentAvailable:   5,
 					DesiredAvailable:   100,
@@ -768,7 +768,7 @@ func TestPubReconcile(t *testing.T) {
 			getReplicaSet: func() []*apps.ReplicaSet {
 				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MaxUnavailable = nil
 				pub.Spec.MinAvailable = &intstr.IntOrString{
@@ -777,8 +777,8 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 0,
 					CurrentAvailable:   5,
 					DesiredAvailable:   5,
@@ -803,7 +803,7 @@ func TestPubReconcile(t *testing.T) {
 			getReplicaSet: func() []*apps.ReplicaSet {
 				return []*apps.ReplicaSet{replicaSetDemo.DeepCopy()}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MaxUnavailable = nil
 				pub.Spec.MinAvailable = &intstr.IntOrString{
@@ -812,8 +812,8 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
-				return policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
+				return policyv1beta1.PodUnavailableBudgetStatus{
 					UnavailableAllowed: 2,
 					CurrentAvailable:   10,
 					DesiredAvailable:   8,
@@ -842,7 +842,7 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return []*apps.ReplicaSet{object}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					pub.Status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -852,7 +852,7 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
 				status := pubDemo.Status.DeepCopy()
 				for i := 0; i < 10; i++ {
 					status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -892,7 +892,7 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return []*apps.ReplicaSet{object}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					pub.Status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -902,7 +902,7 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
 				status := pubDemo.Status.DeepCopy()
 				for i := 0; i < 10; i++ {
 					status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -941,7 +941,7 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return []*apps.ReplicaSet{object}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					pub.Status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -951,7 +951,7 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
 				status := pubDemo.Status.DeepCopy()
 				for i := 0; i < 10; i++ {
 					status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -990,7 +990,7 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return []*apps.ReplicaSet{object}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					if i >= 0 && i < 5 {
@@ -1004,7 +1004,7 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
 				status := pubDemo.Status.DeepCopy()
 				for i := 5; i < 10; i++ {
 					status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -1043,7 +1043,7 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return []*apps.ReplicaSet{object}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				for i := 0; i < 10; i++ {
 					if i >= 0 && i < 5 {
@@ -1061,7 +1061,7 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
 				status := pubDemo.Status.DeepCopy()
 				for i := 5; i < 10; i++ {
 					status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -1101,10 +1101,10 @@ func TestPubReconcile(t *testing.T) {
 				object.Spec.Replicas = utilpointer.Int32Ptr(100)
 				return []*apps.ReplicaSet{object}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 
-				pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] = "50"
+				pub.Annotations[policyv1beta1.PubProtectTotalReplicas] = "50"
 				for i := 0; i < 10; i++ {
 					if i >= 0 && i < 5 {
 						pub.Status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Time{Time: time.Now().Add(-10 * time.Second)}
@@ -1121,7 +1121,7 @@ func TestPubReconcile(t *testing.T) {
 				}
 				return pub
 			},
-			expectPubStatus: func() policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
 				status := pubDemo.Status.DeepCopy()
 				for i := 5; i < 10; i++ {
 					status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Now()
@@ -1176,13 +1176,13 @@ func TestPubReconcile(t *testing.T) {
 func TestDesiredAvailableForPub(t *testing.T) {
 	cases := []struct {
 		name             string
-		getPub           func() *policyv1alpha1.PodUnavailableBudget
+		getPub           func() *policyv1beta1.PodUnavailableBudget
 		totalReplicas    int32
 		desiredAvailable int32
 	}{
 		{
 			name: "DesiredAvailableForPub, maxUnavailable 10%, total 15",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				demo := pubDemo.DeepCopy()
 				demo.Spec.MaxUnavailable = &intstr.IntOrString{
 					Type:   intstr.String,
@@ -1206,8 +1206,8 @@ func TestDesiredAvailableForPub(t *testing.T) {
 	}
 }
 
-func getLatestPub(client client.Client, pub *policyv1alpha1.PodUnavailableBudget) (*policyv1alpha1.PodUnavailableBudget, error) {
-	newPub := &policyv1alpha1.PodUnavailableBudget{}
+func getLatestPub(client client.Client, pub *policyv1beta1.PodUnavailableBudget) (*policyv1beta1.PodUnavailableBudget, error) {
+	newPub := &policyv1beta1.PodUnavailableBudget{}
 	key := types.NamespacedName{
 		Namespace: pub.Namespace,
 		Name:      pub.Name,
@@ -1216,7 +1216,7 @@ func getLatestPub(client client.Client, pub *policyv1alpha1.PodUnavailableBudget
 	return newPub, err
 }
 
-func isPubStatusEqual(expectStatus, nowStatus policyv1alpha1.PodUnavailableBudgetStatus) bool {
+func isPubStatusEqual(expectStatus, nowStatus policyv1beta1.PodUnavailableBudgetStatus) bool {
 	nTime := metav1.Now()
 	for i := range expectStatus.UnavailablePods {
 		expectStatus.UnavailablePods[i] = nTime

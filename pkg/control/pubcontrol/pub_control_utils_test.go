@@ -24,7 +24,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,7 @@ import (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(apps.AddToScheme(scheme))
 }
@@ -46,16 +46,16 @@ func init() {
 var (
 	scheme *runtime.Scheme
 
-	pubDemo = policyv1alpha1.PodUnavailableBudget{
+	pubDemo = policyv1beta1.PodUnavailableBudget{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1alpha1.GroupVersion.String(),
+			APIVersion: policyv1beta1.GroupVersion.String(),
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pub-test",
 		},
-		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+		Spec: policyv1beta1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"pub-controller": "true",
@@ -66,7 +66,7 @@ var (
 				StrVal: "30%",
 			},
 		},
-		Status: policyv1alpha1.PodUnavailableBudgetStatus{
+		Status: policyv1beta1.PodUnavailableBudgetStatus{
 			UnavailablePods:    map[string]metav1.Time{},
 			DisruptedPods:      map[string]metav1.Time{},
 			UnavailableAllowed: 0,
@@ -176,10 +176,10 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 	cases := []struct {
 		name            string
 		getPod          func() *corev1.Pod
-		getPub          func() *policyv1alpha1.PodUnavailableBudget
-		operation       policyv1alpha1.PubOperation
+		getPub          func() *policyv1beta1.PodUnavailableBudget
+		operation       policyv1beta1.PubOperation
 		expectAllow     bool
-		expectPubStatus func() *policyv1alpha1.PodUnavailableBudgetStatus
+		expectPubStatus func() *policyv1beta1.PodUnavailableBudgetStatus
 	}{
 		{
 			name: "valid update pod, allow",
@@ -187,14 +187,14 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.UnavailableAllowed = 1
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.UnavailablePods[podDemo.Name] = metav1.Now()
 				pubStatus.UnavailableAllowed = 0
@@ -207,13 +207,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -225,13 +225,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -244,13 +244,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				podReadyCondition.Status = corev1.ConditionFalse
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -262,13 +262,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod.Labels[fmt.Sprintf("%sdata", appspub.PubUnavailablePodLabelPrefix)] = "true"
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -296,7 +296,7 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 		getPod        func() *corev1.Pod
 		getDeployment func() *apps.Deployment
 		getReplicaSet func() *apps.ReplicaSet
-		getPub        func() *policyv1alpha1.PodUnavailableBudget
+		getPub        func() *policyv1beta1.PodUnavailableBudget
 		matchedPub    bool
 	}{
 		{
@@ -314,10 +314,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 				rep := replicaSetDemo.DeepCopy()
 				return rep
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					Name:       deploymentDemo.Name,
 					Kind:       deploymentDemo.Kind,
 					APIVersion: deploymentDemo.APIVersion,
@@ -341,11 +341,11 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 				rep := replicaSetDemo.DeepCopy()
 				return rep
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Namespace = "no-ns"
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					Name:       deploymentDemo.Name,
 					Kind:       deploymentDemo.Kind,
 					APIVersion: deploymentDemo.APIVersion,
@@ -369,7 +369,7 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 				rep := replicaSetDemo.DeepCopy()
 				return rep
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{

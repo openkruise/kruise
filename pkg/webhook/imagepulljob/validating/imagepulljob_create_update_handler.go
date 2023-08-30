@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -42,7 +42,7 @@ var _ admission.Handler = &ImagePullJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.ImagePullJob{}
+	obj := &appsv1beta1.ImagePullJob{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -63,7 +63,7 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 	return admission.ValidationResponse(true, "allowed")
 }
 
-func validate(obj *appsv1alpha1.ImagePullJob) error {
+func validate(obj *appsv1beta1.ImagePullJob) error {
 	if obj.Spec.Selector != nil {
 		if obj.Spec.Selector.MatchLabels != nil || obj.Spec.Selector.MatchExpressions != nil {
 			if obj.Spec.Selector.Names != nil {
@@ -98,9 +98,9 @@ func validate(obj *appsv1alpha1.ImagePullJob) error {
 	}
 
 	switch obj.Spec.CompletionPolicy.Type {
-	case appsv1alpha1.Always:
+	case appsv1beta1.Always:
 
-	case appsv1alpha1.Never:
+	case appsv1beta1.Never:
 		if obj.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil || obj.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
 			return fmt.Errorf("activeDeadlineSeconds and ttlSecondsAfterFinished can only work with Always CompletionPolicyType")
 		}

@@ -17,7 +17,7 @@ limitations under the License.
 package pubcontrol
 
 import (
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,13 +34,13 @@ type PubControl interface {
 	// return two parameters
 	// 1. podList
 	// 2. expectedCount, the default is workload.Replicas
-	GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error)
+	GetPodsForPub(pub *policyv1beta1.PodUnavailableBudget) ([]*corev1.Pod, int32, error)
 
 	// webhook
 	// determine if this change to pod might cause unavailability
 	IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 	// get pub for pod
-	GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error)
+	GetPubForPod(pod *corev1.Pod) (*policyv1beta1.PodUnavailableBudget, error)
 }
 
 func NewPubControl(client client.Client) PubControl {

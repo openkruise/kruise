@@ -19,7 +19,7 @@ package podprobemarker
 import (
 	"context"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	corev1 "k8s.io/api/core/v1"

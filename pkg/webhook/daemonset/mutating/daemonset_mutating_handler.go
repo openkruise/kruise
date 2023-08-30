@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -46,7 +46,7 @@ var _ admission.Handler = &DaemonSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.DaemonSet{}
+	obj := &appsv1beta1.DaemonSet{}
 
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {

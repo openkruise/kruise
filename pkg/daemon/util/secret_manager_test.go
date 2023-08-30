@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -60,12 +60,12 @@ func TestGetSecretsFromCache(t *testing.T) {
 		t.Fatalf("failed to create fake secret: %v", err)
 	}
 
-	secrets, err := secretManager.GetSecrets([]appsv1alpha1.ReferenceObject{{Namespace: "ns-bar", Name: "bar"}})
+	secrets, err := secretManager.GetSecrets([]appsv1beta1.ReferenceObject{{Namespace: "ns-bar", Name: "bar"}})
 	if err != nil || len(secrets) != 1 {
 		t.Errorf("failed to get secret: %v", err)
 	}
 
-	secrets, err = secretManager.GetSecrets([]appsv1alpha1.ReferenceObject{{Namespace: "ns-foo", Name: "foo"}})
+	secrets, err = secretManager.GetSecrets([]appsv1beta1.ReferenceObject{{Namespace: "ns-foo", Name: "foo"}})
 	if err != nil || len(secrets) != 1 {
 		t.Fatalf("failed to get secret: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestGetSecretsFromCache(t *testing.T) {
 	if _, err := fakeClient.CoreV1().Secrets(secretFoo.Namespace).Update(context.TODO(), &secretFoo, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("failed to update fake secret: %v", err)
 	}
-	secrets, err = secretManager.GetSecrets([]appsv1alpha1.ReferenceObject{{Namespace: "ns-foo", Name: "foo"}})
+	secrets, err = secretManager.GetSecrets([]appsv1beta1.ReferenceObject{{Namespace: "ns-foo", Name: "foo"}})
 	if err != nil || len(secrets) != 1 {
 		t.Fatalf("failed to get secret: %v", err)
 	}

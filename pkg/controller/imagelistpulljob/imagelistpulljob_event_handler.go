@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
@@ -46,7 +46,7 @@ func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
 }
 
 func (p *imagePullJobEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	job := evt.Object.(*appsv1alpha1.ImagePullJob)
+	job := evt.Object.(*appsv1beta1.ImagePullJob)
 	if job.DeletionTimestamp != nil {
 		p.Delete(event.DeleteEvent{Object: evt.Object}, q)
 		return
@@ -59,7 +59,7 @@ func (p *imagePullJobEventHandler) Create(evt event.CreateEvent, q workqueue.Rat
 }
 
 func (p *imagePullJobEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	job := evt.Object.(*appsv1alpha1.ImagePullJob)
+	job := evt.Object.(*appsv1beta1.ImagePullJob)
 	if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && isImageListPullJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: job.Namespace, Name: controllerRef.Name}.String()
 		scaleExpectations.ObserveScale(key, expectations.Delete, job.Spec.Image)
@@ -68,7 +68,7 @@ func (p *imagePullJobEventHandler) Delete(evt event.DeleteEvent, q workqueue.Rat
 }
 
 func (p *imagePullJobEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	newJob := evt.ObjectNew.(*appsv1alpha1.ImagePullJob)
+	newJob := evt.ObjectNew.(*appsv1beta1.ImagePullJob)
 	resourceVersionExpectations.Expect(newJob)
 	p.enqueueHandler.Update(evt, q)
 }

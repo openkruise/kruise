@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -168,12 +168,12 @@ func (r *ReconcileSidecarTerminator) groupSidecars(pod *corev1.Pod) (sets.String
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
 		for j := range container.Env {
-			if !runningOnVK && container.Env[j].Name == appsv1alpha1.KruiseTerminateSidecarEnv &&
+			if !runningOnVK && container.Env[j].Name == appsv1beta1.KruiseTerminateSidecarEnv &&
 				strings.EqualFold(container.Env[j].Value, "true") {
 				killContainer.Insert(container.Name)
 				break
 			}
-			if container.Env[j].Name == appsv1alpha1.KruiseTerminateSidecarWithImageEnv &&
+			if container.Env[j].Name == appsv1beta1.KruiseTerminateSidecarWithImageEnv &&
 				container.Env[j].Value != "" {
 				inPlaceUpdate.Insert(container.Name)
 			}

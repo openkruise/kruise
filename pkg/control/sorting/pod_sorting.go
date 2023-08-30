@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
@@ -44,7 +43,7 @@ func SortPods(reader client.Reader, ns string, owner metav1.OwnerReference, pods
 	}
 
 	// ignore no Kruise owners
-	if gv.Group != appsv1alpha1.GroupVersion.Group {
+	if gv.Group != appsv1beta1.GroupVersion.Group {
 		return pods, nil
 	}
 
@@ -52,7 +51,7 @@ func SortPods(reader client.Reader, ns string, owner metav1.OwnerReference, pods
 	namespacedName := types.NamespacedName{Namespace: ns, Name: owner.Name}
 	switch owner.Kind {
 	case "CloneSet":
-		set := &appsv1alpha1.CloneSet{}
+		set := &appsv1beta1.CloneSet{}
 		if err := reader.Get(context.TODO(), namespacedName, set); err != nil {
 			if errors.IsNotFound(err) {
 				return pods, nil
@@ -72,7 +71,7 @@ func SortPods(reader client.Reader, ns string, owner metav1.OwnerReference, pods
 		indexes = sortPodsForStatefulSet(set, pods)
 
 	case "SidecarSet":
-		set := &appsv1alpha1.SidecarSet{}
+		set := &appsv1beta1.SidecarSet{}
 		if err := reader.Get(context.TODO(), namespacedName, set); err != nil {
 			if errors.IsNotFound(err) {
 				return pods, nil
@@ -93,7 +92,7 @@ func SortPods(reader client.Reader, ns string, owner metav1.OwnerReference, pods
 	return newPods, nil
 }
 
-func sortPodsForCloneSet(set *appsv1alpha1.CloneSet, pods []*v1.Pod) []int {
+func sortPodsForCloneSet(set *appsv1beta1.CloneSet, pods []*v1.Pod) []int {
 	indexes := make([]int, 0, len(pods))
 	for i := 0; i < len(pods); i++ {
 		indexes = append(indexes, i)
@@ -118,7 +117,7 @@ func sortPodsForStatefulSet(set *appsv1beta1.StatefulSet, pods []*v1.Pod) []int 
 	return indexes
 }
 
-func sortPodsForSidecarSet(set *appsv1alpha1.SidecarSet, pods []*v1.Pod) []int {
+func sortPodsForSidecarSet(set *appsv1beta1.SidecarSet, pods []*v1.Pod) []int {
 	indexes := make([]int, 0, len(pods))
 	for i := 0; i < len(pods); i++ {
 		indexes = append(indexes, i)

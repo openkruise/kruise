@@ -22,7 +22,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,15 +33,15 @@ import (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
 }
 
 var (
 	scheme *runtime.Scheme
 
-	pubDemo = policyv1alpha1.PodUnavailableBudget{
+	pubDemo = policyv1beta1.PodUnavailableBudget{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1alpha1.GroupVersion.String(),
+			APIVersion: policyv1beta1.GroupVersion.String(),
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -49,13 +49,13 @@ var (
 			Name:        "pub-test",
 			Annotations: map[string]string{},
 		},
-		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+		Spec: policyv1beta1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "pub-controller",
 				},
 			},
-			TargetReference: &policyv1alpha1.TargetReference{
+			TargetReference: &policyv1beta1.TargetReference{
 				APIVersion: "apps",
 				Kind:       "Deployment",
 				Name:       "deployment-test",
@@ -75,12 +75,12 @@ var (
 func TestValidatingPub(t *testing.T) {
 	cases := []struct {
 		name          string
-		pub           func() *policyv1alpha1.PodUnavailableBudget
+		pub           func() *policyv1beta1.PodUnavailableBudget
 		expectErrList int
 	}{
 		{
 			name: "valid pub, TargetReference and MaxUnavailable",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
@@ -90,7 +90,7 @@ func TestValidatingPub(t *testing.T) {
 		},
 		{
 			name: "valid pub, Selector and MinAvailable",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.TargetReference = nil
 				pub.Spec.MaxUnavailable = nil
@@ -100,7 +100,7 @@ func TestValidatingPub(t *testing.T) {
 		},
 		{
 			name: "invalid pub, Selector and TargetReference are nil",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.TargetReference = nil
 				pub.Spec.Selector = nil
@@ -111,7 +111,7 @@ func TestValidatingPub(t *testing.T) {
 		},
 		{
 			name: "invalid pub, Selector and TargetReference are mutually exclusive",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MinAvailable = nil
 				return pub
@@ -120,7 +120,7 @@ func TestValidatingPub(t *testing.T) {
 		},
 		{
 			name: "invalid pub, MaxUnavailable and MinAvailable are nil",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.MaxUnavailable = nil
 				pub.Spec.MinAvailable = nil
@@ -131,7 +131,7 @@ func TestValidatingPub(t *testing.T) {
 		},
 		{
 			name: "invalid pub, MaxUnavailable and MinAvailable are mutually exclusive",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				return pub
@@ -140,44 +140,44 @@ func TestValidatingPub(t *testing.T) {
 		},
 		{
 			name: "invalid pub feature-gate annotation",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "xxxxx"
+				pub.Annotations[policyv1beta1.PubProtectOperationAnnotation] = "xxxxx"
 				return pub
 			},
 			expectErrList: 1,
 		},
 		{
 			name: "valid pub feature-gate annotation",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubEvictOperation + "," + policyv1alpha1.PubDeleteOperation)
+				pub.Annotations[policyv1beta1.PubProtectOperationAnnotation] = string(policyv1beta1.PubEvictOperation + "," + policyv1beta1.PubDeleteOperation)
 				return pub
 			},
 			expectErrList: 0,
 		},
 		{
 			name: "invalid pub feature-gate annotation",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
-				pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] = "%%"
+				pub.Annotations[policyv1beta1.PubProtectTotalReplicas] = "%%"
 				return pub
 			},
 			expectErrList: 1,
 		},
 		{
 			name: "valid pub feature-gate annotation",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
-				pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] = "1000"
+				pub.Annotations[policyv1beta1.PubProtectTotalReplicas] = "1000"
 				return pub
 			},
 			expectErrList: 0,
@@ -203,73 +203,73 @@ func TestValidatingPub(t *testing.T) {
 func TestPubConflictWithOthers(t *testing.T) {
 	cases := []struct {
 		name          string
-		pub           func() *policyv1alpha1.PodUnavailableBudget
-		otherPubs     func() []*policyv1alpha1.PodUnavailableBudget
+		pub           func() *policyv1beta1.PodUnavailableBudget
+		otherPubs     func() []*policyv1beta1.PodUnavailableBudget
 		expectErrList int
 	}{
 		{
 			name: "no conflict with other pubs, and TargetReference",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			otherPubs: func() []*policyv1alpha1.PodUnavailableBudget {
+			otherPubs: func() []*policyv1beta1.PodUnavailableBudget {
 				pub1 := pubDemo.DeepCopy()
 				pub1.Name = "pub1"
-				pub1.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub1.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps",
 					Kind:       "Deployment",
 					Name:       "deployment-test1",
 				}
 				pub2 := pubDemo.DeepCopy()
 				pub2.Name = "pub2"
-				pub2.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub2.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps",
 					Kind:       "Deployment",
 					Name:       "deployment-test2",
 				}
-				return []*policyv1alpha1.PodUnavailableBudget{pub1, pub2}
+				return []*policyv1beta1.PodUnavailableBudget{pub1, pub2}
 			},
 			expectErrList: 0,
 		},
 		{
 			name: "invalid conflict with other pubs, and TargetReference",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			otherPubs: func() []*policyv1alpha1.PodUnavailableBudget {
+			otherPubs: func() []*policyv1beta1.PodUnavailableBudget {
 				pub1 := pubDemo.DeepCopy()
 				pub1.Name = "pub1"
-				pub1.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub1.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps",
 					Kind:       "Deployment",
 					Name:       "deployment-test",
 				}
 				pub2 := pubDemo.DeepCopy()
 				pub2.Name = "pub2"
-				pub2.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub2.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps",
 					Kind:       "Deployment",
 					Name:       "deployment-test2",
 				}
-				return []*policyv1alpha1.PodUnavailableBudget{pub1, pub2}
+				return []*policyv1beta1.PodUnavailableBudget{pub1, pub2}
 			},
 			expectErrList: 1,
 		},
 		{
 			name: "no conflict with other pubs, and Selector",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.TargetReference = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			otherPubs: func() []*policyv1alpha1.PodUnavailableBudget {
+			otherPubs: func() []*policyv1beta1.PodUnavailableBudget {
 				pub1 := pubDemo.DeepCopy()
 				pub1.Name = "pub1"
 				pub1.Spec.TargetReference = nil
@@ -286,19 +286,19 @@ func TestPubConflictWithOthers(t *testing.T) {
 						"app": "pub2-controller",
 					},
 				}
-				return []*policyv1alpha1.PodUnavailableBudget{pub1, pub2}
+				return []*policyv1beta1.PodUnavailableBudget{pub1, pub2}
 			},
 			expectErrList: 0,
 		},
 		{
 			name: "conflict with other pubs, and Selector",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.TargetReference = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			otherPubs: func() []*policyv1alpha1.PodUnavailableBudget {
+			otherPubs: func() []*policyv1beta1.PodUnavailableBudget {
 				pub1 := pubDemo.DeepCopy()
 				pub1.Name = "pub1"
 				pub1.Spec.TargetReference = nil
@@ -315,19 +315,19 @@ func TestPubConflictWithOthers(t *testing.T) {
 						"app": "pub2-controller",
 					},
 				}
-				return []*policyv1alpha1.PodUnavailableBudget{pub1, pub2}
+				return []*policyv1beta1.PodUnavailableBudget{pub1, pub2}
 			},
 			expectErrList: 1,
 		},
 		{
 			name: "no conflict with other pubs, and Selector, other namespace",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.TargetReference = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			otherPubs: func() []*policyv1alpha1.PodUnavailableBudget {
+			otherPubs: func() []*policyv1beta1.PodUnavailableBudget {
 				pub1 := pubDemo.DeepCopy()
 				pub1.Name = "pub1"
 				pub1.Namespace = "pub1"
@@ -345,7 +345,7 @@ func TestPubConflictWithOthers(t *testing.T) {
 						"app": "pub2-controller",
 					},
 				}
-				return []*policyv1alpha1.PodUnavailableBudget{pub1, pub2}
+				return []*policyv1beta1.PodUnavailableBudget{pub1, pub2}
 			},
 			expectErrList: 0,
 		},
@@ -373,19 +373,19 @@ func TestPubConflictWithOthers(t *testing.T) {
 func TestValidatingUpdatePub(t *testing.T) {
 	cases := []struct {
 		name          string
-		old           func() *policyv1alpha1.PodUnavailableBudget
-		obj           func() *policyv1alpha1.PodUnavailableBudget
+		old           func() *policyv1beta1.PodUnavailableBudget
+		obj           func() *policyv1beta1.PodUnavailableBudget
 		expectErrList int
 	}{
 		{
 			name: "valid pub, targetRef not changed",
-			old: func() *policyv1alpha1.PodUnavailableBudget {
+			old: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			obj: func() *policyv1alpha1.PodUnavailableBudget {
+			obj: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
@@ -395,17 +395,17 @@ func TestValidatingUpdatePub(t *testing.T) {
 		},
 		{
 			name: "invalid pub, targetRef changed",
-			old: func() *policyv1alpha1.PodUnavailableBudget {
+			old: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			obj: func() *policyv1alpha1.PodUnavailableBudget {
+			obj: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					APIVersion: "apps",
 					Kind:       "Deployment",
 					Name:       "deployment-changed",
@@ -416,13 +416,13 @@ func TestValidatingUpdatePub(t *testing.T) {
 		},
 		{
 			name: "invalid pub, Selector changed",
-			old: func() *policyv1alpha1.PodUnavailableBudget {
+			old: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.TargetReference = nil
 				pub.Spec.MinAvailable = nil
 				return pub
 			},
-			obj: func() *policyv1alpha1.PodUnavailableBudget {
+			obj: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.TargetReference = nil
 				pub.Spec.MinAvailable = nil

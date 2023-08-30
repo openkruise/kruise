@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // WorkloadSpreadCreateUpdateHandler handles WorkloadSpread
@@ -44,8 +44,8 @@ var _ admission.Handler = &WorkloadSpreadCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.WorkloadSpread{}
-	oldObj := &appsv1alpha1.WorkloadSpread{}
+	obj := &appsv1beta1.WorkloadSpread{}
+	oldObj := &appsv1beta1.WorkloadSpread{}
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Create:

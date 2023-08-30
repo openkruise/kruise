@@ -20,7 +20,7 @@ import (
 	"sort"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,9 +34,9 @@ import (
 )
 
 func watchBroadcastJob(c controller.Controller) error {
-	if err := c.Watch(&source.Kind{Type: &appsv1alpha1.BroadcastJob{}}, &handler.EnqueueRequestForOwner{
+	if err := c.Watch(&source.Kind{Type: &appsv1beta1.BroadcastJob{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appsv1alpha1.AdvancedCronJob{},
+		OwnerType:    &appsv1beta1.AdvancedCronJob{},
 	}); err != nil {
 		return err
 	}
@@ -44,22 +44,22 @@ func watchBroadcastJob(c controller.Controller) error {
 	return nil
 }
 
-func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, req ctrl.Request, advancedCronJob appsv1alpha1.AdvancedCronJob) (ctrl.Result, error) {
-	advancedCronJob.Status.Type = appsv1alpha1.BroadcastJobTemplate
+func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, req ctrl.Request, advancedCronJob appsv1beta1.AdvancedCronJob) (ctrl.Result, error) {
+	advancedCronJob.Status.Type = appsv1beta1.BroadcastJobTemplate
 
-	var childJobs appsv1alpha1.BroadcastJobList
+	var childJobs appsv1beta1.BroadcastJobList
 	if err := r.List(ctx, &childJobs, client.InNamespace(advancedCronJob.Namespace), client.MatchingFields{jobOwnerKey: advancedCronJob.Name}); err != nil {
 		klog.Error(err, "unable to list child Jobs", req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 
-	var activeJobs []*appsv1alpha1.BroadcastJob
-	var successfulJobs []*appsv1alpha1.BroadcastJob
-	var failedJobs []*appsv1alpha1.BroadcastJob
+	var activeJobs []*appsv1beta1.BroadcastJob
+	var successfulJobs []*appsv1beta1.BroadcastJob
+	var failedJobs []*appsv1beta1.BroadcastJob
 	var mostRecentTime *time.Time
-	isJobFinished := func(job *appsv1alpha1.BroadcastJob) (bool, appsv1alpha1.JobConditionType) {
+	isJobFinished := func(job *appsv1beta1.BroadcastJob) (bool, appsv1beta1.JobConditionType) {
 		for _, c := range job.Status.Conditions {
-			if (c.Type == appsv1alpha1.JobComplete || c.Type == appsv1alpha1.JobFailed) && c.Status == corev1.ConditionTrue {
+			if (c.Type == appsv1beta1.JobComplete || c.Type == appsv1beta1.JobFailed) && c.Status == corev1.ConditionTrue {
 				return true, c.Type
 			}
 		}
@@ -68,7 +68,7 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 	}
 
 	// +kubebuilder:docs-gen:collapse=isJobFinished
-	getScheduledTimeForJob := func(job *appsv1alpha1.BroadcastJob) (*time.Time, error) {
+	getScheduledTimeForJob := func(job *appsv1beta1.BroadcastJob) (*time.Time, error) {
 		timeRaw := job.Annotations[scheduledTimeAnnotation]
 		if len(timeRaw) == 0 {
 			return nil, nil
@@ -88,9 +88,9 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 		switch finishedType {
 		case "": // ongoing
 			activeJobs = append(activeJobs, &childJobs.Items[i])
-		case appsv1alpha1.JobFailed:
+		case appsv1beta1.JobFailed:
 			failedJobs = append(failedJobs, &childJobs.Items[i])
-		case appsv1alpha1.JobComplete:
+		case appsv1beta1.JobComplete:
 			successfulJobs = append(successfulJobs, &childJobs.Items[i])
 		}
 
@@ -206,7 +206,7 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 		Otherwise, we'll just return the missed runs (of which we'll just use the latest),
 		and the next run, so that we can know when it's time to reconcile again.
 	*/
-	getNextSchedule := func(cronJob *appsv1alpha1.AdvancedCronJob, now time.Time) (lastMissed time.Time, next time.Time, err error) {
+	getNextSchedule := func(cronJob *appsv1beta1.AdvancedCronJob, now time.Time) (lastMissed time.Time, next time.Time, err error) {
 		sched, err := cron.ParseStandard(formatSchedule(cronJob))
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("unparsable schedule %q: %v", cronJob.Spec.Schedule, err)
@@ -303,13 +303,13 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 	*/
 	// figure out how to run this job -- concurrency policy might forbid us from running
 	// multiple at the same time...
-	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1alpha1.ForbidConcurrent && len(activeJobs) > 0 {
+	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1beta1.ForbidConcurrent && len(activeJobs) > 0 {
 		klog.V(1).Info("concurrency policy blocks concurrent runs, skipping", "num active", len(activeJobs), req.NamespacedName)
 		return scheduledResult, nil
 	}
 
 	// ...or instruct us to replace existing ones...
-	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1alpha1.ReplaceConcurrent {
+	if advancedCronJob.Spec.ConcurrencyPolicy == appsv1beta1.ReplaceConcurrent {
 		for _, activeJob := range activeJobs {
 			// we don't care if the job was already deleted
 			if err := r.Delete(ctx, activeJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
@@ -329,11 +329,11 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 		to clean up jobs when we delete the CronJob, and allows controller-runtime to figure out
 		which cronjob needs to be reconciled when a given job changes (is added, deleted, completes, etc).
 	*/
-	constructBrJobForCronJob := func(advancedCronJob *appsv1alpha1.AdvancedCronJob, scheduledTime time.Time) (*appsv1alpha1.BroadcastJob, error) {
+	constructBrJobForCronJob := func(advancedCronJob *appsv1beta1.AdvancedCronJob, scheduledTime time.Time) (*appsv1beta1.BroadcastJob, error) {
 		// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 		name := fmt.Sprintf("%s-%d", advancedCronJob.Name, scheduledTime.Unix())
 
-		job := &appsv1alpha1.BroadcastJob{
+		job := &appsv1beta1.BroadcastJob{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),

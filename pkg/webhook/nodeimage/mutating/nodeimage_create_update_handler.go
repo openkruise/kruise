@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,7 +41,7 @@ var _ admission.Handler = &NodeImageCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.NodeImage{}
+	obj := &appsv1beta1.NodeImage{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)

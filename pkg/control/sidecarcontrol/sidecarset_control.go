@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,10 +30,10 @@ import (
 )
 
 type commonControl struct {
-	*appsv1alpha1.SidecarSet
+	*appsv1beta1.SidecarSet
 }
 
-func (c *commonControl) GetSidecarset() *appsv1alpha1.SidecarSet {
+func (c *commonControl) GetSidecarset() *appsv1beta1.SidecarSet {
 	return c.SidecarSet
 }
 
@@ -41,7 +41,7 @@ func (c *commonControl) IsActiveSidecarSet() bool {
 	return true
 }
 
-func (c *commonControl) UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container {
+func (c *commonControl) UpgradeSidecarContainer(sidecarContainer *appsv1beta1.SidecarContainer, pod *v1.Pod) *v1.Container {
 	var nameToUpgrade, otherContainer, oldImage string
 	if IsHotUpgradeContainer(sidecarContainer) {
 		nameToUpgrade, otherContainer = findContainerToHotUpgrade(sidecarContainer, pod, c)
@@ -64,8 +64,8 @@ func (c *commonControl) NeedToInjectVolumeMount(volumeMount v1.VolumeMount) bool
 	return true
 }
 
-func (c *commonControl) NeedToInjectInUpdatedPod(pod, oldPod *v1.Pod, sidecarContainer *appsv1alpha1.SidecarContainer,
-	injectedEnvs []v1.EnvVar, injectedMounts []v1.VolumeMount) (needInject bool, existSidecars []*appsv1alpha1.SidecarContainer, existVolumes []v1.Volume) {
+func (c *commonControl) NeedToInjectInUpdatedPod(pod, oldPod *v1.Pod, sidecarContainer *appsv1beta1.SidecarContainer,
+	injectedEnvs []v1.EnvVar, injectedMounts []v1.VolumeMount) (needInject bool, existSidecars []*appsv1beta1.SidecarContainer, existVolumes []v1.Volume) {
 
 	return false, nil, nil
 }
@@ -99,7 +99,7 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	sidecarSet := c.GetSidecarset()
 	// record the ImageID, before update pod sidecar container
 	// if it is changed, indicates the update is complete.
-	// format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
+	// format: sidecarset.name -> appsv1beta1.InPlaceUpdateState
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
 	if stateStr := pod.Annotations[SidecarsetInplaceUpdateStateKey]; len(stateStr) > 0 {
 		if err := json.Unmarshal([]byte(stateStr), &sidecarUpdateStates); err != nil {
@@ -214,7 +214,7 @@ func (c *commonControl) IsPodAvailabilityChanged(pod, oldPod *v1.Pod) bool {
 // isContainerInplaceUpdateCompleted checks whether imageID in container status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated containers in Pod.
 func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets.String) bool {
-	// format: sidecarset.name -> appsv1alpha1.InPlaceUpdateState
+	// format: sidecarset.name -> appsv1beta1.InPlaceUpdateState
 	sidecarUpdateStates := make(map[string]*pub.InPlaceUpdateState)
 	// when the pod annotation not found, indicates the pod only injected sidecar container, and never inplace update
 	// then always think it update complete

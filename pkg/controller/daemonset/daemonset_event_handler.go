@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -46,7 +46,7 @@ type podEventHandler struct {
 	deletionUIDCache sync.Map
 }
 
-func enqueueDaemonSet(q workqueue.RateLimitingInterface, ds *appsv1alpha1.DaemonSet) {
+func enqueueDaemonSet(q workqueue.RateLimitingInterface, ds *appsv1beta1.DaemonSet) {
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 		Name:      ds.GetName(),
 		Namespace: ds.GetNamespace(),
@@ -88,7 +88,7 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	}
 }
 
-func joinDaemonSetNames(dsList []*appsv1alpha1.DaemonSet) string {
+func joinDaemonSetNames(dsList []*appsv1beta1.DaemonSet) string {
 	var names []string
 	for _, ds := range dsList {
 		names = append(names, ds.Name)
@@ -186,12 +186,12 @@ func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimiti
 
 }
 
-func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1alpha1.DaemonSet {
+func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1beta1.DaemonSet {
 	if controllerRef.Kind != controllerKind.Kind || controllerRef.APIVersion != controllerKind.GroupVersion().String() {
 		return nil
 	}
 
-	ds := &appsv1alpha1.DaemonSet{}
+	ds := &appsv1beta1.DaemonSet{}
 	if err := e.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: controllerRef.Name}, ds); err != nil {
 		return nil
 	}
@@ -203,13 +203,13 @@ func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *
 	return ds
 }
 
-func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1alpha1.DaemonSet {
-	dsList := appsv1alpha1.DaemonSetList{}
+func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1beta1.DaemonSet {
+	dsList := appsv1beta1.DaemonSetList{}
 	if err := e.List(context.TODO(), &dsList, client.InNamespace(pod.Namespace)); err != nil {
 		return nil
 	}
 
-	var dsMatched []*appsv1alpha1.DaemonSet
+	var dsMatched []*appsv1beta1.DaemonSet
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
 		selector, err := util.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
@@ -235,7 +235,7 @@ type nodeEventHandler struct {
 }
 
 func (e *nodeEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	dsList := &appsv1alpha1.DaemonSetList{}
+	dsList := &appsv1beta1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(4).Infof("Error enqueueing daemon sets: %v", err)
@@ -261,7 +261,7 @@ func (e *nodeEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitin
 		return
 	}
 
-	dsList := &appsv1alpha1.DaemonSetList{}
+	dsList := &appsv1beta1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(4).Infof("Error listing daemon sets: %v", err)
