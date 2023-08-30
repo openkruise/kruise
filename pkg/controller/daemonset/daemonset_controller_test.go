@@ -223,7 +223,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 
 	newDsc := &daemonSetsController{
 		dsc,
-		kruiseInformerFactory.Apps().V1alpha1().DaemonSets().Informer().GetStore(),
+		kruiseInformerFactory.Apps().V1beta1().DaemonSets().Informer().GetStore(),
 		informerFactory.Apps().V1().ControllerRevisions().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
@@ -283,7 +283,7 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 	}
 	// Make sure the ControllerRefs are correct.
 	for _, controllerRef := range fakePodControl.ControllerRefs {
-		if got, want := controllerRef.APIVersion, "apps.kruise.io/v1alpha1"; got != want {
+		if got, want := controllerRef.APIVersion, "apps.kruise.io/v1beta1"; got != want {
 			return fmt.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
 		}
 		if got, want := controllerRef.Kind, "DaemonSet"; got != want {

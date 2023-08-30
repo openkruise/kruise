@@ -145,7 +145,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 						Labels:    map[string]string{"key": "v1"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds02",
 								UID:        "002",
@@ -253,7 +253,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -270,7 +270,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -328,7 +328,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -345,7 +345,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds02",
 								UID:        "002",
@@ -403,7 +403,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -419,7 +419,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v2", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds02",
 								UID:        "002",
@@ -477,7 +477,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -493,7 +493,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -624,7 +624,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",

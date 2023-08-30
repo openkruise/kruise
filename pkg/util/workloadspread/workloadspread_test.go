@@ -58,7 +58,7 @@ var (
 			Annotations: map[string]string{},
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "apps.kruise.io/v1alpha1",
+					APIVersion:         "apps.kruise.io/v1beta1",
 					Kind:               "CloneSet",
 					Name:               "cloneset-test",
 					Controller:         utilpointer.BoolPtr(true),
@@ -79,7 +79,7 @@ var (
 
 	workloadSpreadDemo = &appsv1beta1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps.kruise.io/v1alpha1",
+			APIVersion: "apps.kruise.io/v1beta1",
 			Kind:       "WorkloadSpread",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,7 +88,7 @@ var (
 		},
 		Spec: appsv1beta1.WorkloadSpreadSpec{
 			TargetReference: &appsv1beta1.TargetReference{
-				APIVersion: "apps.kruise.io/v1alpha1",
+				APIVersion: "apps.kruise.io/v1beta1",
 				Kind:       "CloneSet",
 				Name:       "cloneset-test",
 			},
@@ -986,14 +986,14 @@ func TestIsReferenceEqual(t *testing.T) {
 			name: "ApiVersion, Kind, Name equals",
 			getTargetRef: func() *appsv1beta1.TargetReference {
 				return &appsv1beta1.TargetReference{
-					APIVersion: "apps.kruise.io/v1alpha1",
+					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
 				}
 			},
 			getOwnerRef: func() *metav1.OwnerReference {
 				return &metav1.OwnerReference{
-					APIVersion: "apps.kruise.io/v1alpha1",
+					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
 				}
@@ -1004,7 +1004,7 @@ func TestIsReferenceEqual(t *testing.T) {
 			name: "Group, Kind, Name equal, but Version not equal",
 			getTargetRef: func() *appsv1beta1.TargetReference {
 				return &appsv1beta1.TargetReference{
-					APIVersion: "apps.kruise.io/v1alpha1",
+					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
 				}
@@ -1022,7 +1022,7 @@ func TestIsReferenceEqual(t *testing.T) {
 			name: "Kind, Name equals, but ApiVersion not equal",
 			getTargetRef: func() *appsv1beta1.TargetReference {
 				return &appsv1beta1.TargetReference{
-					APIVersion: "apps.kruise.io/v1alpha1",
+					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
 				}
@@ -1040,14 +1040,14 @@ func TestIsReferenceEqual(t *testing.T) {
 			name: "ApiVersion, Kind equals, but name not equal",
 			getTargetRef: func() *appsv1beta1.TargetReference {
 				return &appsv1beta1.TargetReference{
-					APIVersion: "apps.kruise.io/v1alpha1",
+					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "CloneSet",
 					Name:       "test-1",
 				}
 			},
 			getOwnerRef: func() *metav1.OwnerReference {
 				return &metav1.OwnerReference{
-					APIVersion: "apps.kruise.io/v1alpha1",
+					APIVersion: "apps.kruise.io/v1beta1",
 					Kind:       "CloneSet",
 					Name:       "test-2",
 				}
@@ -1294,7 +1294,7 @@ func TestPatchContainerResource(t *testing.T) {
 
 func TestFilterReference(t *testing.T) {
 	csRef := &metav1.OwnerReference{
-		APIVersion:         "apps.kruise.io/v1alpha1",
+		APIVersion:         "apps.kruise.io/v1beta1",
 		Kind:               "CloneSet",
 		Name:               "cloneset-test",
 		Controller:         utilpointer.BoolPtr(true),

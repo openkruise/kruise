@@ -88,7 +88,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -145,7 +145,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -203,7 +203,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -282,7 +282,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -310,7 +310,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -358,7 +358,7 @@ func TestDeletePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -379,7 +379,7 @@ func TestDeletePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -402,7 +402,7 @@ func TestDeletePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -422,7 +422,7 @@ func TestDeletePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -442,7 +442,7 @@ func TestDeletePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
