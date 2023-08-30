@@ -90,8 +90,40 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().WorkloadSpreads().Informer()}, nil
 
 		// Group=apps.kruise.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("advancedcronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().AdvancedCronJobs().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("broadcastjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().BroadcastJobs().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("clonesets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().CloneSets().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("containerrecreaterequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ContainerRecreateRequests().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("daemonsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().DaemonSets().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("ephemeraljobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().EphemeralJobs().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("imagelistpulljobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ImageListPullJobs().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("imagepulljobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ImagePullJobs().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("nodeimages"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().NodeImages().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("nodepodprobes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().NodePodProbes().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("persistentpodstates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().PersistentPodStates().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("podprobemarkers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().PodProbeMarkers().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("resourcedistributions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ResourceDistributions().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("sidecarsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().SidecarSets().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("uniteddeployments"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().UnitedDeployments().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("workloadspreads"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().WorkloadSpreads().Informer()}, nil
 
 		// Group=policy.kruise.io, Version=v1alpha1
 	case policyv1alpha1.SchemeGroupVersion.WithResource("podunavailablebudgets"):

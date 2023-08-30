@@ -42,6 +42,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	extclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/controller"
 	"github.com/openkruise/kruise/pkg/features"
@@ -79,6 +80,7 @@ func init() {
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
 	scheme.AddUnversionedTypes(metav1.SchemeGroupVersion, &metav1.UpdateOptions{}, &metav1.DeleteOptions{}, &metav1.CreateOptions{})
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

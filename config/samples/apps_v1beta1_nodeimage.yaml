@@ -1,0 +1,12 @@
+apiVersion: apps.kruise.io/v1beta1
+kind: NodeImage
+metadata:
+  labels:
+    app.kubernetes.io/name: nodeimage
+    app.kubernetes.io/instance: nodeimage-sample
+    app.kubernetes.io/part-of: kruise
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kruise
+  name: nodeimage-sample
+spec:
+  # TODO(user): Add fields here

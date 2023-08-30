@@ -1,0 +1,12 @@
+apiVersion: policy.kruise.io/v1beta1
+kind: PodUnavailableBudget
+metadata:
+  labels:
+    app.kubernetes.io/name: podunavailablebudget
+    app.kubernetes.io/instance: podunavailablebudget-sample
+    app.kubernetes.io/part-of: kruise
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kruise
+  name: podunavailablebudget-sample
+spec:
+  # TODO(user): Add fields here

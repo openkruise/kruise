@@ -1,0 +1,27 @@
+# permissions for end users to view resourcedistributions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: resourcedistribution-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: kruise
+    app.kubernetes.io/part-of: kruise
+    app.kubernetes.io/managed-by: kustomize
+  name: resourcedistribution-viewer-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - resourcedistributions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - resourcedistributions/status
+  verbs:
+  - get

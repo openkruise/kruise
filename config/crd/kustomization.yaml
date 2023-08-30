@@ -25,19 +25,20 @@ resources:
 patchesStrategicMerge:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
-#- patches/webhook_in_clonesets.yaml
-#- patches/webhook_in_broadcastjobs.yaml
-#- patches/webhook_in_sidecarsets.yaml
+- patches/webhook_in_clonesets.yaml
+- patches/webhook_in_broadcastjobs.yaml
+- patches/webhook_in_sidecarsets.yaml
 - patches/webhook_in_statefulsets.yaml
-#- patches/webhook_in_uniteddeployments.yaml
-#- patches/webhook_in_daemonsets.yaml
-#- patches/webhook_in_nodeimages.yaml
-#- patches/webhook_in_imagepulljobs.yaml
-#- patches/webhook_in_advancedcronjobs.yaml
-#- patches/webhook_in_containerrecreaterequests.yaml
-#- patches/webhook_in_resourcedistributions.yaml
-#- patches/webhook_in_workloadspreads.yaml
-#- patches/webhook_in_ephemeraljobs.yaml
+- patches/webhook_in_uniteddeployments.yaml
+- patches/webhook_in_daemonsets.yaml
+- patches/webhook_in_nodeimages.yaml
+- patches/webhook_in_imagepulljobs.yaml
+- patches/webhook_in_advancedcronjobs.yaml
+- patches/webhook_in_containerrecreaterequests.yaml
+- patches/webhook_in_resourcedistributions.yaml
+- patches/webhook_in_workloadspreads.yaml
+- patches/webhook_in_ephemeraljobs.yaml
+- patches/webhook_in_podunavailablebudgets.yaml
 # +kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable webhook, uncomment all the sections with [CERTMANAGER] prefix.
@@ -55,6 +56,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_resourcedistributions.yaml
 #- patches/cainjection_in_workloadspreads.yaml
 #- patches/cainjection_in_ephemeraljobs.yaml
+#- patches/cainjection_in_podunavailablebudgets.yaml
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

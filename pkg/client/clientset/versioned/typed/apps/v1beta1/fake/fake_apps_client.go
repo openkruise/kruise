@@ -27,8 +27,72 @@ type FakeAppsV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAppsV1beta1) AdvancedCronJobs(namespace string) v1beta1.AdvancedCronJobInterface {
+	return &FakeAdvancedCronJobs{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) BroadcastJobs(namespace string) v1beta1.BroadcastJobInterface {
+	return &FakeBroadcastJobs{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) CloneSets(namespace string) v1beta1.CloneSetInterface {
+	return &FakeCloneSets{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) ContainerRecreateRequests(namespace string) v1beta1.ContainerRecreateRequestInterface {
+	return &FakeContainerRecreateRequests{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
+	return &FakeDaemonSets{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) EphemeralJobs(namespace string) v1beta1.EphemeralJobInterface {
+	return &FakeEphemeralJobs{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) ImageListPullJobs(namespace string) v1beta1.ImageListPullJobInterface {
+	return &FakeImageListPullJobs{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) ImagePullJobs(namespace string) v1beta1.ImagePullJobInterface {
+	return &FakeImagePullJobs{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) NodeImages() v1beta1.NodeImageInterface {
+	return &FakeNodeImages{c}
+}
+
+func (c *FakeAppsV1beta1) NodePodProbes() v1beta1.NodePodProbeInterface {
+	return &FakeNodePodProbes{c}
+}
+
+func (c *FakeAppsV1beta1) PersistentPodStates(namespace string) v1beta1.PersistentPodStateInterface {
+	return &FakePersistentPodStates{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) PodProbeMarkers(namespace string) v1beta1.PodProbeMarkerInterface {
+	return &FakePodProbeMarkers{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) ResourceDistributions() v1beta1.ResourceDistributionInterface {
+	return &FakeResourceDistributions{c}
+}
+
+func (c *FakeAppsV1beta1) SidecarSets() v1beta1.SidecarSetInterface {
+	return &FakeSidecarSets{c}
+}
+
 func (c *FakeAppsV1beta1) StatefulSets(namespace string) v1beta1.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) UnitedDeployments(namespace string) v1beta1.UnitedDeploymentInterface {
+	return &FakeUnitedDeployments{c, namespace}
+}
+
+func (c *FakeAppsV1beta1) WorkloadSpreads(namespace string) v1beta1.WorkloadSpreadInterface {
+	return &FakeWorkloadSpreads{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

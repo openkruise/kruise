@@ -205,6 +205,197 @@ spec:
             type: object
         type: object
     served: true
+    storage: false
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: The desired number of desired distribution and syncs.
+      jsonPath: .status.desired
+      name: TOTAL
+      type: integer
+    - description: The number of successful distribution and syncs.
+      jsonPath: .status.succeeded
+      name: SUCCEED
+      type: integer
+    - description: The number of failed distributions and syncs.
+      jsonPath: .status.failed
+      name: FAILED
+      type: integer
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ResourceDistribution is the Schema for the resourcedistributions
+          API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ResourceDistributionSpec defines the desired state of ResourceDistribution.
+            properties:
+              resource:
+                description: Resource must be the complete yaml that users want to
+                  distribute.
+                type: object
+                x-kubernetes-embedded-resource: true
+                x-kubernetes-preserve-unknown-fields: true
+              targets:
+                description: Targets defines the namespaces that users want to distribute
+                  to.
+                properties:
+                  allNamespaces:
+                    description: If AllNamespaces is true, Resource will be distributed
+                      to the all namespaces (except some forbidden namespaces, such
+                      as "kube-system" and "kube-public").
+                    type: boolean
+                  excludedNamespaces:
+                    description: If ExcludedNamespaces is not empty, Resource will
+                      never be distributed to the listed namespaces. ExcludedNamespaces
+                      has the highest priority.
+                    properties:
+                      list:
+                        items:
+                          description: ResourceDistributionNamespace contains a namespace
+                            name
+                          properties:
+                            name:
+                              description: Namespace name
+                              type: string
+                          type: object
+                        type: array
+                    type: object
+                  includedNamespaces:
+                    description: If IncludedNamespaces is not empty, Resource will
+                      be distributed to the listed namespaces.
+                    properties:
+                      list:
+                        items:
+                          description: ResourceDistributionNamespace contains a namespace
+                            name
+                          properties:
+                            name:
+                              description: Namespace name
+                              type: string
+                          type: object
+                        type: array
+                    type: object
+                  namespaceLabelSelector:
+                    description: If NamespaceLabelSelector is not empty, Resource
+                      will be distributed to the matched namespaces.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                    type: object
+                type: object
+            required:
+            - resource
+            - targets
+            type: object
+          status:
+            description: ResourceDistributionStatus defines the observed state of
+              ResourceDistribution. ResourceDistributionStatus is recorded by kruise,
+              users' modification is invalid and meaningless.
+            properties:
+              conditions:
+                description: Conditions describe the condition when Resource creating,
+                  updating and deleting.
+                items:
+                  description: ResourceDistributionCondition allows a row to be marked
+                    with additional information.
+                  properties:
+                    failedNamespace:
+                      description: FailedNamespaces describe all failed namespaces
+                        when Status is False
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    reason:
+                      description: Reason describe human readable message indicating
+                        details about last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of ResourceDistributionCondition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              desired:
+                description: Desired represents the number of total target namespaces.
+                format: int32
+                type: integer
+              failed:
+                description: Failed represents the number of failed distributions.
+                format: int32
+                type: integer
+              observedGeneration:
+                description: ObservedGeneration represents the .metadata.generation
+                  that the condition was set based upon.
+                format: int64
+                type: integer
+              succeeded:
+                description: Succeeded represents the number of successful distributions.
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
     storage: true
     subresources:
       status: {}

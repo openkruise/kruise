@@ -608,6 +608,602 @@ spec:
             type: object
         type: object
     served: true
+    storage: false
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: The number of pods matched.
+      jsonPath: .status.matchedPods
+      name: MATCHED
+      type: integer
+    - description: The number of pods matched and updated.
+      jsonPath: .status.updatedPods
+      name: UPDATED
+      type: integer
+    - description: The number of pods matched and ready.
+      jsonPath: .status.readyPods
+      name: READY
+      type: integer
+    - description: CreationTimestamp is a timestamp representing the server time when
+        this object was created. It is not guaranteed to be set in happens-before
+        order across separate operations. Clients may not set this value. It is represented
+        in RFC3339 form and is in UTC.
+      jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: SidecarSet is the Schema for the sidecarsets API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SidecarSetSpec defines the desired state of SidecarSet
+            properties:
+              containers:
+                description: Containers is the list of sidecar containers to be injected
+                  into the selected pod
+                items:
+                  description: SidecarContainer defines the container of Sidecar
+                  properties:
+                    podInjectPolicy:
+                      description: The rules that injected SidecarContainer into Pod.spec.containers,
+                        not takes effect in initContainers If BeforeAppContainer,
+                        the SidecarContainer will be injected in front of the pod.spec.containers
+                        otherwise it will be injected into the back. default BeforeAppContainerType
+                      type: string
+                    shareVolumePolicy:
+                      description: If ShareVolumePolicy is enabled, the sidecar container
+                        will share the other container's VolumeMounts in the pod(don't
+                        contains the injected sidecar container).
+                      properties:
+                        type:
+                          type: string
+                      type: object
+                    transferEnv:
+                      description: TransferEnv will transfer env info from other container
+                        SourceContainerName is pod.spec.container[x].name; EnvName
+                        is pod.spec.container[x].Env.name
+                      items:
+                        properties:
+                          envName:
+                            type: string
+                          envNames:
+                            items:
+                              type: string
+                            type: array
+                          sourceContainerName:
+                            type: string
+                          sourceContainerNameFrom:
+                            properties:
+                              fieldRef:
+                                description: 'Selects a field of the pod: supports
+                                  metadata.name, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,'
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                            type: object
+                        type: object
+                      type: array
+                    upgradeStrategy:
+                      description: 'sidecarContainer upgrade strategy, include: ColdUpgrade,
+                        HotUpgrade'
+                      properties:
+                        hotUpgradeEmptyImage:
+                          description: when HotUpgrade, HotUpgradeEmptyImage is used
+                            to complete the hot upgrading process HotUpgradeEmptyImage
+                            is consistent of sidecar container in Command, Args, Liveness
+                            probe, etc. but it does no actual work.
+                          type: string
+                        upgradeType:
+                          description: when sidecar container is stateless, use ColdUpgrade
+                            otherwise HotUpgrade are more HotUpgrade. examples for
+                            istio envoy container is suitable for HotUpgrade default
+                            is ColdUpgrade
+                          type: string
+                      type: object
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                type: array
+              imagePullSecrets:
+                description: List of the names of secrets required by pulling sidecar
+                  container images
+                items:
+                  description: LocalObjectReference contains enough information to
+                    let you locate the referenced object inside the same namespace.
+                  properties:
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      type: string
+                  type: object
+                type: array
+              initContainers:
+                description: InitContainers is the list of init containers to be injected
+                  into the selected pod We will inject those containers by their name
+                  in ascending order We only inject init containers when a new pod
+                  is created, it does not apply to any existing pod
+                items:
+                  description: SidecarContainer defines the container of Sidecar
+                  properties:
+                    podInjectPolicy:
+                      description: The rules that injected SidecarContainer into Pod.spec.containers,
+                        not takes effect in initContainers If BeforeAppContainer,
+                        the SidecarContainer will be injected in front of the pod.spec.containers
+                        otherwise it will be injected into the back. default BeforeAppContainerType
+                      type: string
+                    shareVolumePolicy:
+                      description: If ShareVolumePolicy is enabled, the sidecar container
+                        will share the other container's VolumeMounts in the pod(don't
+                        contains the injected sidecar container).
+                      properties:
+                        type:
+                          type: string
+                      type: object
+                    transferEnv:
+                      description: TransferEnv will transfer env info from other container
+                        SourceContainerName is pod.spec.container[x].name; EnvName
+                        is pod.spec.container[x].Env.name
+                      items:
+                        properties:
+                          envName:
+                            type: string
+                          envNames:
+                            items:
+                              type: string
+                            type: array
+                          sourceContainerName:
+                            type: string
+                          sourceContainerNameFrom:
+                            properties:
+                              fieldRef:
+                                description: 'Selects a field of the pod: supports
+                                  metadata.name, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,'
+                                properties:
+                                  apiVersion:
+                                    description: Version of the schema the FieldPath
+                                      is written in terms of, defaults to "v1".
+                                    type: string
+                                  fieldPath:
+                                    description: Path of the field to select in the
+                                      specified API version.
+                                    type: string
+                                required:
+                                - fieldPath
+                                type: object
+                            type: object
+                        type: object
+                      type: array
+                    upgradeStrategy:
+                      description: 'sidecarContainer upgrade strategy, include: ColdUpgrade,
+                        HotUpgrade'
+                      properties:
+                        hotUpgradeEmptyImage:
+                          description: when HotUpgrade, HotUpgradeEmptyImage is used
+                            to complete the hot upgrading process HotUpgradeEmptyImage
+                            is consistent of sidecar container in Command, Args, Liveness
+                            probe, etc. but it does no actual work.
+                          type: string
+                        upgradeType:
+                          description: when sidecar container is stateless, use ColdUpgrade
+                            otherwise HotUpgrade are more HotUpgrade. examples for
+                            istio envoy container is suitable for HotUpgrade default
+                            is ColdUpgrade
+                          type: string
+                      type: object
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                type: array
+              injectionStrategy:
+                description: InjectionStrategy describe the strategy when sidecarset
+                  is injected into pods
+                properties:
+                  paused:
+                    description: Paused indicates that SidecarSet will suspend injection
+                      into Pods If Paused is true, the sidecarSet will not be injected
+                      to newly created Pods, but the injected sidecar container remains
+                      updating and running. default is false
+                    type: boolean
+                  revision:
+                    description: Revision can help users rolling update SidecarSet
+                      safely. If users set this filed, SidecarSet will try to inject
+                      specific revision according to different policies.
+                    properties:
+                      customVersion:
+                        description: CustomVersion corresponds to label 'apps.kruise.io/sidecarset-custom-version'
+                          of (History) SidecarSet. SidecarSet will select the specific
+                          ControllerRevision via this CustomVersion, and then restore
+                          the history SidecarSet to inject specific version of the
+                          sidecar to pods.
+                        type: string
+                      policy:
+                        description: Policy describes the behavior of revision injection.
+                          Defaults to Always.
+                        type: string
+                      revisionName:
+                        description: RevisionName corresponds to a specific ControllerRevision
+                          name of SidecarSet that you want to inject to Pods.
+                        type: string
+                    type: object
+                type: object
+              namespace:
+                description: Namespace sidecarSet will only match the pods in the
+                  namespace otherwise, match pods in all namespaces(in cluster)
+                type: string
+              namespaceSelector:
+                description: NamespaceSelector select which namespaces to inject sidecar
+                  containers. Default to the empty LabelSelector, which matches everything.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
+              patchPodMetadata:
+                description: SidecarSet support to inject & in-place update metadata
+                  in pod.
+                items:
+                  properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: annotations
+                      type: object
+                    patchPolicy:
+                      description: labels map[string]string `json:"labels,omitempty"`
+                        patch pod metadata policy, Default is "Retain"
+                      type: string
+                  type: object
+                type: array
+              revisionHistoryLimit:
+                description: RevisionHistoryLimit indicates the maximum quantity of
+                  stored revisions about the SidecarSet. default value is 10
+                format: int32
+                type: integer
+              selector:
+                description: selector is a label query over pods that should be injected
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
+              updateStrategy:
+                description: The sidecarset updateStrategy to use to replace existing
+                  pods with new ones.
+                properties:
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: 'The maximum number of SidecarSet pods that can be
+                      unavailable during the update. Value can be an absolute number
+                      (ex: 5) or a percentage of total number of SidecarSet pods at
+                      the start of the update (ex: 10%). Absolute number is calculated
+                      from percentage by rounding up. This cannot be 0. Default value
+                      is 1.'
+                    x-kubernetes-int-or-string: true
+                  partition:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: Partition is the desired number of pods in old revisions.
+                      It means when partition is set during pods updating, (replicas
+                      - partition) number of pods will be updated. Default value is
+                      0.
+                    x-kubernetes-int-or-string: true
+                  paused:
+                    description: Paused indicates that the SidecarSet is paused to
+                      update the injected pods, but it don't affect the webhook inject
+                      sidecar container into the newly created pods. default is false
+                    type: boolean
+                  priorityStrategy:
+                    description: Priorities are the rules for calculating the priority
+                      of updating pods. Each pod to be updated, will pass through
+                      these terms and get a sum of weights.
+                    properties:
+                      orderPriority:
+                        description: 'Order priority terms, pods will be sorted by
+                          the value of orderedKey. For example: ``` orderPriority:
+                          - orderedKey: key1 - orderedKey: key2 ``` First, all pods
+                          which have key1 in labels will be sorted by the value of
+                          key1. Then, the left pods which have no key1 but have key2
+                          in labels will be sorted by the value of key2 and put behind
+                          those pods have key1.'
+                        items:
+                          description: UpdatePriorityOrderTerm defines order priority.
+                          properties:
+                            orderedKey:
+                              description: Calculate priority by value of this key.
+                                Values of this key, will be sorted by GetInt(val).
+                                GetInt method will find the last int in value, such
+                                as getting 5 in value '5', getting 10 in value 'sts-10'.
+                              type: string
+                          required:
+                          - orderedKey
+                          type: object
+                        type: array
+                      weightPriority:
+                        description: Weight priority terms, pods will be sorted by
+                          the sum of all terms weight.
+                        items:
+                          description: UpdatePriorityWeightTerm defines weight priority.
+                          properties:
+                            matchSelector:
+                              description: MatchSelector is used to select by pod's
+                                labels.
+                              properties:
+                                matchExpressions:
+                                  description: matchExpressions is a list of label
+                                    selector requirements. The requirements are ANDed.
+                                  items:
+                                    description: A label selector requirement is a
+                                      selector that contains values, a key, and an
+                                      operator that relates the key and values.
+                                    properties:
+                                      key:
+                                        description: key is the label key that the
+                                          selector applies to.
+                                        type: string
+                                      operator:
+                                        description: operator represents a key's relationship
+                                          to a set of values. Valid operators are
+                                          In, NotIn, Exists and DoesNotExist.
+                                        type: string
+                                      values:
+                                        description: values is an array of string
+                                          values. If the operator is In or NotIn,
+                                          the values array must be non-empty. If the
+                                          operator is Exists or DoesNotExist, the
+                                          values array must be empty. This array is
+                                          replaced during a strategic merge patch.
+                                        items:
+                                          type: string
+                                        type: array
+                                    required:
+                                    - key
+                                    - operator
+                                    type: object
+                                  type: array
+                                matchLabels:
+                                  additionalProperties:
+                                    type: string
+                                  description: matchLabels is a map of {key,value}
+                                    pairs. A single {key,value} in the matchLabels
+                                    map is equivalent to an element of matchExpressions,
+                                    whose key field is "key", the operator is "In",
+                                    and the values array contains only "value". The
+                                    requirements are ANDed.
+                                  type: object
+                              type: object
+                            weight:
+                              description: Weight associated with matching the corresponding
+                                matchExpressions, in the range 1-100.
+                              format: int32
+                              type: integer
+                          required:
+                          - matchSelector
+                          - weight
+                          type: object
+                        type: array
+                    type: object
+                  scatterStrategy:
+                    description: ScatterStrategy defines the scatter rules to make
+                      pods been scattered when update. This will avoid pods with the
+                      same key-value to be updated in one batch. - Note that pods
+                      will be scattered after priority sort. So, although priority
+                      strategy and scatter strategy can be applied together, we suggest
+                      to use either one of them. - If scatterStrategy is used, we
+                      suggest to just use one term. Otherwise, the update order can
+                      be hard to understand.
+                    items:
+                      properties:
+                        key:
+                          type: string
+                        value:
+                          type: string
+                      required:
+                      - key
+                      - value
+                      type: object
+                    type: array
+                  selector:
+                    description: If selector is not nil, this upgrade will only update
+                      the selected pods.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: A label selector requirement is a selector
+                            that contains values, a key, and an operator that relates
+                            the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: operator represents a key's relationship
+                                to a set of values. Valid operators are In, NotIn,
+                                Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: values is an array of string values. If
+                                the operator is In or NotIn, the values array must
+                                be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced
+                                during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: matchLabels is a map of {key,value} pairs. A
+                          single {key,value} in the matchLabels map is equivalent
+                          to an element of matchExpressions, whose key field is "key",
+                          the operator is "In", and the values array contains only
+                          "value". The requirements are ANDed.
+                        type: object
+                    type: object
+                  type:
+                    description: Type is NotUpdate, the SidecarSet don't update the
+                      injected pods, it will only inject sidecar container into the
+                      newly created pods. Type is RollingUpdate, the SidecarSet will
+                      update the injected pods to the latest version on RollingUpdate
+                      Strategy. default is RollingUpdate
+                    type: string
+                type: object
+              volumes:
+                description: List of volumes that can be mounted by sidecar containers
+                x-kubernetes-preserve-unknown-fields: true
+            type: object
+          status:
+            description: SidecarSetStatus defines the observed state of SidecarSet
+            properties:
+              collisionCount:
+                description: CollisionCount is the count of hash collisions for the
+                  SidecarSet. The SidecarSet controller uses this field as a collision
+                  avoidance mechanism when it needs to create the name for the newest
+                  ControllerRevision.
+                format: int32
+                type: integer
+              latestRevision:
+                description: LatestRevision, if not empty, indicates the latest controllerRevision
+                  name of the SidecarSet.
+                type: string
+              matchedPods:
+                description: matchedPods is the number of Pods whose labels are matched
+                  with this SidecarSet's selector and are created after sidecarset
+                  creates
+                format: int32
+                type: integer
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this SidecarSet. It corresponds to the SidecarSet's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              readyPods:
+                description: readyPods is the number of matched Pods that have a ready
+                  condition
+                format: int32
+                type: integer
+              updatedPods:
+                description: updatedPods is the number of matched Pods that are injected
+                  with the latest SidecarSet's containers
+                format: int32
+                type: integer
+              updatedReadyPods:
+                description: updatedReadyPods is the number of matched pods that updated
+                  and ready
+                format: int32
+                type: integer
+            required:
+            - matchedPods
+            - readyPods
+            - updatedPods
+            type: object
+        type: object
+    served: true
     storage: true
     subresources:
       status: {}

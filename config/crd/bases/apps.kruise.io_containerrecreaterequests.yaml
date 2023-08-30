@@ -325,6 +325,317 @@ spec:
             type: object
         type: object
     served: true
+    storage: false
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: Phase of this ContainerRecreateRequest.
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - description: Pod name of this ContainerRecreateRequest.
+      jsonPath: .spec.podName
+      name: POD
+      type: string
+    - description: Pod name of this ContainerRecreateRequest.
+      jsonPath: .metadata.labels.crr\.apps\.kruise\.io/node-name
+      name: NODE
+      type: string
+    - description: CreationTimestamp is a timestamp representing the server time when
+        this object was created. It is not guaranteed to be set in happens-before
+        order across separate operations. Clients may not set this value. It is represented
+        in RFC3339 form and is in UTC.
+      jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ContainerRecreateRequest is the Schema for the containerrecreaterequests
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ContainerRecreateRequestSpec defines the desired state of
+              ContainerRecreateRequest
+            properties:
+              activeDeadlineSeconds:
+                description: ActiveDeadlineSeconds is the deadline duration of this
+                  ContainerRecreateRequest.
+                format: int64
+                type: integer
+              containers:
+                description: Containers contains the containers that need to recreate
+                  in the Pod.
+                items:
+                  description: ContainerRecreateRequestContainer defines the container
+                    that need to recreate.
+                  properties:
+                    name:
+                      description: Name of the container that need to recreate. It
+                        must be existing in the real pod.Spec.Containers.
+                      type: string
+                    ports:
+                      description: Ports is synced from the real container in Pod
+                        spec during this ContainerRecreateRequest creating. Populated
+                        by the system. Read-only.
+                      items:
+                        description: ContainerPort represents a network port in a
+                          single container.
+                        properties:
+                          containerPort:
+                            description: Number of port to expose on the pod's IP
+                              address. This must be a valid port number, 0 < x < 65536.
+                            format: int32
+                            type: integer
+                          hostIP:
+                            description: What host IP to bind the external port to.
+                            type: string
+                          hostPort:
+                            description: Number of port to expose on the host. If
+                              specified, this must be a valid port number, 0 < x <
+                              65536. If HostNetwork is specified, this must match
+                              ContainerPort. Most containers do not need this.
+                            format: int32
+                            type: integer
+                          name:
+                            description: If specified, this must be an IANA_SVC_NAME
+                              and unique within the pod. Each named port in a pod
+                              must have a unique name. Name for the port that can
+                              be referred to by services.
+                            type: string
+                          protocol:
+                            default: TCP
+                            description: Protocol for port. Must be UDP, TCP, or SCTP.
+                              Defaults to "TCP".
+                            type: string
+                        required:
+                        - containerPort
+                        type: object
+                      type: array
+                    preStop:
+                      description: PreStop is synced from the real container in Pod
+                        spec during this ContainerRecreateRequest creating. Populated
+                        by the system. Read-only.
+                      properties:
+                        exec:
+                          description: One and only one of the following should be
+                            specified. Exec specifies the action to take.
+                          properties:
+                            command:
+                              description: Command is the command line to execute
+                                inside the container, the working directory for the
+                                command  is root ('/') in the container's filesystem.
+                                The command is simply exec'd, it is not run inside
+                                a shell, so traditional shell instructions ('|', etc)
+                                won't work. To use a shell, you need to explicitly
+                                call out to that shell. Exit status of 0 is treated
+                                as live/healthy and non-zero is unhealthy.
+                              items:
+                                type: string
+                              type: array
+                          type: object
+                        httpGet:
+                          description: HTTPGet specifies the http request to perform.
+                          properties:
+                            host:
+                              description: Host name to connect to, defaults to the
+                                pod IP. You probably want to set "Host" in httpHeaders
+                                instead.
+                              type: string
+                            httpHeaders:
+                              description: Custom headers to set in the request. HTTP
+                                allows repeated headers.
+                              items:
+                                description: HTTPHeader describes a custom header
+                                  to be used in HTTP probes
+                                properties:
+                                  name:
+                                    description: The header field name. This will
+                                      be canonicalized upon output, so case-variant
+                                      names will be understood as the same header.
+                                    type: string
+                                  value:
+                                    description: The header field value
+                                    type: string
+                                required:
+                                - name
+                                - value
+                                type: object
+                              type: array
+                            path:
+                              description: Path to access on the HTTP server.
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Name or number of the port to access on
+                                the container. Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                            scheme:
+                              description: Scheme to use for connecting to the host.
+                                Defaults to HTTP.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        tcpSocket:
+                          description: 'TCPSocket specifies an action involving a
+                            TCP port. TCP hooks not yet supported TODO: implement
+                            a realistic TCP lifecycle hook'
+                          properties:
+                            host:
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Number or name of the port to access on
+                                the container. Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                          required:
+                          - port
+                          type: object
+                      type: object
+                    statusContext:
+                      description: StatusContext is synced from the real Pod status
+                        during this ContainerRecreateRequest creating. Populated by
+                        the system. Read-only.
+                      properties:
+                        containerID:
+                          description: Container's ID in the format 'docker://<container_id>'.
+                          type: string
+                        restartCount:
+                          description: The number of times the container has been
+                            restarted, currently based on the number of dead containers
+                            that have not yet been removed. Note that this is calculated
+                            from dead containers. But those containers are subject
+                            to garbage collection. This value will get capped at 5
+                            by GC.
+                          format: int32
+                          type: integer
+                      required:
+                      - containerID
+                      - restartCount
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+              podName:
+                description: PodName is name of the Pod that owns the recreated containers.
+                type: string
+              strategy:
+                description: Strategy defines strategies for containers recreation.
+                properties:
+                  failurePolicy:
+                    description: FailurePolicy decides whether to continue if one
+                      container fails to recreate
+                    type: string
+                  forceRecreate:
+                    description: ForceRecreate indicates whether to force kill the
+                      container even if the previous container is starting.
+                    type: boolean
+                  minStartedSeconds:
+                    description: Minimum number of seconds for which a newly created
+                      container should be started and ready without any of its container
+                      crashing, for it to be considered Succeeded. Defaults to 0 (container
+                      will be considered Succeeded as soon as it is started and ready)
+                    format: int32
+                    type: integer
+                  orderedRecreate:
+                    description: OrderedRecreate indicates whether to recreate the
+                      next container only if the previous one has recreated completely.
+                    type: boolean
+                  terminationGracePeriodSeconds:
+                    description: TerminationGracePeriodSeconds is the optional duration
+                      in seconds to wait the container terminating gracefully. Value
+                      must be non-negative integer. The value zero indicates delete
+                      immediately. If this value is nil, we will use pod.Spec.TerminationGracePeriodSeconds
+                      as default value.
+                    format: int64
+                    type: integer
+                  unreadyGracePeriodSeconds:
+                    description: UnreadyGracePeriodSeconds is the optional duration
+                      in seconds to mark Pod as not ready over this duration before
+                      executing preStop hook and stopping the container.
+                    format: int64
+                    type: integer
+                type: object
+              ttlSecondsAfterFinished:
+                description: TTLSecondsAfterFinished is the TTL duration after this
+                  ContainerRecreateRequest has completed.
+                format: int32
+                type: integer
+            required:
+            - containers
+            - podName
+            type: object
+          status:
+            description: ContainerRecreateRequestStatus defines the observed state
+              of ContainerRecreateRequest
+            properties:
+              completionTime:
+                description: Represents time when the ContainerRecreateRequest was
+                  completed. It is not guaranteed to be set in happens-before order
+                  across separate operations. It is represented in RFC3339 form and
+                  is in UTC.
+                format: date-time
+                type: string
+              containerRecreateStates:
+                description: ContainerRecreateStates contains the recreation states
+                  of the containers.
+                items:
+                  description: ContainerRecreateRequestContainerRecreateState contains
+                    the recreation state of the container.
+                  properties:
+                    isKilled:
+                      description: Containers are killed by kruise daemon
+                      type: boolean
+                    message:
+                      description: A human readable message indicating details about
+                        this state.
+                      type: string
+                    name:
+                      description: Name of the container.
+                      type: string
+                    phase:
+                      description: Phase indicates the recreation phase of the container.
+                      type: string
+                  required:
+                  - name
+                  - phase
+                  type: object
+                type: array
+              message:
+                description: A human readable message indicating details about this
+                  ContainerRecreateRequest.
+                type: string
+              phase:
+                description: Phase of this ContainerRecreateRequest, e.g. Pending,
+                  Recreating, Completed
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
     storage: true
     subresources:
       status: {}

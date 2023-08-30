@@ -25,7 +25,23 @@ import (
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
+	AdvancedCronJobsGetter
+	BroadcastJobsGetter
+	CloneSetsGetter
+	ContainerRecreateRequestsGetter
+	DaemonSetsGetter
+	EphemeralJobsGetter
+	ImageListPullJobsGetter
+	ImagePullJobsGetter
+	NodeImagesGetter
+	NodePodProbesGetter
+	PersistentPodStatesGetter
+	PodProbeMarkersGetter
+	ResourceDistributionsGetter
+	SidecarSetsGetter
 	StatefulSetsGetter
+	UnitedDeploymentsGetter
+	WorkloadSpreadsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the apps.kruise.io group.
@@ -33,8 +49,72 @@ type AppsV1beta1Client struct {
 	restClient rest.Interface
 }
 
+func (c *AppsV1beta1Client) AdvancedCronJobs(namespace string) AdvancedCronJobInterface {
+	return newAdvancedCronJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) BroadcastJobs(namespace string) BroadcastJobInterface {
+	return newBroadcastJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) CloneSets(namespace string) CloneSetInterface {
+	return newCloneSets(c, namespace)
+}
+
+func (c *AppsV1beta1Client) ContainerRecreateRequests(namespace string) ContainerRecreateRequestInterface {
+	return newContainerRecreateRequests(c, namespace)
+}
+
+func (c *AppsV1beta1Client) DaemonSets(namespace string) DaemonSetInterface {
+	return newDaemonSets(c, namespace)
+}
+
+func (c *AppsV1beta1Client) EphemeralJobs(namespace string) EphemeralJobInterface {
+	return newEphemeralJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) ImageListPullJobs(namespace string) ImageListPullJobInterface {
+	return newImageListPullJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) ImagePullJobs(namespace string) ImagePullJobInterface {
+	return newImagePullJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) NodeImages() NodeImageInterface {
+	return newNodeImages(c)
+}
+
+func (c *AppsV1beta1Client) NodePodProbes() NodePodProbeInterface {
+	return newNodePodProbes(c)
+}
+
+func (c *AppsV1beta1Client) PersistentPodStates(namespace string) PersistentPodStateInterface {
+	return newPersistentPodStates(c, namespace)
+}
+
+func (c *AppsV1beta1Client) PodProbeMarkers(namespace string) PodProbeMarkerInterface {
+	return newPodProbeMarkers(c, namespace)
+}
+
+func (c *AppsV1beta1Client) ResourceDistributions() ResourceDistributionInterface {
+	return newResourceDistributions(c)
+}
+
+func (c *AppsV1beta1Client) SidecarSets() SidecarSetInterface {
+	return newSidecarSets(c)
+}
+
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {
 	return newStatefulSets(c, namespace)
+}
+
+func (c *AppsV1beta1Client) UnitedDeployments(namespace string) UnitedDeploymentInterface {
+	return newUnitedDeployments(c, namespace)
+}
+
+func (c *AppsV1beta1Client) WorkloadSpreads(namespace string) WorkloadSpreadInterface {
+	return newWorkloadSpreads(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1beta1Client for the given config.

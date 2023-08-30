@@ -238,6 +238,230 @@ spec:
             type: object
         type: object
     served: true
+    storage: false
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: The status of ephemeral job
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - description: Number of ephemeral container matched by this job
+      jsonPath: .status.match
+      name: MATCH
+      type: integer
+    - description: Number of succeed ephemeral containers
+      jsonPath: .status.succeeded
+      name: SUCCEED
+      type: integer
+    - description: Number of failed ephemeral containers
+      jsonPath: .status.failed
+      name: FAILED
+      type: integer
+    - description: Number of running ephemeral containers
+      jsonPath: .status.running
+      name: RUNNING
+      type: integer
+    - description: Number of waiting ephemeral containers
+      jsonPath: .status.waiting
+      name: WAITING
+      type: integer
+    - description: CreationTimestamp is a timestamp representing the server time when
+        this object was created. It is not guaranteed to be set in happens-before
+        order across separate operations. Clients may not set this value. It is represented
+        in RFC3339 form and is in UTC.
+      jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: EphemeralJob is the Schema for the ephemeraljobs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: EphemeralJobSpec defines the desired state of EphemeralJob
+            properties:
+              activeDeadlineSeconds:
+                description: ActiveDeadlineSeconds specifies the duration in seconds
+                  relative to the startTime that the job may be active before the
+                  system tries to terminate it; value must be positive integer. Only
+                  works for Always type.
+                format: int64
+                type: integer
+              parallelism:
+                description: Parallelism specifies the maximum desired number of pods
+                  which matches running ephemeral containers.
+                format: int32
+                type: integer
+              paused:
+                description: Paused will pause the ephemeral job.
+                type: boolean
+              replicas:
+                description: Replicas indicates a part of the quantity from matched
+                  pods by selector. Usually it is used for gray scale working. if
+                  Replicas exceeded the matched number by selector or not be set,
+                  replicas will not work.
+                format: int32
+                type: integer
+              selector:
+                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                  Selector is a label query over pods that should match the pod labels.'
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
+              template:
+                description: Template describes the ephemeral container that will
+                  be created.
+                properties:
+                  ephemeralContainers:
+                    description: EphemeralContainers defines ephemeral container list
+                      in match pods.
+                    x-kubernetes-preserve-unknown-fields: true
+                required:
+                - ephemeralContainers
+                type: object
+              ttlSecondsAfterFinished:
+                description: ttlSecondsAfterFinished limits the lifetime of a Job
+                  that has finished execution (either Complete or Failed). If this
+                  field is set, ttlSecondsAfterFinished after the eJob finishes, it
+                  is eligible to be automatically deleted. When the Job is being deleted,
+                  its lifecycle guarantees (e.g. finalizers) will be honored. If this
+                  field is unset, default value is 1800 If this field is set to zero,
+                  the Job becomes eligible to be deleted immediately after it finishes.
+                format: int32
+                type: integer
+            required:
+            - selector
+            - template
+            type: object
+          status:
+            description: EphemeralJobStatus defines the observed state of EphemeralJob
+            properties:
+              completionTime:
+                description: Represents time when the job was completed. It is not
+                  guaranteed to be set in happens-before order across separate operations.
+                  It is represented in RFC3339 form and is in UTC.
+                format: date-time
+                type: string
+              conditions:
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                  of cluster Important: Run "make" to regenerate code after modifying
+                  this file'
+                items:
+                  description: JobCondition describes current state of a job.
+                  properties:
+                    lastProbeTime:
+                      description: Last time the condition was checked.
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: Last time the condition transit from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Human readable message indicating details about
+                        last transition.
+                      type: string
+                    reason:
+                      description: (brief) reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of job condition, Complete or Failed.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              failed:
+                description: The number of pods which reached phase Failed.
+                format: int32
+                type: integer
+              match:
+                description: The number of total matched pods.
+                format: int32
+                type: integer
+              phase:
+                description: The phase of the job.
+                type: string
+              running:
+                description: The number of actively running pods.
+                format: int32
+                type: integer
+              startTime:
+                description: Represents time when the job was acknowledged by the
+                  job controller. It is not guaranteed to be set in happens-before
+                  order across separate operations. It is represented in RFC3339 form
+                  and is in UTC.
+                format: date-time
+                type: string
+              succeeded:
+                description: The number of pods which reached phase Succeeded.
+                format: int32
+                type: integer
+              waiting:
+                description: The number of waiting pods.
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
     storage: true
     subresources:
       status: {}

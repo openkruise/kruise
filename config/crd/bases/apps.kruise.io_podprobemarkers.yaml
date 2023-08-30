@@ -311,6 +311,305 @@ spec:
             type: object
         type: object
     served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: PodProbeMarker is the Schema for the PodProbeMarker API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PodProbeMarkerSpec defines the desired state of PodProbeMarker
+            properties:
+              probes:
+                description: Custom container probe, current only support Exec().
+                  Probe Result will record in Pod.Status.Conditions, and condition.type=probe.name.
+                  condition.status=True indicates probe success condition.status=False
+                  indicates probe fails
+                items:
+                  properties:
+                    containerName:
+                      description: container name
+                      type: string
+                    markerPolicy:
+                      description: 'According to the execution result of ContainerProbe,
+                        perform specific actions, such as: patch Pod labels, annotations,
+                        ReadinessGate Condition It cannot be null at the same time
+                        as PodConditionType.'
+                      items:
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: Patch annotations pod.annotations
+                            type: object
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: Patch Labels pod.labels
+                            type: object
+                          state:
+                            description: 'probe status, True or False For example:
+                              State=Succeeded, annotations[controller.kubernetes.io/pod-deletion-cost]
+                              = ''10''. State=Failed, annotations[controller.kubernetes.io/pod-deletion-cost]
+                              = ''-10''. In addition, if State=Failed is not defined,
+                              Exec execution fails, and the annotations[controller.kubernetes.io/pod-deletion-cost]
+                              will be Deleted'
+                            type: string
+                        required:
+                        - state
+                        type: object
+                      type: array
+                    name:
+                      description: probe name, unique within the Pod(Even between
+                        different containers, they cannot be the same)
+                      type: string
+                    podConditionType:
+                      description: If it is not empty, the Probe execution result
+                        will be recorded on the Pod condition. It cannot be null at
+                        the same time as MarkerPolicy. For example PodConditionType=game.kruise.io/healthy,
+                        pod.status.condition.type = game.kruise.io/healthy. When probe
+                        is Succeeded, pod.status.condition.status = True. Otherwise,
+                        when the probe fails to execute, pod.status.condition.status
+                        = False.
+                      type: string
+                    probe:
+                      description: container probe spec
+                      properties:
+                        exec:
+                          description: Exec specifies the action to take.
+                          properties:
+                            command:
+                              description: Command is the command line to execute
+                                inside the container, the working directory for the
+                                command  is root ('/') in the container's filesystem.
+                                The command is simply exec'd, it is not run inside
+                                a shell, so traditional shell instructions ('|', etc)
+                                won't work. To use a shell, you need to explicitly
+                                call out to that shell. Exit status of 0 is treated
+                                as live/healthy and non-zero is unhealthy.
+                              items:
+                                type: string
+                              type: array
+                          type: object
+                        failureThreshold:
+                          description: Minimum consecutive failures for the probe
+                            to be considered failed after having succeeded. Defaults
+                            to 3. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        grpc:
+                          description: GRPC specifies an action involving a GRPC port.
+                            This is a beta field and requires enabling GRPCContainerProbe
+                            feature gate.
+                          properties:
+                            port:
+                              description: Port number of the gRPC service. Number
+                                must be in the range 1 to 65535.
+                              format: int32
+                              type: integer
+                            service:
+                              description: "Service is the name of the service to
+                                place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+                                \n If this is not specified, the default behavior
+                                is defined by gRPC."
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        httpGet:
+                          description: HTTPGet specifies the http request to perform.
+                          properties:
+                            host:
+                              description: Host name to connect to, defaults to the
+                                pod IP. You probably want to set "Host" in httpHeaders
+                                instead.
+                              type: string
+                            httpHeaders:
+                              description: Custom headers to set in the request. HTTP
+                                allows repeated headers.
+                              items:
+                                description: HTTPHeader describes a custom header
+                                  to be used in HTTP probes
+                                properties:
+                                  name:
+                                    description: The header field name. This will
+                                      be canonicalized upon output, so case-variant
+                                      names will be understood as the same header.
+                                    type: string
+                                  value:
+                                    description: The header field value
+                                    type: string
+                                required:
+                                - name
+                                - value
+                                type: object
+                              type: array
+                            path:
+                              description: Path to access on the HTTP server.
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Name or number of the port to access on
+                                the container. Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                            scheme:
+                              description: Scheme to use for connecting to the host.
+                                Defaults to HTTP.
+                              type: string
+                          required:
+                          - port
+                          type: object
+                        initialDelaySeconds:
+                          description: 'Number of seconds after the container has
+                            started before liveness probes are initiated. More info:
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                          format: int32
+                          type: integer
+                        periodSeconds:
+                          description: How often (in seconds) to perform the probe.
+                            Default to 10 seconds. Minimum value is 1.
+                          format: int32
+                          type: integer
+                        successThreshold:
+                          description: Minimum consecutive successes for the probe
+                            to be considered successful after having failed. Defaults
+                            to 1. Must be 1 for liveness and startup. Minimum value
+                            is 1.
+                          format: int32
+                          type: integer
+                        tcpSocket:
+                          description: TCPSocket specifies an action involving a TCP
+                            port.
+                          properties:
+                            host:
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
+                              type: string
+                            port:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Number or name of the port to access on
+                                the container. Number must be in the range 1 to 65535.
+                                Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
+                          required:
+                          - port
+                          type: object
+                        terminationGracePeriodSeconds:
+                          description: Optional duration in seconds the pod needs
+                            to terminate gracefully upon probe failure. The grace
+                            period is the duration in seconds after the processes
+                            running in the pod are sent a termination signal and the
+                            time when the processes are forcibly halted with a kill
+                            signal. Set this value longer than the expected cleanup
+                            time for your process. If this value is nil, the pod's
+                            terminationGracePeriodSeconds will be used. Otherwise,
+                            this value overrides the value provided by the pod spec.
+                            Value must be non-negative integer. The value zero indicates
+                            stop immediately via the kill signal (no opportunity to
+                            shut down). This is a beta field and requires enabling
+                            ProbeTerminationGracePeriod feature gate. Minimum value
+                            is 1. spec.terminationGracePeriodSeconds is used if unset.
+                          format: int64
+                          type: integer
+                        timeoutSeconds:
+                          description: 'Number of seconds after which the probe times
+                            out. Defaults to 1 second. Minimum value is 1. More info:
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                          format: int32
+                          type: integer
+                      type: object
+                  required:
+                  - containerName
+                  - name
+                  - probe
+                  type: object
+                type: array
+              selector:
+                description: 'Selector is a label query over pods that should exec
+                  custom probe It must match the pod template''s labels. More info:
+                  https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
+            required:
+            - probes
+            - selector
+            type: object
+          status:
+            properties:
+              matchedPods:
+                description: matched Pods
+                format: int64
+                type: integer
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this PodProbeMarker. It corresponds to the PodProbeMarker's
+                  generation, which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+            required:
+            - observedGeneration
+            type: object
+        type: object
+    served: true
     storage: true
     subresources:
       status: {}

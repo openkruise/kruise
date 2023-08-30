@@ -1,0 +1,12 @@
+apiVersion: apps.kruise.io/v1beta1
+kind: BroadcastJob
+metadata:
+  labels:
+    app.kubernetes.io/name: broadcastjob
+    app.kubernetes.io/instance: broadcastjob-sample
+    app.kubernetes.io/part-of: kruise
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kruise
+  name: broadcastjob-sample
+spec:
+  # TODO(user): Add fields here
