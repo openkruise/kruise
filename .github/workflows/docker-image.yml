@@ -1,0 +1,15 @@
+name: Docker Image CI
+
+on:
+  workflow_dispatch:
+  
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build the Docker image
+      run: IMG=openkruise/kruise-manager:${{ github.ref_name }}&make docker-multiarch
