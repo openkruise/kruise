@@ -20,11 +20,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-uniteddeployment,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=uniteddeployments,verbs=create;update,versions=v1alpha1,name=muniteddeployment.kb.io
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-uniteddeployment,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=uniteddeployments,verbs=create;update,versions=v1alpha1;v1beta1,name=muniteddeployment.kb.io
 
 var (
 	// HandlerMap contains admission webhook handlers
 	HandlerMap = map[string]admission.Handler{
-		"mutate-apps-kruise-io-v1alpha1-uniteddeployment": &UnitedDeploymentCreateUpdateHandler{},
+		"mutate-apps-kruise-io-uniteddeployment": &UnitedDeploymentCreateUpdateHandler{},
 	}
 )

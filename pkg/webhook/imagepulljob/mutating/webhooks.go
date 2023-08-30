@@ -20,11 +20,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-imagepulljob,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=imagepulljobs,verbs=create;update,versions=v1alpha1,name=mimagepulljob.kb.io
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-imagepulljob,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=imagepulljobs,verbs=create;update,versions=v1alpha1;v1beta1,name=mimagepulljob.kb.io
 
 var (
 	// HandlerMap contains admission webhook handlers
 	HandlerMap = map[string]admission.Handler{
-		"mutate-apps-kruise-io-v1alpha1-imagepulljob": &ImagePullJobCreateUpdateHandler{},
+		"mutate-apps-kruise-io-imagepulljob": &ImagePullJobCreateUpdateHandler{},
 	}
 )

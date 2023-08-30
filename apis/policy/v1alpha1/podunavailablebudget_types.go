@@ -109,7 +109,7 @@ type PodUnavailableBudgetStatus struct {
 // +kubebuilder:printcolumn:name="Current",type="integer",JSONPath=".status.currentAvailable",description="CurrentAvailable current number of available pods"
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".status.desiredAvailable",description="DesiredAvailable minimum desired number of available pods"
 // +kubebuilder:printcolumn:name="Total",type="integer",JSONPath=".status.totalReplicas",description="TotalReplicas total number of pods counted by this budget"
-// +kubebuilder:storageversion
+
 // PodUnavailableBudget is the Schema for the podunavailablebudgets API
 type PodUnavailableBudget struct {
 	metav1.TypeMeta   `json:",inline"`

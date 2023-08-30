@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// +kubebuilder:webhook:path=/validate-policy-kruise-io-podunavailablebudget,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=policy.kruise.io,resources=podunavailablebudgets,verbs=create;update,versions=v1alpha1,name=vpodunavailablebudget.kb.io
+// +kubebuilder:webhook:path=/validate-policy-kruise-io-podunavailablebudget,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=policy.kruise.io,resources=podunavailablebudgets,verbs=create;update,versions=v1alpha1;v1beta1,name=vpodunavailablebudget.kb.io
 
 var (
 	// HandlerMap contains admission webhook handlers
