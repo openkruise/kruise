@@ -22,7 +22,7 @@ import (
 
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -49,30 +49,30 @@ func NewNodeImageTester(c clientset.Interface, kc kruiseclientset.Interface) *No
 }
 
 func (tester *NodeImageTester) CreateFakeNodeImageIfNotPresent() error {
-	_, err := tester.kc.AppsV1alpha1().NodeImages().Get(context.TODO(), "fake-nodeimage", metav1.GetOptions{})
+	_, err := tester.kc.AppsV1beta1().NodeImages().Get(context.TODO(), "fake-nodeimage", metav1.GetOptions{})
 	if err == nil {
 		return nil
 	} else if !errors.IsNotFound(err) {
 		return err
 	}
 
-	fakeObj := appsv1alpha1.NodeImage{
+	fakeObj := appsv1beta1.NodeImage{
 		ObjectMeta: metav1.ObjectMeta{Name: "fake-nodeimage", Labels: map[string]string{FakeNodeImageLabelKey: "true"}},
 	}
-	_, err = tester.kc.AppsV1alpha1().NodeImages().Create(context.TODO(), &fakeObj, metav1.CreateOptions{})
+	_, err = tester.kc.AppsV1beta1().NodeImages().Create(context.TODO(), &fakeObj, metav1.CreateOptions{})
 	return err
 }
 
 func (tester *NodeImageTester) DeleteFakeNodeImage() error {
-	err := tester.kc.AppsV1alpha1().NodeImages().Delete(context.TODO(), "fake-nodeimage", metav1.DeleteOptions{})
+	err := tester.kc.AppsV1beta1().NodeImages().Delete(context.TODO(), "fake-nodeimage", metav1.DeleteOptions{})
 	if err != nil && errors.IsNotFound(err) {
 		return nil
 	}
 	return err
 }
 
-func (tester *NodeImageTester) ListNodeImages() (*appsv1alpha1.NodeImageList, error) {
-	return tester.kc.AppsV1alpha1().NodeImages().List(context.TODO(), metav1.ListOptions{})
+func (tester *NodeImageTester) ListNodeImages() (*appsv1beta1.NodeImageList, error) {
+	return tester.kc.AppsV1beta1().NodeImages().List(context.TODO(), metav1.ListOptions{})
 }
 
 func (tester *NodeImageTester) ExpectNodes() ([]*v1.Node, error) {
@@ -98,8 +98,8 @@ func (tester *NodeImageTester) ExpectNodes() ([]*v1.Node, error) {
 	return nodes, nil
 }
 
-func (tester *NodeImageTester) GetNodeImage(name string) (*appsv1alpha1.NodeImage, error) {
-	return tester.kc.AppsV1alpha1().NodeImages().Get(context.TODO(), name, metav1.GetOptions{})
+func (tester *NodeImageTester) GetNodeImage(name string) (*appsv1beta1.NodeImage, error) {
+	return tester.kc.AppsV1beta1().NodeImages().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (tester *NodeImageTester) IsImageInSpec(image, nodeName string) (bool, error) {

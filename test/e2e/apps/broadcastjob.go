@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/client-go/util/retry"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -88,9 +88,9 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Create BroadcastJob job-" + randStr)
-			job := &appsv1alpha1.BroadcastJob{
+			job := &appsv1beta1.BroadcastJob{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + randStr},
-				Spec: appsv1alpha1.BroadcastJobSpec{
+				Spec: appsv1beta1.BroadcastJobSpec{
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Tolerations: []v1.Toleration{{Key: framework.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
@@ -102,7 +102,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 							RestartPolicy: v1.RestartPolicyNever,
 						},
 					},
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+					CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 				},
 			}
 

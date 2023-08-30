@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +47,7 @@ func NewResourceDistributionTester(c clientset.Interface, kc kruiseclientset.Int
 	}
 }
 
-func (s *ResourceDistributionTester) NewBaseResourceDistribution(nsPrefix string) *appsv1alpha1.ResourceDistribution {
+func (s *ResourceDistributionTester) NewBaseResourceDistribution(nsPrefix string) *appsv1beta1.ResourceDistribution {
 	const resourceJSON = `{
     "apiVersion": "v1",
     "data": {
@@ -59,24 +59,24 @@ func (s *ResourceDistributionTester) NewBaseResourceDistribution(nsPrefix string
     },
     "type": "Opaque"
 }`
-	return &appsv1alpha1.ResourceDistribution{
+	return &appsv1beta1.ResourceDistribution{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nsPrefix,
 		},
-		Spec: appsv1alpha1.ResourceDistributionSpec{
+		Spec: appsv1beta1.ResourceDistributionSpec{
 			Resource: runtime.RawExtension{
 				Raw: []byte(resourceJSON),
 			},
-			Targets: appsv1alpha1.ResourceDistributionTargets{
-				ExcludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-					List: []appsv1alpha1.ResourceDistributionNamespace{
+			Targets: appsv1beta1.ResourceDistributionTargets{
+				ExcludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{
 						{
 							Name: nsPrefix + "-4",
 						},
 					},
 				},
-				IncludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-					List: []appsv1alpha1.ResourceDistributionNamespace{
+				IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{
 						{
 							Name: nsPrefix + "-1",
 						},
@@ -109,30 +109,30 @@ func (s *ResourceDistributionTester) NewBaseNamespace(namespace string) *corev1.
 	}
 }
 
-func (s *ResourceDistributionTester) CreateResourceDistribution(resourceDistribution *appsv1alpha1.ResourceDistribution) *appsv1alpha1.ResourceDistribution {
+func (s *ResourceDistributionTester) CreateResourceDistribution(resourceDistribution *appsv1beta1.ResourceDistribution) *appsv1beta1.ResourceDistribution {
 	Logf("create ResourceDistribution(%s)", resourceDistribution.Name)
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		_, err := s.kc.AppsV1alpha1().ResourceDistributions().Create(context.TODO(), resourceDistribution, metav1.CreateOptions{})
+		_, err := s.kc.AppsV1beta1().ResourceDistributions().Create(context.TODO(), resourceDistribution, metav1.CreateOptions{})
 		return err
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	s.WaitForResourceDistributionCreated(resourceDistribution.Name, time.Minute)
-	resourceDistribution, _ = s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), resourceDistribution.Name, metav1.GetOptions{})
+	resourceDistribution, _ = s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), resourceDistribution.Name, metav1.GetOptions{})
 	return resourceDistribution
 }
 
-func (s *ResourceDistributionTester) UpdateResourceDistribution(resourceDistribution *appsv1alpha1.ResourceDistribution) {
+func (s *ResourceDistributionTester) UpdateResourceDistribution(resourceDistribution *appsv1beta1.ResourceDistribution) {
 	Logf("update ResourceDistribution(%s)", resourceDistribution.Name)
-	resourceDistributionClone, _ := s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), resourceDistribution.Name, metav1.GetOptions{})
+	resourceDistributionClone, _ := s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), resourceDistribution.Name, metav1.GetOptions{})
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		resourceDistributionClone.Spec = resourceDistribution.Spec
 		resourceDistributionClone.Annotations = resourceDistribution.Annotations
 		resourceDistributionClone.Labels = resourceDistribution.Labels
-		_, updateErr := s.kc.AppsV1alpha1().ResourceDistributions().Update(context.TODO(), resourceDistributionClone, metav1.UpdateOptions{})
+		_, updateErr := s.kc.AppsV1beta1().ResourceDistributions().Update(context.TODO(), resourceDistributionClone, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil
 		}
-		resourceDistributionClone, _ = s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), resourceDistributionClone.Name, metav1.GetOptions{})
+		resourceDistributionClone, _ = s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), resourceDistributionClone.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -217,13 +217,13 @@ func (s *ResourceDistributionTester) DeleteSecret(namespace, name string) error 
 	return s.c.CoreV1().Secrets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
-func (s *ResourceDistributionTester) GetResourceDistribution(name string, mustExistAssertion bool) (*appsv1alpha1.ResourceDistribution, error) {
+func (s *ResourceDistributionTester) GetResourceDistribution(name string, mustExistAssertion bool) (*appsv1beta1.ResourceDistribution, error) {
 	if mustExistAssertion {
 		s.WaitForResourceDistributionCreated(name, 2*time.Minute)
 	} else {
 		s.WaitForResourceDistributionCreated(name, time.Minute)
 	}
-	resourceDistribution, err := s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), name, metav1.GetOptions{})
+	resourceDistribution, err := s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (s *ResourceDistributionTester) GetResourceDistribution(name string, mustEx
 }
 
 func (s *ResourceDistributionTester) DeleteResourceDistributions(nsPrefix string) {
-	resourceDistributionList, err := s.kc.AppsV1alpha1().ResourceDistributions().List(context.TODO(), metav1.ListOptions{})
+	resourceDistributionList, err := s.kc.AppsV1beta1().ResourceDistributions().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Logf("List ResourceDistribution failed: %s", err.Error())
 		return
@@ -270,9 +270,9 @@ func (s *ResourceDistributionTester) DeleteNamespace(namespace *corev1.Namespace
 	s.WaitForNamespaceDeleted(namespace)
 }
 
-func (s *ResourceDistributionTester) DeleteResourceDistribution(resourceDistribution *appsv1alpha1.ResourceDistribution) {
+func (s *ResourceDistributionTester) DeleteResourceDistribution(resourceDistribution *appsv1beta1.ResourceDistribution) {
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		err := s.kc.AppsV1alpha1().ResourceDistributions().Delete(context.TODO(), resourceDistribution.Name, metav1.DeleteOptions{})
+		err := s.kc.AppsV1beta1().ResourceDistributions().Delete(context.TODO(), resourceDistribution.Name, metav1.DeleteOptions{})
 		return err
 	})
 	if err != nil {
@@ -284,7 +284,7 @@ func (s *ResourceDistributionTester) DeleteResourceDistribution(resourceDistribu
 func (s *ResourceDistributionTester) WaitForResourceDistributionCreated(name string, timeout time.Duration) {
 	pollErr := wait.PollImmediate(time.Second, timeout,
 		func() (bool, error) {
-			_, err := s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), name, metav1.GetOptions{})
+			_, err := s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -343,10 +343,10 @@ func (s *ResourceDistributionTester) WaitForNamespaceDeleted(namespace *corev1.N
 	}
 }
 
-func (s *ResourceDistributionTester) WaitForResourceDistributionDeleted(resourceDistribution *appsv1alpha1.ResourceDistribution) {
+func (s *ResourceDistributionTester) WaitForResourceDistributionDeleted(resourceDistribution *appsv1beta1.ResourceDistribution) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), resourceDistribution.Name, metav1.GetOptions{})
+			_, err := s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), resourceDistribution.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true, nil
@@ -360,7 +360,7 @@ func (s *ResourceDistributionTester) WaitForResourceDistributionDeleted(resource
 	}
 }
 
-func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1alpha1.ResourceDistributionTargets) (matchedNamespaces, unmatchedNamespaces sets.String, err error) {
+func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1beta1.ResourceDistributionTargets) (matchedNamespaces, unmatchedNamespaces sets.String, err error) {
 	matchedNamespaces = sets.NewString()
 	unmatchedNamespaces = sets.NewString()
 

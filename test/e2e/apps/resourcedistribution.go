@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -296,12 +296,12 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 				// check status.conditions
 				ginkgo.By("checking conditions...")
 				gomega.Expect(resourceDistribution.Status.Conditions).To(gomega.HaveLen(6))
-				gomega.Expect(resourceDistribution.Status.Conditions[0].Status).To(gomega.Equal(appsv1alpha1.ResourceDistributionConditionFalse))
-				gomega.Expect(resourceDistribution.Status.Conditions[1].Status).To(gomega.Equal(appsv1alpha1.ResourceDistributionConditionFalse))
-				gomega.Expect(resourceDistribution.Status.Conditions[2].Status).To(gomega.Equal(appsv1alpha1.ResourceDistributionConditionFalse))
-				gomega.Expect(resourceDistribution.Status.Conditions[3].Status).To(gomega.Equal(appsv1alpha1.ResourceDistributionConditionFalse))
-				gomega.Expect(resourceDistribution.Status.Conditions[4].Status).To(gomega.Equal(appsv1alpha1.ResourceDistributionConditionFalse))
-				gomega.Expect(resourceDistribution.Status.Conditions[5].Status).To(gomega.Equal(appsv1alpha1.ResourceDistributionConditionFalse))
+				gomega.Expect(resourceDistribution.Status.Conditions[0].Status).To(gomega.Equal(appsv1beta1.ResourceDistributionConditionFalse))
+				gomega.Expect(resourceDistribution.Status.Conditions[1].Status).To(gomega.Equal(appsv1beta1.ResourceDistributionConditionFalse))
+				gomega.Expect(resourceDistribution.Status.Conditions[2].Status).To(gomega.Equal(appsv1beta1.ResourceDistributionConditionFalse))
+				gomega.Expect(resourceDistribution.Status.Conditions[3].Status).To(gomega.Equal(appsv1beta1.ResourceDistributionConditionFalse))
+				gomega.Expect(resourceDistribution.Status.Conditions[4].Status).To(gomega.Equal(appsv1beta1.ResourceDistributionConditionFalse))
+				gomega.Expect(resourceDistribution.Status.Conditions[5].Status).To(gomega.Equal(appsv1beta1.ResourceDistributionConditionFalse))
 
 				// checking after some included namespaces is deleted
 				tester.DeleteNamespace(allNamespaces[0])
@@ -313,7 +313,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 				gomega.Expect(resourceDistribution.Status.Desired).Should(gomega.Equal(resourceDistribution.Status.Succeeded))
 
 				// checking after updating spec.targets
-				resourceDistribution.Spec.Targets.IncludedNamespaces.List = []appsv1alpha1.ResourceDistributionNamespace{{Name: prefix + "-2"}}
+				resourceDistribution.Spec.Targets.IncludedNamespaces.List = []appsv1beta1.ResourceDistributionNamespace{{Name: prefix + "-2"}}
 				resourceDistribution.Spec.Targets.NamespaceLabelSelector.MatchLabels = map[string]string{"e2e-rd-group": "two"}
 				tester.UpdateResourceDistribution(resourceDistribution)
 				gomega.Eventually(func() int32 {

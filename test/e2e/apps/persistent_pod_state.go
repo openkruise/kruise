@@ -27,7 +27,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -70,9 +70,9 @@ var _ = SIGDescribe("PersistentPodState", func() {
 		ginkgo.It("statefulset node topology", func() {
 			// create statefulset
 			sts := tester.NewBaseStatefulset(ns)
-			sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] = "true"
-			sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] = podStateOsTopologyLabel
-			sts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] = podStateNodeTopologyLabel
+			sts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] = "true"
+			sts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] = podStateOsTopologyLabel
+			sts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] = podStateNodeTopologyLabel
 			ginkgo.By(fmt.Sprintf("Creating kruise Statefulset %s", sts.Name))
 			tester.CreateStatefulset(sts)
 			time.Sleep(time.Second * 3)
@@ -82,7 +82,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err := tester.ListPodsInKruiseSts(sts)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err := kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err := kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
 			currentStates := staticIP.Status.DeepCopy().PodStates
@@ -107,7 +107,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err = tester.ListPodsInKruiseSts(sts)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.Equal(currentStates))
@@ -133,7 +133,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err = tester.ListPodsInKruiseSts(sts)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
 			for _, pod := range pods {
@@ -158,7 +158,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err = tester.ListPodsInKruiseSts(sts)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
 			for _, pod := range pods {
@@ -175,14 +175,14 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			currentStates = staticIP.Status.DeepCopy().PodStates
 
 			// delete auto generate annotation
-			delete(sts.Annotations, appsv1alpha1.AnnotationAutoGeneratePersistentPodState)
+			delete(sts.Annotations, appsv1beta1.AnnotationAutoGeneratePersistentPodState)
 			tester.UpdateStatefulset(sts)
 			time.Sleep(time.Second * 3)
-			_, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			_, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			// add auto generate annotation
-			sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] = "true"
+			sts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] = "true"
 			tester.UpdateStatefulset(sts)
 			time.Sleep(time.Second * 3)
 
@@ -190,7 +190,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err = tester.ListPodsInKruiseSts(sts)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.Equal(currentStates))
@@ -206,7 +206,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 				gomega.Expect(podState.NodeName).To(gomega.Equal(node.Name))
 			}
 
-			delete(sts.Annotations, appsv1alpha1.AnnotationRequiredPersistentTopology)
+			delete(sts.Annotations, appsv1beta1.AnnotationRequiredPersistentTopology)
 			tester.UpdateStatefulset(sts)
 			time.Sleep(time.Second * 3)
 
@@ -214,7 +214,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err = tester.ListPodsInKruiseSts(sts)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
 			for _, pod := range pods {
@@ -232,10 +232,10 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			currentStates = staticIP.Status.DeepCopy().PodStates
 
 			// update persistentPodState
-			staticIP, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			staticIP.Spec.PersistentPodStateRetentionPolicy = appsv1alpha1.PersistentPodStateRetentionPolicyWhenDeleted
-			_, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Update(context.TODO(), staticIP, metav1.UpdateOptions{})
+			staticIP.Spec.PersistentPodStateRetentionPolicy = appsv1beta1.PersistentPodStateRetentionPolicyWhenDeleted
+			_, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Update(context.TODO(), staticIP, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second * 3)
 
@@ -248,7 +248,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err = tester.ListPodsInKruiseSts(sts)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.Equal(currentStates))
 			for _, pod := range pods {
@@ -266,42 +266,42 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			}
 
 			// check validate webhook
-			other := &appsv1alpha1.PersistentPodState{
+			other := &appsv1beta1.PersistentPodState{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: appsv1alpha1.GroupVersion.String(),
+					APIVersion: appsv1beta1.GroupVersion.String(),
 					Kind:       "PersistentPodState",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns,
 					Name:      "pps-test",
 				},
-				Spec: appsv1alpha1.PersistentPodStateSpec{
-					TargetReference: appsv1alpha1.TargetReference{
+				Spec: appsv1beta1.PersistentPodStateSpec{
+					TargetReference: appsv1beta1.TargetReference{
 						APIVersion: "apps/v1",
 						Kind:       "StatefulSet",
 						Name:       sts.Name,
 					},
-					RequiredPersistentTopology: &appsv1alpha1.NodeTopologyTerm{
+					RequiredPersistentTopology: &appsv1beta1.NodeTopologyTerm{
 						NodeTopologyKeys: []string{podStateNodeTopologyLabel},
 					},
-					PreferredPersistentTopology: []appsv1alpha1.PreferredTopologyTerm{
+					PreferredPersistentTopology: []appsv1beta1.PreferredTopologyTerm{
 						{
 							Weight: 100,
-							Preference: appsv1alpha1.NodeTopologyTerm{
+							Preference: appsv1beta1.NodeTopologyTerm{
 								NodeTopologyKeys: []string{podStateOsTopologyLabel},
 							},
 						},
 					},
 				},
 			}
-			_, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Create(context.TODO(), other, metav1.CreateOptions{})
+			_, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Create(context.TODO(), other, metav1.CreateOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			// delete sts
 			err = c.AppsV1().StatefulSets(sts.Namespace).Delete(context.TODO(), sts.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second * 3)
-			_, err = kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			_, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.HaveOccurred())
 
 			ginkgo.By("statefulset node topology done")
@@ -317,10 +317,10 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			// create statefulset
 			tester.AddStatefulsetLikeClusterRoleConf()
 			sts := tester.NewBaseStatefulsetLikeTest(ns)
-			sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] = "true"
-			sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] = podStateOsTopologyLabel
-			sts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] = podStateNodeTopologyLabel
-			sts.Annotations[appsv1alpha1.AnnotationPersistentPodAnnotations] = "name"
+			sts.Annotations[appsv1beta1.AnnotationAutoGeneratePersistentPodState] = "true"
+			sts.Annotations[appsv1beta1.AnnotationRequiredPersistentTopology] = podStateOsTopologyLabel
+			sts.Annotations[appsv1beta1.AnnotationPreferredPersistentTopology] = podStateNodeTopologyLabel
+			sts.Annotations[appsv1beta1.AnnotationPersistentPodAnnotations] = "name"
 			ginkgo.By(fmt.Sprintf("Creating Statefulset like %s", sts.Name))
 			tester.CreateStatefulsetLikeCRD(ns)
 			sts = tester.CreateStatefulsetLike(sts)
@@ -338,7 +338,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			pods, err := tester.ListPodsInNamespace(sts.Namespace)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			staticIP, err := kc.AppsV1alpha1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			staticIP, err := kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(staticIP.Status.PodStates).To(gomega.HaveLen(len(pods)))
 			currentStates := staticIP.Status.DeepCopy().PodStates

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	apps "k8s.io/api/apps/v1"
@@ -46,23 +45,23 @@ func NewPodProbeMarkerTester(c clientset.Interface, kc kruiseclientset.Interface
 	}
 }
 
-func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alpha1.PodProbeMarker {
-	nginx := appsv1alpha1.PodProbeMarker{
+func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1beta1.PodProbeMarker {
+	nginx := appsv1beta1.PodProbeMarker{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ppm-nginx",
 			Namespace: ns,
 		},
-		Spec: appsv1alpha1.PodProbeMarkerSpec{
+		Spec: appsv1beta1.PodProbeMarkerSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": fmt.Sprintf("probe-%s", randStr),
 				},
 			},
-			Probes: []appsv1alpha1.PodContainerProbe{
+			Probes: []appsv1beta1.PodContainerProbe{
 				{
 					Name:          "healthy",
 					ContainerName: "nginx",
-					Probe: appsv1alpha1.ContainerProbeSpec{
+					Probe: appsv1beta1.ContainerProbeSpec{
 						Probe: corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -72,9 +71,9 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alp
 						},
 					},
 					PodConditionType: "game.kruise.io/healthy",
-					MarkerPolicy: []appsv1alpha1.ProbeMarkerPolicy{
+					MarkerPolicy: []appsv1beta1.ProbeMarkerPolicy{
 						{
-							State: appsv1alpha1.ProbeSucceeded,
+							State: appsv1beta1.ProbeSucceeded,
 							Labels: map[string]string{
 								"nginx": "healthy",
 							},
@@ -85,22 +84,22 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alp
 		},
 	}
 
-	main := appsv1alpha1.PodProbeMarker{
+	main := appsv1beta1.PodProbeMarker{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ppm-main",
 			Namespace: ns,
 		},
-		Spec: appsv1alpha1.PodProbeMarkerSpec{
+		Spec: appsv1beta1.PodProbeMarkerSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": fmt.Sprintf("probe-%s", randStr),
 				},
 			},
-			Probes: []appsv1alpha1.PodContainerProbe{
+			Probes: []appsv1beta1.PodContainerProbe{
 				{
 					Name:          "check",
 					ContainerName: "main",
-					Probe: appsv1alpha1.ContainerProbeSpec{
+					Probe: appsv1beta1.ContainerProbeSpec{
 						Probe: corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								Exec: &corev1.ExecAction{
@@ -110,15 +109,15 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alp
 						},
 					},
 					PodConditionType: "game.kruise.io/check",
-					MarkerPolicy: []appsv1alpha1.ProbeMarkerPolicy{
+					MarkerPolicy: []appsv1beta1.ProbeMarkerPolicy{
 						{
-							State: appsv1alpha1.ProbeSucceeded,
+							State: appsv1beta1.ProbeSucceeded,
 							Annotations: map[string]string{
 								"controller.kubernetes.io/pod-deletion-cost": "10",
 							},
 						},
 						{
-							State: appsv1alpha1.ProbeFailed,
+							State: appsv1beta1.ProbeFailed,
 							Annotations: map[string]string{
 								"controller.kubernetes.io/pod-deletion-cost": "-10",
 							},
@@ -129,7 +128,7 @@ func (s *PodProbeMarkerTester) NewPodProbeMarker(ns, randStr string) []appsv1alp
 		},
 	}
 
-	return []appsv1alpha1.PodProbeMarker{nginx, main}
+	return []appsv1beta1.PodProbeMarker{nginx, main}
 }
 
 func (s *PodProbeMarkerTester) NewBaseStatefulSet(namespace, randStr string) *appsv1beta1.StatefulSet {

@@ -34,7 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util/workloadspread"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -43,8 +43,8 @@ import (
 const WorkloadSpreadFakeZoneKey = "e2e.kruise.io/workloadspread-fake-zone"
 
 var (
-	KruiseKindCloneSet    = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-	KruiseKindStatefulSet = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
+	KruiseKindCloneSet    = appsv1beta1.SchemeGroupVersion.WithKind("CloneSet")
+	KruiseKindStatefulSet = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 	//controllerKindDep  = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	//controllerKindJob  = batchv1.SchemeGroupVersion.WithKind("Job")
 )
@@ -130,12 +130,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("deploy in two zone, the type of maxReplicas is Integer", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 				Kind:       KruiseKindCloneSet.Kind,
 				Name:       cloneSet.Name,
 			}
-			subset1 := appsv1alpha1.WorkloadSpreadSubset{
+			subset1 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -151,7 +151,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 				},
 			}
-			subset2 := appsv1alpha1.WorkloadSpreadSubset{
+			subset2 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-b",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -167,7 +167,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 				},
 			}
-			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
+			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1, subset2})
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 
 			// create cloneset, replicas = 6
@@ -206,7 +206,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(3))
 			gomega.Expect(subset2Pods).To(gomega.Equal(3))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].MissingReplicas).To(gomega.Equal(int32(0)))
@@ -256,7 +256,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(3))
 			gomega.Expect(subset2Pods).To(gomega.Equal(3))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].MissingReplicas).To(gomega.Equal(int32(0)))
@@ -309,7 +309,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 			gomega.Expect(subset2Pods).To(gomega.Equal(2))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -363,7 +363,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(4))
 			gomega.Expect(subset2Pods).To(gomega.Equal(4))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -383,12 +383,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("elastic deployment, zone-a=2, zone-b=nil", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 				Kind:       KruiseKindCloneSet.Kind,
 				Name:       cloneSet.Name,
 			}
-			subset1 := appsv1alpha1.WorkloadSpreadSubset{
+			subset1 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -404,7 +404,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 				},
 			}
-			subset2 := appsv1alpha1.WorkloadSpreadSubset{
+			subset2 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-b",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -420,7 +420,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 				},
 			}
-			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
+			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1, subset2})
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 
 			// create cloneset, replicas = 2
@@ -458,7 +458,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 			gomega.Expect(subset2Pods).To(gomega.Equal(0))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -509,7 +509,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 			gomega.Expect(subset2Pods).To(gomega.Equal(4))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -560,7 +560,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 			gomega.Expect(subset2Pods).To(gomega.Equal(4))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -611,7 +611,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 			gomega.Expect(subset2Pods).To(gomega.Equal(0))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -631,12 +631,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("reschedule subset-a", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 				Kind:       KruiseKindCloneSet.Kind,
 				Name:       cloneSet.Name,
 			}
-			subset1 := appsv1alpha1.WorkloadSpreadSubset{
+			subset1 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "subset-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -653,7 +653,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-a"}}}`),
 				},
 			}
-			subset2 := appsv1alpha1.WorkloadSpreadSubset{
+			subset2 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "subset-b",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -668,9 +668,9 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"subset-b"}}}`),
 				},
 			}
-			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
-			workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-				Type: appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType,
+			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1, subset2})
+			workloadSpread.Spec.ScheduleStrategy = appsv1beta1.WorkloadSpreadScheduleStrategy{
+				Type: appsv1beta1.FixedWorkloadSpreadScheduleStrategyType,
 			}
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 
@@ -723,7 +723,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			// check workloadSpread status
 			ginkgo.By(fmt.Sprintf("check workloadSpread(%s/%s) status", workloadSpread.Namespace, workloadSpread.Name))
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -737,9 +737,9 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			// wait for subset schedulabe
 			ginkgo.By(fmt.Sprintf("wait workloadSpread(%s/%s) subset-a reschedulabe", workloadSpread.Namespace, workloadSpread.Name))
-			workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-				Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-				Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+			workloadSpread.Spec.ScheduleStrategy = appsv1beta1.WorkloadSpreadScheduleStrategy{
+				Type: appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType,
+				Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 					DisableSimulationSchedule: true,
 					RescheduleCriticalSeconds: pointer.Int32Ptr(5),
 				},
@@ -748,12 +748,12 @@ var _ = SIGDescribe("workloadspread", func() {
 			tester.WaitForWorkloadSpreadRunning(workloadSpread)
 
 			err = wait.PollImmediate(time.Second, time.Minute*6, func() (bool, error) {
-				ws, err := kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+				ws, err := kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
 				for _, condition := range ws.Status.SubsetStatuses[0].Conditions {
-					if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
+					if condition.Type == appsv1beta1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
 						return true, nil
 					}
 				}
@@ -794,12 +794,12 @@ var _ = SIGDescribe("workloadspread", func() {
 			// wait subset-a to schedulable
 			ginkgo.By(fmt.Sprintf("wait subset-a to schedulable"))
 			err = wait.PollImmediate(time.Second, time.Minute*5, func() (bool, error) {
-				ws, err := kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+				ws, err := kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
 				for _, condition := range ws.Status.SubsetStatuses[0].Conditions {
-					if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionTrue {
+					if condition.Type == appsv1beta1.SubsetSchedulable && condition.Status == corev1.ConditionTrue {
 						return true, nil
 					}
 				}
@@ -824,12 +824,12 @@ var _ = SIGDescribe("workloadspread", func() {
 				}},
 			}
 			// build workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 				Kind:       KruiseKindCloneSet.Kind,
 				Name:       cloneSet.Name,
 			}
-			subset1 := appsv1alpha1.WorkloadSpreadSubset{
+			subset1 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -845,7 +845,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 				},
 			}
-			subset2 := appsv1alpha1.WorkloadSpreadSubset{
+			subset2 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-b",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -860,7 +860,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 				},
 			}
-			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
+			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1, subset2})
 			ginkgo.By("Creating CloneSet with 4 replicas before creating workloadSpread...")
 			cloneSet = tester.CreateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
@@ -1007,12 +1007,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("only one subset, zone-a=nil", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 				Kind:       KruiseKindCloneSet.Kind,
 				Name:       cloneSet.Name,
 			}
-			subset1 := appsv1alpha1.WorkloadSpreadSubset{
+			subset1 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1029,7 +1029,7 @@ var _ = SIGDescribe("workloadspread", func() {
 				},
 			}
 
-			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1})
+			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1})
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 
 			// create cloneset, replicas = 2
@@ -1060,7 +1060,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1099,7 +1099,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			gomega.Expect(subset1Pods).To(gomega.Equal(6))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1138,7 +1138,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			gomega.Expect(subset1Pods).To(gomega.Equal(6))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1153,12 +1153,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("only one subset, zone-a=2", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 				Kind:       KruiseKindCloneSet.Kind,
 				Name:       cloneSet.Name,
 			}
-			subset1 := appsv1alpha1.WorkloadSpreadSubset{
+			subset1 := appsv1beta1.WorkloadSpreadSubset{
 				Name: "zone-a",
 				RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 					MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1175,7 +1175,7 @@ var _ = SIGDescribe("workloadspread", func() {
 				},
 			}
 
-			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1})
+			workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1})
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 
 			// create cloneset, replicas = 2
@@ -1206,7 +1206,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1245,7 +1245,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1285,7 +1285,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			gomega.Expect(subset1Pods).To(gomega.Equal(2))
 
-			workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1300,12 +1300,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("manage existing pods by only preferredNodeSelector, then deletion subset-b", func() {
 			cs := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 				Kind:       KruiseKindCloneSet.Kind,
 				Name:       cs.Name,
 			}
-			subsets := []appsv1alpha1.WorkloadSpreadSubset{
+			subsets := []appsv1beta1.WorkloadSpreadSubset{
 				{
 					Name: "subset-a",
 					Tolerations: []corev1.Toleration{{
@@ -1419,7 +1419,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 
 			ginkgo.By("Deletion subset-b and waiting for workloadspread's reconcile...")
-			ws.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+			ws.Spec.Subsets = []appsv1beta1.WorkloadSpreadSubset{
 				ws.Spec.Subsets[0],
 			}
 			tester.UpdateWorkloadSpread(ws)
@@ -1438,12 +1438,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("manage statefulset pods only with patch", func() {
 			sts, svc := tester.NewBaseHeadlessStatefulSet(ns)
 			// create workloadSpread
-			targetRef := appsv1alpha1.TargetReference{
+			targetRef := appsv1beta1.TargetReference{
 				APIVersion: KruiseKindStatefulSet.GroupVersion().String(),
 				Kind:       KruiseKindStatefulSet.Kind,
 				Name:       sts.Name,
 			}
-			subsets := []appsv1alpha1.WorkloadSpreadSubset{
+			subsets := []appsv1beta1.WorkloadSpreadSubset{
 				{
 					Name:        "subset-a",
 					MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
@@ -1517,12 +1517,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		//ginkgo.It("deploy in two zone, maxReplicas=50%", func() {
 		//	cloneSet := tester.NewBaseCloneSet(ns)
 		//	// create workloadSpread
-		//	targetRef := appsv1alpha1.TargetReference{
+		//	targetRef := appsv1beta1.TargetReference{
 		//		APIVersion: KruiseKindCloneSet.GroupVersion().String(),
 		//		Kind:       KruiseKindCloneSet.Kind,
 		//		Name:       cloneSet.Name,
 		//	}
-		//	subset1 := appsv1alpha1.WorkloadSpreadSubset{
+		//	subset1 := appsv1beta1.WorkloadSpreadSubset{
 		//		Name: "zone-a",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1538,7 +1538,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 		//		},
 		//	}
-		//	subset2 := appsv1alpha1.WorkloadSpreadSubset{
+		//	subset2 := appsv1beta1.WorkloadSpreadSubset{
 		//		Name: "zone-b",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1554,7 +1554,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 		//		},
 		//	}
-		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
+		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1, subset2})
 		//	workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 		//
 		//	// create cloneset, replicas = 2
@@ -1666,7 +1666,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//	gomega.Expect(subset1Pods).To(gomega.Equal(3))
 		//	gomega.Expect(subset2Pods).To(gomega.Equal(3))
 		//
-		//	workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(workloadSpread.Name, metav1.GetOptions{})
+		//	workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(workloadSpread.Name, metav1.GetOptions{})
 		//	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		//
 		//	gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1718,12 +1718,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		//ginkgo.It("elastic deploy for deployment, zone-a=2, zone-b=nil", func() {
 		//	deployment := tester.NewBaseDeployment(ns)
 		//	// create workloadSpread
-		//	targetRef := appsv1alpha1.TargetReference{
+		//	targetRef := appsv1beta1.TargetReference{
 		//		APIVersion: controllerKindDep.GroupVersion().String(),
 		//		Kind:       controllerKindDep.Kind,
 		//		Name:       deployment.Name,
 		//	}
-		//	subset1 := appsv1alpha1.WorkloadSpreadSubset{
+		//	subset1 := appsv1beta1.WorkloadSpreadSubset{
 		//		Name: "zone-a",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1739,7 +1739,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 		//		},
 		//	}
-		//	subset2 := appsv1alpha1.WorkloadSpreadSubset{
+		//	subset2 := appsv1beta1.WorkloadSpreadSubset{
 		//		Name: "zone-b",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1755,7 +1755,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 		//		},
 		//	}
-		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
+		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1, subset2})
 		//	workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 		//
 		//	// create deployment, replicas = 2
@@ -1830,7 +1830,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//	gomega.Expect(subset1Pods).To(gomega.Equal(2))
 		//	gomega.Expect(subset2Pods).To(gomega.Equal(4))
 		//
-		//	workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(workloadSpread.Name, metav1.GetOptions{})
+		//	workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(workloadSpread.Name, metav1.GetOptions{})
 		//	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		//
 		//	gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))
@@ -1920,12 +1920,12 @@ var _ = SIGDescribe("workloadspread", func() {
 		//ginkgo.It("deploy for job, zone-a=1, zone-b=nil", func() {
 		//	job := tester.NewBaseJob(ns)
 		//	// create workloadSpread
-		//	targetRef := appsv1alpha1.TargetReference{
+		//	targetRef := appsv1beta1.TargetReference{
 		//		APIVersion: controllerKindJob.GroupVersion().String(),
 		//		Kind:       controllerKindJob.Kind,
 		//		Name:       job.Name,
 		//	}
-		//	subset1 := appsv1alpha1.WorkloadSpreadSubset{
+		//	subset1 := appsv1beta1.WorkloadSpreadSubset{
 		//		Name: "zone-a",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1941,7 +1941,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
 		//		},
 		//	}
-		//	subset2 := appsv1alpha1.WorkloadSpreadSubset{
+		//	subset2 := appsv1beta1.WorkloadSpreadSubset{
 		//		Name: "zone-b",
 		//		RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
 		//			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1956,7 +1956,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//			Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-b"}}}`),
 		//		},
 		//	}
-		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1alpha1.WorkloadSpreadSubset{subset1, subset2})
+		//	workloadSpread := tester.NewWorkloadSpread(ns, workloadSpreadName, &targetRef, []appsv1beta1.WorkloadSpreadSubset{subset1, subset2})
 		//	workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 		//
 		//	job.Spec.Completions = pointer.Int32Ptr(10)
@@ -2009,7 +2009,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//
 		//	// check workloadSpread status
 		//	ginkgo.By(fmt.Sprintf("check workloadSpread(%s/%s) status", workloadSpread.Namespace, workloadSpread.Name))
-		//	workloadSpread, err = kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(workloadSpread.Name, metav1.GetOptions{})
+		//	workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(workloadSpread.Name, metav1.GetOptions{})
 		//	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		//
 		//	gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Name).To(gomega.Equal(workloadSpread.Spec.Subsets[0].Name))

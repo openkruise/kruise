@@ -30,7 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -84,28 +84,28 @@ var _ = SIGDescribe("PullImage", func() {
 	})
 
 	framework.KruiseDescribe("ImagePullJob pulling images functionality [ImagePullJob]", func() {
-		var baseJob *appsv1alpha1.ImagePullJob
+		var baseJob *appsv1beta1.ImagePullJob
 		intorstr4 := intstr.FromInt(4)
 
 		ginkgo.BeforeEach(func() {
-			baseJob = &appsv1alpha1.ImagePullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagepulljob"}}
+			baseJob = &appsv1beta1.ImagePullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagepulljob"}}
 		})
 
 		framework.ConformanceIt("create an always job to pull an image on all real nodes", func() {
 			job := baseJob.DeepCopy()
-			job.Spec = appsv1alpha1.ImagePullJobSpec{
+			job.Spec = appsv1beta1.ImagePullJobSpec{
 				Image: NginxImage,
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 						{Key: framework.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
 					}}},
-					PullPolicy: &appsv1alpha1.PullPolicy{
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type:                    appsv1alpha1.Always,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type:                    appsv1beta1.Always,
 						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
 					},
@@ -157,17 +157,17 @@ var _ = SIGDescribe("PullImage", func() {
 
 		framework.ConformanceIt("create an always job to pull an image on one real node", func() {
 			job := baseJob.DeepCopy()
-			job.Spec = appsv1alpha1.ImagePullJobSpec{
+			job.Spec = appsv1beta1.ImagePullJobSpec{
 				Image: NewNginxImage,
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
-					PullPolicy: &appsv1alpha1.PullPolicy{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type: appsv1alpha1.Always,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
 					},
 				},
 			}
@@ -203,16 +203,16 @@ var _ = SIGDescribe("PullImage", func() {
 
 		framework.ConformanceIt("create a never job to pull an image on all nodes", func() {
 			job := baseJob.DeepCopy()
-			job.Spec = appsv1alpha1.ImagePullJobSpec{
+			job.Spec = appsv1beta1.ImagePullJobSpec{
 				Image: WebserverImage,
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					PullPolicy: &appsv1alpha1.PullPolicy{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type: appsv1alpha1.Never,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Never,
 					},
 				},
 			}
@@ -247,17 +247,17 @@ var _ = SIGDescribe("PullImage", func() {
 			ginkgo.By("Create job1")
 			job1 := baseJob.DeepCopy()
 			job1.Name = baseJob.Name + "-1"
-			job1.Spec = appsv1alpha1.ImagePullJobSpec{
+			job1.Spec = appsv1beta1.ImagePullJobSpec{
 				Image: NewWebserverImage,
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
-					PullPolicy: &appsv1alpha1.PullPolicy{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type: appsv1alpha1.Never,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Never,
 					},
 				},
 			}
@@ -284,17 +284,17 @@ var _ = SIGDescribe("PullImage", func() {
 			ginkgo.By("Create job2")
 			job2 := baseJob.DeepCopy()
 			job2.Name = baseJob.Name + "-2"
-			job2.Spec = appsv1alpha1.ImagePullJobSpec{
+			job2.Spec = appsv1beta1.ImagePullJobSpec{
 				Image: NewWebserverImage,
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
-					PullPolicy: &appsv1alpha1.PullPolicy{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type: appsv1alpha1.Never,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Never,
 					},
 				},
 			}

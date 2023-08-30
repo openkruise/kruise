@@ -23,8 +23,8 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	apps "k8s.io/api/apps/v1"
@@ -69,7 +69,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 		ginkgo.It("ns should be protected", func() {
 			ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
 				Name:   "kruise-e2e-deletion-protection-" + randStr,
-				Labels: map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
+				Labels: map[string]string{policyv1beta1.DeletionProtectionKey: policyv1beta1.DeletionProtectionTypeAlways},
 			}}
 			ginkgo.By("Create test namespace " + ns.Name + " with Always")
 			_, err := c.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -82,7 +82,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Create a CloneSet in this namespace and wait for pod created")
 			tester := framework.NewCloneSetTester(c, kc, ns.Name)
-			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() int32 {
@@ -93,7 +93,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Patch the namespace deletion to Cascading")
 			_, err = c.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType,
-				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading)), metav1.PatchOptions{})
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1beta1.DeletionProtectionKey, policyv1beta1.DeletionProtectionTypeCascading)), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the namespace should be rejected")
@@ -102,7 +102,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
 			ginkgo.By("Scale CloneSet replicas to 0")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32Ptr(0)
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -168,7 +168,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			crd := &apiextensionsv1.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "testdeletioncases.e2e.kruise.io",
-					Labels: map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
+					Labels: map[string]string{policyv1beta1.DeletionProtectionKey: policyv1beta1.DeletionProtectionTypeAlways},
 				},
 				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 					Group: "e2e.kruise.io",
@@ -210,7 +210,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Patch the CRD deletion to Cascading")
 			_, err = ec.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.StrategicMergePatchType,
-				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading)), metav1.PatchOptions{})
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, policyv1beta1.DeletionProtectionKey, policyv1beta1.DeletionProtectionTypeCascading)), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Delete the CRD should be rejected")
@@ -233,8 +233,8 @@ var _ = SIGDescribe("DeletionProtection", func() {
 		ginkgo.It("CloneSet should be protected", func() {
 			ginkgo.By("Create a CloneSet with Always")
 			tester := framework.NewCloneSetTester(c, kc, ns)
-			cs := tester.NewCloneSet("clone-"+randStr, 0, appsv1alpha1.CloneSetUpdateStrategy{})
-			cs.Labels = map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways}
+			cs := tester.NewCloneSet("clone-"+randStr, 0, appsv1beta1.CloneSetUpdateStrategy{})
+			cs.Labels = map[string]string{policyv1beta1.DeletionProtectionKey: policyv1beta1.DeletionProtectionTypeAlways}
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -244,9 +244,9 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
 			ginkgo.By("Scale CloneSet replicas to 2 and protection to Cascading")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32Ptr(2)
-				cs.Labels[policyv1alpha1.DeletionProtectionKey] = policyv1alpha1.DeletionProtectionTypeCascading
+				cs.Labels[policyv1beta1.DeletionProtectionKey] = policyv1beta1.DeletionProtectionTypeCascading
 			})
 			gomega.Eventually(func() int32 {
 				cs, err = tester.GetCloneSet(cs.Name)
@@ -260,7 +260,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 			gomega.Expect(err.Error()).Should(gomega.ContainSubstring(deleteForbiddenMessage))
 
 			ginkgo.By("Scale CloneSet replicas to 0")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32Ptr(0)
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -282,7 +282,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns,
 					Name:      name,
-					Labels:    map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
+					Labels:    map[string]string{policyv1beta1.DeletionProtectionKey: policyv1beta1.DeletionProtectionTypeAlways},
 				},
 				Spec: apps.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(0),
@@ -315,7 +315,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Scale Deployment replicas to 2 and protection to Cascading")
 			deploy, err = c.AppsV1().Deployments(ns).Patch(context.TODO(), deploy.Name, types.StrategicMergePatchType,
-				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}},"spec":{"replicas":%d}}`, policyv1alpha1.DeletionProtectionKey, policyv1alpha1.DeletionProtectionTypeCascading, 2)), metav1.PatchOptions{})
+				[]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}},"spec":{"replicas":%d}}`, policyv1beta1.DeletionProtectionKey, policyv1beta1.DeletionProtectionTypeCascading, 2)), metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() int32 {
 				deploy, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deploy.Name, metav1.GetOptions{})

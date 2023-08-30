@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
@@ -61,8 +61,8 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
-			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
-				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1beta1.SidecarContainerUpgradeStrategy{
+				UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 				HotUpgradeEmptyImage: BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
@@ -99,13 +99,13 @@ var _ = SIGDescribe("SidecarSet", func() {
 		framework.ConformanceIt("sidecarSet upgrade hot sidecar container image", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
-			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			sidecarSetIn.Spec.UpdateStrategy = appsv1beta1.SidecarSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
 			sidecarSetIn.Spec.Containers[0].Image = NginxImage
-			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
-				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1beta1.SidecarContainerUpgradeStrategy{
+				UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 				HotUpgradeEmptyImage: BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
@@ -139,7 +139,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) sidecar container image to new nginx", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Image = NewNginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except := &appsv1alpha1.SidecarSetStatus{
+			except := &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      1,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 1,
@@ -164,7 +164,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) sidecar container image to nginx", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Image = NginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except = &appsv1alpha1.SidecarSetStatus{
+			except = &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      1,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 1,
@@ -195,7 +195,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				},
 			}
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except = &appsv1alpha1.SidecarSetStatus{
+			except = &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      1,
 				UpdatedPods:      0,
 				UpdatedReadyPods: 0,
@@ -210,13 +210,13 @@ var _ = SIGDescribe("SidecarSet", func() {
 		framework.ConformanceIt("sidecarSet upgrade hot sidecar container failed image", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
-			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			sidecarSetIn.Spec.UpdateStrategy = appsv1beta1.SidecarSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
 			sidecarSetIn.Spec.Containers[0].Image = NginxImage
-			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
-				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1beta1.SidecarContainerUpgradeStrategy{
+				UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 				HotUpgradeEmptyImage: BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
@@ -245,7 +245,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// update sidecarSet sidecar container failed image
 			sidecarSetIn.Spec.Containers[0].Image = InvalidImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except := &appsv1alpha1.SidecarSetStatus{
+			except := &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      2,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 0,
@@ -258,7 +258,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			//update sidecarSet sidecar container again, and success image
 			sidecarSetIn.Spec.Containers[0].Image = NewNginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except = &appsv1alpha1.SidecarSetStatus{
+			except = &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      2,
 				UpdatedPods:      2,
 				UpdatedReadyPods: 2,

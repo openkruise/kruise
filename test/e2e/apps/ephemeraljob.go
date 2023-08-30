@@ -6,7 +6,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
@@ -137,13 +137,13 @@ var _ = SIGDescribe("EphemeralJob", func() {
 
 			var defaultInt32Value int32 = 1
 			var defaultTTLSecondsAfterCreated int64 = 20
-			job := &appsv1alpha1.EphemeralJob{
+			job := &appsv1beta1.EphemeralJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-" + randStr},
-				Spec: appsv1alpha1.EphemeralJobSpec{
+				Spec: appsv1beta1.EphemeralJobSpec{
 					Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"run": "nginx"}},
 					Replicas:    &defaultInt32Value,
 					Parallelism: &defaultInt32Value,
-					Template: appsv1alpha1.EphemeralContainerTemplateSpec{
+					Template: appsv1beta1.EphemeralContainerTemplateSpec{
 						EphemeralContainers: []v1.EphemeralContainer{
 							{
 								TargetContainerName: "nginx",
@@ -162,10 +162,10 @@ var _ = SIGDescribe("EphemeralJob", func() {
 
 			job = tester.CreateEphemeralJob(job)
 			ginkgo.By("Check the status of job")
-			gomega.Eventually(func() appsv1alpha1.EphemeralJobPhase {
+			gomega.Eventually(func() appsv1beta1.EphemeralJobPhase {
 				ejob, _ := tester.GetEphemeralJob(job.Name)
 				return ejob.Status.Phase
-			}, 60*time.Second, 10*time.Second).Should(gomega.Equal(appsv1alpha1.EphemeralJobFailed))
+			}, 60*time.Second, 10*time.Second).Should(gomega.Equal(appsv1beta1.EphemeralJobFailed))
 		})
 
 		// This can't be Conformance yet.
@@ -352,13 +352,13 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			var defaultInt32Value int32 = 1
 			var defaultTTLSecondsAfterCreated int32 = 5
 			var defaultActiveDeadlineSeconds int64 = 5
-			job := &appsv1alpha1.EphemeralJob{
+			job := &appsv1beta1.EphemeralJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-" + randStr},
-				Spec: appsv1alpha1.EphemeralJobSpec{
+				Spec: appsv1beta1.EphemeralJobSpec{
 					Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"run": "nginx"}},
 					Replicas:    &defaultInt32Value,
 					Parallelism: &defaultInt32Value,
-					Template: appsv1alpha1.EphemeralContainerTemplateSpec{
+					Template: appsv1beta1.EphemeralContainerTemplateSpec{
 						EphemeralContainers: []v1.EphemeralContainer{
 							{
 								TargetContainerName: "nginx",
@@ -397,12 +397,12 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			// create cloneset
 			ginkgo.By("Create CloneSet " + randStr)
 			cloneSetTester := framework.NewCloneSetTester(c, kc, ns)
-			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers[0].Image = NginxImage
 			cs.Spec.Template.ObjectMeta.Labels["run"] = "nginx"
 			cs, err := cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -454,7 +454,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			oldEphemeralContainers := pods[0].Status.EphemeralContainerStatuses[0]
 
 			ginkgo.By("Update image to new nginx")
-			err = cloneSetTester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = cloneSetTester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				if cs.Annotations == nil {
 					cs.Annotations = map[string]string{}
 				}
@@ -492,12 +492,12 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			// create cloneset
 			ginkgo.By("Create CloneSet " + randStr)
 			cloneSetTester := framework.NewCloneSetTester(c, kc, ns)
-			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers[0].Image = NginxImage
 			cs.Spec.Template.ObjectMeta.Labels["run"] = "nginx"
 			cs, err := cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -552,14 +552,14 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				resetartContainerTester := framework.NewContainerRecreateTester(c, kc, ns)
 				ginkgo.By("Create CRR for pods[0], recreate container: app")
 				pod := pods[0]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-0"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "nginx"},
 						},
-						Strategy:                &appsv1alpha1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
+						Strategy:                &appsv1beta1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(99999),
 					},
 				}
@@ -568,26 +568,26 @@ var _ = SIGDescribe("EphemeralJob", func() {
 
 				// wait webhook
 				gomega.Eventually(func() string {
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey]
 				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(string(pod.UID)))
 
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
-				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestFailurePolicyFail))
+				gomega.Expect(crr.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
+				gomega.Expect(crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
+				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestFailurePolicyFail))
 				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(pod.Status.ContainerStatuses[0].ContainerID))
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = resetartContainerTester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = resetartContainerTester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
 
 				ginkgo.By("Check Pod containers recreated and started for minStartedSeconds")
 				pod, err = resetartContainerTester.GetPod(pod.Name)
@@ -614,12 +614,12 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			// create cloneset
 			ginkgo.By("Create CloneSet " + randStr)
 			cloneSetTester := framework.NewCloneSetTester(c, kc, ns)
-			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := cloneSetTester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers[0].Image = NginxImage
 			cs.Spec.Template.ObjectMeta.Labels["run"] = "nginx"
 			cs, err := cloneSetTester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {

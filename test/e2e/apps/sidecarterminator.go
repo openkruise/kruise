@@ -7,7 +7,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	batchv1 "k8s.io/api/batch/v1"
@@ -46,7 +46,7 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 				ImagePullPolicy: v1.PullIfNotPresent,
 				Env: []v1.EnvVar{
 					{
-						Name:  appsv1alpha1.KruiseTerminateSidecarEnv,
+						Name:  appsv1beta1.KruiseTerminateSidecarEnv,
 						Value: "true",
 					},
 				},
@@ -165,9 +165,9 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 				{
 					name: "BroadcastJob, restartPolicy=Never",
 					createJob: func(str string) metav1.Object {
-						job := &appsv1alpha1.BroadcastJob{
+						job := &appsv1beta1.BroadcastJob{
 							ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + str},
-							Spec: appsv1alpha1.BroadcastJobSpec{
+							Spec: appsv1beta1.BroadcastJobSpec{
 								Template: v1.PodTemplateSpec{
 									Spec: v1.PodSpec{
 										Containers: []v1.Container{
@@ -177,26 +177,26 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 										RestartPolicy: v1.RestartPolicyNever,
 									},
 								},
-								CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+								CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 							},
 						}
-						job, err := kc.AppsV1alpha1().BroadcastJobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
+						job, err := kc.AppsV1beta1().BroadcastJobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
 						return job
 					},
 					checkStatus: func(object metav1.Object) bool {
-						job, err := kc.AppsV1alpha1().BroadcastJobs(object.GetNamespace()).
+						job, err := kc.AppsV1beta1().BroadcastJobs(object.GetNamespace()).
 							Get(context.TODO(), object.GetName(), metav1.GetOptions{})
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
-						return job.Status.Phase == appsv1alpha1.PhaseCompleted
+						return job.Status.Phase == appsv1beta1.PhaseCompleted
 					},
 				},
 				{
 					name: "BroadcastJob, restartPolicy=OnFailure, main failed",
 					createJob: func(str string) metav1.Object {
-						job := &appsv1alpha1.BroadcastJob{
+						job := &appsv1beta1.BroadcastJob{
 							ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + str},
-							Spec: appsv1alpha1.BroadcastJobSpec{
+							Spec: appsv1beta1.BroadcastJobSpec{
 								Template: v1.PodTemplateSpec{
 									Spec: v1.PodSpec{
 										Containers: []v1.Container{
@@ -210,26 +210,26 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 										RestartPolicy: v1.RestartPolicyOnFailure,
 									},
 								},
-								CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+								CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 							},
 						}
-						job, err := kc.AppsV1alpha1().BroadcastJobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
+						job, err := kc.AppsV1beta1().BroadcastJobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
 						return job
 					},
 					checkStatus: func(object metav1.Object) bool {
-						job, err := kc.AppsV1alpha1().BroadcastJobs(object.GetNamespace()).
+						job, err := kc.AppsV1beta1().BroadcastJobs(object.GetNamespace()).
 							Get(context.TODO(), object.GetName(), metav1.GetOptions{})
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
-						return job.Status.Phase == appsv1alpha1.PhaseFailed
+						return job.Status.Phase == appsv1beta1.PhaseFailed
 					},
 				},
 				{
 					name: "BroadcastJob, restartPolicy=OnFailure, main succeeded",
 					createJob: func(str string) metav1.Object {
-						job := &appsv1alpha1.BroadcastJob{
+						job := &appsv1beta1.BroadcastJob{
 							ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + str},
-							Spec: appsv1alpha1.BroadcastJobSpec{
+							Spec: appsv1beta1.BroadcastJobSpec{
 								Template: v1.PodTemplateSpec{
 									Spec: v1.PodSpec{
 										Containers: []v1.Container{
@@ -239,18 +239,18 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 										RestartPolicy: v1.RestartPolicyOnFailure,
 									},
 								},
-								CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+								CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 							},
 						}
-						job, err := kc.AppsV1alpha1().BroadcastJobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
+						job, err := kc.AppsV1beta1().BroadcastJobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
 						return job
 					},
 					checkStatus: func(object metav1.Object) bool {
-						job, err := kc.AppsV1alpha1().BroadcastJobs(object.GetNamespace()).
+						job, err := kc.AppsV1beta1().BroadcastJobs(object.GetNamespace()).
 							Get(context.TODO(), object.GetName(), metav1.GetOptions{})
 						gomega.Expect(err).NotTo(gomega.HaveOccurred())
-						return job.Status.Phase == appsv1alpha1.PhaseCompleted
+						return job.Status.Phase == appsv1beta1.PhaseCompleted
 					},
 				},
 			}

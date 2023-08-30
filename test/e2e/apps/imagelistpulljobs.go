@@ -29,7 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -44,7 +44,7 @@ var _ = SIGDescribe("PullImages", func() {
 	var testerForImageListPullJob *framework.ImageListPullJobTester
 	var testerForImagePullJob *framework.ImagePullJobTester
 	var nodes []*v1.Node
-	var imagePullJobs *appsv1alpha1.ImagePullJobList
+	var imagePullJobs *appsv1beta1.ImagePullJobList
 
 	f.AfterEachActions = []func(){
 		func() {
@@ -87,28 +87,28 @@ var _ = SIGDescribe("PullImages", func() {
 	})
 
 	framework.KruiseDescribe("ImageListPullJob pulling images functionality [ImageListPullJob]", func() {
-		var baseJob *appsv1alpha1.ImageListPullJob
+		var baseJob *appsv1beta1.ImageListPullJob
 		intorstr4 := intstr.FromInt(4)
 
 		ginkgo.BeforeEach(func() {
-			baseJob = &appsv1alpha1.ImageListPullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagelistpulljob"}}
+			baseJob = &appsv1beta1.ImageListPullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagelistpulljob"}}
 		})
 
 		framework.ConformanceIt("create an always job to pull two images on all real nodes", func() {
 			job := baseJob.DeepCopy()
-			job.Spec = appsv1alpha1.ImageListPullJobSpec{
+			job.Spec = appsv1beta1.ImageListPullJobSpec{
 				Images: []string{NginxImage, BusyboxImage},
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 						{Key: framework.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
 					}}},
-					PullPolicy: &appsv1alpha1.PullPolicy{
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type:                    appsv1alpha1.Always,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type:                    appsv1beta1.Always,
 						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
 					},
@@ -155,17 +155,17 @@ var _ = SIGDescribe("PullImages", func() {
 
 		framework.ConformanceIt("create an always job to pull two images on one real node", func() {
 			job := baseJob.DeepCopy()
-			job.Spec = appsv1alpha1.ImageListPullJobSpec{
+			job.Spec = appsv1beta1.ImageListPullJobSpec{
 				Images: []string{NewNginxImage, BusyboxImage},
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
-					PullPolicy: &appsv1alpha1.PullPolicy{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type: appsv1alpha1.Always,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
 					},
 				},
 			}
@@ -201,16 +201,16 @@ var _ = SIGDescribe("PullImages", func() {
 
 		framework.ConformanceIt("create an always job to pull an image on all nodes", func() {
 			job := baseJob.DeepCopy()
-			job.Spec = appsv1alpha1.ImageListPullJobSpec{
+			job.Spec = appsv1beta1.ImageListPullJobSpec{
 				Images: []string{WebserverImage},
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					PullPolicy: &appsv1alpha1.PullPolicy{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type: appsv1alpha1.Always,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
 					},
 				},
 			}
@@ -248,16 +248,16 @@ var _ = SIGDescribe("PullImages", func() {
 
 		framework.ConformanceIt("create a never job to pull an image on all nodes", func() {
 			job := baseJob.DeepCopy()
-			job.Spec = appsv1alpha1.ImageListPullJobSpec{
+			job.Spec = appsv1beta1.ImageListPullJobSpec{
 				Images: []string{WebserverImage},
-				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-					PullPolicy: &appsv1alpha1.PullPolicy{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					PullPolicy: &appsv1beta1.PullPolicy{
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
 					Parallelism: &intorstr4,
-					CompletionPolicy: appsv1alpha1.CompletionPolicy{
-						Type: appsv1alpha1.Never,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Never,
 					},
 				},
 			}

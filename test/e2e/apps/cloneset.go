@@ -26,7 +26,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -65,11 +65,11 @@ var _ = SIGDescribe("CloneSet", func() {
 		var err error
 
 		framework.ConformanceIt("scales in normal cases", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1beta1.CloneSetUpdateStrategy{})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.RecreateCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.RecreateCloneSetUpdateStrategyType))
 			gomega.Expect(cs.Spec.UpdateStrategy.MaxUnavailable).To(gomega.Equal(func() *intstr.IntOrString { i := intstr.FromString("20%"); return &i }()))
 
 			ginkgo.By("Wait for replicas satisfied")
@@ -90,7 +90,7 @@ var _ = SIGDescribe("CloneSet", func() {
 		framework.ConformanceIt("scales with minReadySeconds and scaleStrategy", func() {
 			const replicas int32 = 4
 			const scaleMaxUnavailable int32 = 1
-			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1beta1.CloneSetUpdateStrategy{})
 			cs.Spec.MinReadySeconds = 10
 			cs.Spec.Template.Spec.Containers[0].ImagePullPolicy = "IfNotPresent"
 			cs.Spec.ScaleStrategy.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: scaleMaxUnavailable}
@@ -126,8 +126,8 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 
 		framework.ConformanceIt("pods should be ready when paused=true", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{
-				Type:   appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1beta1.CloneSetUpdateStrategy{
+				Type:   appsv1beta1.RecreateCloneSetUpdateStrategyType,
 				Paused: true,
 			})
 			cs, err = tester.CreateCloneSet(cs)
@@ -149,7 +149,7 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 
 		framework.ConformanceIt("specific delete a Pod, when scalingExcludePreparingDelete is disabled", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1beta1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Labels["lifecycle-hook"] = "true"
 			cs.Spec.Lifecycle = &appspub.Lifecycle{
 				PreDelete: &appspub.LifecycleHook{
@@ -179,7 +179,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			specifiedPodName := oldPods[0].Name
 			ginkgo.By(fmt.Sprintf("Patch Pod %s with specified-delete label", specifiedPodName))
-			patchBody := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"true"}}}`, appsv1alpha1.SpecifiedDeleteKey))
+			patchBody := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"true"}}}`, appsv1beta1.SpecifiedDeleteKey))
 			_, err = c.CoreV1().Pods(cs.Namespace).Patch(context.TODO(), specifiedPodName, types.StrategicMergePatchType, patchBody, metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -232,8 +232,8 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 
 		framework.ConformanceIt("specific scale down with lifecycle and then scale up, when scalingExcludePreparingDelete is enabled", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
-			cs.Labels = map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"}
+			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1beta1.CloneSetUpdateStrategy{})
+			cs.Labels = map[string]string{appsv1beta1.CloneSetScalingExcludePreparingDeleteKey: "true"}
 			cs.Spec.Template.Labels["lifecycle-hook"] = "true"
 			cs.Spec.Lifecycle = &appspub.Lifecycle{
 				PreDelete: &appspub.LifecycleHook{
@@ -263,7 +263,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			specifiedPodName := oldPods[0].Name
 			ginkgo.By(fmt.Sprintf("Scale down replicas=2 with specified Pod %s", specifiedPodName))
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32(2)
 				cs.Spec.ScaleStrategy.PodsToDelete = []string{specifiedPodName}
 			})
@@ -281,7 +281,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(cs.Status.Replicas).To(gomega.Equal(int32(3)))
 
 			ginkgo.By("Scale up to 3 again and wait status.replicas to be 4")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32(3)
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -327,14 +327,14 @@ var _ = SIGDescribe("CloneSet", func() {
 
 		// This can't be Conformance yet.
 		ginkgo.It("in-place update images with the same imageID", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			imageConfig := imageutils.GetConfig(imageutils.Nginx)
 			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -358,7 +358,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			ginkgo.By("Update image to nginx mainline-alpine")
 			imageConfig.SetVersion("mainline-alpine")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				if cs.Annotations == nil {
 					cs.Annotations = map[string]string{}
 				}
@@ -394,7 +394,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 		// This can't be Conformance yet.
 		ginkgo.It("in-place update both image and env from label", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers[0].Image = NginxImage
 			cs.Spec.Template.ObjectMeta.Labels["test-env"] = "foo"
 			cs.Spec.Template.Spec.Containers[0].Env = append(cs.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
@@ -403,7 +403,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -426,7 +426,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			oldContainerStatus := pods[0].Status.ContainerStatuses[0]
 
 			ginkgo.By("Update test-env label")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				if cs.Annotations == nil {
 					cs.Annotations = map[string]string{}
 				}
@@ -462,7 +462,7 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 
 		framework.ConformanceIt("in-place update two container images with priorities successfully", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:      "redis",
 				Image:     RedisImage,
@@ -473,7 +473,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -494,7 +494,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(pods)).Should(gomega.Equal(1))
 
 			ginkgo.By("Update images of nginx and redis")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
 				cs.Spec.Template.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 			})
@@ -542,7 +542,7 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 
 		framework.ConformanceIt("in-place update two container images with priorities, should not update the next when the previous one failed", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:      "redis",
 				Image:     RedisImage,
@@ -552,7 +552,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -573,7 +573,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(pods)).Should(gomega.Equal(1))
 
 			ginkgo.By("Update images of nginx and redis")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
 				cs.Spec.Template.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 			})
@@ -621,7 +621,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 		// This can't be Conformance yet.
 		ginkgo.It("in-place update two container image and env from metadata with priorities", func() {
-			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Annotations = map[string]string{"config": "foo"}
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:  "redis",
@@ -634,7 +634,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -655,7 +655,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(pods)).Should(gomega.Equal(1))
 
 			ginkgo.By("Update nginx image and config annotation")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
 				cs.Spec.Template.Annotations["config"] = "bar"
 			})
@@ -703,8 +703,8 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 
 		ginkgo.It(`CloneSet partition="99%", replicas=4, make sure one pod is upgraded`, func() {
-			updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{
-				Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+			updateStrategy := appsv1beta1.CloneSetUpdateStrategy{
+				Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 				MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
 				Partition:      &intstr.IntOrString{Type: intstr.String, StrVal: "99%"},
 			}
@@ -715,7 +715,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -737,7 +737,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			ginkgo.By("Update image to nginx mainline-alpine")
 			imageConfig.SetVersion("mainline-alpine")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				if cs.Annotations == nil {
 					cs.Annotations = map[string]string{}
 				}
@@ -783,7 +783,7 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 
 		ginkgo.It(`CloneSet Update with DisablePVCReuse=true`, func() {
-			updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType}
+			updateStrategy := appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.RecreateCloneSetUpdateStrategyType}
 			cs := tester.NewCloneSet("clone-"+randStr, 4, updateStrategy)
 			imageConfig := imageutils.GetConfig(imageutils.Nginx)
 			imageConfig.SetRegistry("docker.io/library")
@@ -811,7 +811,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			}
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.RecreateCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.RecreateCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -832,14 +832,14 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(pods)).Should(gomega.Equal(4))
 			instanceIds := sets.NewString()
 			for _, pod := range pods {
-				instanceIds.Insert(pod.Labels[appsv1alpha1.CloneSetInstanceID])
+				instanceIds.Insert(pod.Labels[appsv1beta1.CloneSetInstanceID])
 			}
 			pvcs, err := tester.ListPVCForCloneSet()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pvcs)).Should(gomega.Equal(8))
 			pvcIds := sets.NewString()
 			for _, pvc := range pvcs {
-				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1alpha1.CloneSetInstanceID])).Should(gomega.BeTrue())
+				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1beta1.CloneSetInstanceID])).Should(gomega.BeTrue())
 				pvcIds.Insert(pvc.Name)
 				ref := metav1.GetControllerOf(pvc)
 				gomega.Expect(ref).NotTo(gomega.BeNil())
@@ -863,7 +863,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pvcs)).Should(gomega.Equal(8))
 			for _, pvc := range pvcs {
-				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1alpha1.CloneSetInstanceID])).Should(gomega.BeTrue())
+				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1beta1.CloneSetInstanceID])).Should(gomega.BeTrue())
 				gomega.Expect(pvcIds.Has(pvc.Name)).To(gomega.Equal(true))
 				ref := metav1.GetControllerOf(pvc)
 				gomega.Expect(ref).NotTo(gomega.BeNil())
@@ -872,7 +872,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			// update cloneSet again, and DisablePVCReuse=true
 			ginkgo.By("Update cloneSet DisablePVCReuse=true")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.ScaleStrategy.DisablePVCReuse = true
 			})
 			time.Sleep(time.Second)
@@ -895,13 +895,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(pods)).Should(gomega.Equal(4))
 			instanceIds = sets.NewString()
 			for _, pod := range pods {
-				instanceIds.Insert(pod.Labels[appsv1alpha1.CloneSetInstanceID])
+				instanceIds.Insert(pod.Labels[appsv1beta1.CloneSetInstanceID])
 			}
 			pvcs, err = tester.ListPVCForCloneSet()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pvcs)).Should(gomega.Equal(8))
 			for _, pvc := range pvcs {
-				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1alpha1.CloneSetInstanceID])).Should(gomega.BeTrue())
+				gomega.Expect(instanceIds.Has(pvc.Labels[appsv1beta1.CloneSetInstanceID])).Should(gomega.BeTrue())
 				gomega.Expect(pvcIds.Has(pvc.Name)).To(gomega.Equal(false))
 				ref := metav1.GetControllerOf(pvc)
 				gomega.Expect(ref).NotTo(gomega.BeNil())
@@ -911,8 +911,8 @@ var _ = SIGDescribe("CloneSet", func() {
 
 		ginkgo.It(`CloneSet regard preparing-update pod as update when scaling`, func() {
 			const updateHookLabel = "preparing-update-hook"
-			updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{
-				Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+			updateStrategy := appsv1beta1.CloneSetUpdateStrategy{
+				Type:           appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType,
 				MaxUnavailable: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
 				Partition:      &intstr.IntOrString{Type: intstr.String, StrVal: "99%"},
 			}
@@ -932,7 +932,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			cs.Spec.Template.Labels[updateHookLabel] = "true"
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
 			ginkgo.By("Wait for all pods ready")
 			gomega.Eventually(func() int32 {
@@ -947,7 +947,7 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			ginkgo.By("Update image to nginx mainline-alpine")
 			imageConfig.SetVersion("mainline-alpine")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				if cs.Annotations == nil {
 					cs.Annotations = map[string]string{}
 				}
@@ -1015,7 +1015,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(preUpdateIndex)).Should(gomega.Equal(1))
 
 			ginkgo.By("scale up cloneSet to 3 replicas")
-			tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32(3)
 			})
 
@@ -1042,7 +1042,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			}, 120*time.Second, 3*time.Second).Should(gomega.BeTrue())
 
 			ginkgo.By("updating cloneSet partition to nil")
-			tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.UpdateStrategy.Partition = nil
 				cs.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 			})
@@ -1072,10 +1072,10 @@ var _ = SIGDescribe("CloneSet", func() {
 
 		framework.ConformanceIt("pre-download for new image", func() {
 			partition := intstr.FromInt(1)
-			cs := tester.NewCloneSet("clone-"+randStr, 5, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, Partition: &partition})
+			cs := tester.NewCloneSet("clone-"+randStr, 5, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType, Partition: &partition})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 			gomega.Expect(cs.Spec.UpdateStrategy.MaxUnavailable).To(gomega.Equal(func() *intstr.IntOrString { i := intstr.FromString("20%"); return &i }()))
 
 			ginkgo.By("Wait for replicas satisfied")
@@ -1086,17 +1086,17 @@ var _ = SIGDescribe("CloneSet", func() {
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(5)))
 
 			ginkgo.By("Update image to new nginx")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				if cs.Annotations == nil {
 					cs.Annotations = map[string]string{}
 				}
-				cs.Annotations[appsv1alpha1.ImagePreDownloadParallelismKey] = "2"
+				cs.Annotations[appsv1beta1.ImagePreDownloadParallelismKey] = "2"
 				cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Should get the ImagePullJob")
-			var job *appsv1alpha1.ImagePullJob
+			var job *appsv1beta1.ImagePullJob
 			gomega.Eventually(func() int {
 				jobs, err := tester.ListImagePullJobsForCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())

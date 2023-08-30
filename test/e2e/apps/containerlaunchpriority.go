@@ -24,7 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
@@ -48,7 +48,7 @@ var _ = SIGDescribe("containerpriority", func() {
 	var deploymentTester *framework.DeploymentTester
 	var nodeTester *framework.NodeTester
 	var randStr string
-	var cs *appsv1alpha1.CloneSet
+	var cs *appsv1beta1.CloneSet
 	var nodes []*v1.Node
 	var err error
 	var replicas int32
@@ -68,7 +68,7 @@ var _ = SIGDescribe("containerpriority", func() {
 
 	framework.KruiseDescribe("start a pod with different container priorities", func() {
 		framework.ConformanceIt("container priority created by CloneSet", func() {
-			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1beta1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   WebserverImage,
@@ -212,7 +212,7 @@ var _ = SIGDescribe("containerpriority", func() {
 		})
 
 		framework.ConformanceIt("run with no container priority", func() {
-			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1beta1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   WebserverImage,
@@ -262,7 +262,7 @@ var _ = SIGDescribe("containerpriority", func() {
 		})
 
 		framework.ConformanceIt("run with priorityAnnotation set", func() {
-			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1beta1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{

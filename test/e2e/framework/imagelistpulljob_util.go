@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,45 +39,45 @@ func NewImageListPullJobTester(c clientset.Interface, kc kruiseclientset.Interfa
 	}
 }
 
-func (tester *ImageListPullJobTester) CreateJob(job *appsv1alpha1.ImageListPullJob) error {
-	_, err := tester.kc.AppsV1alpha1().ImageListPullJobs(job.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+func (tester *ImageListPullJobTester) CreateJob(job *appsv1beta1.ImageListPullJob) error {
+	_, err := tester.kc.AppsV1beta1().ImageListPullJobs(job.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
 	return err
 }
 
-func (tester *ImageListPullJobTester) DeleteJob(job *appsv1alpha1.ImageListPullJob) error {
-	return tester.kc.AppsV1alpha1().ImageListPullJobs(job.Namespace).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
+func (tester *ImageListPullJobTester) DeleteJob(job *appsv1beta1.ImageListPullJob) error {
+	return tester.kc.AppsV1beta1().ImageListPullJobs(job.Namespace).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
 }
 
 func (tester *ImageListPullJobTester) DeleteAllJobs(ns string) error {
-	return tester.kc.AppsV1alpha1().ImageListPullJobs(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	return tester.kc.AppsV1beta1().ImageListPullJobs(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 }
 
-func (tester *ImageListPullJobTester) GetJob(job *appsv1alpha1.ImageListPullJob) (*appsv1alpha1.ImageListPullJob, error) {
-	return tester.kc.AppsV1alpha1().ImageListPullJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
+func (tester *ImageListPullJobTester) GetJob(job *appsv1beta1.ImageListPullJob) (*appsv1beta1.ImageListPullJob, error) {
+	return tester.kc.AppsV1beta1().ImageListPullJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 }
 
-func (tester *ImageListPullJobTester) ListJobs(ns string) (*appsv1alpha1.ImageListPullJobList, error) {
-	return tester.kc.AppsV1alpha1().ImageListPullJobs(ns).List(context.TODO(), metav1.ListOptions{})
+func (tester *ImageListPullJobTester) ListJobs(ns string) (*appsv1beta1.ImageListPullJobList, error) {
+	return tester.kc.AppsV1beta1().ImageListPullJobs(ns).List(context.TODO(), metav1.ListOptions{})
 }
 
 func (tester *ImageListPullJobTester) FailNodeImageFast(name string) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		nodeImage, err := tester.kc.AppsV1alpha1().NodeImages().Get(context.TODO(), name, metav1.GetOptions{})
+		nodeImage, err := tester.kc.AppsV1beta1().NodeImages().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		if nodeImage.Status.ImageStatuses == nil {
-			nodeImage.Status.ImageStatuses = map[string]appsv1alpha1.ImageStatus{}
+			nodeImage.Status.ImageStatuses = map[string]appsv1beta1.ImageStatus{}
 		}
 		var desired int32 = 0
 		for image, spec := range nodeImage.Spec.Images {
 			desired += int32(len(nodeImage.Spec.Images))
-			tagStatuses := make([]appsv1alpha1.ImageTagStatus, len(spec.Tags))
-			nodeImage.Status.ImageStatuses[image] = appsv1alpha1.ImageStatus{Tags: tagStatuses}
+			tagStatuses := make([]appsv1beta1.ImageTagStatus, len(spec.Tags))
+			nodeImage.Status.ImageStatuses[image] = appsv1beta1.ImageStatus{Tags: tagStatuses}
 			for i, tag := range spec.Tags {
-				nodeImage.Status.ImageStatuses[image].Tags[i] = appsv1alpha1.ImageTagStatus{
+				nodeImage.Status.ImageStatuses[image].Tags[i] = appsv1beta1.ImageTagStatus{
 					Tag:            tag.Tag,
-					Phase:          appsv1alpha1.ImagePhaseFailed,
+					Phase:          appsv1beta1.ImagePhaseFailed,
 					CompletionTime: &metav1.Time{Time: time.Now()},
 					Version:        tag.Version,
 					Message:        "node has not responded for a long time",
@@ -86,7 +86,7 @@ func (tester *ImageListPullJobTester) FailNodeImageFast(name string) error {
 		}
 		nodeImage.Status.Failed = desired
 		nodeImage.Status.Desired = desired
-		_, err = tester.kc.AppsV1alpha1().NodeImages().UpdateStatus(context.TODO(), nodeImage, metav1.UpdateOptions{})
+		_, err = tester.kc.AppsV1beta1().NodeImages().UpdateStatus(context.TODO(), nodeImage, metav1.UpdateOptions{})
 		return err
 	})
 }

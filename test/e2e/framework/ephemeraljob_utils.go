@@ -24,7 +24,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 
 	v1 "k8s.io/api/core/v1"
@@ -48,7 +48,7 @@ func NewEphemeralJobTester(c clientset.Interface, kc kruiseclientset.Interface, 
 }
 
 func (s *EphemeralJobTester) DeleteEphemeralJobs(ns string) {
-	ejobLists, err := s.kc.AppsV1alpha1().EphemeralJobs(ns).List(context.TODO(), metav1.ListOptions{})
+	ejobLists, err := s.kc.AppsV1beta1().EphemeralJobs(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Logf("List sidecarSets failed: %s", err.Error())
 		return
@@ -59,16 +59,16 @@ func (s *EphemeralJobTester) DeleteEphemeralJobs(ns string) {
 	}
 }
 
-func (t *EphemeralJobTester) DeleteEphemeralJob(job *appsv1alpha1.EphemeralJob) {
-	err := t.kc.AppsV1alpha1().EphemeralJobs(t.ns).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
+func (t *EphemeralJobTester) DeleteEphemeralJob(job *appsv1beta1.EphemeralJob) {
+	err := t.kc.AppsV1beta1().EphemeralJobs(t.ns).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
 	if err != nil {
 		Logf("delete ephemeraljob(%s) failed: %s", job.Name, err.Error())
 	}
 	t.WaitForEphemeralJobDeleted(job)
 }
 
-func (t *EphemeralJobTester) GetEphemeralJob(name string) (*appsv1alpha1.EphemeralJob, error) {
-	return t.kc.AppsV1alpha1().EphemeralJobs(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
+func (t *EphemeralJobTester) GetEphemeralJob(name string) (*appsv1beta1.EphemeralJob, error) {
+	return t.kc.AppsV1beta1().EphemeralJobs(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (t *EphemeralJobTester) GetPodsByEjob(name string) ([]*v1.Pod, error) {
@@ -83,10 +83,10 @@ func (t *EphemeralJobTester) GetPodsByEjob(name string) ([]*v1.Pod, error) {
 	return res, nil
 }
 
-func (t *EphemeralJobTester) WaitForEphemeralJobCreated(job *appsv1alpha1.EphemeralJob) {
+func (t *EphemeralJobTester) WaitForEphemeralJobCreated(job *appsv1beta1.EphemeralJob) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := t.kc.AppsV1alpha1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
+			_, err := t.kc.AppsV1beta1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -97,10 +97,10 @@ func (t *EphemeralJobTester) WaitForEphemeralJobCreated(job *appsv1alpha1.Epheme
 	}
 }
 
-func (t *EphemeralJobTester) WaitForEphemeralJobDeleted(job *appsv1alpha1.EphemeralJob) {
+func (t *EphemeralJobTester) WaitForEphemeralJobDeleted(job *appsv1beta1.EphemeralJob) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := t.kc.AppsV1alpha1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
+			_, err := t.kc.AppsV1beta1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true, nil
@@ -167,37 +167,37 @@ func (t *EphemeralJobTester) CreateTestDeployment(randStr string, replicas int32
 	return
 }
 
-func (t *EphemeralJobTester) CreateTestEphemeralJob(randStr string, replicas, Parallelism int32, selector metav1.LabelSelector, containers []v1.EphemeralContainer) *appsv1alpha1.EphemeralJob {
-	job := &appsv1alpha1.EphemeralJob{
+func (t *EphemeralJobTester) CreateTestEphemeralJob(randStr string, replicas, Parallelism int32, selector metav1.LabelSelector, containers []v1.EphemeralContainer) *appsv1beta1.EphemeralJob {
+	job := &appsv1beta1.EphemeralJob{
 		ObjectMeta: metav1.ObjectMeta{Namespace: t.ns, Name: "job-" + randStr},
-		Spec: appsv1alpha1.EphemeralJobSpec{
+		Spec: appsv1beta1.EphemeralJobSpec{
 			Selector:    &selector,
 			Replicas:    &replicas,
 			Parallelism: &Parallelism,
-			Template: appsv1alpha1.EphemeralContainerTemplateSpec{
+			Template: appsv1beta1.EphemeralContainerTemplateSpec{
 				EphemeralContainers: containers,
 			},
 		},
 	}
 
 	Logf("create ephemeral job(%s/%s)", job.Namespace, job.Name)
-	job, _ = t.kc.AppsV1alpha1().EphemeralJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
+	job, _ = t.kc.AppsV1beta1().EphemeralJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
 	t.WaitForEphemeralJobCreated(job)
 
-	job, _ = t.kc.AppsV1alpha1().EphemeralJobs(t.ns).Get(context.TODO(), "job-"+randStr, metav1.GetOptions{})
+	job, _ = t.kc.AppsV1beta1().EphemeralJobs(t.ns).Get(context.TODO(), "job-"+randStr, metav1.GetOptions{})
 	return job
 }
 
-func (t *EphemeralJobTester) CreateEphemeralJob(job *appsv1alpha1.EphemeralJob) *appsv1alpha1.EphemeralJob {
+func (t *EphemeralJobTester) CreateEphemeralJob(job *appsv1beta1.EphemeralJob) *appsv1beta1.EphemeralJob {
 	job.Namespace = t.ns
 	Logf("create ephemeral job(%s/%s)", job.Namespace, job.Name)
-	job, _ = t.kc.AppsV1alpha1().EphemeralJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
+	job, _ = t.kc.AppsV1beta1().EphemeralJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
 	t.WaitForEphemeralJobCreated(job)
 	return job
 }
 
-func (t *EphemeralJobTester) CheckEphemeralJobExist(job *appsv1alpha1.EphemeralJob) bool {
-	_, err := t.kc.AppsV1alpha1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
+func (t *EphemeralJobTester) CheckEphemeralJobExist(job *appsv1beta1.EphemeralJob) bool {
+	_, err := t.kc.AppsV1beta1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 	return !errors.IsNotFound(err)
 }
 

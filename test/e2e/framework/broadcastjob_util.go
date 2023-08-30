@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 
 	v1 "k8s.io/api/core/v1"
@@ -43,17 +43,17 @@ func NewBroadcastJobTester(c clientset.Interface, kc kruiseclientset.Interface, 
 	}
 }
 
-func (t *BroadcastJobTester) CreateBroadcastJob(job *appsv1alpha1.BroadcastJob) (*appsv1alpha1.BroadcastJob, error) {
-	job, err := t.kc.AppsV1alpha1().BroadcastJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
+func (t *BroadcastJobTester) CreateBroadcastJob(job *appsv1beta1.BroadcastJob) (*appsv1beta1.BroadcastJob, error) {
+	job, err := t.kc.AppsV1beta1().BroadcastJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
 	t.WaitForBroadcastJobCreated(job)
 	return job, err
 }
 
-func (t *BroadcastJobTester) GetBroadcastJob(name string) (*appsv1alpha1.BroadcastJob, error) {
-	return t.kc.AppsV1alpha1().BroadcastJobs(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
+func (t *BroadcastJobTester) GetBroadcastJob(name string) (*appsv1beta1.BroadcastJob, error) {
+	return t.kc.AppsV1beta1().BroadcastJobs(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (t *BroadcastJobTester) GetPodsOfJob(job *appsv1alpha1.BroadcastJob) (pods []*v1.Pod, err error) {
+func (t *BroadcastJobTester) GetPodsOfJob(job *appsv1beta1.BroadcastJob) (pods []*v1.Pod, err error) {
 	podList, err := t.c.CoreV1().Pods(t.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -68,10 +68,10 @@ func (t *BroadcastJobTester) GetPodsOfJob(job *appsv1alpha1.BroadcastJob) (pods 
 	return pods, nil
 }
 
-func (t *BroadcastJobTester) WaitForBroadcastJobCreated(job *appsv1alpha1.BroadcastJob) {
+func (t *BroadcastJobTester) WaitForBroadcastJobCreated(job *appsv1beta1.BroadcastJob) {
 	pollErr := wait.PollImmediate(time.Second, time.Minute,
 		func() (bool, error) {
-			_, err := t.kc.AppsV1alpha1().BroadcastJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
+			_, err := t.kc.AppsV1beta1().BroadcastJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}

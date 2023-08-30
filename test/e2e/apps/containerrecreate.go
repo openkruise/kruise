@@ -24,7 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -79,37 +79,37 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[0], recreate container: app")
 				pod := pods[0]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-0"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 						},
-						Strategy:                &appsv1alpha1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
+						Strategy:                &appsv1beta1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(3),
 					},
 				}
 				crr, err = tester.CreateCRR(crr)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey]).Should(gomega.Equal(string(pod.UID)))
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
-				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestFailurePolicyFail))
+				gomega.Expect(crr.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey]).Should(gomega.Equal(string(pod.UID)))
+				gomega.Expect(crr.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
+				gomega.Expect(crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
+				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestFailurePolicyFail))
 				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("app", pod).ContainerID))
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
 
 				ginkgo.By("Check Pod containers recreated and started for minStartedSeconds")
 				pod, err = tester.GetPod(pod.Name)
@@ -130,11 +130,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[1], recreate container: app and sidecar")
 				pod := pods[1]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-1"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
@@ -146,20 +146,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Spec.Containers[1].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("sidecar", pod).ContainerID))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 
 				ginkgo.By("Check Pod containers recreated")
@@ -195,11 +195,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[0], recreate container: app(postStartHook) and sidecar")
 				pod := pods[0]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-0"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
@@ -211,20 +211,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Spec.Containers[1].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("sidecar", pod).ContainerID))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, time.Second).Should(gomega.Equal(""))
 
 				ginkgo.By("Check Pod containers recreated")
@@ -246,15 +246,15 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[1] with orderedRecreate, recreate container: app(postStartHook) and sidecar")
 				pod := pods[1]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-1"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
-						Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+						Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
 							OrderedRecreate: true,
 						},
 					},
@@ -265,20 +265,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Spec.Containers[1].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("sidecar", pod).ContainerID))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 
 				ginkgo.By("Check Pod containers recreated")
@@ -319,11 +319,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[0], recreate container: app(preStopHook) and sidecar")
 				pod := pods[0]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-0"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
@@ -335,20 +335,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Spec.Containers[1].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("sidecar", pod).ContainerID))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 
 				ginkgo.By("Check Pod containers recreated")
@@ -377,11 +377,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[1] with activeDeadlineSeconds=3, recreate container: app(preStopHook) and sidecar")
 				pod := pods[1]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-1"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
@@ -394,20 +394,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Spec.Containers[1].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("sidecar", pod).ContainerID))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestPending},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestPending},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestPending},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestPending},
 				}))
 
 				ginkgo.By("Check the app container should still be recreated")
@@ -424,24 +424,24 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 
 				crr, err = tester.GetCRR(crr.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestRecreating, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestPending},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestRecreating, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestPending},
 				}))
 			}
 
 			{
 				ginkgo.By("Create CRR for pods[2] with unreadyGracePeriodSeconds=true, recreate container: app(preStopHook) and sidecar")
 				pod := pods[2]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-2"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
-						Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+						Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
 							TerminationGracePeriodSeconds: utilpointer.Int64Ptr(3),
 							UnreadyGracePeriodSeconds:     utilpointer.Int64Ptr(1),
 						},
@@ -468,14 +468,14 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				}))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
+				}, 60*time.Second, time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 
 				ginkgo.By("Check Kruise readiness condition True")
@@ -517,15 +517,15 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[0], recreate container: app(postStartHook) and sidecar by force")
 				pod := pods[0]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-0"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
-						Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+						Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
 							ForceRecreate: true,
 						},
 					},
@@ -535,20 +535,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("app", pod).ContainerID))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, time.Second).Should(gomega.Equal(""))
 
 				ginkgo.By("Check Pod containers recreated")
@@ -569,15 +569,15 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			{
 				ginkgo.By("Create CRR for pods[1] with orderedRecreate by force, recreate container: app(postStartHook) and sidecar")
 				pod := pods[1]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-1"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
-						Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+						Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
 							OrderedRecreate: true,
 							ForceRecreate:   true,
 						},
@@ -589,20 +589,20 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(crr.Spec.Containers[1].StatusContext.ContainerID).Should(gomega.Equal(util.GetContainerStatus("sidecar", pod).ContainerID))
 
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
+				gomega.Eventually(func() appsv1beta1.ContainerRecreateRequestPhase {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{
+					{Name: "app", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					{Name: "sidecar", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 
 				ginkgo.By("Check Pod containers recreated")

@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -64,7 +64,7 @@ var _ = SIGDescribe("ContainerMeta", func() {
 		// This can't be Conformance yet.
 		ginkgo.It("should recreate container when annotations for env changed", func() {
 			ginkgo.By(fmt.Sprintf("Create a CloneSet with replicas=%d", replicas))
-			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			if cs.Spec.Template.ObjectMeta.Annotations == nil {
 				cs.Spec.Template.ObjectMeta.Annotations = map[string]string{}
 			}
@@ -111,7 +111,7 @@ var _ = SIGDescribe("ContainerMeta", func() {
 			gomega.Expect(pod0.Status.ContainerStatuses[0].ContainerID).Should(gomega.Equal(pods[0].Status.ContainerStatuses[0].ContainerID))
 
 			ginkgo.By("Update CloneSet template annotation to bar")
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.Template.ObjectMeta.Annotations["test-env"] = "bar"
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

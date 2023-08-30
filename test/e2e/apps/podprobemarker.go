@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/controller/podprobemarker"
 	"github.com/openkruise/kruise/pkg/util"
@@ -69,7 +69,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				ginkgo.By("pod probe markers list nodeList is zero")
 				return
 			}
-			nppList, err := kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			nppList, err := kc.AppsV1beta1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(nppList.Items).To(gomega.HaveLen(nodeLen))
 
@@ -91,12 +91,12 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// create pod probe marker
 			ppmList := tester.NewPodProbeMarker(ns, randStr)
 			ppm1, ppm2 := &ppmList[0], &ppmList[1]
-			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm1, metav1.CreateOptions{})
+			_, err = kc.AppsV1beta1().PodProbeMarkers(ns).Create(context.TODO(), ppm1, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second * 10)
 
 			// check finalizer
-			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
+			ppm1, err = kc.AppsV1beta1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(controllerutil.ContainsFinalizer(ppm1, podprobemarker.PodProbeMarkerFinalizer)).To(gomega.BeTrue())
 
@@ -106,9 +106,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			validPods := sets.NewString()
 			for _, pod := range pods {
 				validPods.Insert(string(pod.UID))
-				npp, err := kc.AppsV1alpha1().NodePodProbes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
+				npp, err := kc.AppsV1beta1().NodePodProbes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				var podProbe *appsv1alpha1.PodProbe
+				var podProbe *appsv1beta1.PodProbe
 				for i := range npp.Spec.PodProbes {
 					obj := &npp.Spec.PodProbes[i]
 					if obj.UID == string(pod.UID) {
@@ -124,7 +124,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				condition = util.GetCondition(pod, "game.kruise.io/check")
 				gomega.Expect(condition).To(gomega.BeNil())
 			}
-			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			nppList, err = kc.AppsV1beta1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
@@ -132,7 +132,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				}
 			}
 			// create other pod probe marker
-			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm2, metav1.CreateOptions{})
+			_, err = kc.AppsV1beta1().PodProbeMarkers(ns).Create(context.TODO(), ppm2, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second * 10)
 
@@ -153,20 +153,20 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 
 			// update failed probe
-			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
+			ppm1, err = kc.AppsV1beta1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm1.Spec.Probes[0].Probe.Exec = &v1.ExecAction{
 				Command: []string{"/bin/sh", "-c", "failed /"},
 			}
-			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
+			_, err = kc.AppsV1beta1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ppm2, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm2.Name, metav1.GetOptions{})
+			ppm2, err = kc.AppsV1beta1().PodProbeMarkers(ns).Get(context.TODO(), ppm2.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm2.Spec.Probes[0].Probe.Exec = &v1.ExecAction{
 				Command: []string{"/bin/sh", "-c", "failed -ef"},
 			}
-			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm2, metav1.UpdateOptions{})
+			_, err = kc.AppsV1beta1().PodProbeMarkers(ns).Update(context.TODO(), ppm2, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second * 10)
 
@@ -187,12 +187,12 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 
 			// update success probe
-			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
+			ppm1, err = kc.AppsV1beta1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm1.Spec.Probes[0].Probe.Exec = &v1.ExecAction{
 				Command: []string{"/bin/sh", "-c", "ls /"},
 			}
-			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
+			_, err = kc.AppsV1beta1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			// scale down
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
@@ -219,7 +219,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				gomega.Expect(condition).NotTo(gomega.BeNil())
 				gomega.Expect(string(condition.Status)).To(gomega.Equal(string(v1.ConditionFalse)))
 			}
-			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			nppList, err = kc.AppsV1beta1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
@@ -253,7 +253,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				gomega.Expect(condition).NotTo(gomega.BeNil())
 				gomega.Expect(string(condition.Status)).To(gomega.Equal(string(v1.ConditionFalse)))
 			}
-			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			nppList, err = kc.AppsV1beta1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
@@ -263,11 +263,11 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 
 			// delete podProbeMarker
 			for _, ppm := range ppmList {
-				err = kc.AppsV1alpha1().PodProbeMarkers(ns).Delete(context.TODO(), ppm.Name, metav1.DeleteOptions{})
+				err = kc.AppsV1beta1().PodProbeMarkers(ns).Delete(context.TODO(), ppm.Name, metav1.DeleteOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			}
 			time.Sleep(time.Second * 3)
-			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			nppList, err = kc.AppsV1beta1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				gomega.Expect(npp.Spec.PodProbes).To(gomega.HaveLen(0))
