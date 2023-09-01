@@ -33,14 +33,10 @@ const (
 	// InPlaceUpdateStateKey records the state of inplace-update.
 	// The value of annotation is InPlaceUpdateState.
 	InPlaceUpdateStateKey string = "apps.kruise.io/inplace-update-state"
-	// TODO: will be removed since v1.0.0
-	InPlaceUpdateStateKeyOld string = "inplace-update-state"
 
 	// InPlaceUpdateGraceKey records the spec that Pod should be updated when
 	// grace period ends.
 	InPlaceUpdateGraceKey string = "apps.kruise.io/inplace-update-grace"
-	// TODO: will be removed since v1.0.0
-	InPlaceUpdateGraceKeyOld string = "inplace-update-grace"
 
 	// RuntimeContainerMetaKey is a key in pod annotations. Kruise-daemon should report the
 	// states of runtime containers into its value, which is a structure JSON of RuntimeContainerMetaSet type.
@@ -102,24 +98,17 @@ type InPlaceUpdateStrategy struct {
 }
 
 func GetInPlaceUpdateState(obj metav1.Object) (string, bool) {
-	if v, ok := obj.GetAnnotations()[InPlaceUpdateStateKey]; ok {
-		return v, ok
-	}
-	v, ok := obj.GetAnnotations()[InPlaceUpdateStateKeyOld]
+	v, ok := obj.GetAnnotations()[InPlaceUpdateStateKey]
 	return v, ok
 }
 
 func GetInPlaceUpdateGrace(obj metav1.Object) (string, bool) {
-	if v, ok := obj.GetAnnotations()[InPlaceUpdateGraceKey]; ok {
-		return v, ok
-	}
-	v, ok := obj.GetAnnotations()[InPlaceUpdateGraceKeyOld]
+	v, ok := obj.GetAnnotations()[InPlaceUpdateGraceKey]
 	return v, ok
 }
 
 func RemoveInPlaceUpdateGrace(obj metav1.Object) {
 	delete(obj.GetAnnotations(), InPlaceUpdateGraceKey)
-	delete(obj.GetAnnotations(), InPlaceUpdateGraceKeyOld)
 }
 
 // RuntimeContainerMetaSet contains all the containers' meta of the Pod.

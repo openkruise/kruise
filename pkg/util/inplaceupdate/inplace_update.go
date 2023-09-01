@@ -332,7 +332,6 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 		}
 		inPlaceUpdateStateJSON, _ := json.Marshal(inPlaceUpdateState)
 		clone.Annotations[appspub.InPlaceUpdateStateKey] = string(inPlaceUpdateStateJSON)
-		delete(clone.Annotations, appspub.InPlaceUpdateStateKeyOld)
 
 		if spec.GraceSeconds <= 0 {
 			if clone, err = opts.PatchSpecToPod(clone, spec, &inPlaceUpdateState); err != nil {
