@@ -137,7 +137,9 @@ type NodeImageStatus struct {
 // ImageStatus defines the pulling status of an image
 type ImageStatus struct {
 	// Represents statuses of pulling tasks on this node
-	Tags []ImageTagStatus `json:"tags"`
+	// +patchMergeKey=tag
+	// +patchStrategy=merge
+	Tags []ImageTagStatus `json:"tags" patchStrategy:"merge" patchMergeKey:"tag"`
 }
 
 // ImageTagStatus defines the pulling status of an image tag

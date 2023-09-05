@@ -29,7 +29,9 @@ type WorkloadSpreadSpec struct {
 	TargetReference *TargetReference `json:"targetRef"`
 
 	// Subsets describes the pods distribution details between each of subsets.
-	Subsets []WorkloadSpreadSubset `json:"subsets"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Subsets []WorkloadSpreadSubset `json:"subsets" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// ScheduleStrategy indicates the strategy the WorkloadSpread used to preform the schedule between each of subsets.
 	// +optional
@@ -126,8 +128,10 @@ type WorkloadSpreadStatus struct {
 	//ObservedWorkloadReplicas int32 `json:"observedWorkloadReplicas"`
 
 	// Contains the status of each subset. Each element in this array represents one subset
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
-	SubsetStatuses []WorkloadSpreadSubsetStatus `json:"subsetStatuses,omitempty"`
+	SubsetStatuses []WorkloadSpreadSubsetStatus `json:"subsetStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 type WorkloadSpreadSubsetConditionType string
@@ -170,8 +174,10 @@ type WorkloadSpreadSubsetStatus struct {
 	Replicas int32 `json:"replicas"`
 
 	// Conditions is an array of current observed subset conditions.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
-	Conditions []WorkloadSpreadSubsetCondition `json:"conditions,omitempty"`
+	Conditions []WorkloadSpreadSubsetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// MissingReplicas is the number of active replicas belong to this subset not be found.
 	// MissingReplicas > 0 indicates the subset is still missing MissingReplicas pods to create

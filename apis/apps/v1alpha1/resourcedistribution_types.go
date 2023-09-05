@@ -69,8 +69,10 @@ type ResourceDistributionTargetNamespaces struct {
 		Pattern string `json:"pattern,omitempty"`
 	*/
 
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +optional
-	List []ResourceDistributionNamespace `json:"list,omitempty"`
+	List []ResourceDistributionNamespace `json:"list,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ResourceDistributionNamespace contains a namespace name
@@ -98,7 +100,9 @@ type ResourceDistributionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions describe the condition when Resource creating, updating and deleting.
-	Conditions []ResourceDistributionCondition `json:"conditions,omitempty"`
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []ResourceDistributionCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ResourceDistributionCondition allows a row to be marked with additional information.

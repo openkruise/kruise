@@ -161,8 +161,10 @@ type ManualUpdate struct {
 type Topology struct {
 	// Contains the details of each subset. Each element in this array represents one subset
 	// which will be provisioned and managed by UnitedDeployment.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +optional
-	Subsets []Subset `json:"subsets,omitempty"`
+	Subsets []Subset `json:"subsets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // Subset defines the detail of a subset.
@@ -233,8 +235,10 @@ type UnitedDeploymentStatus struct {
 	SubsetReplicas map[string]int32 `json:"subsetReplicas,omitempty"`
 
 	// Represents the latest available observations of a UnitedDeployment's current state.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
-	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty"`
+	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// Records the information of update progress.
 	// +optional
