@@ -213,10 +213,7 @@ func main() {
 
 	go func() {
 		setupLog.Info("wait webhook ready")
-		if err = webhook.WaitReady(); err != nil {
-			setupLog.Error(err, "unable to wait webhook ready")
-			os.Exit(1)
-		}
+		_ = webhook.WaitReady()
 
 		setupLog.Info("setup controllers")
 		if err = controller.SetupWithManager(mgr); err != nil {
