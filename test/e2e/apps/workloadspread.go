@@ -792,7 +792,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(subset2Pods).To(gomega.Equal(5))
 
 			// wait subset-a to schedulable
-			ginkgo.By(fmt.Sprintf("wait subset-a to schedulable"))
+			ginkgo.By("wait subset-a to schedulable")
 			err = wait.PollImmediate(time.Second, time.Minute*5, func() (bool, error) {
 				ws, err := kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 				if err != nil {

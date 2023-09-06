@@ -245,7 +245,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			for _, cs := range cases {
 				ginkgo.By(cs.name)
 				allNamespaces := cs.getNamespaces()
-				ginkgo.By(fmt.Sprintf("creating namespaces"))
+				ginkgo.By("creating namespaces")
 				tester.CreateNamespaces(allNamespaces...)
 
 				ginkgo.By(fmt.Sprintf("Creating ResourceDistribution %s", resourceDistribution.Name))
