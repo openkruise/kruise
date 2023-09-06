@@ -21,8 +21,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/http"
-	"path"
 	"os"
+	"path"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
