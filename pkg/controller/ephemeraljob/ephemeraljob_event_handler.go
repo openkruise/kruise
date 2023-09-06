@@ -97,6 +97,12 @@ func (e *ejobHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInte
 		return
 	}
 
+	if curEJob.DeletionTimestamp != nil {
+		klog.V(3).Infof("Observed deleting ephemeral job: %s/%s", curEJob.Namespace, curEJob.Name)
+		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: curEJob.Namespace, Name: curEJob.Name}})
+		return
+	}
+
 	// only update these fields
 	if oldEJob.Spec.TTLSecondsAfterFinished != curEJob.Spec.TTLSecondsAfterFinished ||
 		oldEJob.Spec.Paused != curEJob.Spec.Paused || oldEJob.Spec.Parallelism != curEJob.Spec.Parallelism ||
