@@ -49,13 +49,12 @@ func (h *NamespaceHandler) Handle(ctx context.Context, req admission.Request) ad
 		klog.Warningf("Skip to validate namespace %s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Name)
 		return admission.ValidationResponse(true, "")
 	}
-
 	obj := &v1.Namespace{}
 	if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, obj); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-
 	if err := deletionprotection.ValidateNamespaceDeletion(h.Client, obj); err != nil {
+		deletionprotection.NamespaceDeletionProtectionMetrics.WithLabelValues(obj.Name, req.UserInfo.Username).Add(1)
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")

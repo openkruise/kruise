@@ -28,7 +28,6 @@ import (
 	"github.com/openkruise/kruise/apis"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
@@ -959,7 +958,6 @@ func TestUpdate(t *testing.T) {
 				inplaceupdate.New(fakeClient, clonesetutils.RevisionAdapterImpl),
 				record.NewFakeRecorder(10),
 				&controllerfinder.ControllerFinder{Client: fakeClient},
-				pubcontrol.NewPubControl(fakeClient),
 			}
 			currentRevision := mc.updateRevision
 			if len(mc.revisions) > 0 {

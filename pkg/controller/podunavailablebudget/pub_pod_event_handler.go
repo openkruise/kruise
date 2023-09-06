@@ -48,14 +48,12 @@ var _ handler.EventHandler = &enqueueRequestForPod{}
 func newEnqueueRequestForPod(c client.Client) handler.EventHandler {
 	e := &enqueueRequestForPod{client: c}
 	e.controllerFinder = controllerfinder.Finder
-	e.pubControl = pubcontrol.NewPubControl(c)
 	return e
 }
 
 type enqueueRequestForPod struct {
 	client           client.Client
 	controllerFinder *controllerfinder.ControllerFinder
-	pubControl       pubcontrol.PubControl
 }
 
 func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -78,7 +76,7 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 	}
 	var pub *policyv1alpha1.PodUnavailableBudget
 	if pod.Annotations[pubcontrol.PodRelatedPubAnnotation] != "" {
-		pub, _ = p.pubControl.GetPubForPod(pod)
+		pub, _ = pubcontrol.PubControl.GetPubForPod(pod)
 	}
 	if pub == nil {
 		return
@@ -142,11 +140,11 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 		return
 	}
 
-	pub, _ := p.pubControl.GetPubForPod(newPod)
+	pub, _ := pubcontrol.PubControl.GetPubForPod(newPod)
 	if pub == nil {
 		return
 	}
-	if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, pub, p.pubControl); isReconcile {
+	if isReconcile, enqueueDelayTime := isPodAvailableChanged(oldPod, newPod, pub); isReconcile {
 		q.AddAfter(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      pub.Name,
@@ -157,7 +155,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old,
 
 }
 
-func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, control pubcontrol.PubControl) (bool, time.Duration) {
+func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget) (bool, time.Duration) {
 	var enqueueDelayTime time.Duration
 	// If the pod's deletion timestamp is set, remove endpoint from ready address.
 	if oldPod.DeletionTimestamp.IsZero() && !newPod.DeletionTimestamp.IsZero() {
@@ -169,6 +167,7 @@ func isPodAvailableChanged(oldPod, newPod *corev1.Pod, pub *policyv1alpha1.PodUn
 		return false, enqueueDelayTime
 	}
 
+	control := pubcontrol.PubControl
 	// If the pod's readiness has changed, the associated endpoint address
 	// will move from the unready endpoints set to the ready endpoints.
 	// So for the purposes of an endpoint, a readiness change on a pod
