@@ -20,8 +20,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path"
 	"sync"
 
@@ -40,7 +40,7 @@ var (
 )
 
 func loadHTTPClientWithCACert() error {
-	caCert, err := ioutil.ReadFile(caCertFilePath)
+	caCert, err := os.ReadFile(caCertFilePath)
 	if err != nil {
 		return err
 	}
