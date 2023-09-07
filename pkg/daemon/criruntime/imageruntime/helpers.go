@@ -38,10 +38,13 @@ import (
 )
 
 var (
-	keyring = credentialprovider.NewDockerKeyring()
+	keyring credentialprovider.DockerKeyring
 )
 
 func convertToRegistryAuths(pullSecrets []v1.Secret, repo string) (infos []daemonutil.AuthInfo, err error) {
+	if keyring == nil {
+		keyring = credentialprovider.NewDockerKeyring()
+	}
 	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, keyring)
 	if err != nil {
 		return nil, err

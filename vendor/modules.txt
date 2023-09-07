@@ -547,6 +547,7 @@ golang.org/x/oauth2/jwt
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
+golang.org/x/sync/singleflight
 # golang.org/x/sys v0.6.0
 ## explicit; go 1.17
 golang.org/x/sys/execabs
@@ -1265,6 +1266,14 @@ k8s.io/kube-openapi/pkg/validation/spec
 k8s.io/kube-scheduler/config/v1beta2
 k8s.io/kube-scheduler/config/v1beta3
 k8s.io/kube-scheduler/extender/v1
+# k8s.io/kubelet v0.0.0 => k8s.io/kubelet v0.24.16
+## explicit; go 1.19
+k8s.io/kubelet/config/v1alpha1
+k8s.io/kubelet/config/v1beta1
+k8s.io/kubelet/pkg/apis/credentialprovider
+k8s.io/kubelet/pkg/apis/credentialprovider/install
+k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1
+k8s.io/kubelet/pkg/apis/credentialprovider/v1beta1
 # k8s.io/kubernetes v1.24.0 => k8s.io/kubernetes v1.24.16
 ## explicit; go 1.19
 k8s.io/kubernetes/pkg/api/legacyscheme
@@ -1283,6 +1292,7 @@ k8s.io/kubernetes/pkg/apis/core/install
 k8s.io/kubernetes/pkg/apis/core/pods
 k8s.io/kubernetes/pkg/apis/core/v1
 k8s.io/kubernetes/pkg/apis/core/v1/helper
+k8s.io/kubernetes/pkg/apis/core/v1/helper/qos
 k8s.io/kubernetes/pkg/apis/core/validation
 k8s.io/kubernetes/pkg/apis/policy
 k8s.io/kubernetes/pkg/apis/scheduling
@@ -1294,14 +1304,19 @@ k8s.io/kubernetes/pkg/controller/daemon/util
 k8s.io/kubernetes/pkg/controller/history
 k8s.io/kubernetes/pkg/controller/util/node
 k8s.io/kubernetes/pkg/credentialprovider
+k8s.io/kubernetes/pkg/credentialprovider/plugin
 k8s.io/kubernetes/pkg/credentialprovider/secrets
 k8s.io/kubernetes/pkg/features
 k8s.io/kubernetes/pkg/fieldpath
+k8s.io/kubernetes/pkg/kubelet/apis/config
+k8s.io/kubernetes/pkg/kubelet/apis/config/v1alpha1
+k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1
 k8s.io/kubernetes/pkg/kubelet/container
 k8s.io/kubernetes/pkg/kubelet/cri/remote
 k8s.io/kubernetes/pkg/kubelet/cri/remote/util
 k8s.io/kubernetes/pkg/kubelet/events
 k8s.io/kubernetes/pkg/kubelet/lifecycle
+k8s.io/kubernetes/pkg/kubelet/qos
 k8s.io/kubernetes/pkg/kubelet/server/metrics
 k8s.io/kubernetes/pkg/kubelet/types
 k8s.io/kubernetes/pkg/kubelet/util
