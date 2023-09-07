@@ -22,12 +22,12 @@ import (
 	"io"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	pouchfilters "github.com/alibaba/pouch/apis/filters"
 	pouchtypes "github.com/alibaba/pouch/apis/types"
 	pouchapi "github.com/alibaba/pouch/client"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
@@ -82,7 +82,7 @@ func (d *pouchImageService) PullImage(ctx context.Context, imageName, tag string
 
 	if len(pullSecrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
-		authInfos, err = convertToRegistryAuths(pullSecrets, registry)
+		authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, registry)
 		if err == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {

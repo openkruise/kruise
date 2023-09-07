@@ -20,8 +20,8 @@ import (
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
@@ -133,7 +133,7 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 
 	if len(pullSecrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
-		authInfos, err = convertToRegistryAuths(pullSecrets, repoToPull)
+		authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, repoToPull)
 		if err == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {
@@ -253,7 +253,7 @@ func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName
 
 	if len(pullSecrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
-		authInfos, err = convertToRegistryAuths(pullSecrets, repoToPull)
+		authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, repoToPull)
 		if err == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {
