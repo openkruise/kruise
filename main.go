@@ -113,8 +113,8 @@ func main() {
 		"leader-election-lease-duration is the duration that non-leader candidates will wait to force acquire leadership. This is measured against time of last observed ack. Default is 15 seconds.")
 	flag.DurationVar(&renewDeadLine, "leader-election-renew-deadline", defaultRenewDeadline,
 		"leader-election-renew-deadline is the duration that the acting controlplane will retry refreshing leadership before giving up. Default is 10 seconds.")
-	flag.StringVar(&leaderElectionResourceLock, "leader-election-resource-lock", resourcelock.ConfigMapsLeasesResourceLock,
-		"leader-election-resource-lock determines which resource lock to use for leader election, defaults to \"configmapsleases\".")
+	flag.StringVar(&leaderElectionResourceLock, "leader-election-resource-lock", resourcelock.LeasesResourceLock,
+		"leader-election-resource-lock determines which resource lock to use for leader election, defaults to \"leases\".")
 	flag.StringVar(&leaderElectionId, "leader-election-id", "kruise-manager",
 		"leader-election-id determines the name of the resource that leader election will use for holding the leader lock, Default is kruise-manager.")
 	flag.DurationVar(&retryPeriod, "leader-election-retry-period", defaultRetryPeriod,
