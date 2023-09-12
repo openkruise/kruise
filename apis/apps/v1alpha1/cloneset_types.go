@@ -196,9 +196,7 @@ type CloneSetStatus struct {
 	CollisionCount *int32 `json:"collisionCount,omitempty"`
 
 	// Conditions represents the latest available observations of a CloneSet's current state.
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	Conditions []CloneSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []CloneSetCondition `json:"conditions,omitempty"`
 
 	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
 	LabelSelector string `json:"labelSelector,omitempty"`

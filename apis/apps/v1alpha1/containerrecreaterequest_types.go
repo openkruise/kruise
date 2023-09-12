@@ -141,9 +141,7 @@ type ContainerRecreateRequestStatus struct {
 	// A human readable message indicating details about this ContainerRecreateRequest.
 	Message string `json:"message,omitempty"`
 	// ContainerRecreateStates contains the recreation states of the containers.
-	// +patchMergeKey=name
-	// +patchStrategy=merge
-	ContainerRecreateStates []ContainerRecreateRequestContainerRecreateState `json:"containerRecreateStates,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	ContainerRecreateStates []ContainerRecreateRequestContainerRecreateState `json:"containerRecreateStates,omitempty"`
 }
 
 type ContainerRecreateRequestPhase string

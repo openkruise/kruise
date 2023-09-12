@@ -137,9 +137,7 @@ type SidecarContainer struct {
 
 	// TransferEnv will transfer env info from other container
 	// SourceContainerName is pod.spec.container[x].name; EnvName is pod.spec.container[x].Env.name
-	// +patchMergeKey=sourceContainerName
-	// +patchStrategy=merge
-	TransferEnv []TransferEnvVar `json:"transferEnv,omitempty" patchStrategy:"merge" patchMergeKey:"sourceContainerName"`
+	TransferEnv []TransferEnvVar `json:"transferEnv,omitempty"`
 }
 
 type ShareVolumePolicy struct {

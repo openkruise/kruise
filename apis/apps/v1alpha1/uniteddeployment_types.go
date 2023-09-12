@@ -235,10 +235,8 @@ type UnitedDeploymentStatus struct {
 	SubsetReplicas map[string]int32 `json:"subsetReplicas,omitempty"`
 
 	// Represents the latest available observations of a UnitedDeployment's current state.
-	// +patchMergeKey=type
-	// +patchStrategy=merge
 	// +optional
-	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty"`
 
 	// Records the information of update progress.
 	// +optional

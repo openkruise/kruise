@@ -100,9 +100,7 @@ type ResourceDistributionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Conditions describe the condition when Resource creating, updating and deleting.
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	Conditions []ResourceDistributionCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []ResourceDistributionCondition `json:"conditions,omitempty"`
 }
 
 // ResourceDistributionCondition allows a row to be marked with additional information.
