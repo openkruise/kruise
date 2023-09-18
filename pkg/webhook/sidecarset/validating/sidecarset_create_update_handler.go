@@ -48,7 +48,10 @@ import (
 )
 
 const (
-	sidecarSetNameMaxLen = 63
+	// 按照社区的规范, 资源名最大长度为 253 个字符
+	//
+	// https://kubernetes.io/zh-cn/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
+	sidecarSetNameMaxLen = 253
 )
 
 var validDownwardAPIFieldPathExpressions = sets.NewString(
