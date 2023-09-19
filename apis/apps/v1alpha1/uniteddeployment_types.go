@@ -161,8 +161,10 @@ type ManualUpdate struct {
 type Topology struct {
 	// Contains the details of each subset. Each element in this array represents one subset
 	// which will be provisioned and managed by UnitedDeployment.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +optional
-	Subsets []Subset `json:"subsets,omitempty"`
+	Subsets []Subset `json:"subsets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // Subset defines the detail of a subset.

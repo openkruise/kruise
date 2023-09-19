@@ -31,7 +31,9 @@ type PodProbeMarkerSpec struct {
 	// Probe Result will record in Pod.Status.Conditions, and condition.type=probe.name.
 	// condition.status=True indicates probe success
 	// condition.status=False indicates probe fails
-	Probes []PodContainerProbe `json:"probes"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Probes []PodContainerProbe `json:"probes" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 type PodContainerProbe struct {
@@ -44,7 +46,9 @@ type PodContainerProbe struct {
 	// According to the execution result of ContainerProbe, perform specific actions,
 	// such as: patch Pod labels, annotations, ReadinessGate Condition
 	// It cannot be null at the same time as PodConditionType.
-	MarkerPolicy []ProbeMarkerPolicy `json:"markerPolicy,omitempty"`
+	// +patchMergeKey=state
+	// +patchStrategy=merge
+	MarkerPolicy []ProbeMarkerPolicy `json:"markerPolicy,omitempty"  patchStrategy:"merge" patchMergeKey:"state"`
 	// If it is not empty, the Probe execution result will be recorded on the Pod condition.
 	// It cannot be null at the same time as MarkerPolicy.
 	// For example PodConditionType=game.kruise.io/healthy, pod.status.condition.type = game.kruise.io/healthy.
