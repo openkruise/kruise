@@ -37,8 +37,9 @@ import (
 )
 
 var (
-	bindAddr  = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
-	pprofAddr = flag.String("pprof-addr", ":10222", "The address the pprof binds to.")
+	bindAddr    = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
+	pprofAddr   = flag.String("pprof-addr", ":10222", "The address the pprof binds to.")
+	enablePprof = flag.Bool("enable-pprof", true, "Enable pprof for daemon.")
 )
 
 func main() {
@@ -55,11 +56,13 @@ func main() {
 	if err := client.NewRegistry(cfg); err != nil {
 		klog.Fatalf("Failed to init clientset registry: %v", err)
 	}
-	go func() {
-		if err := http.ListenAndServe(*pprofAddr, nil); err != nil {
-			klog.Fatal(err, "unable to start pprof")
-		}
-	}()
+	if enablePprof != nil && *enablePprof {
+		go func() {
+			if err := http.ListenAndServe(*pprofAddr, nil); err != nil {
+				klog.Fatal(err, "unable to start pprof")
+			}
+		}()
+	}
 	ctx := signals.SetupSignalHandler()
 	d, err := daemon.NewDaemon(cfg, *bindAddr)
 	if err != nil {
