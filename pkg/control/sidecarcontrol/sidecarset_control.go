@@ -181,12 +181,12 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 	return IsSidecarContainerUpdateCompleted(pod, sets.NewString(sidecarset.Name), sidecarContainers)
 }
 
-// k8s only allow modify pod.spec.container[x].image,
-// only when annotations[SidecarSetHashWithoutImageAnnotation] is the same, sidecarSet can upgrade pods
-func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
+func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) (canUpgrade, consistent bool) {
 	sidecarSet := c.GetSidecarset()
+	// k8s only allow modify pod.spec.container[x].image,
+	// only when annotations[SidecarSetHashWithoutImageAnnotation] is the same, sidecarSet can upgrade pods
 	if GetPodSidecarSetWithoutImageRevision(sidecarSet.Name, pod) != GetSidecarSetWithoutImageRevision(sidecarSet) {
-		return false
+		return false, false
 	}
 
 	// cStatus: container.name -> containerStatus.Ready
@@ -200,11 +200,11 @@ func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) bool {
 		// indicates that sidecar container is in the process of being upgraded
 		// wait for the last upgrade to complete before performing this upgrade
 		if cStatus[sidecar] && !c.IsPodStateConsistent(pod, sets.NewString(sidecar)) {
-			return false
+			return true, false
 		}
 	}
 
-	return true
+	return true, true
 }
 
 func (c *commonControl) IsPodAvailabilityChanged(pod, oldPod *v1.Pod) bool {

@@ -842,14 +842,15 @@ var _ = SIGDescribe("SidecarSet", func() {
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
+			sidecarSetIn.Spec.InitContainers = nil
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
-			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", util.DumpJSON(sidecarSetIn)))
 			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -878,13 +879,18 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 
 			// modify sidecarSet sidecar field out of image
-			sidecarSetIn.Spec.Containers[0].Command = []string{"sleep", "1000"}
+			sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
+				{
+					Name:  "version",
+					Value: "v2",
+				},
+			}
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except := &appsv1alpha1.SidecarSetStatus{
-				MatchedPods:      2,
+				MatchedPods:      1,
 				UpdatedPods:      0,
 				UpdatedReadyPods: 0,
-				ReadyPods:        2,
+				ReadyPods:        1,
 			}
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
@@ -896,6 +902,22 @@ var _ = SIGDescribe("SidecarSet", func() {
 				gomega.Expect(condition.Status).Should(gomega.Equal(corev1.ConditionFalse))
 			}
 
+			// scale deployment replicas=2
+			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			tester.UpdateDeployment(deploymentIn)
+			time.Sleep(time.Second)
+
+			// update sidecarSet image
+			sidecarSetIn.Spec.Containers[0].Image = NewNginxImage
+			tester.UpdateSidecarSet(sidecarSetIn)
+			time.Sleep(time.Second * 3)
+			except = &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      2,
+				UpdatedPods:      1,
+				UpdatedReadyPods: 1,
+				ReadyPods:        2,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 			ginkgo.By("sidecarSet upgrade sidecar container (more than image field), no pod should be updated done")
 		})
 
