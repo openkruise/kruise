@@ -527,6 +527,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadStatus(ws *appsv1alpha1
 	var rescheduleCriticalSeconds int32
 	if ws.Spec.ScheduleStrategy.Type == appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType &&
 		ws.Spec.ScheduleStrategy.Adaptive != nil &&
+		ws.Spec.ScheduleStrategy.Adaptive.DisableSimulationSchedule == false &&
 		ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds != nil {
 		rescheduleCriticalSeconds = *ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds
 	}
