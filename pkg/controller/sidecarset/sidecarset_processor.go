@@ -163,7 +163,8 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 			klog.Errorf("update NotUpgradable PodCondition error, s:%s, pod:%s, err:%v", sidecarset.Name, pod.Name, err)
 			return err
 		}
-		sidecarcontrol.UpdateExpectations.ExpectUpdated(sidecarset.Name, sidecarcontrol.GetSidecarSetRevision(sidecarset), pod)
+		// Since the pod sidecarSet hash is not updated here, it cannot be called ExpectUpdated
+		// TODO: add ResourceVersionExpectation instead of UpdateExpectations
 	}
 	if len(notUpgradablePods) > 0 {
 		p.recorder.Eventf(sidecarset, corev1.EventTypeNormal, "NotUpgradablePods", "SidecarSet in-place update detected %d not upgradable pod(s) in this round, will skip them.", len(notUpgradablePods))

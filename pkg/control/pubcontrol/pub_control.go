@@ -44,7 +44,6 @@ type commonControl struct {
 }
 
 func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
-	klog.Infof("IsPodReady pod(%s)", util.DumpJSON(pod))
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
 	if !util.IsRunningAndReady(pod) {

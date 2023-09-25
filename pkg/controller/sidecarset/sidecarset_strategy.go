@@ -72,9 +72,10 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 	for index, pod := range pods {
 		isUpdated := sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod)
 		if !isUpdated && isSelected(pod) {
-			if control.IsSidecarSetUpgradable(pod) {
+			canUpgrade, consistent := control.IsSidecarSetUpgradable(pod)
+			if canUpgrade && consistent {
 				waitUpgradedIndexes = append(waitUpgradedIndexes, index)
-			} else if sidecarcontrol.GetPodSidecarSetWithoutImageRevision(sidecarset.Name, pod) != sidecarcontrol.GetSidecarSetWithoutImageRevision(sidecarset) {
+			} else if !canUpgrade {
 				// only image field can be in-place updated, if other fields changed, mark pod as not upgradable
 				notUpgradableIndexes = append(notUpgradableIndexes, index)
 			}
