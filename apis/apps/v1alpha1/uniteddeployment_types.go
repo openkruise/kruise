@@ -195,8 +195,9 @@ type Subset struct {
 
 	// Indicates the lower bounded replicas of the subset.
 	// MinReplicas must be more than or equal to 0 if it is set.
-	// Spec.Replicas must be more than or equal the sum of MinReplicas of all subsets.
-	// Defaults to nil.
+	// Controller will prioritize satisfy minReplicas for each subset
+	// according to the order of Topology.Subsets.
+	// Defaults to 0.
 	// +optional
 	MinReplicas *intstr.IntOrString `json:"minReplicas,omitempty"`
 
