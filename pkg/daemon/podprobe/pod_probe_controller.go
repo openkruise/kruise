@@ -404,6 +404,10 @@ func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.C
 	if container != nil {
 		containerStatus, err = runtimeService.ContainerStatus(container.Id, false)
 	}
+	if containerStatus == nil && err == nil {
+		klog.Infof("NodePodProbe pod(%s) get container(%s) status failed", podUID, name)
+		return nil, err
+	}
 	return containerStatus.Status, err
 }
 
