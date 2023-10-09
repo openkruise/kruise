@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -107,32 +108,40 @@ func validatePodProbeMarkerSpec(obj *appsv1alpha1.PodProbeMarker, fldPath *field
 	}
 	// containerProbe
 	if len(spec.Probes) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), spec.Selector, "empty probes is not valid for PodProbeMarker."))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), spec.Probes, "empty probes is not valid for PodProbeMarker."))
 		return allErrs
 	}
 	uniqueProbe := sets.NewString()
 	uniqueConditionType := sets.NewString()
 	for _, probe := range spec.Probes {
-		if probe.Name == "" || probe.ContainerName == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), spec.Selector, "probe name and containerName can't be empty in PodProbeMarker."))
+		if strings.Contains(probe.Name, "#") {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, "probe name can't contains '#'."))
+			return allErrs
+		}
+		if probe.Name == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, "probe name can't be empty in PodProbeMarker."))
+			return allErrs
+		}
+		if probe.ContainerName == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.ContainerName, "probe containerName can't be empty in PodProbeMarker."))
 			return allErrs
 		}
 		if k8sNativePodConditions.Has(probe.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), spec.Selector, fmt.Sprintf("probe name can't be %s", probe.Name)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, fmt.Sprintf("probe name can't be %s", probe.Name)))
 			return allErrs
 		}
 		if uniqueProbe.Has(probe.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), spec.Selector, "probe name must be unique in PodProbeMarker."))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, "probe name must be unique in PodProbeMarker."))
 			return allErrs
 		}
 		uniqueProbe.Insert(probe.Name)
 		allErrs = append(allErrs, validateProbe(&probe.Probe, fldPath.Child("probe"))...)
 		if probe.PodConditionType == "" && len(probe.MarkerPolicy) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), spec.Selector, "podConditionType and markerPolicy cannot be empty at the same time"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe, "podConditionType and markerPolicy cannot be empty at the same time"))
 			return allErrs
 		}
 		if probe.PodConditionType != "" && uniqueConditionType.Has(probe.PodConditionType) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), spec.Selector, fmt.Sprintf("podConditionType %s must be unique in podProbeMarker", probe.PodConditionType)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.PodConditionType, fmt.Sprintf("podConditionType %s must be unique in podProbeMarker", probe.PodConditionType)))
 			return allErrs
 		} else if probe.PodConditionType != "" {
 			uniqueConditionType.Insert(probe.PodConditionType)
@@ -141,7 +150,7 @@ func validatePodProbeMarkerSpec(obj *appsv1alpha1.PodProbeMarker, fldPath *field
 		uniquePolicy := sets.NewString()
 		for _, policy := range probe.MarkerPolicy {
 			if uniquePolicy.Has(string(policy.State)) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("markerPolicy"), spec.Selector, "marker policy state must be unique."))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("markerPolicy"), policy.State, "marker policy state must be unique."))
 				return allErrs
 			}
 			uniquePolicy.Insert(string(policy.State))
