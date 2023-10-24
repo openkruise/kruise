@@ -155,6 +155,11 @@ func main() {
 		setupLog.Error(err, "unable to init kruise clientset and informer")
 		os.Exit(1)
 	}
+	err = util.InitProtectionLogger()
+	if err != nil {
+		setupLog.Error(err, "unable to init protection logger")
+		os.Exit(1)
+	}
 
 	var syncPeriod *time.Duration
 	if syncPeriodStr != "" {

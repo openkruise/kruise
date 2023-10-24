@@ -20,12 +20,11 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
-
-	"k8s.io/klog/v2"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -55,6 +54,7 @@ func (h *NamespaceHandler) Handle(ctx context.Context, req admission.Request) ad
 	}
 	if err := deletionprotection.ValidateNamespaceDeletion(h.Client, obj); err != nil {
 		deletionprotection.NamespaceDeletionProtectionMetrics.WithLabelValues(obj.Name, req.UserInfo.Username).Add(1)
+		util.LoggerProtectionInfo(util.ProtectionEventDeletionProtection, "Namespace", "", obj.Name, req.UserInfo.Username)
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")

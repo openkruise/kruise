@@ -148,6 +148,7 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 			}
 			PodUnavailableBudgetMetrics.WithLabelValues(fmt.Sprintf("%s_%s_%s", kind, namespace, name), username).Add(1)
 			recorder.Eventf(pod, corev1.EventTypeWarning, "PubPreventPodDeletion", "openkruise pub prevents pod deletion")
+			util.LoggerProtectionInfo(util.ProtectionEventPub, kind, namespace, name, username)
 			return err
 		}
 
