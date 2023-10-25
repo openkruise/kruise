@@ -17,6 +17,7 @@ limitations under the License.
 package validating
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -25,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -1025,6 +1028,99 @@ func TestValidateUnitedDeploymentUpdate(t *testing.T) {
 					field != "spec.topology.subsets[0].nodeSelectorTerm" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
+			}
+		})
+	}
+}
+
+func Test(t *testing.T) {
+	cases := []struct {
+		name        string
+		replicas    int32
+		minReplicas []int32
+		maxReplicas []int32
+		errorHappen bool
+	}{
+		{
+			name:     "sum_all_min_replicas == replicas",
+			replicas: 10,
+			minReplicas: []int32{
+				2, 2, 2, 2, 2,
+			},
+			maxReplicas: []int32{
+				5, 5, 5, 5, -1,
+			},
+			errorHappen: false,
+		},
+		{
+			name:     "sum_all_min_replicas < replicas",
+			replicas: 14,
+			minReplicas: []int32{
+				2, 2, 2, 2, 2,
+			},
+			maxReplicas: []int32{
+				5, 5, 5, 5, -1,
+			},
+			errorHappen: false,
+		},
+		{
+			name:     "sum_all_min_replicas > replicas",
+			replicas: 5,
+			minReplicas: []int32{
+				2, 2, 2, 2, 2,
+			},
+			maxReplicas: []int32{
+				5, 5, 5, 5, -1,
+			},
+			errorHappen: false,
+		},
+		{
+			name:     "min_replicas > max_replicas",
+			replicas: 5,
+			minReplicas: []int32{
+				2, 2, 2, 6, 2,
+			},
+			maxReplicas: []int32{
+				5, 5, 5, 5, -1,
+			},
+			errorHappen: true,
+		},
+		{
+			name:     "all_max_replicas != nil",
+			replicas: 5,
+			minReplicas: []int32{
+				2, 2, 2, 2, 2,
+			},
+			maxReplicas: []int32{
+				5, 5, 5, 5, 5,
+			},
+			errorHappen: true,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			ud := appsv1alpha1.UnitedDeployment{}
+			ud.Spec.Replicas = pointer.Int32(cs.replicas)
+			ud.Spec.Topology.Subsets = []appsv1alpha1.Subset{}
+			for index := range cs.minReplicas {
+				min := intstr.FromInt(int(cs.minReplicas[index]))
+				var max *intstr.IntOrString
+				if cs.maxReplicas[index] != -1 {
+					m := intstr.FromInt(int(cs.maxReplicas[index]))
+					max = &m
+				}
+				ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
+					Name:        fmt.Sprintf("subset-%d", index),
+					MinReplicas: &min,
+					MaxReplicas: max,
+				})
+			}
+			errList := validateSubsetReplicas(&cs.replicas, ud.Spec.Topology.Subsets, field.NewPath("subset"))
+			if len(errList) > 0 && !cs.errorHappen {
+				t.Errorf("expected success, but got error: %v", errList)
+			} else if len(errList) == 0 && cs.errorHappen {
+				t.Errorf("expected error, but got success")
 			}
 		})
 	}

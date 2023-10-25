@@ -189,8 +189,26 @@ type Subset struct {
 	// percentage like '10%', which means 10% of UnitedDeployment replicas of pods will be distributed
 	// under this subset. If nil, the number of replicas in this subset is determined by controller.
 	// Controller will try to keep all the subsets with nil replicas have average pods.
+	// Replicas and MinReplicas/MaxReplicas are mutually exclusive in a UnitedDeployment.
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
+
+	// Indicates the lower bounded replicas of the subset.
+	// MinReplicas must be more than or equal to 0 if it is set.
+	// Controller will prioritize satisfy minReplicas for each subset
+	// according to the order of Topology.Subsets.
+	// Defaults to 0.
+	// +optional
+	MinReplicas *intstr.IntOrString `json:"minReplicas,omitempty"`
+
+	// Indicates the upper bounded replicas of the subset.
+	// MaxReplicas must be more than or equal to MinReplicas.
+	// MaxReplicas == nil means no limitation.
+	// Please ensure that at least one subset has empty MaxReplicas(no limitation) to avoid stuck scaling.
+	// Defaults to nil.
+	// +optional
+	MaxReplicas *intstr.IntOrString `json:"maxReplicas,omitempty"`
+
 	// Patch indicates patching to the templateSpec.
 	// Patch takes precedence over other fields
 	// If the Patch also modifies the Replicas, NodeSelectorTerm or Tolerations, use value in the Patch
