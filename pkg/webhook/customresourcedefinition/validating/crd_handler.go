@@ -20,13 +20,13 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -86,6 +86,7 @@ func (h *CRDHandler) Handle(ctx context.Context, req admission.Request) admissio
 
 	if err := deletionprotection.ValidateCRDDeletion(h.Client, metaObj, gvk); err != nil {
 		deletionprotection.CRDDeletionProtectionMetrics.WithLabelValues(metaObj.GetName(), req.UserInfo.Username).Add(1)
+		util.LoggerProtectionInfo(util.ProtectionEventDeletionProtection, "CustomResourceDefinition", "", metaObj.GetName(), req.UserInfo.Username)
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")

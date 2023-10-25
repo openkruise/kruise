@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"
@@ -81,6 +82,7 @@ func (h *WorkloadHandler) Handle(ctx context.Context, req admission.Request) adm
 
 	if err := deletionprotection.ValidateWorkloadDeletion(metaObj, replicas); err != nil {
 		deletionprotection.WorkloadDeletionProtectionMetrics.WithLabelValues(fmt.Sprintf("%s_%s_%s", req.Kind.Kind, metaObj.GetNamespace(), metaObj.GetName()), req.UserInfo.Username).Add(1)
+		util.LoggerProtectionInfo(util.ProtectionEventDeletionProtection, req.Kind.Kind, metaObj.GetNamespace(), metaObj.GetName(), req.UserInfo.Username)
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")
