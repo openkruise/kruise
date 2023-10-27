@@ -31,7 +31,9 @@ import (
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/globallimiter"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
+	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,33 +44,52 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func init() {
-	flag.IntVar(&concurrentReconciles, "imagepulljob-workers", concurrentReconciles, "Max concurrent workers for ImagePullJob controller.")
-}
-
 var (
 	concurrentReconciles        = 3
+	maxInactiveDeadlineSeconds  = 30 * 60
+	globalParallelism           = 10
 	controllerKind              = appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")
 	resourceVersionExpectations = expectations.NewResourceVersionExpectation()
+	globalLimiter               globallimiter.ParallelismLimiter
+	durationStore               = requeueduration.DurationStore{}
 )
+
+func init() {
+	flag.IntVar(&concurrentReconciles, "imagepulljob-workers", concurrentReconciles, "Max concurrent workers for ImagePullJob controller.")
+	flag.IntVar(&globalParallelism, "imagepulljob-global-parallelism", globalParallelism, "Global parallelism for active image pulling jobs.")
+	flag.IntVar(&maxInactiveDeadlineSeconds, "imagepulljob-max-inactiave-seconds", maxInactiveDeadlineSeconds, "If a job is out of max in-active seconds when pulling images, it will be exclude the global parallelism and stop reconcile.")
+}
 
 const (
 	defaultParallelism = 1
 	minRequeueTime     = time.Second
+	// If a job is out of the global parallelism, it will be ignored in Reconcile,
+	// but we should retry in a period util it is processed.
+	// In default settings, we check each waiting job per 10 seconds.
+	defaultRequeueTime = 10 * time.Second
 )
 
 // Add creates a new ImagePullJob Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
+func Add(mgr manager.Manager) (err error) {
 	if !utildiscovery.DiscoverGVK(controllerKind) || !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGate) {
 		return nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGlobalParallelism) {
+		globalLimiter, err = initializedGlobalLimiter(time.Duration(maxInactiveDeadlineSeconds) * time.Second)
+		if err != nil {
+			return err
+		}
 	}
 	return add(mgr, newReconciler(mgr))
 }
@@ -92,7 +113,22 @@ func add(mgr manager.Manager, r *ReconcileImagePullJob) error {
 	}
 
 	// Watch for changes to ImagePullJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ImagePullJob{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ImagePullJob{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+		DeleteFunc: func(event event.DeleteEvent) bool {
+			if utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGlobalParallelism) {
+				globalLimiter.Del(keyOf(event.Object))
+			}
+			return true
+		},
+		UpdateFunc: func(updateEvent event.UpdateEvent) bool {
+			if utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGlobalParallelism) {
+				if updateEvent.ObjectNew.GetDeletionTimestamp() != nil {
+					globalLimiter.Del(keyOf(updateEvent.ObjectNew))
+				}
+			}
+			return true
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -210,9 +246,27 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 		return reconcile.Result{}, fmt.Errorf("failed to calculate status: %v", err)
 	}
 
-	// Sync image to more NodeImages
-	if err = r.syncNodeImages(job, newStatus, notSyncedNodeImages); err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to sync NodeImages: %v", err)
+	var ExceededGlobalLimit = false
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGlobalParallelism) {
+		switch {
+		case isJobFinished(newStatus):
+			globalLimiter.Del(keyOf(job))
+		case isJobPulling(newStatus) || len(notSyncedNodeImages) > 0:
+			if succeed := globalLimiter.Add(keyOf(job)); succeed {
+				break
+			}
+			ExceededGlobalLimit = true
+			newStatus.Message = "exceeded global limitation, waiting"
+			durationStore.Push(request.NamespacedName.String(), defaultRequeueTime)
+			klog.V(4).Infof("Exceeded global parallelism limitation(%d) for ImagePullJob %v, try again after %v", globalParallelism, klog.KObj(job), defaultRequeueTime)
+		}
+	}
+
+	if !ExceededGlobalLimit {
+		// Sync image to more NodeImages
+		if err = r.syncNodeImages(job, newStatus, notSyncedNodeImages); err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to sync NodeImages: %v", err)
+		}
 	}
 
 	if !util.IsJSONObjectEqual(&job.Status, newStatus) {
@@ -221,22 +275,28 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 			return reconcile.Result{}, fmt.Errorf("update ImagePullJob status error: %v", err)
 		}
 		resourceVersionExpectations.Expect(job)
-		return reconcile.Result{}, nil
+		return reconcile.Result{RequeueAfter: durationStore.Pop(request.NamespacedName.String())}, nil
 	}
 
-	if job.Spec.CompletionPolicy.Type != appsv1alpha1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil {
+	if newStatus.StartTime != nil && job.Spec.CompletionPolicy.Type != appsv1alpha1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil {
 		leftTime := time.Duration(*job.Spec.CompletionPolicy.ActiveDeadlineSeconds)*time.Second - time.Since(newStatus.StartTime.Time)
 		if leftTime < minRequeueTime {
 			leftTime = minRequeueTime
 		}
-		return reconcile.Result{RequeueAfter: leftTime}, nil
+		durationStore.Push(request.NamespacedName.String(), leftTime)
 	}
-	return reconcile.Result{}, nil
+	return reconcile.Result{RequeueAfter: durationStore.Pop(request.NamespacedName.String())}, nil
 }
 
 func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, newStatus *appsv1alpha1.ImagePullJobStatus, notSyncedNodeImages []string) error {
 	if len(notSyncedNodeImages) == 0 {
 		return nil
+	}
+
+	// real start time
+	now := metav1.NewTime(r.clock.Now())
+	if newStatus.StartTime == nil {
+		newStatus.StartTime = &now
 	}
 
 	parallelismLimit := defaultParallelism
@@ -256,7 +316,6 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 	ownerRef := getOwnerRef(job)
 	secrets := getSecrets(job)
 	pullPolicy := getImagePullPolicy(job)
-	now := metav1.NewTime(r.clock.Now())
 	imageName, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(job.Spec.Image)
 	for i := 0; i < parallelism; i++ {
 		var skip bool
@@ -344,9 +403,6 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1alpha1.ImagePullJob, 
 		Desired:   int32(len(nodeImages)),
 	}
 	now := metav1.NewTime(r.clock.Now())
-	if newStatus.StartTime == nil {
-		newStatus.StartTime = &now
-	}
 
 	imageName, imageTag, err := daemonutil.NormalizeImageRefToNameTag(job.Spec.Image)
 	if err != nil {
@@ -404,8 +460,8 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1alpha1.ImagePullJob, 
 		}
 	}
 
-	if job.Spec.CompletionPolicy.Type != appsv1alpha1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && int(newStatus.Desired) != len(succeeded)+len(failed) {
-		if time.Duration(*job.Spec.CompletionPolicy.ActiveDeadlineSeconds)*time.Second <= time.Since(newStatus.StartTime.Time) {
+	if job.Status.StartTime != nil && job.Spec.CompletionPolicy.Type != appsv1alpha1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && int(newStatus.Desired) != len(succeeded)+len(failed) {
+		if time.Duration(*job.Spec.CompletionPolicy.ActiveDeadlineSeconds)*time.Second <= time.Since(job.Status.StartTime.Time) {
 			newStatus.CompletionTime = &now
 			newStatus.Succeeded = int32(len(succeeded))
 			failed = append(failed, pulling...)

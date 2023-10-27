@@ -17,11 +17,18 @@ limitations under the License.
 package imagepulljob
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/util/globallimiter"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -117,4 +124,46 @@ func formatStatusMessage(status *appsv1alpha1.ImagePullJobStatus) (ret string) {
 		return "job is running, no progress"
 	}
 	return fmt.Sprintf("job is running, progress %.1f%%", 100.0*float64(status.Succeeded+status.Failed)/float64(status.Desired))
+}
+
+func initializedGlobalLimiter(keyTimeout time.Duration) (globallimiter.ParallelismLimiter, error) {
+	kruiseClient := kruiseclient.GetGenericClient().KruiseClient
+	jobLister, err := kruiseClient.AppsV1alpha1().ImagePullJobs("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf("Failed to list ImagePullJobs when initialize global limiter: %v", err)
+		return nil, err
+	}
+	currentTime := time.Now()
+	pullingJobs := map[string]time.Time{}
+	for _, job := range jobLister.Items {
+		if !job.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if isJobFinished(&job.Status) {
+			continue
+		}
+		if isJobPulling(&job.Status) {
+			pullingJobs[keyOf(&job)] = currentTime
+		}
+	}
+	limiter := globallimiter.NewParallelismLimiter(globalParallelism, pullingJobs, keyTimeout)
+	return limiter, nil
+}
+
+func isJobFinished(status *appsv1alpha1.ImagePullJobStatus) bool {
+	if status.CompletionTime != nil {
+		return true
+	}
+	return (status.Desired - status.Succeeded - status.Failed) == 0
+}
+
+func isJobPulling(status *appsv1alpha1.ImagePullJobStatus) bool {
+	if status.Desired == 0 || isJobFinished(status) {
+		return false
+	}
+	return status.Active > 0 || (status.Desired-status.Succeeded-status.Failed) > 0
+}
+
+func keyOf(object client.Object) string {
+	return client.ObjectKeyFromObject(object).String()
 }
