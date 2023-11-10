@@ -357,6 +357,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			SidecarSetName:  sidecarSet.Name,
 		}
 
+		isInjecting := false
 		//process initContainers
 		//only when created pod, inject initContainer and pullSecrets
 		if !isUpdated {
@@ -381,7 +382,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				initContainer.Env = append(initContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
 				// merged Env from sidecar.Env and transfer envs
 				initContainer.Env = util.MergeEnvVar(initContainer.Env, transferEnvs)
-
+				isInjecting = true
 				sidecarInitContainers = append(sidecarInitContainers, initContainer)
 			}
 			//process imagePullSecrets
@@ -389,7 +390,6 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		}
 
 		sidecarList := sets.NewString()
-		isInjecting := false
 		//process containers
 		for i := range sidecarSet.Spec.Containers {
 			sidecarContainer := &sidecarSet.Spec.Containers[i]
