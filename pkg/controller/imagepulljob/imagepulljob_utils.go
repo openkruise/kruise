@@ -78,6 +78,7 @@ func getImagePullPolicy(job *appsv1alpha1.ImagePullJob) *appsv1alpha1.ImageTagPu
 	if job.Spec.PullPolicy != nil {
 		pullPolicy.BackoffLimit = job.Spec.PullPolicy.BackoffLimit
 		pullPolicy.TimeoutSeconds = job.Spec.PullPolicy.TimeoutSeconds
+		pullPolicy.Type = job.Spec.PullPolicy.Type
 	}
 	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
 		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForNever()
