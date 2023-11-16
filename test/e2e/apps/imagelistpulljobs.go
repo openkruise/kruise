@@ -106,7 +106,8 @@ var _ = SIGDescribe("PullImages", func() {
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
-					Parallelism: &intorstr4,
+					Parallelism:     &intorstr4,
+					ImagePullPolicy: appsv1alpha1.PullAlways,
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type:                    appsv1alpha1.Always,
 						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
@@ -163,7 +164,8 @@ var _ = SIGDescribe("PullImages", func() {
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
-					Parallelism: &intorstr4,
+					Parallelism:     &intorstr4,
+					ImagePullPolicy: appsv1alpha1.PullIfNotPresent,
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Always,
 					},
@@ -208,7 +210,8 @@ var _ = SIGDescribe("PullImages", func() {
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
-					Parallelism: &intorstr4,
+					Parallelism:     &intorstr4,
+					ImagePullPolicy: appsv1alpha1.PullAlways,
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Always,
 					},
@@ -255,7 +258,8 @@ var _ = SIGDescribe("PullImages", func() {
 						TimeoutSeconds: utilpointer.Int32Ptr(50),
 						BackoffLimit:   utilpointer.Int32Ptr(2),
 					},
-					Parallelism: &intorstr4,
+					Parallelism:     &intorstr4,
+					ImagePullPolicy: appsv1alpha1.PullIfNotPresent,
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Never,
 					},

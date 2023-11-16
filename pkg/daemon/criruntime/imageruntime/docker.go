@@ -21,11 +21,11 @@ import (
 	"io"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	dockertypes "github.com/docker/docker/api/types"
 	dockerapi "github.com/docker/docker/client"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
@@ -81,7 +81,7 @@ func (d *dockerImageService) PullImage(ctx context.Context, imageName, tag strin
 
 	if len(pullSecrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
-		authInfos, err = convertToRegistryAuths(pullSecrets, registry)
+		authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, registry)
 		if err == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {
@@ -158,3 +158,5 @@ func newImageCollectionDocker(infos []dockertypes.ImageSummary) []ImageInfo {
 	}
 	return collection
 }
+
+var _ ImageService = &dockerImageService{}

@@ -27,6 +27,17 @@ const (
 	ImagePreDownloadMinUpdatedReadyPods = "apps.kruise.io/image-predownload-min-updated-ready-pods"
 )
 
+// ImagePullPolicy describes a policy for if/when to pull a container image
+// +enum
+type ImagePullPolicy string
+
+const (
+	// PullAlways means that kruise-daemon always attempts to pull the latest image.
+	PullAlways ImagePullPolicy = "Always"
+	// PullIfNotPresent means that kruise-daemon pulls if the image isn't present on disk.
+	PullIfNotPresent ImagePullPolicy = "IfNotPresent"
+)
+
 // ImagePullJobSpec defines the desired state of ImagePullJob
 type ImagePullJobSpec struct {
 	// Image is the image to be pulled by the job
@@ -69,6 +80,11 @@ type ImagePullJobTemplate struct {
 	// SandboxConfig support attach metadata in PullImage CRI interface during ImagePulljobs
 	// +optional
 	SandboxConfig *SandboxConfig `json:"sandboxConfig,omitempty"`
+
+	// Image pull policy.
+	// One of Always, IfNotPresent. Defaults to IfNotPresent.
+	// +optional
+	ImagePullPolicy ImagePullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // ImagePullJobPodSelector is a selector over pods

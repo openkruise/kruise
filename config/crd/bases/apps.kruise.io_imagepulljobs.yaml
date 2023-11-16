@@ -95,6 +95,10 @@ spec:
               image:
                 description: Image is the image to be pulled by the job
                 type: string
+              imagePullPolicy:
+                description: Image pull policy. One of Always, IfNotPresent. Defaults
+                  to IfNotPresent.
+                type: string
               parallelism:
                 anyOf:
                 - type: integer
