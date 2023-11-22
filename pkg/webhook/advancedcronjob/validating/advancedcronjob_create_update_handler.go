@@ -41,13 +41,13 @@ import (
 )
 
 const (
-	AdvancedCronJobNameMaxLen = 63
+	AdvancedCronJobNameMaxLen      = 63
+	validateAdvancedCronJobNameMsg = "AdvancedCronJob name must consist of alphanumeric characters or '-'"
+	validAdvancedCronJobNameFmt    = `^[a-zA-Z0-9\-]+$`
 )
 
 var (
-	validateAdvancedCronJobNameMsg   = "AdvancedCronJob name must consist of alphanumeric characters or '-'"
 	validateAdvancedCronJobNameRegex = regexp.MustCompile(validAdvancedCronJobNameFmt)
-	validAdvancedCronJobNameFmt      = `^[a-zA-Z0-9\-]+$`
 )
 
 // AdvancedCronJobCreateUpdateHandler handles AdvancedCronJob

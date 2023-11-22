@@ -63,7 +63,9 @@ type SidecarControl interface {
 	// In Kubernetes native scenarios, only Container Image upgrades are allowed
 	// When modifying other fields of the container, e.g. volumemounts, the sidecarSet will not depart to upgrade the sidecar container logic in-place,
 	// and needs to be done by rebuilding the pod
-	IsSidecarSetUpgradable(pod *v1.Pod) bool
+	// consistent indicates pod.spec and pod.status is consistent,
+	// when pod.spec.image is v2 and pod.status.image is v1, then it is inconsistent.
+	IsSidecarSetUpgradable(pod *v1.Pod) (canUpgrade, consistent bool)
 }
 
 func New(cs *appsv1alpha1.SidecarSet) SidecarControl {

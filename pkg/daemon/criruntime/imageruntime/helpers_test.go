@@ -19,6 +19,8 @@ package imageruntime
 import (
 	"testing"
 
+	"github.com/openkruise/kruise/pkg/util/secret"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
@@ -107,7 +109,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ParseImageName failed: %s", err.Error())
 			}
-			infos, err := convertToRegistryAuths(cs.GetSecrets(), repoToPull)
+			infos, err := secret.ConvertToRegistryAuths(cs.GetSecrets(), repoToPull)
 			if err != nil {
 				t.Fatalf("convertToRegistryAuths failed: %s", err.Error())
 			}

@@ -27,8 +27,6 @@ import (
 	"net/url"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	"github.com/alibaba/pouch/pkg/jsonstream"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
@@ -39,7 +37,9 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http/httpproxy"
 	"google.golang.org/grpc"
@@ -202,7 +202,7 @@ func (d *containerdImageClient) getResolver(ctx context.Context, ref reference.N
 	// Stage 1: try to resolving reference by given secrets
 	if len(secrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
-		authInfos, lastErr = convertToRegistryAuths(secrets, registry)
+		authInfos, lastErr = secret.ConvertToRegistryAuths(secrets, registry)
 		if lastErr == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {

@@ -225,6 +225,25 @@ func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateD
 			}
 		}
 	}
+
+	hasReplicasSettings := false
+	hasCapacitySettings := false
+	for _, subset := range obj.Spec.Topology.Subsets {
+		if subset.Replicas != nil {
+			hasReplicasSettings = true
+		}
+		if subset.MinReplicas != nil || subset.MaxReplicas != nil {
+			hasCapacitySettings = true
+		}
+	}
+	if hasCapacitySettings && !hasReplicasSettings {
+		for i := range obj.Spec.Topology.Subsets {
+			subset := &obj.Spec.Topology.Subsets[i]
+			if subset.MinReplicas == nil {
+				subset.MinReplicas = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+			}
+		}
+	}
 }
 
 // SetDefaults_CloneSet set default values for CloneSet.
@@ -365,6 +384,9 @@ func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
 	}
 	if obj.Spec.PullPolicy.BackoffLimit == nil {
 		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
+	}
+	if obj.Spec.ImagePullPolicy == "" {
+		obj.Spec.ImagePullPolicy = v1alpha1.PullIfNotPresent
 	}
 }
 

@@ -3170,6 +3170,16 @@ func (in *Subset) DeepCopyInto(out *Subset) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.MinReplicas != nil {
+		in, out := &in.MinReplicas, &out.MinReplicas
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
+	if in.MaxReplicas != nil {
+		in, out := &in.MaxReplicas, &out.MaxReplicas
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	in.Patch.DeepCopyInto(&out.Patch)
 }
 

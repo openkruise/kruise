@@ -292,6 +292,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 				// merge owner reference
 				tagSpec.OwnerReferences = append(tagSpec.OwnerReferences, *ownerRef)
 				tagSpec.CreatedAt = &now
+				tagSpec.ImagePullPolicy = job.Spec.ImagePullPolicy
 				found = true
 				break
 			}

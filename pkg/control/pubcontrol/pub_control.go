@@ -31,6 +31,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -166,6 +167,10 @@ func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavai
 		return nil, err
 	}
 	return pub, nil
+}
+
+func (c *commonControl) GetPodControllerOf(pod *corev1.Pod) *metav1.OwnerReference {
+	return metav1.GetControllerOf(pod)
 }
 
 func getSidecarSetsInPod(pod *corev1.Pod) (sidecarSets, containers sets.String) {

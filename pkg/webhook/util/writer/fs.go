@@ -20,7 +20,6 @@ package writer
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -158,19 +157,19 @@ func (f *fsCertWriter) read() (*generator.Artifacts, error) {
 	if err := ensureExist(f.Path); err != nil {
 		return nil, err
 	}
-	caKeyBytes, err := ioutil.ReadFile(path.Join(f.Path, CAKeyName))
+	caKeyBytes, err := os.ReadFile(path.Join(f.Path, CAKeyName))
 	if err != nil {
 		return nil, err
 	}
-	caCertBytes, err := ioutil.ReadFile(path.Join(f.Path, CACertName))
+	caCertBytes, err := os.ReadFile(path.Join(f.Path, CACertName))
 	if err != nil {
 		return nil, err
 	}
-	certBytes, err := ioutil.ReadFile(path.Join(f.Path, ServerCertName))
+	certBytes, err := os.ReadFile(path.Join(f.Path, ServerCertName))
 	if err != nil {
 		return nil, err
 	}
-	keyBytes, err := ioutil.ReadFile(path.Join(f.Path, ServerKeyName))
+	keyBytes, err := os.ReadFile(path.Join(f.Path, ServerKeyName))
 	if err != nil {
 		return nil, err
 	}

@@ -213,7 +213,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
-	nextReplicas, err := GetAllocatedReplicas(nameToSubset, instance)
+	nextReplicas, err := NewReplicaAllocator(instance).Alloc(nameToSubset)
 	klog.V(4).Infof("Get UnitedDeployment %s/%s next replicas %v", instance.Namespace, instance.Name, nextReplicas)
 	if err != nil {
 		klog.Errorf("UnitedDeployment %s/%s Specified subset replicas is ineffective: %s",

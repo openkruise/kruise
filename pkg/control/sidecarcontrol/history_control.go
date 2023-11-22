@@ -258,7 +258,7 @@ func (r *realControl) getControllerRevision(set *appsv1alpha1.SidecarSet, revisi
 
 func copySidecarSetSpecRevision(dst, src map[string]interface{}) {
 	// we will use patch instead of update operation to update pods in the future
-	// dst["$patch"] = "replace"
+	dst["$patch"] = "replace"
 	// only record these revisions
 	dst["volumes"] = src["volumes"]
 	dst["containers"] = src["containers"]

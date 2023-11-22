@@ -75,7 +75,9 @@ type EphemeralContainerTemplateSpec struct {
 	// EphemeralContainers defines ephemeral container list in match pods.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
-	EphemeralContainers []v1.EphemeralContainer `json:"ephemeralContainers"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	EphemeralContainers []v1.EphemeralContainer `json:"ephemeralContainers" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // EphemeralJobStatus defines the observed state of EphemeralJob

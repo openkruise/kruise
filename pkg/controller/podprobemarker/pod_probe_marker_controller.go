@@ -161,10 +161,16 @@ func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 		}
 		klog.V(3).Infof("add PodProbeMarker(%s/%s) finalizer success", ppm.Namespace, ppm.Name)
 	}
+
+	groupByNode := make(map[string][]*corev1.Pod)
+	for i, pod := range pods {
+		groupByNode[pod.Spec.NodeName] = append(groupByNode[pod.Spec.NodeName], pods[i])
+	}
+
 	// add podProbe in NodePodProbe
-	for _, pod := range pods {
+	for nodeName := range groupByNode {
 		// add podProbe to NodePodProbe.Spec
-		if err = r.updateNodePodProbe(ppm, pod); err != nil {
+		if err = r.updateNodePodProbes(ppm, nodeName, groupByNode[nodeName]); err != nil {
 			return err
 		}
 	}
@@ -206,43 +212,45 @@ func (r *ReconcilePodProbeMarker) handlerPodProbeMarkerFinalizer(ppm *appsv1alph
 	return nil
 }
 
-func (r *ReconcilePodProbeMarker) updateNodePodProbe(ppm *appsv1alpha1.PodProbeMarker, pod *corev1.Pod) error {
+func (r *ReconcilePodProbeMarker) updateNodePodProbes(ppm *appsv1alpha1.PodProbeMarker, nodeName string, pods []*corev1.Pod) error {
 	npp := &appsv1alpha1.NodePodProbe{}
-	err := r.Get(context.TODO(), client.ObjectKey{Name: pod.Spec.NodeName}, npp)
+	err := r.Get(context.TODO(), client.ObjectKey{Name: nodeName}, npp)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.Warningf("PodProbeMarker ppm(%s/%s) NodePodProbe(%s) is Not Found", ppm.Namespace, ppm.Name, npp.Name)
 			return nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Errorf("PodProbeMarker ppm(%s/%s) get NodePodProbe(%s) failed: %s", ppm.Namespace, ppm.Name, pod.Spec.NodeName, err.Error())
+		klog.Errorf("PodProbeMarker ppm(%s/%s) get NodePodProbe(%s) failed: %s", ppm.Namespace, ppm.Name, nodeName, err.Error())
 		return err
 	}
 
 	oldSpec := npp.Spec.DeepCopy()
-	exist := false
-	for i := range npp.Spec.PodProbes {
-		podProbe := &npp.Spec.PodProbes[i]
-		if podProbe.Name == pod.Name && podProbe.Namespace == pod.Namespace && podProbe.UID == string(pod.UID) {
-			exist = true
+	for _, pod := range pods {
+		exist := false
+		for i := range npp.Spec.PodProbes {
+			podProbe := &npp.Spec.PodProbes[i]
+			if podProbe.Name == pod.Name && podProbe.Namespace == pod.Namespace && podProbe.UID == string(pod.UID) {
+				exist = true
+				for j := range ppm.Spec.Probes {
+					probe := ppm.Spec.Probes[j]
+					setPodContainerProbes(podProbe, probe, ppm.Name)
+				}
+				break
+			}
+		}
+		if !exist {
+			podProbe := appsv1alpha1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID)}
 			for j := range ppm.Spec.Probes {
 				probe := ppm.Spec.Probes[j]
-				setPodContainerProbes(podProbe, probe, ppm.Name)
+				podProbe.Probes = append(podProbe.Probes, appsv1alpha1.ContainerProbe{
+					Name:          fmt.Sprintf("%s#%s", ppm.Name, probe.Name),
+					ContainerName: probe.ContainerName,
+					Probe:         probe.Probe,
+				})
 			}
-			break
+			npp.Spec.PodProbes = append(npp.Spec.PodProbes, podProbe)
 		}
-	}
-	if !exist {
-		podProbe := appsv1alpha1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID)}
-		for j := range ppm.Spec.Probes {
-			probe := ppm.Spec.Probes[j]
-			podProbe.Probes = append(podProbe.Probes, appsv1alpha1.ContainerProbe{
-				Name:          fmt.Sprintf("%s#%s", ppm.Name, probe.Name),
-				ContainerName: probe.ContainerName,
-				Probe:         probe.Probe,
-			})
-		}
-		npp.Spec.PodProbes = append(npp.Spec.PodProbes, podProbe)
 	}
 
 	if reflect.DeepEqual(npp.Spec, oldSpec) {

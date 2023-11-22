@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -65,8 +66,9 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileEphemeralJob {
 	return &ReconcileEphemeralJob{
-		Client: utilclient.NewClientFromManager(mgr, "ephemeraljob-controller"),
-		scheme: mgr.GetScheme(),
+		Client:   utilclient.NewClientFromManager(mgr, "ephemeraljob-controller"),
+		scheme:   mgr.GetScheme(),
+		recorder: mgr.GetEventRecorderFor("ephemeraljob-controller"),
 	}
 }
 
@@ -98,11 +100,13 @@ var _ reconcile.Reconciler = &ReconcileEphemeralJob{}
 // ReconcileEphemeralJob reconciles a ImagePullJob object
 type ReconcileEphemeralJob struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme   *runtime.Scheme
+	recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=ephemeraljobs,verbs=get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=ephemeraljobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=ephemeraljobs/finalizers,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/ephemeralcontainers,verbs=get;update;patch
 
@@ -123,7 +127,6 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 
 	job := &appsv1alpha1.EphemeralJob{}
 	err = r.Get(context, request.NamespacedName, job)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -137,9 +140,14 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 	}
 
 	if job.DeletionTimestamp != nil {
-		if err := r.removeEphemeralContainers(job); err != nil {
+		retryAfter, err := r.removeEphemeralContainers(job)
+		if err != nil {
 			return reconcile.Result{}, err
 		}
+		if retryAfter != nil {
+			return reconcile.Result{RequeueAfter: *retryAfter}, nil
+		}
+
 		job.Finalizers = deleteEphemeralContainerFinalizer(job.Finalizers, EphemeralContainerFinalizer)
 		return reconcile.Result{}, r.Update(context, job)
 	}
@@ -281,6 +289,7 @@ func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJo
 		return nil, err
 	}
 
+	control := econtainer.New(job)
 	// Ignore inactive pods
 	var targetPods []*v1.Pod
 	for i := range podList.Items {
@@ -288,7 +297,7 @@ func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJo
 		if !kubecontroller.IsPodActive(pod) {
 			continue
 		}
-		if exists, owned := existEphemeralContainer(job, pod); exists {
+		if exists, owned := control.ContainsEphemeralContainer(pod); exists {
 			if owned {
 				targetPods = append(targetPods, pod)
 			} else {
@@ -335,7 +344,7 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 	_, err := clonesetutils.DoItSlowly(len(toCreatePods), kubecontroller.SlowStartInitialBatchSize, func() error {
 		pod := <-podsCreationChan
 
-		if exists, _ := existEphemeralContainer(job, pod); exists {
+		if exists, _ := control.ContainsEphemeralContainer(pod); exists {
 			return nil
 		}
 
@@ -348,11 +357,14 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 			for _, podEphemeralContainerName := range getPodEphemeralContainers(pod, job) {
 				scaleExpectations.ObserveScale(key, expectations.Create, podEphemeralContainerName)
 			}
-			return err
+			return fmt.Errorf("failed to create ephemeral container in pod %s/%s: %v", pod.Namespace, pod.Name, err)
 		}
 
 		return nil
 	})
+	if err != nil {
+		r.recorder.Eventf(job, v1.EventTypeWarning, "CreateFailed", err.Error())
+	}
 
 	return err
 }
@@ -433,19 +445,22 @@ func (r *ReconcileEphemeralJob) updateJobStatus(job *appsv1alpha1.EphemeralJob) 
 	return r.Status().Update(context.TODO(), job)
 }
 
-func (r *ReconcileEphemeralJob) removeEphemeralContainers(job *appsv1alpha1.EphemeralJob) error {
+func (r *ReconcileEphemeralJob) removeEphemeralContainers(job *appsv1alpha1.EphemeralJob) (*time.Duration, error) {
 	targetPods, err := r.filterInjectedPods(job)
 	if err != nil {
 		klog.Errorf("Failed to get ephemeral job %s/%s related target pods: %v", job.Namespace, job.Name, err)
-		return err
+		return nil, err
 	}
 
-	var errors error
+	control := econtainer.New(job)
+	var retryAfter *time.Duration
 	for _, pod := range targetPods {
-		if e := econtainer.New(job).RemoveEphemeralContainer(pod); e != nil {
-			errors = e
+		if duration, removeErr := control.RemoveEphemeralContainer(pod); removeErr != nil {
+			err = fmt.Errorf("failed to remove ephemeral containers for pod %s/%s: %s", pod.Namespace, pod.Name, removeErr.Error())
+			r.recorder.Eventf(job, v1.EventTypeWarning, "RemoveFailed", removeErr.Error())
+		} else if duration != nil && (retryAfter == nil || *retryAfter > *duration) {
+			retryAfter = duration
 		}
 	}
-
-	return errors
+	return retryAfter, err
 }

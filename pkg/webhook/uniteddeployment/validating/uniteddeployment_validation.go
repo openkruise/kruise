@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	udctrl "github.com/openkruise/kruise/pkg/controller/uniteddeployment"
@@ -62,14 +63,9 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		allErrs = append(allErrs, validateSubsetTemplate(&spec.Template, selector, fldPath.Child("template"))...)
 	}
 
-	var sumReplicas int32
-	var expectedReplicas int32 = -1
-	if spec.Replicas != nil {
-		expectedReplicas = *spec.Replicas
-	}
-	count := 0
-	subSetNames := sets.String{}
+	allErrs = append(allErrs, validateSubsetReplicas(spec.Replicas, spec.Topology.Subsets, fldPath.Child("topology", "subsets"))...)
 
+	subSetNames := sets.String{}
 	for i, subset := range spec.Topology.Subsets {
 		if len(subset.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("topology", "subsets").Index(i).Child("name"), ""))
@@ -108,28 +104,6 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		if subset.Replicas == nil {
 			continue
 		}
-
-		replicas, err := udctrl.ParseSubsetReplicas(expectedReplicas, *subset.Replicas)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("replicas"), subset.Replicas, fmt.Sprintf("invalid replicas %s", subset.Replicas.String())))
-		} else {
-			sumReplicas += replicas
-			count++
-		}
-	}
-
-	if expectedReplicas != -1 {
-		// sum of subset replicas may be less than uniteddployment replicas
-		if sumReplicas > expectedReplicas {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
-		}
-
-		if count > 0 && count == len(spec.Topology.Subsets) && sumReplicas != expectedReplicas {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
-		}
-	} else if count != len(spec.Topology.Subsets) {
-		// validate all of subsets replicas are not nil
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets"), sumReplicas, "if UnitedDeployment replicas is not provided, replicas of all subsets should be provided"))
 	}
 
 	if spec.UpdateStrategy.ManualUpdate != nil {
@@ -141,6 +115,97 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 	}
 
 	return allErrs
+}
+
+func validateSubsetReplicas(expectedReplicas *int32, subsets []appsv1alpha1.Subset, fldPath *field.Path) field.ErrorList {
+	var (
+		sumReplicas    = int64(0)
+		sumMinReplicas = int64(0)
+		sumMaxReplicas = int64(0)
+
+		countReplicas    = 0
+		countMaxReplicas = 0
+
+		hasReplicasSettings = false
+		hasCapacitySettings = false
+
+		err     error
+		errList field.ErrorList
+	)
+
+	if expectedReplicas == nil {
+		expectedReplicas = pointer.Int32(-1)
+	}
+
+	for i, subset := range subsets {
+		replicas := int32(0)
+		if subset.Replicas != nil {
+			countReplicas++
+			hasReplicasSettings = true
+			replicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.Replicas)
+			if err != nil {
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("replicas"), subset.Replicas, err.Error()))
+			}
+		}
+		sumReplicas += int64(replicas)
+
+		minReplicas := int32(0)
+		if subset.MinReplicas != nil {
+			hasCapacitySettings = true
+			minReplicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.MinReplicas)
+			if err != nil {
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MaxReplicas, err.Error()))
+			}
+		}
+		sumMinReplicas += int64(minReplicas)
+
+		maxReplicas := int32(1000000)
+		if subset.MaxReplicas != nil {
+			countMaxReplicas++
+			hasCapacitySettings = true
+			maxReplicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.MaxReplicas)
+			if err != nil {
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MaxReplicas, err.Error()))
+			}
+		}
+		sumMaxReplicas += int64(maxReplicas)
+
+		if minReplicas > maxReplicas {
+			errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MaxReplicas,
+				fmt.Sprintf("subset[%d].minReplicas must be more than or equal to maxReplicas", i)))
+		}
+	}
+
+	if hasReplicasSettings && hasCapacitySettings {
+		errList = append(errList, field.Invalid(fldPath, subsets, "subset.Replicas and subset.MinReplicas/subset.MaxReplicas are mutually exclusive in a UnitedDeployment"))
+		return errList
+	}
+
+	if hasCapacitySettings {
+		if *expectedReplicas == -1 {
+			errList = append(errList, field.Invalid(fldPath, expectedReplicas, "spec.replicas must be not empty if you set subset.minReplicas/maxReplicas"))
+		}
+		if countMaxReplicas >= len(subsets) {
+			errList = append(errList, field.Invalid(fldPath, countMaxReplicas, "at least one subset.maxReplicas must be empty"))
+		}
+		if sumMinReplicas > sumMaxReplicas {
+			errList = append(errList, field.Invalid(fldPath, sumMinReplicas, "sum of indicated subset.minReplicas should not be greater than sum of indicated subset.maxReplicas"))
+		}
+	} else {
+		if *expectedReplicas != -1 {
+			// sum of subset replicas may be less than uniteddployment replicas
+			if sumReplicas > int64(*expectedReplicas) {
+				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+			}
+			if countReplicas > 0 && countReplicas == len(subsets) && sumReplicas != int64(*expectedReplicas) {
+				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+			}
+		} else if countReplicas != len(subsets) {
+			// validate all of subsets replicas are not nil
+			errList = append(errList, field.Invalid(fldPath, sumReplicas, "if UnitedDeployment replicas is not provided, replicas of all subsets should be provided"))
+		}
+	}
+	return errList
 }
 
 // validateUnitedDeployment validates a UnitedDeployment.

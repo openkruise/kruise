@@ -92,17 +92,6 @@ func getPodEphemeralContainers(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) []s
 	return podEphemeralNames
 }
 
-func existEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) (exists, owned bool) {
-	ephemeralContainersMaps, _ := getEphemeralContainersMaps(econtainer.New(job).GetEphemeralContainers(targetPod))
-	for _, e := range job.Spec.Template.EphemeralContainers {
-		if targetEC, ok := ephemeralContainersMaps[e.Name]; ok {
-			return true, isCreatedByEJob(string(job.UID), targetEC)
-		}
-	}
-
-	return false, false
-}
-
 func existDuplicatedEphemeralContainer(job *appsv1alpha1.EphemeralJob, targetPod *v1.Pod) bool {
 	ephemeralContainersMaps, _ := getEphemeralContainersMaps(econtainer.New(job).GetEphemeralContainers(targetPod))
 	for _, e := range job.Spec.Template.EphemeralContainers {

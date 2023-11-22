@@ -87,7 +87,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deployment.Spec.Replicas)))
 			pod := pods[0]
 			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(len(deployment.Spec.Template.Spec.Containers)))
-			ginkgo.By(fmt.Sprintf("test no matched sidecarSet done"))
+			ginkgo.By("test no matched sidecarSet done")
 		})
 
 		framework.ConformanceIt("sidecarset with volumes.downwardAPI", func() {
@@ -148,7 +148,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			for i, except := range exceptContainers {
 				gomega.Expect(except).To(gomega.Equal(pod.Spec.Containers[i].Name))
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container done"))
+			ginkgo.By("sidecarSet inject pod sidecar container done")
 		})
 
 		framework.ConformanceIt("sidecarSet inject pod sidecar container volumeMounts", func() {
@@ -239,7 +239,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 					gomega.Expect(object).ShouldNot(gomega.BeNil())
 				}
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container volumeMounts done"))
+			ginkgo.By("sidecarSet inject pod sidecar container volumeMounts done")
 		})
 
 		framework.ConformanceIt("sidecarSet inject pod sidecar container volumeMounts, SubPathExpr with expanded subpath", func() {
@@ -342,7 +342,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 					gomega.Expect(object).ShouldNot(gomega.BeNil())
 				}
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container volumeMounts, SubPathExpr with expanded subpath done"))
+			ginkgo.By("sidecarSet inject pod sidecar container volumeMounts, SubPathExpr with expanded subpath done")
 		})
 
 		framework.ConformanceIt("sidecarSet inject pod sidecar container transfer Envs", func() {
@@ -413,7 +413,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				object := util.GetContainerEnvValue(sidecarContainer, key)
 				gomega.Expect(object).To(gomega.Equal(value))
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container transfer Envs done"))
+			ginkgo.By("sidecarSet inject pod sidecar container transfer Envs done")
 		})
 
 		framework.ConformanceIt("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.labels", func() {
@@ -488,7 +488,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				object := util.GetContainerEnvValue(sidecarContainer, key)
 				gomega.Expect(object).To(gomega.Equal(value))
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.labels done"))
+			ginkgo.By("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.labels done")
 		})
 
 		framework.ConformanceIt("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.annotations", func() {
@@ -563,7 +563,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				object := util.GetContainerEnvValue(sidecarContainer, key)
 				gomega.Expect(object).To(gomega.Equal(value))
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.annotations done"))
+			ginkgo.By("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.annotations done")
 		})
 	})
 
@@ -668,7 +668,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				gomega.Expect(pod.Spec.Containers[0].Image).Should(gomega.Equal(BusyboxImage))
 				gomega.Expect(pod.Annotations["key"]).Should(gomega.Equal(`{"nginx-sidecar":2}`))
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet update pod annotations done"))
+			ginkgo.By("sidecarSet update pod annotations done")
 		})
 
 		framework.ConformanceIt("sidecarSet upgrade cold sidecar container image only", func() {
@@ -743,7 +743,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				_, sidecarSetUpgradable := podutil.GetPodCondition(&pod.Status, sidecarcontrol.SidecarSetUpgradable)
 				gomega.Expect(sidecarSetUpgradable.Status).Should(gomega.Equal(corev1.ConditionTrue))
 			}
-			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image done"))
+			ginkgo.By("sidecarSet upgrade cold sidecar container image done")
 		})
 
 		framework.ConformanceIt("sidecarSet upgrade cold sidecar container failed image, and only update one pod", func() {
@@ -833,7 +833,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				gomega.Expect(reflect.DeepEqual(origin.List(), target2.List())).To(gomega.Equal(true))
 			}
 
-			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container failed image, and only update one pod done"))
+			ginkgo.By("sidecarSet upgrade cold sidecar container failed image, and only update one pod done")
 		})
 
 		framework.ConformanceIt("sidecarSet upgrade sidecar container (more than image field), no pod should be updated", func() {
@@ -842,14 +842,15 @@ var _ = SIGDescribe("SidecarSet", func() {
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
+			sidecarSetIn.Spec.InitContainers = nil
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
-			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
+			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", util.DumpJSON(sidecarSetIn)))
 			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -878,13 +879,18 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 
 			// modify sidecarSet sidecar field out of image
-			sidecarSetIn.Spec.Containers[0].Command = []string{"sleep", "1000"}
+			sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
+				{
+					Name:  "version",
+					Value: "v2",
+				},
+			}
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except := &appsv1alpha1.SidecarSetStatus{
-				MatchedPods:      2,
+				MatchedPods:      1,
 				UpdatedPods:      0,
 				UpdatedReadyPods: 0,
-				ReadyPods:        2,
+				ReadyPods:        1,
 			}
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
@@ -896,6 +902,22 @@ var _ = SIGDescribe("SidecarSet", func() {
 				gomega.Expect(condition.Status).Should(gomega.Equal(corev1.ConditionFalse))
 			}
 
+			// scale deployment replicas=2
+			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			tester.UpdateDeployment(deploymentIn)
+			time.Sleep(time.Second)
+
+			// update sidecarSet image
+			sidecarSetIn.Spec.Containers[0].Image = NewNginxImage
+			tester.UpdateSidecarSet(sidecarSetIn)
+			time.Sleep(time.Second * 3)
+			except = &appsv1alpha1.SidecarSetStatus{
+				MatchedPods:      2,
+				UpdatedPods:      1,
+				UpdatedReadyPods: 1,
+				ReadyPods:        2,
+			}
+			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 			ginkgo.By("sidecarSet upgrade sidecar container (more than image field), no pod should be updated done")
 		})
 
@@ -1029,7 +1051,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				ReadyPods:        2,
 			}
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
-			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image, and paused done"))
+			ginkgo.By("sidecarSet upgrade cold sidecar container image, and paused done")
 		})
 
 		framework.ConformanceIt("sidecarSet upgrade cold sidecar container image, and selector", func() {
@@ -1102,7 +1124,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			time.Sleep(time.Minute)
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
-			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image, and selector done"))
+			ginkgo.By("sidecarSet upgrade cold sidecar container image, and selector done")
 		})
 
 		framework.ConformanceIt("sidecarSet upgrade cold sidecar container image, and partition", func() {
@@ -1157,7 +1179,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
-			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image, and partition done"))
+			ginkgo.By("sidecarSet upgrade cold sidecar container image, and partition done")
 		})
 
 		framework.ConformanceIt("sidecarSet upgrade cold sidecar container image, and maxUnavailable", func() {
@@ -1205,7 +1227,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				ReadyPods:        4,
 			}
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
-			ginkgo.By(fmt.Sprintf("sidecarSet upgrade cold sidecar container image, and maxUnavailable done"))
+			ginkgo.By("sidecarSet upgrade cold sidecar container image, and maxUnavailable done")
 		})
 
 		framework.ConformanceIt("sidecarSet update init sidecar container, and don't upgrade", func() {
@@ -1239,13 +1261,13 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// update sidecarSet sidecar container
 			sidecarSetIn.Spec.InitContainers[0].Image = InvalidImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			ginkgo.By(fmt.Sprintf("update sidecarset init container image, and sidecarSet hash not changed"))
+			ginkgo.By("update sidecarset init container image, and sidecarSet hash not changed")
 			time.Sleep(time.Second * 5)
 			sidecarSetIn, _ = kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSetIn.Name, metav1.GetOptions{})
 			hash2 := sidecarSetIn.Annotations[sidecarcontrol.SidecarSetHashAnnotation]
 			// hash not changed
 			gomega.Expect(hash1).To(gomega.Equal(hash2))
-			ginkgo.By(fmt.Sprintf("sidecarSet upgrade init sidecar container, and don't upgrade done"))
+			ginkgo.By("sidecarSet upgrade init sidecar container, and don't upgrade done")
 		})
 
 		framework.ConformanceIt("sidecarSet history revision checker", func() {
@@ -1310,7 +1332,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			waitingForSidecarSetReconcile(sidecarSetIn.Name)
 			expectedOrder = []int64{6, 7, 8, 9, 10, 11, 13, 14, 15, 16}
 			revisionChecker(sidecarSetIn, 10, expectedOrder)
-			ginkgo.By(fmt.Sprintf("sidecarSet history revision check done"))
+			ginkgo.By("sidecarSet history revision check done")
 		})
 
 		framework.ConformanceIt("sidecarSet history revision data checker", func() {
@@ -1376,7 +1398,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			waitingForSidecarSetReconcile(sidecarSetIn.Name)
 			list := tester.ListControllerRevisions(sidecarSetIn)
 			revisionChecker(list)
-			ginkgo.By(fmt.Sprintf("sidecarSet history revision data check done"))
+			ginkgo.By("sidecarSet history revision data check done")
 		})
 
 		framework.ConformanceIt("sidecarSet InjectionStrategy.Revision checker", func() {
@@ -1461,7 +1483,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			err = json.Unmarshal([]byte(pods[0].Annotations[sidecarcontrol.SidecarSetHashAnnotation]), &hash)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(hash[sidecarSetIn.Name].SidecarSetControllerRevision).To(gomega.Equal(list[5].Name))
-			ginkgo.By(fmt.Sprintf("sidecarSet InjectionStrategy.Revision check done"))
+			ginkgo.By("sidecarSet InjectionStrategy.Revision check done")
 		})
 	})
 })

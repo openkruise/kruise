@@ -49,15 +49,21 @@ type SidecarSetSpec struct {
 	// InitContainers is the list of init containers to be injected into the selected pod
 	// We will inject those containers by their name in ascending order
 	// We only inject init containers when a new pod is created, it does not apply to any existing pod
-	InitContainers []SidecarContainer `json:"initContainers,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	InitContainers []SidecarContainer `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// Containers is the list of sidecar containers to be injected into the selected pod
-	Containers []SidecarContainer `json:"containers,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Containers []SidecarContainer `json:"containers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// List of volumes that can be mounted by sidecar containers
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Volumes []corev1.Volume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// The sidecarset updateStrategy to use to replace existing pods with new ones.
 	UpdateStrategy SidecarSetUpdateStrategy `json:"updateStrategy,omitempty"`
@@ -66,7 +72,9 @@ type SidecarSetSpec struct {
 	InjectionStrategy SidecarSetInjectionStrategy `json:"injectionStrategy,omitempty"`
 
 	// List of the names of secrets required by pulling sidecar container images
-	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// RevisionHistoryLimit indicates the maximum quantity of stored revisions about the SidecarSet.
 	// default value is 10

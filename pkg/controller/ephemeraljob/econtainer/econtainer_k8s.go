@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kubeclient "github.com/openkruise/kruise/pkg/client"
@@ -211,13 +212,32 @@ func (k *k8sControl) createEphemeralContainerLegacy(targetPod *v1.Pod, eContaine
 }
 
 // RemoveEphemeralContainer is not support before kubernetes v1.23
-func (k *k8sControl) RemoveEphemeralContainer(target *v1.Pod) error {
+func (k *k8sControl) RemoveEphemeralContainer(target *v1.Pod) (*time.Duration, error) {
 	klog.Warning("RemoveEphemeralContainer is not support before kubernetes v1.23")
-	return nil
+	return nil, nil
 }
 
 // UpdateEphemeralContainer is not support before kubernetes v1.23
 func (k *k8sControl) UpdateEphemeralContainer(target *v1.Pod) error {
 	klog.Warning("UpdateEphemeralContainer is not support before kubernetes v1.23")
 	return nil
+}
+
+func (k *k8sControl) ContainsEphemeralContainer(target *v1.Pod) (exists, owned bool) {
+	ephemeralContainersMaps, _ := getEphemeralContainersMaps(k.GetEphemeralContainers(target))
+	for _, e := range k.Spec.Template.EphemeralContainers {
+		if targetEC, ok := ephemeralContainersMaps[e.Name]; ok {
+			return true, isCreatedByEJob(string(k.UID), targetEC)
+		}
+	}
+	return false, false
+}
+
+func isCreatedByEJob(jobUid string, container v1.EphemeralContainer) bool {
+	for _, env := range container.Env {
+		if env.Name == appsv1alpha1.EphemeralContainerEnvKey && env.Value == jobUid {
+			return true
+		}
+	}
+	return false
 }

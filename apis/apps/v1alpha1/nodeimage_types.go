@@ -80,6 +80,11 @@ type ImageTagSpec struct {
 	// Value must be treated as opaque by clients and .
 	// +optional
 	Version int64 `json:"version,omitempty"`
+
+	// Image pull policy.
+	// One of Always, IfNotPresent. Defaults to IfNotPresent.
+	// +optional
+	ImagePullPolicy ImagePullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // ImageTagPullPolicy defines the policy of the pulling task

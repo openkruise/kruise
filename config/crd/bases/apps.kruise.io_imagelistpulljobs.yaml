@@ -84,6 +84,10 @@ spec:
                       Default is Always.
                     type: string
                 type: object
+              imagePullPolicy:
+                description: Image pull policy. One of Always, IfNotPresent. Defaults
+                  to IfNotPresent.
+                type: string
               images:
                 description: Images is the image list to be pulled by the job
                 items:

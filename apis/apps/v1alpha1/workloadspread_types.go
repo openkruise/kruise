@@ -29,7 +29,9 @@ type WorkloadSpreadSpec struct {
 	TargetReference *TargetReference `json:"targetRef"`
 
 	// Subsets describes the pods distribution details between each of subsets.
-	Subsets []WorkloadSpreadSubset `json:"subsets"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Subsets []WorkloadSpreadSubset `json:"subsets" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// ScheduleStrategy indicates the strategy the WorkloadSpread used to preform the schedule between each of subsets.
 	// +optional
