@@ -1,5 +1,22 @@
 # Change Log
 
+## v1.5.1
+> Chang log since v1.5.0
+
+In version 1.5.1, the focus was on enhancing UnitedDeployment and addressing various bug fixes:
+
+- Add the ability to plan the lower and upper bound of capacity to the subsets in UnitedDeployment ([#1428](https://github.com/openkruise/kruise/pull/1428), [@veophi](https://github.com/veophi))
+
+- Fix unexpected job recreation by adding controller-revision-hash label for ImageListPullJob. ([#1441](https://github.com/openkruise/kruise/pull/1428), [@veophi](https://github.com/veophi))
+
+- Add prometheus metrics for pub and deletion protection to enhance observability for pub & deletion protection ([#1398](https://github.com/openkruise/kruise/pull/1398), [@zmberg](https://github.com/zmberg))
+
+- Add enable pprof flag for kruise daemon, now you can disable the pprof of kruise daemon ([#1416](https://github.com/openkruise/kruise/pull/1416), [@chengjoey](https://github.com/chengjoey))
+
+- Fix SidecarSet upgrade exception for UpdateExpectations to solve the problem of updating the image of the sidecar container ([#1435](https://github.com/openkruise/kruise/pull/1435), [@zmberg](https://github.com/zmberg)])
+
+- add audit log for pub and deletion protection to enhance observability for pub & deletion protection  ([#1438](https://github.com/openkruise/kruise/pull/1438), [@zmberg](https://github.com/zmberg)])
+
 ## v1.5.0
 > Change log since v1.4.0
 
