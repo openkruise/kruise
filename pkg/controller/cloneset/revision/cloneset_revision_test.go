@@ -18,6 +18,7 @@ limitations under the License.
 package revision
 
 import (
+	"os"
 	"reflect"
 	"testing"
 
@@ -32,6 +33,8 @@ import (
 
 func TestMain(m *testing.M) {
 	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
+	code := m.Run()
+	os.Exit(code)
 }
 
 func TestCreateApplyRevision(t *testing.T) {
