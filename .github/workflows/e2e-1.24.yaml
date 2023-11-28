@@ -1,4 +1,4 @@
-name: E2E-1.26
+name: E2E-1.24
 
 on:
   push:
@@ -13,7 +13,7 @@ env:
   GO_VERSION: '1.19'
   KIND_ACTION_VERSION: 'v1.3.0'
   KIND_VERSION: 'v0.14.0'
-  KIND_IMAGE: 'kindest/node:v1.26.4'
+  KIND_IMAGE: 'kindest/node:v1.24.6'
   KIND_CLUSTER_NAME: 'ci-testing'
 
 jobs:
@@ -84,6 +84,12 @@ jobs:
               echo "Kruise-manager has restarted, abort!!!"
               kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
               exit 1
+          fi
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
           fi
           exit $retVal
 
@@ -166,6 +172,13 @@ jobs:
                 exit 1
             fi
           done
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+          fi
+          
           exit $retVal
 
   advanced-daemonset:
@@ -247,6 +260,13 @@ jobs:
                 exit 1
             fi
           done
+          
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+          fi
           exit $retVal
 
   sidecarset:
@@ -328,6 +348,13 @@ jobs:
                 exit 1
             fi
           done
+          
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+          fi
           exit $retVal
 
   ephemeraljob:
@@ -387,6 +414,14 @@ jobs:
           make ginkgo
           set +e
           ./bin/ginkgo -timeout 60m -v --focus='\[apps\] EphemeralJob' test/e2e
+          retVal=$?
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+          fi
+          exit $retVal
 
   podUnavailableBudget:
     runs-on: ubuntu-20.04
@@ -445,7 +480,14 @@ jobs:
           make ginkgo
           set +e
           ./bin/ginkgo -timeout 60m -v --focus='\[policy\] PodUnavailableBudget' test/e2e
-
+          retVal=$?
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+          fi
+          exit $retVal
   other:
     runs-on: ubuntu-20.04
     steps:
@@ -525,4 +567,11 @@ jobs:
                 exit 1
             fi
           done
+          if [ "${retVal}" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+          fi
+
           exit $retVal
