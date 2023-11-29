@@ -439,11 +439,18 @@ func (r *ControllerFinder) getPodStatefulSetLike(ref ControllerReference, namesp
 			UID:         workload.GetUID(),
 		},
 	}
-	obj := workload.UnstructuredContent()
-	if val, found, err := unstructured.NestedInt64(obj, "spec.replicas"); err == nil && found {
-		scaleSelector.Scale = int32(val)
+	if val, err := getSpecReplicas(workload); err == nil {
+		scaleSelector.Scale = val
 	}
 	return scaleSelector, nil
+}
+
+func getSpecReplicas(workload *unstructured.Unstructured) (int32, error) {
+	obj := workload.UnstructuredContent()
+	if val, found, err := unstructured.NestedInt64(obj, "spec", "replicas"); err == nil && found {
+		return int32(val), nil
+	}
+	return 0, nil
 }
 
 func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
