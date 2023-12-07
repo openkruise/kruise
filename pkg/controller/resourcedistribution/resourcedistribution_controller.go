@@ -110,19 +110,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Secrets
-	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
+	secret := unstructured.Unstructured{}
+	secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	err = c.Watch(&source.Kind{Type: &secret}, &handler.EnqueueRequestForOwner{
 		IsController: true, OwnerType: &appsv1alpha1.ResourceDistribution{},
 	}, predicate.Funcs{
 		CreateFunc: func(createEvent event.CreateEvent) bool {
 			return false
 		},
-		UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-			oldObject, oldOK := updateEvent.ObjectOld.(*corev1.Secret)
-			newObject, newOK := updateEvent.ObjectNew.(*corev1.Secret)
-			if !oldOK || !newOK {
-				return false
-			}
-			return !reflect.DeepEqual(oldObject.Data, newObject.Data) || !reflect.DeepEqual(oldObject.StringData, newObject.StringData)
+		GenericFunc: func(genericEvent event.GenericEvent) bool {
+			return false
 		},
 	})
 	if err != nil {
@@ -130,19 +127,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to ConfigMap
-	err = c.Watch(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForOwner{
+	configMap := unstructured.Unstructured{}
+	configMap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+	err = c.Watch(&source.Kind{Type: &configMap}, &handler.EnqueueRequestForOwner{
 		IsController: true, OwnerType: &appsv1alpha1.ResourceDistribution{},
 	}, predicate.Funcs{
 		CreateFunc: func(createEvent event.CreateEvent) bool {
 			return false
 		},
-		UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-			oldObject, oldOK := updateEvent.ObjectOld.(*corev1.ConfigMap)
-			newObject, newOK := updateEvent.ObjectNew.(*corev1.ConfigMap)
-			if !oldOK || !newOK {
-				return false
-			}
-			return !reflect.DeepEqual(oldObject.Data, newObject.Data) || !reflect.DeepEqual(oldObject.BinaryData, newObject.BinaryData)
+		GenericFunc: func(genericEvent event.GenericEvent) bool {
+			return false
 		},
 	})
 	if err != nil {
