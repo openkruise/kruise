@@ -24,6 +24,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -67,6 +70,12 @@ func (h *PodProbeMarkerCreateUpdateHandler) Handle(ctx context.Context, req admi
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodProbeMarkerGate) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.PodProbeMarkerGate))
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.KruiseDaemon))
 	}
 	var old *appsv1alpha1.PodProbeMarker
 	//when Operation is update, decode older object
