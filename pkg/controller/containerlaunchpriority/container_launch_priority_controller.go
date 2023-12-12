@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"time"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
@@ -43,7 +45,8 @@ import (
 )
 
 const (
-	concurrentReconciles = 4
+	concurrentReconciles          = 4
+	defaultContainerLaunchTimeout = 60
 )
 
 func Add(mgr manager.Manager) error {
@@ -132,6 +135,9 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 	}
 	err = r.Get(context.TODO(), barrierNamespacedName, barrier)
 	if errors.IsNotFound(err) {
+		barrier.Annotations = map[string]string{
+			appspub.ContainerLaunchPriorityUpdateTimeKey: time.Now().Format(time.RFC3339),
+		}
 		barrier.Namespace = pod.GetNamespace()
 		barrier.Name = pod.Name + "-barrier"
 		barrier.OwnerReferences = append(barrier.OwnerReferences, metav1.OwnerReference{
@@ -151,12 +157,31 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 		return reconcile.Result{}, err
 	}
 
+	var requeueTime time.Duration
 	// set next starting containers
 	_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
 	if containersReady != nil && containersReady.Status != v1.ConditionTrue {
-		patchKey := r.findNextPatchKey(pod)
+		patchKey, timeout, containers := r.findNextPatchKey(pod)
 		if patchKey == nil {
 			return reconcile.Result{}, nil
+		}
+		updateTime := time.Now()
+		if barrier.Annotations != nil {
+			updateStr := barrier.Annotations[appspub.ContainerLaunchPriorityUpdateTimeKey]
+			parse, err := time.Parse(time.RFC3339, updateStr)
+			if err == nil {
+				updateTime = parse
+			}
+		}
+		for _, container := range containers {
+			containerStatus := util.GetContainerStatus(container.Name, pod)
+			if timeout > 0 && time.Duration(timeout)*time.Second < time.Since(updateTime) && (containerStatus == nil || containerStatus.Ready == false) {
+				r.recorder.Eventf(barrier, v1.EventTypeWarning, "ContainerLaunchTimeout", "Container %s has not launched successfully more than %ss.", container.Name, strconv.Itoa(timeout))
+			}
+		}
+
+		if time.Duration(timeout)*time.Second-time.Since(updateTime) > 0 {
+			requeueTime = time.Duration(timeout)*time.Second - time.Since(updateTime)
 		}
 		key := "p_" + strconv.Itoa(*patchKey)
 		if err = r.patchOnKeyNotExist(barrier, key); err != nil {
@@ -164,10 +189,10 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 		}
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{RequeueAfter: requeueTime}, nil
 }
 
-func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) *int {
+func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) (*int, int, []*v1.Container) {
 	var priority *int
 	var containerPendingSet = make(map[string]bool)
 	for _, status := range pod.Status.ContainerStatuses {
@@ -176,6 +201,9 @@ func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) *int {
 		}
 		containerPendingSet[status.Name] = true
 	}
+
+	timeout := 0
+	var priorityMap = make(map[int][]*v1.Container, len(pod.Spec.Containers))
 	for _, c := range pod.Spec.Containers {
 		if _, ok := containerPendingSet[c.Name]; ok {
 			p := utilcontainerlaunchpriority.GetContainerPriority(&c)
@@ -184,19 +212,37 @@ func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) *int {
 			}
 			if priority == nil || *p > *priority {
 				priority = p
+				timeout = getTimeout(c)
+				priorityMap[timeout] = append(priorityMap[timeout], &c)
 			}
 		}
 	}
-	return priority
+	return priority, timeout, priorityMap[timeout]
 }
 
 func (r *ReconcileContainerLaunchPriority) patchOnKeyNotExist(barrier *v1.ConfigMap, key string) error {
 	if _, ok := barrier.Data[key]; !ok {
 		body := fmt.Sprintf(
-			`{"data":{"%s":"true"}}`,
-			key,
+			`{"data":{"%s":"true"},"metadata":{"annotations":{"%s":"%s"}}}`,
+			key, appspub.ContainerLaunchPriorityUpdateTimeKey, time.Now().Format(time.RFC3339),
 		)
 		return r.Client.Patch(context.TODO(), barrier, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 	}
 	return nil
+}
+
+func parseContainerLaunchTimeOut(v string) int {
+	p, _ := strconv.Atoi(v)
+	if p < 0 {
+		return defaultContainerLaunchTimeout
+	}
+	return p
+}
+func getTimeout(c v1.Container) int {
+	for _, e := range c.Env {
+		if e.Name == appspub.ContainerLaunchTimeOutEnvName {
+			return parseContainerLaunchTimeOut(e.Value)
+		}
+	}
+	return 0
 }
