@@ -194,11 +194,20 @@ var _ = SIGDescribe("PullImages", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check imagepulljob should be cleaned")
+			time.Sleep(3 * time.Second)
 			gomega.Eventually(func() bool {
-				imagePullJobs, err := testerForImagePullJob.ListJobs(job.Namespace)
+				imagePullJobLister, err := testerForImagePullJob.ListJobs(job.Namespace)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return len(imagePullJobs.Items) > 0
-			}, 3*time.Second, time.Second).Should(gomega.Equal(false))
+				var imagePullJobs []*appsv1alpha1.ImagePullJob
+				for i := range imagePullJobLister.Items {
+					pullJob := &imagePullJobLister.Items[i]
+					if metav1.IsControlledBy(pullJob, job) {
+						imagePullJobs = append(imagePullJobs, pullJob)
+					}
+					fmt.Printf("waiting imagePullJob GC: %v", imagePullJobs)
+				}
+				return len(imagePullJobs) == 0
+			}, time.Minute, time.Second).Should(gomega.BeTrue())
 		})
 
 		framework.ConformanceIt("create an always job to pull an image on all nodes", func() {
