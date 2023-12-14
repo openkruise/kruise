@@ -17,12 +17,15 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestMergeVolumeMounts(t *testing.T) {
@@ -382,7 +385,6 @@ func TestSetPodConditionIfMsgChanged(t *testing.T) {
 				},
 			},
 		},
-
 		// case 1: add a new condition
 		{
 			pod: &v1.Pod{
@@ -464,6 +466,219 @@ func TestSetPodConditionIfMsgChanged(t *testing.T) {
 		if !reflect.DeepEqual(expect, actual) {
 			t.Fatalf("case %d: expect Conditions(%s), but get %s", i, expect, actual)
 		}
+	}
+}
+
+func TestExtractPort(t *testing.T) {
+	cases := []struct {
+		name          string
+		param         intstr.IntOrString
+		container     v1.Container
+		expectErr     error
+		expectPortInt int
+	}{
+		{
+			name: "str type container port",
+			param: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "main-port",
+			},
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port",
+						ContainerPort: 80,
+					},
+				},
+			},
+			expectPortInt: 80,
+		},
+		{
+			name: "str type container",
+			param: intstr.IntOrString{
+				Type:   intstr.Int,
+				IntVal: 8081,
+			},
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port",
+						ContainerPort: 8080,
+					},
+				},
+			},
+			expectPortInt: 8081,
+		},
+		{
+			name: "intOrString had no kind",
+			param: intstr.IntOrString{
+				Type: 3,
+			},
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port",
+						ContainerPort: 8080,
+					},
+				},
+			},
+			expectErr:     fmt.Errorf("intOrString had no kind: {Type:3 IntVal:0 StrVal:}"),
+			expectPortInt: -1,
+		},
+		{
+			name: "find port by name error(strconv atoi error)",
+			param: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "main-port",
+			},
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port",
+						ContainerPort: -80,
+					},
+				},
+			},
+			expectErr:     fmt.Errorf("invalid port number: -80"),
+			expectPortInt: -80,
+		},
+		{
+			name: "no found port",
+			param: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "main-port",
+			},
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port-no",
+						ContainerPort: 80,
+					},
+				},
+			},
+			expectErr:     fmt.Errorf("strconv.Atoi: parsing \"main-port\": invalid syntax"),
+			expectPortInt: 0,
+		},
+		{
+			name:  "invalid port number",
+			param: intstr.IntOrString{},
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port",
+						ContainerPort: 8080,
+					},
+				},
+			},
+			expectErr:     fmt.Errorf("invalid port number: 0"),
+			expectPortInt: 0,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			get, err := ExtractPort(cs.param, cs.container)
+			if err != nil && !reflect.DeepEqual(cs.expectErr.Error(), err.Error()) {
+				t.Logf("%v ---> %v", cs.expectErr, err)
+				t.Errorf("Failed to extractPort, err: %v", err)
+			}
+			if get != cs.expectPortInt {
+				t.Errorf("expect: %v, but: %v", cs.expectPortInt, get)
+			}
+		})
+	}
+}
+
+func TestGetPodContainerByName(t *testing.T) {
+	cases := []struct {
+		name            string
+		cName           string
+		pod             *v1.Pod
+		expectContainer *v1.Container
+	}{
+		{
+			name:  "find container by name in pod",
+			cName: "main",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "sp1",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "main",
+							Image: "nginx:1.5",
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "main-port",
+									ContainerPort: 9090,
+								},
+							},
+						},
+						{
+							Name:  "sidecar1",
+							Image: "sidecar1-image:1.5",
+						},
+					},
+				},
+			},
+			expectContainer: &v1.Container{
+				Name:  "main",
+				Image: "nginx:1.5",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port",
+						ContainerPort: 9090,
+					},
+				},
+			},
+		},
+
+		{
+			name:  "no find container by name in pod",
+			cName: "main-using",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "sp1",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "main",
+							Image: "nginx:1.5",
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "main-port",
+									ContainerPort: 9090,
+								},
+							},
+						},
+						{
+							Name:  "sidecar1",
+							Image: "sidecar1-image:1.5",
+						},
+					},
+				},
+			},
+			expectContainer: nil,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			get := GetPodContainerByName(cs.cName, cs.pod)
+			if !reflect.DeepEqual(DumpJSON(get), DumpJSON(cs.expectContainer)) {
+				t.Errorf("expect: %v, but: %v", DumpJSON(cs.expectContainer), DumpJSON(get))
+			}
+		})
 	}
 }
 
@@ -738,5 +953,69 @@ func TestSetPodReadyCondition(t *testing.T) {
 		if expect != actual {
 			t.Fatalf("case %d: expect PodReady Conditions(%s), but get %s", i, expect, actual)
 		}
+	}
+}
+
+func TestFindPortByName(t *testing.T) {
+	cases := []struct {
+		name       string
+		container  v1.Container
+		portName   string
+		expectErr  error
+		expectPort int
+	}{
+		{
+			name: "get port by port name",
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name:          "main-port",
+						ContainerPort: 80,
+					},
+				},
+			},
+			portName:   "main-port",
+			expectPort: 80,
+		},
+		{
+			name: "no find port by port name(container port is nil)",
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name: "main-port",
+					},
+				},
+			},
+			portName:   "main-port",
+			expectPort: 0,
+		},
+		{
+			name: "no found port by port name",
+			container: v1.Container{
+				Name: "main",
+				Ports: []v1.ContainerPort{
+					{
+						Name: "main-port",
+					},
+				},
+			},
+			portName:   "main-port-fake",
+			expectErr:  fmt.Errorf("port main-port-fake not found"),
+			expectPort: 0,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			get, err := findPortByName(cs.container, cs.portName)
+			if !reflect.DeepEqual(cs.expectErr, err) {
+				t.Errorf("Failed to get port by name, err: %v", err)
+			}
+			if get != cs.expectPort {
+				t.Errorf("expect: %v, but: %v", cs.expectPort, get)
+			}
+		})
 	}
 }
