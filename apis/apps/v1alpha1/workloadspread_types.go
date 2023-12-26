@@ -130,6 +130,11 @@ type WorkloadSpreadStatus struct {
 	// Contains the status of each subset. Each element in this array represents one subset
 	// +optional
 	SubsetStatuses []WorkloadSpreadSubsetStatus `json:"subsetStatuses,omitempty"`
+
+	// VersionedSubsetStatuses is to solve rolling-update problems, where the creation of new-version pod
+	// may be earlier than deletion of old-version pod. We have to calculate the pod subset distribution for
+	// each version.
+	VersionedSubsetStatuses map[string][]WorkloadSpreadSubsetStatus `json:"versionedSubsetStatuses,omitempty"`
 }
 
 type WorkloadSpreadSubsetConditionType string

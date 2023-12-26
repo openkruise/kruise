@@ -20,11 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
-	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,16 +39,16 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/util/configuration"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
 type EventAction string
 
 const (
-	CreateEventAction EventAction = "Create"
-	UpdateEventAction EventAction = "Update"
-	DeleteEventAction EventAction = "Delete"
+	CreateEventAction            EventAction = "Create"
+	UpdateEventAction            EventAction = "Update"
+	DeleteEventAction            EventAction = "Delete"
+	DeploymentRevisionAnnotation             = "deployment.kubernetes.io/revision"
 )
 
 var _ handler.EventHandler = &podEventHandler{}
@@ -63,7 +63,7 @@ func (p *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 	oldPod := evt.ObjectOld.(*corev1.Pod)
 	newPod := evt.ObjectNew.(*corev1.Pod)
 
-	if kubecontroller.IsPodActive(oldPod) && !kubecontroller.IsPodActive(newPod) {
+	if kubecontroller.IsPodActive(oldPod) && !kubecontroller.IsPodActive(newPod) || wsutil.GetPodVersion(oldPod) != wsutil.GetPodVersion(newPod) {
 		p.handlePod(q, newPod, UpdateEventAction)
 	}
 }
@@ -103,15 +103,22 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 	var gvk schema.GroupVersionKind
 	var oldReplicas int32
 	var newReplicas int32
+	var otherChanges bool
 
 	switch evt.ObjectNew.(type) {
 	case *appsv1alpha1.CloneSet:
-		oldReplicas = *evt.ObjectOld.(*appsv1alpha1.CloneSet).Spec.Replicas
-		newReplicas = *evt.ObjectNew.(*appsv1alpha1.CloneSet).Spec.Replicas
+		oldObject := evt.ObjectOld.(*appsv1alpha1.CloneSet)
+		newObject := evt.ObjectNew.(*appsv1alpha1.CloneSet)
+		oldReplicas = *oldObject.Spec.Replicas
+		newReplicas = *newObject.Spec.Replicas
+		otherChanges = newObject.Status.UpdateRevision != oldObject.Status.CurrentRevision
 		gvk = controllerKruiseKindCS
 	case *appsv1.Deployment:
-		oldReplicas = *evt.ObjectOld.(*appsv1.Deployment).Spec.Replicas
-		newReplicas = *evt.ObjectNew.(*appsv1.Deployment).Spec.Replicas
+		oldObject := evt.ObjectOld.(*appsv1.Deployment)
+		newObject := evt.ObjectNew.(*appsv1.Deployment)
+		oldReplicas = *oldObject.Spec.Replicas
+		newReplicas = *newObject.Spec.Replicas
+		otherChanges = newObject.Annotations[DeploymentRevisionAnnotation] != oldObject.Annotations[DeploymentRevisionAnnotation]
 		gvk = controllerKindDep
 	case *appsv1.ReplicaSet:
 		oldReplicas = *evt.ObjectOld.(*appsv1.ReplicaSet).Spec.Replicas
@@ -130,20 +137,21 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 		newReplicas = *evt.ObjectNew.(*appsv1beta1.StatefulSet).Spec.Replicas
 		gvk = controllerKruiseKindSts
 	case *unstructured.Unstructured:
-		oldReplicas = w.getReplicasFromUnstructured(evt.ObjectOld.(*unstructured.Unstructured))
-		newReplicas = w.getReplicasFromUnstructured(evt.ObjectNew.(*unstructured.Unstructured))
+		oldReplicas = wsutil.GetReplicasFromCustomWorkload(w.Reader, evt.ObjectOld.(*unstructured.Unstructured))
+		newReplicas = wsutil.GetReplicasFromCustomWorkload(w.Reader, evt.ObjectNew.(*unstructured.Unstructured))
 		gvk = evt.ObjectNew.(*unstructured.Unstructured).GroupVersionKind()
 	default:
 		return
 	}
 
 	// workload replicas changed, and reconcile corresponding WorkloadSpread
-	if oldReplicas != newReplicas {
+	if oldReplicas != newReplicas || otherChanges {
 		workloadNsn := types.NamespacedName{
 			Namespace: evt.ObjectNew.GetNamespace(),
 			Name:      evt.ObjectNew.GetName(),
 		}
-		ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk)
+		owner := metav1.GetControllerOfNoCopy(evt.ObjectNew)
+		ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk, owner)
 		if err != nil {
 			klog.Errorf("unable to get WorkloadSpread related with %s (%s/%s), err: %v",
 				gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, err)
@@ -156,40 +164,6 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 			q.Add(reconcile.Request{NamespacedName: nsn})
 		}
 	}
-}
-
-func (w *workloadEventHandler) getReplicasFromUnstructured(object *unstructured.Unstructured) int32 {
-	if object == nil || reflect.ValueOf(object).IsNil() {
-		return 0
-	}
-	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(w.Reader)
-	if err != nil {
-		klog.Errorf("Failed to get workloadSpread custom workload white list from kruise config map")
-		return 0
-	}
-
-	gvk := object.GroupVersionKind()
-	for _, workload := range whiteList.Workloads {
-		if workload.GroupVersionKind.GroupKind() != gvk.GroupKind() {
-			continue
-		}
-		var exists bool
-		var replicas int64
-		path := strings.Split(workload.ReplicasPath, ".")
-		if len(path) > 0 {
-			replicas, exists, err = unstructured.NestedInt64(object.Object, path...)
-			if err != nil || !exists {
-				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, workload.ReplicasPath)
-			}
-		} else {
-			replicas, exists, err = unstructured.NestedInt64(object.Object, "spec", "replicas")
-			if err != nil || !exists {
-				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, workload.ReplicasPath)
-			}
-		}
-		return int32(replicas)
-	}
-	return 0
 }
 
 func (w workloadEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
@@ -223,7 +197,8 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}
-	ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk)
+	owner := metav1.GetControllerOfNoCopy(obj)
+	ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk, owner)
 	if err != nil {
 		klog.Errorf("unable to get WorkloadSpread related with %s (%s/%s), err: %v",
 			gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, err)
@@ -239,12 +214,23 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 
 func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
 	workloadNamespaceName types.NamespacedName,
-	gvk schema.GroupVersionKind) (*appsv1alpha1.WorkloadSpread, error) {
+	gvk schema.GroupVersionKind, ownerRef *metav1.OwnerReference) (*appsv1alpha1.WorkloadSpread, error) {
 	wsList := &appsv1alpha1.WorkloadSpreadList{}
 	listOptions := &client.ListOptions{Namespace: workloadNamespaceName.Namespace}
 	if err := w.List(context.TODO(), wsList, listOptions); err != nil {
 		klog.Errorf("List WorkloadSpread failed: %s", err.Error())
 		return nil, err
+	}
+
+	// In case of ReplicaSet owned by Deployment, we should consider if the
+	// Deployment is referred by workloadSpread.
+	var ownerKey *types.NamespacedName
+	var ownerGvk schema.GroupVersionKind
+	if ownerRef != nil && reflect.DeepEqual(gvk, controllerKindRS) {
+		ownerGvk = schema.FromAPIVersionAndKind(ownerRef.APIVersion, ownerRef.Kind)
+		if reflect.DeepEqual(ownerGvk, controllerKindDep) {
+			ownerKey = &types.NamespacedName{Namespace: workloadNamespaceName.Namespace, Name: ownerRef.Name}
+		}
 	}
 
 	for _, ws := range wsList.Items {
@@ -257,13 +243,12 @@ func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
 			continue
 		}
 
-		targetGV, err := schema.ParseGroupVersion(targetRef.APIVersion)
-		if err != nil {
-			klog.Errorf("failed to parse targetRef's group version: %s", targetRef.APIVersion)
-			continue
+		// Ignore version
+		targetGk := schema.FromAPIVersionAndKind(targetRef.APIVersion, targetRef.Kind).GroupKind()
+		if reflect.DeepEqual(targetGk, gvk.GroupKind()) && targetRef.Name == workloadNamespaceName.Name {
+			return &ws, nil
 		}
-
-		if targetRef.Kind == gvk.Kind && targetGV.Group == gvk.Group && targetRef.Name == workloadNamespaceName.Name {
+		if ownerKey != nil && reflect.DeepEqual(targetGk, ownerGvk.GroupKind()) && targetRef.Name == ownerKey.Name {
 			return &ws, nil
 		}
 	}
