@@ -712,37 +712,37 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return &status, nil
 	}
 
-	// TODO: separate out the below update only related logic
+	return ssc.rollingUpdateStatefulsetPods(
+		set, &status, currentRevision, updateRevision, revisions, pods, replicas, minReadySeconds,
+	)
+}
+
+func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
+	set *appsv1beta1.StatefulSet,
+	status *appsv1beta1.StatefulSetStatus,
+	currentRevision *apps.ControllerRevision,
+	updateRevision *apps.ControllerRevision,
+	revisions []*apps.ControllerRevision,
+	pods []*v1.Pod,
+	replicas []*v1.Pod,
+	minReadySeconds int32,
+) (*appsv1beta1.StatefulSetStatus, error) {
 
 	// If update expectations have not satisfied yet, skip updating pods
 	if updateSatisfied, _, updateDirtyPods := updateExpectations.SatisfiedExpectations(getStatefulSetKey(set), updateRevision.Name); !updateSatisfied {
 		klog.V(4).Infof("Not satisfied update for %v, updateDirtyPods=%v", getStatefulSetKey(set), updateDirtyPods)
-		return &status, nil
-	}
-
-	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
-	maxUnavailable := 1
-	if set.Spec.UpdateStrategy.RollingUpdate != nil {
-		if set.Spec.UpdateStrategy.RollingUpdate.Paused {
-			return &status, nil
-		}
-
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(*set.Spec.Replicas), false)
-		if err != nil {
-			return &status, err
-		}
-		// maxUnavailable should not be less than 1
-		if maxUnavailable < 1 {
-			maxUnavailable = 1
-		}
+		return status, nil
 	}
 
 	// refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
+		if pod == nil {
+			continue
+		}
 		refreshed, duration, err := ssc.refreshPodState(set, pod, updateRevision.Name)
 		if err != nil {
-			return &status, err
+			return status, err
 		} else if duration > 0 {
 			durationStore.Push(getStatefulSetKey(set), duration)
 		}
@@ -751,22 +751,87 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 	}
 	if modified {
-		return &status, nil
+		return status, nil
 	}
 
-	var unavailablePods []string
+	var err error
+	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
+	maxUnavailable := 1
+	if set.Spec.UpdateStrategy.RollingUpdate != nil {
+		if set.Spec.UpdateStrategy.RollingUpdate.Paused {
+			return status, nil
+		}
+
+		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(*set.Spec.Replicas), false)
+		if err != nil {
+			return status, err
+		}
+		// maxUnavailable should not be less than 1
+		if maxUnavailable < 1 {
+			maxUnavailable = 1
+		}
+	}
+
+	minWaitTime := appsv1beta1.MaxMinReadySeconds * time.Second
+	unavailablePods := sets.NewString()
+	opts := &inplaceupdate.UpdateOptions{}
+	opts = inplaceupdate.SetOptionsDefaults(opts)
+	// counts any targets in the replicas that are unhealthy (terminated / in-place update not-ready / not running and
+	// ready for minReadySeconds) for checking if the count satisfied the MaxUnavailable limit.
+	for target := range replicas {
+		if replicas[target] == nil {
+			continue
+		}
+		if !isHealthy(replicas[target]) {
+			// 1. count pod as unavailable if it's unhealthy or terminating
+			unavailablePods.Insert(replicas[target].Name)
+		} else if completedErr := opts.CheckPodUpdateCompleted(replicas[target]); completedErr != nil {
+			// 2. count pod as unavailable if it's in-place updating and not ready
+			klog.V(4).Infof("StatefulSet %s/%s check Pod %s in-place update not-ready: %v",
+				set.Namespace,
+				set.Name,
+				replicas[target].Name,
+				completedErr)
+			unavailablePods.Insert(replicas[target].Name)
+		} else if isAvailable, waitTime := isRunningAndAvailable(replicas[target], minReadySeconds); !isAvailable {
+			// 3. count pod as unavailable if it's not available yet given the minReadySeconds requirement
+			unavailablePods.Insert(replicas[target].Name)
+			// make sure that we will wait for the first pod to get available
+			if waitTime != 0 && waitTime <= minWaitTime {
+				minWaitTime = waitTime
+				durationStore.Push(getStatefulSetKey(set), waitTime)
+			}
+		}
+	}
+
 	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, *set.Spec.Replicas, replicas)
 	klog.V(3).Infof("Prepare to update pods indexes %v for StatefulSet %s", updateIndexes, getStatefulSetKey(set))
-	minWaitTime := appsv1beta1.MaxMinReadySeconds * time.Second
 	// update pods in sequence
 	for _, target := range updateIndexes {
 
+		// the target is already up-to-date, go to next
+		if getPodRevision(replicas[target]) == updateRevision.Name {
+			continue
+		}
+
+		// the unavailable pods count exceed the maxUnavailable and the target is available, so we can't process it,
+		// wait for unhealthy Pods on update
+		if len(unavailablePods) >= maxUnavailable && !unavailablePods.Has(replicas[target].Name) {
+			klog.V(4).Infof(
+				"StatefulSet %s/%s is waiting for unavailable Pods %v to update, blocked pod %s",
+				set.Namespace,
+				set.Name,
+				unavailablePods.List(),
+				replicas[target].Name)
+			return status, nil
+		}
+
 		// delete the Pod if it is not already terminating and does not match the update revision.
-		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
+		if !isTerminating(replicas[target]) {
 			// todo validate in-place for pub
 			inplacing, inplaceUpdateErr := ssc.inPlaceUpdatePod(set, replicas[target], updateRevision, revisions)
 			if inplaceUpdateErr != nil {
-				return &status, inplaceUpdateErr
+				return status, inplaceUpdateErr
 			}
 			if !inplacing {
 				klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
@@ -774,51 +839,19 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 					set.Name,
 					replicas[target].Name)
 				if _, err := ssc.deletePod(set, replicas[target]); err != nil {
-					return &status, err
+					return status, err
 				}
 			}
+			// mark target as unavailable because it's updated
+			unavailablePods.Insert(replicas[target].Name)
 
 			if getPodRevision(replicas[target]) == currentRevision.Name {
 				status.CurrentReplicas--
 			}
 		}
-
-		opts := &inplaceupdate.UpdateOptions{}
-		opts = inplaceupdate.SetOptionsDefaults(opts)
-		if getPodRevision(replicas[target]) != updateRevision.Name || !isHealthy(replicas[target]) {
-			unavailablePods = append(unavailablePods, replicas[target].Name)
-		} else if completedErr := opts.CheckPodUpdateCompleted(replicas[target]); completedErr != nil {
-			klog.V(4).Infof("StatefulSet %s/%s check Pod %s in-place update not-ready: %v",
-				set.Namespace,
-				set.Name,
-				replicas[target].Name,
-				completedErr)
-			unavailablePods = append(unavailablePods, replicas[target].Name)
-		} else {
-			// check if the updated pod is running and available given minReadySeconds
-			if isAvailable, waitTime := isRunningAndAvailable(replicas[target], minReadySeconds); !isAvailable {
-				// the pod is not available yet given the minReadySeconds requirement
-				unavailablePods = append(unavailablePods, replicas[target].Name)
-				// make sure that we will wait for the first pod to get available
-				if waitTime != 0 && waitTime <= minWaitTime {
-					minWaitTime = waitTime
-					durationStore.Push(getStatefulSetKey(set), waitTime)
-				}
-			}
-		}
-
-		// wait for unhealthy Pods on update
-		if len(unavailablePods) >= maxUnavailable {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for unavailable Pods %v to update",
-				set.Namespace,
-				set.Name,
-				unavailablePods)
-			return &status, nil
-		}
-
 	}
-	return &status, nil
+
+	return status, nil
 }
 
 func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, pod *v1.Pod) (bool, error) {
