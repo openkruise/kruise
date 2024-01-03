@@ -80,7 +80,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 1},
+			expectResult: expectationDiffs{deleteAvailableLimit: 1},
 		},
 		{
 			name: "specified delete 1 pod (all ready) (step 2/3)",
@@ -115,7 +115,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 1},
+			expectResult: expectationDiffs{deleteAvailableLimit: 1},
 		},
 		{
 			name: "specified delete 2 pod (all ready) (step 2/6)",
@@ -150,7 +150,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false), // new creation
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 1},
+			expectResult: expectationDiffs{deleteAvailableLimit: 1},
 		},
 		{
 			name: "specified delete 2 pod (all ready) (step 5/6)",
@@ -185,7 +185,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 2},
+			expectResult: expectationDiffs{deleteAvailableLimit: 2},
 		},
 		{
 			name: "specified delete 2 pod and replicas to 4 (step 2/3)",
@@ -316,7 +316,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 1, useSurge: 1},
+			expectResult: expectationDiffs{deleteAvailableLimit: 1, useSurge: 1},
 		},
 		{
 			name: "specified delete with maxSurge (step 4/4)",
@@ -366,7 +366,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateUpdating, false, false), // new in-place update
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),   // new creation
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteReadyLimit: 0},
+			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteAvailableLimit: 0},
 		},
 		{
 			name: "update in-place partition=3 with maxSurge (step 4/4)",
@@ -379,7 +379,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),  // new in-place update
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteReadyLimit: 1},
+			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteAvailableLimit: 1},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 1/7)",
@@ -417,7 +417,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, true),   // begin to recreate
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 			},
-			expectResult: expectationDiffs{useSurge: 1, useSurgeOldRevision: 1, deleteReadyLimit: 1, updateNum: 1, updateMaxUnavailable: 2},
+			expectResult: expectationDiffs{useSurge: 1, useSurgeOldRevision: 1, deleteAvailableLimit: 1, updateNum: 1, updateMaxUnavailable: 2},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 4/7)",
@@ -442,7 +442,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation for update
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteReadyLimit: 0},
+			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteAvailableLimit: 0},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 6/7)",
@@ -455,7 +455,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),  // new creation
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation for update
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteReadyLimit: 1},
+			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteAvailableLimit: 1},
 		},
 		{
 			name: "update recreate partition=3 with maxSurge (step 7/7)",
@@ -492,7 +492,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteReadyLimit: 3},
+			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteAvailableLimit: 3},
 		},
 		{
 			name: "update recreate partition=99% with maxUnavailable=3, maxSurge=2 (step 3/3)",
@@ -529,7 +529,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteReadyLimit: 2},
+			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteAvailableLimit: 2},
 		},
 		{
 			name: "update recreate partition=99% with maxUnavailable=40%, maxSurge=30% (step 3/3)",
@@ -566,7 +566,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false), // new creation
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteReadyLimit: 1},
+			expectResult: expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 1, deleteAvailableLimit: 1},
 		},
 		{
 			name: "update recreate partition=99% with maxUnavailable=30%, maxSurge=30% (step 3/3)",
@@ -656,7 +656,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 			},
 			revisionConsistent: true,
-			expectResult:       expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 2, deleteReadyLimit: 2, updateNum: 1, updateMaxUnavailable: 2},
+			expectResult:       expectationDiffs{scaleDownNum: 1, scaleDownNumOldRevision: 2, deleteAvailableLimit: 2, updateNum: 1, updateMaxUnavailable: 2},
 		},
 		{
 			name: "disable rollback feature-gate",
@@ -705,7 +705,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, true),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 1},
+			expectResult: expectationDiffs{deleteAvailableLimit: 1},
 		},
 		{
 			name: "[scalingExcludePreparingDelete=false] specific delete a pod with lifecycle hook (step 2/4)",
@@ -745,7 +745,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, true),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 1},
+			expectResult: expectationDiffs{deleteAvailableLimit: 1},
 		},
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook (step 2/4)",
@@ -791,7 +791,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, true),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 1},
+			expectResult: expectationDiffs{deleteAvailableLimit: 1},
 		},
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook and then cancel (step 2/5)",
@@ -826,7 +826,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false), // it has been changed to normal by managePreparingDelete
 				createTestPod(newRevision, appspub.LifecycleStateNormal, false, false),
 			},
-			expectResult: expectationDiffs{scaleDownNum: 1, deleteReadyLimit: 1},
+			expectResult: expectationDiffs{scaleDownNum: 1, deleteAvailableLimit: 1},
 		},
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific delete a pod with lifecycle hook and then cancel (step 5/5)",
@@ -859,7 +859,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(newRevision, appspub.LifecycleStateNormal, true, true),
 			},
-			expectResult: expectationDiffs{deleteReadyLimit: 2},
+			expectResult: expectationDiffs{deleteAvailableLimit: 2},
 		},
 		{
 			name:      "[scalingExcludePreparingDelete=true] specific scale down with lifecycle hook, then scale up pods (step 3/6)",
@@ -950,7 +950,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleDownNum: 2, scaleDownNumOldRevision: 5, deleteReadyLimit: 2, updateNum: 3, updateMaxUnavailable: 2},
+			expectResult: expectationDiffs{scaleDownNum: 2, scaleDownNumOldRevision: 5, deleteAvailableLimit: 2, updateNum: 3, updateMaxUnavailable: 2},
 		},
 		{
 			name: "[UpdateStrategyPaused=true] create 0 newRevision pods with maxSurge=3,maxUnavailable=0",
