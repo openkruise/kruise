@@ -36,6 +36,7 @@ spec:
         - --logtostderr=true
         - --v=5
         - --feature-gates=AllAlpha=true
+        - --imagepulljob-global-parallelism=1
         image: controller:latest
         imagePullPolicy: Always
         name: manager

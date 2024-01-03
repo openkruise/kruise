@@ -113,6 +113,9 @@ const (
 
 	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
 	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
+
+	// ImagePullJobGlobalParallelism enable the max number of active image pulling jobs
+	ImagePullJobGlobalParallelism = "ImagePullJobGlobalParallelism"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -140,6 +143,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
 	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate:     {Default: false, PreRelease: featuregate.Alpha},
+	ImagePullJobGlobalParallelism:             {Default: true, PreRelease: featuregate.Alpha},
 }
 
 func init() {
