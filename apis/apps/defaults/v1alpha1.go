@@ -24,6 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	// ProtectionFinalizer is designed to ensure the GC of resources.
+	ProtectionFinalizer = "apps.kruise.io/deletion-protection"
 )
 
 // SetDefaults_SidecarSet set default values for SidecarSet.
@@ -372,7 +378,7 @@ func SetDefaultsImageTagPullPolicy(obj *v1alpha1.ImageTagPullPolicy) {
 }
 
 // SetDefaults_ImagePullJob set default values for ImagePullJob.
-func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
+func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob, addProtection bool) {
 	if obj.Spec.CompletionPolicy.Type == "" {
 		obj.Spec.CompletionPolicy.Type = v1alpha1.Always
 	}
@@ -387,6 +393,9 @@ func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
 	}
 	if obj.Spec.ImagePullPolicy == "" {
 		obj.Spec.ImagePullPolicy = v1alpha1.PullIfNotPresent
+	}
+	if addProtection {
+		controllerutil.AddFinalizer(obj, ProtectionFinalizer)
 	}
 }
 
