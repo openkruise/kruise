@@ -19,15 +19,28 @@ package imagepulljob
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
+	"strings"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	defaultTTLSecondsForNever = int32(24 * 3600)
+type syncAction string
 
+const (
+	defaultTTLSecondsForNever            = int32(24 * 3600)
 	defaultActiveDeadlineSecondsForNever = int64(1800)
+
+	create   syncAction = "create"
+	update   syncAction = "update"
+	noAction syncAction = "noAction"
 )
 
 func getTTLSecondsForAlways(job *appsv1alpha1.ImagePullJob) *int32 {
@@ -117,4 +130,106 @@ func formatStatusMessage(status *appsv1alpha1.ImagePullJobStatus) (ret string) {
 		return "job is running, no progress"
 	}
 	return fmt.Sprintf("job is running, progress %.1f%%", 100.0*float64(status.Succeeded+status.Failed)/float64(status.Desired))
+}
+
+func keyFromRef(ref appsv1alpha1.ReferenceObject) types.NamespacedName {
+	return types.NamespacedName{
+		Name:      ref.Name,
+		Namespace: ref.Namespace,
+	}
+}
+
+func keyFromObject(object client.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Name:      object.GetName(),
+		Namespace: object.GetNamespace(),
+	}
+}
+
+func targetFromSource(source *v1.Secret, keySet referenceSet) *v1.Secret {
+	target := source.DeepCopy()
+	target.ObjectMeta = metav1.ObjectMeta{
+		Namespace:    util.GetKruiseDaemonConfigNamespace(),
+		GenerateName: fmt.Sprintf("%s-", source.Name),
+		Labels: map[string]string{
+			SourceSecretUIDLabelKey: string(source.UID),
+		},
+		Annotations: map[string]string{
+			SourceSecretKeyAnno:       keyFromObject(source).String(),
+			TargetOwnerReferencesAnno: keySet.String(),
+		},
+	}
+	return target
+}
+
+func updateTarget(target, source *v1.Secret, keySet referenceSet) *v1.Secret {
+	target = target.DeepCopy()
+	target.Data = source.Data
+	target.StringData = source.StringData
+	target.Annotations[TargetOwnerReferencesAnno] = keySet.String()
+	return target
+}
+
+func referenceSetFromTarget(target *v1.Secret) referenceSet {
+	refs := strings.Split(target.Annotations[TargetOwnerReferencesAnno], ",")
+	keys := makeReferenceSet()
+	for _, ref := range refs {
+		namespace, name, err := cache.SplitMetaNamespaceKey(ref)
+		if err != nil {
+			klog.Errorf("Failed to parse job key from target secret %s annotations: %v", target.Name, err)
+			continue
+		}
+		keys.Insert(types.NamespacedName{Namespace: namespace, Name: name})
+	}
+	return keys
+}
+
+func computeTargetSyncAction(source, target *v1.Secret, job *appsv1alpha1.ImagePullJob) syncAction {
+	if target == nil || len(target.UID) == 0 {
+		return create
+	}
+	keySet := referenceSetFromTarget(target)
+	if !keySet.Contains(keyFromObject(job)) ||
+		!reflect.DeepEqual(source.Data, target.Data) ||
+		!reflect.DeepEqual(source.StringData, target.StringData) {
+		return update
+	}
+	return noAction
+}
+
+func makeReferenceSet(items ...types.NamespacedName) referenceSet {
+	refSet := map[types.NamespacedName]struct{}{}
+	for _, item := range items {
+		refSet[item] = struct{}{}
+	}
+	return refSet
+}
+
+type referenceSet map[types.NamespacedName]struct{}
+
+func (set referenceSet) String() string {
+	keyList := make([]string, 0, len(set))
+	for ref := range set {
+		keyList = append(keyList, ref.String())
+	}
+	return strings.Join(keyList, ",")
+}
+
+func (set referenceSet) Contains(key types.NamespacedName) bool {
+	_, exists := set[key]
+	return exists
+}
+
+func (set referenceSet) Insert(key types.NamespacedName) referenceSet {
+	set[key] = struct{}{}
+	return set
+}
+
+func (set referenceSet) Delete(key types.NamespacedName) referenceSet {
+	delete(set, key)
+	return set
+}
+
+func (set referenceSet) IsEmpty() bool {
+	return len(set) == 0
 }

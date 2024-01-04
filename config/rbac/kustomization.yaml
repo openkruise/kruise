@@ -1,3 +1,6 @@
+# Adds namespace to all resources.
+namespace: kruise-system
+
 resources:
 - role.yaml
 - role_binding.yaml
