@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2022 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,4 +23,11 @@ func GetKruiseNamespace() string {
 		return ns
 	}
 	return "kruise-system"
+}
+
+func GetKruiseDaemonConfigNamespace() string {
+	if ns := os.Getenv("KRUISE_DAEMON_CONFIG_NS"); len(ns) > 0 {
+		return ns
+	}
+	return "kruise-daemon-config"
 }
