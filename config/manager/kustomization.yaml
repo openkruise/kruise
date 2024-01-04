@@ -1,2 +1,5 @@
+# Adds namespace to all resources.
+namespace: kruise-system
+
 resources:
 - manager.yaml
