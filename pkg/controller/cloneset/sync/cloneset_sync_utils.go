@@ -63,9 +63,9 @@ type expectationDiffs struct {
 	// scaleUpLimit is the limit number of creating Pods when scaling up
 	// it is limited by scaleStrategy.maxUnavailable
 	scaleUpLimit int
-	// deleteAvailableLimit is the limit number of ready Pods that can be deleted
+	// deleteReadyLimit is the limit number of ready Pods that can be deleted
 	// it is limited by UpdateStrategy.maxUnavailable
-	deleteAvailableLimit int
+	deleteReadyLimit int
 
 	// useSurge is the number that temporarily expect to be above the desired replicas
 	useSurge int
@@ -253,7 +253,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		res.scaleDownNumOldRevision = integer.IntMax(currentTotalOldCount-toDeleteOldRevisionCount-expectedTotalOldCount, 0)
 	}
 	if toDeleteNewRevisionCount > 0 || toDeleteOldRevisionCount > 0 || res.scaleDownNum > 0 {
-		res.deleteAvailableLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-totalUnavailable, 0)
+		res.deleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-totalUnavailable, 0)
 	}
 
 	// The consistency between scale and update will be guaranteed by syncCloneSet and expectations
@@ -279,6 +279,10 @@ func isSpecifiedDelete(cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod) bool {
+	return IsPodAvailable(coreControl, pod, 0)
 }
 
 func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {

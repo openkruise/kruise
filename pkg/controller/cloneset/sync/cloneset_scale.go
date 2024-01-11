@@ -110,16 +110,15 @@ func (r *realControl) Scale(
 	if podsToDelete := util.DiffPods(podsSpecifiedToDelete, podsInPreDelete); len(podsToDelete) > 0 {
 		newPodsToDelete, oldPodsToDelete := clonesetutils.GroupUpdateAndNotUpdatePods(podsToDelete, updateRevision)
 		klog.V(3).Infof("CloneSet %s try to delete pods specified. Delete ready limit: %d. New Pods: %v, old Pods: %v.",
-			controllerKey, diffRes.deleteAvailableLimit, util.GetPodNames(newPodsToDelete).List(), util.GetPodNames(oldPodsToDelete).List())
+			controllerKey, diffRes.deleteReadyLimit, util.GetPodNames(newPodsToDelete).List(), util.GetPodNames(oldPodsToDelete).List())
 
 		podsCanDelete := make([]*v1.Pod, 0, len(podsToDelete))
 		for _, pod := range podsToDelete {
-			// Determine pod available, since deleteAvailableLimit is also based on the pod available calculation
-			if !IsPodAvailable(coreControl, pod, updateCS.Spec.MinReadySeconds) {
+			if !isPodReady(coreControl, pod) {
 				podsCanDelete = append(podsCanDelete, pod)
-			} else if diffRes.deleteAvailableLimit > 0 {
+			} else if diffRes.deleteReadyLimit > 0 {
 				podsCanDelete = append(podsCanDelete, pod)
-				diffRes.deleteAvailableLimit--
+				diffRes.deleteReadyLimit--
 			}
 		}
 
@@ -137,17 +136,16 @@ func (r *realControl) Scale(
 		}
 
 		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev), delete ready limit: %d",
-			controllerKey, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, diffRes.deleteAvailableLimit)
+			controllerKey, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, diffRes.deleteReadyLimit)
 
 		podsPreparingToDelete := r.choosePodsToDelete(updateCS, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, notUpdatedPods, updatedPods)
 		podsToDelete := make([]*v1.Pod, 0, len(podsPreparingToDelete))
 		for _, pod := range podsPreparingToDelete {
-			// Determine pod available, since deleteAvailableLimit is also based on the pod available calculation
-			if !IsPodAvailable(coreControl, pod, updateCS.Spec.MinReadySeconds) {
+			if !isPodReady(coreControl, pod) {
 				podsToDelete = append(podsToDelete, pod)
-			} else if diffRes.deleteAvailableLimit > 0 {
+			} else if diffRes.deleteReadyLimit > 0 {
 				podsToDelete = append(podsToDelete, pod)
-				diffRes.deleteAvailableLimit--
+				diffRes.deleteReadyLimit--
 			}
 		}
 
