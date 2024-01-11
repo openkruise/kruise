@@ -44,7 +44,7 @@ func ExistsPriorities(pod *v1.Pod) bool {
 
 func GetContainerPriority(c *v1.Container) *int {
 	for _, e := range c.Env {
-		if e.Name == appspub.ContainerLaunchBarrierEnvName {
+		if e.Name == appspub.ContainerLaunchBarrierEnvName && len(e.ValueFrom.ConfigMapKeyRef.Key) >= priorityStartIndex {
 			p, _ := strconv.Atoi(e.ValueFrom.ConfigMapKeyRef.Key[priorityStartIndex:])
 			return &p
 		}
