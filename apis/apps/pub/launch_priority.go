@@ -20,6 +20,10 @@ const (
 	// ContainerLaunchPriorityEnvName is the env name that users have to define in pod container
 	// to identity the launch priority of this container.
 	ContainerLaunchPriorityEnvName = "KRUISE_CONTAINER_PRIORITY"
+	// ContainerLaunchTimeOutEnvName is high priority container startup times out.
+	ContainerLaunchTimeOutEnvName = "KRUISE_CONTAINER_LAUNCH_TIMEOUT"
+	// ContainerLaunchPriorityUpdateTimeKey a label used to record the update time.
+	ContainerLaunchPriorityUpdateTimeKey = "apps.kruise.io/container-launch-priority-update-time"
 	// ContainerLaunchBarrierEnvName is the env name that Kruise webhook will inject into containers
 	// if the pod have configured launch priority.
 	ContainerLaunchBarrierEnvName = "KRUISE_CONTAINER_BARRIER"
