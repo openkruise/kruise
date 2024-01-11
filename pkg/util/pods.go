@@ -304,6 +304,18 @@ func SetPodCondition(pod *v1.Pod, condition v1.PodCondition) {
 	pod.Status.Conditions = append(pod.Status.Conditions, condition)
 }
 
+func SetPodConditionIfMsgChanged(pod *v1.Pod, condition v1.PodCondition) {
+	for i, c := range pod.Status.Conditions {
+		if c.Type == condition.Type {
+			if c.Status != condition.Status || c.Message != condition.Message {
+				pod.Status.Conditions[i] = condition
+			}
+			return
+		}
+	}
+	pod.Status.Conditions = append(pod.Status.Conditions, condition)
+}
+
 func SetPodReadyCondition(pod *v1.Pod) {
 	podReady := GetCondition(pod, v1.PodReady)
 	if podReady == nil {
