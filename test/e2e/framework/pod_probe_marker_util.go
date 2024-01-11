@@ -177,6 +177,77 @@ func (s *PodProbeMarkerTester) NewBaseStatefulSet(namespace, randStr string) *ap
 	}
 }
 
+func (s *PodProbeMarkerTester) NewPodProbeMarkerWithProbeImg(ns, randStr string) appsv1alpha1.PodProbeMarker {
+	return appsv1alpha1.PodProbeMarker{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ppm-minecraft",
+			Namespace: ns,
+		},
+		Spec: appsv1alpha1.PodProbeMarkerSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": fmt.Sprintf("probe-%s", randStr),
+				},
+			},
+			Probes: []appsv1alpha1.PodContainerProbe{
+				{
+					Name:          "healthy",
+					ContainerName: "minecraft",
+					Probe: appsv1alpha1.ContainerProbeSpec{
+						Probe: corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								Exec: &corev1.ExecAction{
+									Command: []string{"bash", "./probe.sh"},
+								},
+							},
+						},
+					},
+					PodConditionType: "game.kruise.io/healthy",
+				},
+			},
+		},
+	}
+}
+
+func (s *PodProbeMarkerTester) NewStatefulSetWithProbeImg(namespace, randStr string) *appsv1beta1.StatefulSet {
+	return &appsv1beta1.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps.kruise.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "stateful-test",
+			Namespace: namespace,
+		},
+		Spec: appsv1beta1.StatefulSetSpec{
+			PodManagementPolicy: apps.ParallelPodManagement,
+			ServiceName:         "fake-service",
+			Replicas:            utilpointer.Int32Ptr(2),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": fmt.Sprintf("probe-%s", randStr),
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": fmt.Sprintf("probe-%s", randStr),
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "minecraft",
+							Image:           "openkruise/minecraft-demo:probe-v0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func (s *PodProbeMarkerTester) CreateStatefulSet(sts *appsv1beta1.StatefulSet) {
 	Logf("create sts(%s/%s)", sts.Namespace, sts.Name)
 	_, err := s.kc.AppsV1beta1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
@@ -185,7 +256,7 @@ func (s *PodProbeMarkerTester) CreateStatefulSet(sts *appsv1beta1.StatefulSet) {
 }
 
 func (s *PodProbeMarkerTester) WaitForStatefulSetRunning(sts *appsv1beta1.StatefulSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
+	pollErr := wait.PollImmediate(time.Second, 2*time.Minute,
 		func() (bool, error) {
 			inner, err := s.kc.AppsV1beta1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			if err != nil {

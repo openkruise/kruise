@@ -19,7 +19,10 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -272,6 +275,119 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			for _, npp := range nppList.Items {
 				gomega.Expect(npp.Spec.PodProbes).To(gomega.HaveLen(0))
 			}
+		})
+
+		ginkgo.It("pod probe marker test2", func() {
+			nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			nodeLen := len(nodeList.Items)
+			if nodeLen == 0 {
+				ginkgo.By("pod probe markers list nodeList is zero")
+				return
+			}
+			nppList, err := kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(nppList.Items).To(gomega.HaveLen(nodeLen))
+
+			// create statefulset
+			sts := tester.NewStatefulSetWithProbeImg(ns, randStr)
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			sts.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     sts.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
+			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			ginkgo.By(fmt.Sprintf("Create statefulset(%s/%s)", sts.Namespace, sts.Name))
+			tester.CreateStatefulSet(sts)
+
+			// create pod probe marker
+			ppm := tester.NewPodProbeMarkerWithProbeImg(ns, randStr)
+			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), &ppm, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Firstly, probe.sh return false
+			err = wait.PollImmediate(1*time.Second, 10*time.Second,
+				func() (done bool, err error) {
+					pods, err := tester.ListActivePods(ns)
+					if err != nil {
+						return false, err
+					}
+					if len(pods) != nodeLen {
+						return false, nil
+					}
+
+					for _, pod := range pods {
+						condition := util.GetCondition(pod, "game.kruise.io/healthy")
+						if condition == nil {
+							return false, nil
+						}
+						if condition.Status != v1.ConditionFalse {
+							return false, nil
+						}
+					}
+					return true, nil
+				})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Secondly, probe.sh return true & msg is 'data'
+			err = wait.PollImmediate(1*time.Second, 20*time.Second,
+				func() (done bool, err error) {
+					pods, err := tester.ListActivePods(ns)
+					if err != nil {
+						return false, err
+					}
+					if len(pods) != nodeLen {
+						return false, fmt.Errorf("the num of pods(%d) is not same as num of nodes(%d)", len(pods), nodeLen)
+					}
+
+					for _, pod := range pods {
+						condition := util.GetCondition(pod, "game.kruise.io/healthy")
+						if condition == nil {
+							return false, nil
+						}
+						ginkgo.By(fmt.Sprintf("Pod(%s/%s) game.kruise.io/healthy condition status is %s; message is %s", pod.Namespace, pod.Name, condition.Status, condition.Message))
+						if condition.Status != v1.ConditionTrue {
+							return false, nil
+						}
+						if !strings.Contains(condition.Message, "data") {
+							return false, nil
+						}
+					}
+					return true, nil
+				})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Thirdly, probe.sh return true & msg is 'gate'
+			err = wait.PollImmediate(1*time.Second, 20*time.Second,
+				func() (done bool, err error) {
+					pods, err := tester.ListActivePods(ns)
+					if err != nil {
+						return false, err
+					}
+					if len(pods) != nodeLen {
+						return false, fmt.Errorf("the num of pods(%d) is not same as num of nodes(%d)", len(pods), nodeLen)
+					}
+
+					for _, pod := range pods {
+						condition := util.GetCondition(pod, "game.kruise.io/healthy")
+						if condition == nil {
+							return false, nil
+						}
+						ginkgo.By(fmt.Sprintf("Pod(%s/%s) game.kruise.io/healthy condition status is %s; message is %s", pod.Namespace, pod.Name, condition.Status, condition.Message))
+						if condition.Status != v1.ConditionTrue {
+							return false, nil
+						}
+						if !strings.Contains(condition.Message, "gate") {
+							return false, nil
+						}
+					}
+					return true, nil
+				})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
 })
