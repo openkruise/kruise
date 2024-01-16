@@ -29,4 +29,8 @@ const (
 	ContainerLaunchPriorityKey = "apps.kruise.io/container-launch-priority"
 	// ContainerLaunchOrdered is the annotation value that indicates containers in pod should be launched by ordinal.
 	ContainerLaunchOrdered = "Ordered"
+
+	// ContainerLaunchPriorityCompletedKey is the annotation indicates the pod has all its priorities
+	// patched into its barrier configmap.
+	ContainerLaunchPriorityCompletedKey = "apps.kruise.io/container-launch-priority-completed"
 )

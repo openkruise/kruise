@@ -4,15 +4,18 @@ import (
 	"context"
 	"strconv"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagenames "k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
 )
 
 // start containers based on priority order
-func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
+func (h *PodCreateHandler) containerLaunchPriorityInitialization(_ context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
 	if len(req.AdmissionRequest.SubResource) > 0 ||
 		req.AdmissionRequest.Operation != admissionv1.Create ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
@@ -30,6 +33,7 @@ func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Con
 			priority[i] = 0 - i
 		}
 		h.setPodEnv(priority, pod)
+		klog.V(3).Infof("Injected ordered container launch priority for Pod %s/%s", pod.Namespace, pod.Name)
 		return false, nil
 	}
 
@@ -43,6 +47,7 @@ func (h *PodCreateHandler) containerLaunchPriorityInitialization(ctx context.Con
 	}
 
 	h.setPodEnv(priority, pod)
+	klog.V(3).Infof("Injected customized container launch priority for Pod %s/%s", pod.Namespace, pod.Name)
 	return false, nil
 }
 
@@ -87,15 +92,6 @@ func (h *PodCreateHandler) setPodEnv(priority []int, pod *corev1.Pod) {
 		pod.Name = storagenames.SimpleNameGenerator.GenerateName(pod.GenerateName)
 	}
 	for i := range priority {
-		env := corev1.EnvVar{
-			Name: appspub.ContainerLaunchBarrierEnvName,
-			ValueFrom: &corev1.EnvVarSource{
-				ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: pod.Name + "-barrier"},
-					Key:                  "p_" + strconv.Itoa(priority[i]),
-				},
-			},
-		}
-		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, env)
+		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, utilcontainerlaunchpriority.GeneratePriorityEnv(priority[i], pod.Name))
 	}
 }

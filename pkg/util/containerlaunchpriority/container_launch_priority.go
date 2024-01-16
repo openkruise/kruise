@@ -17,6 +17,7 @@ limitations under the License.
 package containerlaunchpriority
 
 import (
+	"fmt"
 	"strconv"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -28,20 +29,6 @@ const (
 	priorityStartIndex = 2
 )
 
-func ExistsPriorities(pod *v1.Pod) bool {
-	if len(pod.Spec.Containers) == 0 {
-		return false
-	}
-	for i := range pod.Spec.Containers {
-		for _, env := range pod.Spec.Containers[i].Env {
-			if env.Name == appspub.ContainerLaunchBarrierEnvName {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func GetContainerPriority(c *v1.Container) *int {
 	for _, e := range c.Env {
 		if e.Name == appspub.ContainerLaunchBarrierEnvName {
@@ -50,4 +37,20 @@ func GetContainerPriority(c *v1.Container) *int {
 		}
 	}
 	return nil
+}
+
+func GeneratePriorityEnv(priority int, podName string) v1.EnvVar {
+	return v1.EnvVar{
+		Name: appspub.ContainerLaunchBarrierEnvName,
+		ValueFrom: &v1.EnvVarSource{
+			ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{Name: podName + "-barrier"},
+				Key:                  GetKey(priority),
+			},
+		},
+	}
+}
+
+func GetKey(priority int) string {
+	return fmt.Sprintf("p_%d", priority)
 }
