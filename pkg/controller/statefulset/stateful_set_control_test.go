@@ -1692,6 +1692,9 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 				pod.Status.Phase = v1.PodRunning
 				condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 				podutil.UpdatePodCondition(&pod.Status, &condition)
+				// force reset pod ready time to now because we use InPlaceIfPossible strategy in these testcases and
+				// the fakeObjectManager won't reset the pod's status when update pod in place.
+				podutil.GetPodReadyCondition(pod.Status).LastTransitionTime = metav1.Now()
 				fakeResourceVersion(pod)
 				if err := om.podsIndexer.Update(pod); err != nil {
 					return err
@@ -1813,7 +1816,7 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		}
 		// update the image
 		set.Spec.Template.Spec.Containers[0].Image = "foo"
-		// reconcile once, start with no pod
+		// reconcile once, start with no pod updated
 		if err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1825,7 +1828,7 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 		if err := test.updatePod(spc, set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		// reconcile once more
+		// reconcile twice
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
@@ -2111,6 +2114,90 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 	spc.setPodReady(set, 5)
 	originalPods, _ = spc.setPodReady(set, 3)
 	sort.Sort(ascendingOrdinal(originalPods))
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if !reflect.DeepEqual(pods, originalPods) {
+		t.Fatalf("Expected pods %v, got pods %v", originalPods, pods)
+	}
+}
+
+func TestStatefulSetControlRollingUpdateBlockByMaxUnavailable(t *testing.T) {
+	set := burst(newStatefulSet(6))
+	var partition int32 = 3
+	var maxUnavailable = intstr.FromInt(2)
+	set.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
+		Type: apps.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
+			return &appsv1beta1.RollingUpdateStatefulSetStrategy{
+				Partition:      &partition,
+				MaxUnavailable: &maxUnavailable,
+			}
+		}(),
+	}
+
+	client := fake.NewSimpleClientset()
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	spc, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+	if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+		t.Fatal(err)
+	}
+	set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// set pod 0 to terminating
+	originalPods, err := spc.setPodTerminated(set, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(originalPods))
+
+	// start to update
+	set.Spec.Template.Spec.Containers[0].Image = "foo"
+
+	// first update pod 5 only because pod 0 is terminating
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if !reflect.DeepEqual(pods, originalPods[:5]) {
+		t.Fatalf("Expected pods %v, got pods %v", originalPods[:3], pods)
+	}
+
+	// create new pods 5
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pods) != 6 {
+		t.Fatalf("Expected create pods 5, got pods %v", pods)
+	}
+
+	// set pod 2 to terminating and pod 5 to ready
+	spc.setPodTerminated(set, 2)
+	spc.setPodRunning(set, 5)
+	originalPods, _ = spc.setPodReady(set, 5)
+	sort.Sort(ascendingOrdinal(originalPods))
+	// should not update any pods because pod 0 and 2 are terminating
 	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
 		t.Fatal(err)
 	}
@@ -2957,6 +3044,12 @@ func (om *fakeObjectManager) setPodRunning(set *appsv1beta1.StatefulSet, ordinal
 }
 
 func (om *fakeObjectManager) setPodReady(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+	return om.setPodReadyWithMinReadySeconds(set, ordinal, 0)
+}
+
+func (om *fakeObjectManager) setPodReadyWithMinReadySeconds(
+	set *appsv1beta1.StatefulSet, ordinal int, minReadySeconds int32,
+) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -2972,6 +3065,13 @@ func (om *fakeObjectManager) setPodReady(set *appsv1beta1.StatefulSet, ordinal i
 	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
+	if readyTime := podutil.GetPodReadyCondition(pod.Status).LastTransitionTime; minReadySeconds > 0 &&
+		metav1.Now().Sub(readyTime.Time) < time.Duration(minReadySeconds)*time.Second {
+
+		podutil.GetPodReadyCondition(pod.Status).LastTransitionTime = metav1.NewTime(
+			time.Now().Add(-time.Second * time.Duration(minReadySeconds)),
+		)
+	}
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
 	return om.podsLister.Pods(set.Namespace).List(selector)
@@ -3242,7 +3342,7 @@ func scaleUpStatefulSetControl(set *appsv1beta1.StatefulSet,
 	if err != nil {
 		return err
 	}
-	for set.Status.ReadyReplicas < *set.Spec.Replicas {
+	for set.Status.UpdatedAvailableReplicas < *set.Spec.Replicas {
 		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			return err
@@ -3269,7 +3369,7 @@ func scaleUpStatefulSetControl(set *appsv1beta1.StatefulSet,
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReady(set, ord); err != nil {
+				if pods, err = om.setPodReadyWithMinReadySeconds(set, ord, getMinReadySeconds(set)); err != nil {
 					return err
 				}
 			default:
