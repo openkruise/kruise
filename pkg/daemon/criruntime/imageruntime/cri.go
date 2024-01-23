@@ -23,13 +23,14 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util/secret"
+
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	runtimeapiv1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapiv1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -55,16 +56,15 @@ func NewCRIImageService(runtimeURI string, accountManager daemonutil.ImagePullAc
 		return nil, err
 	}
 
-	imageClientV1, imageClientV1alpha2, err := determineImageClientAPIVersion(conn)
+	imageClientV1, err := determineImageClientAPIVersion(conn)
 	if err != nil {
 		klog.ErrorS(err, "Failed to determine CRI image API version")
 		return nil, err
 	}
 
 	return &commonCRIImageService{
-		accountManager:         accountManager,
-		criImageClient:         imageClientV1,
-		criImageClientV1alpha2: imageClientV1alpha2,
+		accountManager: accountManager,
+		criImageClient: imageClientV1,
 	}, nil
 }
 

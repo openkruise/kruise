@@ -20,7 +20,6 @@ import (
 	"context"
 	"reflect"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var _ handler.EventHandler = &enqueueRequestForNodePodProbe{}
@@ -95,7 +96,7 @@ func (p *enqueueRequestForPod) Delete(evt event.DeleteEvent, q workqueue.RateLim
 	npp := &appsalphav1.NodePodProbe{}
 	if err := p.reader.Get(context.TODO(), client.ObjectKey{Name: obj.Spec.NodeName}, npp); err != nil {
 		if !errors.IsNotFound(err) {
-			klog.Errorf("Get NodePodProbe(%s) failed: %s", obj.Spec.NodeName)
+			klog.Errorf("Get NodePodProbe(%s) failed: %s", obj.Spec.NodeName, err)
 		}
 		return
 	}
@@ -124,7 +125,7 @@ func (p *enqueueRequestForPod) Update(evt event.UpdateEvent, q workqueue.RateLim
 		npp := &appsalphav1.NodePodProbe{}
 		if err := p.reader.Get(context.TODO(), client.ObjectKey{Name: new.Spec.NodeName}, npp); err != nil {
 			if !errors.IsNotFound(err) {
-				klog.Errorf("Get NodePodProbe(%s) failed: %s", new.Spec.NodeName)
+				klog.Errorf("Get NodePodProbe(%s) failed: %s", new.Spec.NodeName, err)
 			}
 			return
 		}

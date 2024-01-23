@@ -385,7 +385,7 @@ func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.C
 		klog.Warningf("NodePodProbe not found runtimeService")
 		return nil, nil
 	}
-	containers, err := runtimeService.ListContainers(&runtimeapi.ContainerFilter{
+	containers, err := runtimeService.ListContainers(context.TODO(), &runtimeapi.ContainerFilter{
 		LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: podUID},
 	})
 	if err != nil {
@@ -404,7 +404,7 @@ func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.C
 	}
 	var containerStatus *runtimeapi.ContainerStatusResponse
 	if container != nil {
-		containerStatus, err = runtimeService.ContainerStatus(container.Id, false)
+		containerStatus, err = runtimeService.ContainerStatus(context.TODO(), container.Id, false)
 	}
 	return containerStatus.Status, err
 }

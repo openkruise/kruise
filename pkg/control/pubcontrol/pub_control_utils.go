@@ -22,9 +22,6 @@ import (
 	"strings"
 	"time"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	kubeClient "github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kubeClient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 const (
@@ -81,7 +82,7 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 	} else if pub.Status.DesiredAvailable == 0 {
 		return true, "", nil
 	} else if !isNeedPubProtection(pub, operation) {
-		klog.V(3).Infof("pod(%s/%s) operation(%s) is not in pub(%s) protection", pod.Namespace, pod.Name, pub.Name)
+		klog.V(3).Infof("pod(%s/%s) operation(%s) is not in pub(%s) protection", pod.Namespace, pod.Name, operation, pub.Name)
 		return true, "", nil
 		// pod is in pub.Status.DisruptedPods or pub.Status.UnavailablePods, then don't need check it
 	} else if isPodRecordedInPub(pod.Name, pub) {

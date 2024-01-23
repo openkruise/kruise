@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
@@ -16,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -56,279 +56,318 @@ func init() {
 }
 
 func TestValidateSidecarSet(t *testing.T) {
-	errorCases := map[string]appsv1alpha1.SidecarSet{
-		"missing-selector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyDisabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	testErrorCases := []struct {
+		caseName   string
+		sidecarSet appsv1alpha1.SidecarSet
+		expectErrs int
+	}{
+		{
+			caseName: "missing-selector",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
 				},
 			},
+			expectErrs: 1,
 		},
-		"wrong-updateStrategy": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
-					ScatterStrategy: appsv1alpha1.UpdateScatterStrategy{
-						{
-							Key:   "key-1",
-							Value: "value-1",
-						},
-						{
-							Key:   "key-1",
-							Value: "value-1",
+		{
+			caseName: "wrong-updateStrategy",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+						ScatterStrategy: appsv1alpha1.UpdateScatterStrategy{
+							{
+								Key:   "key-1",
+								Value: "value-1",
+							},
+							{
+								Key:   "key-1",
+								Value: "value-1",
+							},
 						},
 					},
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyDisabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
 				},
 			},
+			expectErrs: 1,
 		},
-		"wrong-selector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "app-name",
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"app-group", "app-risk-"},
+		{
+			caseName: "wrong-selector",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "app-name",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"app-group", "app-risk-"},
+							},
 						},
 					},
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyEnabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyEnabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
 				},
 			},
+			expectErrs: 2,
 		},
-		"wrong-namespaceSelector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "app-name",
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"app-group", "app-risk"},
+		{
+			caseName: "wrong-namespaceSelector",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "app-name",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"app-group", "app-risk"},
+							},
 						},
 					},
-				},
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "app-name",
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"app-group", "app-risk-"},
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "app-name",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"app-group", "app-risk-"},
+							},
 						},
 					},
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyEnabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyEnabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
 				},
 			},
+			expectErrs: 2,
 		},
-		"wrong-namespace": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "app-name",
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"app-group", "app-risk"},
+		{
+			caseName: "wrong-namespace",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "app-name",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"app-group", "app-risk"},
+							},
 						},
 					},
-				},
-				Namespace: "ns-test",
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
+					Namespace: "ns-test",
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
 
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyEnabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-						},
-					},
-				},
-			},
-		},
-		"wrong-initContainer": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
-				},
-				InitContainers: []appsv1alpha1.SidecarContainer{
-					{
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyEnabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
 				},
 			},
+			expectErrs: 1,
 		},
-		"missing-container": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+		{
+			caseName: "wrong-initContainer",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					InitContainers: []appsv1alpha1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
+						},
+					},
 				},
 			},
+			expectErrs: 1,
 		},
-		"wrong-containers": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
+		{
+			caseName: "missing-container",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
 				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+			},
+			expectErrs: 1,
+		},
+		{
+			caseName: "wrong-containers",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
 
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
 				},
 			},
+			expectErrs: 1,
 		},
-		"wrong-volumes": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyDisabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+		{
+			caseName: "wrong-volumes",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
-				},
-				Volumes: []corev1.Volume{
-					{
-						Name: "test-volume",
-					},
-					{
-						Name: "istio-token",
-						VolumeSource: corev1.VolumeSource{
-							Projected: &corev1.ProjectedVolumeSource{
-								DefaultMode: pointer.Int32Ptr(420),
-								Sources: []corev1.VolumeProjection{
-									{
-										ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
-											Audience:          "istio-ca",
-											ExpirationSeconds: pointer.Int64Ptr(43200),
-											Path:              "istio-token",
+					Volumes: []corev1.Volume{
+						{
+							Name: "test-volume",
+						},
+						{
+							Name: "istio-token",
+							VolumeSource: corev1.VolumeSource{
+								Projected: &corev1.ProjectedVolumeSource{
+									DefaultMode: pointer.Int32Ptr(420),
+									Sources: []corev1.VolumeProjection{
+										{
+											ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+												Audience:          "istio-ca",
+												ExpirationSeconds: pointer.Int64Ptr(43200),
+												Path:              "istio-token",
+											},
 										},
 									},
 								},
@@ -337,115 +376,128 @@ func TestValidateSidecarSet(t *testing.T) {
 					},
 				},
 			},
+			expectErrs: 1,
 		},
-		"wrong-metadata": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyDisabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+		{
+			caseName: "wrong-metadata",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
-				},
-				PatchPodMetadata: []appsv1alpha1.SidecarSetPatchPodMetadata{
-					{
-						Annotations: map[string]string{
-							"key1": "value1",
+					PatchPodMetadata: []appsv1alpha1.SidecarSetPatchPodMetadata{
+						{
+							Annotations: map[string]string{
+								"key1": "value1",
+							},
+							PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
 						},
-						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
-					},
-					{
-						Annotations: map[string]string{
-							"key1": "value1",
-						},
-						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
-					},
-				},
-			},
-		},
-		"wrong-name-injectionStrategy": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
-					Revision: &appsv1alpha1.SidecarSetInjectRevision{
-						CustomVersion: pointer.String("normal-sidecarset-01234"),
-					},
-				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyDisabled,
-						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						{
+							Annotations: map[string]string{
+								"key1": "value1",
+							},
+							PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
 						},
 					},
 				},
 			},
+			expectErrs: 1,
 		},
-		"not-existing-injectionStrategy": {
-			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-			Spec: appsv1alpha1.SidecarSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
-					Revision: &appsv1alpha1.SidecarSetInjectRevision{
-						RevisionName: pointer.String("test-sidecarset-678235"),
-						Policy:       appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
+		{
+			caseName: "wrong-name-injectionStrategy",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
 					},
-				},
-				UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-					Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
-				},
-				Containers: []appsv1alpha1.SidecarContainer{
-					{
-						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-						ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-							Type: appsv1alpha1.ShareVolumePolicyDisabled,
+					InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
+						Revision: &appsv1alpha1.SidecarSetInjectRevision{
+							CustomVersion: pointer.String("normal-sidecarset-01234"),
 						},
-						UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-							UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
-						},
-						Container: corev1.Container{
-							Name:                     "test-sidecar",
-							Image:                    "test-image",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
-							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
 						},
 					},
 				},
 			},
+			expectErrs: 1,
+		},
+		{
+			caseName: "not-existing-injectionStrategy",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
+						Revision: &appsv1alpha1.SidecarSetInjectRevision{
+							RevisionName: pointer.String("test-sidecarset-678235"),
+							Policy:       appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
+						},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 1,
 		},
 	}
 
@@ -462,15 +514,17 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 	}
 	_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", features.SidecarSetPatchPodMetadataDefaultsAllowed))
-	for name, sidecarSet := range errorCases {
-		fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(SidecarSetRevisions...).Build()
-		handler.Client = fakeClient
-		allErrs := handler.validateSidecarSetSpec(&sidecarSet, field.NewPath("spec"))
-		if len(allErrs) != 1 {
-			t.Errorf("%v: expect errors len 1, but got: len %d %v", name, len(allErrs), util.DumpJSON(allErrs))
-		} else {
-			fmt.Printf("%v: %v\n", name, allErrs)
-		}
+	for _, tc := range testErrorCases {
+		t.Run(tc.caseName, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(SidecarSetRevisions...).Build()
+			handler.Client = fakeClient
+			allErrs := handler.validateSidecarSetSpec(&tc.sidecarSet, field.NewPath("spec"))
+			if len(allErrs) != tc.expectErrs {
+				t.Errorf("%v: expect errors len %v, but got: len %d %v", tc.caseName, tc.expectErrs, len(allErrs), util.DumpJSON(allErrs))
+			} else {
+				fmt.Printf("%v: %v\n", tc.caseName, allErrs)
+			}
+		})
 	}
 }
 

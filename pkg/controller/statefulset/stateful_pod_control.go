@@ -236,7 +236,7 @@ func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(set *appsv1beta1
 		claim, err := spc.objectMgr.GetClaim(set.Namespace, claimName)
 		switch {
 		case apierrors.IsNotFound(err):
-			klog.V(4).Infof("Expected claim %s missing, continuing to pick up in next iteration.")
+			klog.V(4).Infof("Expected claim %s missing, continuing to pick up in next iteration.", claimName)
 		case err != nil:
 			return fmt.Errorf("Could not retrieve claim %s not found for %s when checking PVC deletion policy: %w", claimName, pod.Name, err)
 		default:

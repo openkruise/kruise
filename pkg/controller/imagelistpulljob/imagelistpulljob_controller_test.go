@@ -26,14 +26,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
 var testscheme *k8sruntime.Scheme
@@ -423,7 +424,14 @@ func TestComputeImagePullJobActions(t *testing.T) {
 }
 
 func createReconcileJob(scheme *k8sruntime.Scheme, initObjs ...client.Object) ReconcileImageListPullJob {
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjs...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjs...).
+		WithIndex(&appsv1alpha1.ImagePullJob{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+			var owners []string
+			for _, ref := range obj.GetOwnerReferences() {
+				owners = append(owners, string(ref.UID))
+			}
+			return owners
+		}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, corev1.EventSource{Component: "imagelistpulljob-controller"})
 	reconcileJob := ReconcileImageListPullJob{

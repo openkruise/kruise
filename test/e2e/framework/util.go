@@ -55,7 +55,6 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	uexec "k8s.io/utils/exec"
 )
 
@@ -677,7 +676,7 @@ func Failf(format string, args ...interface{}) {
 func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
+	ginkgo.Fail(nowStamp()+": "+msg, 1+offset)
 }
 
 // ExpectNoError checks if "err" is set

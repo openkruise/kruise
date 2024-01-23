@@ -23,18 +23,19 @@ import (
 	"testing"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
 
 func TestCalculateInPlaceUpdateSpec(t *testing.T) {
@@ -615,7 +616,7 @@ func TestRefresh(t *testing.T) {
 		},
 	}
 
-	Clock = clock.NewFakeClock(aHourAgo.Time)
+	Clock = testingclock.NewFakeClock(aHourAgo.Time)
 	for i, testCase := range cases {
 		testCase.pod.Name = fmt.Sprintf("pod-%d", i)
 		testCase.expectedPod.Name = fmt.Sprintf("pod-%d", i)

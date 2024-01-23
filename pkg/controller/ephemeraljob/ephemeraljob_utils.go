@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
-	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -179,7 +180,7 @@ func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.Cont
 		}
 
 		status := parseEphemeralContainerStatus(&eContainerStatus)
-		klog.V(5).Infof("parse ephemeral container %s status %s", eContainerStatus.Name, status)
+		klog.V(5).Infof("parse ephemeral container %s status %v", eContainerStatus.Name, status)
 		switch status {
 		case FailedStatus:
 			return v1.PodFailed, nil

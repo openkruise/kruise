@@ -27,10 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
@@ -258,7 +260,14 @@ func TestRescheduleSubset(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			currentTime = time.Now()
 			workloadSpread := cs.getWorkloadSpread()
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getCloneSet(), workloadSpread).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getCloneSet(), workloadSpread).
+				WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+					var owners []string
+					for _, ref := range obj.GetOwnerReferences() {
+						owners = append(owners, string(ref.UID))
+					}
+					return owners
+				}).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
 				err := fakeClient.Create(context.TODO(), podIn)

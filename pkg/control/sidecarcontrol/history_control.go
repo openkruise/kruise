@@ -22,9 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +34,10 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 var (
@@ -196,7 +197,7 @@ func (r *realControl) GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, 
 	}
 	patched, err := strategicpatch.StrategicMergePatch(cloneBytes, revision.Data.Raw, clone)
 	if err != nil {
-		klog.Errorf("Failed to merge sidecarSet(%v) and controllerRevision(%v): %v, error: %v", sidecarSet.Name, revision.Name, err)
+		klog.Errorf("Failed to merge sidecarSet(%v) and controllerRevision(%v), error: %v", sidecarSet.Name, revision.Name, err)
 		return nil, err
 	}
 	// restore history from patch

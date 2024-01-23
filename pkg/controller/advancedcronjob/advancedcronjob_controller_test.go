@@ -23,7 +23,6 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -38,6 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
 func init() {
@@ -120,7 +122,7 @@ func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 	// Node3 does not have pod running
 	node3 := createNode("node3")
 
-	reconcileJob := createReconcileJob(scheme, job1, node1, node2, node3)
+	reconcileJob := createReconcileJobWithBroadcastJobIndex(scheme, job1, node1, node2, node3)
 
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -158,7 +160,7 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 	// Node3 does not have pod running
 	node3 := createNode("node3")
 
-	reconcileJob := createReconcileJob(scheme, job1, node1, node2, node3)
+	reconcileJob := createReconcileJobWithBatchJobIndex(scheme, job1, node1, node2, node3)
 
 	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -180,8 +182,38 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createReconcileJob(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileAdvancedCronJob {
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjs...).Build()
+func createReconcileJobWithBroadcastJobIndex(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileAdvancedCronJob {
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(initObjs...).
+		WithIndex(&appsv1alpha1.BroadcastJob{}, fieldindex.IndexNameForController, func(rawObj client.Object) []string {
+			job := rawObj.(*appsv1alpha1.BroadcastJob)
+			owner := metav1.GetControllerOf(job)
+			if owner == nil {
+				return nil
+			}
+			return []string{owner.Name}
+		}).Build()
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "advancedcronjob-controller"})
+	reconcileJob := ReconcileAdvancedCronJob{
+		Client:   fakeClient,
+		scheme:   scheme,
+		recorder: recorder,
+	}
+	return reconcileJob
+}
+
+func createReconcileJobWithBatchJobIndex(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileAdvancedCronJob {
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(initObjs...).
+		WithIndex(&batchv1.Job{}, fieldindex.IndexNameForController, func(rawObj client.Object) []string {
+			job := rawObj.(*batchv1.Job)
+			owner := metav1.GetControllerOf(job)
+			if owner == nil {
+				return nil
+			}
+			return []string{owner.Name}
+		}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "advancedcronjob-controller"})
 	reconcileJob := ReconcileAdvancedCronJob{

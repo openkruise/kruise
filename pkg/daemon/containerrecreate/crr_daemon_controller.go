@@ -25,15 +25,6 @@ import (
 	"sort"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/client"
-	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
-	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,6 +39,16 @@ import (
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/client"
+	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
 const (
@@ -312,7 +313,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 
 	pod := convertCRRToPod(crr)
 
-	podStatus, err := runtimeManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := runtimeManager.GetPodStatus(context.TODO(), pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		return fmt.Errorf("failed to GetPodStatus %s/%s with uid %s: %v", pod.Namespace, pod.Name, pod.UID, err)
 	}

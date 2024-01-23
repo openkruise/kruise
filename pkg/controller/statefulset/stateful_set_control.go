@@ -344,7 +344,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
 				minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(*set.Spec.Replicas), true)
 				if err != nil {
-					klog.Errorf("Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for %s: %v", set, err)
+					klog.Errorf("Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for %v: %v", set, err)
 				}
 			}
 			updatedReadyReplicas := set.Status.UpdatedReadyReplicas

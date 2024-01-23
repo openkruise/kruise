@@ -23,13 +23,15 @@ import (
 	"os"
 	"time"
 
-	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	criremote "k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+
+	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 const (
@@ -114,12 +116,12 @@ func NewFactory(varRunPath string, accountManager daemonutil.ImagePullAccountMan
 			continue
 		}
 
-		runtimeService, err = criremote.NewRemoteRuntimeService(cfg.runtimeRemoteURI, time.Second*5)
+		runtimeService, err = criremote.NewRemoteRuntimeService(cfg.runtimeRemoteURI, time.Second*5, oteltrace.NewNoopTracerProvider())
 		if err != nil {
 			klog.Warningf("Failed to new runtime service for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 			continue
 		}
-		typedVersion, err = runtimeService.Version(kubeRuntimeAPIVersion)
+		typedVersion, err = runtimeService.Version(context.TODO(), kubeRuntimeAPIVersion)
 		if err != nil {
 			klog.Warningf("Failed to get runtime typed version for %v (%s, %s): %v", cfg.runtimeType, cfg.runtimeURI, cfg.runtimeRemoteURI, err)
 			continue
