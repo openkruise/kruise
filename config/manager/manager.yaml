@@ -38,6 +38,14 @@ spec:
         - --feature-gates=AllAlpha=true
         image: controller:latest
         imagePullPolicy: Always
+        securityContext:
+          capabilities:
+            drop:
+              - all
+            add: [ 'NET_BIND_SERVICE' ]
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65534
         name: manager
         env:
           - name: KUBE_CACHE_MUTATION_DETECTOR
@@ -97,6 +105,12 @@ spec:
         - --feature-gates=AllAlpha=true
         image: controller:latest
         imagePullPolicy: Always
+        securityContext:
+          capabilities:
+            drop:
+              - all
+            add: [ 'NET_BIND_SERVICE' ]
+          allowPrivilegeEscalation: false
         name: daemon
         env:
         - name: KUBE_CACHE_MUTATION_DETECTOR

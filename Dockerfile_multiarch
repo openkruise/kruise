@@ -26,7 +26,15 @@ ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
 
+WORKDIR /
+COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/daemon ./kruise-daemon
+
 RUN set -eux; \
+    mkdir -p /log /tmp && \
+    chown -R nobody:nobody /log && \
+    chown -R nobody:nobody /tmp && \
+    chown -R nobody:nobody /manager && \
     apk --no-cache --update upgrade && \
     apk --no-cache add ca-certificates && \
     apk --no-cache add tzdata && \
@@ -42,7 +50,4 @@ RUN set -eux; \
     rm -rf /sbin/* && \
     rm -rf /bin/*
 
-WORKDIR /
-COPY --from=builder /workspace/manager .
-COPY --from=builder /workspace/daemon ./kruise-daemon
 ENTRYPOINT ["/manager"]

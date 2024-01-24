@@ -23,10 +23,28 @@ ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
 
-RUN apk add --no-cache ca-certificates bash expat \
-  && rm -rf /var/cache/apk/*
-
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/daemon ./kruise-daemon
+
+RUN set -eux; \
+    mkdir -p /log /tmp && \
+    chown -R nobody:nobody /log && \
+    chown -R nobody:nobody /tmp && \
+    chown -R nobody:nobody /manager && \
+    apk --no-cache --update upgrade && \
+    apk --no-cache add ca-certificates && \
+    apk --no-cache add tzdata && \
+    rm -rf /var/cache/apk/* && \
+    update-ca-certificates && \
+    echo "only include root and nobody user" && \
+    echo -e "root:x:0:0:root:/root:/bin/ash\nnobody:x:65534:65534:nobody:/:/sbin/nologin" | tee /etc/passwd && \
+    echo -e "root:x:0:root\nnobody:x:65534:" | tee /etc/group && \
+    rm -rf /usr/local/sbin/* && \
+    rm -rf /usr/local/bin/* && \
+    rm -rf /usr/sbin/* && \
+    rm -rf /usr/bin/* && \
+    rm -rf /sbin/* && \
+    rm -rf /bin/*
+
 ENTRYPOINT ["/manager"]
