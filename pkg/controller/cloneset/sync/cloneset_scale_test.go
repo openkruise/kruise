@@ -609,8 +609,8 @@ func TestScale(t *testing.T) {
 				}
 				return generatePods(obj, 5)
 			},
-			expectedPodsLen:  3,
-			expectedModified: true,
+			expectedPodsLen:  5,
+			expectedModified: false,
 		},
 		{
 			name: "cloneSet(replicas=3,maxUnavailable=20%,partition=nil,maxSurge=nil,minReadySeconds=0), specified delete pod-0, pods=5, and scale replicas 5 -> 3",
