@@ -3,12 +3,7 @@
 ## v1.5.2
 > Chang log since v1.5.1
 
-### CVE FIX: Leverage the kruise-daemon pod to list all secrets in the entire cluster
-Attacker that has gain root privilege of the node that kruise-daemon run , can leverage the kruise-daemon pod to list all secrets in the entire cluster.
-After that, attackers can leverage the "captured" secrets (e.g. the kruise-manager service account token) to gain extra privilege such as pod modification.
-
-For this fix, we removed the cluster secret permissions from kruise-daemon and converged the secret to kruise-manager, reducing the risk of cluster secret leaks.
-([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
+### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
 
 ### Start kruise-manager as a non-root user
 We start kruise-manger with a non-root user to further enhance the security of kruise-manager. ([#1491](https://github.com/openkruise/kruise/pull/1491), [@zmberg](https://github.com/zmberg))
@@ -86,6 +81,11 @@ And some bugs were fixed by
 ([#1348](https://github.com/openkruise/kruise/pull/1348), [#1343](https://github.com/openkruise/kruise/pull/1343), [Colvin-Y](https://github.com/Colvin-Y)),
 thanks!
 
+## v.1.4.1
+> Change log since v1.4.0
+
+### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
+
 ## v1.4.0
 
 > Change log since v1.3.0
@@ -135,6 +135,12 @@ For more detail, please refer to its [proposal](https://github.com/openkruise/kr
 - Fix config/samples/apps_v1alpha1_uniteddeployment.yaml invalid image. ([#1198](https://github.com/openkruise/kruise/pull/1198), [@chengleqi](https://github.com/chengleqi))
 - Change kruise base image to alpine. ([#1166](https://github.com/openkruise/kruise/pull/1166), [@fengshunli](https://github.com/fengshunli))
 - PersistentPodState support custom workload (like statefulSet). ([#1063](https://github.com/openkruise/kruise/pull/1063), [@baxiaoshi](https://github.com/baxiaoshi))
+
+## v1.3.1
+
+> Change log since v1.3.0
+
+### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
 
 ## v1.3.0
 
