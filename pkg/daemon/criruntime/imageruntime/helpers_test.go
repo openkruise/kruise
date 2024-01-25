@@ -17,10 +17,10 @@ limitations under the License.
 package imageruntime
 
 import (
+	"context"
 	"testing"
 
 	"github.com/openkruise/kruise/pkg/util/secret"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
@@ -86,7 +86,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 				}
 				return []v1.Secret{demo}
 			},
-			Expect: 2,
+			Expect: 1,
 		},
 		{
 			name:  "test5",
@@ -97,6 +97,20 @@ func TestMatchRegistryAuths(t *testing.T) {
 						v1.DockerConfigJsonKey: []byte(`{"auths":{"registry.private.com/nginx":{"username":"echoserver","password":"test","auth":"ZWNob3NlcnZlcjp0ZXN0"}}}`),
 					},
 					Type: v1.SecretTypeDockerConfigJson,
+				}
+				return []v1.Secret{demo}
+			},
+			Expect: 0,
+		},
+		{
+			name:  "test6",
+			Image: "registry.private.com/app/echoserver:v1",
+			GetSecrets: func() []v1.Secret {
+				demo := v1.Secret{
+					Data: map[string][]byte{
+						"data": []byte("not docker config json"),
+					},
+					Type: v1.SecretTypeOpaque,
 				}
 				return []v1.Secret{demo}
 			},
@@ -188,6 +202,39 @@ func TestContainsImage(t *testing.T) {
 				if res != cs.Expect {
 					t.Fatalf("ContainsImage failed")
 				}
+			}
+		})
+	}
+}
+
+func TestAuthInfos(t *testing.T) {
+	cases := []struct {
+		name       string
+		Image      []string
+		GetSecrets func() []v1.Secret
+		Expect     int
+	}{
+		{
+			name:  "test1",
+			Image: []string{"registry.private.com/app/echoserver", "v1"},
+			GetSecrets: func() []v1.Secret {
+				demo := v1.Secret{
+					Data: map[string][]byte{
+						v1.DockerConfigJsonKey: []byte(`{"auths":{"registry.private.com":{"username":"echoserver","password":"test","auth":"ZWNob3NlcnZlcjp0ZXN0"}}}`),
+					},
+					Type: v1.SecretTypeDockerConfigJson,
+				}
+				return []v1.Secret{demo}
+			},
+			Expect: 1,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			infos := secret.AuthInfos(context.TODO(), cs.Image[0], cs.Image[1], cs.GetSecrets())
+			if len(infos) != cs.Expect {
+				t.Fatalf("AuthInfos failed")
 			}
 		})
 	}
