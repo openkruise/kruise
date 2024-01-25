@@ -1,5 +1,18 @@
 # Change Log
 
+## v1.5.2
+> Chang log since v1.5.1
+
+### CVE FIX: Leverage the kruise-daemon pod to list all secrets in the entire cluster
+Attacker that has gain root privilege of the node that kruise-daemon run , can leverage the kruise-daemon pod to list all secrets in the entire cluster.
+After that, attackers can leverage the "captured" secrets (e.g. the kruise-manager service account token) to gain extra privilege such as pod modification.
+
+For this fix, we removed the cluster secret permissions from kruise-daemon and converged the secret to kruise-manager, reducing the risk of cluster secret leaks.
+([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
+
+### Start kruise-manager as a non-root user
+We start kruise-manger with a non-root user to further enhance the security of kruise-manager. ([#1491](https://github.com/openkruise/kruise/pull/1491), [@zmberg](https://github.com/zmberg))
+
 ## v1.5.1
 > Chang log since v1.5.0
 
