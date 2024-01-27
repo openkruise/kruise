@@ -21,7 +21,7 @@ const (
 	LifecycleTimestampKey = "lifecycle.apps.kruise.io/timestamp"
 
 	// LifecycleStatePreparingNormal means the Pod is created but unavailable.
-	// It will translate to Normal state if Lifecycle.PreNormal is hooked.
+	// It will translate to Normal state if Lifecycle.PreNormal is hooked and pod condition ContainerReady is true.
 	LifecycleStatePreparingNormal LifecycleStateType = "PreparingNormal"
 	// LifecycleStateNormal is a necessary condition for Pod to be available.
 	LifecycleStateNormal LifecycleStateType = "Normal"

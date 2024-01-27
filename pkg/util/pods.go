@@ -204,6 +204,10 @@ func IsRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod) && pod.DeletionTimestamp.IsZero()
 }
 
+func IsRunningAndContainerReady(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodRunning && podutil.IsContainersReadyConditionTrue(pod.Status) && pod.DeletionTimestamp.IsZero()
+}
+
 func GetPodContainerImageIDs(pod *v1.Pod) map[string]string {
 	cImageIDs := make(map[string]string, len(pod.Status.ContainerStatuses))
 	for i := range pod.Status.ContainerStatuses {
