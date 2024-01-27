@@ -1121,3 +1121,39 @@ func TestFindPortByName(t *testing.T) {
 		})
 	}
 }
+
+func TestHasPodScheduled(t *testing.T) {
+	cases := []struct {
+		name      string
+		pod       *v1.Pod
+		scheduled bool
+	}{
+		{
+			name: "pod has scheduled",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+				Spec:       v1.PodSpec{NodeName: "host1"},
+				Status:     v1.PodStatus{Phase: v1.PodRunning},
+			},
+			scheduled: true,
+		},
+		{
+			name: "pod has not scheduled",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+				Spec:       v1.PodSpec{NodeName: ""},
+				Status:     v1.PodStatus{Phase: v1.PodPending},
+			},
+			scheduled: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			scheduled := HasPodScheduled(cs.pod)
+			if scheduled != cs.scheduled {
+				t.Errorf("expect: %v, but: %v", cs.scheduled, scheduled)
+			}
+		})
+	}
+}
