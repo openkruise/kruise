@@ -20,13 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod, sidecars sets.String) error {
@@ -47,9 +48,19 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 	}
 
 	var sidecarContainers []appsv1alpha1.ContainerRecreateRequestContainer
+	preStopMap := getSidecarContainerNamePreStopMap(pod)
 	for _, name := range uncompletedSidecars.List() {
+		var preStopHook *appsv1alpha1.ProbeHandler
+		if preStop, ok := preStopMap[name]; ok {
+			preStopHook = &appsv1alpha1.ProbeHandler{
+				Exec:      preStop.Exec,
+				HTTPGet:   preStop.HTTPGet,
+				TCPSocket: preStop.TCPSocket,
+			}
+		}
 		sidecarContainers = append(sidecarContainers, appsv1alpha1.ContainerRecreateRequestContainer{
-			Name: name,
+			Name:    name,
+			PreStop: preStopHook,
 		})
 	}
 
@@ -97,4 +108,14 @@ func filterUncompletedSidecars(pod *corev1.Pod, sidecars sets.String) sets.Strin
 
 func getCRRName(pod *corev1.Pod) string {
 	return fmt.Sprintf("sidecar-termination-%v", pod.UID)
+}
+
+func getSidecarContainerNamePreStopMap(pod *corev1.Pod) map[string]*corev1.LifecycleHandler {
+	result := make(map[string]*corev1.LifecycleHandler)
+	for _, container := range pod.Spec.Containers {
+		if container.Lifecycle != nil {
+			result[container.Name] = container.Lifecycle.PreStop
+		}
+	}
+	return result
 }

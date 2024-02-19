@@ -22,17 +22,18 @@ import (
 	"reflect"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const (
@@ -111,6 +112,13 @@ var (
 						{
 							Name:  appsv1alpha1.KruiseTerminateSidecarWithImageEnv,
 							Value: ExitQuicklyImage,
+						},
+					},
+					Lifecycle: &corev1.Lifecycle{
+						PreStop: &corev1.LifecycleHandler{
+							Exec: &corev1.ExecAction{
+								Command: []string{"sleep", "5"},
+							},
 						},
 					},
 				},
@@ -377,6 +385,9 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				Namespace: podDemo.Namespace,
 			}, realCRR)
 			expectCRR := cs.getCRR()
+			if expectCRR != nil {
+				assert.NotEqual(t, nil, getCRRContainerPreStop("sidecar-2", expectCRR))
+			}
 
 			realBy, _ := json.Marshal(realCRR)
 			expectBy, _ := json.Marshal(expectCRR)
@@ -587,4 +598,13 @@ func mainContainerFactory(name string) corev1.Container {
 func rename(status *corev1.ContainerStatus, name string) corev1.ContainerStatus {
 	status.Name = name
 	return *status
+}
+
+func getCRRContainerPreStop(sidecarContainerName string, crr *appsv1alpha1.ContainerRecreateRequest) *appsv1alpha1.ProbeHandler {
+	for i := range crr.Spec.Containers {
+		if crr.Spec.Containers[i].Name == sidecarContainerName {
+			return crr.Spec.Containers[i].PreStop
+		}
+	}
+	return nil
 }
