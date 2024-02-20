@@ -149,7 +149,13 @@ var (
 		Spec: appsv1alpha1.ContainerRecreateRequestSpec{
 			PodName: podDemo.Name,
 			Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
-				{Name: "sidecar"},
+				{Name: "sidecar",
+					PreStop: &appsv1alpha1.ProbeHandler{
+						Exec: &corev1.ExecAction{
+							Command: []string{"sleep", "5"},
+						},
+					},
+				},
 			},
 			Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
 				ForceRecreate: true,
