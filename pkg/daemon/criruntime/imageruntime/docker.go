@@ -23,12 +23,13 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockerapi "github.com/docker/docker/client"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/util/secret"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 )
 
 // NewDockerImageService create a docker runtime
@@ -54,7 +55,7 @@ func (d *dockerImageService) createRuntimeClientIfNecessary() error {
 	if d.client != nil {
 		return nil
 	}
-	c, err := dockerapi.NewClient(d.runtimeURI, "1.23", nil, nil)
+	c, err := dockerapi.NewClientWithOpts(dockerapi.WithHost(d.runtimeURI), dockerapi.WithVersion("1.24"))
 	if err != nil {
 		return err
 	}
