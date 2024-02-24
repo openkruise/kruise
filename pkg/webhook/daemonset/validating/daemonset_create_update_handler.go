@@ -55,6 +55,7 @@ func (h *DaemonSetCreateUpdateHandler) validateDaemonSetUpdate(ds, oldDs *appsv1
 	if !apiequality.Semantic.DeepEqual(daemonset.Spec, oldDs.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to daemonset spec for fields other than 'BurstReplicas', 'template', 'lifecycle',  'updateStrategy', 'minReadySeconds', and 'revisionHistoryLimit' are forbidden"))
 	}
+	allErrs = append(allErrs, validateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 

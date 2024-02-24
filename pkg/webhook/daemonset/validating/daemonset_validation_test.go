@@ -126,7 +126,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	intOrStr1 := intstr.FromInt(1)
 	intOrStr2 := intstr.FromInt(2)
-	intOrStr3 := intstr.FromInt(3)
 	successCases := []testCase{
 		{
 			spec: &appsv1alpha1.DaemonSetSpec{
@@ -137,7 +136,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
 						MaxUnavailable: &intOrStr1,
-						MaxSurge:       &intOrStr2,
 					},
 				},
 			},
@@ -149,7 +147,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
 						MaxUnavailable: &intOrStr1,
-						MaxSurge:       &intOrStr2,
 					},
 				},
 			},
@@ -163,7 +160,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
 						MaxUnavailable: &intOrStr1,
-						MaxSurge:       &intOrStr3,
 					},
 				},
 			},
@@ -175,7 +171,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
 						MaxUnavailable: &intOrStr1,
-						MaxSurge:       &intOrStr2,
 					},
 				},
 			},
