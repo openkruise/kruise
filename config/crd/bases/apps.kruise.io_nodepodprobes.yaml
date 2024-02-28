@@ -38,6 +38,9 @@ spec:
               podProbes:
                 items:
                   properties:
+                    IP:
+                      description: pod ip
+                      type: string
                     name:
                       description: pod name
                       type: string
@@ -221,6 +224,7 @@ spec:
                       description: pod uid
                       type: string
                   required:
+                  - IP
                   - name
                   - namespace
                   - uid

@@ -19,9 +19,6 @@ package podprobemarker
 import (
 	"context"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +30,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPodProbeMarker{}
@@ -95,11 +96,14 @@ func (p *enqueueRequestForPod) Update(evt event.UpdateEvent, q workqueue.RateLim
 	if newInitialCondition == nil {
 		return
 	}
-	if kubecontroller.IsPodActive(new) && (oldInitialCondition == nil || oldInitialCondition.Status == corev1.ConditionFalse) &&
-		newInitialCondition.Status == corev1.ConditionTrue {
+	if !kubecontroller.IsPodActive(new) {
+		return
+	}
+	if ((oldInitialCondition == nil || oldInitialCondition.Status == corev1.ConditionFalse) &&
+		newInitialCondition.Status == corev1.ConditionTrue) || old.Status.PodIP != new.Status.PodIP {
 		ppms, err := p.getPodProbeMarkerForPod(new)
 		if err != nil {
-			klog.Errorf("List PodProbeMarker fialed: %s", err.Error())
+			klog.Errorf("List PodProbeMarker fail: %s", err.Error())
 			return
 		}
 		for _, ppm := range ppms {

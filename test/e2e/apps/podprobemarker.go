@@ -26,18 +26,20 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/controller/podprobemarker"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/controller/podprobemarker"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 var _ = SIGDescribe("PodProbeMarker", func() {
@@ -56,7 +58,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 		randStr = rand.String(10)
 	})
 
-	framework.KruiseDescribe("PodProbeMarker functionality", func() {
+	framework.KruiseDescribe("PodProbeMarker with exec functionality", func() {
 
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
@@ -64,7 +66,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 		})
 
-		ginkgo.It("pod probe marker test1", func() {
+		ginkgo.It("pod probe marker exec test", func() {
 			nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			nodeLen := len(nodeList.Items)
@@ -388,6 +390,184 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 					return true, nil
 				})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+	})
+
+	framework.KruiseDescribe("PodProbeMarker with tcpCheck functionality", func() {
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+		})
+
+		ginkgo.It("pod probe marker tcpCheck test", func() {
+			nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			nodeLen := len(nodeList.Items)
+			if nodeLen == 0 {
+				ginkgo.By("pod probe markers list nodeList is zero")
+				return
+			}
+			nppList, err := kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(nppList.Items).To(gomega.HaveLen(nodeLen))
+
+			// create statefulset
+			sts := tester.NewBaseStatefulSet(ns, randStr)
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			sts.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     sts.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
+			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			ginkgo.By(fmt.Sprintf("Create statefulset(%s/%s)", sts.Namespace, sts.Name))
+			tester.CreateStatefulSet(sts)
+
+			// create pod probe marker
+			ppmList := tester.NewPodProbeMarkerForTcpCheck(ns, randStr)
+			ppm1 := &ppmList[0]
+			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm1, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 10)
+
+			// check finalizer
+			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(controllerutil.ContainsFinalizer(ppm1, podprobemarker.PodProbeMarkerFinalizer)).To(gomega.BeTrue())
+
+			pods, err := tester.ListActivePods(ns)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
+			validPods := sets.NewString()
+			for _, pod := range pods {
+				validPods.Insert(string(pod.UID))
+				npp, err := kc.AppsV1alpha1().NodePodProbes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				var podProbe *appsv1alpha1.PodProbe
+				for i := range npp.Spec.PodProbes {
+					obj := &npp.Spec.PodProbes[i]
+					if obj.UID == string(pod.UID) {
+						podProbe = obj
+						break
+					}
+				}
+				gomega.Expect(podProbe).NotTo(gomega.BeNil())
+				gomega.Expect(pod.Labels["nginx"]).To(gomega.Equal("healthy"))
+				condition := util.GetCondition(pod, "game.kruise.io/healthy")
+				gomega.Expect(condition).NotTo(gomega.BeNil())
+				gomega.Expect(string(condition.Status)).To(gomega.Equal(string(v1.ConditionTrue)))
+				condition = util.GetCondition(pod, "game.kruise.io/check")
+				gomega.Expect(condition).To(gomega.BeNil())
+			}
+			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, npp := range nppList.Items {
+				for _, podProbe := range npp.Spec.PodProbes {
+					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
+				}
+			}
+
+			// update failed probe, tcp port check from 80 ---> 8081
+			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			ppm1.Spec.Probes[0].Probe.TCPSocket = &v1.TCPSocketAction{
+				Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(8081)},
+			}
+			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 60)
+			pods, err = tester.ListActivePods(ns)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
+			for _, pod := range pods {
+				// healthy probe
+				gomega.Expect(pod.Labels["nginx"]).To(gomega.Equal(""))
+				condition := util.GetCondition(pod, "game.kruise.io/healthy")
+				gomega.Expect(condition).NotTo(gomega.BeNil())
+				gomega.Expect(string(condition.Status)).To(gomega.Equal(string(v1.ConditionFalse)))
+			}
+
+			// update success probe
+			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			ppm1.Spec.Probes[0].Probe.TCPSocket = &v1.TCPSocketAction{
+				Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(80)},
+			}
+			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// scale down
+			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			sts.Spec.Replicas = utilpointer.Int32Ptr(1)
+			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 60)
+
+			pods, err = tester.ListActivePods(ns)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).To(gomega.Equal(1))
+			validPods = sets.NewString()
+			for _, pod := range pods {
+				validPods.Insert(string(pod.UID))
+				// healthy probe
+				gomega.Expect(pod.Labels["nginx"]).To(gomega.Equal("healthy"))
+				condition := util.GetCondition(pod, "game.kruise.io/healthy")
+				gomega.Expect(condition).NotTo(gomega.BeNil())
+				gomega.Expect(string(condition.Status)).To(gomega.Equal(string(v1.ConditionTrue)))
+			}
+			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, npp := range nppList.Items {
+				for _, podProbe := range npp.Spec.PodProbes {
+					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
+				}
+			}
+
+			// scale up
+			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			tester.WaitForStatefulSetRunning(sts)
+			time.Sleep(time.Second * 100)
+
+			pods, err = tester.ListActivePods(ns)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).To(gomega.Equal(nodeLen))
+			validPods = sets.NewString()
+			for _, pod := range pods {
+				validPods.Insert(string(pod.UID))
+				// healthy probe
+				gomega.Expect(pod.Labels["nginx"]).To(gomega.Equal("healthy"))
+				condition := util.GetCondition(pod, "game.kruise.io/healthy")
+				gomega.Expect(condition).NotTo(gomega.BeNil())
+				gomega.Expect(string(condition.Status)).To(gomega.Equal(string(v1.ConditionTrue)))
+			}
+			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, npp := range nppList.Items {
+				for _, podProbe := range npp.Spec.PodProbes {
+					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
+				}
+			}
+
+			// delete podProbeMarker
+			for _, ppm := range ppmList {
+				err = kc.AppsV1alpha1().PodProbeMarkers(ns).Delete(context.TODO(), ppm.Name, metav1.DeleteOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
+			time.Sleep(time.Second * 3)
+			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, npp := range nppList.Items {
+				gomega.Expect(npp.Spec.PodProbes).To(gomega.HaveLen(0))
+			}
 		})
 	})
 })

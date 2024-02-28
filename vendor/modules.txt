@@ -1369,6 +1369,7 @@ k8s.io/kubernetes/pkg/kubelet/util/format
 k8s.io/kubernetes/pkg/kubelet/util/ioutils
 k8s.io/kubernetes/pkg/probe
 k8s.io/kubernetes/pkg/probe/exec
+k8s.io/kubernetes/pkg/probe/tcp
 k8s.io/kubernetes/pkg/proxy/util
 k8s.io/kubernetes/pkg/scheduler
 k8s.io/kubernetes/pkg/scheduler/apis/config

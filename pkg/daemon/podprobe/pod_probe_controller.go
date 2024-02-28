@@ -26,15 +26,6 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/client"
-	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
-	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
-	"github.com/openkruise/kruise/pkg/daemon/util"
-	commonutil "github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +42,16 @@ import (
 	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/klog/v2"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/client"
+	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	"github.com/openkruise/kruise/pkg/daemon/util"
+	commonutil "github.com/openkruise/kruise/pkg/util"
 )
 
 const (
@@ -63,6 +64,7 @@ type probeKey struct {
 	podNs         string
 	podName       string
 	podUID        string
+	podIP         string
 	containerName string
 	probeName     string
 }
@@ -249,7 +251,7 @@ func (c *Controller) sync() error {
 	c.workerLock.Lock()
 	validWorkers := map[probeKey]struct{}{}
 	for _, podProbe := range npp.Spec.PodProbes {
-		key := probeKey{podNs: podProbe.Namespace, podName: podProbe.Name, podUID: podProbe.UID}
+		key := probeKey{podNs: podProbe.Namespace, podName: podProbe.Name, podUID: podProbe.UID, podIP: podProbe.IP}
 		for i := range podProbe.Probes {
 			probe := podProbe.Probes[i]
 			key.containerName = probe.ContainerName

@@ -32,6 +32,8 @@ type PodProbe struct {
 	Namespace string `json:"namespace"`
 	// pod uid
 	UID string `json:"uid"`
+	// pod ip
+	IP string `json:"IP"`
 	// Custom container probe, supports Exec, Tcp, and returns the result to Pod yaml
 	Probes []ContainerProbe `json:"probes,omitempty"`
 }

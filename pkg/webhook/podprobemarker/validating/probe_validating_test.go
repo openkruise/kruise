@@ -19,14 +19,16 @@ package validating
 import (
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func init() {
@@ -133,8 +135,10 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 					Probe: appsv1alpha1.ContainerProbeSpec{
 						Probe: corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
-								TCPSocket: &corev1.TCPSocketAction{
-									Port: intstr.FromInt(80),
+								HTTPGet: &corev1.HTTPGetAction{
+									Path:   "/index.html",
+									Scheme: corev1.URISchemeHTTP,
+									Port:   intstr.FromInt(80),
 								},
 							},
 						},
@@ -234,5 +238,219 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 				t.Fatalf("expect errList(%d) but get(%d) error: %s", cs.expectErrList, len(errList), errList.ToAggregate().Error())
 			}
 		})
+	}
+}
+
+func TestValidateHandler(t *testing.T) {
+	successCases := []corev1.ProbeHandler{
+		{Exec: &corev1.ExecAction{Command: []string{"echo"}}},
+		{TCPSocket: &corev1.TCPSocketAction{
+			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(8000)},
+			Host: "3.3.3.3",
+		}},
+		{TCPSocket: &corev1.TCPSocketAction{
+			Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port"},
+			Host: "3.3.3.3",
+		}},
+	}
+	for _, h := range successCases {
+		if errs := validateHandler(&h, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []corev1.ProbeHandler{
+		{},
+		{Exec: &corev1.ExecAction{Command: []string{}}},
+		{TCPSocket: &corev1.TCPSocketAction{
+			Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
+			Host: "3.3.3.3",
+		}},
+		{TCPSocket: &corev1.TCPSocketAction{
+			Port: intstr.IntOrString{Type: intstr.Int, IntVal: -1},
+			Host: "3.3.3.3",
+		}},
+		{HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromInt(0), Host: ""}},
+		{HTTPGet: &corev1.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65536), Host: "host"}},
+		{HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""}},
+		{
+			Exec: &corev1.ExecAction{Command: []string{}},
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
+				Host: "3.3.3.3",
+			},
+		},
+		{
+			Exec:    &corev1.ExecAction{Command: []string{}},
+			HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""},
+		},
+		{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
+				Host: "3.3.3.3",
+			},
+			HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""},
+		},
+		{
+			Exec: &corev1.ExecAction{Command: []string{}},
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
+				Host: "3.3.3.3",
+			},
+			HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""},
+		},
+	}
+	for _, h := range errorCases {
+		if errs := validateHandler(&h, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure for %#v", h)
+		}
+	}
+}
+
+func TestValidatePortNumOrName(t *testing.T) {
+	successCases := []struct {
+		port    intstr.IntOrString
+		fldPath *field.Path
+	}{
+		{
+			port: intstr.IntOrString{
+				Type:   intstr.Int,
+				IntVal: 80,
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			port: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "abc",
+			},
+			fldPath: field.NewPath("field"),
+		},
+	}
+	for _, cs := range successCases {
+		if getErrs := ValidatePortNumOrName(cs.port, cs.fldPath); len(getErrs) != 0 {
+			t.Errorf("expect failure for %#v", util.DumpJSON(cs))
+		}
+	}
+
+	errorCases := []struct {
+		port    intstr.IntOrString
+		fldPath *field.Path
+	}{
+		{
+			port: intstr.IntOrString{
+				Type:   intstr.Int,
+				IntVal: -1,
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			port: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "",
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			// IsValidPortName check that the argument is valid syntax. It must be
+			// non-empty and no more than 15 characters long. It may contain only [-a-z0-9]
+			// and must contain at least one letter [a-z].
+			port: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "aaaaabbbbbcccccd", // more than 15 characters
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			port: intstr.IntOrString{
+				Type: 3, // fake type
+			},
+			fldPath: field.NewPath("field"),
+		},
+	}
+	for _, cs := range errorCases {
+		if getErrs := ValidatePortNumOrName(cs.port, cs.fldPath); len(getErrs) == 0 {
+			t.Errorf("expect failure for %#v", util.DumpJSON(cs))
+		}
+	}
+}
+
+func TestValidateTCPSocketAction(t *testing.T) {
+	successCases := []struct {
+		tcp     *corev1.TCPSocketAction
+		fldPath *field.Path
+	}{
+		{
+			tcp: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 80,
+				},
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			tcp: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "abc",
+				},
+			},
+			fldPath: field.NewPath("field"),
+		},
+	}
+	for _, cs := range successCases {
+		if getErrs := validateTCPSocketAction(cs.tcp, cs.fldPath); len(getErrs) != 0 {
+			t.Errorf("expect failure for %#v", util.DumpJSON(cs))
+		}
+	}
+
+	errorCases := []struct {
+		tcp     *corev1.TCPSocketAction
+		fldPath *field.Path
+	}{
+		{
+			tcp: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: -1,
+				},
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			tcp: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "",
+				},
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			tcp: &corev1.TCPSocketAction{
+				// IsValidPortName check that the argument is valid syntax. It must be
+				// non-empty and no more than 15 characters long. It may contain only [-a-z0-9]
+				// and must contain at least one letter [a-z].
+				Port: intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "aaaaabbbbbcccccd", // more than 15 characters
+				},
+			},
+			fldPath: field.NewPath("field"),
+		},
+		{
+			tcp: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{
+					Type: 3, // fake type
+				},
+			},
+			fldPath: field.NewPath("field"),
+		},
+	}
+	for _, cs := range errorCases {
+		if getErrs := validateTCPSocketAction(cs.tcp, cs.fldPath); len(getErrs) == 0 {
+			t.Errorf("expect failure for %#v", util.DumpJSON(cs))
+		}
 	}
 }
