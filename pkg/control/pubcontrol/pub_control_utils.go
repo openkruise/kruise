@@ -64,9 +64,9 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 	if pod.Annotations[policyv1alpha1.PodPubNoProtectionAnnotation] == "true" {
 		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, policyv1alpha1.PodPubNoProtectionAnnotation)
 		return true, "", nil
-		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-	} else if !PubControl.IsPodReady(pod) {
-		klog.V(3).Infof("pod(%s/%s) is not ready, then don't need check pub", pod.Namespace, pod.Name)
+		// If the pod is not ready or state is inconsistent, it doesn't count towards healthy and we should not decrement
+	} else if !PubControl.IsPodReady(pod) || !PubControl.IsPodStateConsistent(pod) {
+		klog.V(3).Infof("pod(%s/%s) is not ready or state is inconsistent, then don't need check pub", pod.Namespace, pod.Name)
 		return true, "", nil
 	}
 

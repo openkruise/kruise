@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openkruise/kruise/apis/apps/pub"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -273,6 +274,34 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
+		},
+		{
+			name: "valid delete pod, pod state is inconsistent(inplace update not completed yet), ignore",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations[pub.InPlaceUpdateStateKey] = `{"nextContainerImages":{"main":"nginx:v2"}}`
+				return pod
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:   policyv1alpha1.PubDeleteOperation,
+			expectAllow: true,
+		},
+		{
+			name: "valid delete pod, pod declared no protect , ignore",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations[policyv1alpha1.PodPubNoProtectionAnnotation] = "true"
+				return pod
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:   policyv1alpha1.PubDeleteOperation,
+			expectAllow: true,
 		},
 	}
 
