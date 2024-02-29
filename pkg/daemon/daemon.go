@@ -139,7 +139,7 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 		Healthz:        healthz,
 	}
 
-	puller, err := imagepuller.NewController(opts, secretManager)
+	puller, err := imagepuller.NewController(opts, secretManager, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new image puller controller: %v", err)
 	}
