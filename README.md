@@ -25,7 +25,7 @@ It consists of several controllers which extend and complement the [Kubernetes c
 | Application Protection                      | Basic protections against cascading deletion of resources. | Enhanced protections for Kubernetes resources and application availability, such as PodUnavailableBudget. |
 | Ease of Use                                 | Requires manual configuration and management. | Simplified configuration and management of workloads and applications. |
 
-Refer documentation for better understanding(official site: [https://openkruise.io](https://openkruise.io/docs)) 
+Refer documentation for better understanding(official site: [https://openkruise.io/docs](https://openkruise.io/docs)) 
 ## Key Features
 
 - **Advance Workloads**
