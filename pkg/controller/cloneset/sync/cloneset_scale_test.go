@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -28,8 +29,10 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -765,11 +768,122 @@ func TestScale(t *testing.T) {
 	}
 }
 
+func TestChoosePodsToDelete(t *testing.T) {
+	scheduledPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "test",
+			Name:        "pod",
+			Annotations: make(map[string]string),
+		},
+		Spec: v1.PodSpec{
+			NodeName: "node",
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodScheduled,
+					Status: v1.ConditionTrue,
+				},
+			},
+			Phase: v1.PodRunning,
+		},
+	}
+
+	scheduledFailedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "test",
+			Name:        "pod",
+			Annotations: make(map[string]string),
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodScheduled,
+					Status: v1.ConditionFalse,
+				},
+			},
+			Phase: v1.PodPending,
+		},
+	}
+
+	testCases := []struct {
+		name           string
+		cloneSet       *appsv1alpha1.CloneSet
+		scaleDown      int
+		scaleDownOld   int
+		notUpdatedPods []*v1.Pod
+		updatedPods    []*v1.Pod
+		expected       []string
+	}{
+		{
+			name:           "no schedule failed pods",
+			cloneSet:       &appsv1alpha1.CloneSet{},
+			scaleDown:      3,
+			scaleDownOld:   2,
+			notUpdatedPods: generatePodsWithIndex(scheduledPod, 5, 0),
+			updatedPods:    generatePodsWithIndex(scheduledPod, 5, 5),
+			expected:       []string{"pod-0", "pod-1", "pod-5"},
+		},
+		{
+			name:         "scale down partial schedule failed pods",
+			cloneSet:     &appsv1alpha1.CloneSet{},
+			scaleDown:    4,
+			scaleDownOld: 2,
+			notUpdatedPods: append(
+				generatePodsWithIndex(scheduledPod, 2, 0),
+				generatePodsWithIndex(scheduledFailedPod, 3, 2)...,
+			),
+			updatedPods: append(
+				generatePodsWithIndex(scheduledPod, 3, 5),
+				generatePodsWithIndex(scheduledFailedPod, 2, 8)...,
+			),
+			expected: []string{"pod-2", "pod-3", "pod-4", "pod-8"},
+		},
+		{
+			name:         "scale down all schedule failed pods first",
+			cloneSet:     &appsv1alpha1.CloneSet{},
+			scaleDown:    5,
+			scaleDownOld: 2,
+			notUpdatedPods: append(
+				generatePodsWithIndex(scheduledPod, 7, 0),
+				generatePodsWithIndex(scheduledFailedPod, 1, 7)...,
+			),
+			updatedPods: append(
+				generatePodsWithIndex(scheduledPod, 1, 8),
+				generatePodsWithIndex(scheduledFailedPod, 1, 9)...,
+			),
+			expected: []string{"pod-0", "pod-1", "pod-7", "pod-8", "pod-9"},
+		},
+	}
+
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloneSetScaleDownScheduleFailedPodsPreferentially, true)()
+	for _, cs := range testCases {
+		t.Run(cs.name, func(t *testing.T) {
+			rc := &realControl{}
+			podsToDelete := rc.choosePodsToDelete(cs.cloneSet, cs.scaleDown, cs.scaleDownOld, cs.notUpdatedPods, cs.updatedPods)
+			if !util.GetPodNames(podsToDelete).Equal(sets.NewString(cs.expected...)) {
+				t.Fatalf("expected %v, but got %v", cs.expected, util.GetPodNames(podsToDelete).List())
+			}
+		})
+	}
+}
+
 func generatePods(base *v1.Pod, replicas int) []*v1.Pod {
 	objs := make([]*v1.Pod, 0, replicas)
 	for i := 0; i < replicas; i++ {
 		obj := base.DeepCopy()
 		obj.Name = fmt.Sprintf("%s-%d", base.Name, i)
+		objs = append(objs, obj)
+	}
+	return objs
+}
+
+func generatePodsWithIndex(base *v1.Pod, replicas int, index int) []*v1.Pod {
+	objs := make([]*v1.Pod, 0, replicas)
+	for i := 0; i < replicas; i++ {
+		obj := base.DeepCopy()
+		obj.Annotations[v1.PodDeletionCost] = strconv.Itoa(i + index)
+		obj.Name = fmt.Sprintf("%s-%d", base.Name, i+index)
 		objs = append(objs, obj)
 	}
 	return objs

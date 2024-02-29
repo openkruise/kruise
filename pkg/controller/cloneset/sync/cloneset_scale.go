@@ -27,13 +27,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/integer"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/revision"
 )
@@ -371,6 +374,9 @@ func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
 func (r *realControl) choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
 	coreControl := clonesetcore.New(cs)
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
+		if len(pods) == 0 || diff <= 0 {
+			return []*v1.Pod{}
+		}
 		// No need to sort pods if we are about to delete all of them.
 		if diff < len(pods) {
 			var ranker clonesetutils.Ranker
@@ -394,13 +400,23 @@ func (r *realControl) choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff in
 	}
 
 	var podsToDelete []*v1.Pod
+	if feature.DefaultFeatureGate.Enabled(features.CloneSetScaleDownScheduleFailedPodsPreferentially) {
+		var scheduleFailedPods []*v1.Pod
+		notUpdatedPods, updatedPods, scheduleFailedPods = clonesetutils.FilterOutScheduledFailedPods(notUpdatedPods, updatedPods)
+		podsToDelete = choose(scheduleFailedPods, integer.IntMin(len(scheduleFailedPods), totalDiff))
+		totalDiff -= len(podsToDelete)
+		if len(podsToDelete) > 0 {
+			klog.V(4).Infof("CloneSet %v choose schedule failed pods %v to scale down", klog.KObj(cs), util.GetPodNames(podsToDelete))
+		}
+	}
+
 	if currentRevDiff >= totalDiff {
-		podsToDelete = choose(notUpdatedPods, totalDiff)
+		podsToDelete = append(podsToDelete, choose(notUpdatedPods, totalDiff)...)
 	} else if currentRevDiff > 0 {
-		podsToDelete = choose(notUpdatedPods, currentRevDiff)
+		podsToDelete = append(podsToDelete, choose(notUpdatedPods, currentRevDiff)...)
 		podsToDelete = append(podsToDelete, choose(updatedPods, totalDiff-currentRevDiff)...)
 	} else {
-		podsToDelete = choose(updatedPods, totalDiff)
+		podsToDelete = append(podsToDelete, choose(updatedPods, totalDiff)...)
 	}
 
 	return podsToDelete

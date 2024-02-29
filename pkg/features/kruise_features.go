@@ -113,6 +113,9 @@ const (
 
 	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
 	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
+
+	// CloneSetScaleDownScheduleFailedPodsPreferentially enable CloneSet controller scale down scheduled failed pods with the highest priority.
+	CloneSetScaleDownScheduleFailedPodsPreferentially = "CloneSetScaleDownScheduleFailedPodsPreferentially"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -120,26 +123,27 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	KruiseDaemon:      {Default: true, PreRelease: featuregate.Beta},
 	DaemonWatchingPod: {Default: true, PreRelease: featuregate.Beta},
 
-	CloneSetShortHash:                         {Default: false, PreRelease: featuregate.Alpha},
-	KruisePodReadinessGate:                    {Default: false, PreRelease: featuregate.Alpha},
-	PreDownloadImageForInPlaceUpdate:          {Default: false, PreRelease: featuregate.Alpha},
-	CloneSetPartitionRollback:                 {Default: false, PreRelease: featuregate.Alpha},
-	ResourcesDeletionProtection:               {Default: true, PreRelease: featuregate.Alpha},
-	WorkloadSpread:                            {Default: true, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetDeleteGate:            {Default: true, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetUpdateGate:            {Default: false, PreRelease: featuregate.Alpha},
-	TemplateNoDefaults:                        {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceUpdateEnvFromMetadata:              {Default: true, PreRelease: featuregate.Alpha},
-	StatefulSetAutoDeletePVC:                  {Default: true, PreRelease: featuregate.Alpha},
-	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
-	SidecarTerminator:                         {Default: false, PreRelease: featuregate.Alpha},
-	PodProbeMarkerGate:                        {Default: true, PreRelease: featuregate.Alpha},
-	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
-	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
-	PreparingUpdateAsUpdate:                   {Default: false, PreRelease: featuregate.Alpha},
-	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
-	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
-	DeletionProtectionForCRDCascadingGate:     {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetShortHash:                                 {Default: false, PreRelease: featuregate.Alpha},
+	KruisePodReadinessGate:                            {Default: false, PreRelease: featuregate.Alpha},
+	PreDownloadImageForInPlaceUpdate:                  {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetPartitionRollback:                         {Default: false, PreRelease: featuregate.Alpha},
+	ResourcesDeletionProtection:                       {Default: true, PreRelease: featuregate.Alpha},
+	WorkloadSpread:                                    {Default: true, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetDeleteGate:                    {Default: true, PreRelease: featuregate.Alpha},
+	PodUnavailableBudgetUpdateGate:                    {Default: false, PreRelease: featuregate.Alpha},
+	TemplateNoDefaults:                                {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceUpdateEnvFromMetadata:                      {Default: true, PreRelease: featuregate.Alpha},
+	StatefulSetAutoDeletePVC:                          {Default: true, PreRelease: featuregate.Alpha},
+	SidecarSetPatchPodMetadataDefaultsAllowed:         {Default: false, PreRelease: featuregate.Alpha},
+	SidecarTerminator:                                 {Default: false, PreRelease: featuregate.Alpha},
+	PodProbeMarkerGate:                                {Default: true, PreRelease: featuregate.Alpha},
+	PreDownloadImageForDaemonSetUpdate:                {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetEventHandlerOptimization:                  {Default: false, PreRelease: featuregate.Alpha},
+	PreparingUpdateAsUpdate:                           {Default: false, PreRelease: featuregate.Alpha},
+	ImagePullJobGate:                                  {Default: false, PreRelease: featuregate.Alpha},
+	ResourceDistributionGate:                          {Default: false, PreRelease: featuregate.Alpha},
+	DeletionProtectionForCRDCascadingGate:             {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetScaleDownScheduleFailedPodsPreferentially: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
