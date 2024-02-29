@@ -15,6 +15,17 @@ English | [简体中文](./README-zh_CN.md)
 OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is a CNCF([Cloud Native Computing Foundation](https://cncf.io/)) incubating project.
 It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload and application management.
 
+## Native Kubernetes vs Kubernetes with OpenKruise
+| Feature                                     | Native Kubernetes                  | OpenKruise                                       |
+|---------------------------------------------|------------------------------------|--------------------------------------------------|
+| Advanced Workloads                          | Basic support for stateless, stateful, daemon, and job workloads. | Additional features like in-place update, configurable scale/upgrade strategies, and parallel operations. |
+| Sidecar Container Management                | Manual sidecar injection and management. | Simplified sidecar injection, in-place sidecar updates, and enhanced startup/termination control. |
+| Multi-domain Management                     | Limited support for managing applications across nodes with multiple domains. | Ability to manage applications across different node pools, availability zones, architectures, and node types. |
+| Enhanced Operations                         | Limited support for container restarts and pre-downloading images. | Features like ContainerRecreateRequest for container restarts, ImagePullJob for pre-downloading images, and more. |
+| Application Protection                      | Basic protections against cascading deletion of resources. | Enhanced protections for Kubernetes resources and application availability, such as PodUnavailableBudget. |
+| Ease of Use                                 | Requires manual configuration and management. | Simplified configuration and management of workloads and applications. |
+
+Refer documentation for better understanding(official site: [https://openkruise.io](https://openkruise.io/docs)) 
 ## Key Features
 
 - **Advance Workloads**
