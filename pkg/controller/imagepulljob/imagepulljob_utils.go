@@ -151,14 +151,18 @@ func targetFromSource(source *v1.Secret, keySet referenceSet) *v1.Secret {
 	target.ObjectMeta = metav1.ObjectMeta{
 		Namespace:    util.GetKruiseDaemonConfigNamespace(),
 		GenerateName: fmt.Sprintf("%s-", source.Name),
-		Labels: map[string]string{
-			SourceSecretUIDLabelKey: string(source.UID),
-		},
-		Annotations: map[string]string{
-			SourceSecretKeyAnno:       keyFromObject(source).String(),
-			TargetOwnerReferencesAnno: keySet.String(),
-		},
+		Labels:       source.Labels,
+		Annotations:  source.Annotations,
 	}
+	if target.Labels == nil {
+		target.Labels = map[string]string{}
+	}
+	target.Labels[SourceSecretUIDLabelKey] = string(source.UID)
+	if target.Annotations == nil {
+		target.Annotations = map[string]string{}
+	}
+	target.Annotations[SourceSecretKeyAnno] = keyFromObject(source).String()
+	target.Annotations[TargetOwnerReferencesAnno] = keySet.String()
 	return target
 }
 
