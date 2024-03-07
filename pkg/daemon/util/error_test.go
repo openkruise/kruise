@@ -18,6 +18,7 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 )
@@ -29,7 +30,7 @@ func TestFilterCloseErr(t *testing.T) {
 		t.Errorf("FilterCloseErr true")
 	}
 
-	ret = FilterCloseErr(errors.Join(err, io.EOF))
+	ret = FilterCloseErr(fmt.Errorf("%s: %w", err.Error(), io.EOF))
 	if ret == false {
 		t.Errorf("FilterCloseErr false")
 	}
