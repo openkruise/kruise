@@ -15,6 +15,7 @@ package imageruntime
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"reflect"
 	"time"
@@ -22,7 +23,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util/secret"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -189,7 +189,7 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 	// Anonymous pull
 	_, err = c.criImageClient.PullImage(ctx, pullImageReq)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to pull image reference %q", fullImageName)
+		return nil, fmt.Errorf("Failed to pull image reference %q: %w", fullImageName, err)
 	}
 	pipeW.CloseWithError(io.EOF)
 	return newImagePullStatusReader(pipeR), nil
@@ -309,7 +309,7 @@ func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName
 	// Anonymous pull
 	_, err = c.criImageClientV1alpha2.PullImage(ctx, pullImageReq)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to pull image reference %q", fullImageName)
+		return nil, fmt.Errorf("Failed to pull image reference %q: %w", fullImageName, err)
 	}
 	pipeW.CloseWithError(io.EOF)
 	return newImagePullStatusReader(pipeR), nil

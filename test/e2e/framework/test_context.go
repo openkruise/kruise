@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/config"
-	"github.com/pkg/errors"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"

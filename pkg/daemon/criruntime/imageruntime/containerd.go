@@ -40,7 +40,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util/secret"
-	"github.com/pkg/errors"
 	"golang.org/x/net/http/httpproxy"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
@@ -98,7 +97,7 @@ func (d *containerdImageClient) PullImage(ctx context.Context, imageName, tag st
 	imageRef := fmt.Sprintf("%s:%s", imageName, tag)
 	namedRef, err := daemonutil.NormalizeImageRef(imageRef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse image reference %q", imageRef)
+		return nil, fmt.Errorf("failed to parse image reference %q: %w", imageRef, err)
 	}
 
 	resolver, isSchema1, err := d.getResolver(ctx, namedRef, pullSecrets)
@@ -330,7 +329,7 @@ func getDefaultValuesFromCRIStatus(conn *grpc.ClientConn) (snapshotter string, h
 	rclient := runtimeapi.NewRuntimeServiceClient(conn)
 	resp, err := rclient.Status(ctx, &runtimeapi.StatusRequest{Verbose: true})
 	if err != nil {
-		return "", "", errors.Wrap(err, "failed to fetch cri-containerd status")
+		return "", "", fmt.Errorf("failed to fetch cri-containerd status: %w", err)
 	}
 
 	var partInfo struct {
@@ -344,11 +343,11 @@ func getDefaultValuesFromCRIStatus(conn *grpc.ClientConn) (snapshotter string, h
 
 	config, ok := resp.Info["config"]
 	if !ok {
-		return "", "", errors.Wrap(err, "failed to get config info from containerd")
+		return "", "", fmt.Errorf("failed to get config info from containerd: %w", err)
 	}
 
 	if err := json.Unmarshal([]byte(config), &partInfo); err != nil {
-		return "", "", errors.Wrapf(err, "failed to unmarshal config(%v)", config)
+		return "", "", fmt.Errorf("failed to unmarshal config(%v): %w", config, err)
 	}
 
 	snapshotter = partInfo.ContainerdConfig.Snapshotter
