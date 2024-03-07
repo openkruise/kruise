@@ -18,8 +18,10 @@ limitations under the License.
 package framework
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"time"
 
@@ -367,7 +369,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if err == nil {
 		return
 	}
-	if !os.IsNotExist(errors.Cause(err)) {
+	if errors.Is(err, fs.ErrNotExist) {
 		Failf("Failed to setup provider config: %v", err)
 	}
 	// We allow unknown provider parameters for historic reasons. At least log a
