@@ -19,7 +19,6 @@ package util
 import (
 	"errors"
 	"io"
-	"net/http"
 	"testing"
 )
 
