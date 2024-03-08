@@ -22,8 +22,6 @@ import (
 	"os"
 	"strings"
 	"syscall"
-
-	"github.com/pkg/errors"
 )
 
 // FilterCloseErr rewrites EOF and EPIPE errors to bool. Use when
@@ -34,7 +32,7 @@ func FilterCloseErr(err error) bool {
 	switch {
 	case err == io.EOF:
 		return true
-	case errors.Cause(err) == io.EOF:
+	case strings.Contains(err.Error(), io.EOF.Error()):
 		return true
 	case strings.Contains(err.Error(), "use of closed network connection"):
 		return true
