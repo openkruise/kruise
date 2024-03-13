@@ -6,7 +6,6 @@ import (
 
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 )
 
@@ -21,14 +20,13 @@ func AuthInfos(ctx context.Context, imageName, tag string, pullSecrets []corev1.
 	return authInfos
 }
 
-var (
-	keyring = credentialprovider.NewDockerKeyring()
-)
-
 func ConvertToRegistryAuths(pullSecrets []corev1.Secret, repo string) (infos []daemonutil.AuthInfo, err error) {
-	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, keyring)
+	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, nil)
 	if err != nil {
 		return nil, err
+	}
+	if keyring == nil {
+		return nil, nil
 	}
 	creds, withCredentials := keyring.Lookup(repo)
 	if !withCredentials {
