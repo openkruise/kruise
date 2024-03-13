@@ -143,6 +143,48 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 			expectLen: 0,
 		},
 		{
+			name: "Pod, main container completed -> completed, sidecar container completed and pod has reached succeeded phase",
+			getOldPod: func() *corev1.Pod {
+				oldPod := oldPodDemo.DeepCopy()
+				oldPod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					succeededMainContainerStatus,
+					completedSidecarContainerStatus,
+				}
+				return oldPod
+			},
+			getNewPod: func() *corev1.Pod {
+				newPod := newPodDemo.DeepCopy()
+				newPod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					succeededMainContainerStatus,
+					completedSidecarContainerStatus,
+				}
+				newPod.Status.Phase = corev1.PodSucceeded
+				return newPod
+			},
+			expectLen: 0,
+		},
+		{
+			name: "Pod, main container completed -> completed, sidecar container failed and pod has reached succeeded phase",
+			getOldPod: func() *corev1.Pod {
+				oldPod := oldPodDemo.DeepCopy()
+				oldPod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					succeededMainContainerStatus,
+					completedSidecarContainerStatus,
+				}
+				return oldPod
+			},
+			getNewPod: func() *corev1.Pod {
+				newPod := newPodDemo.DeepCopy()
+				newPod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					succeededMainContainerStatus,
+					failedSidecarContainerStatus,
+				}
+				newPod.Status.Phase = corev1.PodSucceeded
+				return newPod
+			},
+			expectLen: 0,
+		},
+		{
 			name: "Pod, main container completed -> uncompleted, sidecar container completed",
 			getOldPod: func() *corev1.Pod {
 				oldPod := oldPodDemo.DeepCopy()
@@ -260,13 +302,27 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			expectLen: 1,
 		},
 		{
-			name: "Pod, main container completed, sidecar container completed",
+			name: "Pod, main container completed, sidecar container completed and pod has reached succeeded phase",
 			getPod: func() *corev1.Pod {
 				newPod := demoPod.DeepCopy()
 				newPod.Status.ContainerStatuses = []corev1.ContainerStatus{
 					succeededMainContainerStatus,
 					completedSidecarContainerStatus,
 				}
+				newPod.Status.Phase = corev1.PodSucceeded
+				return newPod
+			},
+			expectLen: 0,
+		},
+		{
+			name: "Pod, main container completed, sidecar container failed and pod has reached succeeded phase",
+			getPod: func() *corev1.Pod {
+				newPod := demoPod.DeepCopy()
+				newPod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					succeededMainContainerStatus,
+					failedSidecarContainerStatus,
+				}
+				newPod.Status.Phase = corev1.PodSucceeded
 				return newPod
 			},
 			expectLen: 0,
