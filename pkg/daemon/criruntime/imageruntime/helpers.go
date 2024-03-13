@@ -24,14 +24,12 @@ import (
 	"time"
 
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
+	"google.golang.org/grpc"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	runtimeapiv1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog/v2"
 )
 
 // // Auths struct contains an embedded RegistriesStruct of name auths
@@ -222,22 +220,20 @@ func (c ImageInfo) ContainsImage(name string, tag string) bool {
 	return false
 }
 
-func determineImageClientAPIVersion(conn *grpc.ClientConn) (runtimeapi.ImageServiceClient, runtimeapiv1alpha2.ImageServiceClient, error) {
+func determineImageClientAPIVersion(conn *grpc.ClientConn) (runtimeapi.ImageServiceClient, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	klog.V(4).InfoS("Finding the CRI API image version")
 	imageClientV1 := runtimeapi.NewImageServiceClient(conn)
 
+	//"CRI v1alpha2 image API (deprecated in k8s 1.24)"
 	_, err := imageClientV1.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{})
 	if err == nil {
 		klog.V(2).InfoS("Using CRI v1 image API")
-		return imageClientV1, nil, nil
+		return imageClientV1, nil
 
-	} else if status.Code(err) == codes.Unimplemented {
-		klog.V(2).InfoS("Falling back to CRI v1alpha2 image API (deprecated in k8s 1.24)")
-		return nil, runtimeapiv1alpha2.NewImageServiceClient(conn), nil
 	}
 
-	return nil, nil, fmt.Errorf("unable to determine image API version: %w", err)
+	return nil, fmt.Errorf("unable to determine image API version: %w", err)
 }

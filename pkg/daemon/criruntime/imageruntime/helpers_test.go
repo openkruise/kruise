@@ -19,10 +19,10 @@ package imageruntime
 import (
 	"testing"
 
-	"github.com/openkruise/kruise/pkg/util/secret"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/util/parsers"
+
+	"github.com/openkruise/kruise/pkg/util/secret"
 )
 
 func TestMatchRegistryAuths(t *testing.T) {

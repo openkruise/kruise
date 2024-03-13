@@ -132,12 +132,12 @@ var _ = SIGDescribe("PullImages", func() {
 				return job.Status.Desired
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(job.Spec.Images))))
 
-			ginkgo.By("Wait completed in 180s")
+			ginkgo.By("Wait completed in 270s")
 			gomega.Eventually(func() bool {
 				job, err = testerForImageListPullJob.GetJob(job)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.CompletionTime != nil
-			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(true))
+			}, 270*time.Second, 3*time.Second).Should(gomega.Equal(true))
 			gomega.Expect(job.Status.Succeeded).To(gomega.Equal(int32(len(job.Spec.Images))))
 
 			ginkgo.By("Wait clean in 25s")

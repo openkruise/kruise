@@ -18,6 +18,7 @@ package podprobe
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -98,7 +99,7 @@ type execInContainer struct {
 
 func (pb *prober) newExecInContainer(containerID string, cmd []string, timeout time.Duration) exec.Cmd {
 	return &execInContainer{run: func() ([]byte, error) {
-		stdout, stderr, err := pb.runtimeService.ExecSync(containerID, cmd, timeout)
+		stdout, stderr, err := pb.runtimeService.ExecSync(context.TODO(), containerID, cmd, timeout)
 		if err != nil {
 			return stderr, err
 		}

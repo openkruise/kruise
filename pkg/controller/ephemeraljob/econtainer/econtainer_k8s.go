@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kubeclient "github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kubeclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 type ephemeralContainerStatusState int
@@ -104,7 +105,7 @@ func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.Cont
 		}
 
 		status := parseEphemeralContainerStatus(&eContainerStatus)
-		klog.V(5).Infof("parse ephemeral container %s status %s", eContainerStatus.Name, status)
+		klog.V(5).Infof("parse ephemeral container %s status %v", eContainerStatus.Name, status)
 		switch status {
 		case FailedStatus:
 			return v1.PodFailed, nil

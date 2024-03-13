@@ -74,6 +74,7 @@ type Server struct {
 
 	// TLSVersion is the minimum version of TLS supported. Accepts
 	// "", "1.0", "1.1", "1.2" and "1.3" only ("" is equivalent to "1.0" for backwards compatibility)
+	// Deprecated: Use TLSOpts instead.
 	TLSMinVersion string
 
 	// TLSOpts is used to allow configuring the TLS config used for the server
@@ -299,7 +300,7 @@ func (s *Server) Start(ctx context.Context) error {
 // server has been started.
 func (s *Server) StartedChecker() healthz.Checker {
 	config := &tls.Config{
-		InsecureSkipVerify: true, // nolint:gosec // config is used to connect to our own webhook port.
+		InsecureSkipVerify: true, //nolint:gosec // config is used to connect to our own webhook port.
 	}
 	return func(req *http.Request) error {
 		s.mu.Lock()

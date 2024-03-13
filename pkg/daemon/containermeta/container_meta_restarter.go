@@ -17,12 +17,11 @@ limitations under the License.
 package containermeta
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
@@ -30,6 +29,9 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
+
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
 )
 
 type restartController struct {
@@ -82,7 +84,7 @@ func (c *restartController) sync(containerID kubeletcontainer.ContainerID) error
 		return nil
 	}
 
-	containers, err := criRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID.ID})
+	containers, err := criRuntime.ListContainers(context.TODO(), &runtimeapi.ContainerFilter{Id: containerID.ID})
 	if err != nil {
 		klog.Errorf("Failed to list containers by %s: %v", containerID.String(), err)
 		return err

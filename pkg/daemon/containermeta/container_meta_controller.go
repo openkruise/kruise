@@ -27,18 +27,6 @@ import (
 	"sync"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
-	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilcontainermeta "github.com/openkruise/kruise/pkg/util/containermeta"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +44,19 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilcontainermeta "github.com/openkruise/kruise/pkg/util/containermeta"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 var (
@@ -278,7 +279,7 @@ func (c *Controller) sync(key string) (retErr error) {
 		}
 	}()
 
-	kubePodStatus, err := kubeRuntime.GetPodStatus(pod.UID, name, namespace)
+	kubePodStatus, err := kubeRuntime.GetPodStatus(context.TODO(), pod.UID, name, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to GetPodStatus: %v", err)
 	}
@@ -385,7 +386,7 @@ func wrapEnvGetter(criRuntime criapi.RuntimeService, containerID, logID string) 
 	return func(key string) (string, error) {
 		once.Do(func() {
 			var stdout []byte
-			stdout, _, getErr = criRuntime.ExecSync(containerID, []string{"env"}, time.Second*3)
+			stdout, _, getErr = criRuntime.ExecSync(context.TODO(), containerID, []string{"env"}, time.Second*3)
 			if getErr != nil {
 				return
 			}

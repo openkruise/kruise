@@ -23,11 +23,11 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/gomega"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	"k8s.io/klog/v2"
 
+	"github.com/openkruise/kruise/test/e2e/framework"
+
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
 
 //var (
@@ -179,7 +179,7 @@ func RunE2ETests(t *testing.T) {
 	//logs.InitLogs()
 	//defer logs.FlushLogs()
 
-	gomega.RegisterFailHandler(ginkgowrapper.Fail)
+	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Disable skipped tests unless they are explicitly requested.
 	if len(config.GinkgoConfig.FocusStrings) == 0 && len(config.GinkgoConfig.SkipStrings) == 0 {
 		config.GinkgoConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
