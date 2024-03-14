@@ -288,21 +288,6 @@ var _ = SIGDescribe("EphemeralJob", func() {
 					},
 				}})
 
-			job2 := tester.CreateTestEphemeralJob(randStr+"2", 1, 1, metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"run": "nginx",
-				}}, []v1.EphemeralContainer{
-				{
-					TargetContainerName: "nginx",
-					EphemeralContainerCommon: v1.EphemeralContainerCommon{
-						Name:                     "debugger",
-						Image:                    BusyboxImage,
-						ImagePullPolicy:          v1.PullIfNotPresent,
-						Command:                  []string{"sleep", "3000"},
-						TerminationMessagePolicy: v1.TerminationMessageReadFile,
-					},
-				}})
-
 			ginkgo.By("Check the status of job")
 
 			gomega.Eventually(func() int {
@@ -320,6 +305,21 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				return len(targetPod.Status.EphemeralContainerStatuses)
 			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(1))
 
+			job2 := tester.CreateTestEphemeralJob(randStr+"2", 1, 1, metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"run": "nginx",
+				}}, []v1.EphemeralContainer{
+				{
+					TargetContainerName: "nginx",
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    BusyboxImage,
+						ImagePullPolicy:          v1.PullIfNotPresent,
+						Command:                  []string{"sleep", "3000"},
+						TerminationMessagePolicy: v1.TerminationMessageReadFile,
+					},
+				}})
+			ginkgo.By("Check whether ephemeral container can updated (not possible yet)")
 			gomega.Eventually(func() int32 {
 				job, _ := tester.GetEphemeralJob(job2.Name)
 				return job.Status.Matches
