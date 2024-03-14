@@ -975,6 +975,26 @@ spec:
                     items:
                       description: Subset defines the detail of a subset.
                       properties:
+                        maxReplicas:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: Indicates the upper bounded replicas of the
+                            subset. MaxReplicas must be more than or equal to MinReplicas.
+                            MaxReplicas == nil means no limitation. Please ensure
+                            that at least one subset has empty MaxReplicas(no limitation)
+                            to avoid stuck scaling. Defaults to nil.
+                          x-kubernetes-int-or-string: true
+                        minReplicas:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          description: Indicates the lower bounded replicas of the
+                            subset. MinReplicas must be more than or equal to 0 if
+                            it is set. Controller will prioritize satisfy minReplicas
+                            for each subset according to the order of Topology.Subsets.
+                            Defaults to 0.
+                          x-kubernetes-int-or-string: true
                         name:
                           description: Indicates subset name as a DNS_LABEL, which
                             will be used to generate subset workload name prefix in
@@ -1072,7 +1092,8 @@ spec:
                             pods will be distributed under this subset. If nil, the
                             number of replicas in this subset is determined by controller.
                             Controller will try to keep all the subsets with nil replicas
-                            have average pods.
+                            have average pods. Replicas and MinReplicas/MaxReplicas
+                            are mutually exclusive in a UnitedDeployment.
                           x-kubernetes-int-or-string: true
                         tolerations:
                           description: Indicates the tolerations the pods under this

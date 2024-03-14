@@ -58,7 +58,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 			return false, "", err
 		}
 		// the change will not cause pod unavailability, then pass
-		if !p.pubControl.IsPodUnavailableChanged(oldPod, newPod) {
+		if !pubcontrol.PubControl.IsPodUnavailableChanged(oldPod, newPod) {
 			klog.V(6).Infof("validate pod(%s/%s) changed can not cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
 			return true, "", nil
 		}
@@ -122,5 +122,5 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	if checkPod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
 		return true, "", nil
 	}
-	return pubcontrol.PodUnavailableBudgetValidatePod(p.Client, p.pubControl, checkPod, operation, dryRun)
+	return pubcontrol.PodUnavailableBudgetValidatePod(checkPod, operation, req.UserInfo.Username, dryRun)
 }

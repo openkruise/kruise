@@ -12,7 +12,7 @@ env:
   # Common versions
   GO_VERSION: '1.19'
   KIND_VERSION: 'v0.14.0'
-  KIND_IMAGE: 'kindest/node:v1.20.7'
+  KIND_IMAGE: 'kindest/node:v1.20.15'
   KIND_CLUSTER_NAME: 'ci-testing'
 
 jobs:
@@ -96,4 +96,11 @@ jobs:
                 exit 1
             fi
           done
+
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+          fi
           exit $retVal

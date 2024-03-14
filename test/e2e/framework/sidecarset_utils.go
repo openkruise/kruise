@@ -165,6 +165,21 @@ func (s *SidecarSetTester) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
+func (s *SidecarSetTester) UpdateDeployment(obj *apps.Deployment) {
+	objClone, _ := s.c.AppsV1().Deployments(obj.Namespace).Get(context.TODO(), obj.Name, metav1.GetOptions{})
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		objClone.Spec = obj.Spec
+		_, updateErr := s.c.AppsV1().Deployments(obj.Namespace).Update(context.TODO(), objClone, metav1.UpdateOptions{})
+		if updateErr == nil {
+			return nil
+		}
+		objClone, _ = s.c.AppsV1().Deployments(obj.Namespace).Get(context.TODO(), obj.Name, metav1.GetOptions{})
+		return updateErr
+	})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	s.WaitForDeploymentRunning(obj)
+}
+
 func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
 	Logf("update pod(%s/%s)", pod.Namespace, pod.Name)
 	podClone := pod.DeepCopy()
@@ -273,7 +288,8 @@ func (s *SidecarSetTester) WaitForDeploymentRunning(deployment *apps.Deployment)
 			if err != nil {
 				return false, nil
 			}
-			if *inner.Spec.Replicas == inner.Status.ReadyReplicas {
+			if inner.Status.ObservedGeneration == inner.Generation && *inner.Spec.Replicas == inner.Status.UpdatedReplicas &&
+				*inner.Spec.Replicas == inner.Status.ReadyReplicas && *inner.Spec.Replicas == inner.Status.Replicas {
 				return true, nil
 			}
 			return false, nil

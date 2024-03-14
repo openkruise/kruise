@@ -19,9 +19,12 @@ package workloadspread
 import (
 	"context"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
@@ -42,7 +47,9 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -55,6 +62,10 @@ const (
 
 	PodDeletionCostPositive = 100
 	PodDeletionCostNegative = -100
+
+	// VersionIgnored means all Pods should be regard as a universal version,
+	// i.e., ignore the Pod/Workload version.
+	VersionIgnored = "versionIgnored"
 )
 
 var (
@@ -65,7 +76,24 @@ var (
 	controllerKindRS             = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 	controllerKindDep            = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	controllerKindSts            = appsv1.SchemeGroupVersion.WithKind("StatefulSet")
+
+	enabledWorkloadStrForVersionedStatus = "deployment,replicaset"
+	EnabledWorkloadSetForVersionedStatus sets.String
+
+	GenerateNotFoundError = func(object client.Object, msg string) error {
+		objectGroupKind := object.GetObjectKind().GroupVersionKind().GroupKind()
+		return errors.NewNotFound(schema.GroupResource{Group: objectGroupKind.Group, Resource: objectGroupKind.Kind}, msg)
+	}
 )
+
+func init() {
+	flag.StringVar(&enabledWorkloadStrForVersionedStatus, "ws-enabled-versioned-status", enabledWorkloadStrForVersionedStatus, "Enabled workload that uses versioned subset status of WorkloadSpread.")
+	enabledWorkloadStrForVersionedStatus = strings.ToLower(enabledWorkloadStrForVersionedStatus)
+	EnabledWorkloadSetForVersionedStatus = sets.NewString(strings.Split(enabledWorkloadStrForVersionedStatus, ",")...)
+	if EnabledWorkloadSetForVersionedStatus.Has("deployment") {
+		EnabledWorkloadSetForVersionedStatus.Insert("replicaset")
+	}
+}
 
 type Operation string
 
@@ -362,9 +390,9 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 			// check whether WorkloadSpread has suitable subset for the pod
 			// 1. changed indicates whether workloadSpread status changed
 			// 2. suitableSubset is matched subset for the pod
-			changed, suitableSubset, generatedUID = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
-			if !changed {
-				return nil
+			changed, suitableSubset, generatedUID, err = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
+			if !changed || err != nil {
+				return err
 			}
 
 			// update WorkloadSpread status
@@ -448,28 +476,43 @@ func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpr
 // 3. generatedUID(types.UID) indicates which workloadSpread generate a UID for identifying Pod without a full name.
 func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 	pod *corev1.Pod, injectWS *InjectWorkloadSpread, operation Operation) (
-	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string) {
+	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string, error) {
 	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
 	var generatedUID string
+
+	// We only care about the corresponding versioned subset status.
+	var err error
+	version := GetPodVersion(pod)
+	subsetStatuses := ws.Status.VersionedSubsetStatuses[version]
+	if len(subsetStatuses) == 0 {
+		subsetStatuses, err = h.initializedSubsetStatuses(ws)
+		if err != nil {
+			return false, nil, "", err
+		}
+		if ws.Status.VersionedSubsetStatuses == nil {
+			ws.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{}
+		}
+		ws.Status.VersionedSubsetStatuses[version] = subsetStatuses
+	}
 
 	switch operation {
 	case CreateOperation:
 		if pod.Name != "" {
 			// pod is already in CreatingPods/DeletingPods List, then return
-			if isRecord, subset := isPodRecordedInSubset(ws, pod.Name); isRecord {
-				return false, subset, ""
+			if isRecord, subset := isPodRecordedInSubset(subsetStatuses, pod.Name); isRecord {
+				return false, subset, "", nil
 			}
 		}
 
-		suitableSubset = h.getSuitableSubset(ws)
+		suitableSubset = h.getSuitableSubset(subsetStatuses)
 		if suitableSubset == nil {
-			klog.V(5).Infof("WorkloadSpread (%s/%s) don't have a suitable subset for Pod (%s)",
+			klog.Warningf("WorkloadSpread (%s/%s) don't have a suitable subset for Pod (%s) when creating",
 				ws.Namespace, ws.Name, pod.Name)
-			return false, nil, ""
+			return false, nil, "", nil
 		}
 		// no need to update WorkloadSpread status if MaxReplicas == nil
 		if suitableSubset.MissingReplicas == -1 {
-			return false, suitableSubset, ""
+			return false, suitableSubset, "", nil
 		}
 		if suitableSubset.CreatingPods == nil {
 			suitableSubset.CreatingPods = map[string]metav1.Time{}
@@ -487,17 +530,18 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 		}
 	case DeleteOperation, EvictionOperation:
 		// pod is already in DeletingPods/CreatingPods List, then return
-		if isRecord, _ := isPodRecordedInSubset(ws, pod.Name); isRecord {
-			return false, nil, ""
+		if isRecord, _ := isPodRecordedInSubset(subsetStatuses, pod.Name); isRecord {
+			return false, nil, "", nil
 		}
 
-		suitableSubset = getSpecificSubset(ws, injectWS.Subset)
+		suitableSubset = getSpecificSubset(subsetStatuses, injectWS.Subset)
 		if suitableSubset == nil {
-			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s)", ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
-			return false, nil, ""
+			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s) when deleting",
+				ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
+			return false, nil, "", nil
 		}
 		if suitableSubset.MissingReplicas == -1 {
-			return false, suitableSubset, ""
+			return false, suitableSubset, "", nil
 		}
 		if suitableSubset.DeletingPods == nil {
 			suitableSubset.DeletingPods = map[string]metav1.Time{}
@@ -507,24 +551,24 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 			suitableSubset.MissingReplicas++
 		}
 	default:
-		return false, nil, ""
+		return false, nil, "", nil
 	}
 
 	// update subset status
-	for i := range ws.Status.SubsetStatuses {
-		if ws.Status.SubsetStatuses[i].Name == suitableSubset.Name {
-			ws.Status.SubsetStatuses[i] = *suitableSubset
+	for i := range ws.Status.VersionedSubsetStatuses[version] {
+		if ws.Status.VersionedSubsetStatuses[version][i].Name == suitableSubset.Name {
+			ws.Status.VersionedSubsetStatuses[version][i] = *suitableSubset
 			break
 		}
 	}
 
-	return true, suitableSubset, generatedUID
+	return true, suitableSubset, generatedUID, nil
 }
 
 // return two parameters
 // 1. isRecord(bool) 2. SubsetStatus
-func isPodRecordedInSubset(ws *appsv1alpha1.WorkloadSpread, podName string) (bool, *appsv1alpha1.WorkloadSpreadSubsetStatus) {
-	for _, subset := range ws.Status.SubsetStatuses {
+func isPodRecordedInSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus, podName string) (bool, *appsv1alpha1.WorkloadSpreadSubsetStatus) {
+	for _, subset := range subsetStatuses {
 		if _, ok := subset.CreatingPods[podName]; ok {
 			return true, &subset
 		}
@@ -609,8 +653,8 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 	return true, nil
 }
 
-func getSpecificSubset(ws *appsv1alpha1.WorkloadSpread, specifySubset string) *appsv1alpha1.WorkloadSpreadSubsetStatus {
-	for _, subset := range ws.Status.SubsetStatuses {
+func getSpecificSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus, specifySubset string) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+	for _, subset := range subsetStatuses {
 		if specifySubset == subset.Name {
 			return &subset
 		}
@@ -618,9 +662,9 @@ func getSpecificSubset(ws *appsv1alpha1.WorkloadSpread, specifySubset string) *a
 	return nil
 }
 
-func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpreadSubsetStatus {
-	for i := range ws.Status.SubsetStatuses {
-		subset := &ws.Status.SubsetStatuses[i]
+func (h *Handler) getSuitableSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+	for i := range subsetStatuses {
+		subset := &subsetStatuses[i]
 		canSchedule := true
 		for _, condition := range subset.Conditions {
 			if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
@@ -643,7 +687,7 @@ func (h *Handler) getSuitableSubset(ws *appsv1alpha1.WorkloadSpread) *appsv1alph
 	return nil
 }
 
-func (h Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) bool {
+func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) bool {
 	if owner == nil {
 		return false
 	}
@@ -712,26 +756,10 @@ func getSubsetCondition(ws *appsv1alpha1.WorkloadSpread, subsetName string, cond
 	return nil
 }
 
-func (h Handler) getObjectOf(owner *metav1.OwnerReference, namespace string) (client.Object, error) {
-	var object client.Object
+func (h *Handler) getObjectOf(owner *metav1.OwnerReference, namespace string) (client.Object, error) {
 	objectKey := types.NamespacedName{Namespace: namespace, Name: owner.Name}
 	objectGvk := schema.FromAPIVersionAndKind(owner.APIVersion, owner.Kind)
-	switch objectGvk {
-	case controllerKindRS:
-		object = &appsv1.ReplicaSet{}
-	case controllerKindDep:
-		object = &appsv1.Deployment{}
-	case controllerKindSts:
-		object = &appsv1.StatefulSet{}
-	case controllerKruiseKindBetaSts, controllerKruiseKindAlphaSts:
-		object = &appsv1beta1.StatefulSet{}
-	case controllerKruiseKindCS:
-		object = &appsv1alpha1.CloneSet{}
-	default:
-		o := unstructured.Unstructured{}
-		o.SetGroupVersionKind(objectGvk)
-		object = &o
-	}
+	object := GenerateEmptyWorkloadObject(objectGvk, objectKey)
 	if err := h.Get(context.TODO(), objectKey, object); err != nil {
 		return nil, err
 	}
@@ -759,4 +787,180 @@ func initializeWorkloadsInWhiteList(c client.Client) {
 		}
 	}
 	workloadsInWhiteListInitialized = true
+}
+
+func (h *Handler) initializedSubsetStatuses(ws *appsv1alpha1.WorkloadSpread) ([]appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
+	replicas, err := h.getWorkloadReplicas(ws)
+	if err != nil {
+		return nil, err
+	}
+	var subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus
+	for i := range ws.Spec.Subsets {
+		subset := ws.Spec.Subsets[i]
+		subsetStatus := appsv1alpha1.WorkloadSpreadSubsetStatus{Name: subset.Name}
+		if subset.MaxReplicas == nil {
+			subsetStatus.MissingReplicas = -1
+		} else {
+			missingReplicas, _ := intstrutil.GetScaledValueFromIntOrPercent(subset.MaxReplicas, int(replicas), true)
+			subsetStatus.MissingReplicas = int32(missingReplicas)
+		}
+		subsetStatuses = append(subsetStatuses, subsetStatus)
+	}
+	return subsetStatuses, nil
+}
+
+func (h *Handler) getWorkloadReplicas(ws *appsv1alpha1.WorkloadSpread) (int32, error) {
+	if ws.Spec.TargetReference == nil {
+		return 0, nil
+	}
+	gvk := schema.FromAPIVersionAndKind(ws.Spec.TargetReference.APIVersion, ws.Spec.TargetReference.Kind)
+	key := types.NamespacedName{Namespace: ws.Namespace, Name: ws.Spec.TargetReference.Name}
+	object := GenerateEmptyWorkloadObject(gvk, key)
+
+	// TODO: fetch workload from API Server directly to avoid latency of informer if using Percentage settings of subset[x].maxReplicas.
+	err := h.Get(context.TODO(), key, object)
+	if err != nil {
+		return 0, client.IgnoreNotFound(err)
+	}
+
+	switch o := object.(type) {
+	case *appsv1.Deployment:
+		return *o.Spec.Replicas, nil
+	case *appsv1.ReplicaSet:
+		return *o.Spec.Replicas, nil
+	case *appsv1.StatefulSet:
+		return *o.Spec.Replicas, nil
+	case *batchv1.Job:
+		return *o.Spec.Parallelism, nil
+	case *appsv1alpha1.CloneSet:
+		return *o.Spec.Replicas, nil
+	case *appsv1beta1.StatefulSet:
+		return *o.Spec.Replicas, nil
+	case *unstructured.Unstructured:
+		return GetReplicasFromCustomWorkload(h.Client, o), nil
+	}
+	return 0, fmt.Errorf("got unexpected workload type for workloadspread %s/%s", ws.Namespace, ws.Name)
+}
+
+func GenerateEmptyWorkloadObject(gvk schema.GroupVersionKind, key types.NamespacedName) (object client.Object) {
+	switch gvk {
+	case controllerKindRS:
+		object = &appsv1.ReplicaSet{}
+	case controllerKindDep:
+		object = &appsv1.Deployment{}
+	case controllerKindSts:
+		object = &appsv1.StatefulSet{}
+	case controllerKindJob:
+		object = &batchv1.Job{}
+	case controllerKruiseKindCS:
+		object = &appsv1alpha1.CloneSet{}
+	case controllerKruiseKindAlphaSts, controllerKruiseKindBetaSts:
+		object = &appsv1beta1.StatefulSet{}
+	default:
+		unstructuredObject := &unstructured.Unstructured{}
+		unstructuredObject.SetGroupVersionKind(gvk)
+		object = unstructuredObject
+	}
+	object.SetName(key.Name)
+	object.SetNamespace(key.Namespace)
+	return
+}
+
+func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Unstructured) int32 {
+	if object == nil {
+		return 0
+	}
+	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(reader)
+	if err != nil {
+		klog.Errorf("Failed to get workloadSpread custom workload white list from kruise config map")
+		return 0
+	}
+
+	gvk := object.GroupVersionKind()
+	for _, wl := range whiteList.Workloads {
+		if wl.GroupVersionKind.GroupKind() != gvk.GroupKind() {
+			continue
+		}
+		var exists bool
+		var replicas int64
+		path := strings.Split(wl.ReplicasPath, ".")
+		if len(path) > 0 {
+			replicas, exists, err = unstructured.NestedInt64(object.Object, path...)
+			if err != nil || !exists {
+				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, wl.ReplicasPath)
+			}
+		} else {
+			replicas, exists, err = unstructured.NestedInt64(object.Object, "spec", "replicas")
+			if err != nil || !exists {
+				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, wl.ReplicasPath)
+			}
+		}
+		return int32(replicas)
+	}
+	return 0
+}
+
+func GetPodVersion(pod *corev1.Pod) string {
+	if !enableVersionedStatus(pod) {
+		return VersionIgnored
+	}
+
+	if version, exists := pod.Labels[appsv1.DefaultDeploymentUniqueLabelKey]; exists {
+		return version
+	}
+	if version, exists := pod.Labels[appsv1.ControllerRevisionHashLabelKey]; exists {
+		return utils.GetShortHash(version)
+	}
+	return VersionIgnored
+}
+
+func GetWorkloadVersion(reader client.Reader, object client.Object) (string, error) {
+	if !enableVersionedStatus(object) {
+		return VersionIgnored, nil
+	}
+
+	switch o := object.(type) {
+	case *appsv1.ReplicaSet:
+		return o.Labels[appsv1.DefaultDeploymentUniqueLabelKey], nil
+
+	case *appsv1alpha1.CloneSet:
+		if o.Generation > o.Status.ObservedGeneration {
+			return "", GenerateNotFoundError(o, fmt.Sprintf("%s latest version", klog.KObj(o)))
+		}
+		return utils.GetShortHash(o.Status.UpdateRevision), nil
+
+	case *appsv1.Deployment:
+		rsLister := &appsv1.ReplicaSetList{}
+		selector, _ := metav1.LabelSelectorAsSelector(o.Spec.Selector)
+		err := reader.List(context.TODO(), rsLister, &client.ListOptions{LabelSelector: selector, Namespace: o.Namespace}, utilclient.DisableDeepCopy)
+		if err != nil {
+			return "", err
+		}
+
+		for i := range rsLister.Items {
+			rs := &rsLister.Items[i]
+			owner := metav1.GetControllerOfNoCopy(rs)
+			if owner == nil || owner.UID != o.UID || !rs.DeletionTimestamp.IsZero() {
+				continue
+			}
+			if util.EqualIgnoreHash(&o.Spec.Template, &rs.Spec.Template) {
+				return rs.Labels[appsv1.DefaultDeploymentUniqueLabelKey], nil
+			}
+		}
+		return "", GenerateNotFoundError(o, fmt.Sprintf("%s latest version", klog.KObj(o)))
+	}
+	return VersionIgnored, nil
+}
+
+func enableVersionedStatus(object client.Object) bool {
+	objectKind := object.GetObjectKind().GroupVersionKind().Kind
+	if EnabledWorkloadSetForVersionedStatus.Has(strings.ToLower(objectKind)) {
+		return true
+	}
+
+	owner := metav1.GetControllerOfNoCopy(object)
+	if owner != nil && EnabledWorkloadSetForVersionedStatus.Has(strings.ToLower(owner.Kind)) {
+		return true
+	}
+	return false
 }

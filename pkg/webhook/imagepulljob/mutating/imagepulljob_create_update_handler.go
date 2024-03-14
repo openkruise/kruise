@@ -25,6 +25,7 @@ import (
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -46,7 +47,7 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	var copy runtime.Object = obj.DeepCopy()
-	defaults.SetDefaultsImagePullJob(obj)
+	defaults.SetDefaultsImagePullJob(obj, req.AdmissionRequest.Operation == admissionv1.Create)
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}

@@ -23,17 +23,10 @@ import (
 	"reflect"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -44,6 +37,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -161,10 +163,16 @@ func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 		}
 		klog.V(3).Infof("add PodProbeMarker(%s/%s) finalizer success", ppm.Namespace, ppm.Name)
 	}
+
+	groupByNode := make(map[string][]*corev1.Pod)
+	for i, pod := range pods {
+		groupByNode[pod.Spec.NodeName] = append(groupByNode[pod.Spec.NodeName], pods[i])
+	}
+
 	// add podProbe in NodePodProbe
-	for _, pod := range pods {
+	for nodeName := range groupByNode {
 		// add podProbe to NodePodProbe.Spec
-		if err = r.updateNodePodProbe(ppm, pod); err != nil {
+		if err = r.updateNodePodProbes(ppm, nodeName, groupByNode[nodeName]); err != nil {
 			return err
 		}
 	}
@@ -206,43 +214,77 @@ func (r *ReconcilePodProbeMarker) handlerPodProbeMarkerFinalizer(ppm *appsv1alph
 	return nil
 }
 
-func (r *ReconcilePodProbeMarker) updateNodePodProbe(ppm *appsv1alpha1.PodProbeMarker, pod *corev1.Pod) error {
+func (r *ReconcilePodProbeMarker) updateNodePodProbes(ppm *appsv1alpha1.PodProbeMarker, nodeName string, pods []*corev1.Pod) error {
 	npp := &appsv1alpha1.NodePodProbe{}
-	err := r.Get(context.TODO(), client.ObjectKey{Name: pod.Spec.NodeName}, npp)
+	err := r.Get(context.TODO(), client.ObjectKey{Name: nodeName}, npp)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.Warningf("PodProbeMarker ppm(%s/%s) NodePodProbe(%s) is Not Found", ppm.Namespace, ppm.Name, npp.Name)
 			return nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Errorf("PodProbeMarker ppm(%s/%s) get NodePodProbe(%s) failed: %s", ppm.Namespace, ppm.Name, pod.Spec.NodeName, err.Error())
+		klog.Errorf("PodProbeMarker ppm(%s/%s) get NodePodProbe(%s) failed: %s", ppm.Namespace, ppm.Name, nodeName, err.Error())
 		return err
 	}
 
 	oldSpec := npp.Spec.DeepCopy()
-	exist := false
-	for i := range npp.Spec.PodProbes {
-		podProbe := &npp.Spec.PodProbes[i]
-		if podProbe.Name == pod.Name && podProbe.Namespace == pod.Namespace && podProbe.UID == string(pod.UID) {
-			exist = true
+	for _, pod := range pods {
+		exist := false
+		for i := range npp.Spec.PodProbes {
+			podProbe := &npp.Spec.PodProbes[i]
+			if podProbe.Name == pod.Name && podProbe.Namespace == pod.Namespace && podProbe.UID == string(pod.UID) {
+				exist = true
+				for j := range ppm.Spec.Probes {
+					probe := ppm.Spec.Probes[j]
+					if podProbe.IP == "" {
+						podProbe.IP = pod.Status.PodIP
+					}
+					if probe.Probe.TCPSocket != nil {
+						probe, err = convertTcpSocketProbeCheckPort(probe, pod)
+						if err != nil {
+							klog.Errorf("Failed to convert tcpSocket probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+							continue
+						}
+					}
+					if probe.Probe.HTTPGet != nil {
+						probe, err = convertHttpGetProbeCheckPort(probe, pod)
+						if err != nil {
+							klog.Errorf("Failed to convert httpGet probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+							continue
+						}
+					}
+					setPodContainerProbes(podProbe, probe, ppm.Name)
+				}
+				break
+			}
+		}
+		if !exist {
+			podProbe := appsv1alpha1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID), IP: pod.Status.PodIP}
 			for j := range ppm.Spec.Probes {
 				probe := ppm.Spec.Probes[j]
-				setPodContainerProbes(podProbe, probe, ppm.Name)
+				// look up a port in a container by name & convert container name port
+				if probe.Probe.TCPSocket != nil {
+					probe, err = convertTcpSocketProbeCheckPort(probe, pod)
+					if err != nil {
+						klog.Errorf("Failed to convert tcpSocket probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+						continue
+					}
+				}
+				if probe.Probe.HTTPGet != nil {
+					probe, err = convertHttpGetProbeCheckPort(probe, pod)
+					if err != nil {
+						klog.Errorf("Failed to convert httpGet probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+						continue
+					}
+				}
+				podProbe.Probes = append(podProbe.Probes, appsv1alpha1.ContainerProbe{
+					Name:          fmt.Sprintf("%s#%s", ppm.Name, probe.Name),
+					ContainerName: probe.ContainerName,
+					Probe:         probe.Probe,
+				})
 			}
-			break
+			npp.Spec.PodProbes = append(npp.Spec.PodProbes, podProbe)
 		}
-	}
-	if !exist {
-		podProbe := appsv1alpha1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID)}
-		for j := range ppm.Spec.Probes {
-			probe := ppm.Spec.Probes[j]
-			podProbe.Probes = append(podProbe.Probes, appsv1alpha1.ContainerProbe{
-				Name:          fmt.Sprintf("%s#%s", ppm.Name, probe.Name),
-				ContainerName: probe.ContainerName,
-				Probe:         probe.Probe,
-			})
-		}
-		npp.Spec.PodProbes = append(npp.Spec.PodProbes, podProbe)
 	}
 
 	if reflect.DeepEqual(npp.Spec, oldSpec) {
@@ -256,6 +298,43 @@ func (r *ReconcilePodProbeMarker) updateNodePodProbe(ppm *appsv1alpha1.PodProbeM
 	klog.V(3).Infof("PodProbeMarker ppm(%s/%s) update NodePodProbe(%s) from(%s) -> to(%s) success",
 		ppm.Namespace, ppm.Name, npp.Name, util.DumpJSON(oldSpec), util.DumpJSON(npp.Spec))
 	return nil
+}
+
+func convertHttpGetProbeCheckPort(probe appsv1alpha1.PodContainerProbe, pod *corev1.Pod) (appsv1alpha1.PodContainerProbe, error) {
+	probeNew := probe.DeepCopy()
+	if probe.Probe.HTTPGet.Port.Type == intstr.Int {
+		return *probeNew, nil
+	}
+	container := util.GetPodContainerByName(probe.ContainerName, pod)
+	if container == nil {
+		return *probeNew, fmt.Errorf("Failed to get container by name: %v in pod: %v/%v", probe.ContainerName, pod.Namespace, pod.Name)
+	}
+	portInt, err := util.ExtractPort(probe.Probe.HTTPGet.Port, *container)
+	if err != nil {
+		return *probeNew, fmt.Errorf("Failed to extract port for container: %v in pod: %v/%v", container.Name, pod.Namespace, pod.Name)
+	}
+	// If you need to parse integer values with specific bit sizes, avoid strconv.Atoi,
+	// and instead use strconv.ParseInt or strconv.ParseUint, which also allow specifying the bit size.
+	// https://codeql.github.com/codeql-query-help/go/go-incorrect-integer-conversion/
+	probeNew.Probe.HTTPGet.Port = intstr.FromInt(portInt)
+	return *probeNew, nil
+}
+
+func convertTcpSocketProbeCheckPort(probe appsv1alpha1.PodContainerProbe, pod *corev1.Pod) (appsv1alpha1.PodContainerProbe, error) {
+	probeNew := probe.DeepCopy()
+	if probe.Probe.TCPSocket.Port.Type == intstr.Int {
+		return *probeNew, nil
+	}
+	container := util.GetPodContainerByName(probe.ContainerName, pod)
+	if container == nil {
+		return *probeNew, fmt.Errorf("Failed to get container by name: %v in pod: %v/%v", probe.ContainerName, pod.Namespace, pod.Name)
+	}
+	portInt, err := util.ExtractPort(probe.Probe.TCPSocket.Port, *container)
+	if err != nil {
+		return *probeNew, fmt.Errorf("Failed to extract port for container: %v in pod: %v/%v", container.Name, pod.Namespace, pod.Name)
+	}
+	probeNew.Probe.TCPSocket.Port = intstr.FromInt(portInt)
+	return *probeNew, nil
 }
 
 func setPodContainerProbes(podProbe *appsv1alpha1.PodProbe, probe appsv1alpha1.PodContainerProbe, ppmName string) {

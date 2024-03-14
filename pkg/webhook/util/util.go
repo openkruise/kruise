@@ -20,8 +20,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/klog/v2"
+
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func GetHost() string {

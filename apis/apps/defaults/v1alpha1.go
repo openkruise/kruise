@@ -24,6 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	// ProtectionFinalizer is designed to ensure the GC of resources.
+	ProtectionFinalizer = "apps.kruise.io/deletion-protection"
 )
 
 // SetDefaults_SidecarSet set default values for SidecarSet.
@@ -225,6 +231,25 @@ func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateD
 			}
 		}
 	}
+
+	hasReplicasSettings := false
+	hasCapacitySettings := false
+	for _, subset := range obj.Spec.Topology.Subsets {
+		if subset.Replicas != nil {
+			hasReplicasSettings = true
+		}
+		if subset.MinReplicas != nil || subset.MaxReplicas != nil {
+			hasCapacitySettings = true
+		}
+	}
+	if hasCapacitySettings && !hasReplicasSettings {
+		for i := range obj.Spec.Topology.Subsets {
+			subset := &obj.Spec.Topology.Subsets[i]
+			if subset.MinReplicas == nil {
+				subset.MinReplicas = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+			}
+		}
+	}
 }
 
 // SetDefaults_CloneSet set default values for CloneSet.
@@ -353,7 +378,7 @@ func SetDefaultsImageTagPullPolicy(obj *v1alpha1.ImageTagPullPolicy) {
 }
 
 // SetDefaults_ImagePullJob set default values for ImagePullJob.
-func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
+func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob, addProtection bool) {
 	if obj.Spec.CompletionPolicy.Type == "" {
 		obj.Spec.CompletionPolicy.Type = v1alpha1.Always
 	}
@@ -365,6 +390,12 @@ func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob) {
 	}
 	if obj.Spec.PullPolicy.BackoffLimit == nil {
 		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
+	}
+	if obj.Spec.ImagePullPolicy == "" {
+		obj.Spec.ImagePullPolicy = v1alpha1.PullIfNotPresent
+	}
+	if addProtection {
+		controllerutil.AddFinalizer(obj, ProtectionFinalizer)
 	}
 }
 

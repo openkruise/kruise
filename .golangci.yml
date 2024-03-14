@@ -66,6 +66,12 @@ linters-settings:
     locale: default
     #ignore-words:
     #  - someword
+  depguard:
+    rules:
+      forbid-pkg-errors:
+        deny:
+        - pkg: "github.com/pkg/errors"
+          dsc: Should be replaced with standard lib errors or fmt.Errorf
 
 linters:
   fast: false
@@ -80,6 +86,7 @@ linters:
     - vet
     - unconvert
     - unused
+    - depguard
 issues:
   exclude:
     # staticcheck

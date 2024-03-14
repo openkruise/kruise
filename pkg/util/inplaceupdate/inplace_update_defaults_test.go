@@ -21,18 +21,19 @@ import (
 	"testing"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	testingclock "k8s.io/utils/clock/testing"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func TestDefaultPatchUpdateSpecToPod(t *testing.T) {
 	now := time.Now()
-	Clock = clock.NewFakeClock(now)
+	Clock = testingclock.NewFakeClock(now)
 	givenPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      map[string]string{"label-k1": "foo", "label-k2": "foo"},

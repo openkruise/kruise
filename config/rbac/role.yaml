@@ -259,6 +259,14 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - ephemeraljobs/finalizers
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - ephemeraljobs/status
   verbs:
   - get

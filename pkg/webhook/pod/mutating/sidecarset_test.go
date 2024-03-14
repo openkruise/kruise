@@ -541,6 +541,7 @@ func TestInjectMetadata(t *testing.T) {
 func TestInjectionStrategyRevision(t *testing.T) {
 	spec := map[string]interface{}{
 		"spec": map[string]interface{}{
+			"$patch": "replace",
 			"initContainers": []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{

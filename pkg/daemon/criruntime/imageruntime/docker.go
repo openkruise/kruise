@@ -21,14 +21,15 @@ import (
 	"io"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	dockertypes "github.com/docker/docker/api/types"
 	dockerapi "github.com/docker/docker/client"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 )
 
 // NewDockerImageService create a docker runtime
@@ -54,7 +55,7 @@ func (d *dockerImageService) createRuntimeClientIfNecessary() error {
 	if d.client != nil {
 		return nil
 	}
-	c, err := dockerapi.NewClient(d.runtimeURI, "1.23", nil, nil)
+	c, err := dockerapi.NewClientWithOpts(dockerapi.WithHost(d.runtimeURI), dockerapi.WithVersion("1.24"))
 	if err != nil {
 		return err
 	}
@@ -81,7 +82,7 @@ func (d *dockerImageService) PullImage(ctx context.Context, imageName, tag strin
 
 	if len(pullSecrets) > 0 {
 		var authInfos []daemonutil.AuthInfo
-		authInfos, err = convertToRegistryAuths(pullSecrets, registry)
+		authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, registry)
 		if err == nil {
 			var pullErrs []error
 			for _, authInfo := range authInfos {
@@ -158,3 +159,5 @@ func newImageCollectionDocker(infos []dockertypes.ImageSummary) []ImageInfo {
 	}
 	return collection
 }
+
+var _ ImageService = &dockerImageService{}

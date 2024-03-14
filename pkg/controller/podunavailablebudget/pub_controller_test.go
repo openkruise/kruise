@@ -29,6 +29,8 @@ import (
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1142,7 +1144,14 @@ func TestPubReconcile(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			pub := cs.getPub()
 			defer util.GlobalCache.Delete(pub)
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), pub).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), pub).
+				WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+					var owners []string
+					for _, ref := range obj.GetOwnerReferences() {
+						owners = append(owners, string(ref.UID))
+					}
+					return owners
+				}).Build()
 			for _, pod := range cs.getPods(cs.getReplicaSet()...) {
 				podIn := pod.DeepCopy()
 				_ = fakeClient.Create(context.TODO(), podIn)
@@ -1150,13 +1159,13 @@ func TestPubReconcile(t *testing.T) {
 			for _, obj := range cs.getReplicaSet() {
 				_ = fakeClient.Create(context.TODO(), obj)
 			}
-
+			finder := &controllerfinder.ControllerFinder{Client: fakeClient}
+			pubcontrol.InitPubControl(fakeClient, finder, record.NewFakeRecorder(10))
 			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: fakeClient}
 			reconciler := ReconcilePodUnavailableBudget{
 				Client:           fakeClient,
 				recorder:         record.NewFakeRecorder(10),
 				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
-				pubControl:       pubcontrol.NewPubControl(fakeClient),
 			}
 			_, err := reconciler.syncPodUnavailableBudget(pub)
 			if err != nil {

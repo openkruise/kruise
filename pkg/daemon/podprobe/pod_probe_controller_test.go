@@ -22,16 +22,18 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
-	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
-	commonutil "github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
+	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	commonutil "github.com/openkruise/kruise/pkg/util"
 )
 
 var (
@@ -44,6 +46,7 @@ var (
 				{
 					Name: "pod-0",
 					UID:  "pod-0-uid",
+					IP:   "1.1.1.1",
 					Probes: []appsv1alpha1.ContainerProbe{
 						{
 							Name:          "ppm-1#healthy",
@@ -64,6 +67,7 @@ var (
 				{
 					Name: "pod-1",
 					UID:  "pod-1-uid",
+					IP:   "2.2.2.2",
 					Probes: []appsv1alpha1.ContainerProbe{
 						{
 							Name:          "ppm-1#healthy",
@@ -76,6 +80,27 @@ var (
 										},
 									},
 									InitialDelaySeconds: 100,
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "pod-2",
+					UID:  "pod-2-uid",
+					IP:   "3.3.3.3",
+					Probes: []appsv1alpha1.ContainerProbe{
+						{
+							Name:          "ppm-1#tcpCheck",
+							ContainerName: "main",
+							Probe: appsv1alpha1.ContainerProbeSpec{
+								Probe: corev1.Probe{
+									ProbeHandler: corev1.ProbeHandler{
+										TCPSocket: &corev1.TCPSocketAction{
+											Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(8000)},
+											Host: "3.3.3.3",
+										},
+									},
 								},
 							},
 						},
@@ -96,7 +121,7 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 		{
 			name: "test1, update pod probe status",
 			getUpdate: func() Update {
-				return Update{Key: probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}, State: appsv1alpha1.ProbeSucceeded}
+				return Update{Key: probeKey{"", "pod-1", "pod-1-uid", "2.2.2.2", "main", "ppm-1#healthy"}, State: appsv1alpha1.ProbeSucceeded}
 			},
 			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
 				demo := demoNodePodProbe.DeepCopy()
@@ -144,10 +169,11 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 				return obj
 			},
 		},
+
 		{
 			name: "test2, update pod probe status",
 			getUpdate: func() Update {
-				return Update{Key: probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}, State: appsv1alpha1.ProbeSucceeded}
+				return Update{Key: probeKey{"", "pod-1", "pod-1-uid", "2.2.2.2", "main", "ppm-1#healthy"}, State: appsv1alpha1.ProbeSucceeded}
 			},
 			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
 				demo := demoNodePodProbe.DeepCopy()
@@ -227,10 +253,11 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 				return obj
 			},
 		},
+
 		{
 			name: "test3, update pod probe status",
 			getUpdate: func() Update {
-				return Update{Key: probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}, State: appsv1alpha1.ProbeSucceeded}
+				return Update{Key: probeKey{"", "pod-1", "pod-1-uid", "2.2.2.2", "main", "ppm-1#healthy"}, State: appsv1alpha1.ProbeSucceeded}
 			},
 			getNodePodProbe: func() *appsv1alpha1.NodePodProbe {
 				demo := demoNodePodProbe.DeepCopy()
@@ -286,6 +313,7 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 				return obj
 			},
 		},
+
 		{
 			name: "test4, update pod probe status",
 			getUpdate: func() Update {
@@ -412,7 +440,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 			},
 			setWorkers: func(c *Controller) {
 				c.workers = map[probeKey]*worker{}
-				key1 := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#check"}
+				key1 := probeKey{"", "pod-1", "pod-1-uid", "2.2.2.2", "main", "ppm-1#check"}
 				c.workers[key1] = newWorker(c, key1, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
@@ -423,7 +451,7 @@ func TestSyncNodePodProbe(t *testing.T) {
 					},
 				})
 				go c.workers[key1].run()
-				key2 := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}
+				key2 := probeKey{"", "pod-2", "pod-2-uid", "3.3.3.3", "main", "ppm-1#tcpCheck"}
 				c.workers[key2] = newWorker(c, key2, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
@@ -437,8 +465,8 @@ func TestSyncNodePodProbe(t *testing.T) {
 			},
 			expectWorkers: func(c *Controller) map[probeKey]*worker {
 				expect := map[probeKey]*worker{}
-				key := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}
-				expect[key] = newWorker(c, key, &appsv1alpha1.ContainerProbeSpec{
+				key1 := probeKey{"", "pod-1", "pod-1-uid", "2.2.2.2", "main", "ppm-1#healthy"}
+				expect[key1] = newWorker(c, key1, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
 							Exec: &corev1.ExecAction{
@@ -446,6 +474,17 @@ func TestSyncNodePodProbe(t *testing.T) {
 							},
 						},
 						InitialDelaySeconds: 100,
+					},
+				})
+				key2 := probeKey{"", "pod-2", "pod-2-uid", "3.3.3.3", "main", "ppm-1#tcpCheck"}
+				expect[key2] = newWorker(c, key2, &appsv1alpha1.ContainerProbeSpec{
+					Probe: corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							TCPSocket: &corev1.TCPSocketAction{
+								Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(8000)},
+								Host: "3.3.3.3",
+							},
+						},
 					},
 				})
 				return expect
@@ -476,7 +515,19 @@ func TestSyncNodePodProbe(t *testing.T) {
 			},
 			expectWorkers: func(c *Controller) map[probeKey]*worker {
 				expect := map[probeKey]*worker{}
-				key1 := probeKey{"", "pod-1", "pod-1-uid", "main", "ppm-1#healthy"}
+				key0 := probeKey{"", "pod-0", "pod-0-uid", "1.1.1.1", "main", "ppm-1#healthy"}
+				expect[key0] = newWorker(c, key0, &appsv1alpha1.ContainerProbeSpec{
+					Probe: corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{
+								Command: []string{"/bin/sh", "-c", "/healthy.sh"},
+							},
+						},
+						InitialDelaySeconds: 100,
+					},
+				})
+
+				key1 := probeKey{"", "pod-1", "pod-1-uid", "2.2.2.2", "main", "ppm-1#healthy"}
 				expect[key1] = newWorker(c, key1, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
@@ -487,7 +538,8 @@ func TestSyncNodePodProbe(t *testing.T) {
 						InitialDelaySeconds: 100,
 					},
 				})
-				key2 := probeKey{"", "pod-1", "pod-1-uid", "nginx", "ppm-1#check"}
+
+				key2 := probeKey{"", "pod-1", "pod-1-uid", "2.2.2.2", "nginx", "ppm-1#check"}
 				expect[key2] = newWorker(c, key2, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
@@ -498,15 +550,16 @@ func TestSyncNodePodProbe(t *testing.T) {
 						InitialDelaySeconds: 100,
 					},
 				})
-				key3 := probeKey{"", "pod-0", "pod-0-uid", "main", "ppm-1#healthy"}
+
+				key3 := probeKey{"", "pod-2", "pod-2-uid", "3.3.3.3", "main", "ppm-1#tcpCheck"}
 				expect[key3] = newWorker(c, key3, &appsv1alpha1.ContainerProbeSpec{
 					Probe: corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
-							Exec: &corev1.ExecAction{
-								Command: []string{"/bin/sh", "-c", "/healthy.sh"},
+							TCPSocket: &corev1.TCPSocketAction{
+								Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(8000)},
+								Host: "3.3.3.3",
 							},
 						},
-						InitialDelaySeconds: 100,
 					},
 				})
 				return expect

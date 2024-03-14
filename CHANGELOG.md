@@ -1,5 +1,30 @@
 # Change Log
 
+## v1.5.2
+> Chang log since v1.5.1
+
+### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
+
+### Start kruise-manager as a non-root user
+We start kruise-manger with a non-root user to further enhance the security of kruise-manager. ([#1491](https://github.com/openkruise/kruise/pull/1491), [@zmberg](https://github.com/zmberg))
+
+## v1.5.1
+> Chang log since v1.5.0
+
+In version 1.5.1, the focus was on enhancing UnitedDeployment and addressing various bug fixes:
+
+- Add the ability to plan the lower and upper bound of capacity to the subsets in UnitedDeployment ([#1428](https://github.com/openkruise/kruise/pull/1428), [@veophi](https://github.com/veophi))
+
+- Fix unexpected job recreation by adding controller-revision-hash label for ImageListPullJob. ([#1441](https://github.com/openkruise/kruise/pull/1428), [@veophi](https://github.com/veophi))
+
+- Add prometheus metrics for pub and deletion protection to enhance observability for pub & deletion protection ([#1398](https://github.com/openkruise/kruise/pull/1398), [@zmberg](https://github.com/zmberg))
+
+- Add enable pprof flag for kruise daemon, now you can disable the pprof of kruise daemon ([#1416](https://github.com/openkruise/kruise/pull/1416), [@chengjoey](https://github.com/chengjoey))
+
+- Fix SidecarSet upgrade exception for UpdateExpectations to solve the problem of updating the image of the sidecar container ([#1435](https://github.com/openkruise/kruise/pull/1435), [@zmberg](https://github.com/zmberg)])
+
+- add audit log for pub and deletion protection to enhance observability for pub & deletion protection  ([#1438](https://github.com/openkruise/kruise/pull/1438), [@zmberg](https://github.com/zmberg)])
+
 ## v1.5.0
 > Change log since v1.4.0
 
@@ -56,6 +81,11 @@ And some bugs were fixed by
 ([#1348](https://github.com/openkruise/kruise/pull/1348), [#1343](https://github.com/openkruise/kruise/pull/1343), [Colvin-Y](https://github.com/Colvin-Y)),
 thanks!
 
+## v.1.4.1
+> Change log since v1.4.0
+
+### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
+
 ## v1.4.0
 
 > Change log since v1.3.0
@@ -105,6 +135,12 @@ For more detail, please refer to its [proposal](https://github.com/openkruise/kr
 - Fix config/samples/apps_v1alpha1_uniteddeployment.yaml invalid image. ([#1198](https://github.com/openkruise/kruise/pull/1198), [@chengleqi](https://github.com/chengleqi))
 - Change kruise base image to alpine. ([#1166](https://github.com/openkruise/kruise/pull/1166), [@fengshunli](https://github.com/fengshunli))
 - PersistentPodState support custom workload (like statefulSet). ([#1063](https://github.com/openkruise/kruise/pull/1063), [@baxiaoshi](https://github.com/baxiaoshi))
+
+## v1.3.1
+
+> Change log since v1.3.0
+
+### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
 
 ## v1.3.0
 

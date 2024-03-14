@@ -29,7 +29,9 @@ type WorkloadSpreadSpec struct {
 	TargetReference *TargetReference `json:"targetRef"`
 
 	// Subsets describes the pods distribution details between each of subsets.
-	Subsets []WorkloadSpreadSubset `json:"subsets"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Subsets []WorkloadSpreadSubset `json:"subsets" patchStrategy:"merge" patchMergeKey:"name"`
 
 	// ScheduleStrategy indicates the strategy the WorkloadSpread used to preform the schedule between each of subsets.
 	// +optional
@@ -128,6 +130,11 @@ type WorkloadSpreadStatus struct {
 	// Contains the status of each subset. Each element in this array represents one subset
 	// +optional
 	SubsetStatuses []WorkloadSpreadSubsetStatus `json:"subsetStatuses,omitempty"`
+
+	// VersionedSubsetStatuses is to solve rolling-update problems, where the creation of new-version pod
+	// may be earlier than deletion of old-version pod. We have to calculate the pod subset distribution for
+	// each version.
+	VersionedSubsetStatuses map[string][]WorkloadSpreadSubsetStatus `json:"versionedSubsetStatuses,omitempty"`
 }
 
 type WorkloadSpreadSubsetConditionType string

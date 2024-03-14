@@ -18,6 +18,8 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -34,7 +36,7 @@ const (
 type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visible in Runtime.
-	GetPodStatus(uid types.UID, name, namespace string) (*kubeletcontainer.PodStatus, error)
+	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*kubeletcontainer.PodStatus, error)
 	// KillContainer kills a container through the following steps:
 	// * Run the pre-stop lifecycle hooks (if applicable).
 	// * Stop the container.
@@ -45,15 +47,14 @@ func NewGenericRuntime(
 	runtimeName string,
 	runtimeService criapi.RuntimeService,
 	recorder record.EventRecorder,
-	httpClient kubelettypes.HTTPGetter,
+	httpClient kubelettypes.HTTPDoer,
 ) Runtime {
 	kubeRuntimeManager := &genericRuntimeManager{
 		runtimeName:    runtimeName,
 		runtimeService: runtimeService,
 		recorder:       recorder,
 	}
-
-	kubeRuntimeManager.runner = kubeletlifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
+	kubeRuntimeManager.runner = kubeletlifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
 
 	return kubeRuntimeManager
 }
@@ -69,7 +70,7 @@ type genericRuntimeManager struct {
 
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
-func (m *genericRuntimeManager) GetPodStatus(uid types.UID, name, namespace string) (*kubeletcontainer.PodStatus, error) {
+func (m *genericRuntimeManager) GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*kubeletcontainer.PodStatus, error) {
 	// TODO: get Pod IPs from sandbox container if needed
 
 	// Get statuses of all containers visible in the pod.

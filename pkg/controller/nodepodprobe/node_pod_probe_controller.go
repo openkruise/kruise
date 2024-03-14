@@ -63,7 +63,9 @@ var (
 // Add creates a new NodePodProbe Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	if !utildiscovery.DiscoverGVK(controllerKind) || !utilfeature.DefaultFeatureGate.Enabled(features.PodProbeMarkerGate) {
+	if !utildiscovery.DiscoverGVK(controllerKind) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodProbeMarkerGate) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) {
 		return nil
 	}
 	return add(mgr, newReconciler(mgr))
@@ -331,7 +333,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		oldStatus := podClone.Status.DeepCopy()
 		for i := range probeConditions {
 			condition := probeConditions[i]
-			util.SetPodCondition(podClone, condition)
+			util.SetPodConditionIfMsgChanged(podClone, condition)
 		}
 		oldMetadata := podClone.ObjectMeta.DeepCopy()
 		if podClone.Annotations == nil {

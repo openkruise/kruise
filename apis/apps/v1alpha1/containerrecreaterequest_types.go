@@ -44,7 +44,9 @@ type ContainerRecreateRequestSpec struct {
 	// PodName is name of the Pod that owns the recreated containers.
 	PodName string `json:"podName"`
 	// Containers contains the containers that need to recreate in the Pod.
-	Containers []ContainerRecreateRequestContainer `json:"containers"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Containers []ContainerRecreateRequestContainer `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`
 	// Strategy defines strategies for containers recreation.
 	Strategy *ContainerRecreateRequestStrategy `json:"strategy,omitempty"`
 	// ActiveDeadlineSeconds is the deadline duration of this ContainerRecreateRequest.

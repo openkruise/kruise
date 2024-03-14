@@ -3170,6 +3170,16 @@ func (in *Subset) DeepCopyInto(out *Subset) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.MinReplicas != nil {
+		in, out := &in.MinReplicas, &out.MinReplicas
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
+	if in.MaxReplicas != nil {
+		in, out := &in.MaxReplicas, &out.MaxReplicas
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	in.Patch.DeepCopyInto(&out.Patch)
 }
 
@@ -3654,6 +3664,23 @@ func (in *WorkloadSpreadStatus) DeepCopyInto(out *WorkloadSpreadStatus) {
 		*out = make([]WorkloadSpreadSubsetStatus, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.VersionedSubsetStatuses != nil {
+		in, out := &in.VersionedSubsetStatuses, &out.VersionedSubsetStatuses
+		*out = make(map[string][]WorkloadSpreadSubsetStatus, len(*in))
+		for key, val := range *in {
+			var outVal []WorkloadSpreadSubsetStatus
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make([]WorkloadSpreadSubsetStatus, len(*in))
+				for i := range *in {
+					(*in)[i].DeepCopyInto(&(*out)[i])
+				}
+			}
+			(*out)[key] = outVal
 		}
 	}
 }

@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -258,7 +259,7 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 			}
 			podInput = podOutput.DeepCopy()
 			for cName, infos := range cs.expectedInfo {
-				sidecarContainer := getPodContainerByName(cName, podOutput)
+				sidecarContainer := util.GetPodContainerByName(cName, podOutput)
 				if infos[0] != sidecarContainer.Image {
 					t.Fatalf("expect pod(%s) container(%s) image(%s), but get image(%s)", pod.Name, sidecarContainer.Name, infos[0], sidecarContainer.Image)
 				}
@@ -292,14 +293,4 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 			}
 		})
 	}
-}
-
-func getPodContainerByName(cName string, pod *corev1.Pod) *corev1.Container {
-	for _, container := range pod.Spec.Containers {
-		if cName == container.Name {
-			return &container
-		}
-	}
-
-	return nil
 }

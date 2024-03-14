@@ -22,7 +22,6 @@ var (
 	DefaultPodValidationOptions = corevalidation.PodValidationOptions{
 		AllowDownwardAPIHugePages:       true,
 		AllowInvalidPodDeletionCost:     true,
-		AllowWindowsHostProcessField:    true,
 		AllowExpandedDNSConfig:          true,
 		AllowIndivisibleHugePagesValues: true,
 	}

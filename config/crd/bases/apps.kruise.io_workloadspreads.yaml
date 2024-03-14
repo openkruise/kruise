@@ -432,6 +432,96 @@ spec:
                   - replicas
                   type: object
                 type: array
+              versionedSubsetStatuses:
+                additionalProperties:
+                  items:
+                    description: WorkloadSpreadSubsetStatus defines the observed state
+                      of subset
+                    properties:
+                      conditions:
+                        description: Conditions is an array of current observed subset
+                          conditions.
+                        items:
+                          properties:
+                            lastTransitionTime:
+                              description: Last time the condition transitioned from
+                                one status to another.
+                              format: date-time
+                              type: string
+                            message:
+                              description: A human readable message indicating details
+                                about the transition.
+                              type: string
+                            reason:
+                              description: The reason for the condition's last transition.
+                              type: string
+                            status:
+                              description: Status of the condition, one of True, False,
+                                Unknown.
+                              type: string
+                            type:
+                              description: Type of in place set condition.
+                              type: string
+                          required:
+                          - status
+                          - type
+                          type: object
+                        type: array
+                      creatingPods:
+                        additionalProperties:
+                          format: date-time
+                          type: string
+                        description: CreatingPods contains information about pods
+                          whose creation was processed by the webhook handler but
+                          not yet been observed by the WorkloadSpread controller.
+                          A pod will be in this map from the time when the webhook
+                          handler processed the creation request to the time when
+                          the pod is seen by controller. The key in the map is the
+                          name of the pod and the value is the time when the webhook
+                          handler process the creation request. If the real creation
+                          didn't happen and a pod is still in this map, it will be
+                          removed from the list automatically by WorkloadSpread controller
+                          after some time. If everything goes smooth this map should
+                          be empty for the most of the time. Large number of entries
+                          in the map may indicate problems with pod creations.
+                        type: object
+                      deletingPods:
+                        additionalProperties:
+                          format: date-time
+                          type: string
+                        description: DeletingPods is similar with CreatingPods and
+                          it contains information about pod deletion.
+                        type: object
+                      missingReplicas:
+                        description: MissingReplicas is the number of active replicas
+                          belong to this subset not be found. MissingReplicas > 0
+                          indicates the subset is still missing MissingReplicas pods
+                          to create MissingReplicas = 0 indicates the subset already
+                          has enough pods, there is no need to create MissingReplicas
+                          = -1 indicates the subset's MaxReplicas not set, then there
+                          is no limit for pods number
+                        format: int32
+                        type: integer
+                      name:
+                        description: Name should be unique between all of the subsets
+                          under one WorkloadSpread.
+                        type: string
+                      replicas:
+                        description: Replicas is the most recently observed number
+                          of active replicas for subset.
+                        format: int32
+                        type: integer
+                    required:
+                    - missingReplicas
+                    - name
+                    - replicas
+                    type: object
+                  type: array
+                description: VersionedSubsetStatuses is to solve rolling-update problems,
+                  where the creation of new-version pod may be earlier than deletion
+                  of old-version pod. We have to calculate the pod subset distribution
+                  for each version.
+                type: object
             type: object
         type: object
     served: true

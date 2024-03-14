@@ -134,7 +134,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		pod := pods[idx]
 		// Determine the pub before updating the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
-			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(c.Client, c.pubControl, pod, policyv1alpha1.PubUpdateOperation, false)
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(pod, policyv1alpha1.PubUpdateOperation, "kruise-manager", false)
 			if err != nil {
 				return err
 				// pub check does not pass, try again in seconds

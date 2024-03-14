@@ -19,18 +19,16 @@ package containerlauchpriority
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"sort"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -40,6 +38,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
 )
 
 const (
@@ -70,15 +73,11 @@ func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			pod := e.Object.(*v1.Pod)
-			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			// If in vk scenario, there will be not containerReady condition
-			return utilcontainerlaunchpriority.ExistsPriorities(pod) && (containersReady == nil || containersReady.Status != v1.ConditionTrue)
+			return shouldEnqueue(pod, mgr.GetCache())
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			pod := e.ObjectNew.(*v1.Pod)
-			_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-			// If in vk scenario, there will be not containerReady condition
-			return utilcontainerlaunchpriority.ExistsPriorities(pod) && (containersReady == nil || containersReady.Status != v1.ConditionTrue)
+			return shouldEnqueue(pod, mgr.GetCache())
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false
@@ -92,6 +91,30 @@ func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 	}
 
 	return nil
+}
+
+func shouldEnqueue(pod *v1.Pod, r client.Reader) bool {
+	if pod.Annotations[appspub.ContainerLaunchPriorityCompletedKey] == "true" {
+		return false
+	}
+	if _, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady); containersReady != nil && containersReady.Status == v1.ConditionTrue {
+		return false
+	}
+
+	nextPriorities := findNextPriorities(pod)
+	if len(nextPriorities) == 0 {
+		return false
+	}
+
+	var barrier = &v1.ConfigMap{}
+	var barrierNamespacedName = types.NamespacedName{
+		Namespace: pod.GetNamespace(),
+		Name:      pod.Name + "-barrier",
+	}
+	if err := r.Get(context.TODO(), barrierNamespacedName, barrier); err != nil {
+		return true
+	}
+	return !isExistsInBarrier(nextPriorities[len(nextPriorities)-1], barrier)
 }
 
 var _ reconcile.Reconciler = &ReconcileContainerLaunchPriority{}
@@ -151,52 +174,73 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 		return reconcile.Result{}, err
 	}
 
-	// set next starting containers
-	_, containersReady := podutil.GetPodCondition(&pod.Status, v1.ContainersReady)
-	if containersReady != nil && containersReady.Status != v1.ConditionTrue {
-		patchKey := r.findNextPatchKey(pod)
-		if patchKey == nil {
-			return reconcile.Result{}, nil
-		}
-		key := "p_" + strconv.Itoa(*patchKey)
-		if err = r.patchOnKeyNotExist(barrier, key); err != nil {
-			return reconcile.Result{}, err
-		}
+	// handle the pod and barrier
+	if err = r.handle(pod, barrier); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileContainerLaunchPriority) findNextPatchKey(pod *v1.Pod) *int {
-	var priority *int
-	var containerPendingSet = make(map[string]bool)
-	for _, status := range pod.Status.ContainerStatuses {
-		if status.Ready {
-			continue
-		}
-		containerPendingSet[status.Name] = true
-	}
-	for _, c := range pod.Spec.Containers {
-		if _, ok := containerPendingSet[c.Name]; ok {
-			p := utilcontainerlaunchpriority.GetContainerPriority(&c)
-			if p == nil {
-				continue
-			}
-			if priority == nil || *p > *priority {
-				priority = p
-			}
-		}
-	}
-	return priority
-}
+func (r *ReconcileContainerLaunchPriority) handle(pod *v1.Pod, barrier *v1.ConfigMap) error {
+	nextPriorities := findNextPriorities(pod)
 
-func (r *ReconcileContainerLaunchPriority) patchOnKeyNotExist(barrier *v1.ConfigMap, key string) error {
-	if _, ok := barrier.Data[key]; !ok {
-		body := fmt.Sprintf(
-			`{"data":{"%s":"true"}}`,
-			key,
-		)
-		return r.Client.Patch(context.TODO(), barrier, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	// If there is no more priorities, or the lowest priority exists in barrier, mask as completed.
+	if len(nextPriorities) == 0 || isExistsInBarrier(nextPriorities[0], barrier) {
+		return r.patchCompleted(pod)
+	}
+
+	// Try to add the current priority if not exists.
+	if !isExistsInBarrier(nextPriorities[len(nextPriorities)-1], barrier) {
+		if err := r.addPriorityIntoBarrier(barrier, nextPriorities[len(nextPriorities)-1]); err != nil {
+			return err
+		}
+	}
+
+	// After adding the current priority, if the lowest priority is same to the current one, mark as completed.
+	if nextPriorities[len(nextPriorities)-1] == nextPriorities[0] {
+		return r.patchCompleted(pod)
 	}
 	return nil
+}
+
+func (r *ReconcileContainerLaunchPriority) addPriorityIntoBarrier(barrier *v1.ConfigMap, priority int) error {
+	klog.V(3).Infof("Adding priority %d into barrier %s/%s", priority, barrier.Namespace, barrier.Name)
+	body := fmt.Sprintf(`{"data":{"%s":"true"}}`, utilcontainerlaunchpriority.GetKey(priority))
+	return r.Client.Patch(context.TODO(), barrier, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+}
+
+func (r *ReconcileContainerLaunchPriority) patchCompleted(pod *v1.Pod) error {
+	klog.V(3).Infof("Marking pod %s/%s as launch priority completed", pod.Namespace, pod.Name)
+	body := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"true"}}}`, appspub.ContainerLaunchPriorityCompletedKey)
+	return r.Client.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+}
+
+func findNextPriorities(pod *v1.Pod) (priorities []int) {
+	containerReadySet := sets.NewString()
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Ready {
+			containerReadySet.Insert(status.Name)
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		if containerReadySet.Has(c.Name) {
+			continue
+		}
+		priority := utilcontainerlaunchpriority.GetContainerPriority(&c)
+		if priority == nil {
+			continue
+		}
+
+		priorities = append(priorities, *priority)
+	}
+	if len(priorities) > 0 {
+		sort.Ints(priorities)
+	}
+	return
+}
+
+func isExistsInBarrier(priority int, barrier *v1.ConfigMap) bool {
+	_, exists := barrier.Data[utilcontainerlaunchpriority.GetKey(priority)]
+	return exists
 }

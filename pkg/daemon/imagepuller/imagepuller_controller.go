@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
@@ -56,7 +57,7 @@ type Controller struct {
 }
 
 // NewController returns the controller for image pulling
-func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretManager) (*Controller, error) {
+func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretManager, cfg *rest.Config) (*Controller, error) {
 	genericClient := client.GetGenericClientWithName("kruise-daemon-imagepuller")
 	informer := newNodeImageInformer(genericClient.KruiseClient, opts.NodeName)
 

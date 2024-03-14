@@ -18,14 +18,14 @@ limitations under the License.
 package framework
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"time"
 
 	"github.com/onsi/ginkgo/config"
-	"github.com/pkg/errors"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -346,7 +346,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config
 		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
-			if tempFile, err := ioutil.TempFile(os.TempDir(), "kubeconfig-"); err == nil {
+			if tempFile, err := os.CreateTemp(os.TempDir(), "kubeconfig-"); err == nil {
 				kubeConfig := createKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
@@ -369,7 +369,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if err == nil {
 		return
 	}
-	if !os.IsNotExist(errors.Cause(err)) {
+	if errors.Is(err, fs.ErrNotExist) {
 		Failf("Failed to setup provider config: %v", err)
 	}
 	// We allow unknown provider parameters for historic reasons. At least log a

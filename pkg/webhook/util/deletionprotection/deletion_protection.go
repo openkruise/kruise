@@ -49,6 +49,30 @@ func ValidateWorkloadDeletion(obj metav1.Object, replicas *int32) error {
 	return nil
 }
 
+func ValidateServiceDeletion(service *v1.Service) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || service.DeletionTimestamp != nil {
+		return nil
+	}
+	switch val := service.Labels[policyv1alpha1.DeletionProtectionKey]; val {
+	case policyv1alpha1.DeletionProtectionTypeAlways:
+		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1alpha1.DeletionProtectionKey, val)
+	default:
+	}
+	return nil
+}
+
+func ValidateIngressDeletion(obj metav1.Object) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || obj.GetDeletionTimestamp() != nil {
+		return nil
+	}
+	switch val := obj.GetLabels()[policyv1alpha1.DeletionProtectionKey]; val {
+	case policyv1alpha1.DeletionProtectionTypeAlways:
+		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1alpha1.DeletionProtectionKey, val)
+	default:
+	}
+	return nil
+}
+
 func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || namespace.DeletionTimestamp != nil {
 		return nil

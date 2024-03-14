@@ -69,8 +69,10 @@ type ResourceDistributionTargetNamespaces struct {
 		Pattern string `json:"pattern,omitempty"`
 	*/
 
+	// +patchMergeKey=name
+	// +patchStrategy=merge
 	// +optional
-	List []ResourceDistributionNamespace `json:"list,omitempty"`
+	List []ResourceDistributionNamespace `json:"list,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ResourceDistributionNamespace contains a namespace name

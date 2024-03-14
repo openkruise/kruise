@@ -102,6 +102,10 @@ spec:
                             description: Specifies the create time of this tag
                             format: date-time
                             type: string
+                          imagePullPolicy:
+                            description: Image pull policy. One of Always, IfNotPresent.
+                              Defaults to IfNotPresent.
+                            type: string
                           ownerReferences:
                             description: List of objects depended by this object.
                               If this image is managed by a controller, then an entry

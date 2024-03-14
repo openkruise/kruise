@@ -22,8 +22,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -71,7 +69,7 @@ func SetupProviderConfig(providerName string) (ProviderInterface, error) {
 	defer mutex.Unlock()
 	factory, ok := providers[providerName]
 	if !ok {
-		return nil, errors.Wrapf(os.ErrNotExist, "The provider %s is unknown.", providerName)
+		return nil, fmt.Errorf("The provider %s is unknown.: %w", providerName, os.ErrNotExist)
 	}
 	provider, err := factory()
 
