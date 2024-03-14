@@ -1,5 +1,55 @@
 # Change Log
 
+## v1.6.0
+> Change log since v1.5.2
+
+### Upgrade Notice
+
+> No, really, you must read this before you upgrade
+- OpenKruise no longer supports Kubernetes versions 1.16, 1.17.
+However it's still possible to use OpenKruise with Kubernetes versions 1.16 and 1.17 as long as KruiseDaemon is not enabled(install/upgrade kruise charts with featureGates="KruiseDaemon=false")
+- OpenKruise leader election default to use leases mode. ([#1407](https://github.com/openkruise/kruise/pull/1407), [dsxing](https://github.com/dsxing))
+For users with OpenKruise version 1.3.0 or lower, please first upgrade your OpenKruise to version 1.4 or 1.5 before upgrading to 1.6.0, so as to avoid unexpected multiple leader problem during the installation.
+- Bump Kubernetes dependency to 1.26.10. ([#1511](https://github.com/openkruise/kruise/pull/1511), [KaiShi](https://github.com/BH4AWS))
+
+### Key Features
+- Fix WorkloadSpread incorrect subset allocation after workload rolling updating. ([#1197](https://github.com/openkruise/kruise/pull/1197), [veophi](https://github.com/veophi))
+- ImagePullJob support force image pulling for images with the name as previous one. ([#1384](https://github.com/openkruise/kruise/pull/1384), [ls-2018](https://github.com/ls-2018))
+- Job Sidecar Terminator reports correct pod phase for sidecar containers with non-zero exit code. ([#1303](https://github.com/openkruise/kruise/pull/1303), [@diannaowa](https://github.com/diannaowa))
+- Support the deletion protection of service and ingress resources. ([#1269](https://github.com/openkruise/kruise/pull/1269), [@kevin1689-cloud](https://github.com/kevin1689-cloud))
+
+### Performance Enhancement
+- Optimize PodProbeMarker performance. ([#1430](https://github.com/openkruise/kruise/pull/1430), [ls-2018](https://github.com/ls-2018))
+- Optimize container launch priority performance. ([#1490](https://github.com/openkruise/kruise/pull/1490), [FillZpp](https://github.com/FillZpp))
+
+### Other Changes
+
+- Enhanced Operation
+  - PodProbeMarker:  Container probe support Tcp probing. ([#1474](https://github.com/openkruise/kruise/pull/1474), [KaiShi](https://github.com/BH4AWS))
+  - PodProbeMarker:  Sync podCondition when probe message of probeStates changed. ([#1479](https://github.com/openkruise/kruise/pull/1479), [chrisliu1995](https://github.com/chrisliu1995))
+  - PersistentPodState: Fix the problem that PersistentPodState can't get spec.replicas from unstructured object. ([#1462](https://github.com/openkruise/kruise/pull/1462), [0xgj](https://github.com/0xgj))
+  - Fix PodProbeMarker feature gate dependency . ([#1429](https://github.com/openkruise/kruise/pull/1429), [ls-2018](https://github.com/ls-2018))
+
+- Advanced Workload
+  - Enforce Advanced DaemonSet spec.selector is immutable. ([#1505](https://github.com/openkruise/kruise/pull/1505), [@hantmac](https://github.com/hantmac))
+  - Advanced StatefulSet maxUnavailable now counts unavailable pods with smaller ordinal in the update order during rolling upgrade. ([#1480](https://github.com/openkruise/kruise/pull/1480), [@Yesphet](https://github.com/Yesphet))
+  - Fix EphemeralJob event handler for deleting object. ([#1401](https://github.com/openkruise/kruise/pull/1401), [FillZpp](https://github.com/FillZpp))
+
+- Sidecar Container
+  - Fix pod annotations injection abnormal for SidecarSet. ([#1453](https://github.com/openkruise/kruise/pull/1453), [@a932846905](https://github.com/a932846905))
+
+- Application Protection
+  - PodUnavailableBudget ignore deletion of not ready or inconsistent pods. ([#1512](https://github.com/openkruise/kruise/pull/1512), [Spground](https://github.com/Spground))
+
+- Others
+  - Replace 'github.com/pkg/errors' with the standard Go library 'errors'. ([#1518](https://github.com/openkruise/kruise/pull/1518), [dongjiang1989](https://github.com/dongjiang1989))
+  - Upgrade minimum docker api version from 1.23 to 1.24. ([#1510](https://github.com/openkruise/kruise/pull/1510), [hantmac](https://github.com/hantmac))
+  - Add UT in controller_revision_test file. ([#1457](https://github.com/openkruise/kruise/pull/1457), [xiangpingjiang](https://github.com/xiangpingjiang))
+  - BroadcastJob controller define some parameters as Constant. ([#1414](https://github.com/openkruise/kruise/pull/1414), [lilongfeng0902](https://github.com/lilongfeng0902))
+  - Kruise-daemon enable pprof. ([#1416](https://github.com/openkruise/kruise/pull/1416), [dsxing](https://github.com/dsxing))
+  - Remove deprecated 'io/ioutil' pkg. ([#1404](https://github.com/openkruise/kruise/pull/1404), [testwill](https://github.com/testwill))
+  - Fix unnecessary use of fmt.Sprintf. ([#1403](https://github.com/openkruise/kruise/pull/1403), [testwill](https://github.com/testwill))
+
 ## v1.5.2
 > Chang log since v1.5.1
 
