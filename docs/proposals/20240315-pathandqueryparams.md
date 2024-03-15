@@ -38,7 +38,7 @@ So far, OpenKruise Rollouts simply supports `Header` as the matchers for traffic
 
 ### Goals
 
-- Support Path and/or QueryParams for Gateway API, Istio Mesh and Ingress (Specfically, MSE and Gateway API)
+- Support Path and/or QueryParams for Gateway API, Istio Mesh and Ingress (Specifically, MSE and Gateway API)
 
 ### Non-Goals/Future Work
 
@@ -81,7 +81,7 @@ type HttpRouteMatch struct {
 
 	// Existing
 
-  // Headers specifies HTTP request header matchers. Multiple match values are
+	// Headers specifies HTTP request header matchers. Multiple match values are
 	// ANDed together, meaning, a request must match all the specified headers
 	// to select the route.
 	//
@@ -106,7 +106,6 @@ Currently, only one trafficRouting provider is supported. Then we may consider t
 - MSE Ingress: User can define queryParams, but it **SHOULD NOT** be used together with Headers due to priority and backward-compatibility.
 - Istio: User can define path and/or queryParams and use without any issue.
 - Gateway API: User can define path and/or queryParams. But one of them can take effect if and only if Headers are not defined.
-- 
 
 ### Implementation Details/Notes/Constraints
 
