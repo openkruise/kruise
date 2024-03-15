@@ -15,30 +15,16 @@ Support Path and QueryParams as HttpMatch conditions.
 
 ## Table of Contents
 
-A table of contents is helpful for quickly jumping to sections of a proposal and for highlighting
-any additional information provided beyond the standard proposal template.
-[Tools for generating](https://github.com/ekalinin/github-markdown-toc) a table of contents from markdown are available.
-
-- [Add Path and QueryParams support to trafficRoutings](#title)
+- [Add Path and QueryParams support to trafficRoutings](#add-path-and-queryparams-support-to-trafficroutings)
   - [Table of Contents](#table-of-contents)
   - [Motivation](#motivation)
     - [Goals](#goals)
     - [Non-Goals/Future Work](#non-goalsfuture-work)
   - [Proposal](#proposal)
     - [User Stories](#user-stories)
-      - [Story 1](#story-1)
-      - [Story 2](#story-2)
-    - [Requirements (Optional)](#requirements-optional)
-      - [Functional Requirements](#functional-requirements)
-        - [FR1](#fr1)
-        - [FR2](#fr2)
-      - [Non-Functional Requirements](#non-functional-requirements)
-        - [NFR1](#nfr1)
-        - [NFR2](#nfr2)
     - [Implementation Details/Notes/Constraints](#implementation-detailsnotesconstraints)
-    - [Risks and Mitigations](#risks-and-mitigations)
-  - [Alternatives](#alternatives)
-  - [Upgrade Strategy](#upgrade-strategy)
+	  - [MSE Ingress](#mse-ingress)
+	  - [Gateway API](#gateway-api)
   - [Additional Details](#additional-details)
     - [Test Plan [optional]](#test-plan-optional)
   - [Implementation History](#implementation-history)
