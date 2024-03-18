@@ -663,7 +663,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("InPlace update Pods at the new revision")
-			sst.WaitForPodNotReady(ss, pods.Items[0].Name)
+			sst.WaitForPodUpdatedAndRunning(ss, pods.Items[0].Name, currentRevision)
 			sst.WaitForRunningAndReady(3, ss)
 			ss = sst.GetStatefulSet(ss.Namespace, ss.Name)
 			pods = sst.GetPodList(ss)
@@ -761,8 +761,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("InPlace update Pods at the new revision")
-			sst.WaitForPodNotReady(ss, pods.Items[0].Name)
+			sst.WaitForPodUpdatedAndRunning(ss, pods.Items[0].Name, currentRevision)
 			sst.WaitForRunningAndReady(3, ss)
+
 			ss = sst.GetStatefulSet(ss.Namespace, ss.Name)
 			pods = sst.GetPodList(ss)
 			for i := range pods.Items {

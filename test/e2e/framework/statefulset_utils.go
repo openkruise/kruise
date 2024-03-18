@@ -397,6 +397,28 @@ func (s *StatefulSetTester) WaitForPodNotReady(set *appsv1beta1.StatefulSet, pod
 
 }
 
+// WaitForPodUpdatedAndRunning wait for the Pod named podName to be updated and running, the pod should have revision other than the one in currentRevision
+func (s *StatefulSetTester) WaitForPodUpdatedAndRunning(set *appsv1beta1.StatefulSet, podName string, currentRevision string) (*appsv1beta1.StatefulSet, *v1.PodList) {
+	var pods *v1.PodList
+	s.WaitForState(set, func(set2 *appsv1beta1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+		set = set2
+		pods = pods2
+		for i := range pods.Items {
+			if pods.Items[i].Name != podName {
+				continue
+			}
+
+			if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != currentRevision &&
+				podutil.IsPodReady(&pods.Items[i]) {
+				return true, nil
+			}
+			return false, nil
+		}
+		return false, nil
+	})
+	return set, pods
+}
+
 // WaitForRollingUpdate waits for all Pods in set to exist and have the correct revision and for the RollingUpdate to
 // complete. set must have a RollingUpdateStatefulSetStrategyType.
 func (s *StatefulSetTester) WaitForRollingUpdate(set *appsv1beta1.StatefulSet) (*appsv1beta1.StatefulSet, *v1.PodList) {
