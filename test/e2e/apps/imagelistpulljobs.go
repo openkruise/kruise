@@ -111,7 +111,7 @@ var _ = SIGDescribe("PullImages", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type:                    appsv1alpha1.Always,
 						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
-						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
+						TTLSecondsAfterFinished: utilpointer.Int32Ptr(40),
 					},
 				},
 			}

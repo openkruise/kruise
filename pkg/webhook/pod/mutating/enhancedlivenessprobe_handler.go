@@ -12,12 +12,8 @@ import (
 
 	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
+	livenessprobeUtils "github.com/openkruise/kruise/pkg/util/livenessprobe"
 )
-
-type containerLivenessProbe struct {
-	Name          string   `json:"name"`
-	LivenessProbe v1.Probe `json:"livenessProbe"`
-}
 
 func (h *PodCreateHandler) enhancedLivenessProbeWhenPodCreate(ctx context.Context, req admission.Request, pod *v1.Pod) (skip bool, err error) {
 
@@ -51,13 +47,13 @@ func (h *PodCreateHandler) enhancedLivenessProbeWhenPodCreate(ctx context.Contex
 // 1. the json string of the pod containers native livenessProbe configurations.
 // 2. the error reason of the function.
 func removeAndBackUpPodContainerLivenessProbe(pod *v1.Pod) (string, error) {
-	containersLivenessProbe := []containerLivenessProbe{}
+	containersLivenessProbe := []livenessprobeUtils.ContainerLivenessProbe{}
 	for index := range pod.Spec.Containers {
 		getContainer := &pod.Spec.Containers[index]
 		if getContainer.LivenessProbe == nil {
 			continue
 		}
-		containersLivenessProbe = append(containersLivenessProbe, containerLivenessProbe{
+		containersLivenessProbe = append(containersLivenessProbe, livenessprobeUtils.ContainerLivenessProbe{
 			Name:          getContainer.Name,
 			LivenessProbe: *getContainer.LivenessProbe,
 		})
