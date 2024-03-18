@@ -68,6 +68,9 @@ type InPlaceUpdateState struct {
 	// NextContainerRefMetadata is the containers with lower priority that waiting for in-place update labels/annotations in next batch.
 	NextContainerRefMetadata map[string]metav1.ObjectMeta `json:"nextContainerRefMetadata,omitempty"`
 
+	// NextContainerResources is the containers with lower priority that waiting for in-place update resources in next batch.
+	NextContainerResources map[string]v1.ResourceRequirements `json:"nextContainerResources,omitempty"`
+
 	// PreCheckBeforeNext is the pre-check that must pass before the next containers can be in-place update.
 	PreCheckBeforeNext *InPlaceUpdatePreCheckBeforeNext `json:"preCheckBeforeNext,omitempty"`
 
@@ -91,7 +94,8 @@ type InPlaceUpdateContainerBatch struct {
 // InPlaceUpdateContainerStatus records the statuses of the container that are mainly used
 // to determine whether the InPlaceUpdate is completed.
 type InPlaceUpdateContainerStatus struct {
-	ImageID string `json:"imageID,omitempty"`
+	ImageID  string                  `json:"imageID,omitempty"`
+	Resource v1.ResourceRequirements `json:"resource,omitempty"`
 }
 
 // InPlaceUpdateStrategy defines the strategies for in-place update.

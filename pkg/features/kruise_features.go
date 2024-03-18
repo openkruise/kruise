@@ -113,6 +113,10 @@ const (
 
 	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
 	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
+
+	// InPlaceWorkloadVerticalScaling enable CloneSet/Advanced StatefulSet controller to support vertical scaling
+	// of managed Pods.
+	InPlaceWorkloadVerticalScaling featuregate.Feature = "InPlaceWorkloadVerticalScaling"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -140,6 +144,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
 	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate:     {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceWorkloadVerticalScaling:            {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
