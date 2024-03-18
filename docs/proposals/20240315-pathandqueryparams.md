@@ -121,7 +121,7 @@ So the priority in Rollouts is Header(Cookie) > QueryParams.
 
 Since Gateway API uses logical AND for all matches, only a single match condition will be selected.
 
-For backwards-comptability, the priority in Rollouts is Header(Cookie) > Path > QueryParams.
+For backwards-compatibility, the priority in Rollouts is Header(Cookie) > Path > QueryParams.
 
 ## Additional Details
 
