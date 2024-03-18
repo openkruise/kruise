@@ -93,7 +93,7 @@ type HttpRouteMatch struct {
 }
 ```
 
-Matches define conditions used to match incoming HTTP requests to the canary service. Each match condition may contain serveral conditions as children which are independent of each other.
+Matches define conditions used to match incoming HTTP requests to the canary service. Each match condition may contain several conditions as children which are independent of each other.
 
 For Gateway API, only a single match rule will be applied since Gateway API use ANDed rules if multiple ones are defined, i.e. the match will evaluate to be true only if all conditions are satisfied. Priority: Header > QueryParams, for backwards-compatibility.
 
