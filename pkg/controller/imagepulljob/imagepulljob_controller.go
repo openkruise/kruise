@@ -242,7 +242,8 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 				return reconcile.Result{}, nil
 			}
 			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for NodeImage %v updating", request.String(), nodeImage.Name)
-			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
+			// fix issue https://github.com/openkruise/kruise/issues/1528
+			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 	}
 
