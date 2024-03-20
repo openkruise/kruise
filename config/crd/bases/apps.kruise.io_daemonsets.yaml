@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
+    controller-gen.kubebuilder.io/version: v0.11.0
   creationTimestamp: null
   name: daemonsets.apps.kruise.io
 spec:
@@ -210,6 +210,7 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+                x-kubernetes-map-type: atomic
               template:
                 description: 'An object that describes the pod that will be created.
                   The DaemonSet will create exactly one copy of this pod on every
@@ -332,6 +333,7 @@ spec:
                               only "value". The requirements are ANDed.
                             type: object
                         type: object
+                        x-kubernetes-map-type: atomic
                     type: object
                   type:
                     description: Type of daemon set update. Can be "RollingUpdate"

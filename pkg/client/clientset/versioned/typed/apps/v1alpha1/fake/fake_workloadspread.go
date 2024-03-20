@@ -116,7 +116,7 @@ func (c *FakeWorkloadSpreads) UpdateStatus(ctx context.Context, workloadSpread *
 // Delete takes name of the workloadSpread and deletes it. Returns an error if one occurs.
 func (c *FakeWorkloadSpreads) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(workloadspreadsResource, c.ns, name), &v1alpha1.WorkloadSpread{})
+		Invokes(testing.NewDeleteActionWithOptions(workloadspreadsResource, c.ns, name, opts), &v1alpha1.WorkloadSpread{})
 
 	return err
 }

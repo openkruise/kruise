@@ -117,7 +117,7 @@ func (c *FakeCloneSets) UpdateStatus(ctx context.Context, cloneSet *v1alpha1.Clo
 // Delete takes name of the cloneSet and deletes it. Returns an error if one occurs.
 func (c *FakeCloneSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clonesetsResource, c.ns, name), &v1alpha1.CloneSet{})
+		Invokes(testing.NewDeleteActionWithOptions(clonesetsResource, c.ns, name, opts), &v1alpha1.CloneSet{})
 
 	return err
 }

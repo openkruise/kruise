@@ -116,7 +116,7 @@ func (c *FakeEphemeralJobs) UpdateStatus(ctx context.Context, ephemeralJob *v1al
 // Delete takes name of the ephemeralJob and deletes it. Returns an error if one occurs.
 func (c *FakeEphemeralJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(ephemeraljobsResource, c.ns, name), &v1alpha1.EphemeralJob{})
+		Invokes(testing.NewDeleteActionWithOptions(ephemeraljobsResource, c.ns, name, opts), &v1alpha1.EphemeralJob{})
 
 	return err
 }
