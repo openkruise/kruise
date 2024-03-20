@@ -168,7 +168,6 @@ func compatibleEnv() {
 func SetDefaultFeatureGates() {
 	if !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", KruisePodReadinessGate))
-		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ResourcesDeletionProtection))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetDeleteGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetUpdateGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", WorkloadSpread))
