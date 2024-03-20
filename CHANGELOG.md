@@ -11,6 +11,8 @@ However it's still possible to use OpenKruise with Kubernetes versions 1.16 and 
 - OpenKruise leader election default to use leases mode. ([#1407](https://github.com/openkruise/kruise/pull/1407), [dsxing](https://github.com/dsxing))
 For users with OpenKruise version 1.3.0 or lower, please first upgrade your OpenKruise to version 1.4 or 1.5 before upgrading to 1.6.0, so as to avoid unexpected multiple leader problem during the installation.
 - Bump Kubernetes dependency to 1.26.10. ([#1511](https://github.com/openkruise/kruise/pull/1511), [KaiShi](https://github.com/BH4AWS))
+- To avoid potential circular dependency problem, features rely on webhook will no longer work for resources under kube-system,
+e.g. SidecarSet, WorkloadSpread, PodUnavailableBudget, ContainerLaunchPriority and PersistentPodState. ([#92](https://github.com/openkruise/charts/pull/92), [@hantmac](https://github.com/hantmac))
 
 ### Key Features
 - Fix WorkloadSpread incorrect subset allocation after workload rolling updating. ([#1197](https://github.com/openkruise/kruise/pull/1197), [veophi](https://github.com/veophi))
