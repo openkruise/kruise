@@ -117,7 +117,7 @@ func (c *FakeUnitedDeployments) UpdateStatus(ctx context.Context, unitedDeployme
 // Delete takes name of the unitedDeployment and deletes it. Returns an error if one occurs.
 func (c *FakeUnitedDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(uniteddeploymentsResource, c.ns, name), &v1alpha1.UnitedDeployment{})
+		Invokes(testing.NewDeleteActionWithOptions(uniteddeploymentsResource, c.ns, name, opts), &v1alpha1.UnitedDeployment{})
 
 	return err
 }

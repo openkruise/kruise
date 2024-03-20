@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
+    controller-gen.kubebuilder.io/version: v0.11.0
   creationTimestamp: null
   name: uniteddeployments.apps.kruise.io
 spec:
@@ -116,6 +116,7 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+                x-kubernetes-map-type: atomic
               template:
                 description: Template describes the subset that will be created.
                 properties:
@@ -330,6 +331,7 @@ spec:
                                   contains only "value". The requirements are ANDed.
                                 type: object
                             type: object
+                            x-kubernetes-map-type: atomic
                           serviceName:
                             description: 'serviceName is the name of the service that
                               governs this StatefulSet. This service must exist before
@@ -524,6 +526,7 @@ spec:
                                                         are ANDed.
                                                       type: object
                                                   type: object
+                                                  x-kubernetes-map-type: atomic
                                                 weight:
                                                   description: Weight associated with
                                                     matching the corresponding matchExpressions,
@@ -741,6 +744,7 @@ spec:
                                   contains only "value". The requirements are ANDed.
                                 type: object
                             type: object
+                            x-kubernetes-map-type: atomic
                           template:
                             description: Template describes the pods that will be
                               created.
@@ -893,6 +897,7 @@ spec:
                                                 ANDed.
                                               type: object
                                           type: object
+                                          x-kubernetes-map-type: atomic
                                         weight:
                                           description: Weight associated with matching
                                             the corresponding matchExpressions, in
@@ -1076,6 +1081,7 @@ spec:
                                 type: object
                               type: array
                           type: object
+                          x-kubernetes-map-type: atomic
                         patch:
                           description: Patch indicates patching to the templateSpec.
                             Patch takes precedence over other fields If the Patch

@@ -116,7 +116,7 @@ func (c *FakeBroadcastJobs) UpdateStatus(ctx context.Context, broadcastJob *v1al
 // Delete takes name of the broadcastJob and deletes it. Returns an error if one occurs.
 func (c *FakeBroadcastJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(broadcastjobsResource, c.ns, name), &v1alpha1.BroadcastJob{})
+		Invokes(testing.NewDeleteActionWithOptions(broadcastjobsResource, c.ns, name, opts), &v1alpha1.BroadcastJob{})
 
 	return err
 }

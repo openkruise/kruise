@@ -116,7 +116,7 @@ func (c *FakeImagePullJobs) UpdateStatus(ctx context.Context, imagePullJob *v1al
 // Delete takes name of the imagePullJob and deletes it. Returns an error if one occurs.
 func (c *FakeImagePullJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(imagepulljobsResource, c.ns, name), &v1alpha1.ImagePullJob{})
+		Invokes(testing.NewDeleteActionWithOptions(imagepulljobsResource, c.ns, name, opts), &v1alpha1.ImagePullJob{})
 
 	return err
 }

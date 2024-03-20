@@ -47,10 +47,10 @@ GROUPS_WITH_VERSIONS="$4"
 shift 4
 
 (
-  # To support running this script from anywhere, we have to first cd into this directory
-  # so we can install the tools.
+  # To support running this script from anywhere, first cd into this directory,
+  # and then install with forced module mode on and fully qualified name.
   cd "$(dirname "${0}")"
-  go install ./cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+  GO111MODULE=on go install k8s.io/code-generator/cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
 )
 # Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
 GOBIN="$(go env GOBIN)"
@@ -71,25 +71,36 @@ done
 
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
-  "${gobin}/deepcopy-gen" --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.deepcopy --bounding-dirs "${APIS_PKG}" "$@"
+  "${gobin}/deepcopy-gen" \
+      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
+      -O zz_generated.deepcopy \
+      "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
-  "${gobin}/client-gen" --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" --input-base "" --input "$(codegen::join , "${FQ_APIS[@]}")" --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" "$@"
+  "${gobin}/client-gen" \
+      --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" \
+      --input-base "" \
+      --input "$(codegen::join , "${FQ_APIS[@]}")" \
+      --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
+      "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
   echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
-  "${gobin}/lister-gen" --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" --output-package "${OUTPUT_PKG}/listers" "$@"
+  "${gobin}/lister-gen" \
+      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
+      --output-package "${OUTPUT_PKG}/listers" \
+      "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   "${gobin}/informer-gen" \
-           --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
-           --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-           --listers-package "${OUTPUT_PKG}/listers" \
-           --output-package "${OUTPUT_PKG}/informers" \
-           "$@"
+      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
+      --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
+      --listers-package "${OUTPUT_PKG}/listers" \
+      --output-package "${OUTPUT_PKG}/informers" \
+      "$@"
 fi

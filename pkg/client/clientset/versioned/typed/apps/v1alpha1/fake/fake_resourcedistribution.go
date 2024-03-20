@@ -109,7 +109,7 @@ func (c *FakeResourceDistributions) UpdateStatus(ctx context.Context, resourceDi
 // Delete takes name of the resourceDistribution and deletes it. Returns an error if one occurs.
 func (c *FakeResourceDistributions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(resourcedistributionsResource, name), &v1alpha1.ResourceDistribution{})
+		Invokes(testing.NewRootDeleteActionWithOptions(resourcedistributionsResource, name, opts), &v1alpha1.ResourceDistribution{})
 	return err
 }
 

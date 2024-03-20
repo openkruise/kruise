@@ -116,7 +116,7 @@ func (c *FakeAdvancedCronJobs) UpdateStatus(ctx context.Context, advancedCronJob
 // Delete takes name of the advancedCronJob and deletes it. Returns an error if one occurs.
 func (c *FakeAdvancedCronJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(advancedcronjobsResource, c.ns, name), &v1alpha1.AdvancedCronJob{})
+		Invokes(testing.NewDeleteActionWithOptions(advancedcronjobsResource, c.ns, name, opts), &v1alpha1.AdvancedCronJob{})
 
 	return err
 }
