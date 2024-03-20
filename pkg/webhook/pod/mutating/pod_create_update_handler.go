@@ -21,13 +21,14 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 // PodCreateHandler handles Pod
@@ -101,6 +102,15 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusInternalServerError, err)
 	} else if !skip {
 		changed = true
+	}
+
+	// EnhancedLivenessProbe enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnhancedLivenessProbeGate) {
+		if skip, err := h.enhancedLivenessProbeWhenPodCreate(ctx, req, obj); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		} else if !skip {
+			changed = true
+		}
 	}
 
 	if !changed {
