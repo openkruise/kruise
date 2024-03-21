@@ -21,14 +21,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
@@ -38,10 +45,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {
@@ -848,4 +852,403 @@ func collectEvents(source <-chan string) []string {
 		}
 	}
 	return events
+}
+
+func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
+	cases := []struct {
+		name              string
+		getStatefulSet    func() *appsv1beta1.StatefulSet
+		getPods           func(set *appsv1beta1.StatefulSet) []*v1.Pod
+		expectPvcOwnerRef func(pvcName string) metav1.OwnerReference
+	}{
+		{
+			name: "reserveOrdinals is nil, scaleDown=false, whenScaled=Retain, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(5)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 2, 3, 4}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				/*separatorIndex := strings.Index(pvcName, "-") + 1
+				podName := pvcName[separatorIndex:]*/
+				return metav1.OwnerReference{
+					APIVersion: "apps.kruise.io/v1beta1",
+					Kind:       "StatefulSet",
+					Name:       "foo",
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is nil, scaleDown=false, whenScaled=Delete, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(5)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 2, 3, 4}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				/*separatorIndex := strings.Index(pvcName, "-") + 1
+				podName := pvcName[separatorIndex:]*/
+				return metav1.OwnerReference{
+					APIVersion: "apps.kruise.io/v1beta1",
+					Kind:       "StatefulSet",
+					Name:       "foo",
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is nil, scaleDown=true, whenScaled=Retain, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(3)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				setClone := set.DeepCopy()
+				setClone.Spec.Replicas = utilpointer.Int32(5)
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 2, 3, 4}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				sIndex1 := strings.Index(pvcName, "-") + 1
+				podName := pvcName[sIndex1:]
+				sIndex2 := strings.LastIndex(pvcName, "-") + 1
+				index, _ := strconv.Atoi(pvcName[sIndex2:])
+				if index < 5 {
+					return metav1.OwnerReference{
+						APIVersion: "apps.kruise.io/v1beta1",
+						Kind:       "StatefulSet",
+						Name:       "foo",
+					}
+				}
+				return metav1.OwnerReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       podName,
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is nil, scaleDown=true, whenScaled=Delete, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(3)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				setClone := set.DeepCopy()
+				setClone.Spec.Replicas = utilpointer.Int32(5)
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 2, 3, 4}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				sIndex1 := strings.Index(pvcName, "-") + 1
+				podName := pvcName[sIndex1:]
+				sIndex2 := strings.LastIndex(pvcName, "-") + 1
+				index, _ := strconv.Atoi(pvcName[sIndex2:])
+				if index < 3 {
+					return metav1.OwnerReference{
+						APIVersion: "apps.kruise.io/v1beta1",
+						Kind:       "StatefulSet",
+						Name:       "foo",
+					}
+				}
+				return metav1.OwnerReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       podName,
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is [2,4], scaleDown=false, whenScaled=Retain, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(5)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				set.Spec.ReserveOrdinals = []int{2, 4}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 3, 5, 6}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				/*separatorIndex := strings.Index(pvcName, "-") + 1
+				podName := pvcName[separatorIndex:]*/
+				return metav1.OwnerReference{
+					APIVersion: "apps.kruise.io/v1beta1",
+					Kind:       "StatefulSet",
+					Name:       "foo",
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is [2,4], scaleDown=false, whenScaled=Delete, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(5)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+				set.Spec.ReserveOrdinals = []int{2, 4}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 3, 5, 6}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				/*separatorIndex := strings.Index(pvcName, "-") + 1
+				podName := pvcName[separatorIndex:]*/
+				return metav1.OwnerReference{
+					APIVersion: "apps.kruise.io/v1beta1",
+					Kind:       "StatefulSet",
+					Name:       "foo",
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is [2,4], scaleDown=true, whenScaled=Delete, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(3)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+				}
+				set.Spec.ReserveOrdinals = []int{2, 4}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				setClone := set.DeepCopy()
+				setClone.Spec.Replicas = utilpointer.Int32(5)
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 3, 5, 6}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				sIndex1 := strings.Index(pvcName, "-") + 1
+				podName := pvcName[sIndex1:]
+				sIndex2 := strings.LastIndex(pvcName, "-") + 1
+				index, _ := strconv.Atoi(pvcName[sIndex2:])
+				if index < 5 {
+					return metav1.OwnerReference{
+						APIVersion: "apps.kruise.io/v1beta1",
+						Kind:       "StatefulSet",
+						Name:       "foo",
+					}
+				}
+				return metav1.OwnerReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       podName,
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is [2,4], scaleDown=true, whenScaled=Retain, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(3)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				set.Spec.ReserveOrdinals = []int{2, 4}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				setClone := set.DeepCopy()
+				setClone.Spec.Replicas = utilpointer.Int32(5)
+				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 1, 3, 5, 6}
+				currentIndex := make([]int, 0)
+				for i := 0; i < replicaCount; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				sIndex1 := strings.Index(pvcName, "-") + 1
+				podName := pvcName[sIndex1:]
+				sIndex2 := strings.LastIndex(pvcName, "-") + 1
+				index, _ := strconv.Atoi(pvcName[sIndex2:])
+				if index < 7 {
+					return metav1.OwnerReference{
+						APIVersion: "apps.kruise.io/v1beta1",
+						Kind:       "StatefulSet",
+						Name:       "foo",
+					}
+				}
+				return metav1.OwnerReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       podName,
+				}
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			set := cs.getStatefulSet()
+			pods := cs.getPods(set)
+			claimIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
+			claimObjects := make([]runtime.Object, 0)
+			for _, pod := range pods {
+				for _, claim := range getPersistentVolumeClaims(set, pod) {
+					clone := claim.DeepCopy()
+					claimObjects = append(claimObjects, clone)
+					_ = claimIndexer.Add(clone)
+				}
+			}
+			fakeClient := fake.NewSimpleClientset(claimObjects...)
+			control := NewStatefulPodControl(fakeClient, nil, claimLister, nil)
+			for _, pod := range pods {
+				err := control.UpdatePodClaimForRetentionPolicy(set, pod)
+				if err != nil {
+					t.Fatalf(err.Error())
+				}
+			}
+
+			claims, err := claimLister.List(labels.Everything())
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+
+			for _, claim := range claims {
+				obj, err := fakeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf(err.Error())
+				}
+				ownerRef := obj.GetOwnerReferences()
+				if len(ownerRef) != 1 {
+					t.Fatalf("claim ownerRef is nil")
+				}
+				expect := cs.expectPvcOwnerRef(claim.Name)
+				if expect.Kind != ownerRef[0].Kind || expect.Name != ownerRef[0].Name {
+					t.Fatalf("expect(%s), but get(%s)", util.DumpJSON(expect), util.DumpJSON(ownerRef[0]))
+				}
+			}
+		})
+	}
 }
