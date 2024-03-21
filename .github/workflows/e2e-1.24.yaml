@@ -8,6 +8,9 @@ on:
   pull_request: {}
   workflow_dispatch: {}
 
+# Declare default permissions as read only.
+permissions: read-all
+
 env:
   # Common versions
   GO_VERSION: '1.19'
@@ -89,7 +92,11 @@ jobs:
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')             
           fi
           exit $retVal
 
@@ -176,7 +183,11 @@ jobs:
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')            
           fi
           
           exit $retVal
@@ -265,7 +276,11 @@ jobs:
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')          
           fi
           exit $retVal
 
@@ -353,7 +368,11 @@ jobs:
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')             
           fi
           exit $retVal
 
@@ -419,7 +438,11 @@ jobs:
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')           
           fi
           exit $retVal
 
@@ -571,7 +594,11 @@ jobs:
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')           
           fi
 
           exit $retVal

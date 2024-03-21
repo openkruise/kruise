@@ -109,7 +109,7 @@ func (c *FakeSidecarSets) UpdateStatus(ctx context.Context, sidecarSet *v1alpha1
 // Delete takes name of the sidecarSet and deletes it. Returns an error if one occurs.
 func (c *FakeSidecarSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(sidecarsetsResource, name), &v1alpha1.SidecarSet{})
+		Invokes(testing.NewRootDeleteActionWithOptions(sidecarsetsResource, name, opts), &v1alpha1.SidecarSet{})
 	return err
 }
 

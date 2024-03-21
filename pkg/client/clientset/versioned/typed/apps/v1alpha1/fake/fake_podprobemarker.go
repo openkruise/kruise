@@ -116,7 +116,7 @@ func (c *FakePodProbeMarkers) UpdateStatus(ctx context.Context, podProbeMarker *
 // Delete takes name of the podProbeMarker and deletes it. Returns an error if one occurs.
 func (c *FakePodProbeMarkers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podprobemarkersResource, c.ns, name), &v1alpha1.PodProbeMarker{})
+		Invokes(testing.NewDeleteActionWithOptions(podprobemarkersResource, c.ns, name, opts), &v1alpha1.PodProbeMarker{})
 
 	return err
 }

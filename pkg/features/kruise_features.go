@@ -113,6 +113,9 @@ const (
 
 	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
 	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
+
+	// Enables a enhanced livenessProbe solution
+	EnhancedLivenessProbeGate featuregate.Feature = "EnhancedLivenessProbe"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -135,11 +138,14 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	SidecarTerminator:                         {Default: false, PreRelease: featuregate.Alpha},
 	PodProbeMarkerGate:                        {Default: true, PreRelease: featuregate.Alpha},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
-	CloneSetEventHandlerOptimization:          {Default: false, PreRelease: featuregate.Alpha},
-	PreparingUpdateAsUpdate:                   {Default: false, PreRelease: featuregate.Alpha},
-	ImagePullJobGate:                          {Default: false, PreRelease: featuregate.Alpha},
-	ResourceDistributionGate:                  {Default: false, PreRelease: featuregate.Alpha},
-	DeletionProtectionForCRDCascadingGate:     {Default: false, PreRelease: featuregate.Alpha},
+
+	CloneSetEventHandlerOptimization:      {Default: false, PreRelease: featuregate.Alpha},
+	PreparingUpdateAsUpdate:               {Default: false, PreRelease: featuregate.Alpha},
+	ImagePullJobGate:                      {Default: false, PreRelease: featuregate.Alpha},
+	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Alpha},
+	DeletionProtectionForCRDCascadingGate: {Default: false, PreRelease: featuregate.Alpha},
+
+	EnhancedLivenessProbeGate: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -162,11 +168,11 @@ func compatibleEnv() {
 func SetDefaultFeatureGates() {
 	if !utilfeature.DefaultFeatureGate.Enabled(PodWebhook) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", KruisePodReadinessGate))
-		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ResourcesDeletionProtection))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetDeleteGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodUnavailableBudgetUpdateGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", WorkloadSpread))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarSetPatchPodMetadataDefaultsAllowed))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", EnhancedLivenessProbeGate))
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))
@@ -176,6 +182,7 @@ func SetDefaultFeatureGates() {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PodProbeMarkerGate))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarTerminator))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", ImagePullJobGate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", EnhancedLivenessProbeGate))
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForInPlaceUpdate) || utilfeature.DefaultFeatureGate.Enabled(PreDownloadImageForDaemonSetUpdate) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", ImagePullJobGate))

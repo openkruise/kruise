@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.0
+    controller-gen.kubebuilder.io/version: v0.11.0
   creationTimestamp: null
   name: imagelistpulljobs.apps.kruise.io
 spec:
@@ -147,6 +147,7 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+                x-kubernetes-map-type: atomic
               pullPolicy:
                 description: PullPolicy is an optional field to set parameters of
                   the pulling task. If not specified, the system will use the default
@@ -235,6 +236,7 @@ spec:
                       type: string
                     type: array
                 type: object
+                x-kubernetes-map-type: atomic
             required:
             - completionPolicy
             - images
