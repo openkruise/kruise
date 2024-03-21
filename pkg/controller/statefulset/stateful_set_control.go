@@ -373,14 +373,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.CollisionCount = utilpointer.Int32Ptr(collisionCount)
 	status.LabelSelector = selector.String()
 
-	reserveOrdinals := sets.NewInt(set.Spec.ReserveOrdinals...)
-	replicaCount := 0
-	for realReplicaCount := 0; realReplicaCount < int(*set.Spec.Replicas); replicaCount++ {
-		if reserveOrdinals.Has(replicaCount) {
-			continue
-		}
-		realReplicaCount++
-	}
+	replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
 	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < replicaCount and not in reserveOrdinals
 	replicas := make([]*v1.Pod, replicaCount)
 	// slice that will contain all Pods such that replicaCount <= getOrdinal(pod) or in reserveOrdinals
