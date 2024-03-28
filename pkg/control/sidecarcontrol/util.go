@@ -64,6 +64,10 @@ const (
 
 	// SidecarSetUpgradable is a pod condition to indicate whether the pod's sidecarset is upgradable
 	SidecarSetUpgradable corev1.PodConditionType = "SidecarSetUpgradable"
+
+	// SidecarSetUpgradeSpec State
+	SidecarSetHashStateUpdating = "Updating"
+	SidecarSetHashStateNormal   = "Normal"
 )
 
 var (
@@ -81,6 +85,7 @@ type SidecarSetUpgradeSpec struct {
 	SidecarSetName               string      `json:"sidecarSetName"`
 	SidecarList                  []string    `json:"sidecarList"`                  // sidecarSet container list
 	SidecarSetControllerRevision string      `json:"controllerRevision,omitempty"` // sidecarSet controllerRevision name
+	State                        string      `json:"state"`                        // enum: Normal, Updating
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
@@ -253,9 +258,58 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 		SidecarSetName:               sidecarSet.Name,
 		SidecarList:                  sidecarList.List(),
 		SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,
+		State:                        SidecarSetHashStateUpdating,
 	}
 	newHash, _ := json.Marshal(sidecarSetHash)
 	pod.Annotations[hashKey] = string(newHash)
+}
+
+func IsSiderCarContainersReady(pod *corev1.Pod, containers sets.String) bool {
+	for _, cs := range pod.Status.ContainerStatuses {
+		// only check containers set
+		if !containers.Has(cs.Name) {
+			continue
+		}
+		if !cs.Ready {
+			return false
+		}
+	}
+	return true
+}
+
+func IsPodFinishSiderCarContainersUpdate(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) bool {
+	sidecars := GetSidecarContainersInPod(sidecarSet)
+	if _, ok := pod.Annotations[SidecarsetInplaceUpdateStateKey]; ok {
+		if IsSidecarContainerUpdateCompleted(pod, sets.NewString(sidecarSet.Name), sidecars) && IsSiderCarContainersReady(pod, sidecars) {
+			return true
+		}
+	} else {
+		if IsSiderCarContainersReady(pod, sidecars) {
+			return true
+		}
+	}
+	return false
+}
+
+func GetPodSidecarSetHashState(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) string {
+	hashKey := SidecarSetHashAnnotation
+	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
+	if err := json.Unmarshal([]byte(pod.Annotations[hashKey]), &sidecarSetHash); err != nil {
+		klog.Errorf("unmarshal pod(%s/%s) annotations[%s] failed: %s", pod.Namespace, pod.Name, hashKey, err.Error())
+
+		// to be compatible with older sidecarSet hash struct, map[string]string
+		olderSidecarSetHash := make(map[string]string)
+		if err = json.Unmarshal([]byte(pod.Annotations[hashKey]), &olderSidecarSetHash); err == nil {
+			for k, v := range olderSidecarSetHash {
+				sidecarSetHash[k] = SidecarSetUpgradeSpec{
+					SidecarSetHash:  v,
+					UpdateTimestamp: metav1.Now(),
+					SidecarSetName:  sidecarSet.Name,
+				}
+			}
+		}
+	}
+	return sidecarSetHash[sidecarSet.Name].State
 }
 
 func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
