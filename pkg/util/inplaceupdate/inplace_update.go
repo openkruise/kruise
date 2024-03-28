@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -89,7 +90,6 @@ type UpdateSpec struct {
 	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
 	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
 }
-
 type realControl struct {
 	podAdapter      podadapter.Adapter
 	revisionAdapter revisionadapter.Interface
@@ -139,7 +139,6 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 				klog.V(5).Infof("Pod %s/%s in-place update pre-check not passed: %v", pod.Namespace, pod.Name, checkErr)
 				return RefreshResult{}
 			}
-
 			// do update the next containers
 			if updated, err := c.updateNextBatch(pod, opts); err != nil {
 				return RefreshResult{RefreshErr: err}
@@ -217,13 +216,13 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 				delayDuration = roundupSeconds(graceDuration - span)
 				return nil
 			}
-
 			if clone, err = opts.PatchSpecToPod(clone, &spec, &updateState); err != nil {
 				return err
 			}
+			// record restart count of the pod(containers)
+			recordPodAndContainersRestartCount(clone, &spec, updateState.Revision)
 			appspub.RemoveInPlaceUpdateGrace(clone)
 		}
-
 		_, err = c.podAdapter.UpdatePod(clone)
 		return err
 	})
@@ -259,7 +258,8 @@ func (c *realControl) updateNextBatch(pod *v1.Pod, opts *UpdateOptions) (bool, e
 		if clone, err = opts.PatchSpecToPod(clone, &spec, &state); err != nil {
 			return err
 		}
-
+		// record restart count of the pod(containers)
+		recordPodAndContainersRestartCount(clone, &spec, state.Revision)
 		updated = true
 		_, err = c.podAdapter.UpdatePod(clone)
 		return err
@@ -274,7 +274,6 @@ func (c *realControl) CanUpdateInPlace(oldRevision, newRevision *apps.Controller
 
 func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) UpdateResult {
 	opts = SetOptionsDefaults(opts)
-
 	// 1. calculate inplace update spec
 	spec := opts.CalculateSpec(oldRevision, newRevision, opts)
 	if spec == nil {
@@ -339,12 +338,13 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			if clone, err = opts.PatchSpecToPod(clone, spec, &inPlaceUpdateState); err != nil {
 				return err
 			}
+			// record restart count of the pod(containers)
+			recordPodAndContainersRestartCount(clone, spec, inPlaceUpdateState.Revision)
 			appspub.RemoveInPlaceUpdateGrace(clone)
 		} else {
 			inPlaceUpdateSpecJSON, _ := json.Marshal(spec)
 			clone.Annotations[appspub.InPlaceUpdateGraceKey] = string(inPlaceUpdateSpecJSON)
 		}
-
 		newPod, updateErr := c.podAdapter.UpdatePod(clone)
 		if updateErr == nil {
 			newResourceVersion = newPod.ResourceVersion
@@ -419,4 +419,60 @@ func hasEqualCondition(pod *v1.Pod, newCondition *v1.PodCondition) bool {
 	isEqual := oldCondition != nil && oldCondition.Status == newCondition.Status &&
 		oldCondition.Reason == newCondition.Reason && oldCondition.Message == newCondition.Message
 	return isEqual
+}
+
+// recordPodAndContainersRestartCount record the count of pod(containers) restarts
+func recordPodAndContainersRestartCount(pod *v1.Pod, spec *UpdateSpec, revision string) {
+	if spec.ContainerImages == nil && !spec.UpdateEnvFromMetadata {
+		return
+	}
+	var currentPodRestartCount int64
+	containersRestartCount := make(map[string]appspub.InPlaceUpdateContainerRestartCount)
+
+	if v, ok := pod.Annotations[appspub.InPlaceUpdatePodRestartKey]; ok {
+		currentPodRestartCount, _ = strconv.ParseInt(v, 10, 64)
+	}
+
+	if v, ok := pod.Annotations[appspub.InPlaceUpdateContainersRestartKey]; ok {
+		if err := json.Unmarshal([]byte(v), &containersRestartCount); err != nil {
+			return
+		}
+	}
+	calculateRestartCountFunc := func(cname string) {
+		containerRestartCount, ok := containersRestartCount[cname]
+		if ok && revision != containerRestartCount.Revision {
+			containerRestartCount.RestartCount += 1
+			containerRestartCount.Revision = revision
+			containerRestartCount.Timestamp = metav1.NewTime(Clock.Now())
+			currentPodRestartCount += 1 // pod restart
+		} else if !ok {
+			containerRestartCount = appspub.InPlaceUpdateContainerRestartCount{
+				Revision:     revision,
+				RestartCount: 1,
+				Timestamp:    metav1.NewTime(Clock.Now()),
+			}
+			currentPodRestartCount += 1 // pod restart
+		}
+		containersRestartCount[cname] = containerRestartCount // containers restart
+	}
+
+	containers := make(map[string]bool)
+	if spec.ContainerImages != nil {
+		for cname := range spec.ContainerImages {
+			containers[cname] = true
+			calculateRestartCountFunc(cname)
+		}
+	}
+
+	if spec.UpdateEnvFromMetadata {
+		for cname := range spec.ContainerRefMetadata {
+			if !containers[cname] {
+				calculateRestartCountFunc(cname)
+			}
+		}
+	}
+
+	containersRestartCountJson, _ := json.Marshal(containersRestartCount)
+	pod.Annotations[appspub.InPlaceUpdateContainersRestartKey] = string(containersRestartCountJson)
+	pod.Annotations[appspub.InPlaceUpdatePodRestartKey] = strconv.FormatInt(currentPodRestartCount, 10)
 }
