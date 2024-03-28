@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
@@ -35,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -64,13 +67,21 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	}
 
 	// DisableDeepCopy:true, indicates must be deep copy before update sidecarSet objection
+
 	sidecarsetList := &appsv1alpha1.SidecarSetList{}
-	if err = h.Client.List(ctx, sidecarsetList, utilclient.DisableDeepCopy); err != nil {
+	sidecarsetList2 := &appsv1alpha1.SidecarSetList{}
+	podNamespace := pod.Namespace
+	if podNamespace == "" {
+		podNamespace = "default"
+	}
+	if err := h.Client.List(ctx, sidecarsetList, client.MatchingFields{fieldindex.IndexNameForSidecarSetNamespace: podNamespace}, utilclient.DisableDeepCopy); err != nil {
 		return false, err
 	}
-
+	if err := h.Client.List(ctx, sidecarsetList2, client.MatchingFields{fieldindex.IndexNameForSidecarSetNamespace: fieldindex.IndexValueSidecarSetClusterScope}, utilclient.DisableDeepCopy); err != nil {
+		return false, err
+	}
 	matchedSidecarSets := make([]sidecarcontrol.SidecarControl, 0)
-	for _, sidecarSet := range sidecarsetList.Items {
+	for _, sidecarSet := range append(sidecarsetList.Items, sidecarsetList2.Items...) {
 		if sidecarSet.Spec.InjectionStrategy.Paused {
 			continue
 		}
