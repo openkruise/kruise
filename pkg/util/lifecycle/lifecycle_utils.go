@@ -237,6 +237,15 @@ func IsPodAllHooked(hook *appspub.LifecycleHook, pod *v1.Pod) bool {
 	return true
 }
 
+// IsPreNormalHookNilOrAllHooked
+// pod lifecycle can be transformed to Normal only if no hook or all hooks are hooked
+func IsPreNormalHookNilOrAllHooked(hooks *appspub.Lifecycle, pod *v1.Pod) bool {
+	// nothing changed, but avoiding excessive complexity in if conditions
+	return hooks == nil ||
+		hooks.PreNormal == nil ||
+		IsPodAllHooked(hooks.PreNormal, pod)
+}
+
 func getReadinessMessage(key string) podreadiness.Message {
 	return podreadiness.Message{UserAgent: "Lifecycle", Key: key}
 }
