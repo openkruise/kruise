@@ -33,6 +33,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -199,6 +200,18 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 		// TODO: support 'PartitionBased' policy to inject old/new revision according to Partition
 		switch sidecarSet.Spec.InjectionStrategy.Revision.Policy {
 		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy:
+			// if pod matched the UpdateStrategy.Selector, skip inject custom revision
+			strategy := sidecarSet.Spec.UpdateStrategy
+			if !strategy.Paused && strategy.Selector != nil {
+				selector, err := util.ValidatedLabelSelectorAsSelector(strategy.Selector)
+				if err != nil {
+					return nil, err
+				}
+
+				if selector.Matches(labels.Set(newPod.Labels)) {
+					return h.getSpecificHistorySidecarSet(sidecarSet, nil)
+				}
+			}
 			return h.getSpecificHistorySidecarSet(sidecarSet, revisionInfo)
 		}
 

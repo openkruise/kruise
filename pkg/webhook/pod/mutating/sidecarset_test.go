@@ -567,43 +567,97 @@ func TestInjectionStrategyRevision(t *testing.T) {
 
 	raw, _ := json.Marshal(spec)
 	revisionID := fmt.Sprintf("%s-12345", sidecarSet1.Name)
+	injectedRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: webhookutil.GetNamespace(),
+			Name:      revisionID,
+			Labels: map[string]string{
+				appsv1alpha1.SidecarSetCustomVersionLabel: revisionID,
+			},
+		},
+		Data: runtime.RawExtension{
+			Raw: raw,
+		},
+	}
+
 	sidecarSetIn := sidecarSet1.DeepCopy()
 	sidecarSetIn.Spec.InjectionStrategy.Revision = &appsv1alpha1.SidecarSetInjectRevision{
 		CustomVersion: &revisionID,
 		Policy:        appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
 	}
-	historyInjection := []client.Object{
-		sidecarSetIn,
-		&apps.ControllerRevision{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: webhookutil.GetNamespace(),
-				Name:      revisionID,
-				Labels: map[string]string{
-					appsv1alpha1.SidecarSetCustomVersionLabel: revisionID,
-				},
-			},
-			Data: runtime.RawExtension{
-				Raw: raw,
-			},
-		},
-	}
-	testInjectionStrategyRevision(t, historyInjection)
+
+	testInjectionStrategyRevision(t, sidecarSetIn, injectedRevision)
 }
 
-func testInjectionStrategyRevision(t *testing.T, env []client.Object) {
-	podIn := pod1.DeepCopy()
-	podOut := podIn.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(env...).Build()
-	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
-	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
-	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
-	if err != nil {
-		t.Fatalf("failed to mutating pod, err: %v", err)
+func testInjectionStrategyRevision(t *testing.T, sidecarSet *appsv1alpha1.SidecarSet, injectedRevision client.Object) {
+	cases := []struct {
+		name                 string
+		getSidecarSets       func() *appsv1alpha1.SidecarSet
+		expectInitContainers int
+		expectContainers     int
+	}{
+		{
+			name: "inject CustomVersion by default",
+			getSidecarSets: func() *appsv1alpha1.SidecarSet {
+				return sidecarSet.DeepCopy()
+			},
+			expectInitContainers: 2,
+			expectContainers:     2,
+		},
+		{
+			name: "inject latest version when pod matches UpdateStrategy.Selector",
+			getSidecarSets: func() *appsv1alpha1.SidecarSet {
+				s := sidecarSet.DeepCopy()
+				s.Spec.UpdateStrategy.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "suxing-test",
+					},
+				}
+				return s
+			},
+			expectInitContainers: 3,
+			expectContainers:     3,
+		},
+		{
+			name: "inject CustomVersion when .UpdateStrategy.Paused set to true",
+			getSidecarSets: func() *appsv1alpha1.SidecarSet {
+				s := sidecarSet.DeepCopy()
+
+				s.Spec.UpdateStrategy.Paused = true
+				s.Spec.UpdateStrategy.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": "suxing-test",
+					},
+				}
+				return s
+			},
+			expectInitContainers: 2,
+			expectContainers:     2,
+		},
 	}
 
-	if len(podIn.Spec.Containers)+len(podIn.Spec.InitContainers)+2 != len(podOut.Spec.Containers)+len(podOut.Spec.InitContainers) {
-		t.Fatalf("expect %v containers but got %v", len(podIn.Spec.Containers)+2, len(podOut.Spec.Containers))
+	for _, c := range cases {
+		podIn := pod1.DeepCopy()
+		podOut := podIn.DeepCopy()
+
+		revisions := []client.Object{c.getSidecarSets(), injectedRevision}
+
+		decoder, _ := admission.NewDecoder(scheme.Scheme)
+		client := fake.NewClientBuilder().WithObjects(revisions...).Build()
+		podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
+		req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+
+		_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+		if err != nil {
+			t.Fatalf("inject sidecar into pod failed, err: %v", err)
+		}
+
+		if len(podOut.Spec.InitContainers) != c.expectInitContainers {
+			t.Fatalf("expect %v initContainers but got %v", c.expectInitContainers, len(podOut.Spec.InitContainers))
+		}
+		if len(podOut.Spec.Containers) != c.expectContainers {
+			t.Fatalf("expect %v containers but got %v", c.expectContainers, len(podOut.Spec.Containers))
+		}
 	}
 }
 
