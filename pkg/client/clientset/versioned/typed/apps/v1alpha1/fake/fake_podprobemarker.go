@@ -23,7 +23,6 @@ import (
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakePodProbeMarkers struct {
 	ns   string
 }
 
-var podprobemarkersResource = schema.GroupVersionResource{Group: "apps.kruise.io", Version: "v1alpha1", Resource: "podprobemarkers"}
+var podprobemarkersResource = v1alpha1.SchemeGroupVersion.WithResource("podprobemarkers")
 
-var podprobemarkersKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "PodProbeMarker"}
+var podprobemarkersKind = v1alpha1.SchemeGroupVersion.WithKind("PodProbeMarker")
 
 // Get takes name of the podProbeMarker, and returns the corresponding podProbeMarker object, and an error if there is any.
 func (c *FakePodProbeMarkers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodProbeMarker, err error) {

@@ -23,7 +23,6 @@ import (
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeBroadcastJobs struct {
 	ns   string
 }
 
-var broadcastjobsResource = schema.GroupVersionResource{Group: "apps.kruise.io", Version: "v1alpha1", Resource: "broadcastjobs"}
+var broadcastjobsResource = v1alpha1.SchemeGroupVersion.WithResource("broadcastjobs")
 
-var broadcastjobsKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "BroadcastJob"}
+var broadcastjobsKind = v1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
 
 // Get takes name of the broadcastJob, and returns the corresponding broadcastJob object, and an error if there is any.
 func (c *FakeBroadcastJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.BroadcastJob, err error) {

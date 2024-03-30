@@ -23,7 +23,6 @@ import (
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeAdvancedCronJobs struct {
 	ns   string
 }
 
-var advancedcronjobsResource = schema.GroupVersionResource{Group: "apps.kruise.io", Version: "v1alpha1", Resource: "advancedcronjobs"}
+var advancedcronjobsResource = v1alpha1.SchemeGroupVersion.WithResource("advancedcronjobs")
 
-var advancedcronjobsKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "AdvancedCronJob"}
+var advancedcronjobsKind = v1alpha1.SchemeGroupVersion.WithKind("AdvancedCronJob")
 
 // Get takes name of the advancedCronJob, and returns the corresponding advancedCronJob object, and an error if there is any.
 func (c *FakeAdvancedCronJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.AdvancedCronJob, err error) {

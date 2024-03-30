@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: uniteddeployments.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -47,14 +46,19 @@ spec:
         description: UnitedDeployment is the Schema for the uniteddeployments API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -62,41 +66,44 @@ spec:
             description: UnitedDeploymentSpec defines the desired state of UnitedDeployment.
             properties:
               replicas:
-                description: Replicas is the total desired replicas of all the subsets.
+                description: |-
+                  Replicas is the total desired replicas of all the subsets.
                   If unspecified, defaults to 1.
                 format: int32
                 type: integer
               revisionHistoryLimit:
-                description: Indicates the number of histories to be conserved. If
-                  unspecified, defaults to 10.
+                description: |-
+                  Indicates the number of histories to be conserved.
+                  If unspecified, defaults to 10.
                 format: int32
                 type: integer
               selector:
-                description: Selector is a label query over pods that should match
-                  the replica count. It must match the pod template's labels.
+                description: |-
+                  Selector is a label query over pods that should match the replica count.
+                  It must match the pod template's labels.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
                       The requirements are ANDed.
                     items:
-                      description: A label selector requirement is a selector that
-                        contains values, a key, and an operator that relates the key
-                        and values.
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
                       properties:
                         key:
                           description: key is the label key that the selector applies
                             to.
                           type: string
                         operator:
-                          description: operator represents a key's relationship to
-                            a set of values. Valid operators are In, NotIn, Exists
-                            and DoesNotExist.
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
                           type: string
                         values:
-                          description: values is an array of string values. If the
-                            operator is In or NotIn, the values array must be non-empty.
-                            If the operator is Exists or DoesNotExist, the values
-                            array must be empty. This array is replaced during a strategic
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
                             merge patch.
                           items:
                             type: string
@@ -109,11 +116,10 @@ spec:
                   matchLabels:
                     additionalProperties:
                       type: string
-                    description: matchLabels is a map of {key,value} pairs. A single
-                      {key,value} in the matchLabels map is equivalent to an element
-                      of matchExpressions, whose key field is "key", the operator
-                      is "In", and the values array contains only "value". The requirements
-                      are ANDed.
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
@@ -146,13 +152,12 @@ spec:
                                       type: string
                                     type: object
                                   markPodNotReady:
-                                    description: 'MarkPodNotReady = true means: -
-                                      Pod will be set to ''NotReady'' at preparingDelete/preparingUpdate
-                                      state. - Pod will be restored to ''Ready'' at
-                                      Updated state if it was set to ''NotReady''
-                                      at preparingUpdate state. Currently, MarkPodNotReady
-                                      only takes effect on InPlaceUpdate & PreDelete
-                                      hook. Default to false.'
+                                    description: |-
+                                      MarkPodNotReady = true means:
+                                      - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                                      - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                                      Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                                      Default to false.
                                     type: boolean
                                 type: object
                               preDelete:
@@ -168,13 +173,12 @@ spec:
                                       type: string
                                     type: object
                                   markPodNotReady:
-                                    description: 'MarkPodNotReady = true means: -
-                                      Pod will be set to ''NotReady'' at preparingDelete/preparingUpdate
-                                      state. - Pod will be restored to ''Ready'' at
-                                      Updated state if it was set to ''NotReady''
-                                      at preparingUpdate state. Currently, MarkPodNotReady
-                                      only takes effect on InPlaceUpdate & PreDelete
-                                      hook. Default to false.'
+                                    description: |-
+                                      MarkPodNotReady = true means:
+                                      - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                                      - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                                      Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                                      Default to false.
                                     type: boolean
                                 type: object
                               preNormal:
@@ -190,111 +194,105 @@ spec:
                                       type: string
                                     type: object
                                   markPodNotReady:
-                                    description: 'MarkPodNotReady = true means: -
-                                      Pod will be set to ''NotReady'' at preparingDelete/preparingUpdate
-                                      state. - Pod will be restored to ''Ready'' at
-                                      Updated state if it was set to ''NotReady''
-                                      at preparingUpdate state. Currently, MarkPodNotReady
-                                      only takes effect on InPlaceUpdate & PreDelete
-                                      hook. Default to false.'
+                                    description: |-
+                                      MarkPodNotReady = true means:
+                                      - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                                      - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                                      Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                                      Default to false.
                                     type: boolean
                                 type: object
                             type: object
                           persistentVolumeClaimRetentionPolicy:
-                            description: PersistentVolumeClaimRetentionPolicy describes
-                              the policy used for PVCs created from the StatefulSet
-                              VolumeClaimTemplates. This requires the StatefulSetAutoDeletePVC
-                              feature gate to be enabled, which is alpha.
+                            description: |-
+                              PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
+                              the StatefulSet VolumeClaimTemplates. This requires the
+                              StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
                             properties:
                               whenDeleted:
-                                description: WhenDeleted specifies what happens to
-                                  PVCs created from StatefulSet VolumeClaimTemplates
-                                  when the StatefulSet is deleted. The default policy
-                                  of `Retain` causes PVCs to not be affected by StatefulSet
-                                  deletion. The `Delete` policy causes those PVCs
-                                  to be deleted.
+                                description: |-
+                                  WhenDeleted specifies what happens to PVCs created from StatefulSet
+                                  VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+                                  of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
+                                  `Delete` policy causes those PVCs to be deleted.
                                 type: string
                               whenScaled:
-                                description: WhenScaled specifies what happens to
-                                  PVCs created from StatefulSet VolumeClaimTemplates
-                                  when the StatefulSet is scaled down. The default
-                                  policy of `Retain` causes PVCs to not be affected
-                                  by a scaledown. The `Delete` policy causes the associated
-                                  PVCs for any excess pods above the replica count
-                                  to be deleted.
+                                description: |-
+                                  WhenScaled specifies what happens to PVCs created from StatefulSet
+                                  VolumeClaimTemplates when the StatefulSet is scaled down. The default
+                                  policy of `Retain` causes PVCs to not be affected by a scaledown. The
+                                  `Delete` policy causes the associated PVCs for any excess pods above
+                                  the replica count to be deleted.
                                 type: string
                             type: object
                           podManagementPolicy:
-                            description: podManagementPolicy controls how pods are
-                              created during initial scale up, when replacing pods
-                              on nodes, or when scaling down. The default policy is
-                              `OrderedReady`, where pods are created in increasing
-                              order (pod-0, then pod-1, etc) and the controller will
-                              wait until each pod is ready before continuing. When
-                              scaling down, the pods are removed in the opposite order.
-                              The alternative policy is `Parallel` which will create
-                              pods in parallel to match the desired scale without
-                              waiting, and on scale down will delete all pods at once.
+                            description: |-
+                              podManagementPolicy controls how pods are created during initial scale up,
+                              when replacing pods on nodes, or when scaling down. The default policy is
+                              `OrderedReady`, where pods are created in increasing order (pod-0, then
+                              pod-1, etc) and the controller will wait until each pod is ready before
+                              continuing. When scaling down, the pods are removed in the opposite order.
+                              The alternative policy is `Parallel` which will create pods in parallel
+                              to match the desired scale without waiting, and on scale down will delete
+                              all pods at once.
                             type: string
                           replicas:
-                            description: 'replicas is the desired number of replicas
-                              of the given Template. These are replicas in the sense
-                              that they are instantiations of the same Template, but
-                              individual replicas also have a consistent identity.
-                              If unspecified, defaults to 1. TODO: Consider a rename
-                              of this field.'
+                            description: |-
+                              replicas is the desired number of replicas of the given Template.
+                              These are replicas in the sense that they are instantiations of the
+                              same Template, but individual replicas also have a consistent identity.
+                              If unspecified, defaults to 1.
+                              TODO: Consider a rename of this field.
                             format: int32
                             type: integer
                           reserveOrdinals:
-                            description: 'reserveOrdinals controls the ordinal numbers
-                              that should be reserved, and the replicas will always
-                              be the expectation number of running Pods. For a sts
-                              with replicas=3 and its Pods in [0, 1, 2]: - If you
-                              want to migrate Pod-1 and reserve this ordinal, just
-                              set spec.reserveOrdinal to [1]. Then controller will
-                              delete Pod-1 and create Pod-3 (existing Pods will be
-                              [0, 2, 3]) - If you just want to delete Pod-1, you should
-                              set spec.reserveOrdinal to [1] and spec.replicas to
-                              2. Then controller will delete Pod-1 (existing Pods
-                              will be [0, 2])'
+                            description: |-
+                              reserveOrdinals controls the ordinal numbers that should be reserved, and the replicas
+                              will always be the expectation number of running Pods.
+                              For a sts with replicas=3 and its Pods in [0, 1, 2]:
+                              - If you want to migrate Pod-1 and reserve this ordinal, just set spec.reserveOrdinal to [1].
+                                Then controller will delete Pod-1 and create Pod-3 (existing Pods will be [0, 2, 3])
+                              - If you just want to delete Pod-1, you should set spec.reserveOrdinal to [1] and spec.replicas to 2.
+                                Then controller will delete Pod-1 (existing Pods will be [0, 2])
                             items:
                               type: integer
                             type: array
                           revisionHistoryLimit:
-                            description: revisionHistoryLimit is the maximum number
-                              of revisions that will be maintained in the StatefulSet's
-                              revision history. The revision history consists of all
-                              revisions not represented by a currently applied StatefulSetSpec
-                              version. The default value is 10.
+                            description: |-
+                              revisionHistoryLimit is the maximum number of revisions that will
+                              be maintained in the StatefulSet's revision history. The revision history
+                              consists of all revisions not represented by a currently applied
+                              StatefulSetSpec version. The default value is 10.
                             format: int32
                             type: integer
                           scaleStrategy:
-                            description: scaleStrategy indicates the StatefulSetScaleStrategy
-                              that will be employed to scale Pods in the StatefulSet.
+                            description: |-
+                              scaleStrategy indicates the StatefulSetScaleStrategy that will be
+                              employed to scale Pods in the StatefulSet.
                             properties:
                               maxUnavailable:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: 'The maximum number of pods that can
-                                  be unavailable during scaling. Value can be an absolute
-                                  number (ex: 5) or a percentage of desired pods (ex:
-                                  10%). Absolute number is calculated from percentage
-                                  by rounding down. It can just be allowed to work
-                                  with Parallel podManagementPolicy.'
+                                description: |-
+                                  The maximum number of pods that can be unavailable during scaling.
+                                  Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                                  Absolute number is calculated from percentage by rounding down.
+                                  It can just be allowed to work with Parallel podManagementPolicy.
                                 x-kubernetes-int-or-string: true
                             type: object
                           selector:
-                            description: 'selector is a label query over pods that
-                              should match the replica count. It must match the pod
-                              template''s labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            description: |-
+                              selector is a label query over pods that should match the replica count.
+                              It must match the pod template's labels.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
                             properties:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector
                                   requirements. The requirements are ANDed.
                                 items:
-                                  description: A label selector requirement is a selector
-                                    that contains values, a key, and an operator that
+                                  description: |-
+                                    A label selector requirement is a selector that contains values, a key, and an operator that
                                     relates the key and values.
                                   properties:
                                     key:
@@ -302,17 +300,16 @@ spec:
                                         applies to.
                                       type: string
                                     operator:
-                                      description: operator represents a key's relationship
-                                        to a set of values. Valid operators are In,
-                                        NotIn, Exists and DoesNotExist.
+                                      description: |-
+                                        operator represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists and DoesNotExist.
                                       type: string
                                     values:
-                                      description: values is an array of string values.
-                                        If the operator is In or NotIn, the values
-                                        array must be non-empty. If the operator is
-                                        Exists or DoesNotExist, the values array must
-                                        be empty. This array is replaced during a
-                                        strategic merge patch.
+                                      description: |-
+                                        values is an array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty. This array is replaced during a strategic
+                                        merge patch.
                                       items:
                                         type: string
                                       type: array
@@ -324,34 +321,33 @@ spec:
                               matchLabels:
                                 additionalProperties:
                                   type: string
-                                description: matchLabels is a map of {key,value} pairs.
-                                  A single {key,value} in the matchLabels map is equivalent
-                                  to an element of matchExpressions, whose key field
-                                  is "key", the operator is "In", and the values array
-                                  contains only "value". The requirements are ANDed.
+                                description: |-
+                                  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                  map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                  operator is "In", and the values array contains only "value". The requirements are ANDed.
                                 type: object
                             type: object
                             x-kubernetes-map-type: atomic
                           serviceName:
-                            description: 'serviceName is the name of the service that
-                              governs this StatefulSet. This service must exist before
-                              the StatefulSet, and is responsible for the network
-                              identity of the set. Pods get DNS/hostnames that follow
-                              the pattern: pod-specific-string.serviceName.default.svc.cluster.local
-                              where "pod-specific-string" is managed by the StatefulSet
-                              controller.'
+                            description: |-
+                              serviceName is the name of the service that governs this StatefulSet.
+                              This service must exist before the StatefulSet, and is responsible for
+                              the network identity of the set. Pods get DNS/hostnames that follow the
+                              pattern: pod-specific-string.serviceName.default.svc.cluster.local
+                              where "pod-specific-string" is managed by the StatefulSet controller.
                             type: string
                           template:
-                            description: template is the object that describes the
-                              pod that will be created if insufficient replicas are
-                              detected. Each pod stamped out by the StatefulSet will
-                              fulfill this Template, but have a unique identity from
-                              the rest of the StatefulSet.
+                            description: |-
+                              template is the object that describes the pod that will be created if
+                              insufficient replicas are detected. Each pod stamped out by the StatefulSet
+                              will fulfill this Template, but have a unique identity from the rest
+                              of the StatefulSet.
                             x-kubernetes-preserve-unknown-fields: true
                           updateStrategy:
-                            description: updateStrategy indicates the StatefulSetUpdateStrategy
-                              that will be employed to update Pods in the StatefulSet
-                              when a revision is made to Template.
+                            description: |-
+                              updateStrategy indicates the StatefulSetUpdateStrategy that will be
+                              employed to update Pods in the StatefulSet when a revision is made to
+                              Template.
                             properties:
                               rollingUpdate:
                                 description: RollingUpdate is used to communicate
@@ -362,10 +358,9 @@ spec:
                                       for in-place update.
                                     properties:
                                       gracePeriodSeconds:
-                                        description: GracePeriodSeconds is the timespan
-                                          between set Pod status to not-ready and
-                                          update images in Pod spec when in-place
-                                          update a Pod.
+                                        description: |-
+                                          GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
+                                          when in-place update a Pod.
                                         format: int32
                                         type: integer
                                     type: object
@@ -373,82 +368,73 @@ spec:
                                     anyOf:
                                     - type: integer
                                     - type: string
-                                    description: 'The maximum number of pods that
-                                      can be unavailable during the update. Value
-                                      can be an absolute number (ex: 5) or a percentage
-                                      of desired pods (ex: 10%). Absolute number is
-                                      calculated from percentage by rounding down.
-                                      Also, maxUnavailable can just be allowed to
-                                      work with Parallel podManagementPolicy. Defaults
-                                      to 1.'
+                                    description: |-
+                                      The maximum number of pods that can be unavailable during the update.
+                                      Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                                      Absolute number is calculated from percentage by rounding down.
+                                      Also, maxUnavailable can just be allowed to work with Parallel podManagementPolicy.
+                                      Defaults to 1.
                                     x-kubernetes-int-or-string: true
                                   minReadySeconds:
-                                    description: MinReadySeconds indicates how long
-                                      will the pod be considered ready after it's
-                                      updated. MinReadySeconds works with both OrderedReady
-                                      and Parallel podManagementPolicy. It affects
-                                      the pod scale up speed when the podManagementPolicy
-                                      is set to be OrderedReady. Combined with MaxUnavailable,
-                                      it affects the pod update speed regardless of
-                                      podManagementPolicy. Default value is 0, max
-                                      is 300.
+                                    description: |-
+                                      MinReadySeconds indicates how long will the pod be considered ready after it's updated.
+                                      MinReadySeconds works with both OrderedReady and Parallel podManagementPolicy.
+                                      It affects the pod scale up speed when the podManagementPolicy is set to be OrderedReady.
+                                      Combined with MaxUnavailable, it affects the pod update speed regardless of podManagementPolicy.
+                                      Default value is 0, max is 300.
                                     format: int32
                                     type: integer
                                   partition:
-                                    description: 'Partition indicates the ordinal
-                                      at which the StatefulSet should be partitioned
-                                      by default. But if unorderedUpdate has been
-                                      set: - Partition indicates the number of pods
-                                      with non-updated revisions when rolling update.
-                                      - It means controller will update $(replicas
-                                      - partition) number of pod. Default value is
-                                      0.'
+                                    description: |-
+                                      Partition indicates the ordinal at which the StatefulSet should be partitioned by default.
+                                      But if unorderedUpdate has been set:
+                                        - Partition indicates the number of pods with non-updated revisions when rolling update.
+                                        - It means controller will update $(replicas - partition) number of pod.
+                                      Default value is 0.
                                     format: int32
                                     type: integer
                                   paused:
-                                    description: Paused indicates that the StatefulSet
-                                      is paused. Default value is false
+                                    description: |-
+                                      Paused indicates that the StatefulSet is paused.
+                                      Default value is false
                                     type: boolean
                                   podUpdatePolicy:
-                                    description: PodUpdatePolicy indicates how pods
-                                      should be updated Default value is "ReCreate"
+                                    description: |-
+                                      PodUpdatePolicy indicates how pods should be updated
+                                      Default value is "ReCreate"
                                     type: string
                                   unorderedUpdate:
-                                    description: UnorderedUpdate contains strategies
-                                      for non-ordered update. If it is not nil, pods
-                                      will be updated with non-ordered sequence. Noted
-                                      that UnorderedUpdate can only be allowed to
-                                      work with Parallel podManagementPolicy
+                                    description: |-
+                                      UnorderedUpdate contains strategies for non-ordered update.
+                                      If it is not nil, pods will be updated with non-ordered sequence.
+                                      Noted that UnorderedUpdate can only be allowed to work with Parallel podManagementPolicy
                                     properties:
                                       priorityStrategy:
-                                        description: Priorities are the rules for
-                                          calculating the priority of updating pods.
-                                          Each pod to be updated, will pass through
-                                          these terms and get a sum of weights.
+                                        description: |-
+                                          Priorities are the rules for calculating the priority of updating pods.
+                                          Each pod to be updated, will pass through these terms and get a sum of weights.
                                         properties:
                                           orderPriority:
-                                            description: 'Order priority terms, pods
-                                              will be sorted by the value of orderedKey.
-                                              For example: ``` orderPriority: - orderedKey:
-                                              key1 - orderedKey: key2 ``` First, all
-                                              pods which have key1 in labels will
-                                              be sorted by the value of key1. Then,
-                                              the left pods which have no key1 but
-                                              have key2 in labels will be sorted by
-                                              the value of key2 and put behind those
-                                              pods have key1.'
+                                            description: |-
+                                              Order priority terms, pods will be sorted by the value of orderedKey.
+                                              For example:
+                                              ```
+                                              orderPriority:
+                                              - orderedKey: key1
+                                              - orderedKey: key2
+                                              ```
+                                              First, all pods which have key1 in labels will be sorted by the value of key1.
+                                              Then, the left pods which have no key1 but have key2 in labels will be sorted by
+                                              the value of key2 and put behind those pods have key1.
                                             items:
                                               description: UpdatePriorityOrderTerm
                                                 defines order priority.
                                               properties:
                                                 orderedKey:
-                                                  description: Calculate priority
-                                                    by value of this key. Values of
-                                                    this key, will be sorted by GetInt(val).
-                                                    GetInt method will find the last
-                                                    int in value, such as getting
-                                                    5 in value '5', getting 10 in
-                                                    value 'sts-10'.
+                                                  description: |-
+                                                    Calculate priority by value of this key.
+                                                    Values of this key, will be sorted by GetInt(val). GetInt method will find the last int in value,
+                                                    such as getting 5 in value '5', getting 10 in value 'sts-10'.
                                                   type: string
                                               required:
                                               - orderedKey
@@ -472,10 +458,8 @@ spec:
                                                         requirements. The requirements
                                                         are ANDed.
                                                       items:
-                                                        description: A label selector
-                                                          requirement is a selector
-                                                          that contains values, a
-                                                          key, and an operator that
+                                                        description: |-
+                                                          A label selector requirement is a selector that contains values, a key, and an operator that
                                                           relates the key and values.
                                                         properties:
                                                           key:
@@ -484,24 +468,15 @@ spec:
                                                               applies to.
                                                             type: string
                                                           operator:
-                                                            description: operator
-                                                              represents a key's relationship
-                                                              to a set of values.
-                                                              Valid operators are
-                                                              In, NotIn, Exists and
-                                                              DoesNotExist.
+                                                            description: |-
+                                                              operator represents a key's relationship to a set of values.
+                                                              Valid operators are In, NotIn, Exists and DoesNotExist.
                                                             type: string
                                                           values:
-                                                            description: values is
-                                                              an array of string values.
-                                                              If the operator is In
-                                                              or NotIn, the values
-                                                              array must be non-empty.
-                                                              If the operator is Exists
-                                                              or DoesNotExist, the
-                                                              values array must be
-                                                              empty. This array is
-                                                              replaced during a strategic
+                                                            description: |-
+                                                              values is an array of string values. If the operator is In or NotIn,
+                                                              the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                                              the values array must be empty. This array is replaced during a strategic
                                                               merge patch.
                                                             items:
                                                               type: string
@@ -514,16 +489,10 @@ spec:
                                                     matchLabels:
                                                       additionalProperties:
                                                         type: string
-                                                      description: matchLabels is
-                                                        a map of {key,value} pairs.
-                                                        A single {key,value} in the
-                                                        matchLabels map is equivalent
-                                                        to an element of matchExpressions,
-                                                        whose key field is "key",
-                                                        the operator is "In", and
-                                                        the values array contains
-                                                        only "value". The requirements
-                                                        are ANDed.
+                                                      description: |-
+                                                        matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                                        map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                                        operator is "In", and the values array contains only "value". The requirements are ANDed.
                                                       type: object
                                                   type: object
                                                   x-kubernetes-map-type: atomic
@@ -542,21 +511,20 @@ spec:
                                     type: object
                                 type: object
                               type:
-                                description: Type indicates the type of the StatefulSetUpdateStrategy.
+                                description: |-
+                                  Type indicates the type of the StatefulSetUpdateStrategy.
                                   Default is RollingUpdate.
                                 type: string
                             type: object
                           volumeClaimTemplates:
-                            description: 'volumeClaimTemplates is a list of claims
-                              that pods are allowed to reference. The StatefulSet
-                              controller is responsible for mapping network identities
-                              to claims in a way that maintains the identity of a
-                              pod. Every claim in this list must have at least one
-                              matching (by name) volumeMount in one container in the
-                              template. A claim in this list takes precedence over
-                              any volumes in the template, with the same name. TODO:
-                              Define the behavior if a claim already exists with the
-                              same name.'
+                            description: |-
+                              volumeClaimTemplates is a list of claims that pods are allowed to reference.
+                              The StatefulSet controller is responsible for mapping network identities to
+                              claims in a way that maintains the identity of a pod. Every claim in
+                              this list must have at least one matching (by name) volumeMount in one
+                              container in the template. A claim in this list takes precedence over
+                              any volumes in the template, with the same name.
+                              TODO: Define the behavior if a claim already exists with the same name.
                             x-kubernetes-preserve-unknown-fields: true
                         required:
                         - selector
@@ -591,13 +559,12 @@ spec:
                                       type: string
                                     type: object
                                   markPodNotReady:
-                                    description: 'MarkPodNotReady = true means: -
-                                      Pod will be set to ''NotReady'' at preparingDelete/preparingUpdate
-                                      state. - Pod will be restored to ''Ready'' at
-                                      Updated state if it was set to ''NotReady''
-                                      at preparingUpdate state. Currently, MarkPodNotReady
-                                      only takes effect on InPlaceUpdate & PreDelete
-                                      hook. Default to false.'
+                                    description: |-
+                                      MarkPodNotReady = true means:
+                                      - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                                      - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                                      Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                                      Default to false.
                                     type: boolean
                                 type: object
                               preDelete:
@@ -613,13 +580,12 @@ spec:
                                       type: string
                                     type: object
                                   markPodNotReady:
-                                    description: 'MarkPodNotReady = true means: -
-                                      Pod will be set to ''NotReady'' at preparingDelete/preparingUpdate
-                                      state. - Pod will be restored to ''Ready'' at
-                                      Updated state if it was set to ''NotReady''
-                                      at preparingUpdate state. Currently, MarkPodNotReady
-                                      only takes effect on InPlaceUpdate & PreDelete
-                                      hook. Default to false.'
+                                    description: |-
+                                      MarkPodNotReady = true means:
+                                      - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                                      - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                                      Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                                      Default to false.
                                     type: boolean
                                 type: object
                               preNormal:
@@ -635,79 +601,78 @@ spec:
                                       type: string
                                     type: object
                                   markPodNotReady:
-                                    description: 'MarkPodNotReady = true means: -
-                                      Pod will be set to ''NotReady'' at preparingDelete/preparingUpdate
-                                      state. - Pod will be restored to ''Ready'' at
-                                      Updated state if it was set to ''NotReady''
-                                      at preparingUpdate state. Currently, MarkPodNotReady
-                                      only takes effect on InPlaceUpdate & PreDelete
-                                      hook. Default to false.'
+                                    description: |-
+                                      MarkPodNotReady = true means:
+                                      - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                                      - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                                      Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                                      Default to false.
                                     type: boolean
                                 type: object
                             type: object
                           minReadySeconds:
-                            description: Minimum number of seconds for which a newly
-                              created pod should be ready without any of its container
-                              crashing, for it to be considered available. Defaults
-                              to 0 (pod will be considered available as soon as it
-                              is ready)
+                            description: |-
+                              Minimum number of seconds for which a newly created pod should be ready
+                              without any of its container crashing, for it to be considered available.
+                              Defaults to 0 (pod will be considered available as soon as it is ready)
                             format: int32
                             type: integer
                           replicas:
-                            description: Replicas is the desired number of replicas
-                              of the given Template. These are replicas in the sense
-                              that they are instantiations of the same Template. If
-                              unspecified, defaults to 1.
+                            description: |-
+                              Replicas is the desired number of replicas of the given Template.
+                              These are replicas in the sense that they are instantiations of the
+                              same Template.
+                              If unspecified, defaults to 1.
                             format: int32
                             type: integer
                           revisionHistoryLimit:
-                            description: RevisionHistoryLimit is the maximum number
-                              of revisions that will be maintained in the CloneSet's
-                              revision history. The revision history consists of all
-                              revisions not represented by a currently applied CloneSetSpec
-                              version. The default value is 10.
+                            description: |-
+                              RevisionHistoryLimit is the maximum number of revisions that will
+                              be maintained in the CloneSet's revision history. The revision history
+                              consists of all revisions not represented by a currently applied
+                              CloneSetSpec version. The default value is 10.
                             format: int32
                             type: integer
                           scaleStrategy:
-                            description: ScaleStrategy indicates the ScaleStrategy
-                              that will be employed to create and delete Pods in the
-                              CloneSet.
+                            description: |-
+                              ScaleStrategy indicates the ScaleStrategy that will be employed to
+                              create and delete Pods in the CloneSet.
                             properties:
                               disablePVCReuse:
-                                description: Indicate if cloneSet will reuse already
-                                  existed pvc to rebuild a new pod
+                                description: |-
+                                  Indicate if cloneSet will reuse already existed pvc to
+                                  rebuild a new pod
                                 type: boolean
                               maxUnavailable:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: The maximum number of pods that can be
-                                  unavailable for scaled pods. This field can control
-                                  the changes rate of replicas for CloneSet so as
-                                  to minimize the impact for users' service. The scale
-                                  will fail if the number of unavailable pods were
-                                  greater than this MaxUnavailable at scaling up.
+                                description: |-
+                                  The maximum number of pods that can be unavailable for scaled pods.
+                                  This field can control the changes rate of replicas for CloneSet so as to minimize the impact for users' service.
+                                  The scale will fail if the number of unavailable pods were greater than this MaxUnavailable at scaling up.
                                   MaxUnavailable works only when scaling up.
                                 x-kubernetes-int-or-string: true
                               podsToDelete:
-                                description: PodsToDelete is the names of Pod should
-                                  be deleted. Note that this list will be truncated
-                                  for non-existing pod names.
+                                description: |-
+                                  PodsToDelete is the names of Pod should be deleted.
+                                  Note that this list will be truncated for non-existing pod names.
                                 items:
                                   type: string
                                 type: array
                             type: object
                           selector:
-                            description: 'Selector is a label query over pods that
-                              should match the replica count. It must match the pod
-                              template''s labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                            description: |-
+                              Selector is a label query over pods that should match the replica count.
+                              It must match the pod template's labels.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
                             properties:
                               matchExpressions:
                                 description: matchExpressions is a list of label selector
                                   requirements. The requirements are ANDed.
                                 items:
-                                  description: A label selector requirement is a selector
-                                    that contains values, a key, and an operator that
+                                  description: |-
+                                    A label selector requirement is a selector that contains values, a key, and an operator that
                                     relates the key and values.
                                   properties:
                                     key:
@@ -715,17 +680,16 @@ spec:
                                         applies to.
                                       type: string
                                     operator:
-                                      description: operator represents a key's relationship
-                                        to a set of values. Valid operators are In,
-                                        NotIn, Exists and DoesNotExist.
+                                      description: |-
+                                        operator represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists and DoesNotExist.
                                       type: string
                                     values:
-                                      description: values is an array of string values.
-                                        If the operator is In or NotIn, the values
-                                        array must be non-empty. If the operator is
-                                        Exists or DoesNotExist, the values array must
-                                        be empty. This array is replaced during a
-                                        strategic merge patch.
+                                      description: |-
+                                        values is an array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty. This array is replaced during a strategic
+                                        merge patch.
                                       items:
                                         type: string
                                       type: array
@@ -737,11 +701,10 @@ spec:
                               matchLabels:
                                 additionalProperties:
                                   type: string
-                                description: matchLabels is a map of {key,value} pairs.
-                                  A single {key,value} in the matchLabels map is equivalent
-                                  to an element of matchExpressions, whose key field
-                                  is "key", the operator is "In", and the values array
-                                  contains only "value". The requirements are ANDed.
+                                description: |-
+                                  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                  map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                  operator is "In", and the values array contains only "value". The requirements are ANDed.
                                 type: object
                             type: object
                             x-kubernetes-map-type: atomic
@@ -750,18 +713,18 @@ spec:
                               created.
                             x-kubernetes-preserve-unknown-fields: true
                           updateStrategy:
-                            description: UpdateStrategy indicates the UpdateStrategy
-                              that will be employed to update Pods in the CloneSet
-                              when a revision is made to Template.
+                            description: |-
+                              UpdateStrategy indicates the UpdateStrategy that will be employed to
+                              update Pods in the CloneSet when a revision is made to Template.
                             properties:
                               inPlaceUpdateStrategy:
                                 description: InPlaceUpdateStrategy contains strategies
                                   for in-place update.
                                 properties:
                                   gracePeriodSeconds:
-                                    description: GracePeriodSeconds is the timespan
-                                      between set Pod status to not-ready and update
-                                      images in Pod spec when in-place update a Pod.
+                                    description: |-
+                                      GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
+                                      when in-place update a Pod.
                                     format: int32
                                     type: integer
                                 type: object
@@ -769,67 +732,65 @@ spec:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: 'The maximum number of pods that can
-                                  be scheduled above the desired replicas during update
-                                  or specified delete. Value can be an absolute number
-                                  (ex: 5) or a percentage of desired pods (ex: 10%).
-                                  Absolute number is calculated from percentage by
-                                  rounding up. Defaults to 0.'
+                                description: |-
+                                  The maximum number of pods that can be scheduled above the desired replicas during update or specified delete.
+                                  Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                                  Absolute number is calculated from percentage by rounding up.
+                                  Defaults to 0.
                                 x-kubernetes-int-or-string: true
                               maxUnavailable:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: 'The maximum number of pods that can
-                                  be unavailable during update or scale. Value can
-                                  be an absolute number (ex: 5) or a percentage of
-                                  desired pods (ex: 10%). Absolute number is calculated
-                                  from percentage by rounding up by default. When
-                                  maxSurge > 0, absolute number is calculated from
-                                  percentage by rounding down. Defaults to 20%.'
+                                description: |-
+                                  The maximum number of pods that can be unavailable during update or scale.
+                                  Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                                  Absolute number is calculated from percentage by rounding up by default.
+                                  When maxSurge > 0, absolute number is calculated from percentage by rounding down.
+                                  Defaults to 20%.
                                 x-kubernetes-int-or-string: true
                               partition:
                                 anyOf:
                                 - type: integer
                                 - type: string
-                                description: 'Partition is the desired number of pods
-                                  in old revisions. Value can be an absolute number
-                                  (ex: 5) or a percentage of desired pods (ex: 10%).
-                                  Absolute number is calculated from percentage by
-                                  rounding up by default. It means when partition
-                                  is set during pods updating, (replicas - partition
-                                  value) number of pods will be updated. Default value
-                                  is 0.'
+                                description: |-
+                                  Partition is the desired number of pods in old revisions.
+                                  Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                                  Absolute number is calculated from percentage by rounding up by default.
+                                  It means when partition is set during pods updating, (replicas - partition value) number of pods will be updated.
+                                  Default value is 0.
                                 x-kubernetes-int-or-string: true
                               paused:
-                                description: Paused indicates that the CloneSet is
-                                  paused. Default value is false
+                                description: |-
+                                  Paused indicates that the CloneSet is paused.
+                                  Default value is false
                                 type: boolean
                               priorityStrategy:
-                                description: Priorities are the rules for calculating
-                                  the priority of updating pods. Each pod to be updated,
-                                  will pass through these terms and get a sum of weights.
+                                description: |-
+                                  Priorities are the rules for calculating the priority of updating pods.
+                                  Each pod to be updated, will pass through these terms and get a sum of weights.
                                 properties:
                                   orderPriority:
-                                    description: 'Order priority terms, pods will
-                                      be sorted by the value of orderedKey. For example:
-                                      ``` orderPriority: - orderedKey: key1 - orderedKey:
-                                      key2 ``` First, all pods which have key1 in
-                                      labels will be sorted by the value of key1.
-                                      Then, the left pods which have no key1 but have
-                                      key2 in labels will be sorted by the value of
-                                      key2 and put behind those pods have key1.'
+                                    description: |-
+                                      Order priority terms, pods will be sorted by the value of orderedKey.
+                                      For example:
+                                      ```
+                                      orderPriority:
+                                      - orderedKey: key1
+                                      - orderedKey: key2
+                                      ```
+                                      First, all pods which have key1 in labels will be sorted by the value of key1.
+                                      Then, the left pods which have no key1 but have key2 in labels will be sorted by
+                                      the value of key2 and put behind those pods have key1.
                                     items:
                                       description: UpdatePriorityOrderTerm defines
                                         order priority.
                                       properties:
                                         orderedKey:
-                                          description: Calculate priority by value
-                                            of this key. Values of this key, will
-                                            be sorted by GetInt(val). GetInt method
-                                            will find the last int in value, such
-                                            as getting 5 in value '5', getting 10
-                                            in value 'sts-10'.
+                                          description: |-
+                                            Calculate priority by value of this key.
+                                            Values of this key, will be sorted by GetInt(val). GetInt method will find the last int in value,
+                                            such as getting 5 in value '5', getting 10 in value 'sts-10'.
                                           type: string
                                       required:
                                       - orderedKey
@@ -851,10 +812,9 @@ spec:
                                                 of label selector requirements. The
                                                 requirements are ANDed.
                                               items:
-                                                description: A label selector requirement
-                                                  is a selector that contains values,
-                                                  a key, and an operator that relates
-                                                  the key and values.
+                                                description: |-
+                                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                                  relates the key and values.
                                                 properties:
                                                   key:
                                                     description: key is the label
@@ -862,20 +822,16 @@ spec:
                                                       to.
                                                     type: string
                                                   operator:
-                                                    description: operator represents
-                                                      a key's relationship to a set
-                                                      of values. Valid operators are
-                                                      In, NotIn, Exists and DoesNotExist.
+                                                    description: |-
+                                                      operator represents a key's relationship to a set of values.
+                                                      Valid operators are In, NotIn, Exists and DoesNotExist.
                                                     type: string
                                                   values:
-                                                    description: values is an array
-                                                      of string values. If the operator
-                                                      is In or NotIn, the values array
-                                                      must be non-empty. If the operator
-                                                      is Exists or DoesNotExist, the
-                                                      values array must be empty.
-                                                      This array is replaced during
-                                                      a strategic merge patch.
+                                                    description: |-
+                                                      values is an array of string values. If the operator is In or NotIn,
+                                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                                      the values array must be empty. This array is replaced during a strategic
+                                                      merge patch.
                                                     items:
                                                       type: string
                                                     type: array
@@ -887,14 +843,10 @@ spec:
                                             matchLabels:
                                               additionalProperties:
                                                 type: string
-                                              description: matchLabels is a map of
-                                                {key,value} pairs. A single {key,value}
-                                                in the matchLabels map is equivalent
-                                                to an element of matchExpressions,
-                                                whose key field is "key", the operator
-                                                is "In", and the values array contains
-                                                only "value". The requirements are
-                                                ANDed.
+                                              description: |-
+                                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                                operator is "In", and the values array contains only "value". The requirements are ANDed.
                                               type: object
                                           type: object
                                           x-kubernetes-map-type: atomic
@@ -911,15 +863,11 @@ spec:
                                     type: array
                                 type: object
                               scatterStrategy:
-                                description: ScatterStrategy defines the scatter rules
-                                  to make pods been scattered when update. This will
-                                  avoid pods with the same key-value to be updated
-                                  in one batch. - Note that pods will be scattered
-                                  after priority sort. So, although priority strategy
-                                  and scatter strategy can be applied together, we
-                                  suggest to use either one of them. - If scatterStrategy
-                                  is used, we suggest to just use one term. Otherwise,
-                                  the update order can be hard to understand.
+                                description: |-
+                                  ScatterStrategy defines the scatter rules to make pods been scattered when update.
+                                  This will avoid pods with the same key-value to be updated in one batch.
+                                  - Note that pods will be scattered after priority sort. So, although priority strategy and scatter strategy can be applied together, we suggest to use either one of them.
+                                  - If scatterStrategy is used, we suggest to just use one term. Otherwise, the update order can be hard to understand.
                                 items:
                                   properties:
                                     key:
@@ -932,14 +880,15 @@ spec:
                                   type: object
                                 type: array
                               type:
-                                description: Type indicates the type of the CloneSetUpdateStrategy.
+                                description: |-
+                                  Type indicates the type of the CloneSetUpdateStrategy.
                                   Default is ReCreate.
                                 type: string
                             type: object
                           volumeClaimTemplates:
-                            description: VolumeClaimTemplates is a list of claims
-                              that pods are allowed to reference. Note that PVC will
-                              be deleted when its pod has been deleted.
+                            description: |-
+                              VolumeClaimTemplates is a list of claims that pods are allowed to reference.
+                              Note that PVC will be deleted when its pod has been deleted.
                             x-kubernetes-preserve-unknown-fields: true
                         required:
                         - selector
@@ -974,9 +923,9 @@ spec:
                   each of subsets.
                 properties:
                   subsets:
-                    description: Contains the details of each subset. Each element
-                      in this array represents one subset which will be provisioned
-                      and managed by UnitedDeployment.
+                    description: |-
+                      Contains the details of each subset. Each element in this array represents one subset
+                      which will be provisioned and managed by UnitedDeployment.
                     items:
                       description: Subset defines the detail of a subset.
                       properties:
@@ -984,60 +933,60 @@ spec:
                           anyOf:
                           - type: integer
                           - type: string
-                          description: Indicates the upper bounded replicas of the
-                            subset. MaxReplicas must be more than or equal to MinReplicas.
-                            MaxReplicas == nil means no limitation. Please ensure
-                            that at least one subset has empty MaxReplicas(no limitation)
-                            to avoid stuck scaling. Defaults to nil.
+                          description: |-
+                            Indicates the upper bounded replicas of the subset.
+                            MaxReplicas must be more than or equal to MinReplicas.
+                            MaxReplicas == nil means no limitation.
+                            Please ensure that at least one subset has empty MaxReplicas(no limitation) to avoid stuck scaling.
+                            Defaults to nil.
                           x-kubernetes-int-or-string: true
                         minReplicas:
                           anyOf:
                           - type: integer
                           - type: string
-                          description: Indicates the lower bounded replicas of the
-                            subset. MinReplicas must be more than or equal to 0 if
-                            it is set. Controller will prioritize satisfy minReplicas
-                            for each subset according to the order of Topology.Subsets.
+                          description: |-
+                            Indicates the lower bounded replicas of the subset.
+                            MinReplicas must be more than or equal to 0 if it is set.
+                            Controller will prioritize satisfy minReplicas for each subset
+                            according to the order of Topology.Subsets.
                             Defaults to 0.
                           x-kubernetes-int-or-string: true
                         name:
-                          description: Indicates subset name as a DNS_LABEL, which
-                            will be used to generate subset workload name prefix in
-                            the format '<deployment-name>-<subset-name>-'. Name should
-                            be unique between all of the subsets under one UnitedDeployment.
+                          description: |-
+                            Indicates subset name as a DNS_LABEL, which will be used to generate
+                            subset workload name prefix in the format '<deployment-name>-<subset-name>-'.
+                            Name should be unique between all of the subsets under one UnitedDeployment.
                           type: string
                         nodeSelectorTerm:
-                          description: Indicates the node selector to form the subset.
-                            Depending on the node selector, pods provisioned could
-                            be distributed across multiple groups of nodes. A subset's
-                            nodeSelectorTerm is not allowed to be updated.
+                          description: |-
+                            Indicates the node selector to form the subset. Depending on the node selector,
+                            pods provisioned could be distributed across multiple groups of nodes.
+                            A subset's nodeSelectorTerm is not allowed to be updated.
                           properties:
                             matchExpressions:
                               description: A list of node selector requirements by
                                 node's labels.
                               items:
-                                description: A node selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
+                                description: |-
+                                  A node selector requirement is a selector that contains values, a key, and an operator
+                                  that relates the key and values.
                                 properties:
                                   key:
                                     description: The label key that the selector applies
                                       to.
                                     type: string
                                   operator:
-                                    description: Represents a key's relationship to
-                                      a set of values. Valid operators are In, NotIn,
-                                      Exists, DoesNotExist. Gt, and Lt.
+                                    description: |-
+                                      Represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                     type: string
                                   values:
-                                    description: An array of string values. If the
-                                      operator is In or NotIn, the values array must
-                                      be non-empty. If the operator is Exists or DoesNotExist,
-                                      the values array must be empty. If the operator
-                                      is Gt or Lt, the values array must have a single
-                                      element, which will be interpreted as an integer.
-                                      This array is replaced during a strategic merge
-                                      patch.
+                                    description: |-
+                                      An array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. If the operator is Gt or Lt, the values
+                                      array must have a single element, which will be interpreted as an integer.
+                                      This array is replaced during a strategic merge patch.
                                     items:
                                       type: string
                                     type: array
@@ -1050,28 +999,26 @@ spec:
                               description: A list of node selector requirements by
                                 node's fields.
                               items:
-                                description: A node selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
+                                description: |-
+                                  A node selector requirement is a selector that contains values, a key, and an operator
+                                  that relates the key and values.
                                 properties:
                                   key:
                                     description: The label key that the selector applies
                                       to.
                                     type: string
                                   operator:
-                                    description: Represents a key's relationship to
-                                      a set of values. Valid operators are In, NotIn,
-                                      Exists, DoesNotExist. Gt, and Lt.
+                                    description: |-
+                                      Represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                                     type: string
                                   values:
-                                    description: An array of string values. If the
-                                      operator is In or NotIn, the values array must
-                                      be non-empty. If the operator is Exists or DoesNotExist,
-                                      the values array must be empty. If the operator
-                                      is Gt or Lt, the values array must have a single
-                                      element, which will be interpreted as an integer.
-                                      This array is replaced during a strategic merge
-                                      patch.
+                                    description: |-
+                                      An array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. If the operator is Gt or Lt, the values
+                                      array must have a single element, which will be interpreted as an integer.
+                                      This array is replaced during a strategic merge patch.
                                     items:
                                       type: string
                                     type: array
@@ -1083,66 +1030,60 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         patch:
-                          description: Patch indicates patching to the templateSpec.
-                            Patch takes precedence over other fields If the Patch
-                            also modifies the Replicas, NodeSelectorTerm or Tolerations,
-                            use value in the Patch
+                          description: |-
+                            Patch indicates patching to the templateSpec.
+                            Patch takes precedence over other fields
+                            If the Patch also modifies the Replicas, NodeSelectorTerm or Tolerations, use value in the Patch
                           x-kubernetes-preserve-unknown-fields: true
                         replicas:
                           anyOf:
                           - type: integer
                           - type: string
-                          description: Indicates the number of the pod to be created
-                            under this subset. Replicas could also be percentage like
-                            '10%', which means 10% of UnitedDeployment replicas of
-                            pods will be distributed under this subset. If nil, the
-                            number of replicas in this subset is determined by controller.
-                            Controller will try to keep all the subsets with nil replicas
-                            have average pods. Replicas and MinReplicas/MaxReplicas
-                            are mutually exclusive in a UnitedDeployment.
+                          description: |-
+                            Indicates the number of the pod to be created under this subset. Replicas could also be
+                            percentage like '10%', which means 10% of UnitedDeployment replicas of pods will be distributed
+                            under this subset. If nil, the number of replicas in this subset is determined by controller.
+                            Controller will try to keep all the subsets with nil replicas have average pods.
+                            Replicas and MinReplicas/MaxReplicas are mutually exclusive in a UnitedDeployment.
                           x-kubernetes-int-or-string: true
                         tolerations:
-                          description: Indicates the tolerations the pods under this
-                            subset have. A subset's tolerations is not allowed to
-                            be updated.
+                          description: |-
+                            Indicates the tolerations the pods under this subset have.
+                            A subset's tolerations is not allowed to be updated.
                           items:
-                            description: The pod this Toleration is attached to tolerates
-                              any taint that matches the triple <key,value,effect>
-                              using the matching operator <operator>.
+                            description: |-
+                              The pod this Toleration is attached to tolerates any taint that matches
+                              the triple <key,value,effect> using the matching operator <operator>.
                             properties:
                               effect:
-                                description: Effect indicates the taint effect to
-                                  match. Empty means match all taint effects. When
-                                  specified, allowed values are NoSchedule, PreferNoSchedule
-                                  and NoExecute.
+                                description: |-
+                                  Effect indicates the taint effect to match. Empty means match all taint effects.
+                                  When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
                                 type: string
                               key:
-                                description: Key is the taint key that the toleration
-                                  applies to. Empty means match all taint keys. If
-                                  the key is empty, operator must be Exists; this
-                                  combination means to match all values and all keys.
+                                description: |-
+                                  Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                                  If the key is empty, operator must be Exists; this combination means to match all values and all keys.
                                 type: string
                               operator:
-                                description: Operator represents a key's relationship
-                                  to the value. Valid operators are Exists and Equal.
-                                  Defaults to Equal. Exists is equivalent to wildcard
-                                  for value, so that a pod can tolerate all taints
-                                  of a particular category.
+                                description: |-
+                                  Operator represents a key's relationship to the value.
+                                  Valid operators are Exists and Equal. Defaults to Equal.
+                                  Exists is equivalent to wildcard for value, so that a pod can
+                                  tolerate all taints of a particular category.
                                 type: string
                               tolerationSeconds:
-                                description: TolerationSeconds represents the period
-                                  of time the toleration (which must be of effect
-                                  NoExecute, otherwise this field is ignored) tolerates
-                                  the taint. By default, it is not set, which means
-                                  tolerate the taint forever (do not evict). Zero
-                                  and negative values will be treated as 0 (evict
-                                  immediately) by the system.
+                                description: |-
+                                  TolerationSeconds represents the period of time the toleration (which must be
+                                  of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                                  it is not set, which means tolerate the taint forever (do not evict). Zero and
+                                  negative values will be treated as 0 (evict immediately) by the system.
                                 format: int64
                                 type: integer
                               value:
-                                description: Value is the taint value the toleration
-                                  matches to. If the operator is Exists, the value
-                                  should be empty, otherwise just a regular string.
+                                description: |-
+                                  Value is the taint value the toleration matches to.
+                                  If the operator is Exists, the value should be empty, otherwise just a regular string.
                                 type: string
                             type: object
                           type: array
@@ -1152,8 +1093,9 @@ spec:
                     type: array
                 type: object
               updateStrategy:
-                description: UpdateStrategy indicates the strategy the UnitedDeployment
-                  use to preform the update, when template is changed.
+                description: |-
+                  UpdateStrategy indicates the strategy the UnitedDeployment use to preform the update,
+                  when template is changed.
                 properties:
                   manualUpdate:
                     description: Includes all of the parameters a Manual update strategy
@@ -1167,8 +1109,9 @@ spec:
                         type: object
                     type: object
                   type:
-                    description: Type of UnitedDeployment update strategy. Default
-                      is Manual.
+                    description: |-
+                      Type of UnitedDeployment update strategy.
+                      Default is Manual.
                     type: string
                 type: object
             required:
@@ -1178,9 +1121,10 @@ spec:
             description: UnitedDeploymentStatus defines the observed state of UnitedDeployment.
             properties:
               collisionCount:
-                description: Count of hash collisions for the UnitedDeployment. The
-                  UnitedDeployment controller uses this field as a collision avoidance
-                  mechanism when it needs to create the name for the newest ControllerRevision.
+                description: |-
+                  Count of hash collisions for the UnitedDeployment. The UnitedDeployment controller
+                  uses this field as a collision avoidance mechanism when it needs to
+                  create the name for the newest ControllerRevision.
                 format: int32
                 type: integer
               conditions:
@@ -1219,9 +1163,9 @@ spec:
                   that should match the replica count used by HPA.
                 type: string
               observedGeneration:
-                description: ObservedGeneration is the most recent generation observed
-                  for this UnitedDeployment. It corresponds to the UnitedDeployment's
-                  generation, which is updated on mutation by the API Server.
+                description: |-
+                  ObservedGeneration is the most recent generation observed for this UnitedDeployment. It corresponds to the
+                  UnitedDeployment's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
               readyReplicas:
