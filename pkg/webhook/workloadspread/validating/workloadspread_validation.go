@@ -195,7 +195,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 
 		if len(spec.Subsets) > 1 && spec.Subsets[len(spec.Subsets)-1].MaxReplicas != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive"),
-				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the last subset must be not specified when using adaptive scheduleStrategy"))
+				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the last subset's maxReplicas must be not specified when using adaptive scheduleStrategy"))
 		}
 
 		allowedMaxSeconds := int32(math.MaxInt32)
