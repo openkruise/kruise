@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilretry "k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -112,9 +113,15 @@ func TestRevisionManage(t *testing.T) {
 	g.Expect(c.List(context.TODO(), revisionList, &client.ListOptions{})).Should(gomega.BeNil())
 	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(1))
 
-	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	instance.Spec.Template.StatefulSetTemplate.Labels["version"] = "v2"
-	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
+	err = utilretry.RetryOnConflict(utilretry.DefaultRetry, func() error {
+		if err := c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance); err != nil {
+			return err
+		}
+		instance.Spec.Template.StatefulSetTemplate.Labels["version"] = "v2"
+		return c.Update(context.TODO(), instance)
+	})
+
+	g.Expect(err).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 0)
 
 	revisionList = &appsv1.ControllerRevisionList{}
