@@ -1,5 +1,21 @@
 # Change Log
 
+## v1.6.1
+> Change log since v1.6.0
+
+### Upgrade Notice
+- FeatureGate PodWebhook=false will not disable ResourcesDeletionProtection. ([#1526](https://github.com/openkruise/kruise/pull/1526), [@zmberg](https://github.com/zmberg))
+- Update go.mod require k8s version from 1.29 to 1.26, and remove go mod replace. ([#1527](https://github.com/openkruise/kruise/pull/1527), [KaiShi](https://github.com/BH4AWS))
+
+### Advanced Workload
+- Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
+
+## v1.5.3
+> Chang log since v1.5.2
+
+### Advanced Workload
+- Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
+
 ## v1.6.0
 > Change log since v1.5.2
 
