@@ -23,7 +23,6 @@ Table of Contents
     - [2. The behavior of progressDeadlineSeconds](#2the-behavior-of-progressDeadlineSeconds)
     - [3. handle the logic](#2handle-the-logic)
 
-
 ## Motivation
 
 `.spec.progressDeadlineSeconds` is an optional field in Deployment that specifies the number of seconds one wants to wait for their Deployment to progress before the system reports back that the Deployment has failed progressing.
@@ -35,10 +34,10 @@ reason: ProgressDeadlineExceeded
 ```
 
 This is useful for users to control the progress of the deployment.
-So we should add support for `progressDeadlineSeconds` in CloneSet as well. 
+So we should add support for `progressDeadlineSeconds` in CloneSet as well.
 
 ## Proposal
-Firstly, add the `progressDeadlineSeconds` field to the CloneSetSpec. 
+Firstly, add the `progressDeadlineSeconds` field to the CloneSetSpec.
 Then add the handle logic in cloneSet controller to handle the `progressDeadlineSeconds` field.
 
 ### 1. add .spec.progressDeadlineSeconds field
@@ -72,7 +71,7 @@ Here are two possible interpretations of `progressDeadlineSeconds` in the contex
 These interpretations are open for discussion and we welcome feedback from the community to make a decision.
 
 ### 3. handle the logic
-In cloneset controller, we should add the logic to handle the `progressDeadlineSeconds` field. 
+In cloneset controller, we should add the logic to handle the `progressDeadlineSeconds` field.
 ```go
 func (c *CloneSetController) syncCloneSetStatus(cloneSet *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
     ...
