@@ -18,6 +18,8 @@ package podreadiness
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -27,7 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -107,34 +109,43 @@ func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.R
 		}
 	}()
 
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		pod := &v1.Pod{}
-		err = r.Get(context.TODO(), request.NamespacedName, pod)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Object not found, return.  Created objects are automatically garbage collected.
-				// For additional cleanup logic use finalizers.
-				return nil
-			}
-			// Error reading the object - requeue the request.
-			return err
+	pod := &v1.Pod{}
+	err = r.Get(context.TODO(), request.NamespacedName, pod)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Object not found, return.  Created objects are automatically garbage collected.
+			// For additional cleanup logic use finalizers.
+			return reconcile.Result{}, nil
 		}
-		if pod.DeletionTimestamp != nil {
-			return nil
-		}
-		if !utilpodreadiness.ContainsReadinessGate(pod) {
-			return nil
-		}
-		if utilpodreadiness.GetReadinessCondition(pod) != nil {
-			return nil
-		}
+		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
+	}
+	if pod.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
+	if !utilpodreadiness.ContainsReadinessGate(pod) {
+		return reconcile.Result{}, nil
+	}
+	if utilpodreadiness.GetReadinessCondition(pod) != nil {
+		return reconcile.Result{}, nil
+	}
 
-		pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
-			Type:               appspub.KruisePodReadyConditionType,
-			Status:             v1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-		})
-		return r.Status().Update(context.TODO(), pod)
-	})
-	return reconcile.Result{}, err
+	// patch pod condition
+	status := v1.PodStatus{
+		Conditions: []v1.PodCondition{
+			{
+				Type:               appspub.KruisePodReadyConditionType,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+			},
+		},
+	}
+	by, _ := json.Marshal(status)
+	patchBody := fmt.Sprintf(`{"status":%s}`, string(by))
+	rcvObject := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name}}
+
+	if err := r.Status().Patch(context.TODO(), rcvObject, client.RawPatch(types.StrategicMergePatchType, []byte(patchBody))); err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to patch pod status: %v", err)
+	}
+	return reconcile.Result{}, nil
 }
