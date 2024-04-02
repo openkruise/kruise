@@ -1,5 +1,23 @@
 # Change Log
 
+## v1.6.2
+> Change log since v1.6.1
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.5.4
+> Chang log since v1.5.3
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.4.2
+> Change log since v1.4.1
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
 ## v1.6.1
 > Change log since v1.6.0
 
@@ -149,7 +167,7 @@ And some bugs were fixed by
 ([#1348](https://github.com/openkruise/kruise/pull/1348), [#1343](https://github.com/openkruise/kruise/pull/1343), [Colvin-Y](https://github.com/Colvin-Y)),
 thanks!
 
-## v.1.4.1
+## v1.4.1
 > Change log since v1.4.0
 
 ### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
