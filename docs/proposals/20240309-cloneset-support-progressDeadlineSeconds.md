@@ -20,7 +20,8 @@ Table of Contents
   - [Motivation](#motivation)
   - [Proposal](#proposal)
     - [1. add .spec.progressDeadlineSeconds field](#1add-.spec.progressDeadlineSeconds-field)
-    - [2. handle the logic](#2handle-the-logic)
+    - [2. The behavior of progressDeadlineSeconds](#2the-behavior-of-progressDeadlineSeconds)
+    - [3. handle the logic](#2handle-the-logic)
 
 
 ## Motivation
@@ -62,7 +63,15 @@ spec:
             image: nginx:1.14.2
  ```
 
-### 2. handle the logic
+### 2. The behavior of progressDeadlineSeconds
+However, the behavior of `progressDeadlineSeconds` in CloneSet might differ from its behavior in Deployment due to the support of partition in CloneSet. If a CloneSet is paused due to partition, it's debatable whether the paused time should be included in the progress deadline.
+Here are two possible interpretations of `progressDeadlineSeconds` in the context of CloneSet:
+1. `progressDeadlineSeconds` could be redefined as the time taken for the CloneSet to reach completion or the "paused" state due to partition. In this case, the time during which the CloneSet is paused would be included in the progress deadline.
+2. Secondly, `progressDeadlineSeconds` could only be supported if the partition is not set. This means that if a partition is set, the `progressDeadlineSeconds` field would not be applicable or has no effect.
+
+These interpretations are open for discussion and we welcome feedback from the community to make a decision.
+
+### 3. handle the logic
 In cloneset controller, we should add the logic to handle the `progressDeadlineSeconds` field. 
 ```go
 func (c *CloneSetController) syncCloneSetStatus(cloneSet *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
@@ -74,6 +83,14 @@ func (c *CloneSetController) syncCloneSetStatus(cloneSet *appsv1alpha1.CloneSet,
 }
 ```
 And we check the progress of the CloneSet in the `syncCloneSetStatus` function. If the progress exceeds the `progressDeadlineSeconds`, we should add a CloneSetCondition to the CloneSet's `.status.conditions`:
+
+```go
+const (
+    CloneSetProgressDeadlineExceeded CloneSetConditionReason = "ProgressDeadlineExceeded"
+    CloneSetConditionTypeProgressing CloneSetConditionType = "Progressing"
+)
+```
+
 ```go
 func (c *CloneSetController) syncCloneSetStatus(cloneSet *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
     ...
