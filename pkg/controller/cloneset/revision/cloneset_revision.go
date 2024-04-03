@@ -23,6 +23,8 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -69,6 +71,7 @@ func (c *realControl) NewRevision(cs *appsv1alpha1.CloneSet, revision int64, col
 	for key, value := range cs.Annotations {
 		cr.ObjectMeta.Annotations[key] = value
 	}
+	volumeclaimtemplate.PatchVCTemplateHash(cr, cs.Spec.VolumeClaimTemplates)
 	return cr, nil
 }
 

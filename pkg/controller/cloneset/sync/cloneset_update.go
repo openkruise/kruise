@@ -249,7 +249,6 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 				break
 			}
 		}
-
 		if c.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, coreControl.GetUpdateOptions()) {
 			switch state := lifecycle.GetPodLifecycleState(pod); state {
 			case "", appspub.LifecycleStatePreparingNormal, appspub.LifecycleStateNormal:

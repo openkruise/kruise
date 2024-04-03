@@ -39,6 +39,8 @@ import (
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
+	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,7 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
+	klog "k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -427,14 +429,32 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 		return nil, nil, collisionCount, err
 	}
 
+	// Here, we do not consider the case where the volumeClaimTemplates Hash was not added before the upgrade feature.
+	// 1. It is not possible to actually extract the previous volumeClaimTemplates Hash.
+	// 2. the hash must exist in all revisions that have been updated after the feature is enabled.
+	VCTHashEqual := func(revision *apps.ControllerRevision, needle *apps.ControllerRevision) bool {
+		needleVolumeClaimHash, _ := volumeclaimtemplate.GetVCTemplatesHash(needle)
+		tmpHash, exist := volumeclaimtemplate.GetVCTemplatesHash(revision)
+		// vcTemplate hash may not exist in old revision, use hash of new revision instead
+		if !exist || tmpHash != needleVolumeClaimHash {
+			return false
+		}
+		return true
+	}
+
+	// When there is a change in the PVC only, no new revision will be generated.
 	// find any equivalent revisions
 	equalRevisions := history.FindEqualRevisions(revisions, updateRevision)
 	equalCount := len(equalRevisions)
-
 	if equalCount > 0 && history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
 		// if the equivalent revision is immediately prior the update revision has not changed
 		updateRevision = revisions[revisionCount-1]
 	} else if equalCount > 0 {
+		lastEqualRevision := equalRevisions[equalCount-1]
+		if !VCTHashEqual(lastEqualRevision, updateRevision) {
+			klog.Infof("revision %v vct hash will be updated from %v to %v", lastEqualRevision.Name, lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation], updateRevision.Annotations[volumeclaimtemplate.HashAnnotation])
+			lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation] = updateRevision.Annotations[volumeclaimtemplate.HashAnnotation]
+		}
 		// if the equivalent revision is not immediately prior we will roll back by incrementing the
 		// Revision of the equivalent revision
 		updateRevision, err = r.controllerHistory.UpdateControllerRevision(equalRevisions[equalCount-1], updateRevision.Revision)

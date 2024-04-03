@@ -116,6 +116,9 @@ const (
 
 	// Enables a enhanced livenessProbe solution
 	EnhancedLivenessProbeGate featuregate.Feature = "EnhancedLivenessProbe"
+
+	// RecreatePodWhenChangeVCTInCloneSetGate recreate the pod upon changing volume claim templates in a clone set to ensure PVC consistency.
+	RecreatePodWhenChangeVCTInCloneSetGate featuregate.Feature = "RecreatePodWhenChangeVCTInCloneSetGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -145,7 +148,8 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate: {Default: false, PreRelease: featuregate.Alpha},
 
-	EnhancedLivenessProbeGate: {Default: false, PreRelease: featuregate.Alpha},
+	EnhancedLivenessProbeGate:              {Default: false, PreRelease: featuregate.Alpha},
+	RecreatePodWhenChangeVCTInCloneSetGate: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
