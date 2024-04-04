@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: broadcastjobs.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -48,14 +47,19 @@ spec:
         description: BroadcastJob is the Schema for the broadcastjobs API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -63,31 +67,34 @@ spec:
             description: BroadcastJobSpec defines the desired state of BroadcastJob
             properties:
               completionPolicy:
-                description: CompletionPolicy indicates the completion policy of the
-                  job. Default is Always CompletionPolicyType.
+                description: |-
+                  CompletionPolicy indicates the completion policy of the job.
+                  Default is Always CompletionPolicyType.
                 properties:
                   activeDeadlineSeconds:
-                    description: ActiveDeadlineSeconds specifies the duration in seconds
-                      relative to the startTime that the job may be active before
-                      the system tries to terminate it; value must be positive integer.
+                    description: |-
+                      ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active
+                      before the system tries to terminate it; value must be positive integer.
                       Only works for Always type.
                     format: int64
                     type: integer
                   ttlSecondsAfterFinished:
-                    description: ttlSecondsAfterFinished limits the lifetime of a
-                      Job that has finished execution (either Complete or Failed).
-                      If this field is set, ttlSecondsAfterFinished after the Job
-                      finishes, it is eligible to be automatically deleted. When the
-                      Job is being deleted, its lifecycle guarantees (e.g. finalizers)
-                      will be honored. If this field is unset, the Job won't be automatically
-                      deleted. If this field is set to zero, the Job becomes eligible
-                      to be deleted immediately after it finishes. This field is alpha-level
-                      and is only honored by servers that enable the TTLAfterFinished
-                      feature. Only works for Always type
+                    description: |-
+                      ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+                      execution (either Complete or Failed). If this field is set,
+                      ttlSecondsAfterFinished after the Job finishes, it is eligible to be
+                      automatically deleted. When the Job is being deleted, its lifecycle
+                      guarantees (e.g. finalizers) will be honored. If this field is unset,
+                      the Job won't be automatically deleted. If this field is set to zero,
+                      the Job becomes eligible to be deleted immediately after it finishes.
+                      This field is alpha-level and is only honored by servers that enable the
+                      TTLAfterFinished feature.
+                      Only works for Always type
                     format: int32
                     type: integer
                   type:
-                    description: Type indicates the type of the CompletionPolicy.
+                    description: |-
+                      Type indicates the type of the CompletionPolicy.
                       Default is Always.
                     type: string
                 type: object
@@ -101,19 +108,20 @@ spec:
                     format: int32
                     type: integer
                   type:
-                    description: Type indicates the type of FailurePolicyType. Default
-                      is FailurePolicyTypeFailFast.
+                    description: |-
+                      Type indicates the type of FailurePolicyType.
+                      Default is FailurePolicyTypeFailFast.
                     type: string
                 type: object
               parallelism:
                 anyOf:
                 - type: integer
                 - type: string
-                description: Parallelism specifies the maximum desired number of pods
-                  the job should run at any given time. The actual number of pods
-                  running in steady state will be less than this number when the work
-                  left to do is less than max parallelism. Not setting this value
-                  means no limit.
+                description: |-
+                  Parallelism specifies the maximum desired number of pods the job should
+                  run at any given time. The actual number of pods running in steady state will
+                  be less than this number when the work left to do is less than max parallelism.
+                  Not setting this value means no limit.
                 x-kubernetes-int-or-string: true
               paused:
                 description: Paused will pause the job.
@@ -133,8 +141,9 @@ spec:
                 format: int32
                 type: integer
               completionTime:
-                description: Represents time when the job was completed. It is not
-                  guaranteed to be set in happens-before order across separate operations.
+                description: |-
+                  Represents time when the job was completed. It is not guaranteed to
+                  be set in happens-before order across separate operations.
                   It is represented in RFC3339 form and is in UTC.
                 format: date-time
                 type: string
@@ -184,10 +193,10 @@ spec:
                 description: The phase of the job.
                 type: string
               startTime:
-                description: Represents time when the job was acknowledged by the
-                  job controller. It is not guaranteed to be set in happens-before
-                  order across separate operations. It is represented in RFC3339 form
-                  and is in UTC.
+                description: |-
+                  Represents time when the job was acknowledged by the job controller.
+                  It is not guaranteed to be set in happens-before order across separate operations.
+                  It is represented in RFC3339 form and is in UTC.
                 format: date-time
                 type: string
               succeeded:
