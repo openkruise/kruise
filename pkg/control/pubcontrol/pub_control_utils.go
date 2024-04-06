@@ -59,15 +59,15 @@ const (
 // 1. allowed(bool) indicates whether to allow this update operation
 // 2. err(error)
 func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.PubOperation, username string, dryRun bool) (allowed bool, reason string, err error) {
-	klog.V(3).Infof("validating pod(%s/%s) operation(%s) for PodUnavailableBudget", pod.Namespace, pod.Name, operation)
+	klog.V(3).InfoS("Validated pod operation for podUnavailableBudget", "pod", klog.KObj(pod), "operation", operation)
 	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
 	// and will no longer check the pub quota
 	if pod.Annotations[policyv1alpha1.PodPubNoProtectionAnnotation] == "true" {
-		klog.V(3).Infof("pod(%s/%s) contains annotations[%s]=true, then don't need check pub", pod.Namespace, pod.Name, policyv1alpha1.PodPubNoProtectionAnnotation)
+		klog.V(3).InfoS("Pod contained annotations=true, then didn't need check pub", "pod", klog.KObj(pod), "annotations", policyv1alpha1.PodPubNoProtectionAnnotation)
 		return true, "", nil
 		// If the pod is not ready or state is inconsistent, it doesn't count towards healthy and we should not decrement
 	} else if !PubControl.IsPodReady(pod) || !PubControl.IsPodStateConsistent(pod) {
-		klog.V(3).Infof("pod(%s/%s) is not ready or state is inconsistent, then don't need check pub", pod.Namespace, pod.Name)
+		klog.V(3).InfoS("Pod was not ready or state was inconsistent, then didn't need check pub", "pod", klog.KObj(pod))
 		return true, "", nil
 	}
 
@@ -82,11 +82,11 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 	} else if pub.Status.DesiredAvailable == 0 {
 		return true, "", nil
 	} else if !isNeedPubProtection(pub, operation) {
-		klog.V(3).Infof("pod(%s/%s) operation(%s) is not in pub(%s) protection", pod.Namespace, pod.Name, operation, pub.Name)
+		klog.V(3).InfoS("Pod operation was not in pub protection", "pod", klog.KObj(pod), "operation", operation, "pubName", pub.Name)
 		return true, "", nil
 		// pod is in pub.Status.DisruptedPods or pub.Status.UnavailablePods, then don't need check it
 	} else if isPodRecordedInPub(pod.Name, pub) {
-		klog.V(3).Infof("pod(%s/%s) already is recorded in pub(%s/%s)", pod.Namespace, pod.Name, pub.Namespace, pub.Name)
+		klog.V(3).InfoS("Pod was already recorded in pub", "pod", klog.KObj(pod), "pub", klog.KObj(pub))
 		return true, "", nil
 	}
 	// check and decrement pub quota
@@ -103,14 +103,14 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1alpha1().
 				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
 			if err != nil {
-				klog.Errorf("Get PodUnavailableBudget(%s/%s) failed form etcd: %s", pub.Namespace, pub.Name, err.Error())
+				klog.ErrorS(err, "Failed to get podUnavailableBudget form etcd", "pub", klog.KObj(pub))
 				return err
 			}
 		} else {
 			// compare local cache and informer cache, then get the newer one
 			item, _, err := util.GlobalCache.Get(pub)
 			if err != nil {
-				klog.Errorf("Get cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
+				klog.ErrorS(err, "Failed to get cache for podUnavailableBudget", "pub", klog.KObj(pub))
 			}
 			if localCached, ok := item.(*policyv1alpha1.PodUnavailableBudget); ok {
 				pubClone = localCached.DeepCopy()
@@ -155,18 +155,18 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 
 		// If this is a dry-run, we don't need to go any further than that.
 		if dryRun {
-			klog.V(3).Infof("pod(%s) operation for pub(%s/%s) is a dry run", pod.Name, pubClone.Namespace, pubClone.Name)
+			klog.V(3).InfoS("Pod operation for pub was a dry run", "pod", klog.KObj(pod), "pub", klog.KObj(pubClone))
 			return nil
 		}
-		klog.V(3).Infof("pub(%s/%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
-			pubClone.Namespace, pubClone.Name, len(pubClone.Status.DisruptedPods), len(pubClone.Status.UnavailablePods),
-			pubClone.Status.TotalReplicas, pubClone.Status.DesiredAvailable, pubClone.Status.CurrentAvailable, pubClone.Status.UnavailableAllowed)
+		klog.V(3).InfoS("Updated pub status", "pub", klog.KObj(pubClone), "disruptedPods", len(pubClone.Status.DisruptedPods),
+			"unavailablePods", len(pubClone.Status.UnavailablePods), "expectedCount", pubClone.Status.TotalReplicas, "desiredAvailable",
+			pubClone.Status.DesiredAvailable, "currentAvailable", pubClone.Status.CurrentAvailable, "unavailableAllowed", pubClone.Status.UnavailableAllowed)
 		start = time.Now()
 		err = kclient.Status().Update(context.TODO(), pubClone)
 		costOfUpdate += time.Since(start)
 		if err == nil {
 			if err = util.GlobalCache.Add(pubClone); err != nil {
-				klog.Errorf("Add cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
+				klog.ErrorS(err, "Failed to add cache for podUnavailableBudget", "pub", klog.KObj(pub))
 			}
 			return nil
 		}
@@ -175,18 +175,20 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 		refresh = true
 		return err
 	})
-	klog.V(3).Infof("Webhook cost of pub(%s/%s): conflict times %v, cost of Get %v, cost of Update %v",
-		pub.Namespace, pub.Name, conflictTimes, costOfGet, costOfUpdate)
+	klog.V(3).InfoS("Webhook cost of pub", "pub", klog.KObj(pub),
+		"conflictTimes", conflictTimes, "costOfGet", costOfGet, "costOfUpdate", costOfUpdate)
 	if err != nil && err != wait.ErrWaitTimeout {
-		klog.V(3).Infof("pod(%s/%s) operation(%s) for pub(%s/%s) failed: %s", pod.Namespace, pod.Name, operation, pub.Namespace, pub.Name, err.Error())
+		klog.V(3).InfoS("Pod operation for pub failed", "pod", klog.KObj(pod), "operation", operation,
+			"pub", klog.KObj(pub), "error", err)
 		return false, err.Error(), nil
 	} else if err == wait.ErrWaitTimeout {
 		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodUnavailableBudget %s due to conflicts", pub.Name), 10)
-		klog.Errorf("pod(%s/%s) operation(%s) failed: %s", pod.Namespace, pod.Name, operation, err.Error())
+		klog.ErrorS(err, "Pod operation failed", "pod", klog.KObj(pod), "operation", operation)
 		return false, err.Error(), nil
 	}
 
-	klog.V(3).Infof("admit pod(%s/%s) operation(%s) for pub(%s/%s)", pod.Namespace, pod.Name, operation, pub.Namespace, pub.Name)
+	klog.V(3).InfoS("Admitted pod operation for pub", "pod", klog.KObj(pod),
+		"operation", operation, "pub", klog.KObj(pub))
 	return true, "", nil
 }
 
@@ -209,10 +211,10 @@ func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget,
 
 	if operation == policyv1alpha1.PubUpdateOperation {
 		pub.Status.UnavailablePods[podName] = metav1.Time{Time: time.Now()}
-		klog.V(3).Infof("pod(%s) is recorded in pub(%s/%s) UnavailablePods", podName, pub.Namespace, pub.Name)
+		klog.V(3).InfoS("Pod was recorded in pub unavailablePods", "podName", podName, "pub", klog.KObj(pub))
 	} else {
 		pub.Status.DisruptedPods[podName] = metav1.Time{Time: time.Now()}
-		klog.V(3).Infof("pod(%s) is recorded in pub(%s/%s) DisruptedPods", podName, pub.Namespace, pub.Name)
+		klog.V(3).InfoS("Pod was recorded in pub disruptedPods", "podName", podName, "pub", klog.KObj(pub))
 	}
 	return nil
 }

@@ -57,7 +57,7 @@ func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
 func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool {
 	// If pod.spec changed, pod will be in unavailable condition
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
-		klog.V(3).Infof("pod(%s/%s) specification changed, and maybe cause unavailability", newPod.Namespace, newPod.Name)
+		klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
 		return true
 	}
 	// pod add unavailable label
@@ -80,13 +80,13 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
 		return matchedPods, expectedCount, err
 	} else if pub.Spec.Selector == nil {
-		klog.Warningf("pub(%s/%s) spec.Selector cannot be empty", pub.Namespace, pub.Name)
+		klog.InfoS("Pub spec.Selector could not be empty", "pub", klog.KObj(pub))
 		return nil, 0, nil
 	}
 	// get pods for selector
 	labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
 	if err != nil {
-		klog.Warningf("pub(%s/%s) ValidatedLabelSelectorAsSelector failed: %s", pub.Namespace, pub.Name, err.Error())
+		klog.InfoS("Pub ValidatedLabelSelectorAsSelector failed", "pub", klog.KObj(pub), "error", err)
 		return nil, 0, nil
 	}
 	listOptions = &client.ListOptions{Namespace: pub.Namespace, LabelSelector: labelSelector}
@@ -125,7 +125,7 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 		}
 
 		if !util.IsPodContainerDigestEqual(sets.NewString(container.Name), pod) {
-			klog.V(5).Infof("pod(%s/%s) container(%s) image is inconsistent", pod.Namespace, pod.Name, container.Name)
+			klog.V(5).InfoS("Pod container image was inconsistent", "pod", klog.KObj(pod), "containerName", container.Name)
 			return false
 		}
 	}
@@ -138,14 +138,14 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 	sidecarSets, sidecars := getSidecarSetsInPod(pod)
 	if sidecarSets.Len() > 0 && sidecars.Len() > 0 {
 		if !sidecarcontrol.IsSidecarContainerUpdateCompleted(pod, sidecarSets, sidecars) {
-			klog.V(5).Infof("PodUnavailableBudget check Pod(%s/%s) is inconsistent", pod.Namespace, pod.Name)
+			klog.V(5).InfoS("PodUnavailableBudget check pod was inconsistent", "pod", klog.KObj(pod))
 			return false
 		}
 	}
 
 	// whether other containers is consistent
 	if err := inplaceupdate.DefaultCheckInPlaceUpdateCompleted(pod); err != nil {
-		klog.V(5).Infof("check pod(%s/%s) InPlaceUpdate failed: %s", pod.Namespace, pod.Name, err.Error())
+		klog.V(5).InfoS("Failed to check pod InPlaceUpdate", "pod", klog.KObj(pod), "error", err)
 		return false
 	}
 
@@ -161,7 +161,7 @@ func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavai
 	err := c.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pubName}, pub)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Warningf("pod(%s/%s) pub(%s) Is NotFound", pod.Namespace, pod.Name, pubName)
+			klog.InfoS("Pod pub was NotFound", "pod", klog.KObj(pod), "pubName", pubName)
 			return nil, nil
 		}
 		return nil, err

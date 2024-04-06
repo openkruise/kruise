@@ -192,12 +192,12 @@ func (r *realControl) GetHistorySidecarSet(sidecarSet *appsv1alpha1.SidecarSet, 
 	clone := sidecarSet.DeepCopy()
 	cloneBytes, err := runtime.Encode(patchCodec, clone)
 	if err != nil {
-		klog.Errorf("Failed to encode sidecarSet(%v), error: %v", sidecarSet.Name, err)
+		klog.ErrorS(err, "Failed to encode sidecarSet", "sidecarSet", klog.KRef("", sidecarSet.Name))
 		return nil, err
 	}
 	patched, err := strategicpatch.StrategicMergePatch(cloneBytes, revision.Data.Raw, clone)
 	if err != nil {
-		klog.Errorf("Failed to merge sidecarSet(%v) and controllerRevision(%v), error: %v", sidecarSet.Name, revision.Name, err)
+		klog.ErrorS(err, "Failed to merge sidecarSet and controllerRevision", "sidecarSet", klog.KRef("", sidecarSet.Name), "controllerRevision", klog.KRef("", revision.Name))
 		return nil, err
 	}
 	// restore history from patch
@@ -224,7 +224,7 @@ func (r *realControl) getControllerRevision(set *appsv1alpha1.SidecarSet, revisi
 			Name:      *revisionInfo.RevisionName,
 		}
 		if err := r.Client.Get(context.TODO(), revisionKey, revision); err != nil {
-			klog.Errorf("Failed to get ControllerRevision %v for SidecarSet(%v), err: %v", *revisionInfo.RevisionName, set.Name, err)
+			klog.ErrorS(err, "Failed to get controllerRevision for sidecarSet", "controllerRevision", klog.KRef("", *revisionInfo.RevisionName), "sidecarSet", klog.KRef("", set.Name))
 			return nil, err
 		}
 		return revision, nil
@@ -237,7 +237,8 @@ func (r *realControl) getControllerRevision(set *appsv1alpha1.SidecarSet, revisi
 		}
 		revisionList := &apps.ControllerRevisionList{}
 		if err := r.Client.List(context.TODO(), revisionList, listOpts...); err != nil {
-			klog.Errorf("Failed to get ControllerRevision for SidecarSet(%v), custom version: %v, err: %v", set.Name, *revisionInfo.CustomVersion, err)
+			klog.ErrorS(err, "Failed to get controllerRevision for sidecarSet", "controllerRevision", klog.KRef("", *revisionInfo.CustomVersion),
+				"sidecarSet", klog.KRef("", set.Name), "customVersion", *revisionInfo.CustomVersion)
 			return nil, err
 		}
 
@@ -253,7 +254,7 @@ func (r *realControl) getControllerRevision(set *appsv1alpha1.SidecarSet, revisi
 		return revisions[len(revisions)-1], nil
 	}
 
-	klog.Error("Failed to get controllerRevision due to both empty RevisionName and CustomVersion")
+	klog.ErrorS(fmt.Errorf("Failed to get controllerRevision due to both empty revisionName and customVersion"), "Failed to get controllerRevision")
 	return nil, nil
 }
 
