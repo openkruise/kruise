@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: podunavailablebudgets.policy.kruise.io
 spec:
   group: policy.kruise.io
@@ -42,14 +41,19 @@ spec:
           API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -60,20 +64,18 @@ spec:
                 anyOf:
                 - type: integer
                 - type: string
-                description: Delete pod, evict pod or update pod specification is
-                  allowed if at most "maxUnavailable" pods selected by "selector"
-                  or "targetRef"  are unavailable after the above operation for pod.
-                  MaxUnavailable and MinAvailable are mutually exclusive, MaxUnavailable
-                  is priority to take effect
+                description: |-
+                  Delete pod, evict pod or update pod specification is allowed if at most "maxUnavailable" pods selected by
+                  "selector" or "targetRef"  are unavailable after the above operation for pod.
+                  MaxUnavailable and MinAvailable are mutually exclusive, MaxUnavailable is priority to take effect
                 x-kubernetes-int-or-string: true
               minAvailable:
                 anyOf:
                 - type: integer
                 - type: string
-                description: Delete pod, evict pod or update pod specification is
-                  allowed if at least "minAvailable" pods selected by "selector" or
-                  "targetRef" will still be available after the above operation for
-                  pod.
+                description: |-
+                  Delete pod, evict pod or update pod specification is allowed if at least "minAvailable" pods selected by
+                  "selector" or "targetRef" will still be available after the above operation for pod.
                 x-kubernetes-int-or-string: true
               selector:
                 description: Selector label query over pods managed by the budget
@@ -82,24 +84,24 @@ spec:
                     description: matchExpressions is a list of label selector requirements.
                       The requirements are ANDed.
                     items:
-                      description: A label selector requirement is a selector that
-                        contains values, a key, and an operator that relates the key
-                        and values.
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
                       properties:
                         key:
                           description: key is the label key that the selector applies
                             to.
                           type: string
                         operator:
-                          description: operator represents a key's relationship to
-                            a set of values. Valid operators are In, NotIn, Exists
-                            and DoesNotExist.
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
                           type: string
                         values:
-                          description: values is an array of string values. If the
-                            operator is In or NotIn, the values array must be non-empty.
-                            If the operator is Exists or DoesNotExist, the values
-                            array must be empty. This array is replaced during a strategic
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
                             merge patch.
                           items:
                             type: string
@@ -112,18 +114,17 @@ spec:
                   matchLabels:
                     additionalProperties:
                       type: string
-                    description: matchLabels is a map of {key,value} pairs. A single
-                      {key,value} in the matchLabels map is equivalent to an element
-                      of matchExpressions, whose key field is "key", the operator
-                      is "In", and the values array contains only "value". The requirements
-                      are ANDed.
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
               targetRef:
-                description: TargetReference contains enough information to let you
-                  identify an workload for PodUnavailableBudget Selector and TargetReference
-                  are mutually exclusive, TargetReference is priority to take effect
+                description: |-
+                  TargetReference contains enough information to let you identify an workload for PodUnavailableBudget
+                  Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -153,14 +154,14 @@ spec:
                 additionalProperties:
                   format: date-time
                   type: string
-                description: DisruptedPods contains information about pods whose eviction
-                  or deletion was processed by the API handler but has not yet been
-                  observed by the PodUnavailableBudget.
+                description: |-
+                  DisruptedPods contains information about pods whose eviction or deletion was
+                  processed by the API handler but has not yet been observed by the PodUnavailableBudget.
                 type: object
               observedGeneration:
-                description: Most recent generation observed when updating this PUB
-                  status. UnavailableAllowed and other status information is valid
-                  only if observedGeneration equals to PUB's object generation.
+                description: |-
+                  Most recent generation observed when updating this PUB status. UnavailableAllowed and other
+                  status information is valid only if observedGeneration equals to PUB's object generation.
                 format: int64
                 type: integer
               totalReplicas:
@@ -177,9 +178,9 @@ spec:
                 additionalProperties:
                   format: date-time
                   type: string
-                description: UnavailablePods contains information about pods whose
-                  specification changed(inplace-update pod), once pod is available(consistent
-                  and ready) again, it will be removed from the list.
+                description: |-
+                  UnavailablePods contains information about pods whose specification changed(inplace-update pod),
+                  once pod is available(consistent and ready) again, it will be removed from the list.
                 type: object
             required:
             - currentAvailable

@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: ephemeraljobs.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -55,14 +54,19 @@ spec:
         description: EphemeralJob is the Schema for the ephemeraljobs API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -70,10 +74,10 @@ spec:
             description: EphemeralJobSpec defines the desired state of EphemeralJob
             properties:
               activeDeadlineSeconds:
-                description: ActiveDeadlineSeconds specifies the duration in seconds
-                  relative to the startTime that the job may be active before the
-                  system tries to terminate it; value must be positive integer. Only
-                  works for Always type.
+                description: |-
+                  ActiveDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be active
+                  before the system tries to terminate it; value must be positive integer.
+                  Only works for Always type.
                 format: int64
                 type: integer
               parallelism:
@@ -85,39 +89,40 @@ spec:
                 description: Paused will pause the ephemeral job.
                 type: boolean
               replicas:
-                description: Replicas indicates a part of the quantity from matched
-                  pods by selector. Usually it is used for gray scale working. if
-                  Replicas exceeded the matched number by selector or not be set,
-                  replicas will not work.
+                description: |-
+                  Replicas indicates a part of the quantity from matched pods by selector.
+                  Usually it is used for gray scale working.
+                  if Replicas exceeded the matched number by selector or not be set, replicas will not work.
                 format: int32
                 type: integer
               selector:
-                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                description: |-
+                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
                   Important: Run "make" to regenerate code after modifying this file
-                  Selector is a label query over pods that should match the pod labels.'
+                  Selector is a label query over pods that should match the pod labels.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
                       The requirements are ANDed.
                     items:
-                      description: A label selector requirement is a selector that
-                        contains values, a key, and an operator that relates the key
-                        and values.
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
                       properties:
                         key:
                           description: key is the label key that the selector applies
                             to.
                           type: string
                         operator:
-                          description: operator represents a key's relationship to
-                            a set of values. Valid operators are In, NotIn, Exists
-                            and DoesNotExist.
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
                           type: string
                         values:
-                          description: values is an array of string values. If the
-                            operator is In or NotIn, the values array must be non-empty.
-                            If the operator is Exists or DoesNotExist, the values
-                            array must be empty. This array is replaced during a strategic
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
                             merge patch.
                           items:
                             type: string
@@ -130,11 +135,10 @@ spec:
                   matchLabels:
                     additionalProperties:
                       type: string
-                    description: matchLabels is a map of {key,value} pairs. A single
-                      {key,value} in the matchLabels map is equivalent to an element
-                      of matchExpressions, whose key field is "key", the operator
-                      is "In", and the values array contains only "value". The requirements
-                      are ANDed.
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
@@ -150,12 +154,14 @@ spec:
                 - ephemeralContainers
                 type: object
               ttlSecondsAfterFinished:
-                description: ttlSecondsAfterFinished limits the lifetime of a Job
-                  that has finished execution (either Complete or Failed). If this
-                  field is set, ttlSecondsAfterFinished after the eJob finishes, it
-                  is eligible to be automatically deleted. When the Job is being deleted,
-                  its lifecycle guarantees (e.g. finalizers) will be honored. If this
-                  field is unset, default value is 1800 If this field is set to zero,
+                description: |-
+                  ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+                  execution (either Complete or Failed). If this field is set,
+                  ttlSecondsAfterFinished after the eJob finishes, it is eligible to be
+                  automatically deleted. When the Job is being deleted, its lifecycle
+                  guarantees (e.g. finalizers) will be honored.
+                  If this field is unset, default value is 1800
+                  If this field is set to zero,
                   the Job becomes eligible to be deleted immediately after it finishes.
                 format: int32
                 type: integer
@@ -167,15 +173,16 @@ spec:
             description: EphemeralJobStatus defines the observed state of EphemeralJob
             properties:
               completionTime:
-                description: Represents time when the job was completed. It is not
-                  guaranteed to be set in happens-before order across separate operations.
+                description: |-
+                  Represents time when the job was completed. It is not guaranteed to
+                  be set in happens-before order across separate operations.
                   It is represented in RFC3339 form and is in UTC.
                 format: date-time
                 type: string
               conditions:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file'
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
                 items:
                   description: JobCondition describes current state of a job.
                   properties:
@@ -222,10 +229,10 @@ spec:
                 format: int32
                 type: integer
               startTime:
-                description: Represents time when the job was acknowledged by the
-                  job controller. It is not guaranteed to be set in happens-before
-                  order across separate operations. It is represented in RFC3339 form
-                  and is in UTC.
+                description: |-
+                  Represents time when the job was acknowledged by the job controller.
+                  It is not guaranteed to be set in happens-before order across separate operations.
+                  It is represented in RFC3339 form and is in UTC.
                 format: date-time
                 type: string
               succeeded:
