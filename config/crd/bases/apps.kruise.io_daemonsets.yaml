@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: daemonsets.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -62,14 +61,19 @@ spec:
         description: DaemonSet is the Schema for the daemonsets API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -80,13 +84,14 @@ spec:
                 anyOf:
                 - type: integer
                 - type: string
-                description: BurstReplicas is a rate limiter for booting pods on a
-                  lot of pods. The default value is 250
+                description: |-
+                  BurstReplicas is a rate limiter for booting pods on a lot of pods.
+                  The default value is 250
                 x-kubernetes-int-or-string: true
               lifecycle:
-                description: Lifecycle defines the lifecycle hooks for Pods pre-delete,
-                  in-place update. Currently, we only support pre-delete hook for
-                  Advanced DaemonSet.
+                description: |-
+                  Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
+                  Currently, we only support pre-delete hook for Advanced DaemonSet.
                 properties:
                   inPlaceUpdate:
                     description: InPlaceUpdate is the hook before Pod to update and
@@ -101,12 +106,12 @@ spec:
                           type: string
                         type: object
                       markPodNotReady:
-                        description: 'MarkPodNotReady = true means: - Pod will be
-                          set to ''NotReady'' at preparingDelete/preparingUpdate state.
-                          - Pod will be restored to ''Ready'' at Updated state if
-                          it was set to ''NotReady'' at preparingUpdate state. Currently,
-                          MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete
-                          hook. Default to false.'
+                        description: |-
+                          MarkPodNotReady = true means:
+                          - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                          - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                          Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                          Default to false.
                         type: boolean
                     type: object
                   preDelete:
@@ -121,12 +126,12 @@ spec:
                           type: string
                         type: object
                       markPodNotReady:
-                        description: 'MarkPodNotReady = true means: - Pod will be
-                          set to ''NotReady'' at preparingDelete/preparingUpdate state.
-                          - Pod will be restored to ''Ready'' at Updated state if
-                          it was set to ''NotReady'' at preparingUpdate state. Currently,
-                          MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete
-                          hook. Default to false.'
+                        description: |-
+                          MarkPodNotReady = true means:
+                          - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                          - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                          Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                          Default to false.
                         type: boolean
                     type: object
                   preNormal:
@@ -142,55 +147,59 @@ spec:
                           type: string
                         type: object
                       markPodNotReady:
-                        description: 'MarkPodNotReady = true means: - Pod will be
-                          set to ''NotReady'' at preparingDelete/preparingUpdate state.
-                          - Pod will be restored to ''Ready'' at Updated state if
-                          it was set to ''NotReady'' at preparingUpdate state. Currently,
-                          MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete
-                          hook. Default to false.'
+                        description: |-
+                          MarkPodNotReady = true means:
+                          - Pod will be set to 'NotReady' at preparingDelete/preparingUpdate state.
+                          - Pod will be restored to 'Ready' at Updated state if it was set to 'NotReady' at preparingUpdate state.
+                          Currently, MarkPodNotReady only takes effect on InPlaceUpdate & PreDelete hook.
+                          Default to false.
                         type: boolean
                     type: object
                 type: object
               minReadySeconds:
-                description: The minimum number of seconds for which a newly created
-                  DaemonSet pod should be ready without any of its container crashing,
-                  for it to be considered available. Defaults to 0 (pod will be considered
-                  available as soon as it is ready).
+                description: |-
+                  The minimum number of seconds for which a newly created DaemonSet pod should
+                  be ready without any of its container crashing, for it to be considered
+                  available. Defaults to 0 (pod will be considered available as soon as it
+                  is ready).
                 format: int32
                 type: integer
               revisionHistoryLimit:
-                description: The number of old history to retain to allow rollback.
+                description: |-
+                  The number of old history to retain to allow rollback.
                   This is a pointer to distinguish between explicit zero and not specified.
                   Defaults to 10.
                 format: int32
                 type: integer
               selector:
-                description: 'A label query over pods that are managed by the daemon
-                  set. Must match in order to be controlled. It must match the pod
-                  template''s labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors'
+                description: |-
+                  A label query over pods that are managed by the daemon set.
+                  Must match in order to be controlled.
+                  It must match the pod template's labels.
+                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
                       The requirements are ANDed.
                     items:
-                      description: A label selector requirement is a selector that
-                        contains values, a key, and an operator that relates the key
-                        and values.
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
                       properties:
                         key:
                           description: key is the label key that the selector applies
                             to.
                           type: string
                         operator:
-                          description: operator represents a key's relationship to
-                            a set of values. Valid operators are In, NotIn, Exists
-                            and DoesNotExist.
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
                           type: string
                         values:
-                          description: values is an array of string values. If the
-                            operator is In or NotIn, the values array must be non-empty.
-                            If the operator is Exists or DoesNotExist, the values
-                            array must be empty. This array is replaced during a strategic
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
                             merge patch.
                           items:
                             type: string
@@ -203,19 +212,20 @@ spec:
                   matchLabels:
                     additionalProperties:
                       type: string
-                    description: matchLabels is a map of {key,value} pairs. A single
-                      {key,value} in the matchLabels map is equivalent to an element
-                      of matchExpressions, whose key field is "key", the operator
-                      is "In", and the values array contains only "value". The requirements
-                      are ANDed.
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
               template:
-                description: 'An object that describes the pod that will be created.
-                  The DaemonSet will create exactly one copy of this pod on every
-                  node that matches the template''s node selector (or on every node
-                  if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template'
+                description: |-
+                  An object that describes the pod that will be created.
+                  The DaemonSet will create exactly one copy of this pod on every node
+                  that matches the template's node selector (or on every node if no node
+                  selector is specified).
+                  More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
                 x-kubernetes-preserve-unknown-fields: true
               updateStrategy:
                 description: An update strategy to replace existing DaemonSet pods
@@ -229,74 +239,74 @@ spec:
                         anyOf:
                         - type: integer
                         - type: string
-                        description: 'The maximum number of nodes with an existing
-                          available DaemonSet pod that can have an updated DaemonSet
-                          pod during during an update. Value can be an absolute number
-                          (ex: 5) or a percentage of desired pods (ex: 10%). This
-                          can not be 0 if MaxUnavailable is 0. Absolute number is
-                          calculated from percentage by rounding up to a minimum of
-                          1. Default value is 0. Example: when this is set to 30%,
-                          at most 30% of the total number of nodes that should be
-                          running the daemon pod (i.e. status.desiredNumberScheduled)
-                          can have their a new pod created before the old pod is marked
-                          as deleted. The update starts by launching new pods on 30%
-                          of nodes. Once an updated pod is available (Ready for at
-                          least minReadySeconds) the old DaemonSet pod on that node
-                          is marked deleted. If the old pod becomes unavailable for
-                          any reason (Ready transitions to false, is evicted, or is
-                          drained) an updated pod is immediatedly created on that
-                          node without considering surge limits. Allowing surge implies
-                          the possibility that the resources consumed by the daemonset
-                          on any given node can double if the readiness check fails,
-                          and so resource intensive daemonsets should take into account
-                          that they may cause evictions during disruption. This is
-                          beta field and enabled/disabled by DaemonSetUpdateSurge
-                          feature gate.'
+                        description: |-
+                          The maximum number of nodes with an existing available DaemonSet pod that
+                          can have an updated DaemonSet pod during during an update.
+                          Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                          This can not be 0 if MaxUnavailable is 0.
+                          Absolute number is calculated from percentage by rounding up to a minimum of 1.
+                          Default value is 0.
+                          Example: when this is set to 30%, at most 30% of the total number of nodes
+                          that should be running the daemon pod (i.e. status.desiredNumberScheduled)
+                          can have their a new pod created before the old pod is marked as deleted.
+                          The update starts by launching new pods on 30% of nodes. Once an updated
+                          pod is available (Ready for at least minReadySeconds) the old DaemonSet pod
+                          on that node is marked deleted. If the old pod becomes unavailable for any
+                          reason (Ready transitions to false, is evicted, or is drained) an updated
+                          pod is immediatedly created on that node without considering surge limits.
+                          Allowing surge implies the possibility that the resources consumed by the
+                          daemonset on any given node can double if the readiness check fails, and
+                          so resource intensive daemonsets should take into account that they may
+                          cause evictions during disruption.
+                          This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
                         x-kubernetes-int-or-string: true
                       maxUnavailable:
                         anyOf:
                         - type: integer
                         - type: string
-                        description: 'The maximum number of DaemonSet pods that can
-                          be unavailable during the update. Value can be an absolute
-                          number (ex: 5) or a percentage of total number of DaemonSet
-                          pods at the start of the update (ex: 10%). Absolute number
-                          is calculated from percentage by rounding up. This cannot
-                          be 0 if MaxSurge is 0 Default value is 1. Example: when
-                          this is set to 30%, at most 30% of the total number of nodes
+                        description: |-
+                          The maximum number of DaemonSet pods that can be unavailable during the
+                          update. Value can be an absolute number (ex: 5) or a percentage of total
+                          number of DaemonSet pods at the start of the update (ex: 10%). Absolute
+                          number is calculated from percentage by rounding up.
+                          This cannot be 0 if MaxSurge is 0
+                          Default value is 1.
+                          Example: when this is set to 30%, at most 30% of the total number of nodes
                           that should be running the daemon pod (i.e. status.desiredNumberScheduled)
-                          can have their pods stopped for an update at any given time.
-                          The update starts by stopping at most 30% of those DaemonSet
-                          pods and then brings up new DaemonSet pods in their place.
-                          Once the new pods are available, it then proceeds onto other
-                          DaemonSet pods, thus ensuring that at least 70% of original
-                          number of DaemonSet pods are available at all times during
-                          the update.'
+                          can have their pods stopped for an update at any given time. The update
+                          starts by stopping at most 30% of those DaemonSet pods and then brings
+                          up new DaemonSet pods in their place. Once the new pods are available,
+                          it then proceeds onto other DaemonSet pods, thus ensuring that at least
+                          70% of original number of DaemonSet pods are available at all times during
+                          the update.
                         x-kubernetes-int-or-string: true
                       partition:
-                        description: The number of DaemonSet pods remained to be old
-                          version. Default value is 0. Maximum value is status.DesiredNumberScheduled,
-                          which means no pod will be updated.
+                        description: |-
+                          The number of DaemonSet pods remained to be old version.
+                          Default value is 0.
+                          Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
                         format: int32
                         type: integer
                       paused:
-                        description: Indicates that the daemon set is paused and will
-                          not be processed by the daemon set controller.
+                        description: |-
+                          Indicates that the daemon set is paused and will not be processed by the
+                          daemon set controller.
                         type: boolean
                       rollingUpdateType:
                         description: Type is to specify which kind of rollingUpdate.
                         type: string
                       selector:
-                        description: A label query over nodes that are managed by
-                          the daemon set RollingUpdate. Must match in order to be
-                          controlled. It must match the node's labels.
+                        description: |-
+                          A label query over nodes that are managed by the daemon set RollingUpdate.
+                          Must match in order to be controlled.
+                          It must match the node's labels.
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector
                               requirements. The requirements are ANDed.
                             items:
-                              description: A label selector requirement is a selector
-                                that contains values, a key, and an operator that
+                              description: |-
+                                A label selector requirement is a selector that contains values, a key, and an operator that
                                 relates the key and values.
                               properties:
                                 key:
@@ -304,17 +314,16 @@ spec:
                                     applies to.
                                   type: string
                                 operator:
-                                  description: operator represents a key's relationship
-                                    to a set of values. Valid operators are In, NotIn,
-                                    Exists and DoesNotExist.
+                                  description: |-
+                                    operator represents a key's relationship to a set of values.
+                                    Valid operators are In, NotIn, Exists and DoesNotExist.
                                   type: string
                                 values:
-                                  description: values is an array of string values.
-                                    If the operator is In or NotIn, the values array
-                                    must be non-empty. If the operator is Exists or
-                                    DoesNotExist, the values array must be empty.
-                                    This array is replaced during a strategic merge
-                                    patch.
+                                  description: |-
+                                    values is an array of string values. If the operator is In or NotIn,
+                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                    the values array must be empty. This array is replaced during a strategic
+                                    merge patch.
                                   items:
                                     type: string
                                   type: array
@@ -326,11 +335,10 @@ spec:
                           matchLabels:
                             additionalProperties:
                               type: string
-                            description: matchLabels is a map of {key,value} pairs.
-                              A single {key,value} in the matchLabels map is equivalent
-                              to an element of matchExpressions, whose key field is
-                              "key", the operator is "In", and the values array contains
-                              only "value". The requirements are ANDed.
+                            description: |-
+                              matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                              map is equivalent to an element of matchExpressions, whose key field is "key", the
+                              operator is "In", and the values array contains only "value". The requirements are ANDed.
                             type: object
                         type: object
                         x-kubernetes-map-type: atomic
@@ -348,9 +356,10 @@ spec:
             description: DaemonSetStatus defines the observed state of DaemonSet
             properties:
               collisionCount:
-                description: Count of hash collisions for the DaemonSet. The DaemonSet
-                  controller uses this field as a collision avoidance mechanism when
-                  it needs to create the name for the newest ControllerRevision.
+                description: |-
+                  Count of hash collisions for the DaemonSet. The DaemonSet controller
+                  uses this field as a collision avoidance mechanism when it needs to
+                  create the name for the newest ControllerRevision.
                 format: int32
                 type: integer
               conditions:
@@ -384,8 +393,10 @@ spec:
                   type: object
                 type: array
               currentNumberScheduled:
-                description: 'The number of nodes that are running at least 1 daemon
-                  pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/'
+                description: |-
+                  The number of nodes that are running at least 1
+                  daemon pod and are supposed to run the daemon pod.
+                  More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
                 format: int32
                 type: integer
               daemonSetHash:
@@ -393,31 +404,37 @@ spec:
                   represents the latest version of the DaemonSet.
                 type: string
               desiredNumberScheduled:
-                description: 'The total number of nodes that should be running the
-                  daemon pod (including nodes correctly running the daemon pod). More
-                  info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/'
+                description: |-
+                  The total number of nodes that should be running the daemon
+                  pod (including nodes correctly running the daemon pod).
+                  More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
                 format: int32
                 type: integer
               numberAvailable:
-                description: The number of nodes that should be running the daemon
-                  pod and have one or more of the daemon pod running and available
-                  (ready for at least spec.minReadySeconds)
+                description: |-
+                  The number of nodes that should be running the
+                  daemon pod and have one or more of the daemon pod running and
+                  available (ready for at least spec.minReadySeconds)
                 format: int32
                 type: integer
               numberMisscheduled:
-                description: 'The number of nodes that are running the daemon pod,
-                  but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/'
+                description: |-
+                  The number of nodes that are running the daemon pod, but are
+                  not supposed to run the daemon pod.
+                  More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
                 format: int32
                 type: integer
               numberReady:
-                description: The number of nodes that should be running the daemon
-                  pod and have one or more of the daemon pod running and ready.
+                description: |-
+                  The number of nodes that should be running the daemon pod and have one
+                  or more of the daemon pod running and ready.
                 format: int32
                 type: integer
               numberUnavailable:
-                description: The number of nodes that should be running the daemon
-                  pod and have none of the daemon pod running and available (ready
-                  for at least spec.minReadySeconds)
+                description: |-
+                  The number of nodes that should be running the
+                  daemon pod and have none of the daemon pod running and available
+                  (ready for at least spec.minReadySeconds)
                 format: int32
                 type: integer
               observedGeneration:
