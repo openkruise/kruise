@@ -13,11 +13,10 @@ COPY main.go main.go
 COPY apis/ apis/
 COPY cmd/ cmd/
 COPY pkg/ pkg/
-COPY vendor/ vendor/
 
 # Build
-RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o manager main.go \
-  && CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -a -o daemon ./cmd/daemon/main.go
+RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o manager main.go \
+  && CGO_ENABLED=0 GO111MODULE=on go build -a -o daemon ./cmd/daemon/main.go
 
 ARG BASE_IMAGE
 ARG BASE_IMAGE_VERSION

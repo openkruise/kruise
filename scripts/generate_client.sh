@@ -17,3 +17,5 @@ cp -r ./{apis,hack,vendor,go.mod} "${TMP_DIR}"/src/github.com/openkruise/kruise/
 
 rm -rf ./pkg/client/{clientset,informers,listers}
 mv "${TMP_DIR}"/src/github.com/openkruise/kruise/pkg/client/* ./pkg/client
+
+rm -rf vendor 
