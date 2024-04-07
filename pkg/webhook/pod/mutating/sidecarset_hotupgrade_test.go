@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,7 +42,9 @@ func TestInjectHotUpgradeSidecar(t *testing.T) {
 func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
