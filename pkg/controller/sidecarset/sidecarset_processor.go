@@ -30,6 +30,7 @@ import (
 	controlutil "github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -225,14 +226,23 @@ func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarContro
 
 func (p *Processor) listMatchedSidecarSets(pod *corev1.Pod) string {
 	sidecarSetList := &appsv1alpha1.SidecarSetList{}
-	if err := p.Client.List(context.TODO(), sidecarSetList); err != nil {
+	sidecarSetList2 := &appsv1alpha1.SidecarSetList{}
+	podNamespace := pod.Namespace
+	if podNamespace == "" {
+		podNamespace = "default"
+	}
+	if err := p.Client.List(context.TODO(), sidecarSetList, client.MatchingFields{fieldindex.IndexNameForSidecarSetNamespace: podNamespace}, utilclient.DisableDeepCopy); err != nil {
+		klog.Errorf("List SidecarSets failed: %s", err.Error())
+		return ""
+	}
+	if err := p.Client.List(context.TODO(), sidecarSetList2, client.MatchingFields{fieldindex.IndexNameForSidecarSetNamespace: fieldindex.IndexValueSidecarSetClusterScope}, utilclient.DisableDeepCopy); err != nil {
 		klog.Errorf("List SidecarSets failed: %s", err.Error())
 		return ""
 	}
 
 	//matched SidecarSet.Name list
 	sidecarSetNames := make([]string, 0)
-	for _, sidecarSet := range sidecarSetList.Items {
+	for _, sidecarSet := range append(sidecarSetList.Items, sidecarSetList2.Items...) {
 		if matched, _ := sidecarcontrol.PodMatchedSidecarSet(p.Client, pod, &sidecarSet); matched {
 			sidecarSetNames = append(sidecarSetNames, sidecarSet.Name)
 		}

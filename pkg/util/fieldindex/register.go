@@ -20,21 +20,24 @@ import (
 	"context"
 	"sync"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	IndexNameForPodNodeName = "spec.nodeName"
-	IndexNameForOwnerRefUID = "ownerRefUID"
-	IndexNameForController  = ".metadata.controller"
-	IndexNameForIsActive    = "isActive"
+	IndexNameForPodNodeName          = "spec.nodeName"
+	IndexNameForOwnerRefUID          = "ownerRefUID"
+	IndexNameForController           = ".metadata.controller"
+	IndexNameForIsActive             = "isActive"
+	IndexNameForSidecarSetNamespace  = "namespace"
+	IndexValueSidecarSetClusterScope = "clusterScope"
+	LabelMetadataName                = v1.LabelMetadataName
 )
 
 var (
@@ -84,6 +87,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		// imagepulljob active
 		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
 			if err = indexImagePullJobActive(c); err != nil {
+				return
+			}
+		}
+		// sidecar spec namespaces
+		if utildiscovery.DiscoverObject(&appsv1alpha1.SidecarSet{}) {
+			if err = indexSidecarSet(c); err != nil {
 				return
 			}
 		}
@@ -150,5 +159,34 @@ func indexImagePullJobActive(c cache.Cache) error {
 			isActive = "true"
 		}
 		return []string{isActive}
+	})
+}
+
+func IndexSidecarSet(rawObj client.Object) []string {
+	obj := rawObj.(*appsv1alpha1.SidecarSet)
+	if obj == nil {
+		return nil
+	}
+	if obj.Spec.Namespace != "" {
+		return []string{obj.Spec.Namespace}
+	}
+	if obj.Spec.NamespaceSelector != nil {
+		if obj.Spec.NamespaceSelector.MatchLabels != nil {
+			if v, ok := obj.Spec.NamespaceSelector.MatchLabels[LabelMetadataName]; ok {
+				return []string{v}
+			}
+		}
+		for _, item := range obj.Spec.NamespaceSelector.MatchExpressions {
+			if item.Key == LabelMetadataName && item.Operator == metav1.LabelSelectorOpIn {
+				return item.Values
+			}
+		}
+	}
+	return []string{IndexValueSidecarSetClusterScope}
+}
+
+func indexSidecarSet(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
+		return IndexSidecarSet(rawObj)
 	})
 }

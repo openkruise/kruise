@@ -24,12 +24,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -37,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -424,7 +424,9 @@ func testPodHasNoMatchedSidecarSet(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 	podIn.Labels["app"] = "doesnt-match"
 	podOut := podIn.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
 	_, _ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
@@ -466,7 +468,9 @@ func doMergeSidecarSecretsTest(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	podIn.Spec.ImagePullSecrets = podImagePullSecrets
 	podOut := podIn.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
 	_, _ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
@@ -487,7 +491,9 @@ func testInjectionStrategyPaused(t *testing.T, sidecarIn *appsv1alpha1.SidecarSe
 	sidecarPaused := sidecarIn
 	sidecarPaused.Spec.InjectionStrategy.Paused = true
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarPaused).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarPaused).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
 	_, _ = podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
@@ -525,7 +531,10 @@ func TestInjectMetadata(t *testing.T) {
 		},
 	}
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(demo1, demo2).Build()
+	client := fake.NewClientBuilder().WithObjects(demo1, demo2).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
+
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
 	podHandler.sidecarsetMutatingPod(context.Background(), req, podIn)
@@ -594,7 +603,9 @@ func testInjectionStrategyRevision(t *testing.T, env []client.Object) {
 	podIn := pod1.DeepCopy()
 	podOut := podIn.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(env...).Build()
+	client := fake.NewClientBuilder().WithObjects(env...).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
 	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
@@ -615,7 +626,9 @@ func TestSidecarSetPodInjectPolicy(t *testing.T) {
 func testSidecarSetPodInjectPolicy(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
@@ -692,7 +705,9 @@ func testSidecarVolumesAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSe
 	podIn := pod1.DeepCopy()
 
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
@@ -845,7 +860,9 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 		t.Run(cs.name, func(t *testing.T) {
 			podIn := cs.getPod()
 			decoder, _ := admission.NewDecoder(scheme.Scheme)
-			client := fake.NewClientBuilder().WithObjects(cs.getSidecarSets()).Build()
+			client := fake.NewClientBuilder().WithObjects(cs.getSidecarSets()).WithIndex(
+				&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+			).Build()
 			podOut := podIn.DeepCopy()
 			podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 			req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
@@ -889,7 +906,9 @@ func TestSidecarSetTransferEnv(t *testing.T) {
 func testSidecarSetTransferEnv(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
@@ -923,7 +942,9 @@ func testSidecarSetHashInject(t *testing.T, sidecarSetIn1 *appsv1alpha1.SidecarS
 	sidecarSetIn3 := sidecarSet3.DeepCopy()
 
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn1, sidecarSetIn2, sidecarSetIn3).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn1, sidecarSetIn2, sidecarSetIn3).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
@@ -954,7 +975,9 @@ func TestSidecarSetNameInject(t *testing.T) {
 func testSidecarSetNameInject(t *testing.T, sidecarSetIn1, sidecarSetIn3 *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder, _ := admission.NewDecoder(scheme.Scheme)
-	client := fake.NewClientBuilder().WithObjects(sidecarSetIn1, sidecarSetIn3).Build()
+	client := fake.NewClientBuilder().WithObjects(sidecarSetIn1, sidecarSetIn3).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
 	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
