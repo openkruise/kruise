@@ -27,3 +27,5 @@ cp -r ./{apis,hack,vendor} "${TMP_DIR}"/src/github.com/openkruise/kruise/
 cp -f "${TMP_DIR}"/src/github.com/openkruise/kruise/apis/apps/pub/openapi_generated.go ./apis/apps/pub
 cp -f "${TMP_DIR}"/src/github.com/openkruise/kruise/apis/apps/v1alpha1/openapi_generated.go ./apis/apps/v1alpha1
 cp -f "${TMP_DIR}"/src/github.com/openkruise/kruise/apis/apps/v1beta1/openapi_generated.go ./apis/apps/v1beta1
+
+rm -rf vendor 
