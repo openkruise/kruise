@@ -1,0 +1,17 @@
+# This YAML configuration file is used to enable Dependabot for automated dependency management.
+# Dependabot helps keep the project's dependencies up-to-date by automatically creating pull requests
+# for outdated dependencies based on the version constraints defined in your project.
+# For more information and customization options, please refer to the Dependabot documentation:
+# Documentation: https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically
+# Configuration options: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+- package-ecosystem: "github-actions"
+  directory: "/"
+  # Allow up to 10 open pull requests for update github-actions
+  # 5 by default
+  # see https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#open-pull-requests-limit
+  open-pull-requests-limit: 10
+  schedule:
+    # Check for updates to GitHub Actions every week
+    interval: "weekly"
