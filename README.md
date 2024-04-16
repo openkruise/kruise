@@ -99,6 +99,9 @@ Active communication channels:
 - Bi-weekly Community Meeting (*English*): TODO
   - [Meeting Link(zoom)](https://us02web.zoom.us/j/87059136652?pwd=NlI4UThFWXVRZkxIU0dtR1NINncrQT09)
 
+## Security
+Please report vulnerabilities by email to kubernetes-security@service.aliyun.com. Also see our [SECURITY.md](SECURITY.md) file for details.
+
 ## License
 
 Kruise is licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE.md) for the full license text.
