@@ -98,6 +98,10 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Clo
 - Bi-weekly Community Meeting (*English*): TODO
   - [进入会议(zoom)](https://us02web.zoom.us/j/87059136652?pwd=NlI4UThFWXVRZkxIU0dtR1NINncrQT09)
 
+## 安全
+
+汇报安全漏洞请通过邮箱kubernetes-security@service.aliyun.com, 更多安全细节并参见[SECURITY.md](SECURITY.md)
+
 ## License
 
 Kruise is licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE.md) for the full license text.

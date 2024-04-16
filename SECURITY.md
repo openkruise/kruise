@@ -9,9 +9,10 @@ Here's an overview:
 
 | Version | Supported           |
 | ------- | ------------------- |
-| 0.10.x   | :white_check_mark: |
-| 0.9.x   | :white_check_mark:  |
-| < 0.9   | :x:                 |
+| 1.16.x   | :white_check_mark: |
+| 1.15.x   | :white_check_mark:  |
+| 1.14.x   | :white_check_mark:  |
+| < 1.14   | :x:                 |
 
 ## Prevention
 
@@ -26,16 +27,9 @@ Kruise maintainers are working to improve our prevention by adding additional me
 
 We strive to ship secure software, but we need the community to help us find security breaches.
 
-In case of a confirmed breach, reporters will get full credit and can be keep in the loop, if
-preferred.
+In case of a confirmed breach, reporters will get full credit and can be keep in the loop, if preferred.
 
-### Private Disclosure Processes
-
-We ask that all suspected vulnerabilities be privately and responsibly disclosed by [contacting our maintainers](mailto:cncf-openkruise-maintainers@lists.cncf.io).
-
-### Public Disclosure Processes
-
-If you know of a publicly disclosed security vulnerability please IMMEDIATELY email the [OpenKruise maintainers](mailto:cncf-openkruise-maintainers@lists.cncf.io) to inform about the vulnerability so they may start the patch, release, and communication process.
+DO NOT CREATE AN ISSUE to report a security problem. Instead, please send an email to kubernetes-security@service.aliyun.com
 
 ### Compensation
 
