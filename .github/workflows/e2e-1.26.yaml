@@ -27,7 +27,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -106,7 +106,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -198,7 +198,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -290,7 +290,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -382,7 +382,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -452,7 +452,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -517,7 +517,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
