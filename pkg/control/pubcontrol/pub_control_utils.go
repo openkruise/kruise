@@ -102,7 +102,7 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 		if refresh {
 			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1alpha1().
 				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
-			if err != nil {
+			if err != nil && !errors.IsNotFound(err) {
 				klog.ErrorS(err, "Failed to get podUnavailableBudget form etcd", "pub", klog.KObj(pub))
 				return err
 			}
