@@ -70,7 +70,7 @@ func TestHasOwnerRef(t *testing.T) {
 	}
 }
 
-func TestRemoveOnwer(t *testing.T) {
+func TestRemoveOwner(t *testing.T) {
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",

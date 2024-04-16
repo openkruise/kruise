@@ -36,7 +36,7 @@ One of the most common-used features of it is to pull images from private reposi
 
 ## Proposal
 **Main idea**: In this design, we separate the logic of `Secret` and `SidecarSet`.
-In `SidecarSet` part, we only consider injecting their `imagePullSecrets` feilds into Pod.
+In `SidecarSet` part, we only consider injecting their `imagePullSecrets` fields into Pod.
 Users should manually  distribute the required `Secrets` to all the namespaces that the `SidecarSet` may be instantiated.
 
 ### API Definition

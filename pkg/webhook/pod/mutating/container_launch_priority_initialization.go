@@ -51,7 +51,7 @@ func (h *PodCreateHandler) containerLaunchPriorityInitialization(_ context.Conte
 	return false, nil
 }
 
-// the return []int is prioirty for each container in the pod, ordered as container
+// the return []int is priority for each container in the pod, ordered as container
 // order list in pod spec.
 // the priorityFlag indicates whether this pod needs to launch containers with priority.
 // return error is there is any (e.g. priority value less than minimum possible int value)
