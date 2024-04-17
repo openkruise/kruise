@@ -315,13 +315,13 @@ func TestRescheduleSubset(t *testing.T) {
 				ec := GetWorkloadSpreadSubsetCondition(&exceptStatus.SubsetStatuses[i], appsv1alpha1.SubsetSchedulable)
 
 				if lc == nil && ec != nil {
-					t.Fatalf("rescheudle failed")
+					t.Fatalf("reschedule failed")
 				}
 				if lc != nil && ec == nil {
-					t.Fatalf("rescheudle failed")
+					t.Fatalf("reschedule failed")
 				}
 				if lc != nil && ec != nil && lc.Status != ec.Status {
-					t.Fatalf("rescheudle failed")
+					t.Fatalf("reschedule failed")
 				}
 			}
 		})

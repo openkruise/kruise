@@ -3,5 +3,12 @@ Ded = "Ded"
 ons = "ons"
 ist = "ist"
 WITHO = "WITHO"
+
+[default]
+extend-ignore-re = [
+    # *sigh* this just isn't worth the cost of fixing
+    "sha256:.*",
+]
+
 [files]
 extend-exclude = ["vendor/", "go.mod", "CHANGELOG.md"]

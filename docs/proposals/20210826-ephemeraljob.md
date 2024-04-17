@@ -103,7 +103,7 @@ the number of creating ephemeralcontainer will not exceed replicas.
 
 the value of parallelism cannot exceed 10.
 
-1. templete describe ephemeralcontainers spec.
+1. template describe ephemeralcontainers spec.
 
 1. ttlSecondsAfterCreated means the TTL duration after ephemeral job has created.
 
@@ -133,7 +133,7 @@ status:
 
 The status.phase can be:
 
-- Waitting: this EJOB waits ephemeral containers to be created.
+- Waiting: this EJOB waits ephemeral containers to be created.
 
 it means no ephemeral container reach to running state.
 
@@ -152,7 +152,7 @@ already failed to complete it's task.
 - Error: some errors exits during ephemeralcontaienr creating.
 
 status.failed means the number of failed completed ephemeralcontainers.
-status.success means the number of success compeleted ephemeralcontainers.
+status.success means the number of success completed ephemeralcontainers.
 status.waiting means the number of waiting ephemeralcontainers.
 status.running means the number of running ephemeralcontainers.
 

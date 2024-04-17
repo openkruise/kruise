@@ -617,7 +617,7 @@ func completeRollingUpdate(set *appsv1beta1.StatefulSet, status *appsv1beta1.Sta
 	}
 }
 
-// SortPodsAscendingOrdinal sorts the given Pods according to their oridinals.
+// SortPodsAscendingOrdinal sorts the given Pods according to their ordinals.
 func SortPodsAscendingOrdinal(pods []*v1.Pod) {
 	sort.Sort(ascendingOrdinal(pods))
 }

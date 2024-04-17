@@ -119,7 +119,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 		}
 	}
 	if len(conflicted) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, targets, fmt.Sprintf("ambiguous targets because namespace %v is in both IncludedNamespaces.List and ExcludedNamesapces.List", conflicted)))
+		allErrs = append(allErrs, field.Invalid(fldPath, targets, fmt.Sprintf("ambiguous targets because namespace %v is in both IncludedNamespaces.List and ExcludedNamespaces.List", conflicted)))
 	}
 
 	// 2. validate targets.NamespaceLabelSelector
