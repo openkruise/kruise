@@ -104,8 +104,8 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
-                                    return nil
-			        }
+					return nil
+				}
 				klog.ErrorS(err, "Failed to get podUnavailableBudget form etcd", "pub", klog.KObj(pub))
 				return err
 			}
@@ -172,6 +172,10 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 				klog.ErrorS(err, "Failed to add cache for podUnavailableBudget", "pub", klog.KObj(pub))
 			}
 			return nil
+		} else {
+			if errors.IsNotFound(err) {
+				return nil
+			}
 		}
 		// if conflicts, then retry
 		conflictTimes++
