@@ -20,7 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/registry"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -30,7 +30,7 @@ type AuthInfo struct {
 }
 
 func (i *AuthInfo) EncodeToString() string {
-	authConfig := dockertypes.AuthConfig{
+	authConfig := registry.AuthConfig{
 		Username: i.Username,
 		Password: i.Password,
 	}
