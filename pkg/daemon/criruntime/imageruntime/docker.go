@@ -21,15 +21,16 @@ import (
 	"io"
 	"sync"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
+
 	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	dockerapi "github.com/docker/docker/client"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/util/secret"
 )
 
 // NewDockerImageService create a docker runtime
@@ -139,7 +140,7 @@ func (d *dockerImageService) ListImages(ctx context.Context) ([]ImageInfo, error
 	if err := d.createRuntimeClientIfNecessary(); err != nil {
 		return nil, err
 	}
-	infos, err := d.client.ImageList(ctx, dockertypes.ImageListOptions{All: true})
+	infos, err := d.client.ImageList(ctx, image.ListOptions{All: true})
 	if err != nil {
 		d.handleRuntimeError(err)
 		return nil, err
@@ -147,7 +148,7 @@ func (d *dockerImageService) ListImages(ctx context.Context) ([]ImageInfo, error
 	return newImageCollectionDocker(infos), nil
 }
 
-func newImageCollectionDocker(infos []dockertypes.ImageSummary) []ImageInfo {
+func newImageCollectionDocker(infos []image.Summary) []ImageInfo {
 	collection := make([]ImageInfo, 0, len(infos))
 	for _, info := range infos {
 		collection = append(collection, ImageInfo{
