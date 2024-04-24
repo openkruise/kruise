@@ -33,7 +33,7 @@ import (
 func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.GroupVersionKind, name, image string, labels map[string]string, annotations map[string]string, podSelector metav1.LabelSelector, pullSecrets []string) error {
 	var pullTimeoutSeconds int32 = 300
 	if str, ok := owner.GetAnnotations()[appsv1alpha1.ImagePreDownloadTimeoutSecondsKey]; ok {
-		if i, err := strconv.Atoi(str); err == nil {
+		if i, err := strconv.ParseInt(str, 10, 32); err == nil {
 			pullTimeoutSeconds = int32(i)
 		}
 	}
