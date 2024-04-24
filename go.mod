@@ -7,7 +7,7 @@ require (
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
 	github.com/docker/distribution v2.8.2+incompatible
-	github.com/docker/docker v26.0.1+incompatible
+	github.com/docker/docker v26.0.2+incompatible
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
@@ -128,7 +128,7 @@ require (
 	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
@@ -151,6 +151,7 @@ require (
 )
 
 replace (
+	golang.org/x/sys => golang.org/x/sys v0.19.0
 	k8s.io/api => k8s.io/api v0.26.15
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.26.15
 	k8s.io/apimachinery => k8s.io/apimachinery v0.26.15
