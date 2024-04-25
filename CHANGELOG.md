@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.6.3
+> Change log since v1.6.2
+
+### CVE FIX
+- fix potential security issues of dependent packages ([#1586](https://github.com/openkruise/kruise/pull/1586), [ABNER-1](https://github.com/ABNER-1)) ([#1591](https://github.com/openkruise/kruise/pull/1591), [ABNER-1](https://github.com/ABNER-1))
+
 ## v1.6.2
 > Change log since v1.6.1
 
