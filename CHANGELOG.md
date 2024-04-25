@@ -1,5 +1,45 @@
 # Change Log
 
+## v1.6.3
+> Change log since v1.6.2
+
+### CVE FIX
+- fix potential security issues of dependent packages ([#1586](https://github.com/openkruise/kruise/pull/1586), [ABNER-1](https://github.com/ABNER-1)) ([#1591](https://github.com/openkruise/kruise/pull/1591), [ABNER-1](https://github.com/ABNER-1))
+
+## v1.6.2
+> Change log since v1.6.1
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.5.4
+> Chang log since v1.5.3
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.4.2
+> Change log since v1.4.1
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.6.1
+> Change log since v1.6.0
+
+### Upgrade Notice
+- FeatureGate PodWebhook=false will not disable ResourcesDeletionProtection. ([#1526](https://github.com/openkruise/kruise/pull/1526), [@zmberg](https://github.com/zmberg))
+- Update go.mod require k8s version from 1.29 to 1.26, and remove go mod replace. ([#1527](https://github.com/openkruise/kruise/pull/1527), [KaiShi](https://github.com/BH4AWS))
+
+### Advanced Workload
+- Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
+
+## v1.5.3
+> Chang log since v1.5.2
+
+### Advanced Workload
+- Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
+
 ## v1.6.0
 > Change log since v1.5.2
 
