@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: persistentpodstates.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -21,14 +20,19 @@ spec:
         description: PersistentPodState is the Schema for the PersistentPodState API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -47,13 +51,14 @@ spec:
                   type: object
                 type: array
               persistentPodStateRetentionPolicy:
-                description: PersistentPodStateRetentionPolicy describes the policy
-                  used for PodState. The default policy of 'WhenScaled' causes when
-                  scale down statefulSet, deleting it.
+                description: |-
+                  PersistentPodStateRetentionPolicy describes the policy used for PodState.
+                  The default policy of 'WhenScaled' causes when scale down statefulSet, deleting it.
                 type: string
               preferredPersistentTopology:
-                description: Pod rebuilt topology preferred for node labels, with
-                  xx weight for example  kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone
+                description: |-
+                  Pod rebuilt topology preferred for node labels, with xx weight
+                  for example  kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone
                 items:
                   properties:
                     preference:
@@ -76,8 +81,9 @@ spec:
                   type: object
                 type: array
               requiredPersistentTopology:
-                description: Pod rebuilt topology required for node labels for example
-                  kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone
+                description: |-
+                  Pod rebuilt topology required for node labels
+                  for example kubernetes.io/hostname, failure-domain.beta.kubernetes.io/zone
                 properties:
                   nodeTopologyKeys:
                     description: A list of node selector requirements by node's labels.
@@ -88,9 +94,9 @@ spec:
                 - nodeTopologyKeys
                 type: object
               targetRef:
-                description: TargetReference contains enough information to let you
-                  identify an workload for PersistentPodState Selector and TargetReference
-                  are mutually exclusive, TargetReference is priority to take effect
+                description: |-
+                  TargetReference contains enough information to let you identify an workload for PersistentPodState
+                  Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
                   current only support StatefulSet
                 properties:
                   apiVersion:
@@ -113,9 +119,9 @@ spec:
           status:
             properties:
               observedGeneration:
-                description: observedGeneration is the most recent generation observed
-                  for this PersistentPodState. It corresponds to the PersistentPodState's
-                  generation, which is updated on mutation by the API Server.
+                description: |-
+                  observedGeneration is the most recent generation observed for this PersistentPodState. It corresponds to the
+                  PersistentPodState's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
               podStates:
@@ -132,12 +138,14 @@ spec:
                     nodeTopologyLabels:
                       additionalProperties:
                         type: string
-                      description: node topology labels key=value for example kubernetes.io/hostname=node-1
+                      description: |-
+                        node topology labels key=value
+                        for example kubernetes.io/hostname=node-1
                       type: object
                   type: object
-                description: 'When the pod is ready, record some status information
-                  of the pod, such as: labels, annotations, topologies, etc. map[string]PodState
-                  -> map[Pod.Name]PodState'
+                description: |-
+                  When the pod is ready, record some status information of the pod, such as: labels, annotations, topologies, etc.
+                  map[string]PodState -> map[Pod.Name]PodState
                 type: object
             required:
             - observedGeneration

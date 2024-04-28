@@ -1,5 +1,45 @@
 # Change Log
 
+## v1.6.3
+> Change log since v1.6.2
+
+### CVE FIX
+- fix potential security issues of dependent packages ([#1586](https://github.com/openkruise/kruise/pull/1586), [ABNER-1](https://github.com/ABNER-1)) ([#1591](https://github.com/openkruise/kruise/pull/1591), [ABNER-1](https://github.com/ABNER-1))
+
+## v1.6.2
+> Change log since v1.6.1
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.5.4
+> Chang log since v1.5.3
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.4.2
+> Change log since v1.4.1
+
+### CloneSet
+- Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
+
+## v1.6.1
+> Change log since v1.6.0
+
+### Upgrade Notice
+- FeatureGate PodWebhook=false will not disable ResourcesDeletionProtection. ([#1526](https://github.com/openkruise/kruise/pull/1526), [@zmberg](https://github.com/zmberg))
+- Update go.mod require k8s version from 1.29 to 1.26, and remove go mod replace. ([#1527](https://github.com/openkruise/kruise/pull/1527), [KaiShi](https://github.com/BH4AWS))
+
+### Advanced Workload
+- Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
+
+## v1.5.3
+> Chang log since v1.5.2
+
+### Advanced Workload
+- Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
+
 ## v1.6.0
 > Change log since v1.5.2
 
@@ -8,6 +48,8 @@
 > No, really, you must read this before you upgrade
 - OpenKruise no longer supports Kubernetes versions 1.16, 1.17.
 However it's still possible to use OpenKruise with Kubernetes versions 1.16 and 1.17 as long as KruiseDaemon is not enabled(install/upgrade kruise charts with featureGates="KruiseDaemon=false")
+- Kruise-Daemon will no longer support v1alpha2 CRI runtimes.
+However it's still possible to use OpenKruise on Kubernetes with nodes that only support v1alpha2 CRI as long as KruiseDaemon is not enabled(install/upgrade kruise charts with featureGates="KruiseDaemon=false")
 - OpenKruise leader election default to use leases mode. ([#1407](https://github.com/openkruise/kruise/pull/1407), [dsxing](https://github.com/dsxing))
 For users with OpenKruise version 1.3.0 or lower, please first upgrade your OpenKruise to version 1.4 or 1.5 before upgrading to 1.6.0, so as to avoid unexpected multiple leader problem during the installation.
 - Bump Kubernetes dependency to 1.26.10. ([#1511](https://github.com/openkruise/kruise/pull/1511), [KaiShi](https://github.com/BH4AWS))
