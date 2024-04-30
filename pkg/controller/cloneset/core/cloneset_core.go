@@ -142,6 +142,11 @@ func (c *commonControl) GetUpdateOptions() *inplaceupdate.UpdateOptions {
 	if c.Spec.UpdateStrategy.InPlaceUpdateStrategy != nil {
 		opts.GracePeriodSeconds = c.Spec.UpdateStrategy.InPlaceUpdateStrategy.GracePeriodSeconds
 	}
+	// For the InPlaceOnly strategy, ignore the hash comparison of VolumeClaimTemplates.
+	// Consider making changes through a feature gate.
+	if c.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+		opts.IgnoreVolumeClaimTemplatesHashDiff = true
+	}
 	return opts
 }
 

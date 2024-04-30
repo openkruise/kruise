@@ -59,6 +59,8 @@ type UpdateResult struct {
 }
 
 type UpdateOptions struct {
+	IgnoreVolumeClaimTemplatesHashDiff bool
+
 	GracePeriodSeconds int32
 	AdditionalFuncs    []func(*v1.Pod)
 

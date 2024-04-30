@@ -102,6 +102,10 @@ func (t *CloneSetTester) ListPodsForCloneSet(name string) (pods []*v1.Pod, err e
 	}
 	for i := range podList.Items {
 		pod := &podList.Items[i]
+		// ignore deleting pod
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		if owner := metav1.GetControllerOf(pod); owner != nil && owner.Name == name {
 			pods = append(pods, pod)
 		}

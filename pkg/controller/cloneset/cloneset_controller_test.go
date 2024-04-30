@@ -17,13 +17,13 @@ limitations under the License.
 package cloneset
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -32,6 +32,10 @@ import (
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
+	historyutil "github.com/openkruise/kruise/pkg/util/history"
+	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
+
+	"github.com/onsi/gomega"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,11 +43,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -54,7 +60,7 @@ var c client.Client
 
 var (
 	expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-	images          = []string{"nginx:1.9.1", "nginx:1.9.2", "nginx:1.9.3"}
+	images          = []string{"nginx:1.9.1", "nginx:1.9.2", "nginx:1.9.3", "nginx:1.9.2-alphine", "nginx:1.9.3-alphine"}
 	clonesetUID     = "123"
 	productionLabel = map[string]string{"type": "production"}
 	nilLabel        = map[string]string{}
@@ -147,6 +153,22 @@ func TestReconcile(t *testing.T) {
 
 	// Test for pods update
 	testUpdate(g, instance)
+
+	testVCTWhenFG := func(enable bool) {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecreatePodWhenChangeVCTInCloneSetGate, enable)()
+
+		// Test for pods update with volume claim changed
+		testUpdateVolumeClaimTemplates(t, g, instance, nil)
+
+		// Clean vct hash before each case => lack vct hash -> keep in-place update
+		testUpdateVolumeClaimTemplates(t, g, instance, cleanVCTHashInRevisions)
+	}
+	testVCTWhenFG(true)
+	testVCTWhenFG(false)
+
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecreatePodWhenChangeVCTInCloneSetGate, true)()
+	// Test case with history revision
+	testUpdateVolumeClaimTemplates2(t, g, instance)
 }
 
 func TestClaimPods(t *testing.T) {
@@ -357,6 +379,319 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 	))
 }
 
+type testCloneSetHookFn = func(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet)
+
+func updateCloneSetInTwoStep(description string, t *testing.T, g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet,
+	image, reqStr string, updateType appsv1alpha1.CloneSetUpdateStrategyType,
+	partitionInStep1, updatedInStep1, expectedSameInStep1, replica int,
+	pods0 []*v1.Pod, pvcs0 []*v1.PersistentVolumeClaim, preHook, postHook testCloneSetHookFn,
+	volumeSizeCheck bool, fnsInStep1 ...func(*appsv1alpha1.CloneSet)) ([]*v1.Pod, []*v1.PersistentVolumeClaim) {
+
+	t.Logf("updateCloneSetInTwoStep with case '%v' start", description)
+	defer func() {
+		t.Logf("updateCloneSetInTwoStep with case '%v' end", description)
+	}()
+	if preHook != nil {
+		preHook(g, instance)
+	}
+	maxUnavailable := intstr.FromString("100%")
+
+	res := resource.MustParse(reqStr)
+	//step1
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cs := appsv1alpha1.CloneSet{}
+		if err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs); err != nil {
+			return err
+		}
+		cs.Spec.Template.Spec.Containers[0].Image = image
+		cs.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[v1.ResourceStorage] = res
+		cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+			Type:           updateType,
+			Partition:      util.GetIntOrStrPointer(intstr.FromInt(partitionInStep1)),
+			MaxUnavailable: &maxUnavailable,
+		}
+		for _, fn := range fnsInStep1 {
+			fn(&cs)
+		}
+
+		return c.Update(context.TODO(), &cs)
+	})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	checkStatus(g, int32(replica), int32(updatedInStep1))
+
+	pods1, pvcs1 := checkInstances(g, instance, replica, replica)
+	samePodNames := getPodNames(pods0).Intersection(getPodNames(pods1))
+	samePVCNames := getPVCNames(pvcs0).Intersection(getPVCNames(pvcs1))
+	g.Expect(samePodNames.Len()).Should(gomega.Equal(expectedSameInStep1))
+	g.Expect(samePVCNames.Len()).Should(gomega.Equal(expectedSameInStep1))
+	if expectedSameInStep1 == 1 {
+		g.Expect(strings.HasSuffix(samePVCNames.List()[0], samePodNames.List()[0])).Should(gomega.BeTrue())
+	}
+	if partitionInStep1 == 0 || updatedInStep1 == replica {
+		return pods1, pvcs1
+	}
+
+	// wait all instances ok
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cs := appsv1alpha1.CloneSet{}
+		if err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs); err != nil {
+			return err
+		}
+		cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+			Type:           updateType,
+			MaxUnavailable: &maxUnavailable,
+		}
+		return c.Update(context.TODO(), &cs)
+	})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	checkStatus(g, int32(replica), int32(replica))
+	pods1, pvcs1 = checkInstances(g, instance, replica, replica)
+	if volumeSizeCheck {
+		for _, pvc := range pvcs1 {
+			if !pvc.Spec.Resources.Requests.Storage().Equal(res) {
+				t.Errorf("pvc %v's storage is not equal to %v, actual %v", pvc.Name, reqStr, pvc.Spec.Resources.Requests.Storage())
+			}
+		}
+	}
+
+	if postHook != nil {
+		postHook(g, instance)
+	}
+	return pods1, pvcs1
+}
+
+func cleanVCTHashInRevisions(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
+	controllerHistory := historyutil.NewHistory(c)
+	selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		revisions, err := controllerHistory.ListControllerRevisions(instance, selector)
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		history.SortControllerRevisions(revisions)
+		maxRevision := clonesetutils.NextRevision(revisions)
+		for i, revision := range revisions {
+			if len(revision.Annotations) > 0 {
+				revision.Annotations["m-edited"] = ""
+				delete(revision.Annotations, volumeclaimtemplate.HashAnnotation)
+			}
+			revision, err = controllerHistory.UpdateControllerRevision(revision, maxRevision+int64(i))
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+			g.Expect("").Should(gomega.Equal(revision.Annotations[volumeclaimtemplate.HashAnnotation]))
+		}
+
+		revisions, err = controllerHistory.ListControllerRevisions(instance, selector)
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		history.SortControllerRevisions(revisions)
+		for _, revision := range revisions {
+			val, exist := revision.Annotations[volumeclaimtemplate.HashAnnotation]
+			if val != "" {
+				fmt.Printf("unexpected hash value: %v in revision %v(%v)\n", val, revision.Name, revision.Revision)
+			}
+			if exist {
+				return apierrors.NewConflict(schema.GroupResource{
+					Group:    revision.GroupVersionKind().Group,
+					Resource: revision.GroupVersionKind().Kind},
+					revision.Name, errors.New("changed by others, retry"))
+			}
+		}
+		return nil
+	})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+}
+
+func testUpdateVolumeClaimTemplates(t *testing.T, g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet, preHook testCloneSetHookFn) {
+	missingVCTHash, volumeSizeCheck := false, true
+	replicas := 4
+	var postHook testCloneSetHookFn = nil
+	if preHook != nil || !utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInCloneSetGate) {
+		// when vct hash missing, recreate pod => in-place update pod
+		missingVCTHash = true
+		volumeSizeCheck = false
+	}
+
+	// format clone set
+	pods0, pvcs0 := checkInstances(g, instance, 4, 4)
+	fn := func(cs *appsv1alpha1.CloneSet) {
+		// 避免因为回退到历史版本导致的 vcTemplates 被忽略
+		cs.Spec.Template.Spec.Containers[0].Env = append(cs.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+			Name:  fmt.Sprintf("test-%v", len(cs.Spec.Template.Spec.Containers[0].Env)),
+			Value: "add_test4",
+		})
+	}
+	expectedSameInStep1 := 1
+	pods0, pvcs0 = updateCloneSetInTwoStep("format clone set", t, g, instance, images[0], "12Mi", appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+		1, 3, expectedSameInStep1, replicas, pods0, pvcs0, preHook, postHook, volumeSizeCheck, fn)
+
+	// inplace update strategy however change volumeClaimTemplate size and image
+	// => recreate
+	// when history revision vct hash is empty => inplace update
+	expectedSameInStep1 = 3
+	if missingVCTHash {
+		expectedSameInStep1 = 4
+	}
+	pods0, pvcs0 = updateCloneSetInTwoStep("inplace update strategy however change volumeClaimTemplate size and image", t, g, instance, images[1], "30Mi", appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+		3, 1, expectedSameInStep1, replicas, pods0, pvcs0, preHook, postHook, volumeSizeCheck)
+
+	// inplace update only change image
+	// => inplace update
+	expectedSameInStep1 = 4
+	pods0, pvcs0 = updateCloneSetInTwoStep("inplace update only change image", t, g, instance, images[2], "30Mi", appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+		2, 2, expectedSameInStep1, replicas, pods0, pvcs0, preHook, postHook, volumeSizeCheck)
+
+	// inplace update strategy however only change volumeClaimTemplate size
+	// => nothing changed
+	expectedSameInStep1 = 4
+	pods0, pvcs0 = updateCloneSetInTwoStep("inplace update strategy however only change volumeClaimTemplate size", t, g, instance, images[2], "50Mi", appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+		2, 4, expectedSameInStep1, replicas, pods0, pvcs0, preHook, postHook, volumeSizeCheck)
+
+	// avoid effect of the previous case
+	time.Sleep(1 * time.Second)
+	// inplace update only change image however change volume claim template in previous
+	// => recreate
+	expectedSameInStep1 = 1
+	if missingVCTHash {
+		expectedSameInStep1 = 4
+	}
+	_, _ = updateCloneSetInTwoStep("inplace update only change image however change volume claim template in previous", t, g, instance, images[0], "50Mi", appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+		1, 3, expectedSameInStep1, replicas, pods0, pvcs0, preHook, postHook, volumeSizeCheck)
+}
+
+// case with history revision
+//  1. image 1, vctemplate size of 1MB.
+//  2. Image 2, vcTemplate size of 1MB.
+//  3. Image 3, vcTemplate size of 1MB. (in function testUpdate)
+//  4. Image 4, vcTemplate size of 10MB => recreate.
+//  5. Image 2, vcTemplate size of 10MB => (expected in-place upgrade)
+//     --- Although the history revision hash is consistent, the vct hash is not, update history revision id and hash value
+//  6. Image 4, vcTemplate size of 10MB => in-place upgrade --- Update history revision.
+//  7. Image 4, vcTemplate size of 100MB => (temporarily unchanged) --- Do not generate a new revision.
+//  8. Image 5, vcTemplate size of 100MB => recreate.
+func testUpdateVolumeClaimTemplates2(t *testing.T, g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
+	pods0, pvcs0 := checkInstances(g, instance, 4, 4)
+
+	type args struct {
+		image, reqStr                                                  string
+		updateType                                                     appsv1alpha1.CloneSetUpdateStrategyType
+		partitionInStep1, updatedInStep1, expectedSameInStep1, replica int
+		preHook, postHook                                              testCloneSetHookFn
+		volumeSizeCheck                                                bool
+		fnsInStep1                                                     []func(*appsv1alpha1.CloneSet)
+	}
+
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			// step 3 ensure is ok
+			name: "testUpdateVolumeClaimTemplates2 step 3",
+			args: args{
+				image:            images[2],
+				reqStr:           "1Mi",
+				updateType:       appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+				partitionInStep1: 1,
+				updatedInStep1:   3, expectedSameInStep1: 1, replica: 4,
+				preHook:         nil,
+				postHook:        nil,
+				volumeSizeCheck: true,
+			},
+		},
+		{
+			// step 4 inplace update strategy however change volumeClaimTemplate size and image
+			// => recreate
+			name: "testUpdateVolumeClaimTemplates2 step 4",
+			args: args{
+				image:            images[3],
+				reqStr:           "10Mi",
+				updateType:       appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				partitionInStep1: 1,
+				updatedInStep1:   3, expectedSameInStep1: 1, replica: 4,
+				preHook:         nil,
+				postHook:        nil,
+				volumeSizeCheck: true,
+			},
+		},
+		{
+			// step 5 inplace update only change image
+			// => inplace update
+			name: "testUpdateVolumeClaimTemplates2 step 5",
+			args: args{
+				image:            images[1],
+				reqStr:           "10Mi",
+				updateType:       appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				partitionInStep1: 2, updatedInStep1: 2,
+				expectedSameInStep1: 4,
+				replica:             4,
+				preHook:             nil,
+				postHook:            nil,
+				volumeSizeCheck:     true,
+			},
+		},
+		{
+			// step 6 inplace update strategy history image and vcTemplate
+			// => inplace update and update history revision
+			name: "testUpdateVolumeClaimTemplates2 step 6",
+			args: args{
+				image:            images[3],
+				reqStr:           "10Mi",
+				updateType:       appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				partitionInStep1: 2, updatedInStep1: 2,
+				expectedSameInStep1: 4,
+				replica:             4,
+				preHook:             nil,
+				postHook:            nil,
+				volumeSizeCheck:     true,
+			},
+		},
+		{
+			// step 7 inplace update strategy however only change volumeClaimTemplate size
+			// => nothing changed
+			name: "testUpdateVolumeClaimTemplates2 step 7",
+			args: args{
+				image:            images[3],
+				reqStr:           "100Mi",
+				updateType:       appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				partitionInStep1: 2, updatedInStep1: 4,
+				expectedSameInStep1: 4,
+				replica:             4,
+				preHook:             nil,
+				postHook:            nil,
+				volumeSizeCheck:     true,
+			},
+		},
+		{
+			// step 7 inplace update strategy however only change volumeClaimTemplate size
+			// => nothing changed
+			name: "testUpdateVolumeClaimTemplates2 step 8",
+			args: args{
+				image:            images[4],
+				reqStr:           "100Mi",
+				updateType:       appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				partitionInStep1: 1, updatedInStep1: 3,
+				expectedSameInStep1: 1,
+				replica:             4,
+				preHook:             nil,
+				postHook:            nil,
+				volumeSizeCheck:     true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			arg := tt.args
+			replica := arg.replica
+			partitionInStep1 := arg.partitionInStep1
+			updatedInStep1 := arg.updatedInStep1
+			expectedSameInStep1 := arg.expectedSameInStep1
+			pods0, pvcs0 = updateCloneSetInTwoStep(tt.name, t, g, instance, arg.image, arg.reqStr, arg.updateType,
+				partitionInStep1, updatedInStep1, expectedSameInStep1, replica, pods0, pvcs0,
+				arg.preHook, arg.postHook, arg.volumeSizeCheck, arg.fnsInStep1...)
+		})
+	}
+}
+
 func testUpdate(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 	// No way to test maxUnavailable, for this is a k8s cluster with only etcd and kube-apiserver
 	maxUnavailable := intstr.FromString("100%")
@@ -473,6 +808,11 @@ func checkStatus(g *gomega.GomegaWithT, total, updated int32) {
 		cs := appsv1alpha1.CloneSet{}
 		err := c.Get(context.TODO(), expectedRequest.NamespacedName, &cs)
 		g.Expect(err).NotTo(gomega.HaveOccurred())
+
+		// When the status has not been synchronized yet, force to wait
+		if cs.Generation != cs.Status.ObservedGeneration {
+			return []int32{-1, -1}
+		}
 		return []int32{cs.Status.Replicas, cs.Status.UpdatedReplicas}
 	}, time.Second*10, time.Millisecond*500).Should(gomega.Equal([]int32{total, updated}))
 }
