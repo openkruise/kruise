@@ -274,6 +274,8 @@ func validateSubsetTemplateUpdate(template, oldTemplate *appsv1alpha1.SubsetTemp
 		allErrs = append(allErrs, validateAdvancedStatefulSetUpdate(template.AdvancedStatefulSetTemplate, oldTemplate.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
 	} else if template.DeploymentTemplate != nil && oldTemplate.DeploymentTemplate != nil {
 		allErrs = append(allErrs, validateDeploymentUpdate(template.DeploymentTemplate, oldTemplate.DeploymentTemplate, fldPath.Child("deploymentTemplate"))...)
+	} else if template.CloneSetTemplate != nil && oldTemplate.CloneSetTemplate != nil {
+		allErrs = append(allErrs, validateCloneSetUpdate(template.CloneSetTemplate, oldTemplate.CloneSetTemplate, fldPath.Child("cloneSetTemplate"))...)
 	}
 
 	return allErrs
@@ -340,6 +342,19 @@ func validateSubsetTemplate(template *appsv1alpha1.SubsetTemplate, selector labe
 			return allErrs
 		}
 		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForReplicaSet(coreTemplate, selector, 0, fldPath.Child("deploymentTemplate", "spec", "template"), webhookutil.DefaultPodValidationOptions)...)
+	} else if template.CloneSetTemplate != nil {
+		labels := labels.Set(template.CloneSetTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("cloneSetTemplate", "metadata", "labels"), template.CloneSetTemplate.Labels, "`selector` does not match template `labels`"))
+		}
+		allErrs = append(allErrs, validateCloneSet(template.CloneSetTemplate, fldPath.Child("cloneSetTemplate"))...)
+		template := template.CloneSetTemplate.Spec.Template
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&template)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+			return allErrs
+		}
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForReplicaSet(coreTemplate, selector, 0, fldPath.Child("cloneSetTemplate", "spec", "template"), webhookutil.DefaultPodValidationOptions)...)
 	}
 
 	return allErrs
@@ -376,6 +391,14 @@ func validateDeployment(deployment *appsv1alpha1.DeploymentTemplateSpec, fldPath
 	allErrs := field.ErrorList{}
 	if deployment.Spec.Replicas != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *deployment.Spec.Replicas, "replicas in deploymentTemplate will not be used"))
+	}
+
+	return allErrs
+}
+func validateCloneSet(cs *appsv1alpha1.CloneSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if cs.Spec.Replicas != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *cs.Spec.Replicas, "replicas in cloneSetTemplate will not be used"))
 	}
 
 	return allErrs
@@ -434,6 +457,15 @@ func validateDeploymentUpdate(deployment, oldDeployment *appsv1alpha1.Deployment
 
 	if deployment.Spec.Replicas != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*deployment.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	}
+
+	return allErrs
+}
+func validateCloneSetUpdate(cloneSet, oldCloneSet *appsv1alpha1.CloneSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if cloneSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*cloneSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
 	}
 
 	return allErrs

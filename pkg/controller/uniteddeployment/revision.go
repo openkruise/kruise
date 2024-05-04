@@ -228,6 +228,8 @@ func (r *ReconcileUnitedDeployment) newRevision(ud *appsalphav1.UnitedDeployment
 		selectedLabels = ud.Spec.Template.AdvancedStatefulSetTemplate.Labels
 	} else if ud.Spec.Template.DeploymentTemplate != nil {
 		selectedLabels = ud.Spec.Template.DeploymentTemplate.Labels
+	} else if ud.Spec.Template.CloneSetTemplate != nil {
+		selectedLabels = ud.Spec.Template.CloneSetTemplate.Labels
 	}
 
 	cr, err := history.NewControllerRevision(ud,
