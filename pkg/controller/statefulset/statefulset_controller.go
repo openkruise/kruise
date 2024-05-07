@@ -188,7 +188,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to StatefulSet
-	err = c.Watch(&source.Kind{Type: &appsv1beta1.StatefulSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldSS := e.ObjectOld.(*appsv1beta1.StatefulSet)
 			newSS := e.ObjectNew.(*appsv1beta1.StatefulSet)
@@ -203,10 +203,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod created by StatefulSet
-	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &appsv1beta1.StatefulSet{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), handler.EnqueueRequestForOwner(
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.StatefulSet{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}

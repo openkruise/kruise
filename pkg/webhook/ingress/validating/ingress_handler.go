@@ -20,15 +20,15 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1 "k8s.io/api/admission/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 )
 
 type IngressHandler struct {
@@ -70,18 +70,4 @@ func (h *IngressHandler) Handle(ctx context.Context, req admission.Request) admi
 		return admission.Errored(http.StatusForbidden, err)
 	}
 	return admission.ValidationResponse(true, "")
-}
-
-var _ inject.Client = &IngressHandler{}
-
-func (h *IngressHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &IngressHandler{}
-
-func (h *IngressHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

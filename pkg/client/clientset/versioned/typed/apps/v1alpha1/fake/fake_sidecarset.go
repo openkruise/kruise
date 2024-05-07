@@ -23,7 +23,6 @@ import (
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -34,9 +33,9 @@ type FakeSidecarSets struct {
 	Fake *FakeAppsV1alpha1
 }
 
-var sidecarsetsResource = schema.GroupVersionResource{Group: "apps.kruise.io", Version: "v1alpha1", Resource: "sidecarsets"}
+var sidecarsetsResource = v1alpha1.SchemeGroupVersion.WithResource("sidecarsets")
 
-var sidecarsetsKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "SidecarSet"}
+var sidecarsetsKind = v1alpha1.SchemeGroupVersion.WithKind("SidecarSet")
 
 // Get takes name of the sidecarSet, and returns the corresponding sidecarSet object, and an error if there is any.
 func (c *FakeSidecarSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.SidecarSet, err error) {

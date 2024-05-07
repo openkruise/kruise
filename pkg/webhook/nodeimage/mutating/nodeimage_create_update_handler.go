@@ -22,13 +22,14 @@ import (
 	"net/http"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // NodeImageCreateUpdateHandler handles NodeImage
@@ -72,12 +73,4 @@ func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission
 	}
 
 	return resp
-}
-
-var _ admission.DecoderInjector = &NodeImageCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the NodeImageCreateUpdateHandler
-func (h *NodeImageCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

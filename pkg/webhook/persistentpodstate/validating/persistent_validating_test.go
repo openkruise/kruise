@@ -24,11 +24,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func init() {
@@ -121,7 +122,7 @@ func TestValidatingPer(t *testing.T) {
 		},
 	}
 
-	decoder, _ := admission.NewDecoder(scheme)
+	decoder := admission.NewDecoder(scheme)
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	perHandler := PersistentPodStateCreateUpdateHandler{
 		Client:  client,
@@ -212,7 +213,7 @@ func TestPerConflictWithOthers(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			decoder, _ := admission.NewDecoder(scheme)
+			decoder := admission.NewDecoder(scheme)
 			client := fake.NewClientBuilder().WithScheme(scheme).Build()
 			for _, pps := range cs.otherPers() {
 				client.Create(context.TODO(), pps)
@@ -267,7 +268,7 @@ func TestValidatingUpdatePer(t *testing.T) {
 		},
 	}
 
-	decoder, _ := admission.NewDecoder(scheme)
+	decoder := admission.NewDecoder(scheme)
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	perHandler := PersistentPodStateCreateUpdateHandler{
 		Client:  client,

@@ -22,12 +22,6 @@ import (
 	"testing"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +36,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 )
 
 func init() {
@@ -473,8 +474,9 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			decoder, _ := admission.NewDecoder(scheme)
-			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub()).Build()
+			decoder := admission.NewDecoder(scheme)
+			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub()).
+				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
 			podHandler := PodCreateHandler{
 				Client:  fClient,
 				Decoder: decoder,
@@ -669,8 +671,9 @@ func TestValidateEvictPodForPub(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			decoder, _ := admission.NewDecoder(scheme)
-			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).Build()
+			decoder := admission.NewDecoder(scheme)
+			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).
+				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
 			podHandler := PodCreateHandler{
 				Client:  fClient,
 				Decoder: decoder,
@@ -826,8 +829,9 @@ func TestValidateDeletePodForPub(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			decoder, _ := admission.NewDecoder(scheme)
-			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).Build()
+			decoder := admission.NewDecoder(scheme)
+			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).
+				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
 			podHandler := PodCreateHandler{
 				Client:  fClient,
 				Decoder: decoder,

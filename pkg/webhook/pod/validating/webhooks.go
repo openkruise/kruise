@@ -17,15 +17,23 @@ limitations under the License.
 package validating
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
 // +kubebuilder:webhook:path=/validate-pod,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups="",resources=pods,verbs=update;delete,versions=v1,name=vpod.kb.io
 // +kubebuilder:webhook:path=/validate-pod,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups="",resources=pods/eviction,verbs=create,versions=v1,name=vpodeviction.kb.io
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-pod": &PodCreateHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-pod": func(mgr manager.Manager) admission.Handler {
+			return &PodCreateHandler{
+				Client:  mgr.GetClient(),
+				Decoder: admission.NewDecoder(mgr.GetScheme()),
+			}
+		},
 	}
 )

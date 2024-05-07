@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -205,21 +204,5 @@ func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRe
 		}
 	}
 
-	return nil
-}
-
-var _ inject.Client = &ContainerRecreateRequestHandler{}
-
-// InjectClient injects the client into the ContainerRecreateRequestHandler
-func (h *ContainerRecreateRequestHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &ContainerRecreateRequestHandler{}
-
-// InjectDecoder injects the decoder into the ContainerRecreateRequestHandler
-func (h *ContainerRecreateRequestHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
 	return nil
 }

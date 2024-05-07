@@ -16,7 +16,12 @@ limitations under the License.
 
 package validating
 
-import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
+)
 
 // +kubebuilder:webhook:path=/validate-apps-deployment,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps,resources=deployments,verbs=delete,versions=v1,name=vbuiltindeployment.kb.io
 
@@ -25,10 +30,16 @@ import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 // +kubebuilder:webhook:path=/validate-apps-statefulset,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps,resources=statefulsets,verbs=delete,versions=v1,name=vbuiltinstatefulset.kb.io
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-apps-deployment":  &WorkloadHandler{},
-		"validate-apps-replicaset":  &WorkloadHandler{},
-		"validate-apps-statefulset": &WorkloadHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-apps-deployment": func(mgr manager.Manager) admission.Handler {
+			return &WorkloadHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
+		},
+		"validate-apps-replicaset": func(mgr manager.Manager) admission.Handler {
+			return &WorkloadHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
+		},
+		"validate-apps-statefulset": func(mgr manager.Manager) admission.Handler {
+			return &WorkloadHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
+		},
 	}
 )

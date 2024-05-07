@@ -1312,25 +1312,18 @@ func TestSyncPodProbeMarker(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+			builder := fake.NewClientBuilder().WithScheme(scheme)
+			builder.WithStatusSubresource(&appsv1alpha1.PodProbeMarker{}, &appsv1alpha1.NodePodProbe{})
 			for _, obj := range cs.getPods() {
-				err := fakeClient.Create(context.TODO(), obj.DeepCopy())
-				if err != nil {
-					t.Fatalf("create Pod failed: %s", err.Error())
-				}
+				builder.WithObjects(obj)
 			}
 			for _, obj := range cs.getPodProbeMarkers() {
-				err := fakeClient.Create(context.TODO(), obj.DeepCopy())
-				if err != nil {
-					t.Fatalf("create PodProbeMarker failed: %s", err.Error())
-				}
+				builder.WithObjects(obj)
 			}
 			for _, obj := range cs.getNodePodProbes() {
-				err := fakeClient.Create(context.TODO(), obj.DeepCopy())
-				if err != nil {
-					t.Fatalf("create NodePodProbes failed: %s", err.Error())
-				}
+				builder.WithObjects(obj)
 			}
+			fakeClient := builder.Build()
 
 			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: fakeClient}
 			recon := ReconcilePodProbeMarker{Client: fakeClient}
@@ -1354,8 +1347,8 @@ func checkNodePodProbeEqual(c client.WithWatch, t *testing.T, expect []*appsv1al
 			t.Fatalf("get NodePodProbe failed: %s", err.Error())
 			return false
 		}
-		t.Logf("expect: %v --> but: %v", util.DumpJSON(obj.Spec), util.DumpJSON(npp.Spec))
 		if !reflect.DeepEqual(obj.Spec, npp.Spec) {
+			t.Logf("expect: %v --> but: %v", util.DumpJSON(obj.Spec), util.DumpJSON(npp.Spec))
 			return false
 		}
 	}
@@ -1959,8 +1952,8 @@ func TestUpdateNodePodProbes(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeclient := fake.NewFakeClientWithScheme(scheme, tc.nodePodProbe)
-			r := &ReconcilePodProbeMarker{Client: fakeclient}
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.nodePodProbe).Build()
+			r := &ReconcilePodProbeMarker{Client: fakeClient}
 			get := r.updateNodePodProbes(tc.ppm, tc.nodeName, tc.pods)
 			if !reflect.DeepEqual(tc.getErr, get) {
 				t.Errorf("expect: %v, but: %v", tc.getErr, get)

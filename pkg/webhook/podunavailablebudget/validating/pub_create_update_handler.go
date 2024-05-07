@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -195,20 +194,4 @@ func validatePubConflict(pub *policyv1alpha1.PodUnavailableBudget, others []poli
 		}
 	}
 	return allErrs
-}
-
-var _ inject.Client = &PodUnavailableBudgetCreateUpdateHandler{}
-
-// InjectClient injects the client into the PodUnavailableBudgetCreateUpdateHandler
-func (h *PodUnavailableBudgetCreateUpdateHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &PodUnavailableBudgetCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the PodUnavailableBudgetCreateUpdateHandler
-func (h *PodUnavailableBudgetCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

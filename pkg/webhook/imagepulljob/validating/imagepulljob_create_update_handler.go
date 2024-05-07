@@ -23,13 +23,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // ImagePullJobCreateUpdateHandler handles ImagePullJob
@@ -108,13 +109,5 @@ func validate(obj *appsv1alpha1.ImagePullJob) error {
 		return fmt.Errorf("unknown type of completionPolicy: %s", obj.Spec.CompletionPolicy.Type)
 	}
 
-	return nil
-}
-
-var _ admission.DecoderInjector = &ImagePullJobCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the ImagePullJobCreateUpdateHandler
-func (h *ImagePullJobCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
 	return nil
 }

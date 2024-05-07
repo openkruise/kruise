@@ -423,7 +423,7 @@ func testPodHasNoMatchedSidecarSet(t *testing.T, sidecarSetIn *appsv1alpha1.Side
 	podIn := pod1.DeepCopy()
 	podIn.Labels["app"] = "doesnt-match"
 	podOut := podIn.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -467,7 +467,7 @@ func doMergeSidecarSecretsTest(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	podIn := pod1.DeepCopy()
 	podIn.Spec.ImagePullSecrets = podImagePullSecrets
 	podOut := podIn.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -490,7 +490,7 @@ func testInjectionStrategyPaused(t *testing.T, sidecarIn *appsv1alpha1.SidecarSe
 	podOut := podIn.DeepCopy()
 	sidecarPaused := sidecarIn
 	sidecarPaused.Spec.InjectionStrategy.Paused = true
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarPaused).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -530,7 +530,7 @@ func TestInjectMetadata(t *testing.T) {
 			},
 		},
 	}
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(demo1, demo2).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -588,6 +588,7 @@ func TestInjectionStrategyRevision(t *testing.T) {
 				Namespace: webhookutil.GetNamespace(),
 				Name:      revisionID,
 				Labels: map[string]string{
+					sidecarcontrol.SidecarSetKindName:         sidecarSet1.GetName(),
 					appsv1alpha1.SidecarSetCustomVersionLabel: revisionID,
 				},
 			},
@@ -602,7 +603,7 @@ func TestInjectionStrategyRevision(t *testing.T) {
 func testInjectionStrategyRevision(t *testing.T, env []client.Object) {
 	podIn := pod1.DeepCopy()
 	podOut := podIn.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(env...).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -625,7 +626,7 @@ func TestSidecarSetPodInjectPolicy(t *testing.T) {
 
 func testSidecarSetPodInjectPolicy(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -704,7 +705,7 @@ func TestSidecarVolumesAppend(t *testing.T) {
 func testSidecarVolumesAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -859,7 +860,7 @@ func testPodVolumeMountsAppend(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			podIn := cs.getPod()
-			decoder, _ := admission.NewDecoder(scheme.Scheme)
+			decoder := admission.NewDecoder(scheme.Scheme)
 			client := fake.NewClientBuilder().WithObjects(cs.getSidecarSets()).WithIndex(
 				&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 			).Build()
@@ -905,7 +906,7 @@ func TestSidecarSetTransferEnv(t *testing.T) {
 
 func testSidecarSetTransferEnv(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -941,7 +942,7 @@ func testSidecarSetHashInject(t *testing.T, sidecarSetIn1 *appsv1alpha1.SidecarS
 	sidecarSetIn2 := sidecarsetWithTransferEnv.DeepCopy()
 	sidecarSetIn3 := sidecarSet3.DeepCopy()
 
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn1, sidecarSetIn2, sidecarSetIn3).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()
@@ -974,7 +975,7 @@ func TestSidecarSetNameInject(t *testing.T) {
 
 func testSidecarSetNameInject(t *testing.T, sidecarSetIn1, sidecarSetIn3 *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn1, sidecarSetIn3).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()

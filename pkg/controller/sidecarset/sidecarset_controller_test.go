@@ -182,7 +182,9 @@ func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1alp
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(sidecarSetInput, podInput).
+		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
 		processor: NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10)),
@@ -215,7 +217,9 @@ func testUpdateWhenSidecarSetPaused(t *testing.T, sidecarSetInput *appsv1alpha1.
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(sidecarSetInput, podInput).
+		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
 		processor: NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10)),
@@ -248,7 +252,9 @@ func testUpdateWhenMaxUnavailableNotZero(t *testing.T, sidecarSetInput *appsv1al
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(sidecarSetInput, podInput).
+		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
 		processor: NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10)),
@@ -282,7 +288,8 @@ func testUpdateWhenPartitionFinished(t *testing.T, sidecarSetInput *appsv1alpha1
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).
+		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
 		processor: NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10)),
@@ -316,7 +323,8 @@ func testRemoveSidecarSet(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).
+		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
 		processor: NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10)),

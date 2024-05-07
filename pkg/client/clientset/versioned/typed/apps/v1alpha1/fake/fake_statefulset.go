@@ -24,7 +24,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +35,9 @@ type FakeStatefulSets struct {
 	ns   string
 }
 
-var statefulsetsResource = schema.GroupVersionResource{Group: "apps.kruise.io", Version: "v1alpha1", Resource: "statefulsets"}
+var statefulsetsResource = v1alpha1.SchemeGroupVersion.WithResource("statefulsets")
 
-var statefulsetsKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "StatefulSet"}
+var statefulsetsKind = v1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
 func (c *FakeStatefulSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StatefulSet, err error) {

@@ -24,12 +24,6 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -58,6 +52,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -98,6 +99,20 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
+
+	// todo: maybe we can change to NewControllerManagedBy, example
+	//return ctrl.NewControllerManagedBy(mgr).
+	//	Named("broadcastjob-controller").
+	//	WithOptions(controller.Options{
+	//		MaxConcurrentReconciles: concurrentReconciles,
+	//		CacheSyncTimeout:        util.GetControllerCacheSyncTimeout(),
+	//		RateLimiter:             ratelimiter.DefaultControllerRateLimiter(),
+	//	}).
+	//	For(&appsv1alpha1.BroadcastJob{}).
+	//	Owns(&corev1.Pod{}).
+	//	Watches(&corev1.Node{}, &enqueueBroadcastJobForNode{reader: mgr.GetCache()}).
+	//	Complete(r)
+
 	// Create a new controller
 	c, err := controller.New("broadcastjob-controller", mgr, controller.Options{
 		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
@@ -107,24 +122,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to BroadcastJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.BroadcastJob{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.BroadcastJob{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{
-		enqueueHandler: handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &appsv1alpha1.BroadcastJob{},
-		},
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &podEventHandler{
+		enqueueHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.BroadcastJob{}, handler.OnlyControllerOwner()),
 	})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Node
-	return c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueBroadcastJobForNode{reader: mgr.GetCache()})
+	return c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), &enqueueBroadcastJobForNode{reader: mgr.GetCache()})
 }
 
 var _ reconcile.Reconciler = &ReconcileBroadcastJob{}

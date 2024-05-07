@@ -267,7 +267,7 @@ func TestRescheduleSubset(t *testing.T) {
 						owners = append(owners, string(ref.UID))
 					}
 					return owners
-				}).Build()
+				}).WithStatusSubresource(&appsv1alpha1.WorkloadSpread{}).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
 				err := fakeClient.Create(context.TODO(), podIn)

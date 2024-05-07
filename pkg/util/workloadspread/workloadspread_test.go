@@ -1085,7 +1085,8 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			podIn := cs.getPod()
 			workloadSpreadIn := cs.getWorkloadSpread()
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadIn).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(workloadSpreadIn).WithStatusSubresource(&appsv1alpha1.WorkloadSpread{}).Build()
 			handler := NewWorkloadSpreadHandler(fakeClient)
 
 			var err error

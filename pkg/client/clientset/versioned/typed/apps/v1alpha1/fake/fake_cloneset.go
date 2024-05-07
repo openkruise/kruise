@@ -24,7 +24,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +35,9 @@ type FakeCloneSets struct {
 	ns   string
 }
 
-var clonesetsResource = schema.GroupVersionResource{Group: "apps.kruise.io", Version: "v1alpha1", Resource: "clonesets"}
+var clonesetsResource = v1alpha1.SchemeGroupVersion.WithResource("clonesets")
 
-var clonesetsKind = schema.GroupVersionKind{Group: "apps.kruise.io", Version: "v1alpha1", Kind: "CloneSet"}
+var clonesetsKind = v1alpha1.SchemeGroupVersion.WithKind("CloneSet")
 
 // Get takes name of the cloneSet, and returns the corresponding cloneSet object, and an error if there is any.
 func (c *FakeCloneSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.CloneSet, err error) {

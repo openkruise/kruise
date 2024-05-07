@@ -111,39 +111,31 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to UnitedDeployment
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.UnitedDeployment{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.UnitedDeployment{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}), handler.EnqueueRequestForOwner(
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &appsv1beta1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}), handler.EnqueueRequestForOwner(
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CloneSet{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}), handler.EnqueueRequestForOwner(
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &appsv1alpha1.UnitedDeployment{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}), handler.EnqueueRequestForOwner(
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}

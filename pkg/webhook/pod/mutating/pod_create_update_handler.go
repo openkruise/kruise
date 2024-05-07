@@ -23,11 +23,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
@@ -41,8 +39,6 @@ type PodCreateHandler struct {
 
 	// Decoder decodes objects
 	Decoder *admission.Decoder
-
-	finder *controllerfinder.ControllerFinder
 }
 
 var _ admission.Handler = &PodCreateHandler{}
@@ -125,21 +121,4 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	return admission.PatchResponseFromRaw(original, marshalled)
-}
-
-var _ inject.Client = &PodCreateHandler{}
-
-// InjectClient injects the client into the PodCreateHandler
-func (h *PodCreateHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	h.finder = controllerfinder.Finder
-	return nil
-}
-
-var _ admission.DecoderInjector = &PodCreateHandler{}
-
-// InjectDecoder injects the decoder into the PodCreateHandler
-func (h *PodCreateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

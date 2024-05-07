@@ -16,13 +16,23 @@ limitations under the License.
 
 package validating
 
-import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
+)
 
 // +kubebuilder:webhook:path=/validate-service,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups="",resources=services,verbs=delete,versions=v1,name=vservice.kb.io
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-service": &ServiceHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-service": func(mgr manager.Manager) admission.Handler {
+			return &ServiceHandler{
+				Client:  mgr.GetClient(),
+				Decoder: admission.NewDecoder(mgr.GetScheme()),
+			}
+		},
 	}
 )

@@ -54,12 +54,12 @@ type podEventHandler struct {
 
 var _ handler.EventHandler = &podEventHandler{}
 
-func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	pod := evt.Object.(*v1.Pod)
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
-		e.Delete(event.DeleteEvent{Object: evt.Object}, q)
+		e.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
 		return
 	}
 
@@ -102,7 +102,7 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	}
 }
 
-func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oldPod := evt.ObjectOld.(*v1.Pod)
 	curPod := evt.ObjectNew.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
@@ -118,10 +118,10 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rs never initiates a phase change, and so is never asleep waiting for the same.
-		e.Delete(event.DeleteEvent{Object: evt.ObjectNew}, q)
+		e.Delete(ctx, event.DeleteEvent{Object: evt.ObjectNew}, q)
 		if labelChanged {
 			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
-			e.Delete(event.DeleteEvent{Object: evt.ObjectOld}, q)
+			e.Delete(ctx, event.DeleteEvent{Object: evt.ObjectOld}, q)
 		}
 		return
 	}
@@ -181,7 +181,7 @@ func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, cur
 	return clonesetcore.New(cs).IgnorePodUpdateEvent(oldPod, curPod)
 }
 
-func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	pod, ok := evt.Object.(*v1.Pod)
 	if !ok {
 		klog.Errorf("DeleteEvent parse pod failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
@@ -204,7 +204,7 @@ func (e *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	q.Add(*req)
 }
 
-func (e *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 
 }
 
@@ -269,10 +269,10 @@ type pvcEventHandler struct {
 
 var _ handler.EventHandler = &pvcEventHandler{}
 
-func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	pvc := evt.Object.(*v1.PersistentVolumeClaim)
 	if pvc.DeletionTimestamp != nil {
-		e.Delete(event.DeleteEvent{Object: evt.Object}, q)
+		e.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
 		return
 	}
 
@@ -293,14 +293,14 @@ func (e *pvcEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 	}
 }
 
-func (e *pvcEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	pvc := evt.ObjectNew.(*v1.PersistentVolumeClaim)
 	if pvc.DeletionTimestamp != nil {
-		e.Delete(event.DeleteEvent{Object: evt.ObjectNew}, q)
+		e.Delete(ctx, event.DeleteEvent{Object: evt.ObjectNew}, q)
 	}
 }
 
-func (e *pvcEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	pvc, ok := evt.Object.(*v1.PersistentVolumeClaim)
 	if !ok {
 		klog.Errorf("DeleteEvent parse pvc failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
@@ -315,6 +315,6 @@ func (e *pvcEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiting
 	}
 }
 
-func (e *pvcEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 
 }

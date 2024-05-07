@@ -227,7 +227,7 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 		},
 	}
 
-	decoder, _ := admission.NewDecoder(scheme)
+	decoder := admission.NewDecoder(scheme)
 	perHandler := PodProbeMarkerCreateUpdateHandler{
 		Decoder: decoder,
 	}

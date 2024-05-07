@@ -123,7 +123,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to CloneSet
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CloneSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldCS := e.ObjectOld.(*appsv1alpha1.CloneSet)
 			newCS := e.ObjectNew.(*appsv1alpha1.CloneSet)
@@ -139,13 +139,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &podEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &podEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to PVC, just ensure cache updated
-	err = c.Watch(&source.Kind{Type: &v1.PersistentVolumeClaim{}}, &pvcEventHandler{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.PersistentVolumeClaim{}), &pvcEventHandler{})
 	if err != nil {
 		return err
 	}

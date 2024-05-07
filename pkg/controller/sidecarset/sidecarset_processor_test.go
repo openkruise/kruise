@@ -175,7 +175,9 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 		t.Run(cs.name, func(t *testing.T) {
 			pods := cs.getPods()
 			sidecarset := cs.getSidecarset()
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarset, pods[0], pods[1]).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(sidecarset, pods[0], pods[1]).
+				WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 			processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 			_, err := processor.UpdateSidecarSet(sidecarset)
 			if err != nil {
@@ -270,7 +272,8 @@ func TestCanUpgradePods(t *testing.T) {
 		Type:   intstr.String,
 		StrVal: "50%",
 	}
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).
+		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	pods := factoryPodsCommon(100, 0, sidecarSet)
 	for i := range pods {
 		pods[i].Annotations[sidecarcontrol.SidecarSetListAnnotation] = `test-sidecarset`

@@ -122,37 +122,37 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch WorkloadSpread
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.WorkloadSpread{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.WorkloadSpread{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pods have a specific annotation
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &podEventHandler{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for replica changes to CloneSet
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.CloneSet{}}, &workloadEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}), &workloadEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for replica changes to Deployment
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &workloadEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}), &workloadEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for replica changes to ReplicaSet
-	err = c.Watch(&source.Kind{Type: &appsv1.ReplicaSet{}}, &workloadEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.ReplicaSet{}), &workloadEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for parallelism changes to Job
-	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &workloadEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), &workloadEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if len(whiteList.Workloads) > 0 {
 		workloadHandler := &workloadEventHandler{Reader: mgr.GetClient()}
 		for _, workload := range whiteList.Workloads {
-			if _, err := ctrlUtil.AddWatcherDynamically(c, workloadHandler, workload.GroupVersionKind, "WorkloadSpread"); err != nil {
+			if _, err := ctrlUtil.AddWatcherDynamically(mgr, c, workloadHandler, workload.GroupVersionKind, "WorkloadSpread"); err != nil {
 				return err
 			}
 		}

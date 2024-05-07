@@ -23,7 +23,7 @@ import (
 )
 
 func init() {
-	addHandlersWithGate(validating.HandlerMap, func() (enabled bool) {
+	addHandlersWithGate(validating.HandlerGetterMap, func() (enabled bool) {
 		return utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection)
 	})
 }

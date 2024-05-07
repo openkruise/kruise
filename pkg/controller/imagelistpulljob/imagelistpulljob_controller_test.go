@@ -431,7 +431,7 @@ func createReconcileJob(scheme *k8sruntime.Scheme, initObjs ...client.Object) Re
 				owners = append(owners, string(ref.UID))
 			}
 			return owners
-		}).Build()
+		}).WithStatusSubresource(&appsv1alpha1.ImageListPullJob{}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, corev1.EventSource{Component: "imagelistpulljob-controller"})
 	reconcileJob := ReconcileImageListPullJob{

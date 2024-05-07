@@ -33,7 +33,6 @@ import (
 	"k8s.io/klog/v2"
 	coreval "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -161,20 +160,4 @@ func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, re
 		return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 	}
 	return admission.ValidationResponse(true, "")
-}
-
-var _ inject.Client = &ResourceDistributionCreateUpdateHandler{}
-
-// InjectClient injects the client into the ResourceDistributionCreateUpdateHandler
-func (h *ResourceDistributionCreateUpdateHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &ResourceDistributionCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the ResourceDistributionCreateUpdateHandler
-func (h *ResourceDistributionCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

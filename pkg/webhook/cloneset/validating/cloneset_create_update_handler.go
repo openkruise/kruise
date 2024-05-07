@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"net/http"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 )
 
 // CloneSetCreateUpdateHandler handles CloneSet
@@ -83,20 +83,4 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 	}
 
 	return admission.ValidationResponse(true, "")
-}
-
-var _ inject.Client = &CloneSetCreateUpdateHandler{}
-
-// InjectClient injects the client into the CloneSetCreateUpdateHandler
-func (h *CloneSetCreateUpdateHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &CloneSetCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the CloneSetCreateUpdateHandler
-func (h *CloneSetCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

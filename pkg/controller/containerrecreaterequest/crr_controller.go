@@ -91,13 +91,13 @@ func add(mgr manager.Manager, r *ReconcileContainerRecreateRequest) error {
 	}
 
 	// Watch for changes to ContainerRecreateRequest
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ContainerRecreateRequest{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ContainerRecreateRequest{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for pod for jobs that have pod selector
-	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &podEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &podEventHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
