@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout Actions Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Check spelling with custom config file
         uses: crate-ci/typos@v1.21.0
         with:
@@ -41,7 +41,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: true
       - name: Setup Go
@@ -84,7 +84,7 @@ jobs:
     container: pouchcontainer/pouchlinter:v0.1.2
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run misspell
         run: find  ./* -name  "*"  | grep -v vendor | xargs misspell -error
       - name: Run shellcheck
@@ -107,7 +107,7 @@ jobs:
   unit-tests:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Fetch History

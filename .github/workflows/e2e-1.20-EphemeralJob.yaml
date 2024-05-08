@@ -22,7 +22,7 @@ jobs:
   ephemeraljob:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Setup Go
