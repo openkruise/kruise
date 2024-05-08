@@ -387,6 +387,7 @@ func TestSubsetPodDeletionCost(t *testing.T) {
 				}
 				deleteTime := metav1.Now()
 				pods[0].DeletionTimestamp = &deleteTime
+				pods[0].Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 				return pods
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
@@ -535,6 +536,7 @@ func TestSubsetPodDeletionCost(t *testing.T) {
 
 				deleteTime := metav1.Now()
 				pods[4].DeletionTimestamp = &deleteTime
+				pods[4].Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 				return pods
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
@@ -577,6 +579,7 @@ func TestSubsetPodDeletionCost(t *testing.T) {
 
 				deleteTime := metav1.Now()
 				pods[3].DeletionTimestamp = &deleteTime
+				pods[3].Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 				return pods
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
@@ -1199,6 +1202,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				deleteTime := metav1.Time{Time: currentTime.Add(1 * s)}
 				pods[4].DeletionTimestamp = &deleteTime
+				pods[4].Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 				return pods
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
@@ -1530,27 +1534,22 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			currentTime = time.Now()
 			workloadSpread := cs.getWorkloadSpread()
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpread).
+			builder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpread).
 				WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
 					var owners []string
 					for _, ref := range obj.GetOwnerReferences() {
 						owners = append(owners, string(ref.UID))
 					}
 					return owners
-				}).Build()
+				}).WithStatusSubresource(&appsv1alpha1.WorkloadSpread{})
 			if cs.getCloneSet() != nil {
-				err := fakeClient.Create(context.TODO(), cs.getCloneSet())
-				if err != nil {
-					t.Fatalf("create pod failed: %s", err.Error())
-				}
+				builder.WithObjects(cs.getCloneSet())
 			}
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
-				err := fakeClient.Create(context.TODO(), podIn)
-				if err != nil {
-					t.Fatalf("create pod failed: %s", err.Error())
-				}
+				builder.WithObjects(podIn)
 			}
+			fakeClient := builder.Build()
 
 			reconciler := ReconcileWorkloadSpread{
 				Client:           fakeClient,
@@ -1572,7 +1571,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				if !reflect.DeepEqual(annotation1, annotation2) {
 					fmt.Println(annotation1)
 					fmt.Println(annotation2)
-					t.Fatalf("set Pod deletion-cost annotation failed")
+					t.Fatalf("set Pod %v deletion-cost annotation failed", latestPodList[i].Name)
 				}
 			}
 
@@ -2179,28 +2178,24 @@ func TestManagerExistingPods(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			currentTime = time.Now()
 			workloadSpread := cs.getWorkloadSpread()
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getCloneSet(), workloadSpread).
-				WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
-					var owners []string
-					for _, ref := range obj.GetOwnerReferences() {
-						owners = append(owners, string(ref.UID))
-					}
-					return owners
-				}).Build()
+			builder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getCloneSet(), workloadSpread)
+			builder.WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+				var owners []string
+				for _, ref := range obj.GetOwnerReferences() {
+					owners = append(owners, string(ref.UID))
+				}
+				return owners
+			})
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
-				err := fakeClient.Create(context.TODO(), podIn)
-				if err != nil {
-					t.Fatalf("create pod failed: %s", err.Error())
-				}
+				builder.WithObjects(podIn)
 			}
 			for _, node := range cs.getNodes() {
 				nodeIn := node.DeepCopy()
-				err := fakeClient.Create(context.TODO(), nodeIn)
-				if err != nil {
-					t.Fatalf("create node failed: %s", err.Error())
-				}
+				builder.WithObjects(nodeIn)
 			}
+			builder.WithStatusSubresource(&appsv1alpha1.WorkloadSpread{})
+			fakeClient := builder.Build()
 
 			reconciler := ReconcileWorkloadSpread{
 				Client:           fakeClient,

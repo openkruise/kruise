@@ -25,11 +25,10 @@ import (
 	"time"
 	_ "time/tzdata" // for AdvancedCronJob Time Zone support
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
@@ -38,6 +37,9 @@ import (
 	"k8s.io/klog/v2/klogr"
 	"k8s.io/kubernetes/pkg/capabilities"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -53,6 +55,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	_ "github.com/openkruise/kruise/pkg/util/metrics/leadership"
 	"github.com/openkruise/kruise/pkg/webhook"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -171,8 +174,10 @@ func main() {
 		}
 	}
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress:     healthProbeAddr,
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionID:           leaderElectionId,
@@ -181,9 +186,16 @@ func main() {
 		LeaseDuration:              &leaseDuration,
 		RenewDeadline:              &renewDeadLine,
 		RetryPeriod:                &retryPeriod,
-		Namespace:                  namespace,
-		SyncPeriod:                 syncPeriod,
-		NewCache:                   utilclient.NewCache,
+		Cache: cache.Options{
+			SyncPeriod:        syncPeriod,
+			DefaultNamespaces: getCacheNamespacesFromFlag(namespace),
+		},
+		WebhookServer: ctrlwebhook.NewServer(ctrlwebhook.Options{
+			Host:    "0.0.0.0",
+			Port:    webhookutil.GetPort(),
+			CertDir: webhookutil.GetCertDir(),
+		}),
+		NewCache: utilclient.NewCache,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -247,5 +259,14 @@ func setRestConfig(c *rest.Config) {
 	}
 	if *restConfigBurst > 0 {
 		c.Burst = *restConfigBurst
+	}
+}
+
+func getCacheNamespacesFromFlag(ns string) map[string]cache.Config {
+	if ns == "" {
+		return nil
+	}
+	return map[string]cache.Config{
+		ns: {},
 	}
 }

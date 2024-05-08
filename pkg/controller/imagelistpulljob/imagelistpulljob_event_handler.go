@@ -17,23 +17,22 @@ limitations under the License.
 package imagelistpulljob
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
 type imagePullJobEventHandler struct {
-	enqueueHandler handler.EnqueueRequestForOwner
+	enqueueHandler handler.EventHandler
 }
 
 func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
@@ -45,45 +44,33 @@ func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
 	return controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group
 }
 
-func (p *imagePullJobEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *imagePullJobEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	job := evt.Object.(*appsv1alpha1.ImagePullJob)
 	if job.DeletionTimestamp != nil {
-		p.Delete(event.DeleteEvent{Object: evt.Object}, q)
+		p.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
 		return
 	}
 	if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && isImageListPullJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: job.Namespace, Name: controllerRef.Name}.String()
 		scaleExpectations.ObserveScale(key, expectations.Create, job.Spec.Image)
-		p.enqueueHandler.Create(evt, q)
+		p.enqueueHandler.Create(ctx, evt, q)
 	}
 }
 
-func (p *imagePullJobEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *imagePullJobEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	job := evt.Object.(*appsv1alpha1.ImagePullJob)
 	if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && isImageListPullJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: job.Namespace, Name: controllerRef.Name}.String()
 		scaleExpectations.ObserveScale(key, expectations.Delete, job.Spec.Image)
 	}
-	p.enqueueHandler.Delete(evt, q)
+	p.enqueueHandler.Delete(ctx, evt, q)
 }
 
-func (p *imagePullJobEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *imagePullJobEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	newJob := evt.ObjectNew.(*appsv1alpha1.ImagePullJob)
 	resourceVersionExpectations.Expect(newJob)
-	p.enqueueHandler.Update(evt, q)
+	p.enqueueHandler.Update(ctx, evt, q)
 }
 
-func (p *imagePullJobEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
-}
-
-var _ inject.Mapper = &imagePullJobEventHandler{}
-
-func (p *imagePullJobEventHandler) InjectScheme(s *runtime.Scheme) error {
-	return p.enqueueHandler.InjectScheme(s)
-}
-
-var _ inject.Mapper = &imagePullJobEventHandler{}
-
-func (p *imagePullJobEventHandler) InjectMapper(m meta.RESTMapper) error {
-	return p.enqueueHandler.InjectMapper(m)
+func (p *imagePullJobEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }

@@ -16,15 +16,25 @@ limitations under the License.
 
 package validating
 
-import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
+)
 
 // +kubebuilder:webhook:path=/validate-customresourcedefinition,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=delete,versions=v1;v1beta1,name=vcustomresourcedefinition.kb.io
 
 // +kubebuilder:rbac:groups="*",resources="*",verbs=list
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-customresourcedefinition": &CRDHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-customresourcedefinition": func(mgr manager.Manager) admission.Handler {
+			return &CRDHandler{
+				Client:  mgr.GetClient(),
+				Decoder: admission.NewDecoder(mgr.GetScheme()),
+			}
+		},
 	}
 )

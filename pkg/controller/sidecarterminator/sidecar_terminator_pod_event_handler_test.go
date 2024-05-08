@@ -17,6 +17,7 @@ limitations under the License.
 package sidecarterminator
 
 import (
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -254,7 +255,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 				ObjectNew: cs.getNewPod(),
 			}
 			que := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-			eventHandler.Update(evt, que)
+			eventHandler.Update(context.TODO(), evt, que)
 			if que.Len() != cs.expectLen {
 				t.Fatalf("Get unexpected queue length, expected %v, actual %v", cs.expectLen, que.Len())
 			}
@@ -360,7 +361,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 				Object: cs.getPod(),
 			}
 			que := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-			eventHandler.Create(evt, que)
+			eventHandler.Create(context.TODO(), evt, que)
 			if que.Len() != cs.expectLen {
 				t.Fatalf("Get unexpected queue length, expected %v, actual %v", cs.expectLen, que.Len())
 			}

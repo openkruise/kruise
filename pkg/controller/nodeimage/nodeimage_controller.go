@@ -111,19 +111,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to NodeImage
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.NodeImage{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodeImage{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Node
-	err = c.Watch(&source.Kind{Type: &v1.Node{}}, &nodeHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Node{}), &nodeHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for deletion to ImagePullJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ImagePullJob{}}, &imagePullJobHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImagePullJob{}), &imagePullJobHandler{Reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}

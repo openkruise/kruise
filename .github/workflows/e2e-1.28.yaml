@@ -1,4 +1,4 @@
-name: E2E-1.18
+name: E2E-1.28
 
 on:
   push:
@@ -14,8 +14,8 @@ permissions: read-all
 env:
   # Common versions
   GO_VERSION: '1.20'
-  KIND_VERSION: 'v0.14.0'
-  KIND_IMAGE: 'kindest/node:v1.18.20'
+  KIND_VERSION: 'v0.22.0'
+  KIND_IMAGE: 'kindest/node:v1.28.7'
   KIND_CLUSTER_NAME: 'ci-testing'
 
 jobs:
@@ -31,11 +31,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@v1.9.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf.yaml
+          config: ./test/kind-conf-none-fg.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -80,26 +80,13 @@ jobs:
           retVal=$?
           restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
           if [ "${restartCount}" -eq "0" ];then
-              echo "$out"
               echo "Kruise-manager has not restarted"
           else
-              echo "$out"
+              kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers
               echo "Kruise-manager has restarted, abort!!!"
               kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
               exit 1
           fi
-          kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
-          do
-            restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
-            if [ "${restartCount}" -eq "0" ];then
-                echo "Kruise-daemon has not restarted"
-            else
-                kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
-                echo "Kruise-daemon has restarted, abort!!!"
-                kubectl logs -p -n ${ns} ${name}
-                exit 1
-            fi
-          done
           if [ "$retVal" -ne 0 ];then
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
@@ -108,7 +95,7 @@ jobs:
               echo "test fail, dump kruise-daemon logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')  
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')         
           fi
           exit $retVal
 
@@ -123,11 +110,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@v1.9.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf.yaml
+          config: ./test/kind-conf-none-fg.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -199,8 +186,9 @@ jobs:
               echo "test fail, dump kruise-daemon logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')          
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')         
           fi
+          
           exit $retVal
 
   advanced-daemonset:
@@ -214,11 +202,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@v1.9.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf.yaml
+          config: ./test/kind-conf-none-fg.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -282,6 +270,7 @@ jobs:
                 exit 1
             fi
           done
+          
           if [ "$retVal" -ne 0 ];then
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
@@ -290,7 +279,7 @@ jobs:
               echo "test fail, dump kruise-daemon logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')            
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')         
           fi
           exit $retVal
 
@@ -305,11 +294,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@v1.9.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf.yaml
+          config: ./test/kind-conf-none-fg.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -373,6 +362,77 @@ jobs:
                 exit 1
             fi
           done
+          
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')           
+          fi
+          exit $retVal
+
+  ephemeraljob:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@v1.9.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-none-fg.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          set -ex
+          kubectl cluster-info
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
+          NODES=$(kubectl get node | wc -l)
+          for ((i=1;i<10;i++));
+          do
+            set +e
+            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+            set -e
+            if [ "$PODS" -eq "$NODES" ]; then
+              break
+            fi
+            sleep 3
+          done
+          set +e
+          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
+          kubectl get all -n kruise-system -o yaml
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
+          set -e
+          if [ "$PODS" -eq "$NODES" ]; then
+            echo "Wait for kruise-manager and kruise-daemon ready successfully"
+          else
+            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
+            exit 1
+          fi
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          make ginkgo
+          set +e
+          ./bin/ginkgo -timeout 60m -v --focus='\[apps\] EphemeralJob' test/e2e
+          retVal=$?
           if [ "$retVal" -ne 0 ];then
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
@@ -396,11 +456,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@v1.9.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf.yaml
+          config: ./test/kind-conf-none-fg.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -448,7 +508,7 @@ jobs:
               while read pod; do 
                    kubectl logs -n kruise-system $pod
               done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
-          fi      
+          fi
           exit $retVal
   other:
     runs-on: ubuntu-20.04
@@ -461,11 +521,11 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@v1.9.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf.yaml
+          config: ./test/kind-conf-none-fg.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -529,7 +589,7 @@ jobs:
                 exit 1
             fi
           done
-          if [ "$retVal" -ne 0 ];then
+          if [ "${retVal}" -ne 0 ];then
               echo "test fail, dump kruise-manager logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
@@ -537,6 +597,7 @@ jobs:
               echo "test fail, dump kruise-daemon logs"
               while read pod; do 
                    kubectl logs -n kruise-system $pod
-              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')            
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')             
           fi
+
           exit $retVal

@@ -22,14 +22,14 @@ import (
 	"net/http"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/configuration"
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 )
 
 // PersistentPodStateCreateUpdateHandler handles PersistentPodState
@@ -145,20 +145,4 @@ func validatePerConflict(pps *appsv1alpha1.PersistentPodState, others []appsv1al
 		}
 	}
 	return allErrs
-}
-
-var _ inject.Client = &PersistentPodStateCreateUpdateHandler{}
-
-// InjectClient injects the client into the PersistentPodStateCreateUpdateHandler
-func (h *PersistentPodStateCreateUpdateHandler) InjectClient(c client.Client) error {
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &PersistentPodStateCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the PersistentPodStateCreateUpdateHandler
-func (h *PersistentPodStateCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

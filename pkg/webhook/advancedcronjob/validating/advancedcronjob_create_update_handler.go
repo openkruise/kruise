@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/robfig/cron/v3"
 	admissionv1 "k8s.io/api/admission/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -38,6 +36,9 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 const (
@@ -226,12 +227,4 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 	}
 
 	return admission.ValidationResponse(true, "")
-}
-
-var _ admission.DecoderInjector = &AdvancedCronJobCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the AdvancedCronJobCreateUpdateHandler
-func (h *AdvancedCronJobCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

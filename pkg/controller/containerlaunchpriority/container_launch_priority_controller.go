@@ -70,7 +70,7 @@ func add(mgr manager.Manager, r *ReconcileContainerLaunchPriority) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			pod := e.Object.(*v1.Pod)
 			return shouldEnqueue(pod, mgr.GetCache())

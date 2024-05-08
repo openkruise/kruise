@@ -62,7 +62,7 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_Volume_To_core_Volume failed: %v", err)))
 		return allErrs
 	}
-	allErrs = append(allErrs, corevalidation.ValidateReadOnlyPersistentDisks(coreVolumes, fldPath.Child("template", "spec", "volumes"))...)
+	allErrs = append(allErrs, corevalidation.ValidateReadOnlyPersistentDisks(coreVolumes, nil, fldPath.Child("template", "spec", "volumes"))...)
 
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != corev1.RestartPolicyAlways {

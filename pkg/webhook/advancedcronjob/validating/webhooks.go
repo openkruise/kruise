@@ -17,14 +17,19 @@ limitations under the License.
 package validating
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
 // +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-advancedcronjob,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=advancedcronjobs,verbs=create;update,versions=v1alpha1,name=vadvancedcronjob.kb.io
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-apps-kruise-io-v1alpha1-advancedcronjob": &AdvancedCronJobCreateUpdateHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-apps-kruise-io-v1alpha1-advancedcronjob": func(mgr manager.Manager) admission.Handler {
+			return &AdvancedCronJobCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
+		},
 	}
 )

@@ -23,16 +23,17 @@ import (
 	"net/http"
 	"reflect"
 
+	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // StatefulSetCreateUpdateHandler handles StatefulSet
@@ -132,11 +133,3 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 //	h.Client = c
 //	return nil
 //}
-
-var _ admission.DecoderInjector = &StatefulSetCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the StatefulSetCreateUpdateHandler
-func (h *StatefulSetCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
-}

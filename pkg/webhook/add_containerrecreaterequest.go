@@ -21,5 +21,5 @@ import (
 )
 
 func init() {
-	addHandlers(mutating.HandlerMap)
+	addHandlers(mutating.HandlerGetterMap)
 }

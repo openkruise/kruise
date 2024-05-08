@@ -77,7 +77,7 @@ func TestPodUpdateEventHandler(t *testing.T) {
 	handler := enqueueRequestForPod{reader: fakeClient}
 
 	// update with pod no PodInitialized, then return
-	handler.Update(updateEvent, updateQ)
+	handler.Update(context.TODO(), updateEvent, updateQ)
 	if updateQ.Len() != 0 {
 		t.Errorf("unexpected update event handle queue size, expected 1 actual %d", updateQ.Len())
 	}
@@ -88,7 +88,7 @@ func TestPodUpdateEventHandler(t *testing.T) {
 	newPod.Status.Phase = corev1.PodSucceeded
 
 	// update with pod status changed and reconcile
-	handler.Update(updateEvent, updateQ)
+	handler.Update(context.TODO(), updateEvent, updateQ)
 	if updateQ.Len() != 0 {
 		t.Errorf("unexpected update event handle queue size, expected 1 actual %d", updateQ.Len())
 	}
@@ -98,7 +98,7 @@ func TestPodUpdateEventHandler(t *testing.T) {
 		ObjectOld: nil,
 		ObjectNew: nil,
 	}
-	handler.Update(updateEvent, updateQ)
+	handler.Update(context.TODO(), updateEvent, updateQ)
 	if updateQ.Len() != 0 {
 		t.Errorf("unexpected update event handle queue size, expected 1 actual %d", updateQ.Len())
 	}
@@ -108,7 +108,7 @@ func TestPodUpdateEventHandler(t *testing.T) {
 		ObjectOld: nil,
 		ObjectNew: newPod,
 	}
-	handler.Update(updateEvent, updateQ)
+	handler.Update(context.TODO(), updateEvent, updateQ)
 	if updateQ.Len() != 0 {
 		t.Errorf("unexpected update event handle queue size, expected 1 actual %d", updateQ.Len())
 	}
@@ -456,7 +456,7 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 				ObjectOld: podDemo,
 				ObjectNew: newPod,
 			}
-			handler.Update(updateEvent, updateQ)
+			handler.Update(context.TODO(), updateEvent, updateQ)
 			if updateQ.Len() != cs.expectQLen {
 				t.Errorf("unexpected update event handle queue size, expected %v actual %d", cs.expectQLen, updateQ.Len())
 			}

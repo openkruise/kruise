@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"net/http"
 
+	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
-	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // StatefulSetCreateUpdateHandler handles StatefulSet
@@ -139,11 +140,3 @@ func (h *StatefulSetCreateUpdateHandler) decodeOldObject(req admission.Request, 
 //	h.Client = c
 //	return nil
 //}
-
-var _ admission.DecoderInjector = &StatefulSetCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the StatefulSetCreateUpdateHandler
-func (h *StatefulSetCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
-}

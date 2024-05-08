@@ -17,14 +17,19 @@ limitations under the License.
 package validating
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
 // +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-imagepulljob,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=imagepulljobs,verbs=create;update,versions=v1alpha1,name=vimagepulljob.kb.io
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-apps-kruise-io-v1alpha1-imagepulljob": &ImagePullJobCreateUpdateHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-apps-kruise-io-v1alpha1-imagepulljob": func(mgr manager.Manager) admission.Handler {
+			return &ImagePullJobCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
+		},
 	}
 )

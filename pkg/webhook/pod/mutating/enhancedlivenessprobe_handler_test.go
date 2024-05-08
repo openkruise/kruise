@@ -474,7 +474,7 @@ func TestRemoveAndBackUpPodContainerLivenessProbeLink(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			podIn := tc.pod
-			decoder, _ := admission.NewDecoder(schema)
+			decoder := admission.NewDecoder(schema)
 			client := fake.NewClientBuilder().WithScheme(schema).WithObjects(podIn).Build()
 			podOut := podIn.DeepCopy()
 			podHandler := &PodCreateHandler{Decoder: decoder, Client: client}

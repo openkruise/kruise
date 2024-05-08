@@ -88,7 +88,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to ResourceDistribution
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.ResourceDistribution{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ResourceDistribution{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldObj := e.ObjectOld.(*appsv1alpha1.ResourceDistribution)
 			newObj := e.ObjectNew.(*appsv1alpha1.ResourceDistribution)
@@ -104,7 +104,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to all namespaces
-	err = c.Watch(&source.Kind{Type: &corev1.Namespace{}}, &enqueueRequestForNamespace{reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Namespace{}), &enqueueRequestForNamespace{reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
@@ -112,16 +112,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to Secrets
 	secret := unstructured.Unstructured{}
 	secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-	err = c.Watch(&source.Kind{Type: &secret}, &handler.EnqueueRequestForOwner{
-		IsController: true, OwnerType: &appsv1alpha1.ResourceDistribution{},
-	}, predicate.Funcs{
-		CreateFunc: func(createEvent event.CreateEvent) bool {
-			return false
-		},
-		GenericFunc: func(genericEvent event.GenericEvent) bool {
-			return false
-		},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &secret), handler.EnqueueRequestForOwner(
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ResourceDistribution{}, handler.OnlyControllerOwner()),
+		predicate.Funcs{
+			CreateFunc: func(createEvent event.CreateEvent) bool {
+				return false
+			},
+			GenericFunc: func(genericEvent event.GenericEvent) bool {
+				return false
+			},
+		})
 	if err != nil {
 		return err
 	}
@@ -129,16 +129,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to ConfigMap
 	configMap := unstructured.Unstructured{}
 	configMap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
-	err = c.Watch(&source.Kind{Type: &configMap}, &handler.EnqueueRequestForOwner{
-		IsController: true, OwnerType: &appsv1alpha1.ResourceDistribution{},
-	}, predicate.Funcs{
-		CreateFunc: func(createEvent event.CreateEvent) bool {
-			return false
-		},
-		GenericFunc: func(genericEvent event.GenericEvent) bool {
-			return false
-		},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &configMap), handler.EnqueueRequestForOwner(
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ResourceDistribution{}, handler.OnlyControllerOwner()),
+		predicate.Funcs{
+			CreateFunc: func(createEvent event.CreateEvent) bool {
+				return false
+			},
+			GenericFunc: func(genericEvent event.GenericEvent) bool {
+				return false
+			},
+		})
 	if err != nil {
 		return err
 	}

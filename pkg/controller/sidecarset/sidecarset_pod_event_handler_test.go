@@ -46,7 +46,7 @@ func TestPodEventHandler(t *testing.T) {
 	createEvt := event.CreateEvent{
 		Object: podDemo,
 	}
-	handler.Create(createEvt, createQ)
+	handler.Create(context.TODO(), createEvt, createQ)
 	if createQ.Len() != 1 {
 		t.Errorf("unexpected create event handle queue size, expected 1 actual %d", createQ.Len())
 	}
@@ -61,7 +61,7 @@ func TestPodEventHandler(t *testing.T) {
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
 	}
-	handler.Update(updateEvent, updateQ)
+	handler.Update(context.TODO(), updateEvent, updateQ)
 	if updateQ.Len() != 1 {
 		t.Errorf("unexpected update event handle queue size, expected 1 actual %d", updateQ.Len())
 	}
@@ -75,7 +75,7 @@ func TestPodEventHandler(t *testing.T) {
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
 	}
-	handler.Update(updateEvent, updateQ)
+	handler.Update(context.TODO(), updateEvent, updateQ)
 	if updateQ.Len() != 0 {
 		t.Errorf("unexpected update event handle queue size, expected 0 actual %d", updateQ.Len())
 	}
@@ -85,7 +85,7 @@ func TestPodEventHandler(t *testing.T) {
 	deleteEvt := event.DeleteEvent{
 		Object: podDemo,
 	}
-	handler.Delete(deleteEvt, deleteQ)
+	handler.Delete(context.TODO(), deleteEvt, deleteQ)
 	if deleteQ.Len() != 0 {
 		t.Errorf("unexpected delete event handle queue size, expected 1 actual %d", deleteQ.Len())
 	}

@@ -4,8 +4,6 @@ import (
 	"context"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -13,13 +11,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
 type podHandler struct {
 	client.Reader
 }
 
-func (e *podHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *podHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	pod, ok := evt.Object.(*corev1.Pod)
 	if !ok {
 		return
@@ -28,10 +29,10 @@ func (e *podHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInter
 	e.handle(pod, q)
 }
 
-func (e *podHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *podHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
-func (e *podHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *podHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oldPod := evt.ObjectOld.(*corev1.Pod)
 	curPod := evt.ObjectNew.(*corev1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
@@ -45,7 +46,7 @@ func (e *podHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInter
 	e.handle(curPod, q)
 }
 
-func (e *podHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *podHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	pod, ok := evt.Object.(*corev1.Pod)
 	if !ok {
 		return
@@ -75,7 +76,7 @@ type ejobHandler struct {
 	client.Reader
 }
 
-func (e *ejobHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *ejobHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	ejob, ok := evt.Object.(*appsv1alpha1.EphemeralJob)
 	if !ok {
 		return
@@ -87,10 +88,10 @@ func (e *ejobHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInte
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: ejob.Namespace, Name: ejob.Name}})
 }
 
-func (e *ejobHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *ejobHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
-func (e *ejobHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *ejobHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oldEJob := evt.ObjectOld.(*appsv1alpha1.EphemeralJob)
 	curEJob := evt.ObjectNew.(*appsv1alpha1.EphemeralJob)
 	if oldEJob.ResourceVersion == curEJob.ResourceVersion {
@@ -112,7 +113,7 @@ func (e *ejobHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInte
 	}
 }
 
-func (e *ejobHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *ejobHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	ejob, ok := evt.Object.(*appsv1alpha1.EphemeralJob)
 	if !ok {
 		return

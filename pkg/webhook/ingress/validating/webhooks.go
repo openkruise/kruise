@@ -16,13 +16,23 @@ limitations under the License.
 
 package validating
 
-import "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
+)
 
 // +kubebuilder:webhook:path=/validate-ingress,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=networking.k8s.io,resources=ingresses,verbs=delete,versions=v1;v1beta1,name=vingress.kb.io
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-ingress": &IngressHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-ingress": func(mgr manager.Manager) admission.Handler {
+			return &IngressHandler{
+				Client:  mgr.GetClient(),
+				Decoder: admission.NewDecoder(mgr.GetScheme()),
+			}
+		},
 	}
 )

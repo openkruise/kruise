@@ -124,11 +124,3 @@ func validate(obj *appsv1alpha1.ImageListPullJob) error {
 
 	return nil
 }
-
-var _ admission.DecoderInjector = &ImageListPullJobCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the ImageListPullJobCreateUpdateHandler
-func (h *ImageListPullJobCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
-}

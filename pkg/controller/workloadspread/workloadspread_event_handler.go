@@ -55,11 +55,11 @@ var _ handler.EventHandler = &podEventHandler{}
 
 type podEventHandler struct{}
 
-func (p *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	p.handlePod(q, evt.Object, CreateEventAction)
 }
 
-func (p *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	oldPod := evt.ObjectOld.(*corev1.Pod)
 	newPod := evt.ObjectNew.(*corev1.Pod)
 
@@ -68,11 +68,12 @@ func (p *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 	}
 }
 
-func (p *podEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	p.handlePod(q, evt.Object, DeleteEventAction)
 }
 
-func (p *podEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {}
+func (p *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
 
 func (p *podEventHandler) handlePod(q workqueue.RateLimitingInterface, obj runtime.Object, action EventAction) {
 	pod := obj.(*corev1.Pod)
@@ -95,11 +96,11 @@ type workloadEventHandler struct {
 	client.Reader
 }
 
-func (w workloadEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	w.handleWorkload(q, evt.Object, CreateEventAction)
 }
 
-func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	var gvk schema.GroupVersionKind
 	var oldReplicas int32
 	var newReplicas int32
@@ -166,11 +167,11 @@ func (w workloadEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimi
 	}
 }
 
-func (w workloadEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	w.handleWorkload(q, evt.Object, DeleteEventAction)
 }
 
-func (w workloadEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
 func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,

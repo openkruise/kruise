@@ -215,8 +215,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	dsc := r.(*ReconcileDaemonSet)
 
+	logger := klog.FromContext(context.TODO())
 	// Watch for changes to DaemonSet
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.DaemonSet{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.DaemonSet{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			ds := e.Object.(*appsv1alpha1.DaemonSet)
 			klog.V(4).Infof("Adding DaemonSet %s/%s", ds.Namespace, ds.Name)
@@ -226,7 +227,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			oldDS := e.ObjectOld.(*appsv1alpha1.DaemonSet)
 			newDS := e.ObjectNew.(*appsv1alpha1.DaemonSet)
 			if oldDS.UID != newDS.UID {
-				dsc.expectations.DeleteExpectations(keyFunc(oldDS))
+				dsc.expectations.DeleteExpectations(logger, keyFunc(oldDS))
 			}
 			klog.V(4).Infof("Updating DaemonSet %s/%s", newDS.Namespace, newDS.Name)
 			return true
@@ -234,7 +235,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			ds := e.Object.(*appsv1alpha1.DaemonSet)
 			klog.V(4).Infof("Deleting DaemonSet %s/%s", ds.Namespace, ds.Name)
-			dsc.expectations.DeleteExpectations(keyFunc(ds))
+			dsc.expectations.DeleteExpectations(logger, keyFunc(ds))
 			newPodForDSCache.Delete(ds.UID)
 			return true
 		},
@@ -244,13 +245,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Node.
-	err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &nodeEventHandler{reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), &nodeEventHandler{reader: mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod created by DaemonSet
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &podEventHandler{Reader: mgr.GetCache(), expectations: dsc.expectations})
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &podEventHandler{Reader: mgr.GetCache(), expectations: dsc.expectations})
 	if err != nil {
 		return err
 	}
@@ -363,12 +364,13 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ctx context.Context, ds *appsv1alph
 }
 
 func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconcile.Request) error {
+	logger := klog.FromContext(ctx)
 	dsKey := request.NamespacedName.String()
 	ds, err := dsc.dsLister.DaemonSets(request.Namespace).Get(request.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.V(4).Infof("DaemonSet has been deleted %s", dsKey)
-			dsc.expectations.DeleteExpectations(dsKey)
+			dsc.expectations.DeleteExpectations(logger, dsKey)
 			return nil
 		}
 		return fmt.Errorf("unable to retrieve DaemonSet %s from store: %v", dsKey, err)
@@ -399,7 +401,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconc
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
+	if !dsc.expectations.SatisfiedExpectations(logger, dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
 		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
 
@@ -435,7 +437,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconc
 	}
 
 	// return and wait next reconcile if expectation changed to unsatisfied
-	if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
+	if !dsc.expectations.SatisfiedExpectations(logger, dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
 		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
 
@@ -685,6 +687,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 		}
 	}
 
+	logger := klog.FromContext(ctx)
 	dsKey := keyFunc(ds)
 	createDiff := len(nodesNeedingDaemonPods)
 	deleteDiff := len(podsToDelete)
@@ -697,7 +700,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 		deleteDiff = burstReplicas
 	}
 
-	if err := dsc.expectations.SetExpectations(dsKey, createDiff, deleteDiff); err != nil {
+	if err := dsc.expectations.SetExpectations(logger, dsKey, createDiff, deleteDiff); err != nil {
 		utilruntime.HandleError(err)
 	}
 	// error channel to communicate back failures.  make the buffer big enough to avoid any blocking
@@ -763,7 +766,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 				}
 				if err != nil {
 					klog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
-					dsc.expectations.CreationObserved(dsKey)
+					dsc.expectations.CreationObserved(logger, dsKey)
 					errCh <- err
 					utilruntime.HandleError(err)
 				}
@@ -774,7 +777,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 		skippedPods := createDiff - (batchSize + pos)
 		if errorCount < len(errCh) && skippedPods > 0 {
 			klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for set %q/%q", skippedPods, ds.Namespace, ds.Name)
-			dsc.expectations.LowerExpectations(dsKey, skippedPods, 0)
+			dsc.expectations.LowerExpectations(logger, dsKey, skippedPods, 0)
 			// The skipped pods will be retried later. The next controller resync will
 			// retry the slow start process.
 			break
@@ -788,7 +791,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 		go func(ix int) {
 			defer deleteWait.Done()
 			if err := dsc.podControl.DeletePod(ctx, ds.Namespace, podsToDelete[ix], ds); err != nil {
-				dsc.expectations.DeletionObserved(dsKey)
+				dsc.expectations.DeletionObserved(logger, dsKey)
 				if !errors.IsNotFound(err) {
 					klog.V(2).Infof("Failed deletion, decremented expectations for set %q/%q", ds.Namespace, ds.Name)
 					errCh <- err

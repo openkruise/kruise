@@ -22,17 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	kruiseappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	kubeClient "github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -56,6 +45,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	kruiseappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kubeClient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -118,13 +119,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to PodUnavailableBudget
-	err = c.Watch(&source.Kind{Type: &policyv1alpha1.PodUnavailableBudget{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &policyv1alpha1.PodUnavailableBudget{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, newEnqueueRequestForPod(mgr.GetClient())); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), newEnqueueRequestForPod(mgr.GetClient())); err != nil {
 		return err
 	}
 
@@ -135,7 +136,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// 2. at this time the cloneSet.replicas is scaled down to 50, the pub controller listens to the replicas change, triggering reconcile will adjust UnavailableAllowed to 55.
 	// 3. so pub webhook will not intercept the request to delete the pods
 	// deployment
-	if err = c.Watch(&source.Kind{Type: &apps.Deployment{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), &apps.Deployment{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.Deployment)
 			new := e.ObjectNew.(*apps.Deployment)
@@ -149,7 +150,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// kruise AdvancedStatefulSet
-	if err = c.Watch(&source.Kind{Type: &kruiseappsv1beta1.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), &kruiseappsv1beta1.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1beta1.StatefulSet)
 			new := e.ObjectNew.(*kruiseappsv1beta1.StatefulSet)
@@ -163,7 +164,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// CloneSet
-	if err = c.Watch(&source.Kind{Type: &kruiseappsv1alpha1.CloneSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), &kruiseappsv1alpha1.CloneSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
 			new := e.ObjectNew.(*kruiseappsv1alpha1.CloneSet)
@@ -177,7 +178,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// StatefulSet
-	if err = c.Watch(&source.Kind{Type: &apps.StatefulSet{}}, &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), &apps.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.StatefulSet)
 			new := e.ObjectNew.(*apps.StatefulSet)
