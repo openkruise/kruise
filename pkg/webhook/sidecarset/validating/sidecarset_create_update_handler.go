@@ -112,6 +112,12 @@ func validateSidecarSetName(name string, prefix bool) (allErrs []string) {
 func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
+	// currently when initContainer restartPolicy = Always, kruise don't support in-place update
+	for _, c := range obj.Spec.InitContainers {
+		if sidecarcontrol.IsSidecarContainer(c.Container) && obj.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateSidecarSetStrategyType {
+			allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), "The initContainer in-place upgrade is not currently supported."))
+		}
+	}
 
 	//validate spec selector
 	if spec.Selector == nil {

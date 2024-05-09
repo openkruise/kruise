@@ -246,6 +246,9 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 	for _, sidecar := range sidecarSet.Spec.Containers {
 		sidecarList.Insert(sidecar.Name)
 	}
+	for _, sidecar := range sidecarSet.Spec.InitContainers {
+		sidecarList.Insert(sidecar.Name)
+	}
 
 	sidecarSetHash[sidecarSet.Name] = SidecarSetUpgradeSpec{
 		UpdateTimestamp:              metav1.Now(),
@@ -561,6 +564,14 @@ func matchRegKey(key string, regs []*regexp.Regexp) bool {
 		if reg.MatchString(key) {
 			return true
 		}
+	}
+	return false
+}
+
+// IsSidecarContainer check whether initContainer is sidecar container in k8s 1.28.
+func IsSidecarContainer(container corev1.Container) bool {
+	if container.RestartPolicy != nil && *container.RestartPolicy == corev1.ContainerRestartPolicyAlways {
+		return true
 	}
 	return false
 }

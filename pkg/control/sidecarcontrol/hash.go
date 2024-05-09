@@ -43,6 +43,9 @@ func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, er
 	for i := range ss.Spec.Containers {
 		ss.Spec.Containers[i].Image = ""
 	}
+	for i := range ss.Spec.InitContainers {
+		ss.Spec.InitContainers[i].Image = ""
+	}
 	encoded, err := encodeSidecarSet(ss)
 	if err != nil {
 		return "", err
@@ -53,7 +56,17 @@ func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, er
 func encodeSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
 	m := map[string]interface{}{"containers": sidecarSet.Spec.Containers}
-	//m["initContainers"] = sidecarSet.Spec.InitContainers
+	// when k8s 1.28, if initContainer restartPolicy = Always, indicates it is sidecar container, so the hash needs to contain it.
+	initContainer := make([]appsv1alpha1.SidecarContainer, 0)
+	for i := range sidecarSet.Spec.InitContainers {
+		container := &sidecarSet.Spec.InitContainers[i]
+		if IsSidecarContainer(container.Container) {
+			initContainer = append(initContainer, *container)
+		}
+	}
+	if len(initContainer) > 0 {
+		m["initContainers"] = sidecarSet.Spec.InitContainers
+	}
 	data, err := json.Marshal(m)
 	if err != nil {
 		return "", err
