@@ -17,14 +17,22 @@ limitations under the License.
 package validating
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
 // +kubebuilder:webhook:path=/validate-policy-kruise-io-podunavailablebudget,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=policy.kruise.io,resources=podunavailablebudgets,verbs=create;update,versions=v1alpha1,name=vpodunavailablebudget.kb.io
 
 var (
-	// HandlerMap contains admission webhook handlers
-	HandlerMap = map[string]admission.Handler{
-		"validate-policy-kruise-io-podunavailablebudget": &PodUnavailableBudgetCreateUpdateHandler{},
+	// HandlerGetterMap contains admission webhook handlers
+	HandlerGetterMap = map[string]types.HandlerGetter{
+		"validate-policy-kruise-io-podunavailablebudget": func(mgr manager.Manager) admission.Handler {
+			return &PodUnavailableBudgetCreateUpdateHandler{
+				Client:  mgr.GetClient(),
+				Decoder: admission.NewDecoder(mgr.GetScheme()),
+			}
+		},
 	}
 )

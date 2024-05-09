@@ -41,7 +41,7 @@ func TestInjectHotUpgradeSidecar(t *testing.T) {
 
 func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
-	decoder, _ := admission.NewDecoder(scheme.Scheme)
+	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
 	).Build()

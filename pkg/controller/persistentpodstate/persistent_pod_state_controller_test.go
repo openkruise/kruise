@@ -247,6 +247,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 					// 9 is deleted, but 8 is running
 					if i == 9 {
 						pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					pods = append(pods, pod)
 				}
@@ -342,6 +343,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 					// 12 is deleted, but 11 is running
 					if i == 12 {
 						pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					pods = append(pods, pod)
 				}
@@ -520,6 +522,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 			for _, pod := range pods {
 				clientBuilder.WithObjects(pod)
 			}
+			clientBuilder.WithStatusSubresource(&appsv1alpha1.PersistentPodState{})
 			fakeClient := clientBuilder.WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
 				var owners []string
 				for _, ref := range obj.GetOwnerReferences() {

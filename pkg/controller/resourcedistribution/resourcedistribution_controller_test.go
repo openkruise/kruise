@@ -233,6 +233,7 @@ func makeEnvironment() []runtime.Object {
 
 func makeClientEnvironment(addition ...runtime.Object) {
 	env := append(makeEnvironment(), addition...)
-	fakeClient := fake.NewFakeClientWithScheme(scheme, env...)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(env...).
+		WithStatusSubresource(&appsv1alpha1.ResourceDistribution{}).Build()
 	reconcileHandler.Client = fakeClient
 }

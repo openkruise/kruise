@@ -192,7 +192,7 @@ func createReconcileJobWithBroadcastJobIndex(scheme *runtime.Scheme, initObjs ..
 				return nil
 			}
 			return []string{owner.Name}
-		}).Build()
+		}).WithStatusSubresource(&appsv1alpha1.AdvancedCronJob{}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "advancedcronjob-controller"})
 	reconcileJob := ReconcileAdvancedCronJob{
@@ -213,7 +213,7 @@ func createReconcileJobWithBatchJobIndex(scheme *runtime.Scheme, initObjs ...cli
 				return nil
 			}
 			return []string{owner.Name}
-		}).Build()
+		}).WithStatusSubresource(&appsv1alpha1.AdvancedCronJob{}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "advancedcronjob-controller"})
 	reconcileJob := ReconcileAdvancedCronJob{

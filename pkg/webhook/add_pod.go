@@ -27,7 +27,7 @@ import (
 )
 
 func init() {
-	addHandlersWithGate(mutating.HandlerMap, func() (enabled bool) {
+	addHandlersWithGate(mutating.HandlerGetterMap, func() (enabled bool) {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.PodWebhook) {
 			return false
 		}
@@ -40,7 +40,7 @@ func init() {
 		return true
 	})
 
-	addHandlersWithGate(validating.HandlerMap, func() (enabled bool) {
+	addHandlersWithGate(validating.HandlerGetterMap, func() (enabled bool) {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.PodWebhook) {
 			return false
 		}

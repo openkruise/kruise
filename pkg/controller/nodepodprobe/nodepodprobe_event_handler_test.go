@@ -52,7 +52,7 @@ func TestNodeEventHandler(t *testing.T) {
 	createEvt := event.CreateEvent{
 		Object: demo,
 	}
-	handler.Create(createEvt, createQ)
+	handler.Create(context.TODO(), createEvt, createQ)
 	if createQ.Len() != 1 {
 		t.Errorf("unexpected create event handle queue size, expected 1 actual %d", createQ.Len())
 	}

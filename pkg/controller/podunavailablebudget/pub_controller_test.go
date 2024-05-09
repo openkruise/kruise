@@ -331,6 +331,7 @@ func TestPubReconcile(t *testing.T) {
 					t := metav1.Now()
 					if i >= 7 && i < 10 {
 						pod.DeletionTimestamp = &t
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					matchedPods = append(matchedPods, pod)
 				}
@@ -397,6 +398,7 @@ func TestPubReconcile(t *testing.T) {
 				obj := deploymentDemo.DeepCopy()
 				t := metav1.Now()
 				obj.DeletionTimestamp = &t
+				obj.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 				return obj
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
@@ -531,6 +533,7 @@ func TestPubReconcile(t *testing.T) {
 					if i >= 7 {
 						t := metav1.Now()
 						pod.DeletionTimestamp = &t
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 					matchedPods = append(matchedPods, pod)
@@ -590,6 +593,7 @@ func TestPubReconcile(t *testing.T) {
 				obj := deploymentDemo.DeepCopy()
 				t := metav1.Now()
 				obj.DeletionTimestamp = &t
+				obj.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 				return obj
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
@@ -928,6 +932,7 @@ func TestPubReconcile(t *testing.T) {
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 					if i >= 20 && i < 25 {
 						pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					matchedPods = append(matchedPods, pod)
 				}
@@ -977,6 +982,7 @@ func TestPubReconcile(t *testing.T) {
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 					if i >= 10 && i < 15 {
 						pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					matchedPods = append(matchedPods, pod)
 				}
@@ -1030,6 +1036,7 @@ func TestPubReconcile(t *testing.T) {
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 					if i >= 20 && i < 25 {
 						pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					matchedPods = append(matchedPods, pod)
 				}
@@ -1088,6 +1095,7 @@ func TestPubReconcile(t *testing.T) {
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
 					if i >= 20 && i < 25 {
 						pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+						pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
 					}
 					matchedPods = append(matchedPods, pod)
 				}
@@ -1144,21 +1152,25 @@ func TestPubReconcile(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			pub := cs.getPub()
 			defer util.GlobalCache.Delete(pub)
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), pub).
-				WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
-					var owners []string
-					for _, ref := range obj.GetOwnerReferences() {
-						owners = append(owners, string(ref.UID))
-					}
-					return owners
-				}).Build()
+
+			builder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getDeployment(), pub)
+			builder.WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+				var owners []string
+				for _, ref := range obj.GetOwnerReferences() {
+					owners = append(owners, string(ref.UID))
+				}
+				return owners
+			})
+			builder.WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{})
 			for _, pod := range cs.getPods(cs.getReplicaSet()...) {
 				podIn := pod.DeepCopy()
-				_ = fakeClient.Create(context.TODO(), podIn)
+				builder.WithObjects(podIn)
 			}
 			for _, obj := range cs.getReplicaSet() {
-				_ = fakeClient.Create(context.TODO(), obj)
+				builder.WithObjects(obj)
 			}
+			fakeClient := builder.Build()
+
 			finder := &controllerfinder.ControllerFinder{Client: fakeClient}
 			pubcontrol.InitPubControl(fakeClient, finder, record.NewFakeRecorder(10))
 			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: fakeClient}

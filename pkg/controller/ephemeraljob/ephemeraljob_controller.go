@@ -22,13 +22,6 @@ import (
 	"sort"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +35,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/controller/ephemeraljob/econtainer"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
 var (
@@ -82,12 +83,12 @@ func add(mgr manager.Manager, r *ReconcileEphemeralJob) error {
 	}
 
 	// Watch for changes to EphemeralJob
-	err = c.Watch(&source.Kind{Type: &appsv1alpha1.EphemeralJob{}}, &ejobHandler{mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.EphemeralJob{}), &ejobHandler{mgr.GetCache()})
 	if err != nil {
 		return err
 	}
 	// Watch for changes to Pod
-	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &podHandler{mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &podHandler{mgr.GetCache()})
 	if err != nil {
 		return err
 	}

@@ -17,10 +17,10 @@ set -euo pipefail
 
 # Setup default values
 CLUSTER_NAME=${CLUSTER_NAME:-"ci-testing"}
-KIND_NODE_TAG=${KIND_NODE_TAG:-"v1.24.2"}
+KIND_NODE_TAG=${KIND_NODE_TAG:-"v1.28.7"}
 
 echo "$KIND_NODE_TAG"
 echo "$CLUSTER_NAME"
 
 ## Create kind cluster.
-tools/bin/kind create cluster --image "kindest/node:${KIND_NODE_TAG}" --name "${CLUSTER_NAME}" --config=test/kind-conf.yaml
+tools/bin/kind create cluster --image "kindest/node:${KIND_NODE_TAG}" --name "${CLUSTER_NAME}" --config=test/kind-conf-none-fg.yaml

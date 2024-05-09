@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -1814,7 +1815,7 @@ func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, context.C
 	g := gomega.NewGomegaWithT(t)
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	mgr, err := manager.New(cfg, manager.Options{Metrics: metricsserver.Options{BindAddress: "0"}})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = utilclient.NewClientFromManager(mgr, "test-uniteddeployment-controller")
 	recFn, requests := SetupTestReconcile(newReconciler(mgr))

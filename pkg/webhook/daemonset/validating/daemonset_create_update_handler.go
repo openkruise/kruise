@@ -94,11 +94,3 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 
 	return admission.ValidationResponse(true, "")
 }
-
-var _ admission.DecoderInjector = &DaemonSetCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the DaemonSetCreateUpdateHandler
-func (h *DaemonSetCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
-}

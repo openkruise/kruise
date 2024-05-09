@@ -22,12 +22,13 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/apis/apps/defaults"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 // DaemonSetCreateUpdateHandler handles DaemonSet
@@ -76,11 +77,3 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 //	h.Client = c
 //	return nil
 //}
-
-var _ admission.DecoderInjector = &DaemonSetCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the DaemonSetCreateUpdateHandler
-func (h *DaemonSetCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
-}

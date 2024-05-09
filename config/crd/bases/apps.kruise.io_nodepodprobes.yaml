@@ -86,9 +86,8 @@ spec:
                                 format: int32
                                 type: integer
                               grpc:
-                                description: |-
-                                  GRPC specifies an action involving a GRPC port.
-                                  This is a beta field and requires enabling GRPCContainerProbe feature gate.
+                                description: GRPC specifies an action involving a
+                                  GRPC port.
                                 properties:
                                   port:
                                     description: Port number of the gRPC service.

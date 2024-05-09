@@ -38,8 +38,6 @@ import (
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
@@ -287,19 +285,4 @@ func validatePodProbeMarkerName(name string, prefix bool) (allErrs []string) {
 		allErrs = append(allErrs, validationutil.MaxLenError(nameMaxLen))
 	}
 	return allErrs
-}
-
-var _ inject.Client = &PodProbeMarkerCreateUpdateHandler{}
-
-// InjectClient injects the client into the PodProbeMarkerCreateUpdateHandler
-func (h *PodProbeMarkerCreateUpdateHandler) InjectClient(c client.Client) error {
-	return nil
-}
-
-var _ admission.DecoderInjector = &PodProbeMarkerCreateUpdateHandler{}
-
-// InjectDecoder injects the decoder into the PodProbeMarkerCreateUpdateHandler
-func (h *PodProbeMarkerCreateUpdateHandler) InjectDecoder(d *admission.Decoder) error {
-	h.Decoder = d
-	return nil
 }

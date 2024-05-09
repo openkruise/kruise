@@ -17,6 +17,7 @@ limitations under the License.
 package sidecarterminator
 
 import (
+	"context"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,12 +36,14 @@ var _ handler.EventHandler = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct{}
 
-func (p *enqueueRequestForPod) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface)   {}
-func (p *enqueueRequestForPod) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {}
-func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+}
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	p.handlePodCreate(q, evt.Object)
 }
-func (p *enqueueRequestForPod) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	p.handlePodUpdate(q, evt.ObjectOld, evt.ObjectNew)
 }
 

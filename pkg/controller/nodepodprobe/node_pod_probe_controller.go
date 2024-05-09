@@ -22,14 +22,6 @@ import (
 	"reflect"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +36,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -92,17 +93,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// watch for changes to NodePodProbe
-	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.NodePodProbe{}}, &enqueueRequestForNodePodProbe{}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodePodProbe{}), &enqueueRequestForNodePodProbe{}); err != nil {
 		return err
 	}
 
 	// watch for changes to pod
-	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &enqueueRequestForPod{reader: mgr.GetClient()}); err != nil {
 		return err
 	}
 
 	// watch for changes to node
-	if err = c.Watch(&source.Kind{Type: &corev1.Node{}}, &enqueueRequestForNode{Reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), &enqueueRequestForNode{Reader: mgr.GetClient()}); err != nil {
 		return err
 	}
 
@@ -361,6 +362,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			reflect.DeepEqual(oldMetadata.Annotations, podClone.Annotations) {
 			return nil
 		}
+		// todo: resolve https://github.com/openkruise/kruise/issues/1597
 		return r.Client.Status().Update(context.TODO(), podClone)
 	}); err != nil {
 		klog.Errorf("NodePodProbe patch pod(%s/%s) status failed: %s", podClone.Namespace, podClone.Name, err.Error())

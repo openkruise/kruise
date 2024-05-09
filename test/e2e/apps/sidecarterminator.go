@@ -34,7 +34,7 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 	})
 
 	framework.KruiseDescribe("SidecarTerminator checker", func() {
-		ginkgo.It("use kruise-daemon to kill containers", func() {
+		ginkgo.It("job and broadcast job with sidecar", func() {
 			mainContainer := v1.Container{
 				Name:            "main",
 				Image:           "busybox:latest",

@@ -113,7 +113,7 @@ func TestReconcile(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "pod1-barrier"},
 	}
 
-	fakeClient := fake.NewFakeClientWithScheme(clientgoscheme.Scheme, pod0, pod1, barrier0, barrier1)
+	fakeClient := fake.NewClientBuilder().WithScheme(clientgoscheme.Scheme).WithRuntimeObjects(pod0, pod1, barrier0, barrier1).Build()
 	reconciler := &ReconcileContainerLaunchPriority{Client: fakeClient}
 
 	_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{Namespace: pod0.Namespace, Name: pod0.Name}})

@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -172,7 +173,7 @@ func TestAll(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	var err error
-	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	mgr, err := manager.New(cfg, manager.Options{Metrics: metricsserver.Options{BindAddress: "0"}})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
 	c = utilclient.NewClientFromManager(mgr, "test-nodeimage-utils")

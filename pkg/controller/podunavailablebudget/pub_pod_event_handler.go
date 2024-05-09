@@ -20,13 +20,6 @@ import (
 	"context"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +34,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPod{}
@@ -56,16 +57,17 @@ type enqueueRequestForPod struct {
 	controllerFinder *controllerfinder.ControllerFinder
 }
 
-func (p *enqueueRequestForPod) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	p.addPod(q, evt.Object)
 }
 
-func (p *enqueueRequestForPod) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 }
 
-func (p *enqueueRequestForPod) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {}
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
 
-func (p *enqueueRequestForPod) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	p.updatePod(q, evt.ObjectOld, evt.ObjectNew)
 }
 
@@ -190,22 +192,22 @@ type SetEnqueueRequestForPUB struct {
 }
 
 // Create implements EventHandler
-func (e *SetEnqueueRequestForPUB) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	e.addSetRequest(evt.Object, q)
 }
 
 // Update implements EventHandler
-func (e *SetEnqueueRequestForPUB) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	e.addSetRequest(evt.ObjectNew, q)
 }
 
 // Delete implements EventHandler
-func (e *SetEnqueueRequestForPUB) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	e.addSetRequest(evt.Object, q)
 }
 
 // Generic implements EventHandler
-func (e *SetEnqueueRequestForPUB) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
 func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueue.RateLimitingInterface) {

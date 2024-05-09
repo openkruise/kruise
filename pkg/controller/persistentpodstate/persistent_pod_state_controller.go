@@ -27,13 +27,6 @@ import (
 
 	ctrlUtil "github.com/openkruise/kruise/pkg/controller/util"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-	"github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -51,6 +44,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -104,22 +105,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &enqueueRequestForPod{reader: mgr.GetClient(), client: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &enqueueRequestForPod{reader: mgr.GetClient(), client: mgr.GetClient()}); err != nil {
 		return err
 	}
 
 	// watch for changes to PersistentPodState
-	if err = c.Watch(&source.Kind{Type: &appsv1alpha1.PersistentPodState{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.PersistentPodState{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	// watch for changes to StatefulSet
-	if err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &enqueueRequestForStatefulSet{reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}), &enqueueRequestForStatefulSet{reader: mgr.GetClient()}); err != nil {
 		return err
 	}
 
 	// watch for changes to kruise StatefulSet
-	if err = c.Watch(&source.Kind{Type: &appsv1beta1.StatefulSet{}}, &enqueueRequestForKruiseStatefulSet{reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}), &enqueueRequestForKruiseStatefulSet{reader: mgr.GetClient()}); err != nil {
 		return err
 	}
 
@@ -130,7 +131,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if whiteList != nil {
 		workloadHandler := &enqueueRequestForStatefulSetLike{reader: mgr.GetClient()}
 		for _, workload := range whiteList.Workloads {
-			if _, err := ctrlUtil.AddWatcherDynamically(c, workloadHandler, workload, "PPS"); err != nil {
+			if _, err := ctrlUtil.AddWatcherDynamically(mgr, c, workloadHandler, workload, "PPS"); err != nil {
 				return err
 			}
 		}

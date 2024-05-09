@@ -20,13 +20,14 @@ import (
 	"context"
 	"testing"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/util/podadapter"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util/podadapter"
 )
 
 func TestPodReadiness(t *testing.T) {
@@ -42,7 +43,9 @@ func TestPodReadiness(t *testing.T) {
 			ReadinessGates: []v1.PodReadinessGate{},
 		},
 	}
-	fakeClient := fake.NewClientBuilder().WithScheme(clientgoscheme.Scheme).WithObjects(pod0, pod1).Build()
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(clientgoscheme.Scheme).WithObjects(pod0, pod1).
+		WithStatusSubresource(&v1.Pod{}).Build()
 
 	msg0 := Message{UserAgent: "ua1", Key: "foo"}
 	msg1 := Message{UserAgent: "ua1", Key: "bar"}

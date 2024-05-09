@@ -143,7 +143,7 @@ func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, templ
 
 	ds := object.(*appsv1alpha1.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	f.expectations.CreationObserved(dsKey)
+	f.expectations.CreationObserved(klog.FromContext(ctx), dsKey)
 
 	return nil
 }
@@ -163,7 +163,7 @@ func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID 
 
 	ds := object.(*appsv1alpha1.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	f.expectations.DeletionObserved(dsKey)
+	f.expectations.DeletionObserved(klog.FromContext(ctx), dsKey)
 
 	return nil
 }
@@ -337,7 +337,7 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1al
 		t.Errorf("Could not get key for daemon.")
 		return
 	}
-	manager.expectations.DeleteExpectations(key)
+	manager.expectations.DeleteExpectations(klog.FromContext(context.TODO()), key)
 
 	now := manager.failedPodsBackoff.Clock.Now()
 	hash, _ := currentDSHash(context.TODO(), manager, ds)

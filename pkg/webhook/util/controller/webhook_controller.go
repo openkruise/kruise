@@ -39,9 +39,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	extclient "github.com/openkruise/kruise/pkg/client"
+	webhooktypes "github.com/openkruise/kruise/pkg/webhook/types"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/configuration"
 	"github.com/openkruise/kruise/pkg/webhook/util/crd"
@@ -70,7 +70,7 @@ func Inited() chan struct{} {
 
 type Controller struct {
 	kubeClient clientset.Interface
-	handlers   map[string]admission.Handler
+	handlers   map[string]webhooktypes.HandlerGetter
 
 	informerFactory informers.SharedInformerFactory
 	crdClient       apiextensionsclientset.Interface
@@ -81,7 +81,7 @@ type Controller struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func New(cfg *rest.Config, handlers map[string]admission.Handler) (*Controller, error) {
+func New(cfg *rest.Config, handlers map[string]webhooktypes.HandlerGetter) (*Controller, error) {
 	c := &Controller{
 		kubeClient: extclient.GetGenericClientWithName("webhook-controller").KubeClient,
 		handlers:   handlers,

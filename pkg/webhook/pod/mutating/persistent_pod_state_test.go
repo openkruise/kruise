@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +29,9 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 const (
@@ -220,7 +221,7 @@ func TestPersistentPodStateMutatingPod(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			podIn := cs.getPod()
-			decoder, _ := admission.NewDecoder(scheme.Scheme)
+			decoder := admission.NewDecoder(scheme.Scheme)
 			client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(cs.getPodState()).Build()
 			podOut := podIn.DeepCopy()
 			podHandler := &PodCreateHandler{Decoder: decoder, Client: client}
