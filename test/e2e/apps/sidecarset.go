@@ -565,6 +565,89 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			ginkgo.By("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.annotations done")
 		})
+
+		// currently skip
+		// todo
+		/*framework.ConformanceIt("sidecarSet inject initContainer with restartPolicy=Always", func() {
+			always := corev1.ContainerRestartPolicyAlways
+			// create sidecarSet
+			sidecarSet := tester.NewBaseSidecarSet(ns)
+			sidecarSet.Spec.Containers = nil
+			sidecarSet.Spec.InitContainers = nil
+			obj1 := sidecarSet.DeepCopy()
+			obj1.Name = "sidecarset-1"
+			obj1.Spec.InitContainers = []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:          "init-1",
+						Command:       []string{"/bin/sh", "-c", "sleep 1000000"},
+						Image:         "busybox:latest",
+						RestartPolicy: &always,
+					},
+				},
+			}
+			ginkgo.By("Creating SidecarSet failed")
+			_, err := kc.AppsV1alpha1().SidecarSets().Create(context.TODO(), obj1, metav1.CreateOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			obj1.Spec.UpdateStrategy.Type = appsv1alpha1.NotUpdateSidecarSetStrategyType
+			obj2 := sidecarSet.DeepCopy()
+			obj2.Spec.UpdateStrategy.Type = appsv1alpha1.NotUpdateSidecarSetStrategyType
+			obj2.Name = "sidecarset-2"
+			obj2.Spec.InitContainers = []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:          "hot-init",
+						Image:         "openkruise/hotupgrade-sample:sidecarv1",
+						RestartPolicy: &always,
+						Lifecycle: &corev1.Lifecycle{
+							PostStart: &corev1.LifecycleHandler{
+								Exec: &corev1.ExecAction{
+									Command: []string{"/bin/sh", "/migrate.sh"},
+								},
+							},
+						},
+					},
+					UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+						UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+						HotUpgradeEmptyImage: "openkruise/hotupgrade-sample:empty",
+					},
+				},
+			}
+			ginkgo.By("Creating SidecarSet success")
+			_, err = tester.CreateSidecarSet(obj1)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			_, err = tester.CreateSidecarSet(obj2)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second)
+
+			// create deployment
+			deploymentIn := tester.NewBaseDeployment(ns)
+			deploymentIn.Spec.Template.ObjectMeta.Annotations = map[string]string{
+				"biz": "main",
+			}
+			deploymentIn.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+				{
+					Name:  "POD_NAME",
+					Value: "bar",
+				},
+				{
+					Name:  "OD_NAME",
+					Value: "od_name",
+				},
+				{
+					Name:  "PROXY_IP",
+					Value: "127.0.0.1",
+				},
+			}
+			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
+			tester.CreateDeployment(deploymentIn)
+			// get pods
+			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			podIn := pods[0]
+			gomega.Expect(podIn.Spec.InitContainers).To(gomega.HaveLen(3))
+			ginkgo.By("sidecarSet inject pod sidecar container transfer Envs with downward API by metadata.annotations done")
+		})*/
 	})
 
 	framework.KruiseDescribe("SidecarSet Upgrade functionality [SidecarSeUpgrade]", func() {
@@ -773,6 +856,9 @@ var _ = SIGDescribe("SidecarSet", func() {
 				for _, sidecar := range sidecarSetIn.Spec.Containers {
 					origin.Insert(sidecar.Name)
 				}
+				for _, sidecar := range sidecarSetIn.Spec.InitContainers {
+					origin.Insert(sidecar.Name)
+				}
 				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
 				upgradeSpec1 := sidecarcontrol.GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetIn.Name, sidecarcontrol.SidecarSetHashAnnotation, pod)
 				gomega.Expect(upgradeSpec1.SidecarSetName).To(gomega.Equal(sidecarSetIn.Name))
@@ -817,6 +903,9 @@ var _ = SIGDescribe("SidecarSet", func() {
 			for _, pod := range pods {
 				origin := sets.String{}
 				for _, sidecar := range sidecarSetIn.Spec.Containers {
+					origin.Insert(sidecar.Name)
+				}
+				for _, sidecar := range sidecarSetIn.Spec.InitContainers {
 					origin.Insert(sidecar.Name)
 				}
 				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"

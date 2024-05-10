@@ -152,6 +152,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	sort.SliceStable(sidecarInitContainers, func(i, j int) bool {
 		return sidecarInitContainers[i].Name < sidecarInitContainers[j].Name
 	})
+	// TODO, implement PodInjectPolicy for initContainers
 	for _, initContainer := range sidecarInitContainers {
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer.Container)
 	}
@@ -368,11 +369,13 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		}
 
 		isInjecting := false
+		sidecarList := sets.NewString()
 		//process initContainers
 		//only when created pod, inject initContainer and pullSecrets
 		if !isUpdated {
 			for i := range sidecarSet.Spec.InitContainers {
 				initContainer := &sidecarSet.Spec.InitContainers[i]
+				sidecarList.Insert(initContainer.Name)
 				// volumeMounts that injected into sidecar container
 				// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
 				injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, initContainer, pod)
@@ -393,13 +396,22 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				// merged Env from sidecar.Env and transfer envs
 				initContainer.Env = util.MergeEnvVar(initContainer.Env, transferEnvs)
 				isInjecting = true
-				sidecarInitContainers = append(sidecarInitContainers, initContainer)
+
+				// when sidecar container UpgradeStrategy is HotUpgrade
+				if sidecarcontrol.IsSidecarContainer(initContainer.Container) && sidecarcontrol.IsHotUpgradeContainer(initContainer) {
+					hotContainers, annotations := injectHotUpgradeContainers(hotUpgradeWorkInfo, initContainer)
+					sidecarInitContainers = append(sidecarInitContainers, hotContainers...)
+					for k, v := range annotations {
+						injectedAnnotations[k] = v
+					}
+				} else {
+					sidecarInitContainers = append(sidecarInitContainers, initContainer)
+				}
 			}
 			//process imagePullSecrets
 			sidecarSecrets = append(sidecarSecrets, sidecarSet.Spec.ImagePullSecrets...)
 		}
 
-		sidecarList := sets.NewString()
 		//process containers
 		for i := range sidecarSet.Spec.Containers {
 			sidecarContainer := &sidecarSet.Spec.Containers[i]
