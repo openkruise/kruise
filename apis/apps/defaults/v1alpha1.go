@@ -37,11 +37,11 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 	setSidecarSetUpdateStrategy(&obj.Spec.UpdateStrategy)
 
 	for i := range obj.Spec.InitContainers {
-		setSidecarDefaultContainer(&obj.Spec.InitContainers[i])
+		setDefaultSidecarContainer(&obj.Spec.InitContainers[i], v1alpha1.AfterAppContainerType)
 	}
 
 	for i := range obj.Spec.Containers {
-		setDefaultSidecarContainer(&obj.Spec.Containers[i])
+		setDefaultSidecarContainer(&obj.Spec.Containers[i], v1alpha1.BeforeAppContainerType)
 	}
 
 	//default setting volumes
@@ -74,9 +74,9 @@ func SetDefaultRevisionHistoryLimit(revisionHistoryLimit **int32) {
 	}
 }
 
-func setDefaultSidecarContainer(sidecarContainer *v1alpha1.SidecarContainer) {
+func setDefaultSidecarContainer(sidecarContainer *v1alpha1.SidecarContainer, injectPolicy v1alpha1.PodInjectPolicyType) {
 	if sidecarContainer.PodInjectPolicy == "" {
-		sidecarContainer.PodInjectPolicy = v1alpha1.BeforeAppContainerType
+		sidecarContainer.PodInjectPolicy = injectPolicy
 	}
 	if sidecarContainer.UpgradeStrategy.UpgradeType == "" {
 		sidecarContainer.UpgradeStrategy.UpgradeType = v1alpha1.SidecarContainerColdUpgrade
@@ -85,7 +85,7 @@ func setDefaultSidecarContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 		sidecarContainer.ShareVolumePolicy.Type = v1alpha1.ShareVolumePolicyDisabled
 	}
 
-	setSidecarDefaultContainer(sidecarContainer)
+	setDefaultContainer(sidecarContainer)
 }
 
 func setSidecarSetUpdateStrategy(strategy *v1alpha1.SidecarSetUpdateStrategy) {
@@ -102,7 +102,7 @@ func setSidecarSetUpdateStrategy(strategy *v1alpha1.SidecarSetUpdateStrategy) {
 	}
 }
 
-func setSidecarDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
+func setDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 	container := &sidecarContainer.Container
 	v1.SetDefaults_Container(container)
 	for i := range container.Ports {

@@ -152,10 +152,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	sort.SliceStable(sidecarInitContainers, func(i, j int) bool {
 		return sidecarInitContainers[i].Name < sidecarInitContainers[j].Name
 	})
-	// TODO, implement PodInjectPolicy for initContainers
-	for _, initContainer := range sidecarInitContainers {
-		pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer.Container)
-	}
+	pod.Spec.InitContainers = mergeSidecarContainers(pod.Spec.InitContainers, sidecarInitContainers)
 	// 2. inject containers
 	pod.Spec.Containers = mergeSidecarContainers(pod.Spec.Containers, sidecarContainers)
 	// 3. inject volumes
@@ -287,7 +284,7 @@ func mergeSidecarContainers(origins []corev1.Container, injected []*appsv1alpha1
 		case appsv1alpha1.AfterAppContainerType:
 			afterAppContainers = append(afterAppContainers, sidecar.Container)
 		default:
-			beforeAppContainers = append(beforeAppContainers, sidecar.Container)
+			afterAppContainers = append(afterAppContainers, sidecar.Container)
 		}
 	}
 	origins = append(beforeAppContainers, origins...)
