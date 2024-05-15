@@ -93,7 +93,7 @@ type HttpRouteMatch struct {
 }
 ```
 
-`Matches` defines conditions used to match incoming HTTP requests to the canary service. Each match condition may contain several criterias as children which are independent of each other.
+`Matches` defines conditions used to match incoming HTTP requests to the canary service. Each match condition may contain several criteria as children which are independent of each other.
 
 Only one of the `weight` and `matches` will come into effect. If both fields are configured, then `matches` takes precedence.
 
