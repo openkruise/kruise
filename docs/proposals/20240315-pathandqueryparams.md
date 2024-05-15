@@ -5,7 +5,7 @@ authors:
 reviewers:
   - "@YYY"
 creation-date: 2024-03-15
-last-updated: 2024-03-15
+last-updated: 2024-05-15
 status: implementable
 ---
 
@@ -60,10 +60,22 @@ type HttpRouteMatch struct {
 	// Path specifies a HTTP request path matcher.
 	// Supported list:
 	// - Istio: https://istio.io/latest/docs/reference/config/networking/virtual-service/#HTTPMatchRequest
+	// - GatewayAPI: If path is defined, the whole HttpRouteMatch will be used as a standalone matcher
 	//
 	// +optional
 	Path *gatewayv1beta1.HTTPPathMatch `json:"path,omitempty"`
 
+	// Headers specifies HTTP request header matchers. Multiple match values are
+	// ANDed together, meaning, a request must match all the specified headers
+	// to select the route.
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	// +kubebuilder:validation:MaxItems=16
+	Headers []gatewayv1beta1.HTTPHeaderMatch `json:"headers,omitempty"`
+
+	// Existing
 	// QueryParams specifies HTTP query parameter matchers. Multiple match
 	// values are ANDed together, meaning, a request must match all the
 	// specified query parameters to select the route.
@@ -78,50 +90,33 @@ type HttpRouteMatch struct {
 	// +optional
 	// +kubebuilder:validation:MaxItems=16
 	QueryParams []gatewayv1beta1.HTTPQueryParamMatch `json:"queryParams,omitempty"`
-
-	// Existing
-
-	// Headers specifies HTTP request header matchers. Multiple match values are
-	// ANDed together, meaning, a request must match all the specified headers
-	// to select the route.
-	//
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	// +kubebuilder:validation:MaxItems=16
-	Headers []gatewayv1beta1.HTTPHeaderMatch `json:"headers,omitempty"`
 }
 ```
 
-Matches define conditions used to match incoming HTTP requests to the canary service. Each match condition may contain several conditions as children which are independent of each other.
+`Matches` defines conditions used to match incoming HTTP requests to the canary service. Each match condition may contain several criterias as children which are independent of each other.
 
-For Gateway API, only a single match rule will be applied since Gateway API use ANDed rules if multiple ones are defined, i.e. the match will evaluate to be true only if all conditions are satisfied. Priority: Header > QueryParams, for backwards-compatibility.
-
-Only one of the `weight` and `matches` will come into effect. If both fields are configured, then matches takes precedence.
+Only one of the `weight` and `matches` will come into effect. If both fields are configured, then `matches` takes precedence.
 
 ### User Stories
 
 Currently, only one trafficRouting provider is supported. Then we may consider them case by case,
 
-- MSE Ingress: User can define queryParams, but it **SHOULD NOT** be used together with Headers due to priority and backward-compatibility.
+- MSE Ingress: User can define queryParams together with headers. But due to priority of MSE ingress itself, Headers & QueryParams > Cookie > Weight.
 - Istio: User can define path and/or queryParams and use without any issue.
-- Gateway API: User can define path and/or queryParams. But one of them can take effect if and only if Headers are not defined.
+- Gateway API: User can define path, headers and/or queryParams. But path follows a special rule which will be described in details below.
 
 ### Implementation Details/Notes/Constraints
 
 #### MSE Ingress
 
-Due to backward-compatibility, if both Headers and QueryParams are defined, Headers should be used.
-
-Then according to the documentation of [MSE Ingress](https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/advanced-usage-of-mse-ingress?spm=a2c4g.11186623.0.0.58a26dc4q4GCmn#p-qar-ac2-lvw), if Header and Query Parameter are combined, both conditions MUST be fulfilled.
-
-So the priority in Rollouts is Header(Cookie) > QueryParams.
+According to the documentation of [MSE Ingress](https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/advanced-usage-of-mse-ingress?spm=a2c4g.11186623.0.0.58a26dc4q4GCmn#p-qar-ac2-lvw), if Header and Query Parameter are combined, both conditions MUST be fulfilled.
 
 #### Gateway API
 
-Since Gateway API uses logical AND for all matches, only a single match condition will be selected.
+Considering the Gateway API, all `HttpRouteMatch`es defined in the `matches` field will be applied to the existing rules from the Gateway API one by one if path is not used. 
+For example, M `HttpRouteMatch`es (without `Path`) with N `HTTPRouteRule`s will generate M x N (Cartesian product) `HTTPRouteRule`s to the canary service. 
 
-For backwards-compatibility, the priority in Rollouts is Header(Cookie) > Path > QueryParams.
+If path is defined in the `HttpRouteMatch`, the whole `HttpRouteMatch` will be directly mapped as a `HTTPRouteRule` in the Gateway API to avoid potential path conflict.
 
 ## Additional Details
 
