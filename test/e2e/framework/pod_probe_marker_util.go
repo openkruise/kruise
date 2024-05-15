@@ -210,7 +210,7 @@ func (s *PodProbeMarkerTester) NewBaseStatefulSet(namespace, randStr string) *ap
 						},
 						{
 							Name:            "main",
-							Image:           "centos:6.7",
+							Image:           "centos:7",
 							Command:         []string{"sleep", "999d"},
 							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
