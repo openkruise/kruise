@@ -55,7 +55,7 @@ func PopCachedNodeImagesForJob(job *appsv1alpha1.ImagePullJob) []string {
 }
 
 func writeCache(job *appsv1alpha1.ImagePullJob, nodeImages []*appsv1alpha1.NodeImage) {
-	names := make([]string, len(nodeImages))
+	names := make([]string, 0, len(nodeImages))
 	for _, n := range nodeImages {
 		names = append(names, n.Name)
 	}
