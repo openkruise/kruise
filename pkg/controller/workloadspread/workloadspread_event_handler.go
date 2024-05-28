@@ -80,12 +80,12 @@ func (p *podEventHandler) handlePod(q workqueue.RateLimitingInterface, obj runti
 	if value, exist := pod.GetAnnotations()[wsutil.MatchedWorkloadSpreadSubsetAnnotations]; exist {
 		injectWorkloadSpread := &wsutil.InjectWorkloadSpread{}
 		if err := json.Unmarshal([]byte(value), injectWorkloadSpread); err != nil {
-			klog.Errorf("Failed to unmarshal %s to WorkloadSpread", value)
+			klog.ErrorS(err, "Failed to unmarshal JSON to WorkloadSpread", "JSON", value)
 			return
 		}
 		nsn := types.NamespacedName{Namespace: pod.GetNamespace(), Name: injectWorkloadSpread.Name}
-		klog.V(5).Infof("%s Pod (%s/%s) and reconcile WorkloadSpread (%s/%s)",
-			action, pod.Namespace, pod.Name, nsn.Namespace, nsn.Name)
+		klog.V(5).InfoS("Handle Pod and reconcile WorkloadSpread",
+			"action", action, "pod", klog.KObj(pod), "workloadSpread", nsn)
 		q.Add(reconcile.Request{NamespacedName: nsn})
 	}
 }
@@ -154,13 +154,13 @@ func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent,
 		owner := metav1.GetControllerOfNoCopy(evt.ObjectNew)
 		ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk, owner)
 		if err != nil {
-			klog.Errorf("unable to get WorkloadSpread related with %s (%s/%s), err: %v",
-				gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, err)
+			klog.ErrorS(err, "Unable to get WorkloadSpread related with resource kind",
+				"kind", gvk.Kind, "workload", workloadNsn)
 			return
 		}
 		if ws != nil {
-			klog.V(3).Infof("%s (%s/%s) changed replicas from %d to %d managed by WorkloadSpread (%s/%s)",
-				gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, oldReplicas, newReplicas, ws.GetNamespace(), ws.GetName())
+			klog.V(3).InfoS("Workload changed replicas managed by WorkloadSpread",
+				"kind", gvk.Kind, "workload", workloadNsn, "oldReplicas", oldReplicas, "newReplicas", newReplicas, "workloadSpread", klog.KObj(ws))
 			nsn := types.NamespacedName{Namespace: ws.GetNamespace(), Name: ws.GetName()}
 			q.Add(reconcile.Request{NamespacedName: nsn})
 		}
@@ -201,13 +201,13 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 	owner := metav1.GetControllerOfNoCopy(obj)
 	ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk, owner)
 	if err != nil {
-		klog.Errorf("unable to get WorkloadSpread related with %s (%s/%s), err: %v",
-			gvk.Kind, workloadNsn.Namespace, workloadNsn.Name, err)
+		klog.ErrorS(err, "Unable to get WorkloadSpread related with workload",
+			"kind", gvk.Kind, "workload", workloadNsn)
 		return
 	}
 	if ws != nil {
-		klog.V(5).Infof("%s %s (%s/%s) and reconcile WorkloadSpread (%s/%s)",
-			action, gvk.Kind, workloadNsn.Namespace, workloadNsn.Namespace, ws.Namespace, ws.Name)
+		klog.V(5).InfoS("Handle workload and reconcile WorkloadSpread",
+			"action", action, "kind", gvk.Kind, "workload", workloadNsn, "workloadSpread", klog.KObj(ws))
 		nsn := types.NamespacedName{Namespace: ws.GetNamespace(), Name: ws.GetName()}
 		q.Add(reconcile.Request{NamespacedName: nsn})
 	}
@@ -219,7 +219,7 @@ func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
 	wsList := &appsv1alpha1.WorkloadSpreadList{}
 	listOptions := &client.ListOptions{Namespace: workloadNamespaceName.Namespace}
 	if err := w.List(context.TODO(), wsList, listOptions); err != nil {
-		klog.Errorf("List WorkloadSpread failed: %s", err.Error())
+		klog.ErrorS(err, "Failed to list WorkloadSpread", "namespace", workloadNamespaceName.Namespace)
 		return nil, err
 	}
 

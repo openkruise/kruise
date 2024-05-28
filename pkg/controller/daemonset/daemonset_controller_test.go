@@ -369,7 +369,7 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1al
 	}
 	sort.Strings(lines)
 	for _, line := range lines {
-		klog.Info(line)
+		klog.InfoS(line)
 	}
 }
 

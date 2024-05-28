@@ -827,7 +827,8 @@ func NewStatefulSetController(
 				oldPS := old.(*appsv1beta1.StatefulSet)
 				curPS := cur.(*appsv1beta1.StatefulSet)
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
-					klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
+					klog.V(4).InfoS("Observed updated replica count for StatefulSet",
+						"statefulSetName", curPS.Name, "oldReplicas", oldPS.Status.Replicas, "newReplicas", curPS.Status.Replicas)
 				}
 				ssc.enqueueStatefulSet(cur)
 			},
@@ -844,8 +845,8 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ssc.queue.ShutDown()
 
-	klog.Infof("Starting stateful set controller")
-	defer klog.Infof("Shutting down statefulset controller")
+	klog.InfoS("Starting stateful set controller")
+	defer klog.InfoS("Shutting down statefulset controller")
 
 	if !cache.WaitForNamedCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
@@ -920,7 +921,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 		if set == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
+		klog.V(4).InfoS("Pod created", "pod", klog.KObj(pod), "labels", pod.Labels)
 		ssc.enqueueStatefulSet(set)
 		return
 	}
@@ -931,7 +932,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 	if len(sets) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan Pod %s created, labels: %+v", pod.Name, pod.Labels)
+	klog.V(4).InfoS("Orphan Pod created", "pod", klog.KObj(pod), "labels", pod.Labels)
 	for _, set := range sets {
 		ssc.enqueueStatefulSet(set)
 	}
@@ -965,7 +966,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		if set == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).InfoS("Pod updated", "pod", klog.KObj(curPod), "oldObjectMeta", oldPod.ObjectMeta, "newObjectMeta", curPod.ObjectMeta)
 		ssc.enqueueStatefulSet(set)
 		return
 	}
@@ -977,7 +978,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		if len(sets) == 0 {
 			return
 		}
-		klog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).InfoS("Orphan Pod updated", "pod", klog.KObj(curPod), "oldObjectMeta", oldPod.ObjectMeta, "newObjectMeta", curPod.ObjectMeta)
 		for _, set := range sets {
 			ssc.enqueueStatefulSet(set)
 		}
@@ -1014,7 +1015,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 	if set == nil {
 		return
 	}
-	klog.V(4).Infof("Pod %s/%s deleted through %v.", pod.Namespace, pod.Name, utilruntime.GetCaller())
+	klog.V(4).InfoS("Pod deleted", "pod", klog.KObj(pod), "caller", utilruntime.GetCaller())
 	ssc.enqueueStatefulSet(set)
 }
 

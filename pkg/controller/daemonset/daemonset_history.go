@@ -226,7 +226,7 @@ func (dsc *ReconcileDaemonSet) snapshot(ctx context.Context, ds *appsv1alpha1.Da
 		if updateErr != nil {
 			return nil, updateErr
 		}
-		klog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
+		klog.V(2).InfoS("Found a hash collision for DaemonSet - bumping collisionCount to resolve it", "daemonSet", klog.KObj(ds), "collisionCount", *currDS.Status.CollisionCount)
 		return nil, outerErr
 	}
 	return history, err

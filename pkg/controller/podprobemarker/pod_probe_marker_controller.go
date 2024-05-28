@@ -147,7 +147,7 @@ func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 	}
 	pods, err := r.getMatchingPods(ppm)
 	if err != nil {
-		klog.Errorf("PodProbeMarker ppm(%s/%s) list pods failed: %s", ppm.Namespace, ppm.Name, err.Error())
+		klog.ErrorS(err, "PodProbeMarker listed pods failed", "podProbeMarker", klog.KObj(ppm))
 		return err
 	}
 	// remove podProbe from NodePodProbe.Spec
@@ -158,10 +158,10 @@ func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 	if !controllerutil.ContainsFinalizer(ppm, PodProbeMarkerFinalizer) {
 		err = util.UpdateFinalizer(r.Client, ppm, util.AddFinalizerOpType, PodProbeMarkerFinalizer)
 		if err != nil {
-			klog.Errorf("add PodProbeMarker(%s/%s) finalizer failed: %s", ppm.Namespace, ppm.Name, err.Error())
+			klog.ErrorS(err, "Failed to add PodProbeMarker finalizer", "podProbeMarker", klog.KObj(ppm))
 			return err
 		}
-		klog.V(3).Infof("add PodProbeMarker(%s/%s) finalizer success", ppm.Namespace, ppm.Name)
+		klog.V(3).InfoS("Added PodProbeMarker finalizer success", "podProbeMarker", klog.KObj(ppm))
 	}
 
 	groupByNode := make(map[string][]*corev1.Pod)
@@ -180,7 +180,7 @@ func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 	ppmClone := ppm.DeepCopy()
 	if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: ppm.Namespace, Name: ppm.Name}, ppmClone); err != nil {
-			klog.Errorf("error getting updated podProbeMarker %s from client", ppm.Name)
+			klog.ErrorS(err, "Failed to get updated PodProbeMarker from client", "podProbeMarker", klog.KObj(ppm))
 		}
 		if ppmClone.Status.ObservedGeneration == ppmClone.Generation && int(ppmClone.Status.MatchedPods) == len(pods) {
 			return nil
@@ -189,10 +189,10 @@ func (r *ReconcilePodProbeMarker) syncPodProbeMarker(ns, name string) error {
 		ppmClone.Status.MatchedPods = int64(len(pods))
 		return r.Client.Status().Update(context.TODO(), ppmClone)
 	}); err != nil {
-		klog.Errorf("PodProbeMarker(%s/%s) update status failed: %s", ppm.Namespace, ppm.Name, err.Error())
+		klog.ErrorS(err, "PodProbeMarker update status failed", "podProbeMarker", klog.KObj(ppm))
 		return err
 	}
-	klog.V(3).Infof("PodProbeMarker(%s/%s) update status(%s) success", ppm.Namespace, ppm.Name, util.DumpJSON(ppmClone.Status))
+	klog.V(3).InfoS("PodProbeMarker update status success", "podProbeMarker", klog.KObj(ppm), "status", util.DumpJSON(ppmClone.Status))
 	return nil
 }
 
@@ -207,10 +207,10 @@ func (r *ReconcilePodProbeMarker) handlerPodProbeMarkerFinalizer(ppm *appsv1alph
 	}
 	err := util.UpdateFinalizer(r.Client, ppm, util.RemoveFinalizerOpType, PodProbeMarkerFinalizer)
 	if err != nil {
-		klog.Errorf("remove PodProbeMarker(%s/%s) finalizer failed: %s", ppm.Namespace, ppm.Name, err.Error())
+		klog.ErrorS(err, "Failed to remove PodProbeMarker finalizer", "podProbeMarker", klog.KObj(ppm))
 		return err
 	}
-	klog.V(3).Infof("remove PodProbeMarker(%s/%s) finalizer success", ppm.Namespace, ppm.Name)
+	klog.V(3).InfoS("Removed PodProbeMarker finalizer success", "podProbeMarker", klog.KObj(ppm))
 	return nil
 }
 
@@ -219,11 +219,11 @@ func (r *ReconcilePodProbeMarker) updateNodePodProbes(ppm *appsv1alpha1.PodProbe
 	err := r.Get(context.TODO(), client.ObjectKey{Name: nodeName}, npp)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Warningf("PodProbeMarker ppm(%s/%s) NodePodProbe(%s) is Not Found", ppm.Namespace, ppm.Name, npp.Name)
+			klog.InfoS("PodProbeMarker NodePodProbe was Not Found", "podProbeMarker", klog.KObj(ppm), "nodePodProbe", klog.KObj(npp))
 			return nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Errorf("PodProbeMarker ppm(%s/%s) get NodePodProbe(%s) failed: %s", ppm.Namespace, ppm.Name, nodeName, err.Error())
+		klog.ErrorS(err, "PodProbeMarker got NodePodProbe failed", "podProbeMarker", klog.KObj(ppm), "nodePodProbe", klog.KObj(npp))
 		return err
 	}
 
@@ -242,14 +242,14 @@ func (r *ReconcilePodProbeMarker) updateNodePodProbes(ppm *appsv1alpha1.PodProbe
 					if probe.Probe.TCPSocket != nil {
 						probe, err = convertTcpSocketProbeCheckPort(probe, pod)
 						if err != nil {
-							klog.Errorf("Failed to convert tcpSocket probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+							klog.ErrorS(err, "Failed to convert tcpSocket probe port", "pod", klog.KObj(pod))
 							continue
 						}
 					}
 					if probe.Probe.HTTPGet != nil {
 						probe, err = convertHttpGetProbeCheckPort(probe, pod)
 						if err != nil {
-							klog.Errorf("Failed to convert httpGet probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+							klog.ErrorS(err, "Failed to convert httpGet probe port", "pod", klog.KObj(pod))
 							continue
 						}
 					}
@@ -266,14 +266,14 @@ func (r *ReconcilePodProbeMarker) updateNodePodProbes(ppm *appsv1alpha1.PodProbe
 				if probe.Probe.TCPSocket != nil {
 					probe, err = convertTcpSocketProbeCheckPort(probe, pod)
 					if err != nil {
-						klog.Errorf("Failed to convert tcpSocket probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+						klog.ErrorS(err, "Failed to convert tcpSocket probe port", "pod", klog.KObj(pod))
 						continue
 					}
 				}
 				if probe.Probe.HTTPGet != nil {
 					probe, err = convertHttpGetProbeCheckPort(probe, pod)
 					if err != nil {
-						klog.Errorf("Failed to convert httpGet probe port, err: %v, pod: %v/%v", err, pod.Namespace, pod.Name)
+						klog.ErrorS(err, "Failed to convert httpGet probe port", "pod", klog.KObj(pod))
 						continue
 					}
 				}
@@ -292,11 +292,11 @@ func (r *ReconcilePodProbeMarker) updateNodePodProbes(ppm *appsv1alpha1.PodProbe
 	}
 	err = r.Update(context.TODO(), npp)
 	if err != nil {
-		klog.Errorf("PodProbeMarker ppm(%s/%s) Update NodePodProbe(%s) failed: %s", ppm.Namespace, ppm.Name, npp.Name, err.Error())
+		klog.ErrorS(err, "PodProbeMarker updated NodePodProbe failed", "podProbeMarker", klog.KObj(ppm), "nodePodProbeName", npp.Name)
 		return err
 	}
-	klog.V(3).Infof("PodProbeMarker ppm(%s/%s) update NodePodProbe(%s) from(%s) -> to(%s) success",
-		ppm.Namespace, ppm.Name, npp.Name, util.DumpJSON(oldSpec), util.DumpJSON(npp.Spec))
+	klog.V(3).InfoS("PodProbeMarker updated NodePodProbe success", "podProbeMarker", klog.KObj(ppm), "nodePodProbeName", npp.Name,
+		"oldSpec", util.DumpJSON(oldSpec), "newSpec", util.DumpJSON(npp.Spec))
 	return nil
 }
 
@@ -409,9 +409,9 @@ func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmName, nppNam
 	npp.Spec = newSpec
 	err = r.Update(context.TODO(), npp)
 	if err != nil {
-		klog.Errorf("NodePodProbe(%s) remove PodProbe(%s) failed: %s", nppName, ppmName, err.Error())
+		klog.ErrorS(err, "NodePodProbe removed PodProbeMarker failed", "nodePodProbeName", nppName, "podProbeMarkerName", ppmName)
 		return err
 	}
-	klog.V(3).Infof("NodePodProbe(%s) remove PodProbe(%s) success", nppName, ppmName)
+	klog.V(3).InfoS("NodePodProbe removed PodProbeMarker success", "nodePodProbeName", nppName, "podProbeMarkerName", ppmName)
 	return nil
 }

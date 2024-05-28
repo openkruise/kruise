@@ -69,7 +69,7 @@ func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q w
 		if ds == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s/%s added.", pod.Namespace, pod.Name)
+		klog.V(4).InfoS("Pod added", "pod", klog.KObj(pod))
 		e.expectations.CreationObserved(logger, keyFunc(ds))
 		enqueueDaemonSet(q, ds)
 		return
@@ -83,7 +83,7 @@ func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q w
 	if len(dsList) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan Pod %s/%s created, matched owner: %s", pod.Namespace, pod.Name, joinDaemonSetNames(dsList))
+	klog.V(4).InfoS("Orphan Pod created", "pod", klog.KObj(pod), "owner", joinDaemonSetNames(dsList))
 	for _, ds := range dsList {
 		enqueueDaemonSet(q, ds)
 	}
@@ -131,7 +131,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 		if ds == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s/%s updated, owner: %s", curPod.Namespace, curPod.Name, ds.Name)
+		klog.V(4).InfoS("Pod updated", "pod", klog.KObj(curPod), "owner", klog.KObj(ds))
 		enqueueDaemonSet(q, ds)
 		return
 	}
@@ -142,7 +142,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 	if len(dsList) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan Pod %s/%s updated, matched owner: %s", curPod.Namespace, curPod.Name, joinDaemonSetNames(dsList))
+	klog.V(4).InfoS("Orphan Pod updated", "pod", klog.KObj(curPod), "owner", joinDaemonSetNames(dsList))
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
 		for _, ds := range dsList {
@@ -154,7 +154,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	pod, ok := evt.Object.(*v1.Pod)
 	if !ok {
-		klog.Errorf("DeleteEvent parse pod failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
+		klog.ErrorS(nil, "Skipped pod deletion event", "deleteStateUnknown", evt.DeleteStateUnknown, "object", evt.Object)
 		return
 	}
 	e.deletePod(ctx, pod, q, true)
@@ -177,9 +177,9 @@ func (e *podEventHandler) deletePod(ctx context.Context, pod *v1.Pod, q workqueu
 	}
 	if isDeleted {
 		e.deletionUIDCache.Delete(pod.UID)
-		klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, ds.Name)
+		klog.V(4).InfoS("Pod deleted", "pod", klog.KObj(pod), "owner", klog.KObj(ds))
 	} else {
-		klog.V(4).Infof("Pod %s/%s terminating, owner: %s", pod.Namespace, pod.Name, ds.Name)
+		klog.V(4).InfoS("Pod terminating", "pod", klog.KObj(pod), "owner", klog.KObj(ds))
 	}
 	enqueueDaemonSet(q, ds)
 }
@@ -225,7 +225,7 @@ func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1alpha1.DaemonSe
 	if len(dsMatched) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		klog.Warningf("Error! More than one DaemonSet is selecting pod %s/%s : %s", pod.Namespace, pod.Name, joinDaemonSetNames(dsMatched))
+		klog.InfoS("Error! More than one DaemonSet is selecting pod", "pod", klog.KObj(pod), "daemonSets", joinDaemonSetNames(dsMatched))
 	}
 	return dsMatched
 }
@@ -240,7 +240,7 @@ func (e *nodeEventHandler) Create(ctx context.Context, evt event.CreateEvent, q 
 	dsList := &appsv1alpha1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
-		klog.V(4).Infof("Error enqueueing daemon sets: %v", err)
+		klog.V(4).ErrorS(err, "Error enqueueing DaemonSets")
 		return
 	}
 
@@ -266,7 +266,7 @@ func (e *nodeEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q 
 	dsList := &appsv1alpha1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
-		klog.V(4).Infof("Error listing daemon sets: %v", err)
+		klog.V(4).ErrorS(err, "Error listing DaemonSets")
 		return
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
@@ -276,7 +276,7 @@ func (e *nodeEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q 
 		currentShouldRun, currentShouldContinueRunning := nodeShouldRunDaemonPod(curNode, ds)
 		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) ||
 			(NodeShouldUpdateBySelector(oldNode, ds) != NodeShouldUpdateBySelector(curNode, ds)) {
-			klog.V(6).Infof("update node: %s triggers DaemonSet %s/%s to reconcile.", curNode.Name, ds.GetNamespace(), ds.GetName())
+			klog.V(6).InfoS("Update node triggers DaemonSet to reconcile", "nodeName", curNode.Name, "daemonSet", klog.KObj(ds))
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      ds.GetName(),
 				Namespace: ds.GetNamespace(),

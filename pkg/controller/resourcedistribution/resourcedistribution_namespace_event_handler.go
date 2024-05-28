@@ -61,7 +61,7 @@ func (p *enqueueRequestForNamespace) addNamespace(q workqueue.RateLimitingInterf
 
 	resourceDistributions, err := p.getNamespaceMatchedResourceDistributions(namespace, fn)
 	if err != nil {
-		klog.Errorf("unable to get the ResourceDistributions related with namespace %s, err: %v", namespace.Name, err)
+		klog.ErrorS(err, "Unable to get the ResourceDistributions related with namespace", "namespace", namespace.Name)
 		return
 	}
 	addMatchedResourceDistributionToWorkQueue(q, resourceDistributions)

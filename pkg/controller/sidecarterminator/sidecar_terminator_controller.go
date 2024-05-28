@@ -124,9 +124,9 @@ func (r *ReconcileSidecarTerminator) Reconcile(_ context.Context, request reconc
 	}
 
 	start := time.Now()
-	klog.V(3).Infof("SidecarTerminator -- begin to process pod %v for reconcile", request.NamespacedName)
+	klog.V(3).InfoS("SidecarTerminator -- begin to process pod for reconcile", "pod", request)
 	defer func() {
-		klog.V(3).Infof("SidecarTerminator -- process pod %v done, cost: %v", request.NamespacedName, time.Since(start))
+		klog.V(3).InfoS("SidecarTerminator -- process pod done", "pod", request, "cost", time.Since(start))
 	}()
 
 	return r.doReconcile(pod)
@@ -168,7 +168,7 @@ func (r *ReconcileSidecarTerminator) markJobPodTerminated(pod *corev1.Pod) error
 	// after the pod is terminated by the sidecar terminator, kubelet will kill the containers that are not in the terminal phase
 	// 1. sidecar container terminate with non-zero exit code
 	// 2. sidecar container is not in a terminal phase (still running or waiting)
-	klog.V(3).Infof("all of the main containers are completed, will terminate the job pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("All of the main containers are completed, will terminate the job pod", "pod", klog.KObj(pod))
 	// terminate the pod, ignore the status of the sidecar containers.
 	// in kubelet,pods are not allowed to transition out of terminal phases.
 
@@ -190,7 +190,7 @@ func (r *ReconcileSidecarTerminator) markJobPodTerminated(pod *corev1.Pod) error
 	} else {
 		status.Phase = corev1.PodFailed
 	}
-	klog.V(3).Infof("terminate the job pod %s/%s phase=%s", pod.Namespace, pod.Name, status.Phase)
+	klog.V(3).InfoS("Terminated the job pod", "pod", klog.KObj(pod), "phase", status.Phase)
 
 	by, _ := json.Marshal(status)
 	patchCondition := fmt.Sprintf(`{"status":%s}`, string(by))

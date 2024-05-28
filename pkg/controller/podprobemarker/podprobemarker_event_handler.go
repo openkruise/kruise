@@ -104,7 +104,7 @@ func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent
 		newInitialCondition.Status == corev1.ConditionTrue) || old.Status.PodIP != new.Status.PodIP {
 		ppms, err := p.getPodProbeMarkerForPod(new)
 		if err != nil {
-			klog.Errorf("List PodProbeMarker fail: %s", err.Error())
+			klog.ErrorS(err, "Failed to List PodProbeMarker")
 			return
 		}
 		for _, ppm := range ppms {

@@ -56,8 +56,8 @@ func filterPods(restartLimit int32, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, []*v1
 				activePods = append(activePods, p)
 			}
 		} else {
-			klog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
-				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
+			klog.V(4).InfoS("Ignoring inactive pod, deletion scheduled",
+				"pod", klog.KObj(p), "phase", p.Status.Phase, "deletionTimestamp", p.DeletionTimestamp)
 		}
 	}
 	return activePods, failedPods, succeededPods
@@ -158,6 +158,6 @@ func getAssignedNode(pod *v1.Pod) string {
 			}
 		}
 	}
-	klog.Warningf("Not found assigned node in Pod %s/%s", pod.Namespace, pod.Name)
+	klog.InfoS("Could not find assigned node in Pod", "pod", klog.KObj(pod))
 	return ""
 }

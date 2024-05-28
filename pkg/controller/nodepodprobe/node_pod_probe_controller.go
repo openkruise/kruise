@@ -179,7 +179,7 @@ func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePo
 		pod := &corev1.Pod{}
 		err := r.Get(context.TODO(), client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, pod)
 		if err != nil && !errors.IsNotFound(err) {
-			klog.Errorf("NodePodProbe get pod(%s/%s) failed: %s", obj.Namespace, obj.Name, err.Error())
+			klog.ErrorS(err, "NodePodProbe got pod failed", "pod", klog.KRef(obj.Namespace, obj.Name))
 			return nil, err
 		}
 		if errors.IsNotFound(err) || !kubecontroller.IsPodActive(pod) || string(pod.UID) != obj.UID {
@@ -202,7 +202,7 @@ func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePo
 	nppClone := &appsv1alpha1.NodePodProbe{}
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: npp.Name}, nppClone); err != nil {
-			klog.Errorf("error getting updated npp %s from client", npp.Name)
+			klog.ErrorS(err, "Failed to get updated NodePodProbe from client", "nodePodProbe", klog.KObj(npp))
 		}
 		if reflect.DeepEqual(newSpec, nppClone.Spec) {
 			return nil
@@ -211,10 +211,10 @@ func (r *ReconcileNodePodProbe) syncPodFromNodePodProbe(npp *appsv1alpha1.NodePo
 		return r.Client.Update(context.TODO(), nppClone)
 	})
 	if err != nil {
-		klog.Errorf("NodePodProbe update NodePodProbe(%s) failed:%s", npp.Name, err.Error())
+		klog.ErrorS(err, "Failed to update NodePodProbe", "nodePodProbe", klog.KObj(npp))
 		return nil, err
 	}
-	klog.V(3).Infof("NodePodProbe update NodePodProbe(%s) from(%s) -> to(%s) success", npp.Name, util.DumpJSON(npp.Spec), util.DumpJSON(newSpec))
+	klog.V(3).InfoS("Updated NodePodProbe success", "nodePodProbe", klog.KObj(npp), "oldSpec", util.DumpJSON(npp.Spec), "newSpec", util.DumpJSON(newSpec))
 	return matchedPods, nil
 }
 
@@ -252,7 +252,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			if errors.IsNotFound(err) {
 				continue
 			}
-			klog.Errorf("NodePodProbe(%s) get pod(%s/%s) failed: %s", ppmName, pod.Namespace, pod.Name, err.Error())
+			klog.ErrorS(err, "NodePodProbe got pod failed", "podProbeMarkerName", ppmName, "pod", klog.KObj(pod))
 			return err
 		} else if !ppm.DeletionTimestamp.IsZero() {
 			continue
@@ -267,7 +267,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			}
 		}
 		if conditionType != "" && validConditionTypes.Has(conditionType) {
-			klog.Warningf("NodePodProbe(%s) pod(%s/%s) condition(%s) is conflict", ppmName, pod.Namespace, pod.Name, conditionType)
+			klog.InfoS("NodePodProbe pod condition was conflict", "podProbeMarkerName", ppmName, "pod", klog.KObj(pod), "conditionType", conditionType)
 			// patch pod condition
 		} else if conditionType != "" {
 			validConditionTypes.Insert(conditionType)
@@ -328,7 +328,7 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 	podClone := pod.DeepCopy()
 	if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, podClone); err != nil {
-			klog.Errorf("error getting updated pod(%s/%s) from client", pod.Namespace, pod.Name)
+			klog.ErrorS(err, "Failed to get updated pod from client", "pod", klog.KObj(pod))
 			return err
 		}
 		oldStatus := podClone.Status.DeepCopy()
@@ -365,10 +365,10 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		// todo: resolve https://github.com/openkruise/kruise/issues/1597
 		return r.Client.Status().Update(context.TODO(), podClone)
 	}); err != nil {
-		klog.Errorf("NodePodProbe patch pod(%s/%s) status failed: %s", podClone.Namespace, podClone.Name, err.Error())
+		klog.ErrorS(err, "NodePodProbe patched pod status failed", "pod", klog.KObj(podClone))
 		return err
 	}
-	klog.V(3).Infof("NodePodProbe update pod(%s/%s) metadata(%s) conditions(%s) success", podClone.Namespace, podClone.Name,
-		util.DumpJSON(probeMetadata), util.DumpJSON(probeConditions))
+	klog.V(3).InfoS("NodePodProbe updated pod metadata and conditions success", "pod", klog.KObj(podClone), "metaData",
+		util.DumpJSON(probeMetadata), "conditions", util.DumpJSON(probeConditions))
 	return nil
 }

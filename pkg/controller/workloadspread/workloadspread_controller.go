@@ -219,7 +219,7 @@ func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Req
 				Name:      req.Name,
 			},
 		}); cacheErr != nil {
-			klog.Warningf("Failed to delete workloadSpread(%s/%s) cache after deletion, err: %v", req.Namespace, req.Name, cacheErr)
+			klog.ErrorS(cacheErr, "Failed to delete workloadSpread cache after deletion", "workloadSpread", req)
 		}
 		return reconcile.Result{}, nil
 	} else if err != nil {
@@ -228,9 +228,9 @@ func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Req
 	}
 
 	startTime := time.Now()
-	klog.V(3).Infof("Begin to process WorkloadSpread (%s/%s)", ws.Namespace, ws.Name)
+	klog.V(3).InfoS("Began to process WorkloadSpread", "workloadSpread", klog.KObj(ws))
 	err = r.syncWorkloadSpread(ws)
-	klog.V(3).Infof("Finished syncing WorkloadSpread (%s/%s), cost: %v", ws.Namespace, ws.Name, time.Since(startTime))
+	klog.V(3).InfoS("Finished syncing WorkloadSpread", "workloadSpread", klog.KObj(ws), "cost", time.Since(startTime))
 	return reconcile.Result{RequeueAfter: durationStore.Pop(getWorkloadSpreadKey(ws))}, err
 }
 
@@ -245,7 +245,7 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 	if err != nil {
 		// when error is NotFound, it is ok here.
 		if errors.IsNotFound(err) {
-			klog.V(3).Infof("cannot find Job (%s/%s)", namespace, ref.Name)
+			klog.V(3).InfoS("Could not find Job", "job", klog.KRef(namespace, ref.Name))
 			return nil, 0, nil
 		}
 		return nil, -1, err
@@ -253,7 +253,7 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 
 	labelSelector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
-		klog.Errorf("gets labelSelector failed: %s", err.Error())
+		klog.ErrorS(err, "Failed to get labelSelector")
 		return nil, -1, nil
 	}
 
@@ -297,7 +297,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 	}
 
 	if err != nil {
-		klog.Errorf("WorkloadSpread (%s/%s) handles targetReference failed: %s", ws.Namespace, ws.Name, err.Error())
+		klog.ErrorS(err, "WorkloadSpread handled targetReference failed", "workloadSpread", klog.KObj(ws))
 		return nil, -1, err
 	}
 
@@ -314,12 +314,12 @@ func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSp
 	pods, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)
 	if err != nil || workloadReplicas == -1 {
 		if err != nil {
-			klog.Errorf("WorkloadSpread (%s/%s) gets matched pods failed: %v", ws.Namespace, ws.Name, err)
+			klog.ErrorS(err, "WorkloadSpread got matched pods failed", "workloadSpread", klog.KObj(ws))
 		}
 		return err
 	}
 	if len(pods) == 0 {
-		klog.Warningf("WorkloadSpread (%s/%s) has no matched pods, target workload's replicas[%d]", ws.Namespace, ws.Name, workloadReplicas)
+		klog.InfoS("WorkloadSpread had no matched pods", "workloadSpread", klog.KObj(ws), "targetWorkloadReplicas", workloadReplicas)
 	}
 
 	// group Pods by pod-revision and subset
@@ -359,7 +359,7 @@ func getInjectWorkloadSpreadFromPod(pod *corev1.Pod) *wsutil.InjectWorkloadSprea
 	injectWS := &wsutil.InjectWorkloadSpread{}
 	err := json.Unmarshal([]byte(injectStr), injectWS)
 	if err != nil {
-		klog.Errorf("failed to unmarshal %s from Pod (%s/%s)", injectStr, pod.Namespace, pod.Name)
+		klog.ErrorS(err, "Failed to unmarshal JSON from Pod", "JSON", injectStr, "pod", klog.KObj(pod))
 		return nil
 	}
 	return injectWS
@@ -470,8 +470,8 @@ func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1alpha
 		if err != nil {
 			// requiredSelectorTerm field was validated at webhook stage, so this error should not occur
 			// this error should not be returned, because it is a non-transient error
-			klog.Errorf("unexpected error occurred when matching pod (%s/%s) with subset, please check requiredSelectorTerm field of subset (%s) in WorkloadSpread (%s/%s), err: %s",
-				pod.Namespace, pod.Name, subset.Name, ws.Namespace, ws.Name, err.Error())
+			klog.ErrorS(err, "Unexpected error occurred when matching pod with subset, please check requiredSelectorTerm field of subset in WorkloadSpread",
+				"pod", klog.KObj(pod), "subsetName", subset.Name, "workloadSpread", klog.KObj(ws))
 		}
 		// select the most favorite subsets for the pod by subset.PreferredNodeSelectorTerms
 		if matched && preferredScore > maxPreferredScore {
@@ -523,8 +523,8 @@ func (r *ReconcileWorkloadSpread) patchFavoriteSubsetMetadataToPod(pod *corev1.P
 	})
 
 	if err := r.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, patch)); err != nil {
-		klog.Errorf(`Failed to patch "matched-workloadspread:{Name: %s, Subset: %s} annotation" for pod (%s/%s), err: %s`,
-			ws.Name, favoriteSubset.Name, pod.Namespace, pod.Name, err.Error())
+		klog.ErrorS(err, `Failed to patch "matched-workloadspread" annotation for pod`,
+			"pod", klog.KObj(pod), "annotationValue", fmt.Sprintf("{Name: %s, Subset: %s}", ws.Name, favoriteSubset.Name))
 		return err
 	}
 
@@ -651,8 +651,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 	} else {
 		subsetMaxReplicas, err = intstr.GetValueFromIntOrPercent(subset.MaxReplicas, int(workloadReplicas), true)
 		if err != nil || subsetMaxReplicas < 0 {
-			klog.Errorf("failed to get maxReplicas value from subset (%s) of WorkloadSpread (%s/%s)",
-				subset.Name, ws.Namespace, ws.Name)
+			klog.ErrorS(err, "Failed to get maxReplicas value from subset of WorkloadSpread", "subsetName", subset.Name, "workloadSpread", klog.KObj(ws))
 			return nil
 		}
 	}
@@ -755,7 +754,7 @@ func (r *ReconcileWorkloadSpread) UpdateWorkloadSpreadStatus(ws *appsv1alpha1.Wo
 
 	err := r.writeWorkloadSpreadStatus(clone)
 	if err == nil {
-		klog.V(3).Info(makeStatusChangedLog(ws, status))
+		klog.V(3).InfoS(makeStatusChangedLog(ws, status), "workloadSpread", klog.KObj(ws))
 	}
 	return err
 }
@@ -816,7 +815,7 @@ func (r *ReconcileWorkloadSpread) writeWorkloadSpreadStatus(ws *appsv1alpha1.Wor
 	err := r.Status().Update(context.TODO(), ws)
 	if err == nil {
 		if cacheErr := util.GlobalCache.Add(ws); cacheErr != nil {
-			klog.Warningf("Failed to update workloadSpread(%s/%s) cache after update status, err: %v", ws.Namespace, ws.Name, cacheErr)
+			klog.ErrorS(cacheErr, "Failed to update WorkloadSpread cache after update status", "workloadSpread", klog.KObj(ws))
 		}
 	}
 	return err

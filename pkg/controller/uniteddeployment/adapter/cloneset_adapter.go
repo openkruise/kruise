@@ -142,17 +142,17 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 		TemplateSpecBytes, _ := json.Marshal(set.Spec.Template)
 		modified, err := strategicpatch.StrategicMergePatch(TemplateSpecBytes, subSetConfig.Patch.Raw, &corev1.PodTemplateSpec{})
 		if err != nil {
-			klog.Errorf("failed to merge patch raw %s", subSetConfig.Patch.Raw)
+			klog.ErrorS(err, "Failed to merge patch raw", "patch", subSetConfig.Patch.Raw)
 			return err
 		}
 		patchedTemplateSpec := corev1.PodTemplateSpec{}
 		if err = json.Unmarshal(modified, &patchedTemplateSpec); err != nil {
-			klog.Errorf("failed to unmarshal %s to podTemplateSpec", modified)
+			klog.ErrorS(err, "Failed to unmarshal modified JSON to podTemplateSpec", "JSON", modified)
 			return err
 		}
 
 		set.Spec.Template = patchedTemplateSpec
-		klog.V(2).Infof("CloneSet [%s/%s] was patched successfully: %s", set.Namespace, set.GenerateName, subSetConfig.Patch.Raw)
+		klog.V(2).InfoS("CloneSet was patched successfully", "cloneSet", klog.KRef(set.Namespace, set.GenerateName), "patch", subSetConfig.Patch.Raw)
 	}
 	if set.Annotations == nil {
 		set.Annotations = make(map[string]string)

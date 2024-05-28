@@ -72,7 +72,7 @@ func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q work
 	// Get jobs related to this NodeImage
 	jobs, _, err := utilimagejob.GetActiveJobsForNodeImage(e.Reader, nodeImage, nil)
 	if err != nil {
-		klog.Errorf("Failed to get jobs for NodeImage %s: %v", nodeImage.Name, err)
+		klog.ErrorS(err, "Failed to get jobs for NodeImage", "nodeImageName", nodeImage.Name)
 	}
 	for _, j := range jobs {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: j.Namespace, Name: j.Name}})
@@ -102,18 +102,18 @@ func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1alph
 	for name := range tmpOldNodeImage.Status.ImageStatuses {
 		changedImages.Insert(name)
 	}
-	klog.V(5).Infof("Find NodeImage %s updated and only affect images: %v", nodeImage.Name, changedImages.List())
+	klog.V(5).InfoS("Found NodeImage updated and only affect images", "nodeImageName", nodeImage.Name, "changedImages", changedImages.List())
 
 	// Get jobs related to this NodeImage
 	newJobs, oldJobs, err := utilimagejob.GetActiveJobsForNodeImage(e.Reader, nodeImage, oldNodeImage)
 	if err != nil {
-		klog.Errorf("Failed to get jobs for NodeImage %s: %v", nodeImage.Name, err)
+		klog.ErrorS(err, "Failed to get jobs for NodeImage", "nodeImageName", nodeImage.Name)
 	}
 	diffSet := diffJobs(newJobs, oldJobs)
 	for _, j := range newJobs {
 		imageName, _, err := daemonutil.NormalizeImageRefToNameTag(j.Spec.Image)
 		if err != nil {
-			klog.Warningf("Invalid image %s in job %s/%s", j.Spec.Image, j.Namespace, j.Name)
+			klog.InfoS("Invalid image in job", "image", j.Spec.Image, "imagePullJob", klog.KObj(j))
 			continue
 		}
 		if changedImages.Has(imageName) {
@@ -161,7 +161,7 @@ func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.RateLimitingInterface)
 	// Get jobs related to this Pod
 	jobs, _, err := utilimagejob.GetActiveJobsForPod(e.Reader, pod, nil)
 	if err != nil {
-		klog.Errorf("Failed to get jobs for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "Failed to get jobs for Pod", "pod", klog.KObj(pod))
 	}
 	for _, j := range jobs {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: j.Namespace, Name: j.Name}})
@@ -178,7 +178,7 @@ func (e *podEventHandler) handleUpdate(pod, oldPod *v1.Pod, q workqueue.RateLimi
 	// Get jobs related to this NodeImage
 	newJobs, oldJobs, err := utilimagejob.GetActiveJobsForPod(e.Reader, pod, oldPod)
 	if err != nil {
-		klog.Errorf("Failed to get jobs for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "Failed to get jobs for Pod", "pod", klog.KObj(pod))
 	}
 	if oldPod.Spec.NodeName == "" {
 		for _, j := range newJobs {
@@ -218,7 +218,7 @@ func (e *secretEventHandler) Generic(ctx context.Context, evt event.GenericEvent
 func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.RateLimitingInterface) {
 	if secret != nil && secret.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
 		jobKeySet := referenceSetFromTarget(secret)
-		klog.V(4).Infof("Observe secret %s/%s created, uid: %s, refs: %s", secret.Namespace, secret.Name, secret.UID, jobKeySet.String())
+		klog.V(4).InfoS("Observed Secret created", "secret", klog.KObj(secret), "secretUID", secret.UID, "jobRefs", jobKeySet)
 		for key := range jobKeySet {
 			scaleExpectations.ObserveScale(key.String(), expectations.Create, secret.Labels[SourceSecretUIDLabelKey])
 		}
@@ -231,7 +231,7 @@ func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.RateLimitingI
 	// Get jobs related to this Secret
 	jobKeys, err := e.getActiveJobKeysForSecret(secret)
 	if err != nil {
-		klog.Errorf("Failed to get jobs for Secret %s/%s: %v", secret.Namespace, secret.Name, err)
+		klog.ErrorS(err, "Failed to get jobs for Secret", "secret", klog.KObj(secret))
 	}
 	for _, jKey := range jobKeys {
 		q.Add(reconcile.Request{NamespacedName: jKey})
@@ -254,7 +254,7 @@ func (e *secretEventHandler) handleUpdate(secretNew, secretOld *v1.Secret, q wor
 	// Get jobs related to this Secret
 	jobKeys, err := e.getActiveJobKeysForSecret(secretNew)
 	if err != nil {
-		klog.Errorf("Failed to get jobs for Secret %s/%s: %v", secretNew.Namespace, secretNew.Name, err)
+		klog.ErrorS(err, "Failed to get jobs for Secret", "secret", klog.KObj(secretNew))
 	}
 	for _, jKey := range jobKeys {
 		q.Add(reconcile.Request{NamespacedName: jKey})

@@ -39,10 +39,10 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 	existingCRR := &appsv1alpha1.ContainerRecreateRequest{}
 	err := r.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: getCRRName(pod)}, existingCRR)
 	if err == nil {
-		klog.V(3).Infof("SidecarTerminator -- CRR(%s/%s) exists, waiting for this CRR to complete", existingCRR.Namespace, existingCRR.Name)
+		klog.V(3).InfoS("SidecarTerminator -- CRR exists, waiting for this CRR to complete", "containerRecreateRequest", klog.KObj(existingCRR))
 		return nil
 	} else if client.IgnoreNotFound(err) != nil {
-		klog.Errorf("SidecarTerminator -- Error occurred when try to get CRR(%s/%s), error: %v", existingCRR.Namespace, existingCRR.Name, err)
+		klog.ErrorS(err, "SidecarTerminator -- Error occurred when try to get CRR", "containerRecreateRequest", klog.KObj(existingCRR))
 		return err
 	}
 
@@ -73,9 +73,9 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 
 	err = r.Create(context.TODO(), crr)
 	if err != nil {
-		klog.Errorf("SidecarTerminator -- Error occurred when creating CRR(%v/%v), error %v", crr.Namespace, crr.Name, err)
+		klog.ErrorS(err, "SidecarTerminator -- Error occurred when creating", "containerRecreateRequest", klog.KObj(crr))
 	} else {
-		klog.V(3).Infof("SidecarTerminator -- Creating CRR(%v/%v) successfully", crr.Namespace, crr.Name)
+		klog.V(3).InfoS("SidecarTerminator -- Creating CRR successfully", "containerRecreateRequest", klog.KObj(crr))
 
 		r.recorder.Eventf(pod, corev1.EventTypeNormal, "SidecarTerminator",
 			"Kruise SidecarTerminator is trying to terminate sidecar %v using crr", uncompletedSidecars.List())

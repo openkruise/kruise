@@ -87,7 +87,7 @@ func (s *specificAllocator) Alloc(nameToSubset *map[string]*Subset) (*map[string
 	}
 
 	specifiedReplicas := getSpecifiedSubsetReplicas(expectedReplicas, s.UnitedDeployment)
-	klog.V(4).Infof("UnitedDeployment %s/%s specifiedReplicas: %v", s.Namespace, s.Name, specifiedReplicas)
+	klog.V(4).InfoS("UnitedDeployment specifiedReplicas", "unitedDeployment", klog.KObj(s), "specifiedReplicas", specifiedReplicas)
 	return s.AllocateReplicas(expectedReplicas, specifiedReplicas)
 }
 
@@ -107,7 +107,7 @@ func (s *specificAllocator) validateReplicas(replicas int32, subsetReplicasLimit
 			specifiedCount++
 		}
 	}
-	klog.V(4).Infof("specifiedCount: %d, len(*s.subsets): %d", specifiedCount, len(*s.subsets))
+	klog.V(4).InfoS("SpecifiedCount and subsetsCount", "specifiedCount", specifiedCount, "subsetsCount", len(*s.subsets))
 	if replicas != -1 {
 		if specifiedReplicas > replicas {
 			return fmt.Errorf("specified subsets' replica (%d) is greater than UnitedDeployment replica (%d)",
@@ -137,8 +137,8 @@ func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1alpha1.UnitedDeploymen
 		if specifiedReplicas, err := ParseSubsetReplicas(replicas, *subsetDef.Replicas); err == nil {
 			replicaLimits[subsetDef.Name] = specifiedReplicas
 		} else {
-			klog.Warningf("Fail to consider the replicas of subset %s when parsing replicaLimits during managing replicas of UnitedDeployment %s/%s: %s",
-				subsetDef.Name, ud.Namespace, ud.Name, err)
+			klog.ErrorS(err, "Failed to consider the replicas of subset when parsing replicaLimits during managing replicas of UnitedDeployment",
+				"subsetName", subsetDef.Name, "unitedDeployment", klog.KObj(ud))
 		}
 	}
 

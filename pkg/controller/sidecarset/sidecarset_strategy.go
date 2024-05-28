@@ -53,7 +53,7 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 		// if selector failed, always return false
 		selector, err := util.ValidatedLabelSelectorAsSelector(strategy.Selector)
 		if err != nil {
-			klog.Errorf("sidecarSet(%s) rolling selector error, err: %v", sidecarset.Name, err)
+			klog.ErrorS(err, "SidecarSet rolling selector error", "sidecarSet", klog.KObj(sidecarset))
 			return false
 		}
 		//matched
@@ -82,7 +82,8 @@ func (p *spreadingStrategy) GetNextUpgradePods(control sidecarcontrol.SidecarCon
 		}
 	}
 
-	klog.V(3).Infof("sidecarSet(%s) matchedPods(%d) waitUpdated(%d) notUpgradable(%d)", sidecarset.Name, len(pods), len(waitUpgradedIndexes), len(notUpgradableIndexes))
+	klog.V(3).InfoS("SidecarSet's pods status", "sidecarSet", klog.KObj(sidecarset), "matchedPods", len(pods),
+		"waitUpdated", len(waitUpgradedIndexes), "notUpgradable", len(notUpgradableIndexes))
 	//2. sort Pods with default sequence and scatter
 	waitUpgradedIndexes = SortUpdateIndexes(strategy, pods, waitUpgradedIndexes)
 

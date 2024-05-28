@@ -101,12 +101,12 @@ type ReconcilePodReadiness struct {
 
 func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
-	klog.V(3).Infof("Starting to process Pod %v", request.NamespacedName)
+	klog.V(3).InfoS("Starting to process Pod", "pod", request)
 	defer func() {
 		if err != nil {
-			klog.Warningf("Failed to process Pod %v, elapsedTime %v, error: %v", request.NamespacedName, time.Since(start), err)
+			klog.ErrorS(err, "Failed to process Pod", "pod", request, "elapsedTime", time.Since(start))
 		} else {
-			klog.Infof("Finish to process Pod %v, elapsedTime %v", request.NamespacedName, time.Since(start))
+			klog.InfoS("Finished to process Pod", "pod", request, "elapsedTime", time.Since(start))
 		}
 	}()
 

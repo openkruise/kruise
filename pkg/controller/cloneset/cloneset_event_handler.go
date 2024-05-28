@@ -69,7 +69,7 @@ func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q w
 		if req == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s/%s created, owner: %s", pod.Namespace, pod.Name, req.Name)
+		klog.V(4).InfoS("Pod created", "pod", klog.KObj(pod), "owner", req)
 
 		isSatisfied, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(req.String())
 		clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pod.Name)
@@ -93,7 +93,7 @@ func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q w
 	if len(csList) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan Pod %s/%s created, matched owner: %s", pod.Namespace, pod.Name, e.joinCloneSetNames(csList))
+	klog.V(4).InfoS("Orphan Pod created", "pod", klog.KObj(pod), "owner", e.joinCloneSetNames(csList))
 	for _, cs := range csList {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 			Name:      cs.GetName(),
@@ -149,7 +149,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 			}
 		}
 
-		klog.V(4).Infof("Pod %s/%s updated, owner: %s", curPod.Namespace, curPod.Name, req.Name)
+		klog.V(4).InfoS("Pod updated", "pod", klog.KObj(curPod), "owner", req)
 		q.Add(*req)
 		return
 	}
@@ -161,8 +161,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 		if len(csList) == 0 {
 			return
 		}
-		klog.V(4).Infof("Orphan Pod %s/%s updated, matched owner: %s",
-			curPod.Namespace, curPod.Name, e.joinCloneSetNames(csList))
+		klog.V(4).InfoS("Orphan Pod updated", "pod", klog.KObj(curPod), "owner", e.joinCloneSetNames(csList))
 		for _, cs := range csList {
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      cs.GetName(),
@@ -184,7 +183,7 @@ func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, cur
 func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	pod, ok := evt.Object.(*v1.Pod)
 	if !ok {
-		klog.Errorf("DeleteEvent parse pod failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
+		klog.ErrorS(nil, "Skipped pod deletion event", "deleteStateUnknown", evt.DeleteStateUnknown, "obj", evt.Object)
 		return
 	}
 	clonesetutils.ResourceVersionExpectations.Delete(pod)
@@ -199,7 +198,7 @@ func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q w
 		return
 	}
 
-	klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, req.Name)
+	klog.V(4).InfoS("Pod deleted", "pod", klog.KObj(pod), "owner", req)
 	clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pod.Name)
 	q.Add(*req)
 }
@@ -212,7 +211,7 @@ func resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference
 	// Parse the Group out of the OwnerReference to compare it to what was parsed out of the requested OwnerType
 	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
 	if err != nil {
-		klog.Errorf("Could not parse OwnerReference %v APIVersion: %v", controllerRef, err)
+		klog.ErrorS(err, "Could not parse APIVersion in OwnerReference", "ownerRef", controllerRef)
 		return nil
 	}
 
@@ -250,8 +249,7 @@ func (e *podEventHandler) getPodCloneSets(pod *v1.Pod) []appsv1alpha1.CloneSet {
 	if len(csMatched) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		klog.Warningf("Error! More than one CloneSet is selecting pod %s/%s : %s",
-			pod.Namespace, pod.Name, e.joinCloneSetNames(csMatched))
+		klog.InfoS("Error! More than one CloneSet is selecting pod", "pod", klog.KObj(pod), "cloneSets", e.joinCloneSetNames(csMatched))
 	}
 	return csMatched
 }
@@ -303,7 +301,7 @@ func (e *pvcEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 func (e *pvcEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	pvc, ok := evt.Object.(*v1.PersistentVolumeClaim)
 	if !ok {
-		klog.Errorf("DeleteEvent parse pvc failed, DeleteStateUnknown: %#v, obj: %#v", evt.DeleteStateUnknown, evt.Object)
+		klog.ErrorS(nil, "Skipped pvc deletion event", "deleteStateUnknown", evt.DeleteStateUnknown, "obj", evt.Object)
 		return
 	}
 

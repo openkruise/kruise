@@ -97,7 +97,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	if cs.Spec.UpdateStrategy.Partition != nil {
 		if pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err != nil {
 			// TODO: maybe, we should block pod update if partition settings is wrong
-			klog.Errorf("CloneSet %s/%s partition value is illegal", cs.Namespace, cs.Name)
+			klog.ErrorS(err, "CloneSet partition value was illegal", "cloneSet", klog.KObj(cs))
 		} else {
 			partition = pValue
 		}
@@ -106,7 +106,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, replicas, true)
 		if cs.Spec.UpdateStrategy.Paused {
 			maxSurge = 0
-			klog.V(3).Infof("Because CloneSet(%s/%s) updateStrategy.paused=true, and Set maxSurge=0", cs.Namespace, cs.Name)
+			klog.V(3).InfoS("Because CloneSet updateStrategy.paused=true, and Set maxSurge=0", "cloneSet", klog.KObj(cs))
 		}
 	}
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
@@ -121,16 +121,14 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		if res.isEmpty() {
 			return
 		}
-		klog.V(1).Infof("Calculate diffs for CloneSet %s/%s, replicas=%d, partition=%d, maxSurge=%d, maxUnavailable=%d,"+
-			" allPods=%d, newRevisionPods=%d, newRevisionActivePods=%d, oldRevisionPods=%d, oldRevisionActivePods=%d,"+
-			" unavailableNewRevisionCount=%d, unavailableOldRevisionCount=%d, preDeletingNewRevisionCount=%d, preDeletingOldRevisionCount=%d,"+
-			" toDeleteNewRevisionCount=%d, toDeleteOldRevisionCount=%d, enabledPreparingUpdateAsUpdate=%v, useDefaultIsPodUpdate=%v."+
-			" Result: %+v",
-			cs.Namespace, cs.Name, replicas, partition, maxSurge, maxUnavailable,
-			len(pods), newRevisionCount, newRevisionActiveCount, oldRevisionCount, oldRevisionActiveCount,
-			unavailableNewRevisionCount, unavailableOldRevisionCount, preDeletingNewRevisionCount, preDeletingOldRevisionCount,
-			toDeleteNewRevisionCount, toDeleteOldRevisionCount, utilfeature.DefaultFeatureGate.Enabled(features.PreparingUpdateAsUpdate), isPodUpdate == nil,
-			res)
+		klog.V(1).InfoS("Calculate diffs for CloneSet", "cloneSet", klog.KObj(cs), "replicas", replicas, "partition", partition,
+			"maxSurge", maxSurge, "maxUnavailable", maxUnavailable, "allPodCount", len(pods), "newRevisionCount", newRevisionCount,
+			"newRevisionActiveCount", newRevisionActiveCount, "oldrevisionCount", oldRevisionCount, "oldRevisionActiveCount", oldRevisionActiveCount,
+			"unavailableNewRevisionCount", unavailableNewRevisionCount, "unavailableOldRevisionCount", unavailableOldRevisionCount,
+			"preDeletingNewRevisionCount", preDeletingNewRevisionCount, "preDeletingOldRevisionCount", preDeletingOldRevisionCount,
+			"toDeleteNewRevisionCount", toDeleteNewRevisionCount, "toDeleteOldRevisionCount", toDeleteOldRevisionCount,
+			"enabledPreparingUpdateAsUpdate", utilfeature.DefaultFeatureGate.Enabled(features.PreparingUpdateAsUpdate), "useDefaultIsPodUpdate", isPodUpdate == nil,
+			"result", res)
 	}()
 
 	// If PreparingUpdateAsUpdate feature gate is enabled:

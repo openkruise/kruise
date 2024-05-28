@@ -65,7 +65,9 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 			replicas := nextUpdate[cell].Replicas
 			partition := nextUpdate[cell].Partition
 
-			klog.V(0).Infof("UnitedDeployment %s/%s needs to update Subset (%s) %s/%s with revision %s, replicas %d, partition %d", ud.Namespace, ud.Name, subsetType, subset.Namespace, subset.Name, expectedRevision.Name, replicas, partition)
+			klog.InfoS("UnitedDeployment needed to update Subset with revision, replicas and partition",
+				"unitedDeployment", klog.KObj(ud), "subsetType", subsetType, "subset", klog.KObj(subset),
+				"expectedRevisionName", expectedRevision.Name, "replicas", replicas, "partition", partition)
 			updateSubsetErr := r.subSetControls[subsetType].UpdateSubset(subset, ud, expectedRevision.Name, replicas, partition)
 			if updateSubsetErr != nil {
 				r.recorder.Event(ud.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), fmt.Sprintf("Error updating PodSet (%s) %s when updating: %s", subsetType, subset.Name, updateSubsetErr))
@@ -93,7 +95,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 	for subsetName := range *nameToSubset {
 		gotSubsets.Insert(subsetName)
 	}
-	klog.V(4).Infof("UnitedDeployment %s/%s has subsets %v, expects subsets %v", ud.Namespace, ud.Name, gotSubsets.List(), expectedSubsets.List())
+	klog.V(4).InfoS("UnitedDeployment subsets information", "unitedDeployment", klog.KObj(ud), "subsets", gotSubsets.List(), "expectedSubsets", expectedSubsets.List())
 
 	creates := expectedSubsets.Difference(gotSubsets).List()
 	deletes := gotSubsets.Difference(expectedSubsets).List()
@@ -107,7 +109,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 	// manage creating
 	if len(creates) > 0 {
 		// do not consider deletion
-		klog.V(0).Infof("UnitedDeployment %s/%s needs creating subset (%s) with name: %v", ud.Namespace, ud.Name, subsetType, creates)
+		klog.InfoS("UnitedDeployment needed creating subset with name", "unitedDeployment", klog.KObj(ud), "subsetType", subsetType, "subsetNames", creates)
 		createdSubsets := make([]string, len(creates))
 		for i, subset := range creates {
 			createdSubsets[i] = subset
@@ -138,7 +140,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 
 	// manage deleting
 	if len(deletes) > 0 {
-		klog.V(0).Infof("UnitedDeployment %s/%s needs deleting subset (%s) with name: [%v]", ud.Namespace, ud.Name, subsetType, deletes)
+		klog.InfoS("UnitedDeployment needed deleting subset with name", "unitedDeployment", klog.KObj(ud), "subsetType", subsetType, "subsetNames", deletes)
 		var deleteErrs []error
 		for _, subsetName := range deletes {
 			subset := (*nameToSubset)[subsetName]

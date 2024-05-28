@@ -55,10 +55,9 @@ func (r *realControl) Scale(
 		return false, fmt.Errorf("spec.Replicas is nil")
 	}
 
-	controllerKey := clonesetutils.GetControllerKey(updateCS)
 	coreControl := clonesetcore.New(updateCS)
 	if !coreControl.IsReadyToScale() {
-		klog.Warningf("CloneSet %s skip scaling for not ready to scale", controllerKey)
+		klog.InfoS("CloneSet skipped scaling for not ready to scale", "cloneSet", klog.KObj(updateCS))
 		return false, nil
 	}
 
@@ -83,8 +82,8 @@ func (r *realControl) Scale(
 		// lack number of current version
 		expectedCurrentCreations := diffRes.scaleUpNumOldRevision
 
-		klog.V(3).Infof("CloneSet %s begin to scale out %d pods including %d (current rev)",
-			controllerKey, expectedCreations, expectedCurrentCreations)
+		klog.V(3).InfoS("CloneSet began to scale out pods, including current revision",
+			"cloneSet", klog.KObj(updateCS), "expectedCreations", expectedCreations, "expectedCurrentCreations", expectedCurrentCreations)
 
 		// available instance-id come from free pvc
 		availableIDs := getOrGenAvailableIDs(expectedCreations, pods, pvcs)
@@ -100,7 +99,7 @@ func (r *realControl) Scale(
 
 	// 4. try to delete pods already in pre-delete
 	if len(podsInPreDelete) > 0 {
-		klog.V(3).Infof("CloneSet %s try to delete pods in preDelete: %v", controllerKey, util.GetPodNames(podsInPreDelete).List())
+		klog.V(3).InfoS("CloneSet tried to delete pods in preDelete", "cloneSet", klog.KObj(updateCS), "pods", util.GetPodNames(podsInPreDelete).List())
 		if modified, err := r.deletePods(updateCS, podsInPreDelete, pvcs); err != nil || modified {
 			return modified, err
 		}
@@ -109,8 +108,8 @@ func (r *realControl) Scale(
 	// 5. specified delete
 	if podsToDelete := util.DiffPods(podsSpecifiedToDelete, podsInPreDelete); len(podsToDelete) > 0 {
 		newPodsToDelete, oldPodsToDelete := clonesetutils.GroupUpdateAndNotUpdatePods(podsToDelete, updateRevision)
-		klog.V(3).Infof("CloneSet %s try to delete pods specified. Delete ready limit: %d. New Pods: %v, old Pods: %v.",
-			controllerKey, diffRes.deleteReadyLimit, util.GetPodNames(newPodsToDelete).List(), util.GetPodNames(oldPodsToDelete).List())
+		klog.V(3).InfoS("CloneSet tried to delete pods specified", "cloneSet", klog.KObj(updateCS), "deleteReadyLimit", diffRes.deleteReadyLimit,
+			"newPods", util.GetPodNames(newPodsToDelete).List(), "oldPods", util.GetPodNames(oldPodsToDelete).List())
 
 		podsCanDelete := make([]*v1.Pod, 0, len(podsToDelete))
 		for _, pod := range podsToDelete {
@@ -130,13 +129,13 @@ func (r *realControl) Scale(
 	// 6. scale in
 	if diffRes.scaleDownNum > 0 {
 		if numToDelete > 0 {
-			klog.V(3).Infof("CloneSet %s skip to scale in %d for %d to delete, including %d specified and %d preDelete",
-				controllerKey, diffRes.scaleDownNum, numToDelete, len(podsSpecifiedToDelete), len(podsInPreDelete))
+			klog.V(3).InfoS("CloneSet skipped to scale in for deletion", "cloneSet", klog.KObj(updateCS), "scaleDownNum", diffRes.scaleDownNum,
+				"numToDelete", numToDelete, "specifiedToDelete", len(podsSpecifiedToDelete), "preDelete", len(podsInPreDelete))
 			return false, nil
 		}
 
-		klog.V(3).Infof("CloneSet %s begin to scale in %d pods including %d (current rev), delete ready limit: %d",
-			controllerKey, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, diffRes.deleteReadyLimit)
+		klog.V(3).InfoS("CloneSet began to scale in", "cloneSet", klog.KObj(updateCS), "scaleDownNum", diffRes.scaleDownNum,
+			"oldRevision", diffRes.scaleDownNumOldRevision, "deleteReadyLimit", diffRes.deleteReadyLimit)
 
 		podsPreparingToDelete := r.choosePodsToDelete(updateCS, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, notUpdatedPods, updatedPods)
 		podsToDelete := make([]*v1.Pod, 0, len(podsPreparingToDelete))
@@ -174,8 +173,8 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 			continue
 		}
 
-		klog.V(3).Infof("CloneSet %s cancel deletion of pod %s, and patch lifecycle from PreparingDelete to PreparingNormal",
-			clonesetutils.GetControllerKey(cs), pod.Name)
+		klog.V(3).InfoS("CloneSet canceled deletion of pod and patch lifecycle from PreparingDelete to PreparingNormal",
+			"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 		if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingNormal, false); err != nil {
 			return modified, err
 		} else if updated {
@@ -273,8 +272,8 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 			if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete, markPodNotReady); err != nil {
 				return false, err
 			} else if updated {
-				klog.V(3).Infof("CloneSet %s scaling update pod %s lifecycle to PreparingDelete",
-					clonesetutils.GetControllerKey(cs), pod.Name)
+				klog.V(3).InfoS("CloneSet scaling update pod lifecycle to PreparingDelete",
+					"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 				modified = true
 				clonesetutils.ResourceVersionExpectations.Expect(gotPod)
 			}
@@ -387,7 +386,7 @@ func (r *realControl) choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff in
 				},
 			})
 		} else if diff > len(pods) {
-			klog.Warningf("Diff > len(pods) in choosePodsToDelete func which is not expected.")
+			klog.InfoS("Diff > len(pods) in choosePodsToDelete func which is not expected")
 			return pods
 		}
 		return pods[:diff]

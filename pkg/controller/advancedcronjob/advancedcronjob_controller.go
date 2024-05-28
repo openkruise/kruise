@@ -76,28 +76,28 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	klog.Info("Starting AdvancedCronJob Controller")
+	klog.InfoS("Starting AdvancedCronJob Controller")
 	c, err := controller.New("advancedcronjob-controller", mgr, controller.Options{Reconciler: r,
 		MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout()})
 	if err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Failed to create AdvandedCronJob controller")
 		return err
 	}
 
 	// Watch for changes to AdvancedCronJob
 	src := source.Kind(mgr.GetCache(), &appsv1alpha1.AdvancedCronJob{})
 	if err = c.Watch(src, &handler.EnqueueRequestForObject{}); err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Failed to watch AdvancedCronJob")
 		return err
 	}
 
 	if err = watchJob(mgr, c); err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Failed to watch Job")
 		return err
 	}
 
 	if err = watchBroadcastJob(mgr, c); err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Failed to watch BroadcastJob")
 		return err
 	}
 	return nil
@@ -133,7 +133,7 @@ type ReconcileAdvancedCronJob struct {
 
 func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	klog.Info("Running AdvancedCronJob job ", req.NamespacedName)
+	klog.InfoS("Running AdvancedCronJob job", "advancedCronJob", req)
 
 	namespacedName := types.NamespacedName{
 		Namespace: req.Namespace,
@@ -143,7 +143,7 @@ func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request
 	var advancedCronJob appsv1alpha1.AdvancedCronJob
 
 	if err := r.Get(ctx, namespacedName, &advancedCronJob); err != nil {
-		klog.Error(err, "unable to fetch CronJob", req.NamespacedName)
+		klog.ErrorS(err, "Unable to fetch CronJob", "advancedCronJob", req)
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can get them
 		// on deleted requests.
@@ -156,7 +156,7 @@ func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request
 	case appsv1alpha1.BroadcastJobTemplate:
 		return r.reconcileBroadcastJob(ctx, req, advancedCronJob)
 	default:
-		klog.Info("No template found", req.NamespacedName)
+		klog.InfoS("No template found", "advancedCronJob", req)
 	}
 
 	return ctrl.Result{}, nil
@@ -169,7 +169,7 @@ func (r *ReconcileAdvancedCronJob) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ReconcileAdvancedCronJob) updateAdvancedJobStatus(request reconcile.Request, advancedCronJob *appsv1alpha1.AdvancedCronJob) error {
-	klog.V(1).Info(fmt.Sprintf("Updating job %s status %#v", advancedCronJob.Name, advancedCronJob.Status))
+	klog.V(1).InfoS("Updating job status", "advancedCronJob", klog.KObj(advancedCronJob), "status", advancedCronJob.Status)
 	advancedCronJobCopy := advancedCronJob.DeepCopy()
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		err := r.Status().Update(context.TODO(), advancedCronJobCopy)

@@ -97,7 +97,7 @@ func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.DeleteEvent
 	npp := &appsalphav1.NodePodProbe{}
 	if err := p.reader.Get(context.TODO(), client.ObjectKey{Name: obj.Spec.NodeName}, npp); err != nil {
 		if !errors.IsNotFound(err) {
-			klog.Errorf("Get NodePodProbe(%s) failed: %s", obj.Spec.NodeName, err)
+			klog.ErrorS(err, "Failed to get NodePodProbe", "nodeName", obj.Spec.NodeName)
 		}
 		return
 	}
@@ -126,7 +126,7 @@ func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent
 		npp := &appsalphav1.NodePodProbe{}
 		if err := p.reader.Get(context.TODO(), client.ObjectKey{Name: new.Spec.NodeName}, npp); err != nil {
 			if !errors.IsNotFound(err) {
-				klog.Errorf("Get NodePodProbe(%s) failed: %s", new.Spec.NodeName, err)
+				klog.ErrorS(err, "Failed to get NodePodProbe", "nodeName", new.Spec.NodeName)
 			}
 			return
 		}
@@ -188,17 +188,17 @@ func (e *enqueueRequestForNode) nodeCreate(node *corev1.Node, q workqueue.RateLi
 	npp := &appsalphav1.NodePodProbe{}
 	if err := e.Get(context.TODO(), client.ObjectKey{Name: node.Name}, npp); err != nil {
 		if errors.IsNotFound(err) {
-			klog.Infof("Node create event for nodePodProbe %v", node.Name)
+			klog.InfoS("Node created event for nodePodProbe", "nodeName", node.Name)
 			namespacedName := types.NamespacedName{Name: node.Name}
 			if !isNodeReady(node) {
-				klog.Infof("Skip to enqueue Node %s with not nodePodProbe, for not ready yet.", node.Name)
+				klog.InfoS("Skipped to enqueue Node with not nodePodProbe, for not ready yet", "nodeName", node.Name)
 				return
 			}
-			klog.Infof("Enqueue Node %s with not nodePodProbe.", node.Name)
+			klog.InfoS("Enqueue Node with not nodePodProbe", "nodeName", node.Name)
 			q.Add(reconcile.Request{NamespacedName: namespacedName})
 			return
 		}
-		klog.Errorf("Failed to get nodePodProbe for Node %s: %v", node.Name, err)
+		klog.ErrorS(err, "Failed to get nodePodProbe for Node", "nodeName", node.Name)
 	}
 }
 

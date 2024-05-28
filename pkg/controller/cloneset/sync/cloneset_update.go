@@ -103,16 +103,16 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		if waitUpdate {
 			switch lifecycle.GetPodLifecycleState(pod) {
 			case appspub.LifecycleStatePreparingDelete:
-				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s, so skip to update it",
-					cs.Namespace, cs.Name, pod.Name, lifecycle.GetPodLifecycleState(pod))
+				klog.V(3).InfoS("CloneSet found pod in PreparingDelete state, so skipped updating it",
+					"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 			case appspub.LifecycleStateUpdated:
-				klog.V(3).Infof("CloneSet %s/%s find pod %s in state %s but not in updated revision",
-					cs.Namespace, cs.Name, pod.Name, appspub.LifecycleStateUpdated)
+				klog.V(3).InfoS("CloneSet found pod in Updated state but not in updated revision",
+					"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 				canUpdate = true
 			default:
 				if gracePeriod, _ := appspub.GetInPlaceUpdateGrace(pod); gracePeriod != "" {
-					klog.V(3).Infof("CloneSet %s/%s find pod %s still in grace period %s, so skip to update it",
-						cs.Namespace, cs.Name, pod.Name, gracePeriod)
+					klog.V(3).InfoS("CloneSet found pod still in grace period, so skipped updating it",
+						"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod), "gracePeriod", gracePeriod)
 				} else {
 					canUpdate = true
 				}
@@ -161,8 +161,8 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 
 	res := c.inplaceControl.Refresh(pod, opts)
 	if res.RefreshErr != nil {
-		klog.Errorf("CloneSet %s/%s failed to update pod %s condition for inplace: %v",
-			cs.Namespace, cs.Name, pod.Name, res.RefreshErr)
+		klog.ErrorS(res.RefreshErr, "CloneSet failed to update pod condition for inplace",
+			"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 		return false, 0, res.RefreshErr
 	}
 
@@ -210,7 +210,7 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 			return false, 0, err
 		} else if updated {
 			clonesetutils.ResourceVersionExpectations.Expect(gotPod)
-			klog.V(3).Infof("CloneSet %s update pod %s lifecycle to %s", clonesetutils.GetControllerKey(cs), pod.Name, state)
+			klog.V(3).InfoS("CloneSet updated pod lifecycle", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod), "newState", state)
 			return true, res.DelayDuration, nil
 		}
 	}
@@ -228,7 +228,7 @@ func (c *realControl) fixPodTemplateHashLabel(cs *appsv1alpha1.CloneSet, pod *v1
 		clonesetutils.GetShortHash(pod.Labels[apps.ControllerRevisionHashLabelKey])))
 	pod = pod.DeepCopy()
 	if err := c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, patch)); err != nil {
-		klog.Warningf("CloneSet %s/%s failed to fix pod-template-hash to Pod %s: %v", cs.Namespace, cs.Name, pod.Name, err)
+		klog.ErrorS(err, "CloneSet failed to fix pod-template-hash", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 		return false, err
 	}
 	clonesetutils.ResourceVersionExpectations.Expect(pod)
@@ -259,8 +259,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 					markPodNotReady := cs.Spec.Lifecycle.InPlaceUpdate.MarkPodNotReady
 					if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingUpdate, markPodNotReady); err == nil && updated {
 						clonesetutils.ResourceVersionExpectations.Expect(gotPod)
-						klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
-							clonesetutils.GetControllerKey(cs), pod.Name)
+						klog.V(3).InfoS("CloneSet updated pod lifecycle to PreparingUpdate", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 					}
 					return 0, err
 				}
@@ -274,8 +273,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 				}
 				if updated, gotPod, err = c.lifecycleControl.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, inPlaceUpdateHandler); err == nil && updated {
 					clonesetutils.ResourceVersionExpectations.Expect(gotPod)
-					klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
-						clonesetutils.GetControllerKey(cs), pod.Name)
+					klog.V(3).InfoS("CloneSet updated pod lifecycle to PreparingUpdate", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 				}
 				return 0, err
 			case appspub.LifecycleStatePreparingUpdate:
@@ -305,10 +303,10 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 		if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
 			return 0, fmt.Errorf("find Pod %s update strategy is InPlaceOnly but can not update in-place", pod.Name)
 		}
-		klog.Warningf("CloneSet %s/%s can not update Pod %s in-place, so it will back off to ReCreate", cs.Namespace, cs.Name, pod.Name)
+		klog.InfoS("CloneSet could not update Pod in-place, so it will back off to ReCreate", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 	}
 
-	klog.V(2).Infof("CloneSet %s/%s start to patch Pod %s specified-delete for update %s", cs.Namespace, cs.Name, pod.Name, updateRevision.Name)
+	klog.V(2).InfoS("CloneSet started to patch Pod specified-delete for update", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod), "updateRevision", klog.KObj(updateRevision))
 
 	if patched, err := specifieddelete.PatchPodSpecifiedDelete(c.Client, pod, "true"); err != nil {
 		c.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdatePodReCreate",

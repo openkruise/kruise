@@ -191,7 +191,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	klog.Infof("add podunavailablebudget reconcile.Reconciler success")
+	klog.InfoS("Added podunavailablebudget reconcile.Reconciler success")
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 	pub := &policyv1alpha1.PodUnavailableBudget{}
 	err := r.Get(context.TODO(), req.NamespacedName, pub)
 	if (err != nil && errors.IsNotFound(err)) || (err == nil && !pub.DeletionTimestamp.IsZero()) {
-		klog.V(3).Infof("pub(%s/%s) is Deletion in this time", req.Namespace, req.Name)
+		klog.V(3).InfoS("PodUnavailableBudget is Deletion in this time", "podUnavailableBudget", req)
 		if cacheErr := util.GlobalCache.Delete(&policyv1alpha1.PodUnavailableBudget{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: policyv1alpha1.GroupVersion.String(),
@@ -227,7 +227,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 				Namespace: req.Namespace,
 			},
 		}); cacheErr != nil {
-			klog.Errorf("Delete cache failed for PodUnavailableBudget(%s/%s): %s", req.Namespace, req.Name, err.Error())
+			klog.ErrorS(err, "Deleted cache failed for PodUnavailableBudget", "podUnavailableBudget", req)
 		}
 		// Object not found, return.  Created objects are automatically garbage collected.
 		// For additional cleanup logic use finalizers.
@@ -237,7 +237,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 		return reconcile.Result{}, err
 	}
 
-	klog.V(3).Infof("begin to process podUnavailableBudget(%s/%s)", pub.Namespace, pub.Name)
+	klog.V(3).InfoS("Began to process PodUnavailableBudget", "podUnavailableBudget", klog.KObj(pub))
 	recheckTime, err := r.syncPodUnavailableBudget(pub)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -259,12 +259,12 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	} else {
 		// patch related-pub annotation in all pods of workload
 		if err = r.patchRelatedPubAnnotationInPod(pub, pods); err != nil {
-			klog.Errorf("pub(%s/%s) patch pod annotation failed: %s", pub.Namespace, pub.Name, err.Error())
+			klog.ErrorS(err, "PodUnavailableBudget patch pod annotation failed", "podUnavailableBudget", klog.KObj(pub))
 			return nil, err
 		}
 	}
 
-	klog.V(3).Infof("pub(%s/%s) controller pods(%d) expectedCount(%d)", pub.Namespace, pub.Name, len(pods), expectedCount)
+	klog.V(3).InfoS("PodUnavailableBudget controller pods expectedCount", "podUnavailableBudget", klog.KObj(pub), "podCount", len(pods), "expectedCount", expectedCount)
 	desiredAvailable, err := r.getDesiredAvailableForPub(pub, expectedCount)
 	if err != nil {
 		r.recorder.Eventf(pub, corev1.EventTypeWarning, "CalculateExpectedPodCountFailed", "Failed to calculate the number of expected pods: %v", err)
@@ -287,14 +287,14 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 			pubClone, err = kubeClient.GetGenericClient().KruiseClient.PolicyV1alpha1().
 				PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
 			if err != nil {
-				klog.Errorf("Get PodUnavailableBudget(%s/%s) failed from etcd: %s", pub.Namespace, pub.Name, err.Error())
+				klog.ErrorS(err, "Failed to get PodUnavailableBudget from etcd", "podUnavailableBudget", klog.KObj(pub))
 				return err
 			}
 		} else {
 			// compare local cache and informer cache, then get the newer one
 			item, _, err := util.GlobalCache.Get(pub)
 			if err != nil {
-				klog.Errorf("Get PodUnavailableBudget(%s/%s) cache failed: %s", pub.Namespace, pub.Name, err.Error())
+				klog.ErrorS(err, "Failed to get PodUnavailableBudget cache", "podUnavailableBudget", klog.KObj(pub))
 			}
 			if localCached, ok := item.(*policyv1alpha1.PodUnavailableBudget); ok {
 				pubClone = localCached.DeepCopy()
@@ -331,10 +331,10 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 		conflictTimes++
 		return updateErr
 	})
-	klog.V(3).Infof("Controller cost of pub(%s/%s): conflict times %v, cost of Get %v, cost of Update %v",
-		pub.Namespace, pub.Name, conflictTimes, costOfGet, costOfUpdate)
+	klog.V(3).InfoS("Controller cost of PodUnavailableBudget", "podUnavailableBudget", klog.KObj(pub), "conflictTimes", conflictTimes,
+		"costOfGet", costOfGet, "costOfUpdate", costOfUpdate)
 	if err != nil {
-		klog.Errorf("update pub(%s/%s) status failed: %s", pub.Namespace, pub.Name, err.Error())
+		klog.ErrorS(err, "Failed to update PodUnavailableBudget status", "podUnavailableBudget", klog.KObj(pub))
 	}
 	return recheckTime, err
 }
@@ -356,7 +356,7 @@ func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *poli
 			return err
 		}
 	}
-	klog.V(3).Infof("patch pub(%s/%s) old pods(%d) related-pub annotation success", pub.Namespace, pub.Name, len(updatedPods))
+	klog.V(3).InfoS("Patched PodUnavailableBudget old pods related-pub annotation success", "podUnavailableBudget", klog.KObj(pub), "podCount", len(updatedPods))
 	return nil
 }
 
@@ -498,9 +498,9 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 		return err
 	}
 	if err = util.GlobalCache.Add(pub); err != nil {
-		klog.Errorf("Add cache failed for PodUnavailableBudget(%s/%s): %s", pub.Namespace, pub.Name, err.Error())
+		klog.ErrorS(err, "Added cache failed for PodUnavailableBudget", "podUnavailableBudget", klog.KObj(pub))
 	}
-	klog.V(3).Infof("pub(%s/%s) update status(disruptedPods:%d, unavailablePods:%d, expectedCount:%d, desiredAvailable:%d, currentAvailable:%d, unavailableAllowed:%d)",
-		pub.Namespace, pub.Name, len(disruptedPods), len(unavailablePods), expectedCount, desiredAvailable, currentAvailable, unavailableAllowed)
+	klog.V(3).InfoS("PodUnavailableBudget update status", "podUnavailableBudget", klog.KObj(pub), "disruptedPods", len(disruptedPods), "unavailablePods", len(unavailablePods),
+		"expectedCount", expectedCount, "desiredAvailable", desiredAvailable, "currentAvailable", currentAvailable, "unavailableAllowed", unavailableAllowed)
 	return nil
 }
