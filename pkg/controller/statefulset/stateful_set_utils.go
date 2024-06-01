@@ -66,7 +66,7 @@ func getParentNameAndOrdinal(pod *v1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-// getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
+// getParentName gets the name of pod's parent StatefulSet. If pod has no parent, the empty string is returned.
 func getParentName(pod *v1.Pod) string {
 	parent, _ := getParentNameAndOrdinal(pod)
 	return parent
@@ -80,26 +80,26 @@ func getOrdinal(pod *v1.Pod) int {
 
 // getPodName gets the name of set's child Pod with an ordinal index of ordinal
 func getPodName(set *appsv1beta1.StatefulSet, ordinal int) string {
-	return fmt.Sprintf("%s-%d", set.Name, ordinal)
+	return fmt.Sprintf("%s-%d", set.GenerateName, ordinal)
 }
 
 // getPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a Pod with an ordinal index of ordinal. claim
 // must be a PersistentVolumeClaim from set's VolumeClaims template.
 func getPersistentVolumeClaimName(set *appsv1beta1.StatefulSet, claim *v1.PersistentVolumeClaim, ordinal int) string {
 	// NOTE: This name format is used by the heuristics for zone spreading in ChooseZoneForVolume
-	return fmt.Sprintf("%s-%s-%d", claim.Name, set.Name, ordinal)
+	return fmt.Sprintf("%s-%s-%d", claim.Name, set.GenerateName, ordinal)
 }
 
 // isMemberOf tests if pod is a member of set.
 func isMemberOf(set *appsv1beta1.StatefulSet, pod *v1.Pod) bool {
-	return getParentName(pod) == set.Name
+	return getParentName(pod) == set.GenerateName
 }
 
 // identityMatches returns true if pod has a valid identity and network identity for a member of set.
 func identityMatches(set *appsv1beta1.StatefulSet, pod *v1.Pod) bool {
 	parent, ordinal := getParentNameAndOrdinal(pod)
 	return ordinal >= 0 &&
-		set.Name == parent &&
+		set.GenerateName == parent &&
 		pod.Name == getPodName(set, ordinal) &&
 		pod.Namespace == set.Namespace &&
 		pod.Labels[apps.StatefulSetPodNameLabel] == pod.Name

@@ -183,7 +183,7 @@ func GetInstanceID(obj metav1.Object) string {
 }
 
 // GetPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
-// returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
+// returned PersistentVolumeClaims are each constructed with the name specific to the Pod. This name is determined
 // by getPersistentVolumeClaimName.
 func GetPersistentVolumeClaims(cs *appsv1alpha1.CloneSet, pod *v1.Pod) map[string]v1.PersistentVolumeClaim {
 	templates := cs.Spec.VolumeClaimTemplates
@@ -211,7 +211,7 @@ func GetPersistentVolumeClaims(cs *appsv1alpha1.CloneSet, pod *v1.Pod) map[strin
 // getPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a Pod with an instance id. claim
 // must be a PersistentVolumeClaim from set's VolumeClaims template.
 func getPersistentVolumeClaimName(cs *appsv1alpha1.CloneSet, claim *v1.PersistentVolumeClaim, id string) string {
-	return fmt.Sprintf("%s-%s-%s", claim.Name, cs.Name, id)
+	return fmt.Sprintf("%s-%s-%s", claim.Name, cs.GenerateName, id)
 }
 
 // DoItSlowly tries to call the provided function a total of 'count' times,

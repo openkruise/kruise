@@ -256,7 +256,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		}
 	}
 
-	//release Pods ownerRef
+	// release Pods ownerRef
 	filteredPods, err = r.claimPods(instance, filteredPods)
 	if err != nil {
 		return reconcile.Result{}, err

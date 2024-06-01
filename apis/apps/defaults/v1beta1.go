@@ -28,6 +28,10 @@ import (
 
 // SetDefaultsStatefulSet set default values for StatefulSet.
 func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults bool) {
+	if obj.GenerateName == "" {
+		obj.GenerateName = obj.Name
+	}
+
 	if len(obj.Spec.PodManagementPolicy) == 0 {
 		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 	}

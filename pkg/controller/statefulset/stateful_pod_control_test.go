@@ -637,6 +637,7 @@ func TestPodClaimIsStale(t *testing.T) {
 	for _, tc := range testCases {
 		set := appsv1beta1.StatefulSet{}
 		set.Name = "set"
+		set.GenerateName = "set"
 		set.Namespace = "default"
 		set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 			WhenDeleted: appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
