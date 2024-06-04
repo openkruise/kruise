@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/openkruise/kruise/apis"
@@ -946,6 +947,7 @@ func TestSidecarSetTransferEnv(t *testing.T) {
 
 func testSidecarSetTransferEnv(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
+	sidecarSetIn.Spec.InitContainers[0].PodInjectPolicy = ""
 	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
 		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
@@ -958,7 +960,7 @@ func testSidecarSetTransferEnv(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarS
 		t.Fatalf("inject sidecar into pod failed, err: %v", err)
 	}
 	if len(podOut.Spec.InitContainers[1].Env) != 2 {
-		t.Fatalf("expect 2 envs but got %v", len(podOut.Spec.InitContainers[0].Env))
+		t.Fatalf("expect 2 envs but got %v", len(podOut.Spec.InitContainers[1].Env))
 	}
 	if podOut.Spec.InitContainers[1].Env[1].Value != "world2" {
 		t.Fatalf("expect env with value 'world2' but got %v", podOut.Spec.Containers[0].Env[1].Value)
@@ -1129,6 +1131,17 @@ func TestMergeSidecarContainers(t *testing.T) {
 			expectContainerLen: 4,
 			expectedContainers: []string{"new-sidecar-1", "sidecar-1", "app-container", "sidecar-2"},
 		},
+		{
+			name: "origin no sidecar, sidecar have new containers",
+			getOrigins: func() []corev1.Container {
+				return nil
+			},
+			getInjected: func() []*appsv1alpha1.SidecarContainer {
+				return sidecarContainers
+			},
+			expectContainerLen: 3,
+			expectedContainers: []string{"new-sidecar-1", "sidecar-1", "sidecar-2"},
+		},
 	}
 
 	for _, cs := range cases {
@@ -1250,6 +1263,134 @@ func TestInjectInitContainer(t *testing.T) {
 			}
 			if len(pod.Spec.InitContainers) != cs.expectedInitContainerLen {
 				t.Fatalf("expect(%d), but get(%d)", cs.expectedInitContainerLen, len(pod.Spec.InitContainers))
+			}
+		})
+	}
+}
+
+func TestInjectInitContainerSort(t *testing.T) {
+	cases := []struct {
+		name               string
+		getOrigins         func() []corev1.Container
+		getInjected        func() []*appsv1alpha1.SidecarContainer
+		expectContainerLen int
+		expectedContainers []string
+	}{
+		{
+			name: "origins nil, inject containers(a, b, c)",
+			getOrigins: func() []corev1.Container {
+				return nil
+			},
+			getInjected: func() []*appsv1alpha1.SidecarContainer {
+				return []*appsv1alpha1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name: "a-init",
+						},
+					},
+					{
+						Container: corev1.Container{
+							Name: "c-init",
+						},
+					},
+					{
+						Container: corev1.Container{
+							Name: "b-init",
+						},
+					},
+				}
+			},
+			expectContainerLen: 3,
+			expectedContainers: []string{"a-init", "b-init", "c-init"},
+		},
+		{
+			name: "origin init, inject containers(a, b, c)",
+			getOrigins: func() []corev1.Container {
+				return []corev1.Container{
+					{
+						Name: "app1-init",
+					},
+					{
+						Name: "app2-init",
+					},
+				}
+			},
+			getInjected: func() []*appsv1alpha1.SidecarContainer {
+				return []*appsv1alpha1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name: "a-init",
+						},
+					},
+					{
+						Container: corev1.Container{
+							Name: "c-init",
+						},
+					},
+					{
+						Container: corev1.Container{
+							Name: "b-init",
+						},
+					},
+				}
+			},
+			expectContainerLen: 5,
+			expectedContainers: []string{"app1-init", "app2-init", "a-init", "b-init", "c-init"},
+		},
+		{
+			name: "origins nil, inject containers(a, b, c)-2",
+			getOrigins: func() []corev1.Container {
+				return []corev1.Container{
+					{
+						Name: "app1-init",
+					},
+					{
+						Name: "app2-init",
+					},
+				}
+			},
+			getInjected: func() []*appsv1alpha1.SidecarContainer {
+				return []*appsv1alpha1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name: "a-init",
+						},
+						PodInjectPolicy: appsv1alpha1.AfterAppContainerType,
+					},
+					{
+						Container: corev1.Container{
+							Name: "c-init",
+						},
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+					},
+					{
+						Container: corev1.Container{
+							Name: "b-init",
+						},
+						PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+					},
+				}
+			},
+			expectContainerLen: 5,
+			expectedContainers: []string{"b-init", "c-init", "app1-init", "app2-init", "a-init"},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			origins := cs.getOrigins()
+			injected := cs.getInjected()
+			sort.SliceStable(injected, func(i, j int) bool {
+				return injected[i].Name < injected[j].Name
+			})
+			finals := mergeSidecarContainers(origins, injected)
+			if len(finals) != cs.expectContainerLen {
+				t.Fatalf("expect %d containers but got %v", cs.expectContainerLen, len(finals))
+			}
+			for index, cName := range cs.expectedContainers {
+				if finals[index].Name != cName {
+					t.Fatalf("expect index(%d) container(%s) but got %s", index, cName, finals[index].Name)
+				}
 			}
 		})
 	}

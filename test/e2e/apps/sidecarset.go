@@ -1328,6 +1328,8 @@ var _ = SIGDescribe("SidecarSet", func() {
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
 			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
+			gomega.Expect(sidecarSetIn.Spec.InitContainers[0].PodInjectPolicy).To(gomega.Equal(appsv1alpha1.AfterAppContainerType))
+			gomega.Expect(sidecarSetIn.Spec.Containers[0].PodInjectPolicy).To(gomega.Equal(appsv1alpha1.BeforeAppContainerType))
 			time.Sleep(time.Second)
 
 			// create deployment

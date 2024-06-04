@@ -90,6 +90,9 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 	if older != nil {
 		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec.containers"))...)
 	}
+	if len(allErrs) != 0 {
+		return allErrs
+	}
 	// iterate across all containers in other sidecarsets to avoid duplication of name
 	sidecarSets := &appsv1alpha1.SidecarSetList{}
 	if err := h.Client.List(context.TODO(), sidecarSets, &client.ListOptions{}); err != nil {

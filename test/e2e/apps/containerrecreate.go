@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
@@ -33,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -216,6 +216,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
 				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				klog.Infof("CRR info(%s)", util.DumpJSON(crr))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},

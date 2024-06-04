@@ -23,9 +23,11 @@ import (
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 )
 
 type ContainerRecreateTester struct {
@@ -85,6 +87,7 @@ func (t *ContainerRecreateTester) CreateTestCloneSetAndGetPods(randStr string, r
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	for i := range podList.Items {
 		p := &podList.Items[i]
+		klog.Infof("Pod(%s/%s/%s) status(%s)", p.Namespace, p.Name, p.UID, util.DumpJSON(p.Status))
 		pods = append(pods, p)
 	}
 	return
