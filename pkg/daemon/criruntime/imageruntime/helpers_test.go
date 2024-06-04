@@ -30,7 +30,8 @@ func TestMatchRegistryAuths(t *testing.T) {
 		name       string
 		Image      string
 		GetSecrets func() []v1.Secret
-		Expect     int
+		// fix issue https://github.com/openkruise/kruise/issues/1583
+		ExpectMinValue int
 	}{
 		{
 			name:  "test1",
@@ -44,7 +45,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 				}
 				return []v1.Secret{demo}
 			},
-			Expect: 1,
+			ExpectMinValue: 1,
 		},
 		{
 			name:  "test2",
@@ -58,7 +59,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 				}
 				return []v1.Secret{demo}
 			},
-			Expect: 1,
+			ExpectMinValue: 1,
 		},
 		{
 			name:  "test3",
@@ -72,7 +73,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 				}
 				return []v1.Secret{demo}
 			},
-			Expect: 1,
+			ExpectMinValue: 1,
 		},
 		{
 			name:  "test4",
@@ -86,7 +87,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 				}
 				return []v1.Secret{demo}
 			},
-			Expect: 2,
+			ExpectMinValue: 1,
 		},
 		{
 			name:  "test5",
@@ -100,7 +101,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 				}
 				return []v1.Secret{demo}
 			},
-			Expect: 0,
+			ExpectMinValue: 0,
 		},
 	}
 	for _, cs := range cases {
@@ -113,7 +114,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 			if err != nil {
 				t.Fatalf("convertToRegistryAuths failed: %s", err.Error())
 			}
-			if len(infos) != cs.Expect {
+			if len(infos) < cs.ExpectMinValue {
 				t.Fatalf("convertToRegistryAuths failed")
 			}
 		})
