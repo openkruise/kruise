@@ -19,12 +19,13 @@ package convertor
 import (
 	"strconv"
 
-	"github.com/openkruise/kruise/apis/apps/defaults"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+
+	"github.com/openkruise/kruise/apis/apps/defaults"
 )
 
 func ConvertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {
@@ -55,6 +56,18 @@ func ConvertCoreVolumes(volumes []v1.Volume) ([]core.Volume, error) {
 		coreVolumes = append(coreVolumes, coreVolume)
 	}
 	return coreVolumes, nil
+}
+
+func ConvertEphemeralContainer(ecs []v1.EphemeralContainer) ([]core.EphemeralContainer, error) {
+	coreEphemeralContainers := []core.EphemeralContainer{}
+	for _, ec := range ecs {
+		coreEC := core.EphemeralContainer{}
+		if err := corev1.Convert_v1_EphemeralContainer_To_core_EphemeralContainer(&ec, &coreEC, nil); err != nil {
+			return nil, err
+		}
+		coreEphemeralContainers = append(coreEphemeralContainers, coreEC)
+	}
+	return coreEphemeralContainers, nil
 }
 
 func GetPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
