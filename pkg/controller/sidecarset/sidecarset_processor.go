@@ -626,7 +626,7 @@ func inconsistentStatus(sidecarSet *appsv1alpha1.SidecarSet, status *appsv1alpha
 		status.ReadyPods != sidecarSet.Status.ReadyPods ||
 		status.UpdatedReadyPods != sidecarSet.Status.UpdatedReadyPods ||
 		status.LatestRevision != sidecarSet.Status.LatestRevision ||
-		status.CollisionCount != sidecarSet.Status.CollisionCount
+		!pointer.Int32Equal(sidecarSet.Status.CollisionCount, status.CollisionCount)
 }
 
 func isSidecarSetUpdateFinish(status *appsv1alpha1.SidecarSetStatus) bool {
