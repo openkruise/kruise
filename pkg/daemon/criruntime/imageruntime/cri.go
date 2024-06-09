@@ -131,31 +131,31 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 	// for some runtime implementations.
 	pullImageReq.SandboxConfig.Annotations[pullingImageSandboxConfigAnno] = "kruise-daemon"
 
-	if len(pullSecrets) > 0 {
-		var authInfos []daemonutil.AuthInfo
-		authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, repoToPull)
-		if err == nil {
-			var pullErrs []error
-			for _, authInfo := range authInfos {
-				var pullErr error
-				klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
-				pullImageReq.Auth = &runtimeapi.AuthConfig{
-					Username: authInfo.Username,
-					Password: authInfo.Password,
-				}
-				_, pullErr = c.criImageClient.PullImage(ctx, pullImageReq)
-				if pullErr == nil {
-					pipeW.CloseWithError(io.EOF)
-					return newImagePullStatusReader(pipeR), nil
-				}
-				klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
-				pullErrs = append(pullErrs, pullErr)
+	var authInfos []daemonutil.AuthInfo
+	authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, repoToPull)
+	if err == nil {
+		var pullErrs []error
+		for _, authInfo := range authInfos {
+			var pullErr error
+			klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
+			pullImageReq.Auth = &runtimeapi.AuthConfig{
+				Username: authInfo.Username,
+				Password: authInfo.Password,
+			}
+			_, pullErr = c.criImageClient.PullImage(ctx, pullImageReq)
+			if pullErr == nil {
+				pipeW.CloseWithError(io.EOF)
+				return newImagePullStatusReader(pipeR), nil
+			}
+			klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
+			pullErrs = append(pullErrs, pullErr)
 
-			}
-			if len(pullErrs) > 0 {
-				err = utilerrors.NewAggregate(pullErrs)
-			}
 		}
+		if len(pullErrs) > 0 {
+			err = utilerrors.NewAggregate(pullErrs)
+		}
+	} else {
+		klog.Errorf("Failed to convert to auth info for registry, err %v", err)
 	}
 
 	// Try the default secret
