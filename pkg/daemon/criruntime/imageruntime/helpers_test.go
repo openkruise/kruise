@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/util/parsers"
 
 	"github.com/openkruise/kruise/pkg/util/secret"
@@ -103,7 +105,26 @@ func TestMatchRegistryAuths(t *testing.T) {
 			},
 			ExpectMinValue: 0,
 		},
+		{
+			name:  "test credential plugin if matched",
+			Image: "registry.plugin.com/test/echoserver:v1",
+			GetSecrets: func() []v1.Secret {
+				return []v1.Secret{}
+			},
+			ExpectMinValue: 1,
+		},
 	}
+	pluginBinDir := "fake_plugin"
+	pluginConfigFile := "fake_plugin/plugin-config.yaml"
+	// credential plugin is configured for images with "registry.plugin.com" and "registry.private.com",
+	// however, only images with "registry.plugin.com" will return a fake credential,
+	// other images will be denied by the plugin and an error will be raised,
+	// this is to test whether kruise could get expected auths if plugin fails to run
+	err := plugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir)
+	if err != nil {
+		klog.Errorf("Failed to register credential provider plugins: %v", err)
+	}
+	secret.MakeAndSetKeyring()
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			repoToPull, _, _, err := parsers.ParseImageName(cs.Image)

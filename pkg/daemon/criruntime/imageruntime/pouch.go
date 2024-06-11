@@ -80,26 +80,26 @@ func (d *pouchImageService) PullImage(ctx context.Context, imageName, tag string
 	registry := daemonutil.ParseRegistry(imageName)
 	var ioReader io.ReadCloser
 
-	if len(pullSecrets) > 0 {
-		var authInfos []daemonutil.AuthInfo
-		authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, registry)
-		if err == nil {
-			var pullErrs []error
-			for _, authInfo := range authInfos {
-				var pullErr error
-				klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
-				ioReader, pullErr = d.client.ImagePull(ctx, imageName, tag, authInfo.EncodeToString())
-				if pullErr == nil {
-					return newImagePullStatusReader(ioReader), nil
-				}
-				d.handleRuntimeError(pullErr)
-				klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
-				pullErrs = append(pullErrs, pullErr)
+	var authInfos []daemonutil.AuthInfo
+	authInfos, err = secret.ConvertToRegistryAuths(pullSecrets, registry)
+	if err == nil {
+		var pullErrs []error
+		for _, authInfo := range authInfos {
+			var pullErr error
+			klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
+			ioReader, pullErr = d.client.ImagePull(ctx, imageName, tag, authInfo.EncodeToString())
+			if pullErr == nil {
+				return newImagePullStatusReader(ioReader), nil
 			}
-			if len(pullErrs) > 0 {
-				err = utilerrors.NewAggregate(pullErrs)
-			}
+			d.handleRuntimeError(pullErr)
+			klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
+			pullErrs = append(pullErrs, pullErr)
 		}
+		if len(pullErrs) > 0 {
+			err = utilerrors.NewAggregate(pullErrs)
+		}
+	} else {
+		klog.Errorf("Failed to convert to auth info for registry, err %v", err)
 	}
 
 	// Try the default secret

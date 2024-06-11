@@ -17,6 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"os"
+
+	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
+
 	"flag"
 	"math/rand"
 	"net/http"
@@ -34,12 +38,15 @@ import (
 	"github.com/openkruise/kruise/pkg/daemon"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/secret"
 )
 
 var (
-	bindAddr    = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
-	pprofAddr   = flag.String("pprof-addr", ":10222", "The address the pprof binds to.")
-	enablePprof = flag.Bool("enable-pprof", true, "Enable pprof for daemon.")
+	bindAddr         = flag.String("addr", ":10221", "The address the metric endpoint and healthz binds to.")
+	pprofAddr        = flag.String("pprof-addr", ":10222", "The address the pprof binds to.")
+	enablePprof      = flag.Bool("enable-pprof", true, "Enable pprof for daemon.")
+	pluginConfigFile = flag.String("plugin-config-file", "/kruise/CredentialProviderPlugin.yaml", "The path of plugin config file.")
+	pluginBinDir     = flag.String("plugin-bin-dir", "/kruise/plugins", "The path of directory of plugin binaries.")
 )
 
 func main() {
@@ -68,6 +75,20 @@ func main() {
 	if err != nil {
 		klog.Fatalf("Failed to new daemon: %v", err)
 	}
+
+	if _, err := os.Stat(*pluginConfigFile); err == nil {
+		err = plugin.RegisterCredentialProviderPlugins(*pluginConfigFile, *pluginBinDir)
+		if err != nil {
+			klog.Errorf("Failed to register credential provider plugins: %v", err)
+		}
+	} else if os.IsNotExist(err) {
+		klog.Infof("No plugin config file found, skipping: %s", *pluginConfigFile)
+	} else {
+		klog.Errorf("Failed to check plugin config file: %v", err)
+	}
+	// make sure the new docker key ring is made and set after the credential plugins are registered
+	secret.MakeAndSetKeyring()
+
 	if err := d.Run(ctx); err != nil {
 		klog.Fatalf("Failed to start daemon: %v", err)
 	}
