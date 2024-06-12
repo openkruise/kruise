@@ -244,5 +244,15 @@ func detectRuntime(varRunPath string) (cfgs []runtimeConfig) {
 			})
 		}
 	}
+
+	// cri-docker dockerd as a compliant Container Runtime Interface, detail see https://github.com/Mirantis/cri-dockerd
+	{
+		if _, err = os.Stat(fmt.Sprintf("%s/cri-dockerd.sock", varRunPath)); err == nil {
+			cfgs = append(cfgs, runtimeConfig{
+				runtimeType:      ContainerRuntimeCommonCRI,
+				runtimeRemoteURI: fmt.Sprintf("unix://%s/cri-dockerd.sock", varRunPath),
+			})
+		}
+	}
 	return cfgs
 }
