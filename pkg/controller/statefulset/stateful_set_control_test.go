@@ -3671,3 +3671,113 @@ func isOrHasInternalError(err error) bool {
 	agg, ok := err.(utilerrors.Aggregate)
 	return !ok && !apierrors.IsInternalError(err) || ok && len(agg.Errors()) > 0 && !apierrors.IsInternalError(agg.Errors()[0])
 }
+
+func emptyInvariants(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error {
+	return nil
+}
+
+func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+
+	simpleSetFn := func(replicas, startOrdinal int, reservedIds ...int) *appsv1beta1.StatefulSet {
+		statefulSet := newStatefulSet(replicas)
+		statefulSet.Spec.Ordinals = &appsv1beta1.StatefulSetOrdinals{Start: int32(startOrdinal)}
+		statefulSet.Spec.ReserveOrdinals = append([]int{}, reservedIds...)
+		return statefulSet
+	}
+
+	testCases := []struct {
+		fn          func(*testing.T, *appsv1beta1.StatefulSet, invariantFunc, []int)
+		obj         func() *appsv1beta1.StatefulSet
+		expectedIds []int
+	}{
+		{
+			CreatesPodsWithStartOrdinal,
+			func() *appsv1beta1.StatefulSet {
+				return simpleSetFn(3, 2)
+			},
+			[]int{2, 3, 4},
+		},
+		{
+			CreatesPodsWithStartOrdinal,
+			func() *appsv1beta1.StatefulSet {
+				return simpleSetFn(3, 2, 0, 4)
+			},
+			[]int{2, 3, 5},
+		},
+		{
+			CreatesPodsWithStartOrdinal,
+			func() *appsv1beta1.StatefulSet {
+				return simpleSetFn(3, 2, 0, 2, 3, 4, 5)
+			},
+			[]int{6, 7, 8},
+		},
+		{
+			CreatesPodsWithStartOrdinal,
+			func() *appsv1beta1.StatefulSet {
+				return simpleSetFn(4, 1)
+			},
+			[]int{1, 2, 3, 4},
+		},
+		{
+			CreatesPodsWithStartOrdinal,
+			func() *appsv1beta1.StatefulSet {
+				return simpleSetFn(4, 1, 1, 3, 4)
+			},
+			[]int{2, 5, 6, 7},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testObj := testCase.obj
+		testFn := testCase.fn
+
+		set := testObj()
+		testFn(t, set, emptyInvariants, testCase.expectedIds)
+	}
+}
+
+func CreatesPodsWithStartOrdinal(t *testing.T, set *appsv1beta1.StatefulSet, invariants invariantFunc, expectedIds []int) {
+	client := fake.NewSimpleClientset()
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	om, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.Replicas != *set.Spec.Replicas {
+		t.Errorf("Failed to scale statefulset to %d replicas", *set.Spec.Replicas)
+	}
+	if set.Status.ReadyReplicas != *set.Spec.Replicas {
+		t.Errorf("Failed to set ReadyReplicas correctly, expected %d", *set.Spec.Replicas)
+	}
+	if set.Status.UpdatedReplicas != *set.Spec.Replicas {
+		t.Errorf("Failed to set UpdatedReplicas correctly, expected %d", *set.Spec.Replicas)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if len(expectedIds) != len(pods) {
+		t.Errorf("Expected %d pods. Got %d", len(expectedIds), len(pods))
+		return
+	}
+	for i, pod := range pods {
+		expectedOrdinal := expectedIds[i]
+		actualPodOrdinal := getOrdinal(pod)
+		if actualPodOrdinal != expectedOrdinal {
+			t.Errorf("Expected pod ordinal %d. Got %d", expectedOrdinal, actualPodOrdinal)
+		}
+	}
+}

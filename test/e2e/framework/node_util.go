@@ -18,6 +18,9 @@ package framework
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -25,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
@@ -188,4 +192,197 @@ func (t *NodeTester) ListRealNodesWithFake(tolerations []v1.Toleration) ([]*v1.N
 		}
 	}
 	return nodes, nil
+}
+
+const (
+	// poll is how often to Poll pods, nodes and claims.
+	poll = 2 * time.Second
+
+	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
+	// transient failures from failing tests.
+	singleCallTimeout = 5 * time.Minute
+)
+
+var (
+	// unreachableTaintTemplate is the taint for when a node becomes unreachable.
+	// Copied from pkg/controller/nodelifecycle to avoid pulling extra dependencies
+	unreachableTaintTemplate = &v1.Taint{
+		Key:    v1.TaintNodeUnreachable,
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	// notReadyTaintTemplate is the taint for when a node is not ready for executing pods.
+	// Copied from pkg/controller/nodelifecycle to avoid pulling extra dependencies
+	notReadyTaintTemplate = &v1.Taint{
+		Key:    v1.TaintNodeNotReady,
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	// updateTaintBackOff contains the maximum retries and the wait interval between two retries.
+	updateTaintBackOff = wait.Backoff{
+		Steps:    5,
+		Duration: 100 * time.Millisecond,
+		Jitter:   1.0,
+	}
+)
+
+// checkWaitListSchedulableNodes is a wrapper around listing nodes supporting retries.
+func checkWaitListSchedulableNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
+	nodes, err := waitListSchedulableNodes(c)
+	if err != nil {
+		return nil, fmt.Errorf("error: %s. Non-retryable failure or timed out while listing nodes for e2e cluster", err)
+	}
+	return nodes, nil
+}
+
+// Filter filters nodes in NodeList in place, removing nodes that do not
+// satisfy the given condition
+func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
+	var l []v1.Node
+
+	for _, node := range nodeList.Items {
+		if fn(node) {
+			l = append(l, node)
+		}
+	}
+	nodeList.Items = l
+}
+
+// IsConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
+func IsConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+}
+
+// IsConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
+func IsConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
+}
+
+// isConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
+func isConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == conditionType {
+			return false
+		}
+	}
+	return true
+}
+
+// IsNodeReady returns true if:
+// 1) it's Ready condition is set to true
+// 2) doesn't have NetworkUnavailable condition set to true
+func IsNodeReady(node *v1.Node) bool {
+	nodeReady := IsConditionSetAsExpected(node, v1.NodeReady, true)
+	networkReady := isConditionUnset(node, v1.NodeNetworkUnavailable) ||
+		IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
+	return nodeReady && networkReady
+}
+
+// IsNodeSchedulable returns true if:
+// 1) doesn't have "unschedulable" field set
+// 2) it also returns true from IsNodeReady
+func IsNodeSchedulable(node *v1.Node) bool {
+	if node == nil {
+		return false
+	}
+	return !node.Spec.Unschedulable && IsNodeReady(node)
+}
+
+func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
+	filteredTaints := []v1.Taint{}
+	for _, taint := range taints {
+		if taint.Effect == v1.TaintEffectNoExecute || taint.Effect == v1.TaintEffectNoSchedule {
+			filteredTaints = append(filteredTaints, taint)
+		}
+	}
+
+	toleratesTaint := func(taint v1.Taint) bool {
+		for _, toleration := range tolerations {
+			if toleration.ToleratesTaint(&taint) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	for _, taint := range filteredTaints {
+		if !toleratesTaint(taint) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
+// but allows for taints in the list of non-blocking taints.
+func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
+	// Simple lookup for nonblocking taints based on comma-delimited list.
+	nonblockingTaintsMap := map[string]struct{}{}
+	for _, t := range strings.Split(nonblockingTaints, ",") {
+		if strings.TrimSpace(t) != "" {
+			nonblockingTaintsMap[strings.TrimSpace(t)] = struct{}{}
+		}
+	}
+
+	n := node
+	if len(nonblockingTaintsMap) > 0 {
+		nodeCopy := node.DeepCopy()
+		nodeCopy.Spec.Taints = []v1.Taint{}
+		for _, v := range node.Spec.Taints {
+			if _, isNonblockingTaint := nonblockingTaintsMap[v.Key]; !isNonblockingTaint {
+				nodeCopy.Spec.Taints = append(nodeCopy.Spec.Taints, v)
+			}
+		}
+		n = nodeCopy
+	}
+
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
+}
+
+// GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
+// 1) Needs to be schedulable.
+// 2) Needs to be ready.
+// If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
+// If there are no nodes that are both ready and schedulable, this will return an error.
+func GetReadySchedulableNodes(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
+	nodes, err = checkWaitListSchedulableNodes(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
+	}
+	Filter(nodes, func(node v1.Node) bool {
+		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
+	})
+	if len(nodes.Items) == 0 {
+		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
+	}
+	return nodes, nil
+}
+
+// GetRandomReadySchedulableNode gets a single randomly-selected node which is available for
+// running pods on. If there are no available nodes it will return an error.
+func GetRandomReadySchedulableNode(ctx context.Context, c clientset.Interface) (*v1.Node, error) {
+	nodes, err := GetReadySchedulableNodes(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	return &nodes.Items[rand.Intn(len(nodes.Items))], nil
+}
+
+func WaitForNodeSchedulable(ctx context.Context, c clientset.Interface, name string, timeout time.Duration, wantSchedulable bool) bool {
+	Logf("Waiting up to %v for node %s to be schedulable: %t", timeout, name, wantSchedulable)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			Logf("Couldn't get node %s", name)
+			continue
+		}
+
+		if IsNodeSchedulable(node) == wantSchedulable {
+			return true
+		}
+	}
+	Logf("Node %s didn't reach desired schedulable status (%t) within %v", name, wantSchedulable, timeout)
+	return false
 }

@@ -27,10 +27,6 @@ import (
 	"testing"
 	"time"
 
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +42,11 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	utilpointer "k8s.io/utils/pointer"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {
@@ -872,11 +873,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(set)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 2, 3, 4}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}
@@ -909,11 +910,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(set)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 2, 3, 4}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}
@@ -948,11 +949,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
 				setClone := set.DeepCopy()
 				setClone.Spec.Replicas = utilpointer.Int32(5)
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(setClone)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 2, 3, 4}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}
@@ -996,11 +997,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
 				setClone := set.DeepCopy()
 				setClone.Spec.Replicas = utilpointer.Int32(5)
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(setClone)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 2, 3, 4}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}
@@ -1043,11 +1044,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(set)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 3, 5, 6}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}
@@ -1081,11 +1082,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(set)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 3, 5, 6}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}
@@ -1121,11 +1122,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
 				setClone := set.DeepCopy()
 				setClone.Spec.Replicas = utilpointer.Int32(5)
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(setClone)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 3, 5, 6}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}
@@ -1170,11 +1171,11 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
 				setClone := set.DeepCopy()
 				setClone.Spec.Replicas = utilpointer.Int32(5)
-				replicaCount, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(setClone)
 				pods := make([]*v1.Pod, 0)
 				expectIndex := []int{0, 1, 3, 5, 6}
 				currentIndex := make([]int, 0)
-				for i := 0; i < replicaCount; i++ {
+				for i := startOrdinal; i < endOrdinal; i++ {
 					if reserveOrdinals.Has(i) {
 						continue
 					}

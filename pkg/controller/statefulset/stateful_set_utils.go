@@ -78,6 +78,24 @@ func getOrdinal(pod *v1.Pod) int {
 	return ordinal
 }
 
+/**
+ * Determines if the given pod's ordinal number is within the permissible range
+ * managed by this StatefulSet and is not listed in the reserveOrdinals.
+ *
+ * @return {boolean} True if the pod's ordinal is both within the allowed range and
+ *                   not reserved; false otherwise.
+ */
+func podInOrdinalRange(pod *v1.Pod, set *appsv1beta1.StatefulSet) bool {
+	startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(set)
+	return podInOrdinalRangeWithParams(pod, startOrdinal, endOrdinal, reserveOrdinals)
+}
+
+func podInOrdinalRangeWithParams(pod *v1.Pod, startOrdinal, endOrdinal int, reserveOrdinals sets.Int) bool {
+	ordinal := getOrdinal(pod)
+	return ordinal >= startOrdinal && ordinal < endOrdinal &&
+		!reserveOrdinals.Has(ordinal)
+}
+
 // getPodName gets the name of set's child Pod with an ordinal index of ordinal
 func getPodName(set *appsv1beta1.StatefulSet, ordinal int) string {
 	return fmt.Sprintf("%s-%d", set.Name, ordinal)
@@ -143,8 +161,6 @@ func getPersistentVolumeClaimRetentionPolicy(set *appsv1beta1.StatefulSet) appsv
 // PVC deletion policy for the StatefulSet.
 func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv1beta1.StatefulSet, pod *v1.Pod) bool {
 	policy := getPersistentVolumeClaimRetentionPolicy(set)
-	replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
-	ord := getOrdinal(pod)
 	const retain = appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
@@ -165,12 +181,12 @@ func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv1beta
 		if hasOwnerRef(claim, set) {
 			return false
 		}
-		podScaledDown := ord >= replicaCount || reserveOrdinals.Has(ord)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown != hasOwnerRef(claim, pod) {
 			return false
 		}
 	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
-		podScaledDown := ord >= replicaCount || reserveOrdinals.Has(ord)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		// If a pod is scaled down, there should be no set ref and a pod ref;
 		// if the pod is not scaled down it's the other way around.
 		if podScaledDown == hasOwnerRef(claim, set) {
@@ -206,8 +222,6 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv
 	updateMeta(&podMeta, "Pod")
 	setMeta := set.TypeMeta
 	updateMeta(&setMeta, "StatefulSet")
-	replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
-	ord := getOrdinal(pod)
 	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType
@@ -223,7 +237,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv
 		needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
 	case policy.WhenScaled == delete && policy.WhenDeleted == retain:
 		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
-		podScaledDown := ord >= replicaCount || reserveOrdinals.Has(ord)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown {
 			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
 		}
@@ -231,7 +245,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv
 			needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
 		}
 	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
-		podScaledDown := ord >= replicaCount || reserveOrdinals.Has(ord)
+		podScaledDown := !podInOrdinalRange(pod, set)
 		if podScaledDown {
 			needsUpdate = removeOwnerRef(claim, set) || needsUpdate
 			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
@@ -397,6 +411,11 @@ func isRunningAndReady(pod *v1.Pod) bool {
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *v1.Pod) bool {
 	return pod.Status.Phase != ""
+}
+
+// isPending returns true if pod has a Phase of PodPending
+func isPending(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodPending
 }
 
 // isFailed returns true if pod has a Phase of PodFailed
@@ -699,7 +718,8 @@ func decreaseAndCheckMaxUnavailable(maxUnavailable *int) bool {
 	return val <= 0
 }
 
-// return parameters is replicaCount and reserveOrdinals, and they are used to support reserveOrdinals scenarios.
+// return parameters is startOrdinal(inclusive), endOrdinal(exclusive) and reserveOrdinals,
+// and they are used to support reserveOrdinals scenarios.
 // When configured as follows:
 /*
 	apiVersion: apps.kruise.io/v1beta1
@@ -710,17 +730,19 @@ func decreaseAndCheckMaxUnavailable(maxUnavailable *int) bool {
 	  reserveOrdinals:
 	  - 1
       - 3
+      Spec.Ordinals.Start: 2
 */
-// return replicaCount=6, reserveOrdinals={1, 3}
-
-func getStatefulSetReplicasRange(set *appsv1beta1.StatefulSet) (int, sets.Int) {
+// result is startOrdinal 2(inclusive), endOrdinal 7(exclusive), reserveOrdinals = {1, 3}
+// replicas[endOrdinal - startOrdinal] stores [replica-2, nil(reserveOrdinal 3), replica-4, replica-5, replica-6]
+// todo: maybe we should remove ineffective reserveOrdinals in webhook, reserveOrdinals = {3}
+func getStatefulSetReplicasRange(set *appsv1beta1.StatefulSet) (int, int, sets.Int) {
 	reserveOrdinals := sets.NewInt(set.Spec.ReserveOrdinals...)
-	replicaCount := 0
-	for realReplicaCount := 0; realReplicaCount < int(*set.Spec.Replicas); replicaCount++ {
-		if reserveOrdinals.Has(replicaCount) {
+	replicaMaxOrdinal := getStartOrdinal(set)
+	for realReplicaCount := 0; realReplicaCount < int(*set.Spec.Replicas); replicaMaxOrdinal++ {
+		if reserveOrdinals.Has(replicaMaxOrdinal) {
 			continue
 		}
 		realReplicaCount++
 	}
-	return replicaCount, reserveOrdinals
+	return getStartOrdinal(set), replicaMaxOrdinal, reserveOrdinals
 }
