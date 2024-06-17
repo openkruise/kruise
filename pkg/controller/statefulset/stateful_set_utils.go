@@ -423,6 +423,11 @@ func isFailed(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed
 }
 
+// isSucceeded returns true if pod has a Phase of PodSucceeded
+func isSucceeded(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodSucceeded
+}
+
 // isTerminating returns true if pod's DeletionTimestamp has been set
 func isTerminating(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
@@ -656,6 +661,20 @@ func (ao ascendingOrdinal) Swap(i, j int) {
 
 func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
+}
+
+type descendingOrdinal []*v1.Pod
+
+func (do descendingOrdinal) Len() int {
+	return len(do)
+}
+
+func (do descendingOrdinal) Swap(i, j int) {
+	do[i], do[j] = do[j], do[i]
+}
+
+func (do descendingOrdinal) Less(i, j int) bool {
+	return getOrdinal(do[i]) > getOrdinal(do[j])
 }
 
 // NewStatefulsetCondition creates a new statefulset condition.
