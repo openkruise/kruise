@@ -45,6 +45,9 @@ import (
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 )
 
+// Realistic value for maximum in-flight requests when processing in parallel mode.
+const MaxBatchSize = 500
+
 // StatefulSetControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
 // as an interface to allow for extensions that provide different semantics. Currently, there is only one implementation.
 type StatefulSetControlInterface interface {
@@ -373,10 +376,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.CollisionCount = utilpointer.Int32Ptr(collisionCount)
 	status.LabelSelector = selector.String()
 
-	replicaCount, reserveOrdinals := getStatefulSetReplicasRange(set)
-	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < replicaCount and not in reserveOrdinals
-	replicas := make([]*v1.Pod, replicaCount)
-	// slice that will contain all Pods such that replicaCount <= getOrdinal(pod) or in reserveOrdinals
+	startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(set)
+	// slice that will contain all Pods such that startOrdinal <= getOrdinal(pod) < endOrdinal and not in reserveOrdinals
+	replicas := make([]*v1.Pod, endOrdinal-startOrdinal)
+	// slice that will contain all Pods such that getOrdinal(pod) < startOrdinal or getOrdinal(pod) >= endOrdinal or in reserveOrdinals
 	condemned := make([]*v1.Pod, 0, len(pods))
 	unhealthy := 0
 	firstUnhealthyOrdinal := math.MaxInt32
@@ -424,13 +427,13 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			}
 		}
 
-		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount && !reserveOrdinals.Has(ord) {
+		if ord := getOrdinal(pods[i]); podInOrdinalRangeWithParams(pods[i], startOrdinal, endOrdinal, reserveOrdinals) {
 			// if the ordinal of the pod is within the range of the current number of replicas and not in reserveOrdinals,
 			// insert it at the indirection of its ordinal
-			replicas[ord] = pods[i]
+			replicas[ord-startOrdinal] = pods[i]
 
-		} else if ord >= replicaCount || reserveOrdinals.Has(ord) {
-			// if the ordinal is greater than the number of replicas or in reserveOrdinals,
+		} else if ord >= 0 {
+			// if the ordinal is valid, but not within the range or in reserveOrdinals,
 			// add it to the condemned list
 			condemned = append(condemned, pods[i])
 		}
@@ -438,12 +441,13 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
-	for ord := 0; ord < replicaCount; ord++ {
+	for ord := startOrdinal; ord < endOrdinal; ord++ {
 		if reserveOrdinals.Has(ord) {
 			continue
 		}
-		if replicas[ord] == nil {
-			replicas[ord] = newVersionedStatefulSetPod(
+		replicaIdx := ord - startOrdinal
+		if replicas[replicaIdx] == nil {
+			replicas[replicaIdx] = newVersionedStatefulSetPod(
 				currentSet,
 				updateSet,
 				currentRevision.Name,
@@ -556,6 +560,17 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			// pod created, no more work possible for this round
 			continue
 		}
+
+		// If the Pod is in pending state then trigger PVC creation to create missing PVCs
+		if isPending(replicas[i]) {
+			klog.V(4).Info(
+				"StatefulSet is triggering PVC creation for pending Pod",
+				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
+			if err := ssc.podControl.createMissingPersistentVolumeClaims(ctx, set, replicas[i]); err != nil {
+				return &status, err
+			}
+		}
+
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
 		// completes before we continue to make progress.
 		if isTerminating(replicas[i]) && monotonic {
@@ -1038,4 +1053,15 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	}
 
 	return nil
+}
+
+// getStartOrdinal gets the first possible ordinal (inclusive).
+// Returns spec.ordinals.start if spec.ordinals is set, otherwise returns 0.
+func getStartOrdinal(set *appsv1beta1.StatefulSet) int {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
+		if set.Spec.Ordinals != nil {
+			return int(set.Spec.Ordinals.Start)
+		}
+	}
+	return 0
 }

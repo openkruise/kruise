@@ -30,9 +30,6 @@ import (
 
 	"github.com/onsi/gomega"
 
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/manifest"
 	apps "k8s.io/api/apps/v1"
 	appsV1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
@@ -46,6 +43,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/manifest"
 )
 
 const (
@@ -696,6 +697,10 @@ func (s *StatefulSetTester) CheckServiceName(ss *appsv1beta1.StatefulSet, expect
 
 // SortStatefulPods sorts pods by their ordinals
 func (s *StatefulSetTester) SortStatefulPods(pods *v1.PodList) {
+	sort.Sort(statefulPodsByOrdinal(pods.Items))
+}
+
+func SortStatefulPods(pods *v1.PodList) {
 	sort.Sort(statefulPodsByOrdinal(pods.Items))
 }
 

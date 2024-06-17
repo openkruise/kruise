@@ -32,11 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 // noopRecorder is an EventRecorder that does nothing. record.FakeRecorder has a fixed
@@ -874,4 +877,88 @@ func newStatefulSet(replicas int) *appsv1beta1.StatefulSet {
 		{Name: "home", MountPath: "/home"},
 	}
 	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
+}
+
+func TestGetStatefulSetReplicasRange(t *testing.T) {
+	int32Ptr := func(i int32) *int32 {
+		return &i
+	}
+
+	tests := []struct {
+		name          string
+		statefulSet   *appsv1beta1.StatefulSet
+		expectedCount int
+		expectedRes   sets.Int
+	}{
+		{
+			name: "Ordinals start 0",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(4),
+					ReserveOrdinals: []int{1, 3},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+				},
+			},
+			expectedCount: 6,
+			expectedRes:   sets.NewInt(1, 3),
+		},
+		{
+			name: "Ordinals start 2 with ReserveOrdinals 1&3",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(4),
+					ReserveOrdinals: []int{1, 3},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+				},
+			},
+			expectedCount: 5,
+			expectedRes:   sets.NewInt(1, 3),
+		},
+		{
+			name: "Ordinals start 3 with ReserveOrdinals 1&3",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(4),
+					ReserveOrdinals: []int{1, 3},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 3,
+					},
+				},
+			},
+			expectedCount: 5,
+			expectedRes:   sets.NewInt(1, 3),
+		},
+		{
+			name: "Ordinals start 4 with ReserveOrdinals 1&3",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(4),
+					ReserveOrdinals: []int{1, 3},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 4,
+					},
+				},
+			},
+			expectedCount: 4,
+			expectedRes:   sets.NewInt(1, 3),
+		},
+		// ... other test cases
+	}
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			//count, res := getStatefulSetReplicasRange(tt.statefulSet)
+			startOrdinal, endOrdinal, res := getStatefulSetReplicasRange(tt.statefulSet)
+			count := endOrdinal - startOrdinal
+			if count != tt.expectedCount || len(res) != len(tt.expectedRes) || res.HasAll(tt.expectedRes.Len()) {
+				t.Errorf("getStatefulSetReplicasRange(%v) got (%v, %v), want (%v, %v)",
+					tt.name, count, res, tt.expectedCount, tt.expectedRes)
+			}
+		})
+	}
 }

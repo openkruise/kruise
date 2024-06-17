@@ -17,11 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
 const (
@@ -143,6 +144,21 @@ type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
 }
 
+// StatefulSetOrdinals describes the policy used for replica ordinal assignment
+// in this StatefulSet.
+type StatefulSetOrdinals struct {
+	// start is the number representing the first replica's index. It may be used
+	// to number replicas from an alternate index (eg: 1-indexed) over the default
+	// 0-indexed names, or to orchestrate progressive movement of replicas from
+	// one StatefulSet to another.
+	// If set, replica indices will be in the range:
+	//   [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).
+	// If unset, defaults to 0. Replica indices will be in the range:
+	//   [0, .spec.replicas).
+	// +optional
+	Start int32 `json:"start" protobuf:"varint,1,opt,name=start"`
+}
+
 // StatefulSetSpec defines the desired state of StatefulSet
 type StatefulSetSpec struct {
 	// replicas is the desired number of replicas of the given Template.
@@ -228,6 +244,14 @@ type StatefulSetSpec struct {
 	// StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
+
+	// ordinals controls the numbering of replica indices in a StatefulSet. The
+	// default ordinals behavior assigns a "0" index to the first replica and
+	// increments the index by one for each additional replica requested. Using
+	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
+	// enabled, which is beta.
+	// +optional
+	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty"`
 }
 
 // StatefulSetScaleStrategy defines strategies for pods scale.
