@@ -12,7 +12,7 @@ GOBIN=$(shell go env GOBIN)
 endif
 GOOS ?= $(shell go env GOOS)
 
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary. 
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 # Run `setup-envtest list` to list available versions.
 ENVTEST_K8S_VERSION ?= 1.28.0
 
@@ -173,6 +173,8 @@ run-kruise-e2e-test:
 	@echo -e "\n\033[36mRunning kruise e2e tests...\033[0m"
 	tools/hack/run-kruise-e2e-test.sh
 
+generate_helm_crds:
+	scripts/generate_helm_crds.sh
 
 # kruise-e2e-test runs kruise e2e tests.
 .PHONY: kruise-e2e-test
