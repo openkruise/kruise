@@ -84,26 +84,26 @@ func (e *nodeHandler) nodeCreateOrUpdate(node *v1.Node, q workqueue.RateLimiting
 	namespacedName := types.NamespacedName{Name: node.Name}
 	if err := e.Get(context.TODO(), namespacedName, nodeImage); err != nil {
 		if errors.IsNotFound(err) {
-			klog.Infof("Node create event for nodeimage %v", node.Name)
+			klog.InfoS("Node created event for nodeimage", "nodeImageName", node.Name)
 			if isReady, delay := getNodeReadyAndDelayTime(node); !isReady {
-				klog.Infof("Skip to enqueue Node %s with not NodeImage, for not ready yet.", node.Name)
+				klog.InfoS("Skipped to enqueue Node with not NodeImage, for not ready yet", "nodeImageName", node.Name)
 				return
 			} else if delay > 0 {
-				klog.Infof("Enqueue Node %s with not NodeImage after %v.", node.Name, delay)
+				klog.InfoS("Enqueue Node with not NodeImage after delay", "nodeImageName", node.Name, "delay", delay)
 				q.AddAfter(reconcile.Request{NamespacedName: namespacedName}, delay)
 				return
 			}
-			klog.Infof("Enqueue Node %s with not NodeImage.", node.Name)
+			klog.InfoS("Enqueue Node with not NodeImage", "nodeImageName", node.Name)
 			q.Add(reconcile.Request{NamespacedName: namespacedName})
 			return
 		}
-		klog.Errorf("Failed to get NodeImage for Node %s: %v", node.Name, err)
+		klog.ErrorS(err, "Failed to get NodeImage for Node", "nodeImageName", node.Name)
 		return
 	}
 	if reflect.DeepEqual(node.Labels, nodeImage.Labels) {
 		return
 	}
-	klog.Infof("Node update labels for nodeimage %v", node.Name)
+	klog.InfoS("Node updated labels for NodeImage", "nodeImageName", node.Name)
 	q.Add(reconcile.Request{NamespacedName: namespacedName})
 }
 
@@ -113,7 +113,7 @@ func (e *nodeHandler) nodeDelete(node *v1.Node, q workqueue.RateLimitingInterfac
 	if err := e.Get(context.TODO(), namespacedName, nodeImage); errors.IsNotFound(err) {
 		return
 	}
-	klog.Infof("Node delete event for nodeimage %v", node.Name)
+	klog.InfoS("Node deleted event for NodeImage", "nodeImageName", node.Name)
 	q.Add(reconcile.Request{NamespacedName: namespacedName})
 }
 

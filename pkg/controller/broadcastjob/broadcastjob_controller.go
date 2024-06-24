@@ -172,16 +172,16 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Errorf("failed to get job %s,", job.Name)
+		klog.ErrorS(err, "Failed to get BroadcastJob", "broadcastJob", klog.KObj(job))
 		return reconcile.Result{}, err
 	}
 
 	if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := scaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for bcj %v, scaleDirtyPods=%v, overtime=%v", request.String(), scaleDirtyPods, unsatisfiedDuration)
+			klog.InfoS("Expectation unsatisfied overtime for BroadcastJob", "broadcastJob", request, "scaleDirtyPods", scaleDirtyPods, "overtime", unsatisfiedDuration)
 			return reconcile.Result{}, nil
 		}
-		klog.V(4).Infof("Not satisfied scale for bcj %v, scaleDirtyPods=%v", request.String(), scaleDirtyPods)
+		klog.V(4).InfoS("Not satisfied scale for BroadcastJob", "broadcastJob", request, "scaleDirtyPods", scaleDirtyPods)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
@@ -191,10 +191,10 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	if IsJobFinished(job) {
 		isPast, leftTime := pastTTLDeadline(job)
 		if isPast {
-			klog.Infof("deleting the job %s", job.Name)
+			klog.InfoS("Deleting BroadcastJob", "broadcastJob", klog.KObj(job))
 			err = r.Delete(context.TODO(), job)
 			if err != nil {
-				klog.Errorf("failed to delete job %s", job.Name)
+				klog.ErrorS(err, "Failed to delete BroadcastJob", "broadcastJob", klog.KObj(job))
 			}
 		} else if leftTime > 0 {
 			return reconcile.Result{RequeueAfter: leftTime}, nil
@@ -209,8 +209,8 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 		job.Status.StartTime = &now
 		if job.Spec.CompletionPolicy.Type == appsv1alpha1.Always &&
 			job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil {
-			klog.Infof("Job %s has ActiveDeadlineSeconds, will resync after %d seconds",
-				job.Name, *job.Spec.CompletionPolicy.ActiveDeadlineSeconds)
+			klog.InfoS("BroadcastJob has ActiveDeadlineSeconds, will resync after the deadline", "broadcastJob", klog.KObj(job),
+				"activeDeadlineSeconds", *job.Spec.CompletionPolicy.ActiveDeadlineSeconds)
 			requeueAfter = time.Duration(*job.Spec.CompletionPolicy.ActiveDeadlineSeconds) * time.Second
 		}
 	}
@@ -227,7 +227,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	}
 	err = r.List(context.TODO(), podList, listOptions)
 	if err != nil {
-		klog.Errorf("failed to get podList for job %s,", job.Name)
+		klog.ErrorS(err, "Failed to get podList for BroadcastJob", "broadcastJob", klog.KObj(job))
 		return reconcile.Result{}, err
 	}
 
@@ -247,7 +247,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	nodes := &corev1.NodeList{}
 	err = r.List(context.TODO(), nodes)
 	if err != nil {
-		klog.Errorf("failed to get nodeList for job %s,", job.Name)
+		klog.ErrorS(err, "Failed to get nodeList for BroadcastJob", "broadcastJob", klog.KObj(job))
 		return reconcile.Result{}, err
 	}
 
@@ -259,8 +259,9 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 
 	desiredNodes, restNodesToRunPod, podsToDelete := getNodesToRunPod(nodes, job, existingNodeToPodMap)
 	desired := int32(len(desiredNodes))
-	klog.Infof("%s/%s has %d/%d nodes remaining to schedule pods", job.Namespace, job.Name, len(restNodesToRunPod), desired)
-	klog.Infof("Before broadcastjob reconcile %s/%s, desired=%d, active=%d, failed=%d", job.Namespace, job.Name, desired, active, failed)
+	klog.InfoS("BroadcastJob has some nodes remaining to schedule pods", "broadcastJob", klog.KObj(job), "restNodeCount", len(restNodesToRunPod), "desiredNodeCount", desired)
+	klog.InfoS("Before BroadcastJob reconcile, with desired, active and failed counts",
+		"broadcastJob", klog.KObj(job), "desiredCount", desired, "activeCount", active, "failedCount", failed)
 	job.Status.Active = active
 	job.Status.Failed = failed
 	job.Status.Succeeded = succeeded
@@ -304,7 +305,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 		// Handle Job failures, delete all active pods
 		failed, active, err = r.deleteJobPods(job, activePods, failed, active)
 		if err != nil {
-			klog.Errorf("failed to deleteJobPods for job %s,", job.Name)
+			klog.ErrorS(err, "Failed to deleteJobPods for job", "broadcastJob", klog.KObj(job))
 		}
 		job.Status.Phase = appsv1alpha1.PhaseFailed
 		requeueAfter = finishJob(job, appsv1alpha1.JobFailed, failureMessage)
@@ -316,7 +317,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 			// should we remove the pods without nodes associated, the podgc controller will do this if enabled
 			failed, active, err = r.deleteJobPods(job, podsToDelete, failed, active)
 			if err != nil {
-				klog.Errorf("failed to deleteJobPods for job %s,", job.Name)
+				klog.ErrorS(err, "Failed to delete BroadcastJob Pods", "broadcastJob", klog.KObj(job))
 			}
 		}
 
@@ -324,7 +325,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 		if job.DeletionTimestamp == nil && len(restNodesToRunPod) > 0 {
 			active, err = r.reconcilePods(job, restNodesToRunPod, active, desired)
 			if err != nil {
-				klog.Errorf("failed to reconcilePods for job %s,", job.Name)
+				klog.ErrorS(err, "Failed to reconcile Pods for BroadcastJob", "broadcastJob", klog.KObj(job))
 			}
 		}
 
@@ -336,20 +337,21 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 				fmt.Sprintf("Job %s/%s is completed, %d pods succeeded, %d pods failed", job.Namespace, job.Name, succeeded, failed))
 		}
 	}
-	klog.Infof("After broadcastjob reconcile %s/%s, desired=%d, active=%d, failed=%d", job.Namespace, job.Name, desired, active, failed)
+	klog.InfoS("After broadcastjob reconcile, with desired, active and failed counts",
+		"broadcastJob", klog.KObj(job), "desiredCount", desired, "activeCount", active, "failedCount", failed)
 
 	// update the status
 	job.Status.Failed = failed
 	job.Status.Active = active
 	if err := r.updateJobStatus(request, job); err != nil {
-		klog.Errorf("failed to update job %s, %v", job.Name, err)
+		klog.ErrorS(err, "Failed to update BroadcastJob", "broadcastJob", klog.KObj(job))
 	}
 
 	return reconcile.Result{RequeueAfter: requeueAfter}, err
 }
 
 func (r *ReconcileBroadcastJob) updateJobStatus(request reconcile.Request, job *appsv1alpha1.BroadcastJob) error {
-	klog.Infof("Updating job %s status %#v", job.Name, job.Status)
+	klog.InfoS("Updating BroadcastJob status", "broadcastJob", klog.KObj(job), "status", job.Status)
 	jobCopy := job.DeepCopy()
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		err := r.Status().Update(context.TODO(), jobCopy)
@@ -372,15 +374,15 @@ func (r *ReconcileBroadcastJob) updateJobStatus(request reconcile.Request, job *
 // finishJob appends the condition to JobStatus, and sets ttl if needed
 func finishJob(job *appsv1alpha1.BroadcastJob, conditionType appsv1alpha1.JobConditionType, message string) time.Duration {
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(conditionType, string(conditionType), message))
-	klog.Infof("job %s/%s is %s: %s", job.Namespace, job.Name, string(conditionType), message)
+	klog.InfoS("BroadcastJob conditions updated", "broadcastJob", klog.KObj(job), "conditionType", string(conditionType), "message", message)
 
 	now := metav1.Now()
 	job.Status.CompletionTime = &now
 
 	var requeueAfter time.Duration
 	if job.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
-		klog.Infof("Job %s is %s, will be deleted after %d seconds", job.Name, string(conditionType),
-			*job.Spec.CompletionPolicy.TTLSecondsAfterFinished)
+		klog.InfoS("BroadcastJob will be deleted after a certain seconds", "broadcastJob", klog.KObj(job), "conditionType", string(conditionType),
+			"TTLSecondsAfterFinished", *job.Spec.CompletionPolicy.TTLSecondsAfterFinished)
 		// a bit more than the TTLSecondsAfterFinished to ensure it exceeds the TTLSecondsAfterFinished when being reconciled
 		requeueAfter = time.Duration(*job.Spec.CompletionPolicy.TTLSecondsAfterFinished+1) * time.Second
 	}
@@ -443,7 +445,7 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1alpha1.BroadcastJob,
 				go func(nodeName string) {
 					defer wait.Done()
 					// parallelize pod creation
-					klog.Infof("creating pod on node %s", nodeName)
+					klog.InfoS("Creating pod on node", "nodeName", nodeName)
 					err := r.createPodOnNode(nodeName, job.Namespace, &job.Spec.Template, job, asOwner(job))
 					if err != nil && errors.IsTimeout(err) {
 						// Pod is created but its initialization has timed out.
@@ -493,7 +495,7 @@ func isJobComplete(job *appsv1alpha1.BroadcastJob, desiredNodes map[string]*core
 	}
 	// if no desiredNodes, job pending
 	if len(desiredNodes) == 0 {
-		klog.Info("Num desiredNodes is 0")
+		klog.InfoS("Num desiredNodes is 0")
 		return false
 	}
 	for _, pod := range desiredNodes {
@@ -539,7 +541,7 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 		if pod, ok := existingNodeToPodMap[node.Name]; ok {
 			canFit, err = checkNodeFitness(pod, &node)
 			if !canFit && pod.DeletionTimestamp == nil {
-				klog.Infof("Pod %s does not fit on node %s due to %v", pod.Name, node.Name, err)
+				klog.ErrorS(err, "Pod did not fit on node", "pod", klog.KObj(pod), "nodeName", node.Name)
 				podsToDelete = append(podsToDelete, pod)
 				continue
 			}
@@ -550,7 +552,7 @@ func getNodesToRunPod(nodes *corev1.NodeList, job *appsv1alpha1.BroadcastJob,
 			mockPod := NewMockPod(job, node.Name)
 			canFit, err = checkNodeFitness(mockPod, &node)
 			if !canFit {
-				klog.Infof("Pod does not fit on node %s due to %v", node.Name, err)
+				klog.InfoS("Pod did not fit on node", "nodeName", node.Name, "err", err)
 				continue
 			}
 			restNodesToRunPod = append(restNodesToRunPod, &nodes.Items[i])
@@ -568,7 +570,7 @@ func (r *ReconcileBroadcastJob) getNodeToPodMap(pods []*corev1.Pod, job *appsv1a
 		nodeName := getAssignedNode(pod)
 		if _, ok := nodeToPodMap[nodeName]; ok {
 			// should not happen
-			klog.Warningf("Duplicated pod %s run on the same node %s. this should not happen.", pod.Name, nodeName)
+			klog.InfoS("Duplicated pod run on the same node. This should not happen", "pod", klog.KObj(pod), "nodeName", nodeName)
 			r.recorder.Eventf(job, corev1.EventTypeWarning, "DuplicatePodCreatedOnSameNode",
 				"Duplicated pod %s found on same node %s", pod.Name, nodeName)
 		}
@@ -641,7 +643,7 @@ func logPredicateFailedReason(node *corev1.Node, status *framework.Status) (bool
 		return true, nil
 	}
 	for _, reason := range status.Reasons() {
-		klog.Errorf("Failed predicate on node %s : %s ", node.Name, reason)
+		klog.ErrorS(fmt.Errorf(reason), "Failed to predicate on node", "nodeName", node.Name)
 	}
 	return status.IsSuccess(), status.AsError()
 }
@@ -669,7 +671,7 @@ func (r *ReconcileBroadcastJob) deleteJobPods(job *appsv1alpha1.BroadcastJob, po
 			if err := r.Delete(context.TODO(), pods[ix]); err != nil {
 				scaleExpectations.ObserveScale(key, expectations.Delete, getAssignedNode(pods[ix]))
 				defer utilruntime.HandleError(err)
-				klog.Infof("Failed to delete %v, job %q/%q", pods[ix].Name, job.Namespace, job.Name)
+				klog.InfoS("Failed to delete BroadcastJob Pod", "pod", klog.KObj(pods[ix]), "broadcastJob", klog.KObj(job))
 				errCh <- err
 			} else {
 				failedLock.Lock()
@@ -733,10 +735,10 @@ func (r *ReconcileBroadcastJob) createPod(nodeName, namespace string, template *
 
 	accessor, err := meta.Accessor(object)
 	if err != nil {
-		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
+		klog.ErrorS(err, "ParentObject did not have ObjectMeta")
 		return nil
 	}
-	klog.Infof("Controller %v created pod %v", accessor.GetName(), pod.Name)
+	klog.InfoS("Controller created pod", "controllerName", accessor.GetName(), "pod", klog.KObj(pod))
 	r.recorder.Eventf(object, corev1.EventTypeNormal, kubecontroller.SuccessfulCreatePodReason, "Created pod: %v", pod.Name)
 
 	return nil

@@ -43,12 +43,12 @@ func DiscoverGVK(gvk schema.GroupVersionKind) bool {
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Warningf("Not found kind %s in group version %s, waiting time %s", gvk.Kind, gvk.GroupVersion().String(), time.Since(startTime))
+			klog.InfoS("Kind not found in group version after waiting", "kind", gvk.Kind, "groupVersion", gvk.GroupVersion(), "waitingTime", time.Since(startTime))
 			return false
 		}
 
 		// This might be caused by abnormal apiserver or etcd, ignore it
-		klog.Errorf("Failed to find resources in group version %s: %v, waiting time %s", gvk.GroupVersion().String(), err, time.Since(startTime))
+		klog.ErrorS(err, "Failed to find resources in group version after waiting", "groupVersion", gvk.GroupVersion(), "waitingTime", time.Since(startTime))
 	}
 
 	return true
@@ -61,7 +61,7 @@ func AddWatcherDynamically(mgr manager.Manager, c controller.Controller, h handl
 	}
 
 	if !DiscoverGVK(gvk) {
-		klog.Errorf("Failed to find GVK(%v) in cluster for %s", gvk.String(), controllerKey)
+		klog.ErrorS(nil, "Failed to find GVK in cluster for controller", "GVK", gvk, "controllerKey", controllerKey)
 		return false, nil
 	}
 

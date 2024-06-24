@@ -151,15 +151,15 @@ type ReconcileNodeImage struct {
 // Automatically generate RBAC rules to allow the Controller to read and write nodes
 func (r *ReconcileNodeImage) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
-	klog.V(5).Infof("Starting to process NodeImage %v", request.Name)
+	klog.V(5).InfoS("Starting to process NodeImage", "nodeImage", request)
 	var requeueMsg string
 	defer func() {
 		if err != nil {
-			klog.Warningf("Failed to process NodeImage %v err %v, elapsedTime %v", request.Name, time.Since(start), err)
+			klog.ErrorS(err, "Failed to process NodeImage", "nodeImage", request, "elapsedTime", time.Since(start))
 		} else if res.RequeueAfter > 0 {
-			klog.Infof("Finish to process NodeImage %v, elapsedTime %v, RetryAfter %v: %v", request.Name, time.Since(start), res.RequeueAfter, requeueMsg)
+			klog.InfoS("Finish to process NodeImage with scheduled retry", "nodeImage", request, "elapsedTime", time.Since(start), "retryAfter", res.RequeueAfter, "requeueMsg", requeueMsg)
 		} else {
-			klog.Infof("Finish to process NodeImage %v, elapsedTime %v", request.Name, time.Since(start))
+			klog.InfoS("Finish to process NodeImage", "nodeImage", request, "elapsedTime", time.Since(start))
 		}
 	}()
 
@@ -202,10 +202,10 @@ func (r *ReconcileNodeImage) Reconcile(_ context.Context, request reconcile.Requ
 	// If Node exists, we should create a NodeImage
 	if nodeImage == nil {
 		if isReady, delay := getNodeReadyAndDelayTime(node); !isReady {
-			klog.V(4).Infof("Skip to create NodeImage %s for Node has not ready yet.", request.Name)
+			klog.V(4).InfoS("Skipped to create NodeImage for Node has not ready yet", "nodeImage", request)
 			return reconcile.Result{}, nil
 		} else if delay > 0 {
-			klog.V(4).Infof("Skip to create NodeImage %s for waiting Node ready for %s.", request.Name, delay)
+			klog.V(4).InfoS("Skipped to create NodeImage for waiting Node ready after delay", "nodeImage", request, "delay", delay)
 			return reconcile.Result{RequeueAfter: delay}, nil
 		}
 
@@ -218,7 +218,7 @@ func (r *ReconcileNodeImage) Reconcile(_ context.Context, request reconcile.Requ
 		if err = r.Create(context.TODO(), nodeImage); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to create nodeimage %v, err: %v", nodeImage.Name, err)
 		}
-		klog.Infof("Successfully create nodeimage %s", nodeImage.Name)
+		klog.InfoS("Successfully create nodeimage", "nodeImage", klog.KObj(nodeImage))
 		return reconcile.Result{}, nil
 	}
 
@@ -264,9 +264,9 @@ func (r *ReconcileNodeImage) updateNodeImage(name string, node *v1.Node, duratio
 	})
 	duration.Merge(tmpDuration)
 	if err != nil {
-		klog.Errorf("Failed to update NodeImage %s spec(%v): %v", name, messages, err)
+		klog.ErrorS(err, "Failed to update NodeImage", "nodeImageName", name, "message", messages)
 	} else if modified {
-		klog.Infof("Successfully update NodeImage %s spec(%v)", name, messages)
+		klog.InfoS("Successfully update NodeImage", "nodeImageName", name, "message", messages)
 	}
 	return modified, err
 }
@@ -309,12 +309,12 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 					if errors.IsNotFound(err) {
 						continue
 					}
-					klog.Errorf("Failed to check owners for %s in NodeImage %s, get job %v error: %v", fullName, name, util.DumpJSON(ref), err)
+					klog.ErrorS(err, "Failed to check owners for image in NodeImage, get job error", "imageName", fullName, "nodeImageName", name, "job", util.DumpJSON(ref))
 					activeRefs = append(activeRefs, ref)
 					continue
 				}
 				if job.UID != ref.UID {
-					klog.Warningf("When check owners for %s in NodeImage %s, get job %v find UID %v not equal", fullName, name, util.DumpJSON(ref), job.UID)
+					klog.InfoS("When check owners for image in NodeImage, found job UID not equal", "imageName", fullName, "nodeImageName", name, "job", util.DumpJSON(ref), "jobUID", job.UID)
 					continue
 				}
 				activeRefs = append(activeRefs, ref)
@@ -492,11 +492,11 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 	newStatus.Succeeded = int32(succeeded)
 	newStatus.Failed = int32(failed)
 
-	klog.V(3).Infof("Preparing to update status for NodeImage %s, old: %v, new: %v", nodeImage.Name, util.DumpJSON(nodeImage.Status), util.DumpJSON(newStatus))
+	klog.V(3).InfoS("Preparing to update status for NodeImage", "nodeImage", klog.KObj(nodeImage), "oldStatus", util.DumpJSON(nodeImage.Status), "newStatus", util.DumpJSON(newStatus))
 	nodeImage.Status = *newStatus
 	err := r.Status().Update(context.TODO(), nodeImage)
 	if err != nil && !errors.IsConflict(err) {
-		klog.Errorf("Failed to update status for NodeImage %v: %v", nodeImage.Name, err)
+		klog.ErrorS(err, "Failed to update status for NodeImage", "nodeImage", klog.KObj(nodeImage))
 	}
 	return err
 }

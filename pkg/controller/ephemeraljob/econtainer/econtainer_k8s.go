@@ -94,7 +94,7 @@ func parseEphemeralContainerStatus(status *v1.ContainerStatus) ephemeralContaine
 func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.ContainerStatus) (v1.PodPhase, error) {
 	eContainerMap, empty := getEphemeralContainersMaps(ejob.Spec.Template.EphemeralContainers)
 	if empty {
-		klog.Error("ephemeral job spec containers is empty")
+		klog.InfoS("EphemeralJob spec containers is empty")
 		return v1.PodUnknown, fmt.Errorf("ephemeral job %s/%s spec containers is empty. ", ejob.Namespace, ejob.Name)
 	}
 
@@ -105,7 +105,7 @@ func parseEphemeralPodStatus(ejob *appsv1alpha1.EphemeralJob, statuses []v1.Cont
 		}
 
 		status := parseEphemeralContainerStatus(&eContainerStatus)
-		klog.V(5).Infof("parse ephemeral container %s status %v", eContainerStatus.Name, status)
+		klog.V(5).InfoS("Parse ephemeral container status", "ephemeralContainerStatusName", eContainerStatus.Name, "status", status)
 		switch status {
 		case FailedStatus:
 			return v1.PodFailed, nil
@@ -151,7 +151,7 @@ func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
 		// The apiserver will return a 404 when the EphemeralContainers feature is disabled because the `/ephemeralcontainers` subresource
 		// is missing. Unlike the 404 returned by a missing pod, the status details will be empty.
 		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound && serr.ErrStatus.Details.Name == "" {
-			klog.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
+			klog.ErrorS(err, "Ephemeral containers were disabled for this cluster (error from server)")
 			return nil
 		}
 
@@ -159,7 +159,7 @@ func (k *k8sControl) CreateEphemeralContainer(targetPod *v1.Pod) error {
 		// Kind the api server will respond with a not-registered error. When this happens we can optimistically try
 		// using the old API.
 		if runtime.IsNotRegisteredError(err) {
-			klog.V(1).Infof("Falling back to legacy ephemeral container API because server returned error: %v", err)
+			klog.V(1).ErrorS(err, "Falling back to legacy ephemeral container API because server returned error")
 			return k.createEphemeralContainerLegacy(targetPod, eContainer)
 		}
 	}
@@ -178,7 +178,7 @@ func (k *k8sControl) createEphemeralContainer(targetPod *v1.Pod, eContainer []v1
 		return fmt.Errorf("error creating patch to add ephemeral containers: %v", err)
 	}
 
-	klog.Infof("EphemeralJob %s/%s tries to patch containers to pod %s: %v", k.Namespace, k.Name, targetPod.Name, util.DumpJSON(patch))
+	klog.InfoS("EphemeralJob tried to patch containers to Pod", "ephemeralJob", klog.KObj(k), "pod", klog.KObj(targetPod), "patch", util.DumpJSON(patch))
 
 	kubeClient := kubeclient.GetGenericClient().KubeClient
 	_, err = kubeClient.CoreV1().Pods(targetPod.Namespace).
@@ -202,7 +202,7 @@ func (k *k8sControl) createEphemeralContainerLegacy(targetPod *v1.Pod, eContaine
 	// we can present a JSON 6902 patch that the api server will apply.
 	patch, err := json.Marshal(body)
 	if err != nil {
-		klog.Errorf("error creating JSON 6902 patch for old /ephemeralcontainers API: %s", err)
+		klog.ErrorS(err, "Failed to creat JSON 6902 patch for old /ephemeralcontainers API")
 		return nil
 	}
 
@@ -214,13 +214,13 @@ func (k *k8sControl) createEphemeralContainerLegacy(targetPod *v1.Pod, eContaine
 
 // RemoveEphemeralContainer is not support before kubernetes v1.23
 func (k *k8sControl) RemoveEphemeralContainer(target *v1.Pod) (*time.Duration, error) {
-	klog.Warning("RemoveEphemeralContainer is not support before kubernetes v1.23")
+	klog.InfoS("RemoveEphemeralContainer is not support before kubernetes v1.23")
 	return nil, nil
 }
 
 // UpdateEphemeralContainer is not support before kubernetes v1.23
 func (k *k8sControl) UpdateEphemeralContainer(target *v1.Pod) error {
-	klog.Warning("UpdateEphemeralContainer is not support before kubernetes v1.23")
+	klog.InfoS("UpdateEphemeralContainer is not support before kubernetes v1.23")
 	return nil
 }
 

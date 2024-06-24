@@ -95,7 +95,7 @@ func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1a
 	ref := metav1.GetControllerOf(pod)
 	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(p.client)
 	if err != nil {
-		klog.Errorf("Failed to get persistent pod state config white list, error: %v\n", err.Error())
+		klog.ErrorS(err, "Failed to get persistent pod state config white list")
 		return nil
 	}
 	if ref == nil || !whiteList.ValidateAPIVersionAndKind(ref.APIVersion, ref.Kind) {
@@ -105,7 +105,7 @@ func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1a
 	if ppsName != "" {
 		obj := &appsv1alpha1.PersistentPodState{}
 		if err := p.reader.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: ppsName}, obj); err != nil {
-			klog.Errorf("fetch pod(%s/%s) PersistentPodState(%s) failed: %s", pod.Namespace, pod.Name, ppsName, err.Error())
+			klog.ErrorS(err, "Failed to fetch pod PersistentPodState", "pod", klog.KObj(pod), "persistentPodStateName", ppsName)
 			return nil
 		}
 		return obj
@@ -202,7 +202,7 @@ func enqueuePersistentPodStateRequest(q workqueue.RateLimitingInterface, apiVers
 		Namespace: ns,
 		Name:      qName,
 	}})
-	klog.V(3).Infof("enqueuePersistentPodStateRequest(%s)", qName)
+	klog.V(3).InfoS("Enqueue PersistentPodState request", "qName", qName)
 }
 
 var _ handler.EventHandler = &enqueueRequestForKruiseStatefulSet{}

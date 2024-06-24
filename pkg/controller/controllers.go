@@ -73,7 +73,7 @@ func SetupWithManager(m manager.Manager) error {
 	for _, f := range controllerAddFuncs {
 		if err := f(m); err != nil {
 			if kindMatchErr, ok := err.(*meta.NoKindMatchError); ok {
-				klog.Infof("CRD %v is not installed, its controller will perform noops!", kindMatchErr.GroupKind)
+				klog.InfoS("CRD is not installed, its controller will perform noops!", "CRD", kindMatchErr.GroupKind)
 				continue
 			}
 			return err

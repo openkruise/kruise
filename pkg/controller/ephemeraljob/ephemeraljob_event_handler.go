@@ -99,7 +99,7 @@ func (e *ejobHandler) Update(ctx context.Context, evt event.UpdateEvent, q workq
 	}
 
 	if curEJob.DeletionTimestamp != nil {
-		klog.V(3).Infof("Observed deleting ephemeral job: %s/%s", curEJob.Namespace, curEJob.Name)
+		klog.V(3).InfoS("Observed deleting EphemeralJob", "ephemeralJob", klog.KObj(curEJob))
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: curEJob.Namespace, Name: curEJob.Name}})
 		return
 	}
@@ -108,7 +108,7 @@ func (e *ejobHandler) Update(ctx context.Context, evt event.UpdateEvent, q workq
 	if oldEJob.Spec.TTLSecondsAfterFinished != curEJob.Spec.TTLSecondsAfterFinished ||
 		oldEJob.Spec.Paused != curEJob.Spec.Paused || oldEJob.Spec.Parallelism != curEJob.Spec.Parallelism ||
 		oldEJob.Spec.Replicas != curEJob.Spec.Replicas {
-		klog.V(3).Infof("Observed updated Spec for ephemeral job: %s/%s", curEJob.Namespace, curEJob.Name)
+		klog.V(3).InfoS("Observed updated Spec for EphemeralJob", "ephemeralJob", klog.KObj(curEJob))
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: curEJob.Namespace, Name: curEJob.Name}})
 	}
 }

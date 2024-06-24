@@ -55,11 +55,9 @@ func (r *ReconcileSidecarTerminator) executeInPlaceUpdateAction(originalPod *cor
 	})
 
 	if err != nil {
-		klog.Errorf("SidecarTerminator -- Error occurred when inPlace update pod(%v/%v), error %v",
-			originalPod.Namespace, originalPod.Name, err)
+		klog.ErrorS(err, "SidecarTerminator -- Error occurred when inPlace update pod", "pod", klog.KObj(originalPod))
 	} else {
-		klog.V(3).Infof("SidecarTerminator -- InPlace update pod(%v/%v) successfully",
-			originalPod.Namespace, originalPod.Name)
+		klog.V(3).InfoS("SidecarTerminator -- InPlace update pod successfully", "pod", klog.KObj(originalPod))
 
 		r.recorder.Eventf(originalPod, corev1.EventTypeNormal, "SidecarTerminator",
 			"Kruise SidecarTerminator is trying to terminate sidecar %v using in-place update", uncompletedSidecars.List())

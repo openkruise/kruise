@@ -128,8 +128,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			oldCS := e.ObjectOld.(*appsv1alpha1.CloneSet)
 			newCS := e.ObjectNew.(*appsv1alpha1.CloneSet)
 			if *oldCS.Spec.Replicas != *newCS.Spec.Replicas {
-				klog.V(4).Infof("Observed updated replicas for CloneSet: %s/%s, %d->%d",
-					newCS.Namespace, newCS.Name, *oldCS.Spec.Replicas, *newCS.Spec.Replicas)
+				klog.V(4).InfoS("Observed updated replicas for CloneSet",
+					"cloneSet", klog.KObj(newCS), "oldReplicas", *oldCS.Spec.Replicas, "newReplicas", *newCS.Spec.Replicas)
 			}
 			return true
 		},
@@ -188,12 +188,12 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	defer func() {
 		if retErr == nil {
 			if res.Requeue || res.RequeueAfter > 0 {
-				klog.Infof("Finished syncing CloneSet %s, cost %v, result: %v", request, time.Since(startTime), res)
+				klog.InfoS("Finished syncing CloneSet", "cloneSet", request, "cost", time.Since(startTime), "result", res)
 			} else {
-				klog.Infof("Finished syncing CloneSet %s, cost %v", request, time.Since(startTime))
+				klog.InfoS("Finished syncing CloneSet", "cloneSet", request, "cost", time.Since(startTime))
 			}
 		} else {
-			klog.Errorf("Failed syncing CloneSet %s: %v", request, retErr)
+			klog.ErrorS(retErr, "Failed syncing CloneSet", "cloneSet", request)
 		}
 		// clean the duration store
 		_ = clonesetutils.DurationStore.Pop(request.String())
@@ -206,7 +206,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
-			klog.V(3).Infof("CloneSet %s has been deleted.", request)
+			klog.V(3).InfoS("CloneSet has been deleted", "cloneSet", request)
 			clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
 			return reconcile.Result{}, nil
 		}
@@ -215,13 +215,13 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	coreControl := clonesetcore.New(instance)
 	if coreControl.IsInitializing() {
-		klog.V(4).Infof("CloneSet %s skip reconcile for initializing", request)
+		klog.V(4).InfoS("CloneSet skipped reconcile for initializing", "cloneSet", request)
 		return reconcile.Result{}, nil
 	}
 
 	selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
 	if err != nil {
-		klog.Errorf("Error converting CloneSet %s selector: %v", request, err)
+		klog.ErrorS(err, "Error converting CloneSet selector", "cloneSet", request)
 		// This is a non-transient error, so don't retry.
 		return reconcile.Result{}, nil
 	}
@@ -229,10 +229,10 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	// If scaling expectations have not satisfied yet, just skip this reconcile.
 	if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for %v, scaleDirtyPods=%v, overtime=%v", request.String(), scaleDirtyPods, unsatisfiedDuration)
+			klog.InfoS("Expectation unsatisfied overtime", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods, "overTime", unsatisfiedDuration)
 			return reconcile.Result{}, nil
 		}
-		klog.V(4).Infof("Not satisfied scale for %v, scaleDirtyPods=%v", request.String(), scaleDirtyPods)
+		klog.V(4).InfoS("Not satisfied scale", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
@@ -279,20 +279,20 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	clonesetutils.ResourceVersionExpectations.Observe(updateRevision)
 	if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(updateRevision); !isSatisfied {
 		if unsatisfiedDuration < expectations.ExpectationTimeout {
-			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for updateRevision %v updating", request.String(), updateRevision.Name)
+			klog.V(4).InfoS("Not satisfied resourceVersion for CloneSet, wait for updateRevision updating", "cloneSet", request, "updateRevisionName", updateRevision.Name)
 			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 		}
-		klog.Warningf("Expectation unsatisfied overtime for %v, wait for updateRevision %v updating, timeout=%v", request.String(), updateRevision.Name, unsatisfiedDuration)
+		klog.InfoS("Expectation unsatisfied overtime for CloneSet, wait for updateRevision updating timeout", "cloneSet", request, "updateRevisionName", updateRevision.Name, "timeout", unsatisfiedDuration)
 		clonesetutils.ResourceVersionExpectations.Delete(updateRevision)
 	}
 	for _, pod := range filteredPods {
 		clonesetutils.ResourceVersionExpectations.Observe(pod)
 		if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(pod); !isSatisfied {
 			if unsatisfiedDuration >= expectations.ExpectationTimeout {
-				klog.Warningf("Expectation unsatisfied overtime for %v, wait for pod %v updating, timeout=%v", request.String(), pod.Name, unsatisfiedDuration)
+				klog.InfoS("Expectation unsatisfied overtime for CloneSet, wait for pod updating timeout", "cloneSet", request, "pod", klog.KObj(pod), "timeout", unsatisfiedDuration)
 				return reconcile.Result{}, nil
 			}
-			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for pod %v updating", request.String(), pod.Name)
+			klog.V(4).InfoS("Not satisfied resourceVersion for CloneSet, wait for pod updating", "cloneSet", request, "pod", klog.KObj(pod))
 			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 		}
 	}
@@ -314,7 +314,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 				minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
 				minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(*instance.Spec.Replicas), true)
 				if err != nil {
-					klog.Errorf("Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for %s: %v", request, err)
+					klog.ErrorS(err, "Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for CloneSet", "cloneSet", request)
 				}
 			}
 			updatedReadyReplicas := instance.Status.UpdatedReadyReplicas
@@ -324,13 +324,13 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			if int32(minUpdatedReadyPodsCount) <= updatedReadyReplicas {
 				// pre-download images for new revision
 				if err := r.createImagePullJobsForInPlaceUpdate(instance, currentRevision, updateRevision); err != nil {
-					klog.Errorf("Failed to create ImagePullJobs for %s: %v", request, err)
+					klog.ErrorS(err, "Failed to create ImagePullJobs for CloneSet", "cloneSet", request)
 				}
 			}
 		} else {
 			// delete ImagePullJobs if revisions have been consistent
 			if err := imagejobutilfunc.DeleteJobsForWorkload(r.Client, instance); err != nil {
-				klog.Errorf("Failed to delete imagepulljobs for %s: %v", request, err)
+				klog.ErrorS(err, "Failed to delete imagepulljobs for CloneSet", "cloneSet", request)
 			}
 		}
 	}
@@ -344,11 +344,11 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}
 
 	if err = r.truncatePodsToDelete(instance, filteredPods); err != nil {
-		klog.Warningf("Failed to truncate podsToDelete for %s: %v", request, err)
+		klog.ErrorS(err, "Failed to truncate podsToDelete for CloneSet", "cloneSet", request)
 	}
 
 	if err = r.truncateHistory(instance, filteredPods, revisions, currentRevision, updateRevision); err != nil {
-		klog.Errorf("Failed to truncate history for %s: %v", request, err)
+		klog.ErrorS(err, "Failed to truncate history for CloneSet", "cloneSet", request)
 	}
 
 	if syncErr == nil && instance.Spec.MinReadySeconds > 0 && newStatus.AvailableReplicas != newStatus.ReadyReplicas {
@@ -452,7 +452,7 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 	} else if equalCount > 0 {
 		lastEqualRevision := equalRevisions[equalCount-1]
 		if !VCTHashEqual(lastEqualRevision, updateRevision) {
-			klog.Infof("revision %v vct hash will be updated from %v to %v", lastEqualRevision.Name, lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation], updateRevision.Annotations[volumeclaimtemplate.HashAnnotation])
+			klog.InfoS("Revision vct hash will be updated", "revisionName", lastEqualRevision.Name, "lastRevisionVCTHash", lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation], "updateRevisionVCTHash", updateRevision.Annotations[volumeclaimtemplate.HashAnnotation])
 			lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation] = updateRevision.Annotations[volumeclaimtemplate.HashAnnotation]
 		}
 		// if the equivalent revision is not immediately prior we will roll back by incrementing the
@@ -661,7 +661,7 @@ func (r *ReconcileCloneSet) cleanupPVCs(
 		if err := r.updateOnePVC(cs, pvc); err != nil && !errors.IsNotFound(err) {
 			return nil, err
 		}
-		klog.V(3).Infof("Update CloneSet(%s/%s) pvc(%s)'s ownerRef to Pod", cs.Namespace, cs.Name, pvc.Name)
+		klog.V(3).InfoS("Updated CloneSet pvc's ownerRef to Pod", "cloneSet", klog.KObj(cs), "pvc", klog.KObj(pvc))
 	}
 	// delete pvc directly
 	for i := range toDeletePVCs {
@@ -669,7 +669,7 @@ func (r *ReconcileCloneSet) cleanupPVCs(
 		if err := r.deleteOnePVC(cs, pvc); err != nil && !errors.IsNotFound(err) {
 			return nil, err
 		}
-		klog.V(3).Infof("Delete CloneSet(%s/%s) pvc(%s) directly", cs.Namespace, cs.Name, pvc.Name)
+		klog.V(3).InfoS("Deleted CloneSet pvc directly", "cloneSet", klog.KObj(cs), "pvc", klog.KObj(pvc))
 	}
 	return activePVCs, nil
 }

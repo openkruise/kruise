@@ -52,8 +52,8 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), dsPodsNumber, false)
 	if partition == 0 && maxUnavailable >= dsPodsNumber {
-		klog.V(4).Infof("DaemonSet %s/%s skipped to create ImagePullJob for all Pods update in one batch, replicas=%d, partition=%d, maxUnavailable=%d",
-			ds.Namespace, ds.Name, dsPodsNumber, partition, maxUnavailable)
+		klog.V(4).InfoS("DaemonSet skipped to create ImagePullJob for all Pods update in one batch",
+			"daemonSet", klog.KObj(ds), "replicas", dsPodsNumber, "partition", partition, "maxUnavailable", maxUnavailable)
 		return dsc.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
 	}
 
@@ -85,20 +85,20 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 	}
 
 	containerImages := diffImagesBetweenRevisions(oldRevisions, updateRevision)
-	klog.V(3).Infof("DaemonSet %s/%s begin to create ImagePullJobs for revision %s: %v",
-		ds.Namespace, ds.Name, updateRevision.Name, containerImages)
+	klog.V(3).InfoS("DaemonSet begin to create ImagePullJobs for revision",
+		"daemonSet", klog.KObj(ds), "revision", klog.KObj(updateRevision), "containerImageNames", containerImages)
 	for name, image := range containerImages {
 		// job name is revision name + container name, it can not be more than 255 characters
 		jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
 		err := imagejobutilfunc.CreateJobForWorkload(dsc.Client, ds, controllerKind, jobName, image, labelMap, annotationMap, *selector, pullSecrets)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
-				klog.Errorf("DaemonSet %s/%s failed to create ImagePullJob %s: %v", ds.Namespace, ds.Name, jobName, err)
+				klog.ErrorS(err, "DaemonSet failed to create ImagePullJob", "daemonSet", klog.KObj(ds), "jobName", jobName)
 				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "FailedCreateImagePullJob", "failed to create ImagePullJob %s: %v", jobName, err)
 			}
 			continue
 		}
-		klog.V(3).Infof("DaemonSet %s/%s created ImagePullJob %s for image: %s", ds.Namespace, ds.Name, jobName, image)
+		klog.V(3).InfoS("DaemonSet created ImagePullJob for image", "daemonSet", klog.KObj(ds), "jobName", jobName, "image", image)
 		dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)
 	}
 

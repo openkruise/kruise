@@ -193,7 +193,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			oldSS := e.ObjectOld.(*appsv1beta1.StatefulSet)
 			newSS := e.ObjectNew.(*appsv1beta1.StatefulSet)
 			if oldSS.Status.Replicas != newSS.Status.Replicas {
-				klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", newSS.Name, oldSS.Status.Replicas, newSS.Status.Replicas)
+				klog.V(4).InfoS("Observed updated replica count for StatefulSet",
+					"statefulSet", klog.KObj(newSS), "oldReplicas", oldSS.Status.Replicas, "newReplicas", newSS.Status.Replicas)
 			}
 			return true
 		},
@@ -209,7 +210,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	klog.V(4).Infof("finished to add statefulset-controller")
+	klog.V(4).InfoS("Finished to add statefulset-controller")
 
 	return nil
 }
@@ -235,18 +236,18 @@ func (ssc *ReconcileStatefulSet) Reconcile(ctx context.Context, request reconcil
 	defer func() {
 		if retErr == nil {
 			if res.Requeue || res.RequeueAfter > 0 {
-				klog.Infof("Finished syncing statefulset %q (%v), result: %v", key, time.Since(startTime), res)
+				klog.InfoS("Finished syncing StatefulSet", "statefulSet", request, "elapsedTime", time.Since(startTime), "result", res)
 			} else {
-				klog.Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
+				klog.InfoS("Finished syncing StatefulSet", "statefulSet", request, "elapsedTime", time.Since(startTime))
 			}
 		} else {
-			klog.Infof("Finished syncing statefulset %q (%v), error: %v", key, time.Since(startTime), retErr)
+			klog.ErrorS(retErr, "Finished syncing StatefulSet error", "statefulSet", request, "elapsedTime", time.Since(startTime))
 		}
 	}()
 
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		klog.Infof("StatefulSet has been deleted %v", key)
+		klog.InfoS("StatefulSet deleted", "statefulSet", key)
 		updateExpectations.DeleteExpectations(key)
 		return reconcile.Result{}, nil
 	}
@@ -338,11 +339,11 @@ func (ssc *ReconcileStatefulSet) getPodsForStatefulSet(ctx context.Context, set 
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
 func (ssc *ReconcileStatefulSet) syncStatefulSet(ctx context.Context, set *appsv1beta1.StatefulSet, pods []*v1.Pod) error {
-	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
+	klog.V(4).InfoS("Syncing StatefulSet with pods", "statefulSet", klog.KObj(set), "podCount", len(pods))
 	// TODO: investigate where we mutate the set during the update as it is not obvious.
 	if err := ssc.control.UpdateStatefulSet(ctx, set.DeepCopy(), pods); err != nil {
 		return err
 	}
-	klog.V(4).Infof("Successfully synced StatefulSet %s/%s", set.Namespace, set.Name)
+	klog.V(4).InfoS("Successfully synced StatefulSet", "statefulSet", klog.KObj(set))
 	return nil
 }

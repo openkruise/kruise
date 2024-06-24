@@ -165,7 +165,7 @@ func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv1beta
 	const delete = appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
 	default:
-		klog.Errorf("Unknown policy %v; treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		klog.InfoS("Unknown policy, treating as Retain", "policy", set.Spec.PersistentVolumeClaimRetentionPolicy)
 		fallthrough
 	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
 		if hasOwnerRef(claim, set) ||
@@ -227,7 +227,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *appsv
 	const delete = appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
 	default:
-		klog.Errorf("Unknown policy %v, treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		klog.InfoS("Unknown policy, treating as Retain", "policy", set.Spec.PersistentVolumeClaimRetentionPolicy)
 		fallthrough
 	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
 		needsUpdate = removeOwnerRef(claim, set) || needsUpdate

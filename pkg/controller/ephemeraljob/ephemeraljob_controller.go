@@ -115,14 +115,14 @@ type ReconcileEphemeralJob struct {
 // and what is in the EphemeralJob.Spec
 func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
-	klog.V(5).Infof("Starting to process EphemeralJob %v", request.Name)
+	klog.V(5).InfoS("Starting to process EphemeralJob", "ephemeralJob", request)
 	defer func() {
 		if err != nil {
-			klog.Warningf("Failed to process EphemeralJob %v err %v, elapsedTime %v", request.Name, time.Since(start), err)
+			klog.ErrorS(err, "Failed to process EphemeralJob", "ephemeralJob", request, "elapsedTime", time.Since(start))
 		} else if res.RequeueAfter > 0 {
-			klog.Infof("Finish to process EphemeralJob %v, elapsedTime %v, RetryAfter %v", request.Name, time.Since(start), res.RequeueAfter)
+			klog.InfoS("Finish to process EphemeralJob with scheduled retry", "ephemeralJob", request, "elapsedTime", time.Since(start), "retryAfter", res.RequeueAfter)
 		} else {
-			klog.Infof("Finish to process EphemeralJob %v, elapsedTime %v", request.Name, time.Since(start))
+			klog.InfoS("Finish to process EphemeralJob", "ephemeralJob", request, "elapsedTime", time.Since(start))
 		}
 	}()
 
@@ -136,7 +136,7 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		klog.Errorf("Failed to get ephemeral job %s,", job.Name)
+		klog.InfoS("Failed to get EphemeralJob", "EphemeralJob", request)
 		return reconcile.Result{}, err
 	}
 
@@ -170,7 +170,7 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 
 		leftTime = time.Duration(*job.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(job.Status.CompletionTime.Time)
 		if leftTime <= 0 {
-			klog.Infof("Deleting EphemeralJob %s/%s for ttlSecondsAfterFinished", job.Namespace, job.Name)
+			klog.InfoS("Deleting EphemeralJob for ttlSecondsAfterFinished", "ephemeralJob", klog.KObj(job))
 			if err = r.Delete(context, job); err != nil {
 				return reconcile.Result{}, fmt.Errorf("Delete ephemeral job error: %v. ", err)
 			}
@@ -193,32 +193,32 @@ func (r *ReconcileEphemeralJob) Reconcile(context context.Context, request recon
 		if requeueAfter < 0 {
 			requeueAfter = 0
 		}
-		klog.Infof("Job %s has ActiveDeadlineSeconds, will resync after %d seconds", job.Name, requeueAfter)
+		klog.InfoS("Job has ActiveDeadlineSeconds, will resync after seconds", "ephemeralJob", klog.KObj(job), "requeueAfter", requeueAfter)
 	}
 
 	if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := scaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for ejob %v, scaleDirtyPods=%v, overtime=%v", request.String(), scaleDirtyPods, unsatisfiedDuration)
+			klog.InfoS("Expectation unsatisfied overtime for ejob", "ephemeralJob", request, "scaleDirtyPods", scaleDirtyPods, "overtime", unsatisfiedDuration)
 			return reconcile.Result{}, nil
 		}
-		klog.Infof("Not satisfied scale for ejob %v, scaleDirtyPods=%v", request.String(), scaleDirtyPods)
+		klog.InfoS("Not satisfied scale for ejob", "ephemeralJob", request, "scaleDirtyPods", scaleDirtyPods)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
 	targetPods, err := r.filterPods(job)
 	if err != nil {
-		klog.Errorf("Failed to get ephemeral job %s/%s related target pods: %v", job.Namespace, job.Name, err)
+		klog.ErrorS(err, "Failed to get EphemeralJob related target pods", "ephemeralJob", klog.KObj(job))
 		return reconcile.Result{RequeueAfter: requeueAfter}, err
 	}
 
-	klog.V(5).Infof("filter target pods %d", len(targetPods))
+	klog.V(5).InfoS("Filter target pods", "targetPodCount", len(targetPods))
 	// calculate status
 	if err := r.calculateStatus(job, targetPods); err != nil {
-		klog.Errorf("Error calculate ephemeral job %s/%s status: %v", job.Namespace, job.Name, err)
+		klog.ErrorS(err, "Error calculate EphemeralJob status", "ephemeralJob", klog.KObj(job))
 		return reconcile.Result{}, err
 	}
-	klog.Infof("Sync calculate job %s status: (match: %d, success: %d, failed: %d, running: %d, waiting: %d)",
-		job.Name, job.Status.Matches, job.Status.Succeeded, job.Status.Failed, job.Status.Running, job.Status.Waiting)
+	klog.InfoS("Sync calculate job status", "ephemeralJob", klog.KObj(job), "match", job.Status.Matches, "success", job.Status.Succeeded,
+		"failed", job.Status.Failed, "running", job.Status.Running, "waiting", job.Status.Waiting)
 
 	if job.Status.Phase == appsv1alpha1.EphemeralJobPause {
 		return reconcile.Result{RequeueAfter: requeueAfter}, r.updateJobStatus(job)
@@ -302,7 +302,7 @@ func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJo
 			if owned {
 				targetPods = append(targetPods, pod)
 			} else {
-				klog.Warningf("EphemeralJob %s/%s ignores Pod %s for it exists conflict ephemeral containers", job.Namespace, job.Name, pod)
+				klog.InfoS("EphemeralJob ignored Pod for it existed conflict ephemeral containers", "ephemeralJob", klog.KObj(job), "pod", klog.KObj(pod))
 			}
 		}
 	}
@@ -313,11 +313,11 @@ func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJo
 func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, targetPods []*v1.Pod) error {
 	toCreatePods, _, _ := getSyncPods(job, targetPods)
 	if len(toCreatePods) == 0 {
-		klog.Infoln("there is no target pod to attach")
+		klog.InfoS("There was no target pod to attach")
 		return nil
 	}
 
-	klog.Infof("Ready to create ephemeral containers in %d pods.", len(toCreatePods))
+	klog.InfoS("Ready to create ephemeral containers in pods", "podCount", len(toCreatePods))
 	parallelism := defaultParallelism
 	if job.Spec.Parallelism != nil {
 		parallelism = int(*job.Spec.Parallelism)
@@ -329,7 +329,8 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 
 	diff := parallelism - int(job.Status.Running)
 	if diff < 0 {
-		klog.Infof("error sync phemeraljob %s/%s for parallisem %d less than running pod %d", job.Namespace, job.Name, parallelism, job.Status.Running)
+		klog.InfoS("Error sync EphemeralJob for parallisem less than running pod", "ephemeralJob", klog.KObj(job),
+			"parallelism", parallelism, "runningPodCount", job.Status.Running)
 		return nil
 	}
 
@@ -349,7 +350,7 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 			return nil
 		}
 
-		klog.Infof("Creating ephemeral container in pod %s/%s", pod.Namespace, pod.Name)
+		klog.InfoS("Creating ephemeral container in pod", "pod", klog.KObj(pod))
 
 		for _, podEphemeralContainerName := range getPodEphemeralContainers(pod, job) {
 			scaleExpectations.ExpectScale(key, expectations.Create, podEphemeralContainerName)
@@ -442,14 +443,14 @@ func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, 
 }
 
 func (r *ReconcileEphemeralJob) updateJobStatus(job *appsv1alpha1.EphemeralJob) error {
-	klog.V(5).Infof("Updating job %s status %#v", job.Name, job.Status)
+	klog.V(5).InfoS("Updating job status", "ephemeralJob", klog.KObj(job), "status", job.Status)
 	return r.Status().Update(context.TODO(), job)
 }
 
 func (r *ReconcileEphemeralJob) removeEphemeralContainers(job *appsv1alpha1.EphemeralJob) (*time.Duration, error) {
 	targetPods, err := r.filterInjectedPods(job)
 	if err != nil {
-		klog.Errorf("Failed to get ephemeral job %s/%s related target pods: %v", job.Namespace, job.Name, err)
+		klog.ErrorS(err, "Failed to get ephemeral job related target pods", "ephemeralJob", klog.KObj(job))
 		return nil, err
 	}
 

@@ -38,7 +38,7 @@ type imagePullJobEventHandler struct {
 func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
 	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
 	if err != nil {
-		klog.Errorf("Could not parse OwnerReference %v APIVersion: %v", controllerRef, err)
+		klog.ErrorS(err, "Could not parse APIVersion in OwnerReference", "ownerReference", controllerRef)
 		return false
 	}
 	return controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group

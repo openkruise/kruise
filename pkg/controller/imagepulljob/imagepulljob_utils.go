@@ -180,7 +180,7 @@ func referenceSetFromTarget(target *v1.Secret) referenceSet {
 	for _, ref := range refs {
 		namespace, name, err := cache.SplitMetaNamespaceKey(ref)
 		if err != nil {
-			klog.Errorf("Failed to parse job key from target secret %s annotations: %v", target.Name, err)
+			klog.ErrorS(err, "Failed to parse job key from annotations in target Secret", "secret", klog.KObj(target))
 			continue
 		}
 		keys.Insert(types.NamespacedName{Namespace: namespace, Name: name})

@@ -151,14 +151,14 @@ type ReconcileImagePullJob struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
-	klog.V(5).Infof("Starting to process ImagePullJob %v", request.NamespacedName)
+	klog.V(5).InfoS("Starting to process ImagePullJob", "imagePullJob", request)
 	defer func() {
 		if err != nil {
-			klog.Warningf("Failed to process ImagePullJob %v, elapsedTime %v, error: %v", request.NamespacedName, time.Since(start), err)
+			klog.ErrorS(err, "Failed to process ImagePullJob", "imagePullJob", request, "elapsedTime", time.Since(start))
 		} else if res.RequeueAfter > 0 {
-			klog.Infof("Finish to process ImagePullJob %v, elapsedTime %v, RetryAfter %v", request.NamespacedName, time.Since(start), res.RequeueAfter)
+			klog.InfoS("Finish to process ImagePullJob with scheduled retry", "imagePullJob", request, "elapsedTime", time.Since(start), "RetryAfter", res.RequeueAfter)
 		} else {
-			klog.Infof("Finish to process ImagePullJob %v, elapsedTime %v", request.NamespacedName, time.Since(start))
+			klog.InfoS("Finish to process ImagePullJob", "imagePullJob", request, "elapsedTime", time.Since(start))
 		}
 	}()
 
@@ -178,10 +178,10 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 	// If scale expectations have not satisfied yet, just skip this reconcile
 	if scaleSatisfied, unsatisfiedDuration, dirtyData := scaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.Warningf("ImagePullJob: expectation unsatisfied overtime for %v, dirtyData=%v, overtime=%v", request.String(), dirtyData, unsatisfiedDuration)
+			klog.InfoS("ImagePullJob: expectation unsatisfied overtime", "imagePullJob", request, "dirtyData", dirtyData, "overTime", unsatisfiedDuration)
 			return reconcile.Result{}, nil
 		}
-		klog.V(4).Infof("ImagePullJob: not satisfied scale for %v, dirtyData=%v", request.String(), dirtyData)
+		klog.V(4).InfoS("ImagePullJob: not satisfied scale", "imagePullJob", request, "dirtyData", dirtyData)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
@@ -189,10 +189,10 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 	resourceVersionExpectations.Observe(job)
 	if isSatisfied, unsatisfiedDuration := resourceVersionExpectations.IsSatisfied(job); !isSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for %v, timeout=%v", request.String(), unsatisfiedDuration)
+			klog.InfoS("Expectation unsatisfied overtime", "imagePullJob", request, "timeout", unsatisfiedDuration)
 			return reconcile.Result{}, nil
 		}
-		klog.V(4).Infof("Not satisfied resourceVersion for %v", request.String())
+		klog.V(4).InfoS("Not satisfied resourceVersion", "imagePullJob", request)
 		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 	}
 
@@ -212,7 +212,7 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 		if job.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
 			leftTime = time.Duration(*job.Spec.CompletionPolicy.TTLSecondsAfterFinished)*time.Second - time.Since(job.Status.CompletionTime.Time)
 			if leftTime <= 0 {
-				klog.Infof("Deleting ImagePullJob %s/%s for ttlSecondsAfterFinished", job.Namespace, job.Name)
+				klog.InfoS("Deleting ImagePullJob for ttlSecondsAfterFinished", "imagePullJob", klog.KObj(job))
 				if err = r.Delete(context.TODO(), job); err != nil {
 					return reconcile.Result{}, fmt.Errorf("delete job error: %v", err)
 				}
@@ -238,10 +238,10 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 		resourceVersionExpectations.Observe(nodeImage)
 		if isSatisfied, unsatisfiedDuration := resourceVersionExpectations.IsSatisfied(nodeImage); !isSatisfied {
 			if unsatisfiedDuration >= expectations.ExpectationTimeout {
-				klog.Warningf("Expectation unsatisfied overtime for %v, wait for NodeImage %v updating, timeout=%v", request.String(), nodeImage.Name, unsatisfiedDuration)
+				klog.InfoS("Expectation unsatisfied overtime, waiting for NodeImage updating", "imagePullJob", request, "nodeImageName", nodeImage.Name, "timeout", unsatisfiedDuration)
 				return reconcile.Result{}, nil
 			}
-			klog.V(4).Infof("Not satisfied resourceVersion for %v, wait for NodeImage %v updating", request.String(), nodeImage.Name)
+			klog.V(4).InfoS("Not satisfied resourceVersion, waiting for NodeImage updating", "imagePullJob", request, "nodeImageName", nodeImage.Name)
 			// fix issue https://github.com/openkruise/kruise/issues/1528
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
@@ -315,8 +315,8 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 	}
 	parallelism := parallelismLimit - int(newStatus.Active)
 	if parallelism <= 0 {
-		klog.V(3).Infof("Find ImagePullJob %s/%s have active pulling %d >= parallelism %d, so skip to sync the left %d NodeImages",
-			job.Namespace, job.Name, newStatus.Active, parallelismLimit, len(notSyncedNodeImages))
+		klog.V(3).InfoS("Found ImagePullJob have active pulling more than parallelism, so skip to sync the left NodeImages",
+			"imagePullJob", klog.KObj(job), "activePullingCount", newStatus.Active, "parallelismLimit", parallelismLimit, "notSyncedNodeImagesCount", len(notSyncedNodeImages))
 		return nil
 	}
 	if len(notSyncedNodeImages) < parallelism {
@@ -400,10 +400,10 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 		if updateErr != nil {
 			return fmt.Errorf("update NodeImage %s error: %v", notSyncedNodeImages[i], updateErr)
 		} else if skip {
-			klog.V(4).Infof("ImagePullJob %s/%s find %s already synced in NodeImage %s", job.Namespace, job.Name, job.Spec.Image, notSyncedNodeImages[i])
+			klog.V(4).InfoS("ImagePullJob found image already synced in NodeImage", "imagePullJob", klog.KObj(job), "image", job.Spec.Image, "nodeImage", notSyncedNodeImages[i])
 			continue
 		}
-		klog.V(3).Infof("ImagePullJob %s/%s has synced %s into NodeImage %s", job.Namespace, job.Name, job.Spec.Image, notSyncedNodeImages[i])
+		klog.V(3).InfoS("ImagePullJob had synced image into NodeImage", "imagePullJob", klog.KObj(job), "image", job.Spec.Image, "nodeImage", notSyncedNodeImages[i])
 	}
 	return nil
 }
@@ -432,7 +432,7 @@ func (r *ReconcileImagePullJob) getTargetSecretMap(job *appsv1alpha1.ImagePullJo
 		}
 		sourceNs, sourceName, err := cache.SplitMetaNamespaceKey(target.Annotations[SourceSecretKeyAnno])
 		if err != nil {
-			klog.Warningf("Failed to parse source key from target %s annotations: %s", target.Name, err)
+			klog.ErrorS(err, "Failed to parse source key from annotations in Secret", "secret", klog.KObj(target))
 		}
 		if containsObject(sourceReferences, appsv1alpha1.ReferenceObject{Namespace: sourceNs, Name: sourceName}) {
 			targetMap[target.Labels[SourceSecretUIDLabelKey]] = target

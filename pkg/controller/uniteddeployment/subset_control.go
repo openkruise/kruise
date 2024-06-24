@@ -84,7 +84,7 @@ func (m *SubsetControl) CreateSubset(ud *alpha1.UnitedDeployment, subsetName str
 		return err
 	}
 
-	klog.V(4).Infof("Have %d replicas when creating Subset for UnitedDeployment %s/%s", replicas, ud.Namespace, ud.Name)
+	klog.V(4).InfoS("Replicas when creating Subset for UnitedDeployment", "replicas", replicas, "unitedDeployment", klog.KObj(ud))
 	return m.Create(context.TODO(), set)
 }
 

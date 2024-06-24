@@ -66,7 +66,7 @@ func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSp
 
 	latestVersion, err := r.getWorkloadLatestVersion(ws)
 	if err != nil {
-		klog.Errorf("Failed to get the latest version for workload in workloadSpread %v, err: %v", klog.KObj(ws), err)
+		klog.ErrorS(err, "Failed to get the latest version for workload in workloadSpread", "workloadSpread", klog.KObj(ws))
 		return err
 	}
 
@@ -154,8 +154,7 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 	} else {
 		subsetMaxReplicas, err := intstr.GetValueFromIntOrPercent(subset.MaxReplicas, int(workloadReplicas), true)
 		if err != nil || subsetMaxReplicas < 0 {
-			klog.Errorf("failed to get maxReplicas value from subset (%s) of WorkloadSpread (%s/%s)",
-				subset.Name, ws.Namespace, ws.Name)
+			klog.ErrorS(err, "Failed to get maxReplicas value from subset of WorkloadSpread", "subsetName", subset.Name, "workloadSpread", klog.KObj(ws))
 			return nil
 		}
 
@@ -227,8 +226,7 @@ func (r *ReconcileWorkloadSpread) patchPodDeletionCost(ws *appsv1alpha1.Workload
 	if err := r.Patch(context.TODO(), clone, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
 		return err
 	}
-	klog.V(3).Infof("WorkloadSpread (%s/%s) paths deletion-cost annotation to %s for Pod (%s/%s) successfully",
-		ws.Namespace, ws.Name, deletionCostStr, pod.Namespace, pod.Name)
+	klog.V(3).InfoS("WorkloadSpread patched deletion-cost annotation for Pod successfully", "workloadSpread", klog.KObj(ws), "deletionCost", deletionCostStr, "pod", klog.KObj(pod))
 	return nil
 }
 

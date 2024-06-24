@@ -164,17 +164,17 @@ func (a *StatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, su
 		TemplateSpecBytes, _ := json.Marshal(set.Spec.Template)
 		modified, err := strategicpatch.StrategicMergePatch(TemplateSpecBytes, subSetConfig.Patch.Raw, &corev1.PodTemplateSpec{})
 		if err != nil {
-			klog.Errorf("failed to merge patch raw %s", subSetConfig.Patch.Raw)
+			klog.ErrorS(err, "Failed to merge patch raw", "patch", subSetConfig.Patch.Raw)
 			return err
 		}
 		patchedTemplateSpec := corev1.PodTemplateSpec{}
 		if err = json.Unmarshal(modified, &patchedTemplateSpec); err != nil {
-			klog.Errorf("failed to unmarshal %s to podTemplateSpec", modified)
+			klog.ErrorS(err, "Failed to unmarshal modified JSON to podTemplateSpec", "JSON", modified)
 			return err
 		}
 
 		set.Spec.Template = patchedTemplateSpec
-		klog.V(2).Infof("StatefulSet [%s/%s] was patched successfully: %s", set.Namespace, set.GenerateName, subSetConfig.Patch.Raw)
+		klog.V(2).InfoS("StatefulSet was patched successfully", "statefulSet", klog.KRef(set.Namespace, set.GenerateName), "patch", subSetConfig.Patch.Raw)
 	}
 	if set.Annotations == nil {
 		set.Annotations = make(map[string]string)
@@ -259,7 +259,7 @@ func (a *StatefulSetAdapter) deleteStuckPods(set *appsv1.StatefulSet, revision s
 		pod := pods[i]
 		// If the pod is considered as stuck, delete it.
 		if isPodStuckForRollingUpdate(pod, revision, partition) {
-			klog.V(2).Infof("Delete pod %s/%s at stuck state", pod.Namespace, pod.Name)
+			klog.V(2).InfoS("Deleted pod at stuck state", "pod", klog.KObj(pod))
 			err = a.Delete(context.TODO(), pod, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil {
 				return err

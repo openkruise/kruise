@@ -123,13 +123,13 @@ func podPreferredScore(subset *appsv1alpha1.WorkloadSpreadSubset, pod *corev1.Po
 	podBytes, _ := json.Marshal(pod)
 	modified, err := strategicpatch.StrategicMergePatch(podBytes, subset.Patch.Raw, &corev1.Pod{})
 	if err != nil {
-		klog.Errorf("failed to merge patch raw for pod %v and subset %v", klog.KObj(pod), subset.Name)
+		klog.ErrorS(err, "Failed to merge patch raw for pod and subset", "pod", klog.KObj(pod), "subsetName", subset.Name)
 		return 0
 	}
 	patchedPod := &corev1.Pod{}
 	err = json.Unmarshal(modified, patchedPod)
 	if err != nil {
-		klog.Errorf("failed to unmarshal for pod %v and subset %v", klog.KObj(pod), subset.Name)
+		klog.ErrorS(err, "Failed to unmarshal for pod and subset", "pod", klog.KObj(pod), "subsetName", subset.Name)
 		return 0
 	}
 	// TODO: consider json annotation just like `{"json_key": ["value1", "value2"]}`.

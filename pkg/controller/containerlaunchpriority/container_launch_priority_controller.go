@@ -131,12 +131,12 @@ type ReconcileContainerLaunchPriority struct {
 
 func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
-	klog.V(3).Infof("Starting to process Pod %v", request.NamespacedName)
+	klog.V(3).InfoS("Starting to process Pod", "pod", request)
 	defer func() {
 		if err != nil {
-			klog.Warningf("Failed to process Pod %v, elapsedTime %v, error: %v", request.NamespacedName, time.Since(start), err)
+			klog.ErrorS(err, "Failed to process Pod", "pod", request, "elapsedTime", time.Since(start))
 		} else {
-			klog.Infof("Finish to process Pod %v, elapsedTime %v", request.NamespacedName, time.Since(start))
+			klog.InfoS("Finish to process Pod", "pod", request, "elapsedTime", time.Since(start))
 		}
 	}()
 
@@ -163,7 +163,7 @@ func (r *ReconcileContainerLaunchPriority) Reconcile(_ context.Context, request 
 			Name:       pod.Name,
 			UID:        pod.UID,
 		})
-		klog.V(4).Infof("Creating ConfigMap %s for Pod %s/%s", barrier.Name, pod.Namespace, pod.Name)
+		klog.V(4).InfoS("Creating ConfigMap for Pod", "configMap", klog.KObj(barrier), "pod", klog.KObj(pod))
 		temErr := r.Client.Create(context.TODO(), barrier)
 		if temErr != nil && !errors.IsAlreadyExists(temErr) {
 			return reconcile.Result{}, temErr
@@ -205,13 +205,13 @@ func (r *ReconcileContainerLaunchPriority) handle(pod *v1.Pod, barrier *v1.Confi
 }
 
 func (r *ReconcileContainerLaunchPriority) addPriorityIntoBarrier(barrier *v1.ConfigMap, priority int) error {
-	klog.V(3).Infof("Adding priority %d into barrier %s/%s", priority, barrier.Namespace, barrier.Name)
+	klog.V(3).InfoS("Adding priority into barrier", "priority", priority, "barrier", klog.KObj(barrier))
 	body := fmt.Sprintf(`{"data":{"%s":"true"}}`, utilcontainerlaunchpriority.GetKey(priority))
 	return r.Client.Patch(context.TODO(), barrier, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 }
 
 func (r *ReconcileContainerLaunchPriority) patchCompleted(pod *v1.Pod) error {
-	klog.V(3).Infof("Marking pod %s/%s as launch priority completed", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("Marking pod as launch priority completed", "pod", klog.KObj(pod))
 	body := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"true"}}}`, appspub.ContainerLaunchPriorityCompletedKey)
 	return r.Client.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 }

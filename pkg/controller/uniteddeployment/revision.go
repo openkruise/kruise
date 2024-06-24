@@ -51,7 +51,7 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDe
 	if err != nil {
 		return nil, err
 	}
-	klog.V(1).Infof("List controller revision of UnitedDeployment %s/%s: count %d\n", ud.Namespace, ud.Name, len(histories.Items))
+	klog.V(1).InfoS("List controller revision of UnitedDeployment", "unitedDeployment", klog.KObj(ud), "count", len(histories.Items))
 
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm, err := refmanager.New(r.Client, ud.Spec.Selector, ud, r.scheme)

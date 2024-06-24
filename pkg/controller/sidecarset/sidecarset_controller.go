@@ -90,7 +90,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			oldScS := e.ObjectOld.(*appsv1alpha1.SidecarSet)
 			newScS := e.ObjectNew.(*appsv1alpha1.SidecarSet)
 			if oldScS.GetGeneration() != newScS.GetGeneration() {
-				klog.V(3).Infof("Observed updated Spec for SidecarSet: %s/%s", newScS.GetNamespace(), newScS.GetName())
+				klog.V(3).InfoS("Observed updated Spec for SidecarSet", "sidecarSet", klog.KObj(newScS))
 				return true
 			}
 			return false
@@ -138,6 +138,6 @@ func (r *ReconcileSidecarSet) Reconcile(_ context.Context, request reconcile.Req
 		return reconcile.Result{}, err
 	}
 
-	klog.V(3).Infof("begin to process sidecarset %v for reconcile", sidecarSet.Name)
+	klog.V(3).InfoS("Began to process sidecarset for reconcile", "sidecarSet", klog.KObj(sidecarSet))
 	return r.processor.UpdateSidecarSet(sidecarSet)
 }

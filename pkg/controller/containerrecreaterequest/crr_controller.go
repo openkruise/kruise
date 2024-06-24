@@ -122,14 +122,14 @@ type ReconcileContainerRecreateRequest struct {
 // and what is in the ContainerRecreateRequest.Spec
 func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	start := time.Now()
-	klog.V(3).Infof("Starting to process CRR %v", request.NamespacedName)
+	klog.V(3).InfoS("Starting to process CRR", "containerRecreateRequest", request)
 	defer func() {
 		if err != nil {
-			klog.Warningf("Failed to process CRR %v, elapsedTime %v, error: %v", request.NamespacedName, time.Since(start), err)
+			klog.ErrorS(err, "Failed to process CRR", "containerRecreateRequest", request, "elapsedTime", time.Since(start))
 		} else if res.RequeueAfter > 0 {
-			klog.Infof("Finish to process CRR %v, elapsedTime %v, RetryAfter %v", request.NamespacedName, time.Since(start), res.RequeueAfter)
+			klog.InfoS("Finished processing CRR with scheduled retry", "containerRecreateRequest", request, "elapsedTime", time.Since(start), "retryAfter", res.RequeueAfter)
 		} else {
-			klog.Infof("Finish to process CRR %v, elapsedTime %v", request.NamespacedName, time.Since(start))
+			klog.InfoS("Finished processing CRR", "containerRecreateRequest", request, "elapsedTime", time.Since(start))
 		}
 	}()
 
@@ -171,7 +171,7 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		if crr.Spec.TTLSecondsAfterFinished != nil {
 			leftTime = time.Duration(*crr.Spec.TTLSecondsAfterFinished)*time.Second - time.Since(crr.Status.CompletionTime.Time)
 			if leftTime <= 0 {
-				klog.Infof("Deleting CRR %s/%s for ttlSecondsAfterFinished", crr.Namespace, crr.Name)
+				klog.InfoS("Deleting CRR for ttlSecondsAfterFinished", "containerRecreateRequest", klog.KObj(crr))
 				if err = r.Delete(context.TODO(), crr); err != nil {
 					return reconcile.Result{}, fmt.Errorf("delete CRR error: %v", err)
 				}
@@ -182,8 +182,8 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	}
 
 	if errors.IsNotFound(podErr) || pod.DeletionTimestamp != nil || string(pod.UID) != crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] {
-		klog.Warningf("Complete CRR %s/%s as failure for Pod %s with UID=%s has gone",
-			crr.Namespace, crr.Name, crr.Spec.PodName, crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey])
+		klog.InfoS("Completed CRR as failure for Pod has gone",
+			"containerRecreateRequest", klog.KObj(crr), "podName", crr.Spec.PodName, "podUID", crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey])
 		return reconcile.Result{}, r.completeCRR(crr, "pod has gone")
 	}
 
@@ -193,7 +193,7 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	if crr.Status.Phase == "" {
 		leftTime := responseTimeout - time.Since(crr.CreationTimestamp.Time)
 		if leftTime <= 0 {
-			klog.Warningf("Complete CRR %s/%s as failure for daemon has not responded for a long time", crr.Namespace, crr.Name)
+			klog.InfoS("Completed CRR as failure for daemon has not responded for a long time", "containerRecreateRequest", klog.KObj(crr))
 			return reconcile.Result{}, r.completeCRR(crr, "daemon has not responded for a long time")
 		}
 		duration.Update(leftTime)
@@ -203,7 +203,7 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	if crr.Spec.ActiveDeadlineSeconds != nil {
 		leftTime := time.Duration(*crr.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(crr.CreationTimestamp.Time)
 		if leftTime <= 0 {
-			klog.Warningf("Complete CRR %s/%s as failure for recreating has exceeded the activeDeadlineSeconds", crr.Namespace, crr.Name)
+			klog.InfoS("Completed CRR as failure for recreating has exceeded the activeDeadlineSeconds", "containerRecreateRequest", klog.KObj(crr))
 			return reconcile.Result{}, r.completeCRR(crr, "recreating has exceeded the activeDeadlineSeconds")
 		}
 		duration.Update(leftTime)
@@ -234,7 +234,7 @@ func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1alp
 		c := &crr.Spec.Containers[i]
 		containerStatus := util.GetContainerStatus(c.Name, pod)
 		if containerStatus == nil {
-			klog.Warningf("Not found %s container in Pod Status for CRR %s/%s", c.Name, crr.Namespace, crr.Name)
+			klog.InfoS("Could not find container in Pod Status for CRR", "containerName", c.Name, "containerRecreateRequest", klog.KObj(crr))
 			continue
 		} else if containerStatus.State.Running == nil || containerStatus.State.Running.StartedAt.Before(&crr.CreationTimestamp) {
 			// ignore non-running and history status
@@ -286,7 +286,8 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1alpha1
 			return fmt.Errorf("add Pod not ready error: %v", err)
 		}
 	} else {
-		klog.Warningf("CRR %s/%s can not set Pod %s to not ready, because Pod has no %s readinessGate", crr.Namespace, crr.Name, pod.Name, appspub.KruisePodReadyConditionType)
+		klog.InfoS("CRR could not set Pod to not ready, because Pod has no readinessGate",
+			"containerRecreateRequest", klog.KObj(crr), "pod", klog.KObj(pod), "readinessGate", appspub.KruisePodReadyConditionType)
 	}
 
 	body := fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey, r.clock.Now().Format(time.RFC3339))

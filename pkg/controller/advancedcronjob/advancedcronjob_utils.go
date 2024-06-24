@@ -23,7 +23,7 @@ func formatSchedule(acj *appsv1alpha1.AdvancedCronJob) string {
 	}
 	if acj.Spec.TimeZone != nil {
 		if _, err := time.LoadLocation(*acj.Spec.TimeZone); err != nil {
-			klog.Errorf("Failed to load location %s for %s/%s: %v", *acj.Spec.TimeZone, acj.Namespace, acj.Name, err)
+			klog.ErrorS(err, "Failed to load location for advancedCronJob", "location", *acj.Spec.TimeZone, "advancedCronJob", klog.KObj(acj))
 			return acj.Spec.Schedule
 		}
 		return fmt.Sprintf("TZ=%s %s", *acj.Spec.TimeZone, acj.Spec.Schedule)

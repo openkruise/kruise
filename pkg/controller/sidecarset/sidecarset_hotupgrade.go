@@ -58,7 +58,7 @@ func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarContro
 			Name:      podClone.Name,
 		}
 		if err := p.Client.Get(context.TODO(), key, podClone); err != nil {
-			klog.Errorf("error getting updated pod(%s/%s) from client", podClone.Namespace, podClone.Name)
+			klog.ErrorS(err, "Failed to get updated pod from client", "pod", klog.KObj(podClone))
 		}
 		return updateErr
 	})
@@ -83,8 +83,8 @@ func flipPodSidecarContainerDo(control sidecarcontrol.SidecarControl, pod *corev
 			}
 			// flip the empty sidecar container image
 			containerNeedFlip := containersInPod[emptyContainer]
-			klog.V(3).Infof("try to reset %v/%v/%v from %s to empty(%s)", pod.Namespace, pod.Name, containerNeedFlip.Name,
-				containerNeedFlip.Image, sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage)
+			klog.V(3).InfoS("Tried to reset container's image to empty", "pod", klog.KObj(pod), "containerName", containerNeedFlip.Name,
+				"imageName", containerNeedFlip.Image, "hotUpgradeEmptyImageName", sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage)
 			containerNeedFlip.Image = sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage
 			changedContainer = append(changedContainer, containerNeedFlip.Name)
 			// update pod sidecarSet version annotations

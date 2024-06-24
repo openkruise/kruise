@@ -48,15 +48,15 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	// ignore if update type is OnDelete or pod update policy is ReCreate
 	if string(sts.Spec.UpdateStrategy.Type) == string(apps.OnDeleteStatefulSetStrategyType) || sts.Spec.UpdateStrategy.RollingUpdate == nil ||
 		string(sts.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy) == string(appsv1beta1.RecreatePodUpdateStrategyType) {
-		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for update type is %s",
-			sts.Namespace, sts.Name, sts.Spec.UpdateStrategy.Type)
+		klog.V(4).InfoS("Statefulset skipped to create ImagePullJob for certain update type",
+			"statefulSet", klog.KObj(sts), "updateType", sts.Spec.UpdateStrategy.Type)
 		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if replicas <= minimumReplicasToPreDownloadImage
 	if *sts.Spec.Replicas <= minimumReplicasToPreDownloadImage {
-		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for replicas %d <= %d",
-			sts.Namespace, sts.Name, *sts.Spec.Replicas, minimumReplicasToPreDownloadImage)
+		klog.V(4).InfoS("Statefulset skipped to create ImagePullJob for replicas less than or equal to minimumReplicasToPreDownloadImage",
+			"statefulSet", klog.KObj(sts), "replicas", *sts.Spec.Replicas, "minimumReplicasToPreDownloadImage", minimumReplicasToPreDownloadImage)
 		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
 	}
 
@@ -69,8 +69,8 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(sts.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromString("1")), int(*sts.Spec.Replicas), false)
 	if partition == 0 && maxUnavailable >= int(*sts.Spec.Replicas) {
-		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for all Pods update in one batch, replicas=%d, partition=%d, maxUnavailable=%d",
-			sts.Namespace, sts.Name, *sts.Spec.Replicas, partition, maxUnavailable)
+		klog.V(4).InfoS("Statefulset skipped to create ImagePullJob for all Pods update in one batch",
+			"statefulSet", klog.KObj(sts), "replicas", *sts.Spec.Replicas, "partition", partition, "maxUnavailable", maxUnavailable)
 		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
 	}
 
@@ -83,8 +83,8 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	// ignore if this revision can not update in-place
 	inplaceControl := inplaceupdate.New(sigsruntimeClient, revisionadapter.NewDefaultImpl())
 	if !inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, opts) {
-		klog.V(4).Infof("Statefulset %s/%s skipped to create ImagePullJob for %s -> %s can not update in-place",
-			sts.Namespace, sts.Name, currentRevision.Name, updateRevision.Name)
+		klog.V(4).InfoS("Statefulset skipped to create ImagePullJob because it could not update in-place",
+			"statefulSet", klog.KObj(sts), "currentRevisionName", currentRevision.Name, "updateRevisionName", updateRevision.Name)
 		return dss.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
 	}
 
@@ -116,20 +116,20 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	}
 
 	containerImages := diffImagesBetweenRevisions(currentRevision, updateRevision)
-	klog.V(3).Infof("Statefulset %s/%s begin to create ImagePullJobs for revision %s -> %s: %v",
-		sts.Namespace, sts.Name, currentRevision.Name, updateRevision.Name, containerImages)
+	klog.V(3).InfoS("Statefulset began to create ImagePullJobs", "statefulSet", klog.KObj(sts), "currentRevisionName", currentRevision.Name,
+		"updateRevisionName", updateRevision.Name, "containerImages", containerImages)
 	for name, image := range containerImages {
 		// job name is revision name + container name, it can not be more than 255 characters
 		jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
 		err := imagejobutilfunc.CreateJobForWorkload(sigsruntimeClient, sts, controllerKind, jobName, image, labelMap, annotationMap, *selector, pullSecrets)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
-				klog.Errorf("Statefulset %s/%s failed to create ImagePullJob %s: %v", sts.Namespace, sts.Name, jobName, err)
+				klog.ErrorS(err, "Statefulset failed to create ImagePullJob", "statefulSet", klog.KObj(sts), "jobName", jobName)
 				dss.recorder.Eventf(sts, v1.EventTypeNormal, "FailedCreateImagePullJob", "failed to create ImagePullJob %s: %v", jobName, err)
 			}
 			continue
 		}
-		klog.V(3).Infof("Statefulset %s/%s created ImagePullJob %s for image: %s", sts.Namespace, sts.Name, jobName, image)
+		klog.V(3).InfoS("Statefulset created ImagePullJob for image", "statefulSet", klog.KObj(sts), "jobName", jobName, "image", image)
 		dss.recorder.Eventf(sts, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)
 	}
 

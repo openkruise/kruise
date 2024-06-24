@@ -27,7 +27,7 @@ type podEventHandler struct {
 func isBroadcastJobController(controllerRef *metav1.OwnerReference) bool {
 	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
 	if err != nil {
-		klog.Errorf("Could not parse OwnerReference %v APIVersion: %v", controllerRef, err)
+		klog.ErrorS(err, "Could not parse APIVersion in OwnerReference", "ownerReference", controllerRef)
 		return false
 	}
 	return controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group
@@ -89,13 +89,13 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 	jobList := &v1alpha1.BroadcastJobList{}
 	err := p.reader.List(context.TODO(), jobList)
 	if err != nil {
-		klog.Errorf("Error enqueueing broadcastjob on addNode %v", err)
+		klog.ErrorS(err, "Failed to enqueue BroadcastJob on addNode")
 	}
 	for _, bcj := range jobList.Items {
 		mockPod := NewMockPod(&bcj, node.Name)
 		canFit, err := checkNodeFitness(mockPod, node)
 		if !canFit {
-			klog.Infof("Job %s/%s does not fit on node %s due to %v", bcj.Namespace, bcj.Name, node.Name, err)
+			klog.ErrorS(err, "BroadcastJob did not fit on node", "broadcastJob", klog.KObj(&bcj), "nodeName", node.Name)
 			continue
 		}
 
@@ -116,7 +116,7 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterfac
 	jobList := &v1alpha1.BroadcastJobList{}
 	err := p.reader.List(context.TODO(), jobList)
 	if err != nil {
-		klog.Errorf("Error enqueueing broadcastjob on updateNode %v", err)
+		klog.ErrorS(err, "Failed to enqueue BroadcastJob on updateNode")
 	}
 	for _, bcj := range jobList.Items {
 		mockPod := NewMockPod(&bcj, oldNode.Name)

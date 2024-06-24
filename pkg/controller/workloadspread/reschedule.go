@@ -46,7 +46,7 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpre
 	}
 	unschedulable := len(scheduleFailedPods) > 0
 	if unschedulable {
-		klog.V(3).Infof("Subset (%s) of WorkloadSpread (%s/%s) is unschedulable", subsetStatus.Name, ws.Namespace, ws.Name)
+		klog.V(3).InfoS("Subset of WorkloadSpread is unschedulable", "subsetName", subsetStatus.Name, "workloadSpread", klog.KObj(ws))
 	}
 
 	oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatus, appsv1alpha1.SubsetSchedulable)
@@ -104,8 +104,7 @@ func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadS
 				pod.Namespace, pod.Name, subsetName, ws.Namespace, ws.Name)
 			return err
 		}
-		klog.V(3).Infof("WorkloadSpread (%s/%s) delete unschedulabe Pod (%s/%s) in Subset %s successfully",
-			ws.Namespace, ws.Name, pod.Namespace, pod.Name, subsetName)
+		klog.V(3).InfoS("WorkloadSpread deleted unschedulabe Pod in Subset successfully", "workloadSpread", klog.KObj(ws), "pod", klog.KObj(pod), "subsetName", subsetName)
 	}
 	return nil
 }

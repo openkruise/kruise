@@ -167,7 +167,7 @@ type ReconcileUnitedDeployment struct {
 // Reconcile reads that state of the cluster for a UnitedDeployment object and makes changes based on the state read
 // and what is in the UnitedDeployment.Spec
 func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
-	klog.V(4).Infof("Reconcile UnitedDeployment %s/%s", request.Namespace, request.Name)
+	klog.V(4).InfoS("Reconcile UnitedDeployment", "unitedDeployment", request)
 	// Fetch the UnitedDeployment instance
 	instance := &appsv1alpha1.UnitedDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
@@ -185,31 +185,30 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 
 	currentRevision, updatedRevision, _, collisionCount, err := r.constructUnitedDeploymentRevisions(instance)
 	if err != nil {
-		klog.Errorf("Fail to construct controller revision of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+		klog.ErrorS(err, "Failed to construct controller revision of UnitedDeployment", "unitedDeployment", klog.KObj(instance))
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeRevisionProvision), err.Error())
 		return reconcile.Result{}, err
 	}
 
 	control, subsetType := r.getSubsetControls(instance)
 
-	klog.V(4).Infof("Get UnitedDeployment %s/%s all subsets", request.Namespace, request.Name)
+	klog.V(4).InfoS("Got all subsets of UnitedDeployment", "unitedDeployment", request)
 	expectedRevision := currentRevision.Name
 	if updatedRevision != nil {
 		expectedRevision = updatedRevision.Name
 	}
 	nameToSubset, err := r.getNameToSubset(instance, control, expectedRevision)
 	if err != nil {
-		klog.Errorf("Fail to get Subsets of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+		klog.ErrorS(err, "Failed to get Subsets of UnitedDeployment", "unitedDeployment", klog.KObj(instance))
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeFindSubsets), err.Error())
 		return reconcile.Result{}, err
 	}
 
 	nextReplicas, err := NewReplicaAllocator(instance).Alloc(nameToSubset)
-	klog.V(4).Infof("Get UnitedDeployment %s/%s next replicas %v", instance.Namespace, instance.Name, nextReplicas)
+	klog.V(4).InfoS("Got UnitedDeployment next replicas", "unitedDeployment", klog.KObj(instance), "nextReplicas", nextReplicas)
 	if err != nil {
-		klog.Errorf("UnitedDeployment %s/%s Specified subset replicas is ineffective: %s",
-			instance.Namespace, instance.Name, err.Error())
+		klog.ErrorS(err, "UnitedDeployment specified subset replicas is ineffective", "unitedDeployment", klog.KObj(instance))
 		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeSpecifySubbsetReplicas), "Specified subset replicas is ineffective: %s", err.Error())
 		return reconcile.Result{}, err
@@ -217,18 +216,18 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
 	nextUpdate := getNextUpdate(instance, nextReplicas, nextPartitions)
-	klog.V(4).Infof("Get UnitedDeployment %s/%s next update %v", instance.Namespace, instance.Name, nextUpdate)
+	klog.V(4).InfoS("Got UnitedDeployment next update", "unitedDeployment", klog.KObj(instance), "nextUpdate", nextUpdate)
 
 	newStatus, err := r.manageSubsets(instance, nameToSubset, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
-		klog.Errorf("Fail to update UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
+		klog.ErrorS(err, "Failed to update UnitedDeployment", "unitedDeployment", klog.KObj(instance))
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
 		return reconcile.Result{}, err
 	}
 
 	selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
 	if err != nil {
-		klog.Errorf("Error converting UnitedDeployment %s selector: %v", request, err)
+		klog.ErrorS(err, "Error converting UnitedDeployment selector", "unitedDeployment", klog.KObj(instance))
 		// This is a non-transient error, so don't retry.
 		return reconcile.Result{}, nil
 	}
@@ -244,7 +243,7 @@ func (r *ReconcileUnitedDeployment) getNameToSubset(instance *appsv1alpha1.Unite
 		return nil, fmt.Errorf("fail to get all Subsets for UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 	}
 
-	klog.V(4).Infof("Classify UnitedDeployment %s/%s by subSet name", instance.Namespace, instance.Name)
+	klog.V(4).InfoS("Classify UnitedDeployment by subSet name", "unitedDeployment", klog.KObj(instance))
 	nameToSubsets := r.classifySubsetBySubsetName(instance, subSets)
 
 	nameToSubset, err := r.deleteDupSubset(instance, nameToSubsets, control)
@@ -294,7 +293,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(ud *appsv1alpha1.UnitedDeplo
 	for name, subsets := range nameToSubsets {
 		if len(subsets) > 1 {
 			for _, subset := range subsets[1:] {
-				klog.V(0).Infof("Delete duplicated Subset %s/%s for subset name %s", subset.Namespace, subset.Name, name)
+				klog.InfoS("Deleted duplicated Subset for subset name", "subset", klog.KObj(subset), "subsetName", name)
 				if err := control.DeleteSubset(subset); err != nil {
 					if errors.IsNotFound(err) {
 						continue
@@ -440,12 +439,14 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 
 	var getErr, updateErr error
 	for i, obj := 0, ud; ; i++ {
-		klog.V(4).Infof(fmt.Sprintf("The %d th time updating status for %v: %s/%s, ", i, obj.Kind, obj.Namespace, obj.Name) +
-			fmt.Sprintf("replicas %d->%d (need %d), ", obj.Status.Replicas, newStatus.Replicas, obj.Spec.Replicas) +
-			fmt.Sprintf("readyReplicas %d->%d (need %d), ", obj.Status.ReadyReplicas, newStatus.ReadyReplicas, obj.Spec.Replicas) +
-			fmt.Sprintf("updatedReplicas %d->%d, ", obj.Status.UpdatedReplicas, newStatus.UpdatedReplicas) +
-			fmt.Sprintf("updatedReadyReplicas %d->%d, ", obj.Status.UpdatedReadyReplicas, newStatus.UpdatedReadyReplicas) +
-			fmt.Sprintf("sequence No: %v->%v", obj.Status.ObservedGeneration, newStatus.ObservedGeneration))
+		klog.V(4).InfoS("Updating status",
+			"updateCount", i, "unitedDeployment", klog.KObj(obj),
+			"replicasSpec", obj.Spec.Replicas, "oldReplicas", obj.Status.Replicas, "newReplicas", newStatus.Replicas,
+			"readyReplicasSpec", obj.Spec.Replicas, "oldReadyReplicas", obj.Status.ReadyReplicas, "newReadyReplicas", newStatus.ReadyReplicas,
+			"oldUpdatedReplicas", obj.Status.UpdatedReplicas, "newUpdatedReplicas", newStatus.UpdatedReplicas,
+			"oldUpdatedReadyReplicas", obj.Status.UpdatedReadyReplicas, "newUpdatedReadyReplicas", newStatus.UpdatedReadyReplicas,
+			"oldObservedGeneration", obj.Status.ObservedGeneration, "newObservedGeneration", newStatus.ObservedGeneration,
+		)
 
 		obj.Status = *newStatus
 
@@ -463,6 +464,6 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 		obj = tmpObj
 	}
 
-	klog.Errorf("fail to update UnitedDeployment %s/%s status: %s", ud.Namespace, ud.Name, updateErr)
+	klog.ErrorS(updateErr, "Failed to update UnitedDeployment status", "unitedDeployment", klog.KObj(ud))
 	return nil, updateErr
 }
