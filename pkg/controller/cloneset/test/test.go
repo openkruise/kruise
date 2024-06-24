@@ -84,9 +84,10 @@ func NewCloneSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMoun
 			APIVersion: "apps.kruise.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: v1.NamespaceDefault,
-			UID:       types.UID("test"),
+			Name:         name,
+			GenerateName: name,
+			Namespace:    v1.NamespaceDefault,
+			UID:          types.UID("test"),
 		},
 		Spec: appsv1alpha1.CloneSetSpec{
 			Selector: &metav1.LabelSelector{
