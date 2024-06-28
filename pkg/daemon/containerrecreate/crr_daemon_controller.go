@@ -158,7 +158,7 @@ func enqueue(queue workqueue.Interface, obj *appsv1alpha1.ContainerRecreateReque
 }
 
 func objectKey(obj *appsv1alpha1.ContainerRecreateRequest) string {
-	return obj.Namespace + "/" + obj.Spec.PodName
+	return obj.Namespace + "/" + obj.Name
 }
 
 func (c *Controller) Run(stop <-chan struct{}) {
