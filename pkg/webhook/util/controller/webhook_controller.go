@@ -237,6 +237,11 @@ func (c *Controller) sync() error {
 		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{
 			Path: webhookutil.GetCertDir(),
 		})
+	} else if certWriterType == writer.ExternalCertWriter {
+		certWriter, err = writer.NewExternalCertWriter(writer.ExternalCertWriterOptions{
+			Clientset: c.kubeClient,
+			Secret:    &types.NamespacedName{Namespace: webhookutil.GetNamespace(), Name: webhookutil.GetSecretName()},
+		})
 	} else {
 		certWriter, err = writer.NewSecretCertWriter(writer.SecretCertWriterOptions{
 			Clientset: c.kubeClient,
@@ -254,7 +259,6 @@ func (c *Controller) sync() error {
 	if err := writer.WriteCertsToDir(webhookutil.GetCertDir(), certs); err != nil {
 		return fmt.Errorf("failed to write certs to dir: %v", err)
 	}
-
 	if err := configuration.Ensure(c.kubeClient, c.handlers, certs.CACert); err != nil {
 		return fmt.Errorf("failed to ensure configuration: %v", err)
 	}
