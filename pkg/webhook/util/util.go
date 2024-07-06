@@ -19,6 +19,7 @@ package util
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -68,4 +69,37 @@ func GetCertDir() string {
 
 func GetCertWriter() string {
 	return os.Getenv("WEBHOOK_CERT_WRITER")
+}
+
+var (
+	renewBefore time.Duration
+)
+
+func GetRenewBeforeTime() time.Duration {
+	if renewBefore != 0 {
+		return renewBefore
+	}
+	renewBefore = 6 * 30 * 24 * time.Hour
+	if s := os.Getenv("CERTS_RENEW_BEFORE"); len(s) > 0 {
+		t, err := strconv.Atoi(s[0 : len(s)-1])
+		if err != nil {
+			klog.Errorf("failed to parese time %s: %v", s[0:len(s)-1], err)
+			return renewBefore
+		}
+		suffix := s[len(s)-1]
+		if suffix == 'd' {
+			renewBefore = time.Duration(t) * 7 * time.Hour
+		} else if suffix == 'm' {
+			renewBefore = time.Duration(t) * 30 * time.Hour
+		} else if suffix == 'y' {
+			renewBefore = time.Duration(t) * 365 * time.Hour
+		} else {
+			klog.Errorf("unknown date suffix %c", suffix)
+		}
+	}
+	if renewBefore <= 0 {
+		klog.Error("renewBefore time can not be less or equal than 0")
+		renewBefore = 6 * 30 * 24 * time.Hour
+	}
+	return renewBefore
 }
