@@ -358,6 +358,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			SidecarSetHash:               sidecarcontrol.GetSidecarSetRevision(sidecarSet),
 			SidecarSetName:               sidecarSet.Name,
 			SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,
+			State:                        sidecarcontrol.SidecarSetUpgradeStateNormal,
 		}
 		setUpgrade2 := sidecarcontrol.SidecarSetUpgradeSpec{
 			UpdateTimestamp: metav1.Now(),

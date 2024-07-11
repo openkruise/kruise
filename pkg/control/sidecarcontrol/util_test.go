@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -178,7 +179,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				control := New(sidecarSetDemo.DeepCopy())
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
-				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset(), SidecarSetUpgradeStateUpdating)
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				return pod
 			},
@@ -193,7 +194,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				control := New(sidecarSetDemo.DeepCopy())
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
-				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset(), SidecarSetUpgradeStateUpdating)
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				return pod
@@ -210,7 +211,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				control := New(sidecarSetDemo.DeepCopy())
 				// upgrade cold sidecar completed
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
-				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset(), SidecarSetUpgradeStateUpdating)
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				// start upgrading hot sidecar
@@ -230,7 +231,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				control := New(sidecarSetDemo.DeepCopy())
 				// upgrade cold sidecar completed
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
-				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset(), SidecarSetUpgradeStateUpdating)
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				// start upgrading hot sidecar
@@ -253,7 +254,7 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				control := New(sidecarSetDemo.DeepCopy())
 				// upgrade cold sidecar completed
 				pod.Spec.Containers[1].Image = "cold-sidecar:v2"
-				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset(), SidecarSetUpgradeStateUpdating)
 				control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
 				pod.Status.ContainerStatuses[1].ImageID = ImageIds["cold-sidecar:v2"]
 				// start upgrading hot sidecar
@@ -397,7 +398,6 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
 				pod.Annotations[SidecarSetHashAnnotation] = "failed-sidecarset-hash"
-				pod.Annotations[SidecarSetHashWithoutImageAnnotation] = "failed-sidecarset-hash"
 				return pod
 			},
 			getSidecarSet: func() *appsv1alpha1.SidecarSet {
@@ -416,7 +416,7 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			podInput := cs.getPod()
 			sidecarSetInput := cs.getSidecarSet()
-			UpdatePodSidecarSetHash(podInput, sidecarSetInput)
+			UpdatePodSidecarSetHash(podInput, sidecarSetInput, SidecarSetUpgradeStateUpdating)
 			// sidecarSet hash
 			sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
 			err := json.Unmarshal([]byte(podInput.Annotations[SidecarSetHashAnnotation]), &sidecarSetHash)
@@ -442,6 +442,127 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 				eo := cs.exceptWithoutImageRevision[k]
 				if o.SidecarSetHash != eo.SidecarSetHash {
 					t.Fatalf("except sidecar container %s revision %s, but get revision %s", k, eo.SidecarSetHash, o.SidecarSetHash)
+				}
+			}
+		})
+	}
+}
+
+func TestGetPodSidecarSetHashUpdatedState(t *testing.T) {
+	cases := []struct {
+		name                       string
+		getPod                     func() *corev1.Pod
+		getSidecarSet              func() *appsv1alpha1.SidecarSet
+		getState                   SidecarSetUpgradeState
+		expectState                map[string]SidecarSetUpgradeSpec
+		expectWithoutImageRevision map[string]SidecarSetUpgradeSpec
+		expectError                bool
+	}{
+		{
+			name: "update normal sidecarSet state",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations[SidecarSetHashAnnotation] = `{"test-sidecarset":{"hash":"aaa","state":"Updating"}}`
+				pod.Annotations[SidecarSetHashWithoutImageAnnotation] = `{"test-sidecarset":{"hash":"without-image-aaa"}}`
+				return pod
+			},
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				return sidecarSetDemo.DeepCopy()
+			},
+			getState: SidecarSetUpgradeStateNormal,
+			expectState: map[string]SidecarSetUpgradeSpec{
+				"test-sidecarset": {
+					State: SidecarSetUpgradeStateNormal,
+				},
+			},
+			expectWithoutImageRevision: map[string]SidecarSetUpgradeSpec{
+				"test-sidecarset": {
+					SidecarSetHash: "without-image-aaa",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "sidecarSet not found in annotation",
+			getPod: func() *corev1.Pod {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							SidecarSetHashAnnotation: `{"another-sidecarset":{"state":"Updating"}}`,
+						},
+					},
+				}
+				return pod
+			},
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				return &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-sidecarset",
+					},
+				}
+			},
+			getState:    SidecarSetUpgradeState("Normal"),
+			expectState: nil,
+			expectError: true,
+		},
+		{
+			name: "invalid JSON in annotation",
+			getPod: func() *corev1.Pod {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							SidecarSetHashAnnotation: `invalid-json`,
+						},
+					},
+				}
+				return pod
+			},
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				return &appsv1alpha1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-sidecarset",
+					},
+				}
+			},
+			getState:    SidecarSetUpgradeState("Normal"),
+			expectState: nil,
+			expectError: true,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			podInput := cs.getPod()
+			sidecarSetInput := cs.getSidecarSet()
+			hashUpdatedStateAnnotation, err := GetPodSidecarSetHashUpdatedState(podInput, sidecarSetInput, cs.getState)
+			if cs.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
+				if err = json.Unmarshal([]byte(hashUpdatedStateAnnotation), &sidecarSetHash); err != nil {
+					t.Fatalf("parse hashUpdatedStateAnnotation failed: %s", err.Error())
+				}
+				for k, o := range sidecarSetHash {
+					eo := cs.expectState[k]
+					if o.State != eo.State {
+						t.Fatalf("expect sidecar container %s state %s, but get state %s", k, eo.SidecarSetHash, o.SidecarSetHash)
+					}
+				}
+				if len(cs.expectWithoutImageRevision) == 0 {
+					return
+				}
+				// without image sidecarSet hash
+				sidecarSetHash = make(map[string]SidecarSetUpgradeSpec)
+				err = json.Unmarshal([]byte(podInput.Annotations[SidecarSetHashWithoutImageAnnotation]), &sidecarSetHash)
+				if err != nil {
+					t.Fatalf("parse pod sidecarSet hash failed: %s", err.Error())
+				}
+				for k, o := range sidecarSetHash {
+					eo := cs.expectWithoutImageRevision[k]
+					if o.SidecarSetHash != eo.SidecarSetHash {
+						t.Fatalf("except sidecar container %s revision %s, but get revision %s", k, eo.SidecarSetHash, o.SidecarSetHash)
+					}
 				}
 			}
 		})

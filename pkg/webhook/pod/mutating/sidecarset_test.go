@@ -1202,12 +1202,14 @@ func TestInjectInitContainer(t *testing.T) {
 					SidecarSetHash:  "sidecarset-1-hash",
 					SidecarSetName:  "sidecarset-1",
 					SidecarList:     []string{"init-1"},
+					State:           sidecarcontrol.SidecarSetUpgradeStateNormal,
 				}
 				sidecarSetHash["sidecarset-2"] = sidecarcontrol.SidecarSetUpgradeSpec{
 					UpdateTimestamp: metav1.Now(),
 					SidecarSetHash:  "sidecarset-2-hash",
 					SidecarSetName:  "sidecarset-2",
 					SidecarList:     []string{"hot-init"},
+					State:           sidecarcontrol.SidecarSetUpgradeStateNormal,
 				}
 				sidecarSetHashWithoutImage["sidecarset-1"] = sidecarcontrol.SidecarSetUpgradeSpec{
 					UpdateTimestamp: metav1.Now(),
