@@ -41,6 +41,8 @@ import (
 	"k8s.io/klog/v2"
 
 	extclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	webhooktypes "github.com/openkruise/kruise/pkg/webhook/types"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/configuration"
@@ -53,7 +55,8 @@ const (
 	mutatingWebhookConfigurationName   = "kruise-mutating-webhook-configuration"
 	validatingWebhookConfigurationName = "kruise-validating-webhook-configuration"
 
-	defaultResyncPeriod = time.Minute
+	defaultResyncPeriod      = time.Minute
+	WaitForExternalCertsSync = 10 * time.Second
 )
 
 var (
@@ -189,6 +192,10 @@ func (c *Controller) Start(ctx context.Context) {
 		return
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableExternalCerts) {
+		// wait 10s for external certs to be synced
+		time.Sleep(WaitForExternalCertsSync)
+	}
 	go wait.Until(func() {
 		for c.processNextWorkItem() {
 		}
@@ -233,14 +240,14 @@ func (c *Controller) sync() error {
 	var err error
 
 	certWriterType := webhookutil.GetCertWriter()
-	if certWriterType == writer.FsCertWriter || (len(certWriterType) == 0 && len(webhookutil.GetHost()) != 0) {
-		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{
-			Path: webhookutil.GetCertDir(),
-		})
-	} else if certWriterType == writer.ExternalCertWriter {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableExternalCerts) {
 		certWriter, err = writer.NewExternalCertWriter(writer.ExternalCertWriterOptions{
 			Clientset: c.kubeClient,
 			Secret:    &types.NamespacedName{Namespace: webhookutil.GetNamespace(), Name: webhookutil.GetSecretName()},
+		})
+	} else if certWriterType == writer.FsCertWriter || (len(certWriterType) == 0 && len(webhookutil.GetHost()) != 0) {
+		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{
+			Path: webhookutil.GetCertDir(),
 		})
 	} else {
 		certWriter, err = writer.NewSecretCertWriter(writer.SecretCertWriterOptions{
