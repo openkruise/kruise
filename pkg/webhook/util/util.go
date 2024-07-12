@@ -103,3 +103,7 @@ func GetRenewBeforeTime() time.Duration {
 	}
 	return renewBefore
 }
+
+func SetRenewBeforeTime(t time.Duration) {
+	renewBefore = t
+}
