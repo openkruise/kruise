@@ -41,6 +41,8 @@ import (
 	"k8s.io/klog/v2"
 
 	extclient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	webhooktypes "github.com/openkruise/kruise/pkg/webhook/types"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/configuration"
@@ -233,7 +235,11 @@ func (c *Controller) sync() error {
 	var err error
 
 	certWriterType := webhookutil.GetCertWriter()
-	if certWriterType == writer.FsCertWriter || (len(certWriterType) == 0 && len(webhookutil.GetHost()) != 0) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableExternalCerts) {
+		certWriter, err = writer.NewExternalCertWriter(writer.ExternalCertWriterOptions{
+			Clientset: c.kubeClient,
+		})
+	} else if certWriterType == writer.FsCertWriter || (len(certWriterType) == 0 && len(webhookutil.GetHost()) != 0) {
 		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{
 			Path: webhookutil.GetCertDir(),
 		})
@@ -254,7 +260,6 @@ func (c *Controller) sync() error {
 	if err := writer.WriteCertsToDir(webhookutil.GetCertDir(), certs); err != nil {
 		return fmt.Errorf("failed to write certs to dir: %v", err)
 	}
-
 	if err := configuration.Ensure(c.kubeClient, c.handlers, certs.CACert); err != nil {
 		return fmt.Errorf("failed to ensure configuration: %v", err)
 	}
