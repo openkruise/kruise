@@ -206,6 +206,23 @@ func TestUpdateIdentity(t *testing.T) {
 	}
 }
 
+func TestUpdateIdentityWithPodIndexLabel(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodIndexLabel, true)()
+
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+	updateIdentity(set, pod)
+
+	podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
+	if !exists {
+		t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
+	}
+	podIndexFromName := strconv.Itoa(getOrdinal(pod))
+	if podIndexFromLabel != podIndexFromName {
+		t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
+	}
+}
+
 func TestUpdateStorage(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
