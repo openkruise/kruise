@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 )
 
@@ -61,7 +62,8 @@ func handleCommon(dnsName string, ch certReadWriter) (*generator.Artifacts, bool
 	}
 
 	// Recreate the cert if it's invalid.
-	valid := validCert(certs, dnsName)
+	renewBefore := util.GetRenewBeforeTime()
+	valid := validCert(certs, dnsName, time.Now().Add(renewBefore))
 	if !valid {
 		klog.Info("cert is invalid or expired, regenerating a new one")
 		certs, err = ch.overwrite(certs.ResourceVersion)
@@ -98,10 +100,9 @@ type certReadWriter interface {
 	overwrite(resourceVersion string) (*generator.Artifacts, error)
 }
 
-func validCert(certs *generator.Artifacts, dnsName string) bool {
+func validCert(certs *generator.Artifacts, dnsName string, expired time.Time) bool {
 	if certs == nil {
 		return false
 	}
-	expired := time.Now().AddDate(0, 6, 0)
 	return generator.ValidCACert(certs.Key, certs.Cert, certs.CACert, dnsName, expired)
 }

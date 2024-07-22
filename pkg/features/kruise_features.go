@@ -122,6 +122,9 @@ const (
 
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
+
+	// Use certs generated externally
+	EnableExternalCerts featuregate.Feature = "EnableExternalCerts"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -154,6 +157,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnhancedLivenessProbeGate:              {Default: false, PreRelease: featuregate.Alpha},
 	RecreatePodWhenChangeVCTInCloneSetGate: {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetStartOrdinal:                {Default: false, PreRelease: featuregate.Alpha},
+	EnableExternalCerts:                    {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
