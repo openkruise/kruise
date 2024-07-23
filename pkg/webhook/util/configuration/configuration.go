@@ -87,7 +87,7 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 			return err
 		}
 		if _, ok := handlers[path]; !ok {
-			klog.Warningf("Ignore webhook for %s in configuration", path)
+			klog.InfoS("Ignore webhook in configuration", "path", path)
 			continue
 		}
 		if wh.ClientConfig.Service != nil {
@@ -112,7 +112,7 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 			return err
 		}
 		if _, ok := handlers[path]; !ok {
-			klog.Warningf("Ignore webhook for %s in configuration", path)
+			klog.InfoS("Ignore webhook in configuration", "path", path)
 			continue
 		}
 		if wh.ClientConfig.Service != nil {

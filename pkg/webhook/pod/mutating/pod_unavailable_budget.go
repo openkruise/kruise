@@ -43,6 +43,6 @@ func (h *PodCreateHandler) pubMutatingPod(ctx context.Context, req admission.Req
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[pubcontrol.PodRelatedPubAnnotation] = pub.Name
-	klog.V(3).Infof("mutating add pod(%s/%s) annotation[%s]=%s", pod.Namespace, pod.Name, pubcontrol.PodRelatedPubAnnotation, pub.Name)
+	klog.V(3).InfoS("mutating add pod annotation", "namespace", pod.Namespace, "name", pod.Name, "key", pubcontrol.PodRelatedPubAnnotation, "value", pub.Name)
 	return false, nil
 }

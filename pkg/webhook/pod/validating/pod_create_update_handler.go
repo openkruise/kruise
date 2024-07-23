@@ -44,7 +44,7 @@ type PodCreateHandler struct {
 func (h *PodCreateHandler) validatingPodFn(ctx context.Context, req admission.Request) (allowed bool, reason string, err error) {
 	allowed = true
 	if req.Operation == admissionv1.Delete && len(req.OldObject.Raw) == 0 {
-		klog.Warningf("Skip to validate pod %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Namespace, req.Name)
+		klog.InfoS("Skip to validate pod deletion for no old object, maybe because of Kubernetes version < 1.16", "namespace", req.Namespace, "name", req.Name)
 		return
 	}
 

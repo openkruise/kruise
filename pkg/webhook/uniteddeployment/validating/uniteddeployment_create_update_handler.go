@@ -72,7 +72,7 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 		}
 	case admissionv1.Delete:
 		if len(req.OldObject.Raw) == 0 {
-			klog.Warningf("Skip to validate UnitedDeployment %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Namespace, req.Name)
+			klog.InfoS("Skip to validate UnitedDeployment deletion for no old object, maybe because of Kubernetes version < 1.16", "namespace", req.Namespace, "name", req.Name)
 			return admission.ValidationResponse(true, "")
 		}
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {

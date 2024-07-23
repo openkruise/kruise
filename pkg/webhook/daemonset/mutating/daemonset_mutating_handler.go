@@ -64,7 +64,7 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 	}
 	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
 	if len(resp.Patches) > 0 {
-		klog.V(5).Infof("Admit DaemonSet %s/%s patches: %v", obj.Namespace, obj.Name, util.DumpJSON(resp.Patches))
+		klog.V(5).InfoS("Admit DaemonSet patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
 	}
 
 	return resp

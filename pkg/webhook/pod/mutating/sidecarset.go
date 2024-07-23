@@ -109,13 +109,13 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	// check pod
 	if isUpdated {
 		if !matchedSidecarSets[0].IsPodAvailabilityChanged(pod, oldPod) {
-			klog.V(3).Infof("pod(%s/%s) availability unchanged for sidecarSet, and ignore", pod.Namespace, pod.Name)
+			klog.V(3).InfoS("pod availability unchanged for sidecarSet, and ignore", "namespace", pod.Namespace, "name", pod.Name)
 			return true, nil
 		}
 	}
 
-	klog.V(3).Infof("[sidecar inject] begin to operation(%s) pod(%s/%s) resources(%s) subResources(%s)",
-		req.Operation, req.Namespace, req.Name, req.Resource, req.SubResource)
+	klog.V(4).InfoS("begin to operate resource", "func", "sidecar inject",
+		"operation", req.Operation, "namespace", req.Namespace, "name", req.Name, "resource", req.Resource, "subResource", req.SubResource)
 	// patch pod metadata, annotations & labels
 	// When the Pod main container is upgraded in place, and the sidecarSet configuration does not change at this time,
 	// at this point, it can also patch pod metadata
@@ -127,7 +127,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		sidecarSet := control.GetSidecarset()
 		sk, err := sidecarcontrol.PatchPodMetadata(&pod.ObjectMeta, sidecarSet.Spec.PatchPodMetadata)
 		if err != nil {
-			klog.Errorf("sidecarSet(%s) update pod(%s/%s) metadata failed: %s", sidecarSet.Name, pod.Namespace, pod.Name, err.Error())
+			klog.ErrorS(err, "sidecarSet update pod metadata failed", "sidecarSet", sidecarSet.Name, "namespace", pod.Namespace, "podName", pod.Name)
 			return false, err
 		} else if !sk {
 			// skip = false
@@ -139,14 +139,15 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	if err != nil {
 		return false, err
 	} else if len(sidecarContainers) == 0 && len(sidecarInitContainers) == 0 {
-		klog.V(3).Infof("[sidecar inject] pod(%s/%s) don't have injected containers", pod.Namespace, pod.Name)
+		klog.V(3).InfoS("pod don't have injected containers", "func", "sidecar inject", "namespace", pod.Namespace, "name", pod.Name)
 		return skip, nil
 	}
 
-	klog.V(3).Infof("[sidecar inject] begin inject sidecarContainers(%v) sidecarInitContainers(%v) sidecarSecrets(%v), volumes(%s)"+
-		"annotations(%v) into pod(%s/%s)", sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations,
-		pod.Namespace, pod.Name)
-	klog.V(4).Infof("[sidecar inject] before mutating: %v", util.DumpJSON(pod))
+	klog.V(3).InfoS("begin inject into pod", "func", "sidecar inject", "sidecarContainers", sidecarContainers,
+		"sidecarInitContainers", sidecarInitContainers, "sidecarSecrets", sidecarSecrets,
+		"volumesInSidecar", volumesInSidecar, "injectedAnnotations", injectedAnnotations,
+		"namespace", pod.Namespace, "name", pod.Name)
+	klog.V(4).InfoS("before mutating", "func", "sidecar inject", "pod", klog.KObj(pod))
 	// apply sidecar set info into pod
 	// 1. inject init containers, sort by their name, after the original init containers
 	sort.SliceStable(sidecarInitContainers, func(i, j int) bool {
@@ -163,7 +164,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	for k, v := range injectedAnnotations {
 		pod.Annotations[k] = v
 	}
-	klog.V(4).Infof("[sidecar inject] after mutating: %v", util.DumpJSON(pod))
+	klog.V(4).InfoS("after mutating", "func", "sidecar inject", "pod", klog.KObj(pod))
 	return false, nil
 }
 
@@ -178,7 +179,7 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 		hc := sidecarcontrol.NewHistoryControl(h.Client)
 		revisions, err := history.NewHistory(h.Client).ListControllerRevisions(sidecarcontrol.MockSidecarSetForRevision(sidecarSet), hc.GetRevisionSelector(sidecarSet))
 		if err != nil {
-			klog.Errorf("Failed to list history controllerRevisions, err %v, name %v", err, sidecarSet.Name)
+			klog.ErrorS(err, "Failed to list history controllerRevisions", "name", sidecarSet.Name)
 			return nil, err
 		}
 
@@ -234,13 +235,13 @@ func (h *PodCreateHandler) getSpecificHistorySidecarSet(sidecarSet *appsv1alpha1
 	hc := sidecarcontrol.NewHistoryControl(h.Client)
 	historySidecarSet, err := hc.GetHistorySidecarSet(sidecarSet, revisionInfo)
 	if err != nil {
-		klog.Warningf("Failed to restore history revision for SidecarSet %v, ControllerRevision name %v:, error: %v",
-			sidecarSet.Name, sidecarSet.Spec.InjectionStrategy.Revision, err)
+		klog.ErrorS(err, "Failed to restore history revision for SidecarSet",
+			"name", sidecarSet.Name, "revision", sidecarSet.Spec.InjectionStrategy.Revision)
 		return nil, err
 	}
 	if historySidecarSet == nil {
 		historySidecarSet = sidecarSet.DeepCopy()
-		klog.Warningf("Failed to restore history revision for SidecarSet %v, will use the latest", sidecarSet.Name)
+		klog.InfoS("Failed to restore history revision for SidecarSet, will use the latest", "name", sidecarSet.Name)
 	}
 	return historySidecarSet, nil
 }
@@ -347,7 +348,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 
 	for _, control := range matchedSidecarSets {
 		sidecarSet := control.GetSidecarset()
-		klog.V(3).Infof("build pod(%s/%s) sidecar containers for sidecarSet(%s)", pod.Namespace, pod.Name, sidecarSet.Name)
+		klog.V(3).InfoS("build pod sidecar containers for sidecarSet", "namespace", pod.Namespace, "podName", pod.Name, "sidecarSet", sidecarSet.Name)
 		// sidecarSet List
 		sidecarSetNames.Insert(sidecarSet.Name)
 		// pre-process volumes only in sidecar
@@ -380,8 +381,8 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(initContainer, pod)
 				// append volumeMounts SubPathExpr environments
 				transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-				klog.Infof("try to inject initContainer sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
-					initContainer.Name, pod.Namespace, pod.Name, transferEnvs, injectedMounts)
+				klog.InfoS("try to inject initContainer sidecar",
+					"containerName", initContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts)
 				// insert volumes that initContainers used
 				for _, mount := range initContainer.VolumeMounts {
 					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
@@ -420,8 +421,8 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(sidecarContainer, pod)
 			// append volumeMounts SubPathExpr environments
 			transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-			klog.Infof("try to inject Container sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
-				sidecarContainer.Name, pod.Namespace, pod.Name, transferEnvs, injectedMounts)
+			klog.InfoS("try to inject Container sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
+				"containerName", sidecarContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts)
 			//when update pod object
 			if isUpdated {
 				// judge whether inject sidecar container into pod
@@ -432,12 +433,12 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 					continue
 				}
 
-				klog.V(3).Infof("upgrade or insert sidecar container %v during upgrade in pod %v/%v",
-					sidecarContainer.Name, pod.Namespace, pod.Name)
+				klog.V(3).InfoS("upgrade or insert sidecar container during pod upgrade",
+					"containerName", sidecarContainer.Name, "namespace", pod.Namespace, "podName", pod.Name)
 				//when created pod object, need inject sidecar container into pod
 			} else {
-				klog.V(3).Infof("inject new sidecar container %v during creation in pod %v/%v",
-					sidecarContainer.Name, pod.Namespace, pod.Name)
+				klog.V(3).InfoS("inject new sidecar container during pod creation",
+					"containerName", sidecarContainer.Name, "namespace", pod.Namespace, "podName", pod.Name)
 			}
 			isInjecting = true
 			// insert volume that sidecar container used

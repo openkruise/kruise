@@ -129,7 +129,7 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 
 		// check in-place updating has not completed yet
 		if checkErr := opts.CheckContainersUpdateCompleted(pod, &state); checkErr != nil {
-			klog.V(6).Infof("Check Pod %s/%s in-place update not completed yet: %v", pod.Namespace, pod.Name, checkErr)
+			klog.V(6).ErrorS(checkErr, "Check Pod in-place update not completed yet", "namespace", pod.Namespace, "name", pod.Name)
 			return RefreshResult{}
 		}
 
@@ -138,7 +138,7 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 
 			// pre-check the previous updated containers
 			if checkErr := doPreCheckBeforeNext(pod, state.PreCheckBeforeNext); checkErr != nil {
-				klog.V(5).Infof("Pod %s/%s in-place update pre-check not passed: %v", pod.Namespace, pod.Name, checkErr)
+				klog.V(5).ErrorS(checkErr, "Pod in-place update pre-check not passed", "namespace", pod.Namespace, "name", pod.Name)
 				return RefreshResult{}
 			}
 

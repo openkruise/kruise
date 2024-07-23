@@ -37,13 +37,13 @@ func (h *PodCreateHandler) enhancedLivenessProbeWhenPodCreate(ctx context.Contex
 
 	context, err := removeAndBackUpPodContainerLivenessProbe(pod)
 	if err != nil {
-		klog.Errorf("Remove pod (%v/%v) container livenessProbe config and backup error: %v", pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "Remove pod container livenessProbe config and backup error", "namespace", pod.Namespace, "name", pod.Name)
 		return false, err
 	}
 	if context == "" {
 		return true, nil
 	}
-	klog.V(3).Infof("Mutating add pod(%s/%s) annotation[%s]=%s", pod.Namespace, pod.Name, alpha1.AnnotationNativeContainerProbeContext, context)
+	klog.V(3).InfoS("Mutating add pod annotation", "namespace", pod.Namespace, "name", pod.Name, "key", alpha1.AnnotationNativeContainerProbeContext, "value", context)
 	return false, nil
 }
 
@@ -69,8 +69,8 @@ func removeAndBackUpPodContainerLivenessProbe(pod *v1.Pod) (string, error) {
 	}
 	containersLivenessProbeRaw, err := json.Marshal(containersLivenessProbe)
 	if err != nil {
-		klog.Errorf("Failed to json marshal %v for pod: %v/%v, err: %v",
-			containersLivenessProbe, pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "Failed to json marshal liveness probe for pod",
+			"probe", containersLivenessProbe, "namespace", pod.Namespace, "name", pod.Name)
 		return "", fmt.Errorf("Failed to json marshal %v for pod: %v/%v, err: %v",
 			containersLivenessProbe, pod.Namespace, pod.Name, err)
 	}

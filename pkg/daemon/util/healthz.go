@@ -57,7 +57,7 @@ func (h *Healthz) Handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(500)
 			errMsg := fmt.Sprintf("check %v failed, err: %v", name, err)
 			_, _ = w.Write([]byte(errMsg))
-			klog.Infof("/healthz %v", errMsg)
+			klog.InfoS("/healthz", "message", errMsg)
 			return
 		}
 	}
@@ -65,7 +65,7 @@ func (h *Healthz) Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	_, _ = w.Write([]byte("ok"))
 	if h.healthzCount%10 == 0 {
-		klog.V(6).Infof("/healthz ok %v", h.info)
+		klog.V(6).InfoS("/healthz ok", "message", h.info)
 	}
 }
 

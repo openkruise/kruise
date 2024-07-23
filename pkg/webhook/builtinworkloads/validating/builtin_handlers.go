@@ -47,7 +47,7 @@ func (h *WorkloadHandler) Handle(ctx context.Context, req admission.Request) adm
 		return admission.ValidationResponse(true, "")
 	}
 	if len(req.OldObject.Raw) == 0 {
-		klog.Warningf("Skip to validate %s %s/%s for no old object, maybe because of Kubernetes version < 1.16", req.Kind.Kind, req.Namespace, req.Name)
+		klog.InfoS("Skip to validate for no old object, maybe because of Kubernetes version < 1.16", "kind", req.Kind.Kind, "namespace", req.Namespace, "name", req.Name)
 		return admission.ValidationResponse(true, "")
 	}
 
@@ -76,7 +76,7 @@ func (h *WorkloadHandler) Handle(ctx context.Context, req admission.Request) adm
 		metaObj = obj
 		replicas = obj.Spec.Replicas
 	default:
-		klog.Warningf("Skip to validate %s %s/%s for unsupported resource", req.Kind.Kind, req.Namespace, req.Name)
+		klog.InfoS("Skip to validate for unsupported resource", "kind", req.Kind.Kind, "namespace", req.Namespace, "name", req.Name)
 		return admission.ValidationResponse(true, "")
 	}
 

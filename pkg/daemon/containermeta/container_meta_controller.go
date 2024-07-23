@@ -199,7 +199,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting containermeta Controller")
+	klog.Info("Starting containermeta Controller")
 	go c.restarter.Run(stop)
 	for i := 0; i < workers; i++ {
 		go wait.Until(func() {
@@ -239,7 +239,7 @@ func (c *Controller) processNextWorkItem() bool {
 func (c *Controller) sync(key string) (retErr error) {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		klog.Warningf("Invalid key: %s", key)
+		klog.InfoS("Invalid key", "key", key)
 		return nil
 	}
 
@@ -248,7 +248,7 @@ func (c *Controller) sync(key string) (retErr error) {
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		klog.Errorf("Failed to get Pod %s/%s from lister: %v", namespace, name, err)
+		klog.ErrorS(err, "Failed to get Pod from lister", "namespace", namespace, "name", name)
 		return err
 	} else if pod.DeletionTimestamp != nil || len(pod.Status.ContainerStatuses) == 0 {
 		return nil
@@ -258,24 +258,24 @@ func (c *Controller) sync(key string) (retErr error) {
 		if duration < maxExpectationWaitDuration {
 			return nil
 		}
-		klog.Warningf("Wait for Pod %s/%s resourceVersion expectation over %v", namespace, name, duration)
+		klog.InfoS("Waiting Pod resourceVersion expectation time out", "namespace", namespace, "name", name, "duration", duration)
 		resourceVersionExpectation.Delete(pod)
 	}
 
 	criRuntime, kubeRuntime, err := c.getRuntimeForPod(pod)
 	if err != nil {
-		klog.Errorf("Failed to get runtime for Pod %s/%s: %v", namespace, name, err)
+		klog.ErrorS(err, "Failed to get runtime for Pod", "namespace", namespace, "name", name)
 		return nil
 	} else if criRuntime == nil {
 		return nil
 	}
 
-	klog.V(3).Infof("Start syncing for %s/%s", namespace, name)
+	klog.V(3).InfoS("Start syncing", "namespace", namespace, "name", name)
 	defer func() {
 		if retErr != nil {
-			klog.Errorf("Failed to sync for %s/%s: %v", namespace, name, retErr)
+			klog.ErrorS(retErr, "Failed to sync", "namespace", namespace, "name", name)
 		} else {
-			klog.V(3).Infof("Finished syncing for %s/%s", namespace, name)
+			klog.V(3).InfoS("Finished syncing", "namespace", namespace, "name", name)
 		}
 	}()
 
@@ -286,7 +286,7 @@ func (c *Controller) sync(key string) (retErr error) {
 
 	oldMetaSet, err := appspub.GetRuntimeContainerMetaSet(pod)
 	if err != nil {
-		klog.Warningf("Failed to get old runtime meta from Pod %s/%s: %v", namespace, name, err)
+		klog.ErrorS(err, "Failed to get old runtime meta from Pod", "namespace", namespace, "name", name)
 	}
 	newMetaSet := c.manageContainerMetaSet(pod, kubePodStatus, oldMetaSet, criRuntime)
 
@@ -302,7 +302,7 @@ func (c *Controller) reportContainerMetaSet(pod *v1.Pod, oldMetaSet, newMetaSet 
 		ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
 	}
 	containerMetaSetStr := util.DumpJSON(newMetaSet)
-	klog.Infof("Reporting container meta changed in Pod %s/%s: %v", pod.Namespace, pod.Name, containerMetaSetStr)
+	klog.InfoS("Reporting container meta changed in Pod", "namespace", pod.Namespace, "name", pod.Name, "containerMetaSetStr", containerMetaSetStr)
 	mergePatch, _ := json.Marshal(map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"annotations": map[string]string{
@@ -354,11 +354,11 @@ func (c *Controller) manageContainerMetaSet(pod *v1.Pod, kubePodStatus *kubeletc
 				envGetter := wrapEnvGetter(criRuntime, status.ID.ID, fmt.Sprintf("container %s (%s) in Pod %s/%s", containerSpec.Name, status.ID.String(), pod.Namespace, pod.Name))
 				containerMeta.Hashes.ExtractedEnvFromMetadataHash, err = envHasher.GetCurrentHash(containerSpec, envGetter)
 				if err != nil {
-					klog.Errorf("Failed to hash container %s (%s) with env for Pod %s/%s: %v", containerSpec.Name, status.ID.String(), pod.Namespace, pod.Name, err)
+					klog.ErrorS(err, "Failed to hash container with env for Pod", "containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name)
 					enqueueAfter(c.queue, pod, time.Second*3)
 				} else {
-					klog.V(4).Infof("Extracted env from metadata for container %s (%s) in Pod %s/%s, hash: %v",
-						containerSpec.Name, status.ID.String(), pod.Namespace, pod.Name, containerMeta.Hashes.ExtractedEnvFromMetadataHash)
+					klog.V(4).InfoS("Extracted env from metadata for container",
+						"containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name, "hash", containerMeta.Hashes.ExtractedEnvFromMetadataHash)
 				}
 			}
 
@@ -368,7 +368,7 @@ func (c *Controller) manageContainerMetaSet(pod *v1.Pod, kubePodStatus *kubeletc
 				// Trigger restarting when expected env hash is not equal to current hash
 				if containerMeta.Hashes.ExtractedEnvFromMetadataHash > 0 && containerMeta.Hashes.ExtractedEnvFromMetadataHash != envHasher.GetExpectHash(containerSpec, pod) {
 					// Maybe checking PlainHash inconsistent here can skip to trigger restart. But it is not a good idea for some special scenarios.
-					klog.V(2).Infof("Triggering container %s (%s) in Pod %s/%s to restart, for it has inconsistent hash of env from metadata", containerSpec.Name, status.ID.String(), pod.Namespace, pod.Name)
+					klog.V(2).InfoS("Triggering container in Pod to restart, for it has inconsistent hash of env from metadata", "containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name)
 					c.restarter.queue.AddRateLimited(status.ID)
 				}
 			}
@@ -401,7 +401,7 @@ func wrapEnvGetter(criRuntime criapi.RuntimeService, containerID, logID string) 
 		if getErr != nil {
 			return "", getErr
 		}
-		klog.V(4).Infof("Got env %s=%s in %s", key, envMap[key], logID)
+		klog.V(4).InfoS("Got env", "key", key, "value", envMap[key], "logID", logID)
 		return envMap[key], nil
 	}
 }

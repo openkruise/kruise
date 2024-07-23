@@ -138,13 +138,13 @@ func IsImageDigest(image string) bool {
 func IsContainerImageEqual(image1, image2 string) bool {
 	repo1, tag1, digest1, err := ParseImage(image1)
 	if err != nil {
-		klog.Errorf("parse image %s failed: %s", image1, err.Error())
+		klog.ErrorS(err, "parse image failed", "image", image1)
 		return false
 	}
 
 	repo2, tag2, digest2, err := ParseImage(image2)
 	if err != nil {
-		klog.Errorf("parse image %s failed: %s", image2, err.Error())
+		klog.ErrorS(err, "parse image failed", "image", image2)
 		return false
 	}
 

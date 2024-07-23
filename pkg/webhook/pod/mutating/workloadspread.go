@@ -47,7 +47,7 @@ func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req ad
 		// check dry run
 		dryRun = dryrun.IsDryRun(options.DryRun)
 		if dryRun {
-			klog.V(5).Infof("Operation[%s] Pod (%s/%s) is a dry run, then admit", req.AdmissionRequest.Operation, pod.Namespace, pod.Name)
+			klog.V(5).InfoS("Operation is a dry run, then admit", "operation", req.AdmissionRequest.Operation, "namespace", pod.Namespace, "podName", pod.Name)
 			return true, nil
 		}
 		return workloadSpreadHandler.HandlePodCreation(pod)

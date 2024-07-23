@@ -95,7 +95,7 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 		if owner != nil {
 			newPods, err := sortingcontrol.SortPods(reader, job.Namespace, *owner, pods)
 			if err != nil {
-				klog.Errorf("ImagePullJob %s/%s failed to sort Pods: %v", job.Namespace, job.Name, err)
+				klog.ErrorS(err, "ImagePullJob failed to sort Pods", "namespace", job.Namespace, "name", job.Name)
 			} else {
 				pods = newPods
 			}
@@ -110,8 +110,8 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 			nodeImage := &appsv1alpha1.NodeImage{}
 			if err := reader.Get(context.TODO(), types.NamespacedName{Name: pod.Spec.NodeName}, nodeImage); err != nil {
 				if errors.IsNotFound(err) {
-					klog.Warningf("Get NodeImages for ImagePullJob %s/%s, find Pod %s on Node %s but NodeImage not found",
-						job.Namespace, job.Name, pod.Name, pod.Spec.NodeName)
+					klog.InfoS("Get NodeImages for ImagePullJob, find Pod on Node but NodeImage not found",
+						"namespace", job.Namespace, "name", job.Name, "pod", pod.Name, "node", pod.Spec.NodeName)
 					continue
 				}
 				return nil, err

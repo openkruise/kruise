@@ -182,17 +182,17 @@ func (r *imagePullStatusReader) mainloop() {
 				return
 			}
 			if err != nil {
-				klog.V(5).Infof("runtime read err %v", err)
+				klog.V(5).ErrorS(err, "runtime read err")
 				r.seedPullStatus(ImagePullStatus{Err: err, Finish: true})
 				return
 			}
 			if jm.Error != nil {
-				klog.V(5).Infof("runtime read err %v", jm.Error)
+				klog.V(5).ErrorS(jm.Error, "runtime read err")
 				r.seedPullStatus(ImagePullStatus{Err: fmt.Errorf("get error in pull response: %+v", jm.Error), Finish: true})
 				return
 			}
 
-			klog.V(5).Infof("runtime read progress %v", util.DumpJSON(jm))
+			klog.V(5).InfoS("runtime read progress", "message", util.DumpJSON(jm))
 			if jm.ID != "" {
 				progress.Layers[jm.ID] = layerProgress{
 					JSONProgress: jm.Progress,

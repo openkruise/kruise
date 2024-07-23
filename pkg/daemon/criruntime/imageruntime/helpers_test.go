@@ -122,7 +122,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 	// this is to test whether kruise could get expected auths if plugin fails to run
 	err := plugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir)
 	if err != nil {
-		klog.Errorf("Failed to register credential provider plugins: %v", err)
+		klog.ErrorS(err, "Failed to register credential provider plugins")
 	}
 	secret.MakeAndSetKeyring()
 	for _, cs := range cases {

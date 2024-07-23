@@ -41,12 +41,12 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 	var err error
 	workloadSpreadHandler := wsutil.NewWorkloadSpreadHandler(p.Client)
 
-	klog.V(6).Infof("workloadSpread validate Operation[%s] Pod(%s/%s)", req.Operation, req.Namespace, req.Name)
+	klog.V(6).InfoS("workloadSpread validate Operation", "operation", req.Operation, "namespace", req.Namespace, "name", req.Name)
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Delete:
 		if req.AdmissionRequest.SubResource != "" {
-			klog.V(6).Infof("Pod(%s/%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
+			klog.V(6).InfoS("Pod AdmissionRequest operation(DELETE) subResource, then admit", "namespace", req.Namespace, "name", req.Name, "subResource", req.SubResource)
 			return true, "", nil
 		}
 
@@ -63,7 +63,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 		}
 		dryRun = dryrun.IsDryRun(deletion.DryRun)
 		if dryRun {
-			klog.V(5).Infof("Operation[%s] Pod (%s/%s) is a dry run, then admit", req.AdmissionRequest.Operation, pod.Namespace, pod.Name)
+			klog.V(5).InfoS("Operation is a dry run, then admit", "operation", req.AdmissionRequest.Operation, "namespace", pod.Namespace, "name", pod.Name)
 			return true, "", err
 		}
 
@@ -74,7 +74,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 	case admissionv1.Create:
 		// ignore create operation other than subresource eviction
 		if req.AdmissionRequest.SubResource != "eviction" {
-			klog.V(6).Infof("Pod(%s/%s) AdmissionRequest operation(CREATE) Resource(%s) subResource(%s), then admit", req.Namespace, req.Name, req.Resource, req.SubResource)
+			klog.V(6).InfoS("Pod AdmissionRequest operation(CREATE) Resource and subResource, then admit", "namespace", req.Namespace, "name", req.Name, "resource", req.Resource, "subResource", req.SubResource)
 			return true, "", nil
 		}
 
@@ -87,7 +87,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 		if eviction.DeleteOptions != nil {
 			dryRun = dryrun.IsDryRun(eviction.DeleteOptions.DryRun)
 			if dryRun {
-				klog.V(5).Infof("Operation[Eviction] Pod (%s/%s) is a dry run, then admit", req.AdmissionRequest.Namespace, req.AdmissionRequest.Name)
+				klog.V(5).InfoS("Operation[Eviction] is a dry run, then admit", "namespace", req.AdmissionRequest.Namespace, "name", req.AdmissionRequest.Name)
 				return true, "", nil
 			}
 		}

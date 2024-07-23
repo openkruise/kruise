@@ -148,7 +148,7 @@ func (r *ControllerFinder) getReplicaSetsForObject(scale *ScaleAndSelector) ([]a
 	rsList := &appsv1.ReplicaSetList{}
 	selector, err := util.ValidatedLabelSelectorAsSelector(scale.Selector)
 	if err != nil {
-		klog.Warningf("Object (%s/%s) get labelSelector failed: %s", scale.Metadata.Namespace, scale.Metadata.Name, err.Error())
+		klog.ErrorS(err, "Object get labelSelector failed", "namespace", scale.Metadata.Namespace, "name", scale.Metadata.Name)
 		return nil, nil
 	}
 	err = r.List(context.TODO(), rsList, &client.ListOptions{Namespace: scale.Metadata.Namespace, LabelSelector: selector}, utilclient.DisableDeepCopy)

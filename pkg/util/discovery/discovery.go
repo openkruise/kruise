@@ -71,12 +71,12 @@ func DiscoverGVK(gvk schema.GroupVersionKind) bool {
 
 	if err != nil {
 		if err == errKindNotFound {
-			klog.Warningf("Not found kind %s in group version %s, waiting time %s", gvk.Kind, gvk.GroupVersion().String(), time.Since(startTime))
+			klog.InfoS("Not found kind in group version", "kind", gvk.Kind, "groupVersion", gvk.GroupVersion().String(), "cost", time.Since(startTime))
 			return false
 		}
 
 		// This might be caused by abnormal apiserver or etcd, ignore it
-		klog.Errorf("Failed to find resources in group version %s: %v, waiting time %s", gvk.GroupVersion().String(), err, time.Since(startTime))
+		klog.ErrorS(err, "Failed to find resources in group version", "groupVersion", gvk.GroupVersion().String(), "cost", time.Since(startTime))
 	}
 
 	return true
@@ -85,7 +85,7 @@ func DiscoverGVK(gvk schema.GroupVersionKind) bool {
 func DiscoverObject(obj runtime.Object) bool {
 	gvk, err := apiutil.GVKForObject(obj, internalScheme)
 	if err != nil {
-		klog.Warningf("Not recognized object %T in scheme: %v", obj, err)
+		klog.ErrorS(err, "Not recognized object in scheme", "object", obj)
 		return false
 	}
 	return DiscoverGVK(gvk)

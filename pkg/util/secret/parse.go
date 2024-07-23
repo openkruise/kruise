@@ -28,7 +28,7 @@ var (
 
 // make and set new docker keyring
 func MakeAndSetKeyring() {
-	klog.Infof("make and set new docker keyring")
+	klog.Info("make and set new docker keyring")
 	keyring = credentialprovider.NewDockerKeyring()
 }
 

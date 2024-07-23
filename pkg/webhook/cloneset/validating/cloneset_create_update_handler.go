@@ -69,7 +69,7 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 		}
 	case admissionv1.Delete:
 		if len(req.OldObject.Raw) == 0 {
-			klog.Warningf("Skip to validate CloneSet %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Namespace, req.Name)
+			klog.InfoS("Skip to validate CloneSet %s/%s deletion for no old object, maybe because of Kubernetes version < 1.16", "namespace", req.Namespace, "name", req.Name)
 			return admission.ValidationResponse(true, "")
 		}
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {

@@ -83,7 +83,7 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req admission.Requ
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 	}
-	klog.V(4).Infof("sidecarset after mutating: %v", util.DumpJSON(obj))
+	klog.V(4).InfoS("sidecarset after mutating", "object", util.DumpJSON(obj))
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}
