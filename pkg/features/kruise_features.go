@@ -123,6 +123,9 @@ const (
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
 
+	// Set pod completion index as a pod label for Indexed Jobs.
+	PodIndexLabel featuregate.Feature = "PodIndexLabel"
+
 	// Use certs generated externally
 	EnableExternalCerts featuregate.Feature = "EnableExternalCerts"
 )
@@ -157,6 +160,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnhancedLivenessProbeGate:              {Default: false, PreRelease: featuregate.Alpha},
 	RecreatePodWhenChangeVCTInCloneSetGate: {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetStartOrdinal:                {Default: false, PreRelease: featuregate.Alpha},
+	PodIndexLabel:                          {Default: true, PreRelease: featuregate.Beta},
 	EnableExternalCerts:                    {Default: false, PreRelease: featuregate.Alpha},
 }
 
