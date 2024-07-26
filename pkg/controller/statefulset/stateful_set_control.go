@@ -27,7 +27,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,12 +45,13 @@ import (
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/pvc"
 )
 
 // Realistic value for maximum in-flight requests when processing in parallel mode.
 const MaxBatchSize = 500
 
-const PVCOwnedByStsAnnotationKey = "apps.kruise.io/owned_by_sts"
+const PVCOwnedByStsAnnotationKey = "apps.kruise.io/owned-by-asts"
 
 // StatefulSetControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
 // as an interface to allow for extensions that provide different semantics. Currently, there is only one implementation.
@@ -611,7 +611,7 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 		} else if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
 			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
 			checkReadyFn := func(claim, template *v1.PersistentVolumeClaim) bool {
-				_, ready := PVCCompatibleAndReady(claim, template)
+				_, ready := pvc.IsPVCCompatibleAndReady(claim, template)
 				return ready
 			}
 			// check pvc resize status, if not ready, record pod to unavailablePods
@@ -649,16 +649,17 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 		if !isTerminating(replicas[target]) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
 				set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
-				if match, err := ssc.podControl.ClaimsMatchSpec(set, replicas[target]); err != nil {
+				// resize pvc if necessary and wait for resize completed
+				if match, err := ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
 					return status, err
 				} else if !match {
-					err = ssc.podControl.tryPatchPVCSize(set, replicas[target])
+					err = ssc.podControl.TryPatchPVCSize(set, replicas[target])
 					if err != nil {
 						return status, err
 					}
 				}
 
-				allCompleted, err := ssc.checkOwnedPVCStatus(set, replicas[target], CheckPatchPVCCompleted)
+				allCompleted, err := ssc.checkOwnedPVCStatus(set, replicas[target], pvc.IsPatchPVCCompleted)
 				if err != nil {
 					return status, err
 				} else if !allCompleted {
@@ -929,64 +930,6 @@ func computeReplicaStatus(pods []*v1.Pod, minReadySeconds int32, currentRevision
 		}
 	}
 	return status
-}
-
-func (ssc *defaultStatefulSetControl) checkOwnedPVCStatus(set *appsv1beta1.StatefulSet, pod *v1.Pod, fn CheckClaimFn) (bool, error) {
-	templates := set.Spec.VolumeClaimTemplates
-	ordinal := getOrdinal(pod)
-	for i := range templates {
-		claimName := getPersistentVolumeClaimName(set, &templates[i], ordinal)
-		claim, err := ssc.podControl.objectMgr.GetClaim(set.Namespace, claimName)
-		switch {
-		case apierrors.IsNotFound(err):
-			klog.V(4).InfoS("Expected claim missing", "claim", claimName)
-			return false, err
-		case err != nil:
-			klog.V(4).ErrorS(err, "Could not retrieve claim", "claim", claimName, "pod", pod.Name)
-			return false, err
-		default:
-			ready := fn(claim, &templates[i])
-			if !ready {
-				return false, err
-			}
-		}
-	}
-	return true, nil
-}
-
-func (ssc *defaultStatefulSetControl) updatePVCStatus(status *appsv1beta1.StatefulSetStatus, set *appsv1beta1.StatefulSet, pods []*v1.Pod) {
-	templates := set.Spec.VolumeClaimTemplates
-	status.VolumeClaimTemplates = make([]appsv1beta1.VolumeClaimTemplateStatus, len(templates))
-	templateNameMap := map[string]*appsv1beta1.VolumeClaimTemplateStatus{}
-	for i := range templates {
-		status.VolumeClaimTemplates[i].VolumeClaimName = templates[i].Name
-		templateNameMap[templates[i].Name] = &status.VolumeClaimTemplates[i]
-	}
-	for _, pod := range pods {
-		if pod == nil {
-			continue
-		}
-		ordinal := getOrdinal(pod)
-		for i := range templates {
-			claimName := getPersistentVolumeClaimName(set, &templates[i], ordinal)
-			claim, err := ssc.podControl.objectMgr.GetClaim(set.Namespace, claimName)
-			switch {
-			case apierrors.IsNotFound(err):
-				klog.V(4).InfoS("Expected claim missing", "claim", claimName)
-			case err != nil:
-				klog.V(4).ErrorS(err, "Could not retrieve claim", "claim", claimName, "pod", pod.Name)
-				return
-			default:
-				if compatible, ready := PVCCompatibleAndReady(claim, &templates[i]); compatible {
-					templateStatus := templateNameMap[templates[i].Name]
-					templateStatus.CompatibleReplicas++
-					if ready {
-						templateStatus.CompatibleReadyReplicas++
-					}
-				}
-			}
-		}
-	}
 }
 
 func updateStatus(status *appsv1beta1.StatefulSetStatus, minReadySeconds int32, currentRevision, updateRevision *apps.ControllerRevision, podLists ...[]*v1.Pod) {
