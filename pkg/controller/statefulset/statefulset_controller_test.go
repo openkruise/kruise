@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -627,6 +628,7 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 		informerFactory.Core().V1().Pods(),
 		kruiseInformerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Storage().V1().StorageClasses(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		client,
 		kruiseClient,
@@ -776,6 +778,7 @@ func NewStatefulSetController(
 	podInformer coreinformers.PodInformer,
 	setInformer kruiseappsinformers.StatefulSetInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	scInformer storageinformers.StorageClassInformer,
 	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
 	kruiseClient kruiseclientset.Interface,
@@ -793,6 +796,7 @@ func NewStatefulSetController(
 					kubeClient,
 					podInformer.Lister(),
 					pvcInformer.Lister(),
+					scInformer.Lister(),
 					recorder),
 				inplaceupdate.NewForTypedClient(kubeClient, revisionadapter.NewDefaultImpl()),
 				lifecycle.NewForTypedClient(kubeClient),

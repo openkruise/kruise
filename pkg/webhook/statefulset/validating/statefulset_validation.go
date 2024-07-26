@@ -1,6 +1,7 @@
 package validating
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 	"github.com/appscode/jsonpatch"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -16,9 +18,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/controller/statefulset"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
@@ -319,6 +323,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 
 	restorePVCTemplate := statefulSet.Spec.VolumeClaimTemplates
 	statefulSet.Spec.VolumeClaimTemplates = oldStatefulSet.Spec.VolumeClaimTemplates
+	statefulSet.Spec.VolumeClaimUpdateStrategy = oldStatefulSet.Spec.VolumeClaimUpdateStrategy
 
 	restoreReserveOrdinals := statefulSet.Spec.ReserveOrdinals
 	statefulSet.Spec.ReserveOrdinals = oldStatefulSet.Spec.ReserveOrdinals
@@ -327,7 +332,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1beta1.Stateful
 	statefulSet.Spec.Ordinals = oldStatefulSet.Spec.Ordinals
 
 	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'reserveOrdinals', 'lifecycle', 'revisionHistoryLimit', 'persistentVolumeClaimRetentionPolicy', `volumeClaimTemplates` and 'updateStrategy' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'reserveOrdinals', 'lifecycle', 'revisionHistoryLimit', 'persistentVolumeClaimRetentionPolicy', `volumeClaimTemplates`, `VolumeClaimUpdateStrategy` and 'updateStrategy' are forbidden"))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
 	statefulSet.Spec.Template = restoreTemplate
@@ -357,4 +362,49 @@ func validateTemplateInPlaceOnly(oldTemp, newTemp *v1.PodTemplateSpec) error {
 	}
 
 	return nil
+}
+
+// ValidateVolumeClaimTemplateUpdate tests if only size expand when sc allow expansion.
+func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1.StatefulSet) field.ErrorList {
+	if sts.Spec.VolumeClaimUpdateStrategy.Type == "" ||
+		sts.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPVCDeleteVolumeClaimUpdateStrategyType {
+		return nil
+	}
+	if len(sts.Spec.VolumeClaimTemplates) != len(oldSts.Spec.VolumeClaimTemplates) {
+		return field.ErrorList{field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), sts.Spec.VolumeClaimTemplates, "volumeClaimTemplate can not be added or deleted when OnRollingUpdate")}
+	}
+	for i := range sts.Spec.VolumeClaimTemplates {
+		idxStr := fmt.Sprintf("volumeClaimTemplates[%v]", i)
+		matched, resizeOnly := statefulset.CompareWithCheckFn(&oldSts.Spec.VolumeClaimTemplates[i], &sts.Spec.VolumeClaimTemplates[i], ResizeOnlyPVCCheckFn)
+		if matched {
+			continue
+		}
+		if !resizeOnly {
+			return field.ErrorList{field.Invalid(field.NewPath("spec", idxStr), sts.Spec.VolumeClaimTemplates[i], "volumeClaimTemplate can not be modified when OnRollingUpdate")}
+		}
+		// check if sc allow volume expand
+		scName := sts.Spec.VolumeClaimTemplates[i].Spec.StorageClassName
+		if scName == nil {
+			// nil sc means use default todo: list all scs to check
+			continue
+		}
+		var sc storagev1.StorageClass
+		err := c.Get(context.TODO(), client.ObjectKey{Name: *scName}, &sc)
+		if err != nil {
+			return field.ErrorList{field.Invalid(field.NewPath("spec", idxStr, "spec", "storageClassName"), *scName, "can not get sc")}
+		}
+		if sc.AllowVolumeExpansion != nil && !*sc.AllowVolumeExpansion {
+			return field.ErrorList{field.Forbidden(field.NewPath("spec", idxStr, "spec", "resources", "requests", "storage"),
+				fmt.Sprintf("sc %v disallow volume expansion", *scName))}
+		}
+	}
+	return nil
+}
+
+func ResizeOnlyPVCCheckFn(claim, template *v1.PersistentVolumeClaim) bool {
+	if claim.Spec.Resources.Requests.Storage().Cmp(*template.Spec.Resources.Requests.Storage()) != 0 ||
+		claim.Spec.Resources.Limits.Storage().Cmp(*template.Spec.Resources.Limits.Storage()) != 0 {
+		return true
+	}
+	return false
 }

@@ -21,6 +21,11 @@ import (
 	"math"
 	"reflect"
 
+	v1 "k8s.io/api/core/v1"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/integer"
+
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -30,10 +35,6 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
-	v1 "k8s.io/api/core/v1"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/klog/v2"
-	"k8s.io/utils/integer"
 )
 
 func init() {

@@ -128,6 +128,9 @@ const (
 
 	// Use certs generated externally
 	EnableExternalCerts featuregate.Feature = "EnableExternalCerts"
+
+	// Enables policies auto resizing PVCs created by a StatefulSet when user expands volumeClaimTemplates.
+	StatefulSetAutoResizePVCGate featuregate.Feature = "StatefulSetAutoResizePVCGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -162,6 +165,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	StatefulSetStartOrdinal:                {Default: false, PreRelease: featuregate.Alpha},
 	PodIndexLabel:                          {Default: true, PreRelease: featuregate.Beta},
 	EnableExternalCerts:                    {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetAutoResizePVCGate:           {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

@@ -29,6 +29,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -977,5 +978,14 @@ func TestGetStatefulSetReplicasRange(t *testing.T) {
 					tt.name, count, res, tt.expectedCount, tt.expectedRes)
 			}
 		})
+	}
+}
+
+func newStorageClass(name string, canExpand bool) storagev1.StorageClass {
+	return storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		AllowVolumeExpansion: &canExpand,
 	}
 }
