@@ -19,6 +19,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -658,6 +659,34 @@ func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *appsv1beta1.StatefulS
 	}
 }
 
+func (s *StatefulSetTester) WaitForStatusPVCReadyReplicas(ss *appsv1beta1.StatefulSet, expectedReplicas int32) {
+	Logf("Waiting for statefulset status.volume updated to %d", expectedReplicas)
+
+	ns, name := ss.Namespace, ss.Name
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if ssGet.Status.ObservedGeneration < ss.Generation {
+				return false, nil
+			}
+			for _, template := range ssGet.Status.VolumeClaimTemplates {
+				if template.CompatibleReplicas != expectedReplicas ||
+					template.CompatibleReadyReplicas != expectedReplicas {
+					Logf("Waiting for stateful set status.VolumeClaimTemplates.CompatibleReadyReplicas to become %d, currently %d",
+						expectedReplicas, template.CompatibleReadyReplicas)
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for stateful set volumeClaimTemplates compatibleReadyReplicas updated to %d: %v", expectedReplicas, pollErr)
+	}
+}
+
 // WaitForStatusReplicas waits for the ss.Status.Replicas to be equal to expectedReplicas
 func (s *StatefulSetTester) WaitForStatusReplicas(ss *appsv1beta1.StatefulSet, expectedReplicas int32) {
 	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
@@ -925,4 +954,36 @@ func UpdateStatefulSetWithRetries(kc kruiseclientset.Interface, namespace, name 
 		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
 	}
 	return statefulSet, pollErr
+}
+
+// GetPodList gets the current Pods in ss.
+func (s *StatefulSetTester) GetPVCList(ss *appsv1beta1.StatefulSet) *v1.PersistentVolumeClaimList {
+	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+	ExpectNoError(err)
+	pvcList, err := s.c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	ExpectNoError(err)
+	return pvcList
+}
+func (s *StatefulSetTester) WaitForPVCState(ss *appsv1beta1.StatefulSet, until func(*appsv1beta1.StatefulSet, *v1.PersistentVolumeClaimList) (bool, error)) {
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			pvcList := s.GetPVCList(ssGet)
+			return until(ssGet, pvcList)
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for state update: %v", pollErr)
+	}
+}
+
+func GetVolumeTemplateName(pvcName, stsName string) (string, error) {
+	prefix := strings.Index(pvcName, stsName)
+	if prefix > 0 {
+		sub := pvcName[:prefix-1]
+		return sub, nil
+	}
+	return "", errors.New("pvc is not created by sts")
 }

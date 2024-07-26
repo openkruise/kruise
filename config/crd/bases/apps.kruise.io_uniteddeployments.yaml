@@ -547,6 +547,18 @@ spec:
                               any volumes in the template, with the same name.
                               TODO: Define the behavior if a claim already exists with the same name.
                             x-kubernetes-preserve-unknown-fields: true
+                          volumeClaimUpdateStrategy:
+                            description: |-
+                              VolumeClaimUpdateStrategy specifies the strategy for updating VolumeClaimTemplates within a StatefulSet.
+                              This field is currently only effective if the StatefulSetAutoResizePVCGate is enabled.
+                            properties:
+                              type:
+                                description: |-
+                                  Type specifies the type of update strategy, possible values include:
+                                  OnPodRollingUpdateVolumeClaimUpdateStrategyType: Apply the update strategy during pod rolling updates.
+                                  OnPVCDeleteVolumeClaimUpdateStrategyType: Apply the update strategy when a PersistentVolumeClaim is deleted.
+                                type: string
+                            type: object
                         required:
                         - selector
                         - template

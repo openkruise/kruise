@@ -29,7 +29,7 @@ var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
 		"validate-apps-kruise-io-statefulset": func(mgr manager.Manager) admission.Handler {
-			return &StatefulSetCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
+			return &StatefulSetCreateUpdateHandler{Client: mgr.GetClient(), Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}
 )

@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,6 +34,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -122,6 +124,10 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	if err != nil {
 		return nil, err
 	}
+	scInformer, err := cacher.GetInformerForKind(context.TODO(), storagev1.SchemeGroupVersion.WithKind("StorageClass"))
+	if err != nil {
+		return nil, err
+	}
 	revInformer, err := cacher.GetInformerForKind(context.TODO(), appsv1.SchemeGroupVersion.WithKind("ControllerRevision"))
 	if err != nil {
 		return nil, err
@@ -130,6 +136,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	statefulSetLister := kruiseappslisters.NewStatefulSetLister(statefulSetInformer.(toolscache.SharedIndexInformer).GetIndexer())
 	podLister := corelisters.NewPodLister(podInformer.(toolscache.SharedIndexInformer).GetIndexer())
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcInformer.(toolscache.SharedIndexInformer).GetIndexer())
+	scLister := storagelisters.NewStorageClassLister(scInformer.(toolscache.SharedIndexInformer).GetIndexer())
 
 	genericClient := client.GetGenericClientWithName("statefulset-controller")
 	eventBroadcaster := record.NewBroadcaster()
@@ -147,6 +154,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 				genericClient.KubeClient,
 				podLister,
 				pvcLister,
+				scLister,
 				recorder),
 			inplaceupdate.New(utilclient.NewClientFromManager(mgr, "statefulset-controller"), revisionadapter.NewDefaultImpl()),
 			lifecycle.New(utilclient.NewClientFromManager(mgr, "statefulset-controller")),
@@ -203,6 +211,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to PVC patched by StatefulSet
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.PersistentVolumeClaim{}), &pvcEventHandler{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to Pod created by StatefulSet
 	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), handler.EnqueueRequestForOwner(
 		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.StatefulSet{}, handler.OnlyControllerOwner()))
@@ -219,6 +233,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch

@@ -31,8 +31,11 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,6 +45,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2904,6 +2908,7 @@ func (rt *requestTracker) reset() {
 type fakeObjectManager struct {
 	podsLister       corelisters.PodLister
 	claimsLister     corelisters.PersistentVolumeClaimLister
+	scLister         storagelisters.StorageClassLister
 	setsLister       kruiseappslisters.StatefulSetLister
 	podsIndexer      cache.Indexer
 	claimsIndexer    cache.Indexer
@@ -2919,10 +2924,12 @@ func newFakeObjectManager(informerFactory informers.SharedInformerFactory, kruis
 	claimInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	revisionInformer := informerFactory.Apps().V1().ControllerRevisions()
 	setInformer := kruiseInformerFactory.Apps().V1beta1().StatefulSets()
+	scInformer := informerFactory.Storage().V1().StorageClasses()
 
 	return &fakeObjectManager{
 		podInformer.Lister(),
 		claimInformer.Lister(),
+		scInformer.Lister(),
 		setInformer.Lister(),
 		podInformer.Informer().GetIndexer(),
 		claimInformer.Informer().GetIndexer(),
@@ -2968,7 +2975,8 @@ func (om *fakeObjectManager) DeletePod(pod *v1.Pod) error {
 }
 
 func (om *fakeObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim) error {
-	om.claimsIndexer.Update(claim)
+	claimClone := claim.DeepCopy()
+	om.claimsIndexer.Update(claimClone)
 	return nil
 }
 
@@ -2986,6 +2994,10 @@ func (om *fakeObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error 
 	}
 	om.claimsIndexer.Update(claim)
 	return nil
+}
+
+func (om *fakeObjectManager) GetStorageClass(scName string) (*storagev1.StorageClass, error) {
+	return om.scLister.Get(scName)
 }
 
 func (om *fakeObjectManager) SetCreateStatefulPodError(err error, after int) {
@@ -3779,5 +3791,226 @@ func CreatesPodsWithStartOrdinal(t *testing.T, set *appsv1beta1.StatefulSet, inv
 		if actualPodOrdinal != expectedOrdinal {
 			t.Errorf("Expected pod ordinal %d. Got %d", expectedOrdinal, actualPodOrdinal)
 		}
+	}
+}
+
+func newStatefulSetWithGivenSC(replicas int, vctNumber int, scs []*string) *appsv1beta1.StatefulSet {
+	petMounts := []corev1.VolumeMount{}
+	for i := 0; i < vctNumber; i++ {
+		petMounts = append(petMounts, corev1.VolumeMount{
+			Name: fmt.Sprintf("datadir-%d", i), MountPath: fmt.Sprintf("/tmp/vct-%d", i),
+		})
+	}
+	podMounts := []corev1.VolumeMount{
+		{Name: "home", MountPath: "/home"},
+	}
+	sts := newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
+	if len(sts.Spec.VolumeClaimTemplates) != vctNumber || len(scs) == 0 {
+		return sts
+	}
+	for i := 0; i < vctNumber; i++ {
+		sts.Spec.VolumeClaimTemplates[i].Spec.StorageClassName = scs[i%len(scs)]
+	}
+	return sts
+}
+
+func TestStatefulSetVCTResize(t *testing.T) {
+	//Q: Why this test can work without csi work?
+	//A: All pvcs are not ready. => All pods are unavailable. =>  All pods/pvcs can update.
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoResizePVCGate, true)()
+
+	sc1 := newStorageClass("can_expand", true)
+	sc2 := newStorageClass("cannot_expand", false)
+	simpleSetFn := func(scs []*string) *appsv1beta1.StatefulSet {
+		statefulSet := newStatefulSetWithGivenSC(5, len(scs), scs)
+		statefulSet.Spec.VolumeClaimUpdateStrategy.Type = appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType
+		return statefulSet
+	}
+	validationFn := func(set *appsv1beta1.StatefulSet, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) error {
+		for _, pvc := range pvcs {
+			if *pvc.Spec.StorageClassName == sc1.Name {
+				if !pvc.Spec.Resources.Requests.Storage().Equal(resource.MustParse("20")) {
+					return errors.New("pvc size is not updated")
+				}
+			} else if *pvc.Spec.StorageClassName == sc2.Name {
+				if !pvc.Spec.Resources.Requests.Storage().Equal(resource.MustParse("1")) {
+					return errors.New("pvc size is not updated")
+				}
+			}
+		}
+		return nil
+	}
+	type testCase struct {
+		name       string
+		invariants func(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error
+		initial    func() *appsv1beta1.StatefulSet
+		update     func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet
+		canUpdate  bool
+		validate   func(set *appsv1beta1.StatefulSet, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) error
+	}
+	testFn := func(test *testCase, t *testing.T) {
+		set := test.initial()
+		client := fake.NewSimpleClientset(&sc1, &sc2)
+		kruiseClient := kruisefake.NewSimpleClientset(set)
+		om, _, ssc, stop := setupController(client, kruiseClient)
+		defer close(stop)
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set = test.update(set)
+		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); (err == nil) != test.canUpdate {
+			t.Fatalf("%s expected can update %v: %v", test.name, test.canUpdate, err)
+		}
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+
+		pvcs, err := om.claimsLister.PersistentVolumeClaims(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if test.canUpdate {
+			if err := test.validate(set, pods, pvcs); err != nil {
+				t.Fatalf("%s: %s", test.name, err)
+			}
+		}
+	}
+
+	testCases := []testCase{
+		{
+			name:       "expand_vct_with_sc_can_expand",
+			invariants: emptyInvariants,
+			initial: func() *appsv1beta1.StatefulSet {
+				return simpleSetFn([]*string{&sc1.Name})
+			},
+			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "busybox"
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				return set
+			},
+			canUpdate: true,
+			validate:  validationFn,
+		},
+		{
+			name:       "expand_sts_with_vct_cannot_expand",
+			invariants: emptyInvariants,
+			initial: func() *appsv1beta1.StatefulSet {
+				return simpleSetFn([]*string{&sc2.Name})
+			},
+			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "busybox"
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				return set
+			},
+			canUpdate: false,
+			validate:  validationFn,
+		},
+		{
+			name:       "expand_vct_with_2sc_can_expand",
+			invariants: emptyInvariants,
+			initial: func() *appsv1beta1.StatefulSet {
+				return simpleSetFn([]*string{&sc1.Name, &sc1.Name})
+			},
+			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "busybox"
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				return set
+			},
+			canUpdate: true,
+			validate:  validationFn,
+		},
+		{
+			name:       "expand_vct_with_sc_cannot_expand",
+			invariants: emptyInvariants,
+			initial: func() *appsv1beta1.StatefulSet {
+				return simpleSetFn([]*string{&sc2.Name, &sc2.Name})
+			},
+			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "busybox"
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				return set
+			},
+			canUpdate: false,
+			validate:  validationFn,
+		},
+		{
+			name:       "expand_vct_with_2sc_mixed_expand",
+			invariants: emptyInvariants,
+			initial: func() *appsv1beta1.StatefulSet {
+				return simpleSetFn([]*string{&sc1.Name, &sc2.Name})
+			},
+			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "busybox"
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				return set
+			},
+			canUpdate: false,
+			validate:  validationFn,
+		},
+		{
+			name:       "expand_vct_with_2sc_mixed_expand2",
+			invariants: emptyInvariants,
+			initial: func() *appsv1beta1.StatefulSet {
+				return simpleSetFn([]*string{&sc1.Name, &sc2.Name})
+			},
+			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
+				set.Spec.Template.Spec.Containers[0].Image = "busybox"
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
+					},
+				}
+				return set
+			},
+			canUpdate: true,
+			validate:  validationFn,
+		},
+	}
+	for _, c := range testCases {
+		testFn(&c, t)
 	}
 }
