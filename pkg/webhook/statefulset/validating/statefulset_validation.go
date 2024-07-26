@@ -22,7 +22,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/controller/statefulset"
+	"github.com/openkruise/kruise/pkg/util/pvc"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
@@ -373,35 +373,77 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 	if len(sts.Spec.VolumeClaimTemplates) != len(oldSts.Spec.VolumeClaimTemplates) {
 		return field.ErrorList{field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), sts.Spec.VolumeClaimTemplates, "volumeClaimTemplate can not be added or deleted when OnRollingUpdate")}
 	}
-	for i := range sts.Spec.VolumeClaimTemplates {
-		idxStr := fmt.Sprintf("volumeClaimTemplates[%v]", i)
-		matched, resizeOnly := statefulset.CompareWithCheckFn(&oldSts.Spec.VolumeClaimTemplates[i], &sts.Spec.VolumeClaimTemplates[i], ResizeOnlyPVCCheckFn)
+
+	name2Template := make(map[string]*v1.PersistentVolumeClaim)
+	for i := range oldSts.Spec.VolumeClaimTemplates {
+		name2Template[oldSts.Spec.VolumeClaimTemplates[i].Name] = &oldSts.Spec.VolumeClaimTemplates[i]
+	}
+
+	var err error
+	for _, template := range sts.Spec.VolumeClaimTemplates {
+		templateIdStr := fmt.Sprintf("volumeClaimTemplates[%v]", template.Name)
+		oldTemplate, exist := name2Template[template.Name]
+		if !exist {
+			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "name"), "volumeClaimTemplate name can not be modified")}
+		}
+
+		matched, resizeOnly := pvc.CompareWithCheckFn(oldTemplate, &template, isPVCResizeOnly)
 		if matched {
 			continue
 		}
 		if !resizeOnly {
-			return field.ErrorList{field.Invalid(field.NewPath("spec", idxStr), sts.Spec.VolumeClaimTemplates[i], "volumeClaimTemplate can not be modified when OnRollingUpdate")}
+			return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr), template, "volumeClaimTemplate can not be modified when OnRollingUpdate")}
 		}
 		// check if sc allow volume expand
-		scName := sts.Spec.VolumeClaimTemplates[i].Spec.StorageClassName
+		var sc *storagev1.StorageClass
+		scName := template.Spec.StorageClassName
 		if scName == nil {
-			// nil sc means use default todo: list all scs to check
-			continue
-		}
-		var sc storagev1.StorageClass
-		err := c.Get(context.TODO(), client.ObjectKey{Name: *scName}, &sc)
-		if err != nil {
-			return field.ErrorList{field.Invalid(field.NewPath("spec", idxStr, "spec", "storageClassName"), *scName, "can not get sc")}
+			// nil scName means using default storage class
+			sc, err = GetDefaultStorageClass(c)
+			if err != nil {
+				return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr, "spec", "storageClassName"), "nil", "can not list storage class")}
+			}
+			//	if there is no default sc, skip check
+			if sc == nil {
+				continue
+			}
+		} else {
+			sc = &storagev1.StorageClass{}
+			err = c.Get(context.TODO(), client.ObjectKey{Name: *scName}, sc)
+			if err != nil || sc == nil {
+				return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr, "spec", "storageClassName"), *scName, "can not get sc")}
+			}
 		}
 		if sc.AllowVolumeExpansion != nil && !*sc.AllowVolumeExpansion {
-			return field.ErrorList{field.Forbidden(field.NewPath("spec", idxStr, "spec", "resources", "requests", "storage"),
-				fmt.Sprintf("sc %v disallow volume expansion", *scName))}
+			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "spec", "resources", "requests", "storage"),
+				fmt.Sprintf("sc %v disallow volume expansion", sc.Name))}
 		}
 	}
 	return nil
 }
 
-func ResizeOnlyPVCCheckFn(claim, template *v1.PersistentVolumeClaim) bool {
+const isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
+
+func GetDefaultStorageClass(c client.Client) (*storagev1.StorageClass, error) {
+	// refer to https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
+	// choose the only one or the newest one
+	scs := &storagev1.StorageClassList{}
+	err := c.List(context.TODO(), scs, &client.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var defaultSC *storagev1.StorageClass
+	for i, sc := range scs.Items {
+		if sc.Annotations[isDefaultStorageClassAnnotation] == "true" {
+			if defaultSC == nil || defaultSC.CreationTimestamp.Before(&sc.CreationTimestamp) {
+				defaultSC = &scs.Items[i]
+			}
+		}
+	}
+	return defaultSC, nil
+}
+
+func isPVCResizeOnly(claim, template *v1.PersistentVolumeClaim) bool {
 	if claim.Spec.Resources.Requests.Storage().Cmp(*template.Spec.Resources.Requests.Storage()) != 0 ||
 		claim.Spec.Resources.Limits.Storage().Cmp(*template.Spec.Resources.Limits.Storage()) != 0 {
 		return true

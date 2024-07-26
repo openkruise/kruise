@@ -15,7 +15,7 @@ COPY apis/ apis/
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 
-ENV GOPROXY=https://goproxy.cn,direct
+#ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod tidy
 
 # Build

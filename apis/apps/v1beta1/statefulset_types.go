@@ -46,17 +46,20 @@ const (
 	OnPVCDeleteVolumeClaimUpdateStrategyType VolumeClaimUpdateStrategyType = "OnDelete"
 )
 
-// VolumeClaimTemplateStatus describes the status of a volume claim template.
+// VolumeClaimStatus describes the status of a volume claim template.
 // It provides details about the compatibility and readiness of the volume claim.
-type VolumeClaimTemplateStatus struct {
+type VolumeClaimStatus struct {
 	// VolumeClaimName is the name of the volume claim.
 	// This is a unique identifier used to reference a specific volume claim.
 	VolumeClaimName string `json:"volumeClaimName"`
 	// CompatibleReplicas is the number of replicas currently compatible with the volume claim.
 	// It indicates how many replicas can function properly, being compatible with this volume claim.
+	// Compatibility is determined by whether the PVC spec storage requests are greater than or equal to the template spec storage requests
 	CompatibleReplicas int32 `json:"compatibleReplicas"`
 	// CompatibleReadyReplicas is the number of replicas that are both ready and compatible with the volume claim.
 	// It highlights that these replicas are not only compatible but also ready to be put into service immediately.
+	// Compatibility is determined by whether the pvc spec storage requests are greater than or equal to the template spec storage requests
+	// The "ready" status is determined by whether the PVC status capacity is greater than or equal to the PVC spec storage requests.
 	CompatibleReadyReplicas int32 `json:"compatibleReadyReplicas"`
 }
 
@@ -366,7 +369,7 @@ type StatefulSetStatus struct {
 	// and their respective templates. It tracks whether the VolumeClaims have been updated
 	// to match any changes made to the VolumeClaimTemplates, ensuring synchronization
 	// between the defined templates and the actual PersistentVolumeClaims in use.
-	VolumeClaimTemplates []VolumeClaimTemplateStatus `json:"volumeClaimTemplates,omitempty"`
+	VolumeClaimTemplates []VolumeClaimStatus `json:"volumeClaimTemplates,omitempty"`
 }
 
 // These are valid conditions of a statefulset.

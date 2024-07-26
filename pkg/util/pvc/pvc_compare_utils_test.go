@@ -1,4 +1,4 @@
-package statefulset
+package pvc
 
 import (
 	"testing"
@@ -206,7 +206,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 	// Run tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matched, resizeOnly := CompareWithCheckFn(tt.claim, tt.template, PVCNeedExpand)
+			matched, resizeOnly := CompareWithCheckFn(tt.claim, tt.template, IsPVCNeedExpand)
 			if matched != tt.expectedMatch {
 				t.Errorf("Expected match: %v, got: %v", tt.expectedMatch, matched)
 			}
@@ -373,7 +373,7 @@ func TestPVCCompatibleAndReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			compatible, ready := PVCCompatibleAndReady(tt.claim, tt.template)
+			compatible, ready := IsPVCCompatibleAndReady(tt.claim, tt.template)
 			if compatible != tt.expectedCompat {
 				t.Errorf("expected compatible to be %v, got %v", tt.expectedCompat, compatible)
 			}
