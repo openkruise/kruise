@@ -69,7 +69,7 @@ func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission
 	}
 	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
 	if len(resp.Patches) > 0 {
-		klog.V(5).Infof("Admit NodeImage %s patches: %v", obj.Name, util.DumpJSON(resp.Patches))
+		klog.V(5).InfoS("Admit NodeImage patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
 	}
 
 	return resp

@@ -57,7 +57,7 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 	}
 
 	if err := validate(obj); err != nil {
-		klog.Warningf("Error validate ImagePullJob %s/%s: %v", obj.Namespace, obj.Name, err)
+		klog.ErrorS(err, "Error validate ImagePullJob", "namespace", obj.Namespace, "name", obj.Name)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 

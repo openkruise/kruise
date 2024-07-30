@@ -50,7 +50,7 @@ func addHandlers(m HandlerPath2GetterMap) {
 func addHandlersWithGate(m HandlerPath2GetterMap, fn GateFunc) {
 	for path, handler := range m {
 		if len(path) == 0 {
-			klog.Warningf("Skip handler with empty path.")
+			klog.Warning("Skip handler with empty path")
 			continue
 		}
 		if path[0] != '/' {
@@ -58,7 +58,7 @@ func addHandlersWithGate(m HandlerPath2GetterMap, fn GateFunc) {
 		}
 		_, found := HandlerMap[path]
 		if found {
-			klog.V(1).Infof("conflicting webhook builder path %v in handler map", path)
+			klog.V(1).InfoS("conflicting webhook builder path in handler map", "path", path)
 		}
 		HandlerMap[path] = handler
 		if fn != nil {
@@ -88,7 +88,7 @@ func SetupWithManager(mgr manager.Manager) error {
 	filterActiveHandlers()
 	for path, handlerGetter := range HandlerMap {
 		server.Register(path, &webhook.Admission{Handler: handlerGetter(mgr)})
-		klog.V(3).Infof("Registered webhook handler %s", path)
+		klog.V(3).InfoS("Registered webhook handler", "path", path)
 	}
 
 	// register conversion webhook
@@ -143,7 +143,7 @@ func WaitReady() error {
 		}
 
 		if duration > time.Second*5 {
-			klog.Warningf("Failed to wait webhook ready over %s: %v", duration, err)
+			klog.ErrorS(err, "Failed to wait webhook ready", "duration", duration)
 		}
 		time.Sleep(time.Second * 2)
 	}

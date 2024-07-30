@@ -145,14 +145,14 @@ func VerifyGroupKind(ref interface{}, expectedKind string, expectedGroups []stri
 	case *appsv1alpha1.TargetReference:
 		gv, err = schema.ParseGroupVersion(ref.(*appsv1alpha1.TargetReference).APIVersion)
 		if err != nil {
-			klog.Errorf("failed to parse GroupVersion for apiVersion (%s): %s", ref.(*appsv1alpha1.TargetReference).APIVersion, err.Error())
+			klog.ErrorS(err, "failed to parse GroupVersion for apiVersion", "apiVersion", ref.(*appsv1alpha1.TargetReference).APIVersion)
 			return false, err
 		}
 		kind = ref.(*appsv1alpha1.TargetReference).Kind
 	case *metav1.OwnerReference:
 		gv, err = schema.ParseGroupVersion(ref.(*metav1.OwnerReference).APIVersion)
 		if err != nil {
-			klog.Errorf("failed to parse GroupVersion for apiVersion (%s): %s", ref.(*metav1.OwnerReference).APIVersion, err.Error())
+			klog.ErrorS(err, "failed to parse GroupVersion for apiVersion", "apiVersion", ref.(*metav1.OwnerReference).APIVersion)
 			return false, err
 		}
 		kind = ref.(*metav1.OwnerReference).Kind
@@ -236,8 +236,8 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 	}
 
 	defer func() {
-		klog.V(3).Infof("Cost of handling pod creation by WorkloadSpread (%s/%s) is %v",
-			matchedWS.Namespace, matchedWS.Name, time.Since(start))
+		klog.V(3).InfoS("Cost of handling pod creation by WorkloadSpread",
+			"namespace", matchedWS.Namespace, "name", matchedWS.Name, "cost", time.Since(start))
 	}()
 
 	return false, h.mutatingPod(matchedWS, pod, nil, CreateOperation)
@@ -253,8 +253,8 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error 
 	}
 	err := json.Unmarshal([]byte(str), &injectWS)
 	if err != nil {
-		klog.Errorf("parse Pod (%s/%s) annotations[%s]=%s failed: %s", pod.Namespace, pod.Name,
-			MatchedWorkloadSpreadSubsetAnnotations, str, err.Error())
+		klog.ErrorS(err, "parse Pod annotations failed", "namespace", pod.Namespace, "name", pod.Name,
+			"key", MatchedWorkloadSpreadSubsetAnnotations, "value", str)
 		return nil
 	}
 
@@ -270,16 +270,16 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error 
 	err = h.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: injectWS.Name}, matchedWS)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.Warningf("Pod(%s/%s) matched WorkloadSpread(%s) Not Found", pod.Namespace, pod.Name, injectWS.Name)
+			klog.InfoS("Pod matched WorkloadSpread Not Found", "namespace", pod.Namespace, "name", pod.Name, "workloadSpread", injectWS.Name)
 			return nil
 		}
-		klog.Errorf("get pod(%s/%s) matched workloadSpread(%s) failed: %s", pod.Namespace, pod.Name, injectWS.Name, err.Error())
+		klog.ErrorS(err, "get pod matched workloadSpread failed", "namespace", pod.Namespace, "name", pod.Name, "workloadSpread", injectWS.Name)
 		return err
 	}
 
 	defer func() {
-		klog.V(3).Infof("Cost of handling pod deletion by WorkloadSpread (%s/%s) is %v",
-			matchedWS.Namespace, matchedWS.Name, time.Since(start))
+		klog.V(3).InfoS("Cost of handling pod deletion by WorkloadSpread",
+			"namespace", matchedWS.Namespace, "name", matchedWS.Name, "cost", time.Since(start))
 	}()
 
 	return h.mutatingPod(matchedWS, pod, injectWS, operation)
@@ -294,7 +294,7 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 		podName = pod.GetGenerateName()
 	}
 
-	klog.V(3).Infof("Operation[%s] Pod(%s/%s) matched WorkloadSpread(%s/%s)", operation, pod.Namespace, podName, matchedWS.Namespace, matchedWS.Name)
+	klog.V(3).InfoS("Operation Pod matched WorkloadSpread", "operation", operation, "podNs", pod.Namespace, "podName", podName, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 
 	suitableSubsetName, generatedUID, err := h.acquireSuitableSubset(matchedWS, pod, injectWS, operation)
 	if err != nil {
@@ -305,16 +305,16 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 	// if create pod, inject affinity、toleration、metadata in pod object
 	if operation == CreateOperation && len(suitableSubsetName) > 0 {
 		if _, injectErr = injectWorkloadSpreadIntoPod(matchedWS, pod, suitableSubsetName, generatedUID); injectErr != nil {
-			klog.Errorf("failed to inject Pod(%s/%s) subset(%s) data for WorkloadSpread(%s/%s)",
-				pod.Namespace, podName, suitableSubsetName, matchedWS.Namespace, matchedWS.Name)
+			klog.InfoS("failed to inject Pod subset data for WorkloadSpread",
+				"podNs", pod.Namespace, "podName", podName, "suitableSubsetName", suitableSubsetName, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 			return injectErr
 		}
-		klog.V(3).Infof("inject Pod(%s/%s) subset(%s) data for WorkloadSpread(%s/%s)",
-			pod.Namespace, podName, suitableSubsetName, matchedWS.Namespace, matchedWS.Name)
+		klog.V(3).InfoS("inject Pod subset data for WorkloadSpread",
+			"podNs", pod.Namespace, "podName", podName, "suitableSubsetName", suitableSubsetName, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 	}
 
-	klog.V(3).Infof("handler operation[%s] Pod(%s/%s) generatedUID(%s) for WorkloadSpread(%s/%s) done",
-		operation, pod.Namespace, podName, generatedUID, matchedWS.Namespace, matchedWS.Name)
+	klog.V(3).InfoS("handler operation Pod generatedUID for WorkloadSpread done",
+		"operation", operation, "podNs", pod.Namespace, "podName", podName, "generatedUID", generatedUID, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 
 	return injectErr
 }
@@ -401,17 +401,17 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 				refresh = true
 				conflictTimes++
 			} else {
-				klog.V(3).Infof("update workloadSpread(%s/%s) SubsetStatus(%s) missingReplicas(%d) creatingPods(%d) deletingPods(%d) success",
-					wsClone.Namespace, wsClone.Name, suitableSubset.Name,
-					suitableSubset.MissingReplicas, len(suitableSubset.CreatingPods), len(suitableSubset.DeletingPods))
+				klog.V(3).InfoS("update WorkloadSpread success",
+					"namespace", wsClone.Namespace, "name", wsClone.Name, "subsetStatus", suitableSubset.Name,
+					"missingReplicas", suitableSubset.MissingReplicas, "creatingPods", len(suitableSubset.CreatingPods), "deletingPods", len(suitableSubset.DeletingPods))
 				if cacheErr := util.GlobalCache.Add(wsClone); cacheErr != nil {
-					klog.Warningf("Failed to update workloadSpread(%s/%s) cache after update status, err: %v", wsClone.Namespace, wsClone.Name, cacheErr)
+					klog.ErrorS(cacheErr, "Failed to update workloadSpread cache after update status", "namespace", wsClone.Namespace, "name", wsClone.Name)
 				}
 			}
 			costOfUpdate += time.Since(start)
 			return err
 		}); err != nil {
-			klog.Errorf("update WorkloadSpread(%s/%s) error %s", matchedWS.Namespace, matchedWS.Name, err.Error())
+			klog.ErrorS(err, "update WorkloadSpread error", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
 			return "", "", err
 		}
 	}
@@ -420,8 +420,8 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 		suitableSubsetName = suitableSubset.Name
 	}
 
-	klog.V(5).Infof("Cost of assigning suitable subset of WorkloadSpread (%s %s) for pod is: conflict times: %v, cost of Get %v, cost of Update %v",
-		matchedWS.Namespace, matchedWS.Name, conflictTimes, costOfGet, costOfUpdate)
+	klog.V(5).InfoS("Cost of assigning suitable subset of WorkloadSpread for pod",
+		"namespace", matchedWS.Namespace, "name", matchedWS.Name, "conflictTimes", conflictTimes, "costOfGet", costOfGet, "costOfUpdate", costOfUpdate)
 
 	return suitableSubsetName, generatedUID, nil
 }
@@ -439,13 +439,13 @@ func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpr
 			if errors.IsNotFound(err) {
 				return nil, nil
 			}
-			klog.Errorf("error getting updated WorkloadSpread(%s/%s) from APIServer, err: %v", matchedWS.Namespace, matchedWS.Name, err)
+			klog.ErrorS(err, "error getting updated WorkloadSpread from APIServer", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
 			return nil, err
 		}
 	} else {
 		item, _, cacheErr := util.GlobalCache.Get(matchedWS)
 		if cacheErr != nil {
-			klog.Errorf("Failed to get cached WorkloadSpread(%s/%s) from GlobalCache, err: %v", matchedWS.Namespace, matchedWS.Name, cacheErr)
+			klog.ErrorS(cacheErr, "Failed to get cached WorkloadSpread from GlobalCache", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
 		}
 		if localCachedWS, ok := item.(*appsv1alpha1.WorkloadSpread); ok {
 			wsClone = localCachedWS.DeepCopy()
@@ -506,8 +506,8 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 
 		suitableSubset = h.getSuitableSubset(subsetStatuses)
 		if suitableSubset == nil {
-			klog.Warningf("WorkloadSpread (%s/%s) don't have a suitable subset for Pod (%s) when creating",
-				ws.Namespace, ws.Name, pod.Name)
+			klog.InfoS("WorkloadSpread don't have a suitable subset for Pod when creating",
+				"namespace", ws.Namespace, "wsName", ws.Name, "podName", pod.Name)
 			return false, nil, "", nil
 		}
 		// no need to update WorkloadSpread status if MaxReplicas == nil
@@ -536,8 +536,8 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 
 		suitableSubset = getSpecificSubset(subsetStatuses, injectWS.Subset)
 		if suitableSubset == nil {
-			klog.V(5).Infof("Pod (%s/%s) matched WorkloadSpread (%s) not found Subset(%s) when deleting",
-				ws.Namespace, pod.Name, ws.Name, injectWS.Subset)
+			klog.V(5).InfoS("Pod matched WorkloadSpread not found Subset when deleting",
+				"namespace", ws.Namespace, "podName", pod.Name, "wsName", ws.Name, "subset", injectWS.Subset)
 			return false, nil, "", nil
 		}
 		if suitableSubset.MissingReplicas == -1 {
@@ -625,12 +625,12 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 		cloneBytes, _ := json.Marshal(pod)
 		modified, err := strategicpatch.StrategicMergePatch(cloneBytes, subset.Patch.Raw, &corev1.Pod{})
 		if err != nil {
-			klog.Errorf("failed to merge patch raw %s", subset.Patch.Raw)
+			klog.ErrorS(err, "failed to merge patch raw", "raw", subset.Patch.Raw)
 			return false, err
 		}
 		newPod := &corev1.Pod{}
 		if err = json.Unmarshal(modified, newPod); err != nil {
-			klog.Errorf("failed to unmarshal %s to Pod", modified)
+			klog.ErrorS(err, "failed to unmarshal to Pod", "pod", modified)
 			return false, err
 		}
 		*pod = *newPod
@@ -694,13 +694,13 @@ func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *
 
 	targetGv, err := schema.ParseGroupVersion(target.APIVersion)
 	if err != nil {
-		klog.Errorf("parse TargetReference apiVersion (%s) failed: %s", target.APIVersion, err.Error())
+		klog.ErrorS(err, "parse TargetReference apiVersion failed", "apiVersion", target.APIVersion)
 		return false
 	}
 
 	ownerGv, err := schema.ParseGroupVersion(owner.APIVersion)
 	if err != nil {
-		klog.Errorf("parse OwnerReference apiVersion (%s) failed: %s", owner.APIVersion, err.Error())
+		klog.ErrorS(err, "parse OwnerReference apiVersion failed", "apiVersion", owner.APIVersion)
 		return false
 	}
 
@@ -714,7 +714,7 @@ func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *
 
 	ownerObject, err := h.getObjectOf(owner, namespace)
 	if err != nil {
-		klog.Errorf("Failed to get owner object %v: %v", owner, err)
+		klog.ErrorS(err, "Failed to get owner object", "owner", owner)
 		return false
 	}
 
@@ -872,7 +872,7 @@ func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Un
 	}
 	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(reader)
 	if err != nil {
-		klog.Errorf("Failed to get workloadSpread custom workload white list from kruise config map")
+		klog.Error("Failed to get workloadSpread custom workload white list from kruise config map")
 		return 0
 	}
 
@@ -887,12 +887,12 @@ func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Un
 		if len(path) > 0 {
 			replicas, exists, err = unstructured.NestedInt64(object.Object, path...)
 			if err != nil || !exists {
-				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, wl.ReplicasPath)
+				klog.ErrorS(err, "Failed to get replicas", "from", gvk, "replicasPath", wl.ReplicasPath)
 			}
 		} else {
 			replicas, exists, err = unstructured.NestedInt64(object.Object, "spec", "replicas")
 			if err != nil || !exists {
-				klog.Errorf("Failed to get replicas from %v, replicas path %s", gvk, wl.ReplicasPath)
+				klog.ErrorS(err, "Failed to get replicas", "from", gvk, "replicasPath", wl.ReplicasPath)
 			}
 		}
 		return int32(replicas)

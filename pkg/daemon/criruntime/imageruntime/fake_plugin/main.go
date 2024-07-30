@@ -143,7 +143,7 @@ func newCredentialProviderCommand() *cobra.Command {
 		Short: "ACR credential provider for kubelet",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := runPlugin(context.TODO(), os.Stdin, os.Stdout, os.Args[1:]); err != nil {
-				klog.Errorf("Error running credential provider plugin: %v", err)
+				klog.ErrorS(err, "Error running credential provider plugin")
 				os.Exit(1)
 			}
 		},

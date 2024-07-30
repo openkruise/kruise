@@ -44,7 +44,7 @@ func (h *ServiceHandler) Handle(ctx context.Context, req admission.Request) admi
 		return admission.ValidationResponse(true, "")
 	}
 	if len(req.OldObject.Raw) == 0 {
-		klog.Warningf("Skip to validate service %s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Name)
+		klog.InfoS("Skip to validate service %s deletion for no old object, maybe because of Kubernetes version < 1.16", "name", req.Name)
 		return admission.ValidationResponse(true, "")
 	}
 

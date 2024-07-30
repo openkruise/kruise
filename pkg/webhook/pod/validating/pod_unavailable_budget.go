@@ -59,7 +59,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		// the change will not cause pod unavailability, then pass
 		if !pubcontrol.PubControl.IsPodUnavailableChanged(oldPod, newPod) {
-			klog.V(6).Infof("validate pod(%s/%s) changed can not cause unavailability, then don't need check pub", newPod.Namespace, newPod.Name)
+			klog.V(6).InfoS("validate pod changed can not cause unavailability, then don't need check pub", "namespace", newPod.Namespace, "name", newPod.Name)
 			return true, "", nil
 		}
 		checkPod = oldPod
@@ -75,7 +75,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	// filter out invalid Delete operation, only validate delete pods resources
 	case admissionv1.Delete:
 		if req.AdmissionRequest.SubResource != "" {
-			klog.V(6).Infof("pod(%s/%s) AdmissionRequest operation(DELETE) subResource(%s), then admit", req.Namespace, req.Name, req.SubResource)
+			klog.V(6).InfoS("pod AdmissionRequest operation(DELETE) subResource, then admit", "namespace", req.Namespace, "name", req.Name, "subResource", req.SubResource)
 			return true, "", nil
 		}
 		checkPod = &corev1.Pod{}
@@ -95,7 +95,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 	case admissionv1.Create:
 		// ignore create operation other than subresource eviction
 		if req.AdmissionRequest.SubResource != "eviction" {
-			klog.V(6).Infof("pod(%s/%s) AdmissionRequest operation(CREATE) Resource(%s) subResource(%s), then admit", req.Namespace, req.Name, req.Resource, req.SubResource)
+			klog.V(6).InfoS("pod AdmissionRequest operation(CREATE) Resource and subResource, then admit", "namespace", req.Namespace, "name", req.Name, "subResource", req.SubResource, "resource", req.Resource)
 			return true, "", nil
 		}
 		eviction := &policy.Eviction{}

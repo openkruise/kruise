@@ -83,7 +83,7 @@ func GetRenewBeforeTime() time.Duration {
 	if s := os.Getenv("CERTS_RENEW_BEFORE"); len(s) > 0 {
 		t, err := strconv.Atoi(s[0 : len(s)-1])
 		if err != nil {
-			klog.Errorf("failed to parese time %s: %v", s[0:len(s)-1], err)
+			klog.ErrorS(err, "failed to parse time", "time", s[0:len(s)-1])
 			return renewBefore
 		}
 		suffix := s[len(s)-1]
@@ -94,7 +94,7 @@ func GetRenewBeforeTime() time.Duration {
 		} else if suffix == 'y' {
 			renewBefore = time.Duration(t) * 365 * time.Hour
 		} else {
-			klog.Errorf("unknown date suffix %c", suffix)
+			klog.InfoS("unknown date suffix", "suffix", suffix)
 		}
 	}
 	if renewBefore <= 0 {

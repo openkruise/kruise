@@ -98,7 +98,7 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.Infof("Starting daemon on %v ...", nodeName)
+	klog.InfoS("Starting daemon", "nodeName", nodeName)
 
 	listener, err := net.Listen("tcp", bindAddress)
 	if err != nil {

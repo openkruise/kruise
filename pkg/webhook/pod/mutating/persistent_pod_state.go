@@ -73,8 +73,8 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 		return true, nil
 	}
 
-	klog.V(3).Infof("inject node affinity(required: %s, preferred: %s) in pod(%s/%s) for PersistentPodState",
-		util.DumpJSON(nodeSelector), util.DumpJSON(preference), pod.Namespace, pod.Name)
+	klog.V(3).InfoS("inject node affinity in pod for PersistentPodState",
+		"required", util.DumpJSON(nodeSelector), "preferred", util.DumpJSON(preference), "namespace", pod.Namespace, "name", pod.Name)
 
 	// inject persistentPodState annotation in pod
 	if pod.Annotations == nil {
@@ -147,7 +147,7 @@ func createNodeAffinity(spec appsv1alpha1.PersistentPodStateSpec, podState appsv
 func SelectorPersistentPodState(reader client.Reader, ref appsv1alpha1.TargetReference, ns string) *appsv1alpha1.PersistentPodState {
 	ppsList := &appsv1alpha1.PersistentPodStateList{}
 	if err := reader.List(context.TODO(), ppsList, &client.ListOptions{Namespace: ns}, utilclient.DisableDeepCopy); err != nil {
-		klog.Errorf("List PersistentPodStateList failed: %s", err.Error())
+		klog.ErrorS(err, "List PersistentPodStateList failed")
 		return nil
 	}
 	for i := range ppsList.Items {

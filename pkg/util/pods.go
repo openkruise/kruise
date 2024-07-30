@@ -369,7 +369,7 @@ func ExtractPort(param intstr.IntOrString, container v1.Container) (int, error) 
 	case intstr.String:
 		if port, err = findPortByName(container, param.StrVal); err != nil {
 			// Last ditch effort - maybe it was an int stored as string?
-			klog.Errorf("error : %v", err)
+			klog.ErrorS(err, "failed to find port by name")
 			if port, err = strconv.Atoi(param.StrVal); err != nil {
 				return port, err
 			}

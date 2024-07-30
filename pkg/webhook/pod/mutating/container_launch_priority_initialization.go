@@ -33,7 +33,7 @@ func (h *PodCreateHandler) containerLaunchPriorityInitialization(_ context.Conte
 			priority[i] = 0 - i
 		}
 		h.setPodEnv(priority, pod)
-		klog.V(3).Infof("Injected ordered container launch priority for Pod %s/%s", pod.Namespace, pod.Name)
+		klog.V(3).InfoS("Injected ordered container launch priority for Pod", "namespace", pod.Namespace, "name", pod.Name)
 		return false, nil
 	}
 
@@ -47,7 +47,7 @@ func (h *PodCreateHandler) containerLaunchPriorityInitialization(_ context.Conte
 	}
 
 	h.setPodEnv(priority, pod)
-	klog.V(3).Infof("Injected customized container launch priority for Pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("Injected customized container launch priority for Pod", "namespace", pod.Namespace, "name", pod.Name)
 	return false, nil
 }
 

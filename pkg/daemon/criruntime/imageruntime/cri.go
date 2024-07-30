@@ -137,7 +137,7 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 		var pullErrs []error
 		for _, authInfo := range authInfos {
 			var pullErr error
-			klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
+			klog.V(5).InfoS("Pull image with user", "imageName", imageName, "tag", tag, "user", authInfo.Username)
 			pullImageReq.Auth = &runtimeapi.AuthConfig{
 				Username: authInfo.Username,
 				Password: authInfo.Password,
@@ -147,7 +147,7 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 				pipeW.CloseWithError(io.EOF)
 				return newImagePullStatusReader(pipeR), nil
 			}
-			klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
+			klog.ErrorS(pullErr, "Failed to pull image with user", "imageName", imageName, "tag", tag, "user", authInfo.Username)
 			pullErrs = append(pullErrs, pullErr)
 
 		}
@@ -155,7 +155,7 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 			err = utilerrors.NewAggregate(pullErrs)
 		}
 	} else {
-		klog.Errorf("Failed to convert to auth info for registry, err %v", err)
+		klog.ErrorS(err, "Failed to convert to auth info for registry")
 	}
 
 	// Try the default secret
@@ -164,10 +164,10 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 		var defaultErr error
 		authInfo, defaultErr = c.accountManager.GetAccountInfo(registry)
 		if defaultErr != nil {
-			klog.Warningf("Failed to get account for registry %v, err %v", registry, defaultErr)
+			klog.ErrorS(defaultErr, "Failed to get account for registry", "registry", registry)
 			// When the default account acquisition fails, try to pull anonymously
 		} else if authInfo != nil {
-			klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
+			klog.V(5).InfoS("Pull image with user", "imageName", imageName, "tag", tag, "user", authInfo.Username)
 			pullImageReq.Auth = &runtimeapi.AuthConfig{
 				Username: authInfo.Username,
 				Password: authInfo.Password,
@@ -177,7 +177,7 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 				pipeW.CloseWithError(io.EOF)
 				return newImagePullStatusReader(pipeR), nil
 			}
-			klog.Warningf("Failed to pull image %v:%v, err %v", imageName, tag, err)
+			klog.ErrorS(err, "Failed to pull image", "imageName", imageName, "tag", tag)
 			return nil, err
 		}
 	}
@@ -258,7 +258,7 @@ func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName
 			var pullErrs []error
 			for _, authInfo := range authInfos {
 				var pullErr error
-				klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
+				klog.V(5).InfoS("Pull image with user", "imageName", imageName, "tag", tag, "user", authInfo.Username)
 				pullImageReq.Auth = &runtimeapiv1alpha2.AuthConfig{
 					Username: authInfo.Username,
 					Password: authInfo.Password,
@@ -268,7 +268,7 @@ func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName
 					pipeW.CloseWithError(io.EOF)
 					return newImagePullStatusReader(pipeR), nil
 				}
-				klog.Warningf("Failed to pull image %v:%v with user %v, err %v", imageName, tag, authInfo.Username, pullErr)
+				klog.ErrorS(pullErr, "Failed to pull image with user", "imageName", imageName, "tag", tag, "user", authInfo.Username)
 				pullErrs = append(pullErrs, pullErr)
 
 			}
@@ -284,10 +284,10 @@ func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName
 		var defaultErr error
 		authInfo, defaultErr = c.accountManager.GetAccountInfo(registry)
 		if defaultErr != nil {
-			klog.Warningf("Failed to get account for registry %v, err %v", registry, defaultErr)
+			klog.ErrorS(defaultErr, "Failed to get account for registry %v, err %v", "registry", registry)
 			// When the default account acquisition fails, try to pull anonymously
 		} else if authInfo != nil {
-			klog.V(5).Infof("Pull image %v:%v with user %v", imageName, tag, authInfo.Username)
+			klog.V(5).InfoS("Pull image with user", "imageName", imageName, "tag", tag, "user", authInfo.Username)
 			pullImageReq.Auth = &runtimeapiv1alpha2.AuthConfig{
 				Username: authInfo.Username,
 				Password: authInfo.Password,
@@ -297,7 +297,7 @@ func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName
 				pipeW.CloseWithError(io.EOF)
 				return newImagePullStatusReader(pipeR), nil
 			}
-			klog.Warningf("Failed to pull image %v:%v, err %v", imageName, tag, err)
+			klog.ErrorS(err, "Failed to pull image", "imageName", imageName, "tag", tag)
 			return nil, err
 		}
 	}

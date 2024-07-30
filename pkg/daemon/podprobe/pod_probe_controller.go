@@ -199,7 +199,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 		return
 	}
 
-	klog.Infof("Starting NodePodProbe controller")
+	klog.Info("Starting NodePodProbe controller")
 	// Launch a worker to process resources, for there is only one nodePodProbe per Node
 	go wait.Until(func() {
 		for c.processNextWorkItem() {
@@ -243,7 +243,7 @@ func (c *Controller) sync() error {
 	if errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
-		klog.Errorf("Failed to get nodePodProbe %s: %v", c.nodeName, err)
+		klog.ErrorS(err, "Failed to get nodePodProbe", "nodeName", c.nodeName)
 		return err
 	}
 
@@ -259,21 +259,21 @@ func (c *Controller) sync() error {
 			validWorkers[key] = struct{}{}
 			if worker, ok := c.workers[key]; ok {
 				if !reflect.DeepEqual(probe.Probe, worker.getProbeSpec()) {
-					klog.Infof("NodePodProbe pod(%s) container(%s) probe changed from(%s) -> to(%s)",
-						key.podUID, key.containerName, commonutil.DumpJSON(worker.getProbeSpec()), commonutil.DumpJSON(probe.Probe))
+					klog.InfoS("NodePodProbe pod container probe changed",
+						"podUID", key.podUID, "containerName", key.containerName, "from", commonutil.DumpJSON(worker.getProbeSpec()), "to", commonutil.DumpJSON(probe.Probe))
 					worker.updateProbeSpec(&probe.Probe)
 				}
 				continue
 			}
 			w := newWorker(c, key, &probe.Probe)
 			c.workers[key] = w
-			klog.Infof("NodePodProbe run pod(%s) container(%s) probe(%s) spec(%s) worker", key.podUID, key.containerName, key.probeName, commonutil.DumpJSON(probe.Probe))
+			klog.InfoS("NodePodProbe run pod container probe spec worker", "podUID", key.podUID, "containerName", key.containerName, "probeName", key.probeName, "probeSpec", commonutil.DumpJSON(probe.Probe))
 			go w.run()
 		}
 	}
 	for key, worker := range c.workers {
 		if _, ok := validWorkers[key]; !ok {
-			klog.Infof("NodePodProbe stop pod(%s/%s) container(%s) probe(%s) worker", key.podNs, key.podName, key.containerName, key.probeName)
+			klog.InfoS("NodePodProbe stop pod container probe worker", "namespace", key.podNs, "podName", key.podName, "containerName", key.containerName, "probeName", key.probeName)
 			worker.stop()
 		}
 	}
@@ -309,7 +309,7 @@ func (c *Controller) syncUpdateNodePodProbeStatus() error {
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		klog.Errorf("Get NodePodProbe(%s) failed: %s", c.nodeName, err.Error())
+		klog.ErrorS(err, "Get NodePodProbe failed", "nodeName", c.nodeName)
 		return err
 	}
 	validSets := sets.NewString()
@@ -360,10 +360,10 @@ func (c *Controller) syncUpdateNodePodProbeStatus() error {
 	nppClone.Status = *newStatus
 	_, err = c.nodePodProbeClient.UpdateStatus(context.TODO(), nppClone, metav1.UpdateOptions{})
 	if err != nil {
-		klog.Errorf("NodePodProbe(%s) update status failed: %s", c.nodeName, err.Error())
+		klog.ErrorS(err, "NodePodProbe update status failed", "nodeName", c.nodeName)
 		return err
 	}
-	klog.Infof("NodePodProbe(%s) update status from(%s) -> to(%s) success", c.nodeName, commonutil.DumpJSON(npp.Status), commonutil.DumpJSON(nppClone.Status))
+	klog.InfoS("NodePodProbe(%s) update status success", "nodeName", c.nodeName, "from", commonutil.DumpJSON(npp.Status), "to", commonutil.DumpJSON(nppClone.Status))
 	return nil
 }
 
@@ -377,19 +377,19 @@ func (c *Controller) removeWorker(key probeKey) {
 func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.ContainerStatus, error) {
 	// runtimeService, for example docker
 	if c.runtimeFactory == nil {
-		klog.Warningf("NodePodProbe not found runtimeFactory")
+		klog.Warning("NodePodProbe not found runtimeFactory")
 		return nil, nil
 	}
 	runtimeService := c.runtimeFactory.GetRuntimeService()
 	if runtimeService == nil {
-		klog.Warningf("NodePodProbe not found runtimeService")
+		klog.Warning("NodePodProbe not found runtimeService")
 		return nil, nil
 	}
 	containers, err := runtimeService.ListContainers(context.TODO(), &runtimeapi.ContainerFilter{
 		LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: podUID},
 	})
 	if err != nil {
-		klog.Errorf("NodePodProbe pod(%s) list containers failed: %s", podUID, err.Error())
+		klog.ErrorS(err, "NodePodProbe pod list containers failed", "podUID", podUID)
 		return nil, err
 	}
 	var container *runtimeapi.Container

@@ -46,7 +46,7 @@ func (h *IngressHandler) Handle(ctx context.Context, req admission.Request) admi
 		return admission.ValidationResponse(true, "")
 	}
 	if len(req.OldObject.Raw) == 0 {
-		klog.Warningf("Skip to validate ingress %s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Name)
+		klog.InfoS("Skip to validate ingress deletion for no old object, maybe because of Kubernetes version < 1.16", "name", req.Name)
 		return admission.ValidationResponse(true, "")
 	}
 

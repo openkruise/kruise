@@ -156,7 +156,7 @@ func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, re
 		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ResourceDistributionGate))
 	}
 	if allErrs := h.validateResourceDistribution(obj, oldObj); len(allErrs) != 0 {
-		klog.V(3).Infof("all errors of validation: %v", allErrs)
+		klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
 		return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 	}
 	return admission.ValidationResponse(true, "")

@@ -99,14 +99,14 @@ func New(cfg *rest.Config, handlers map[string]webhooktypes.HandlerGetter) (*Con
 		AddFunc: func(obj interface{}) {
 			secret := obj.(*v1.Secret)
 			if secret.Name == secretName {
-				klog.Infof("Secret %s added", secretName)
+				klog.InfoS("Secret added", "name", secretName)
 				c.queue.Add("")
 			}
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			secret := cur.(*v1.Secret)
 			if secret.Name == secretName {
-				klog.Infof("Secret %s updated", secretName)
+				klog.InfoS("Secret updated", "name", secretName)
 				c.queue.Add("")
 			}
 		},
@@ -116,14 +116,14 @@ func New(cfg *rest.Config, handlers map[string]webhooktypes.HandlerGetter) (*Con
 		AddFunc: func(obj interface{}) {
 			conf := obj.(*admissionregistrationv1.MutatingWebhookConfiguration)
 			if conf.Name == mutatingWebhookConfigurationName {
-				klog.Infof("MutatingWebhookConfiguration %s added", mutatingWebhookConfigurationName)
+				klog.InfoS("MutatingWebhookConfiguration added", "name", mutatingWebhookConfigurationName)
 				c.queue.Add("")
 			}
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			conf := cur.(*admissionregistrationv1.MutatingWebhookConfiguration)
 			if conf.Name == mutatingWebhookConfigurationName {
-				klog.Infof("MutatingWebhookConfiguration %s update", mutatingWebhookConfigurationName)
+				klog.InfoS("MutatingWebhookConfiguration update", "name", mutatingWebhookConfigurationName)
 				c.queue.Add("")
 			}
 		},
@@ -133,14 +133,14 @@ func New(cfg *rest.Config, handlers map[string]webhooktypes.HandlerGetter) (*Con
 		AddFunc: func(obj interface{}) {
 			conf := obj.(*admissionregistrationv1.ValidatingWebhookConfiguration)
 			if conf.Name == validatingWebhookConfigurationName {
-				klog.Infof("ValidatingWebhookConfiguration %s added", validatingWebhookConfigurationName)
+				klog.InfoS("ValidatingWebhookConfiguration added", "name", validatingWebhookConfigurationName)
 				c.queue.Add("")
 			}
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			conf := cur.(*admissionregistrationv1.ValidatingWebhookConfiguration)
 			if conf.Name == validatingWebhookConfigurationName {
-				klog.Infof("ValidatingWebhookConfiguration %s updated", validatingWebhookConfigurationName)
+				klog.InfoS("ValidatingWebhookConfiguration updated", "name", validatingWebhookConfigurationName)
 				c.queue.Add("")
 			}
 		},
@@ -152,14 +152,14 @@ func New(cfg *rest.Config, handlers map[string]webhooktypes.HandlerGetter) (*Con
 		AddFunc: func(obj interface{}) {
 			crd := obj.(*apiextensionsv1.CustomResourceDefinition)
 			if crd.Spec.Group == "apps.kruise.io" {
-				klog.Infof("CustomResourceDefinition %s added", crd.Name)
+				klog.InfoS("CustomResourceDefinition added", "name", crd.Name)
 				c.queue.Add("")
 			}
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			crd := cur.(*apiextensionsv1.CustomResourceDefinition)
 			if crd.Spec.Group == "apps.kruise.io" {
-				klog.Infof("CustomResourceDefinition %s updated", crd.Name)
+				klog.InfoS("CustomResourceDefinition updated", "name", crd.Name)
 				c.queue.Add("")
 			}
 		},
@@ -180,8 +180,8 @@ func (c *Controller) Start(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting webhook-controller")
-	defer klog.Infof("Shutting down webhook-controller")
+	klog.Info("Starting webhook-controller")
+	defer klog.Info("Shutting down webhook-controller")
 
 	c.informerFactory.Start(ctx.Done())
 	go func() {
@@ -195,7 +195,7 @@ func (c *Controller) Start(ctx context.Context) {
 		for c.processNextWorkItem() {
 		}
 	}, time.Second, ctx.Done())
-	klog.Infof("Started webhook-controller")
+	klog.Info("Started webhook-controller")
 
 	<-ctx.Done()
 }
@@ -221,9 +221,9 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 func (c *Controller) sync() error {
-	klog.Infof("Starting to sync webhook certs and configurations")
+	klog.Info("Starting to sync webhook certs and configurations")
 	defer func() {
-		klog.Infof("Finished to sync webhook certs and configurations")
+		klog.Info("Finished to sync webhook certs and configurations")
 	}()
 
 	dnsName := webhookutil.GetHost()

@@ -48,7 +48,7 @@ func (h *CRDHandler) Handle(ctx context.Context, req admission.Request) admissio
 		return admission.ValidationResponse(true, "")
 	}
 	if len(req.OldObject.Raw) == 0 {
-		klog.Warningf("Skip to validate CRD %s deletion for no old object, maybe because of Kubernetes version < 1.16", req.Name)
+		klog.InfoS("Skip to validate CRD %s deletion for no old object, maybe because of Kubernetes version < 1.16", "name", req.Name)
 		return admission.ValidationResponse(true, "")
 	}
 
@@ -80,7 +80,7 @@ func (h *CRDHandler) Handle(ctx context.Context, req admission.Request) admissio
 			}
 		}
 	default:
-		klog.Warningf("Skip to validate CRD %s deletion for unrecognized version %s", req.Name, req.Kind.Version)
+		klog.InfoS("Skip to validate CRD deletion for unrecognized version %s", "name", req.Name, "version", req.Kind.Version)
 		return admission.ValidationResponse(true, "")
 	}
 

@@ -44,7 +44,7 @@ import (
 func (m *genericRuntimeManager) recordContainerEvent(pod *v1.Pod, container *v1.Container, containerID, eventType, reason, message string, args ...interface{}) {
 	ref, err := kubeletcontainer.GenerateContainerRef(pod, container)
 	if err != nil {
-		klog.Errorf("Can't make a ref to pod %q, container %v: %v", format.Pod(pod), container.Name, err)
+		klog.ErrorS(err, "Can't make a ref to pod container", "pod", format.Pod(pod), "container", container.Name)
 		return
 	}
 	eventMessage := message
@@ -168,16 +168,16 @@ func (m *genericRuntimeManager) KillContainer(pod *v1.Pod, containerID kubeletco
 
 	if gracePeriodOverride != nil {
 		gracePeriod = *gracePeriodOverride
-		klog.V(3).Infof("Killing container %q, but using %d second grace period override", containerID, gracePeriod)
+		klog.V(3).InfoS("Killing container, but using grace period override", "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	}
 
-	klog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
+	klog.V(2).InfoS("Killing container with grace period", "containerID", containerID.String(), "gracePeriod", gracePeriod)
 
 	err := m.runtimeService.StopContainer(context.TODO(), containerID.ID, gracePeriod)
 	if err != nil {
-		klog.Errorf("Container %q termination failed with gracePeriod %d: %v", containerID.String(), gracePeriod, err)
+		klog.ErrorS(err, "Container termination failed with grace period", "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	} else {
-		klog.V(3).Infof("Container %q exited normally", containerID.String())
+		klog.V(3).InfoS("Container exited normally", "containerID", containerID.String())
 	}
 
 	return err
@@ -229,7 +229,7 @@ func (m *genericRuntimeManager) restoreSpecsFromContainerLabels(containerID kube
 
 // executePreStopHook runs the pre-stop lifecycle hooks if applicable and returns the duration it takes.
 func (m *genericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID kubeletcontainer.ContainerID, containerSpec *v1.Container, gracePeriod int64) int64 {
-	klog.V(3).Infof("Running preStop hook for container %q", containerID.String())
+	klog.V(3).InfoS("Running preStop hook for container", "containerID", containerID.String())
 
 	start := metav1.Now()
 	done := make(chan struct{})
@@ -237,16 +237,16 @@ func (m *genericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID kube
 		defer close(done)
 		defer utilruntime.HandleCrash()
 		if msg, err := m.runner.Run(context.TODO(), containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
-			klog.Errorf("preStop hook for container %q failed: %v", containerSpec.Name, err)
+			klog.ErrorS(err, "preStop hook for container failed", "name", containerSpec.Name)
 			m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeWarning, events.FailedPreStopHook, msg)
 		}
 	}()
 
 	select {
 	case <-time.After(time.Duration(gracePeriod) * time.Second):
-		klog.V(2).Infof("preStop hook for container %q did not complete in %d seconds", containerID, gracePeriod)
+		klog.V(2).InfoS("preStop hook for container did not complete in time", "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	case <-done:
-		klog.V(3).Infof("preStop hook for container %q completed", containerID)
+		klog.V(3).InfoS("preStop hook for container completed", "containerID", containerID.String())
 	}
 
 	return int64(metav1.Now().Sub(start.Time).Seconds())

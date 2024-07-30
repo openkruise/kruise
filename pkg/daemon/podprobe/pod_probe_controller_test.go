@@ -410,7 +410,7 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 func checkNodePodProbeStatusEqual(lister listersalpha1.NodePodProbeLister, expect appsv1alpha1.NodePodProbeStatus) bool {
 	npp, err := lister.Get("node-1")
 	if err != nil {
-		klog.Errorf("Get NodePodProbe failed: %s", err.Error())
+		klog.ErrorS(err, "Get NodePodProbe failed")
 		return false
 	}
 	for i := range npp.Status.PodProbeStatuses {

@@ -171,7 +171,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 		return
 	}
 
-	klog.Infof("Starting crr daemon controller")
+	klog.Info("Starting crr daemon controller")
 	for i := 0; i < workers; i++ {
 		go wait.Until(func() {
 			for c.processNextWorkItem() {
@@ -210,7 +210,7 @@ func (c *Controller) processNextWorkItem() bool {
 func (c *Controller) sync(key string) (retErr error) {
 	namespace, podName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		klog.Warningf("Invalid key: %s", key)
+		klog.InfoS("Invalid key", "key", key)
 		return nil
 	}
 
@@ -235,12 +235,12 @@ func (c *Controller) sync(key string) (retErr error) {
 		return err
 	}
 
-	klog.V(3).Infof("Start syncing for %s/%s", namespace, crr.Name)
+	klog.V(3).InfoS("Start syncing", "namespace", namespace, "name", crr.Name)
 	defer func() {
 		if retErr != nil {
-			klog.Errorf("Failed to sync for %s/%s: %v", namespace, crr.Name, retErr)
+			klog.ErrorS(retErr, "Failed to sync", "namespace", namespace, "name", crr.Name)
 		} else {
-			klog.V(3).Infof("Finished syncing for %s/%s", namespace, crr.Name)
+			klog.V(3).InfoS("Finished syncing", "namespace", namespace, "name", crr.Name)
 		}
 	}()
 
@@ -252,19 +252,19 @@ func (c *Controller) sync(key string) (retErr error) {
 	if crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil {
 		unreadyTimeStr := crr.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey]
 		if unreadyTimeStr == "" {
-			klog.Infof("CRR %s/%s is waiting for unready acquirement.", crr.Namespace, crr.Name)
+			klog.InfoS("CRR is waiting for unready acquirement", "namespace", crr.Namespace, "name", crr.Name)
 			return nil
 		}
 
 		unreadyTime, err := time.Parse(time.RFC3339, unreadyTimeStr)
 		if err != nil {
-			klog.Errorf("CRR %s/%s failed to parse unready time %s: %v", crr.Namespace, crr.Name, unreadyTimeStr, err)
+			klog.ErrorS(err, "CRR failed to parse unready time", "namespace", crr.Namespace, "name", crr.Name, "unreadyTimeStr", unreadyTimeStr)
 			return c.completeCRRStatus(crr, fmt.Sprintf("failed to parse unready time %s: %v", unreadyTimeStr, err))
 		}
 
 		leftTime := time.Duration(*crr.Spec.Strategy.UnreadyGracePeriodSeconds)*time.Second - time.Since(unreadyTime)
 		if leftTime > 0 {
-			klog.Infof("CRR %s/%s is waiting for unready grace period %v left time.", crr.Namespace, crr.Name, leftTime)
+			klog.InfoS("CRR is waiting for unready grace period", "namespace", crr.Namespace, "name", crr.Name, "leftTime", leftTime)
 			c.queue.AddAfter(crr.Namespace+"/"+crr.Spec.PodName, leftTime+100*time.Millisecond)
 			return nil
 		}
@@ -287,7 +287,7 @@ func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecrea
 			if duration < maxExpectationWaitDuration {
 				break
 			}
-			klog.Warningf("Wait for CRR %s/%s resourceVersion expectation over %v", crr.Namespace, crr.Name, duration)
+			klog.InfoS("Wait for CRR resourceVersion expectation", "namespace", crr.Namespace, "name", crr.Name, "duration", duration)
 			resourceVersionExpectation.Delete(crr)
 		}
 
@@ -296,7 +296,7 @@ func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecrea
 			picked = crr
 		} else if crr.Status.Phase == "" {
 			if err := c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestPending); err != nil {
-				klog.Errorf("Failed to update CRR %s/%s status to Pending: %v", crr.Namespace, crr.Name, err)
+				klog.ErrorS(err, "Failed to update CRR status to Pending", "namespace", crr.Namespace, "name", crr.Name)
 				return nil, err
 			}
 		}
@@ -307,7 +307,7 @@ func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecrea
 func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 	runtimeManager, err := c.newRuntimeManager(c.runtimeFactory, crr)
 	if err != nil {
-		klog.Errorf("Failed to find runtime service for %s/%s: %v", crr.Namespace, crr.Name, err)
+		klog.ErrorS(err, "Failed to find runtime service", "namespace", crr.Namespace, "name", crr.Name)
 		return c.completeCRRStatus(crr, fmt.Sprintf("failed to find runtime service: %v", err))
 	}
 
@@ -317,7 +317,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 	if err != nil {
 		return fmt.Errorf("failed to GetPodStatus %s/%s with uid %s: %v", pod.Namespace, pod.Name, pod.UID, err)
 	}
-	klog.V(5).Infof("CRR %s/%s for Pod %s GetPodStatus: %v", crr.Namespace, crr.Name, pod.Name, util.DumpJSON(podStatus))
+	klog.V(5).InfoS("CRR for Pod GetPodStatus", "namespace", crr.Namespace, "name", crr.Name, "podName", pod.Name, "podStatus", util.DumpJSON(podStatus))
 
 	newCRRContainerRecreateStates := getCurrentCRRContainersRecreateStates(crr, podStatus)
 	if !reflect.DeepEqual(crr.Status.ContainerRecreateStates, newCRRContainerRecreateStates) {
@@ -356,7 +356,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 		msg := fmt.Sprintf("Stopping container %s by ContainerRecreateRequest %s", state.Name, crr.Name)
 		err := runtimeManager.KillContainer(pod, kubeContainerStatus.ID, state.Name, msg, nil)
 		if err != nil {
-			klog.Errorf("Failed to kill container %s in Pod %s/%s for CRR %s/%s: %v", state.Name, pod.Namespace, pod.Name, crr.Namespace, crr.Name, err)
+			klog.ErrorS(err, "Failed to kill container in Pod for CRR", "containerName", state.Name, "podNamespace", pod.Namespace, "podName", pod.Name, "crrNamespace", crr.Namespace, "crrName", crr.Name)
 			state.Phase = appsv1alpha1.ContainerRecreateRequestFailed
 			state.Message = fmt.Sprintf("kill container error: %v", err)
 			if crr.Spec.Strategy.FailurePolicy == appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore {
@@ -385,7 +385,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 }
 
 func (c *Controller) patchCRRContainerRecreateStates(crr *appsv1alpha1.ContainerRecreateRequest, newCRRContainerRecreateStates []appsv1alpha1.ContainerRecreateRequestContainerRecreateState) error {
-	klog.V(3).Infof("CRR %s/%s patch containerRecreateStates: %v", crr.Namespace, crr.Name, util.DumpJSON(newCRRContainerRecreateStates))
+	klog.V(3).InfoS("CRR patch containerRecreateStates", "namespace", crr.Namespace, "name", crr.Name, "states", util.DumpJSON(newCRRContainerRecreateStates))
 	crr = crr.DeepCopy()
 	body := fmt.Sprintf(`{"status":{"containerRecreateStates":%s}}`, util.DumpJSON(newCRRContainerRecreateStates))
 	oldRev := crr.ResourceVersion

@@ -57,7 +57,7 @@ func (h *ImageListPullJobCreateUpdateHandler) Handle(ctx context.Context, req ad
 	}
 	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
 	if len(resp.Patches) > 0 {
-		klog.V(5).Infof("Admit ImageListPullJob %s patches: %v", obj.Name, util.DumpJSON(resp.Patches))
+		klog.V(5).InfoS("Admit ImageListPullJob patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
 	}
 
 	return resp

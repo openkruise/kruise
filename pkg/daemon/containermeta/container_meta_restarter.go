@@ -80,21 +80,21 @@ func (c *restartController) processNextWorkItem() bool {
 func (c *restartController) sync(containerID kubeletcontainer.ContainerID) error {
 	criRuntime := c.runtimeFactory.GetRuntimeServiceByName(containerID.Type)
 	if criRuntime == nil {
-		klog.Errorf("Not found runtime service for %s in daemon", containerID.Type)
+		klog.InfoS("Not found runtime service in daemon", "type", containerID.Type)
 		return nil
 	}
 
 	containers, err := criRuntime.ListContainers(context.TODO(), &runtimeapi.ContainerFilter{Id: containerID.ID})
 	if err != nil {
-		klog.Errorf("Failed to list containers by %s: %v", containerID.String(), err)
+		klog.ErrorS(err, "Failed to list containers", "id", containerID.String())
 		return err
 	}
 	if len(containers) == 0 || containers[0].State != runtimeapi.ContainerState_CONTAINER_RUNNING {
-		klog.V(4).Infof("Skip to kill container %s because of not found or non-running state.", containerID.String())
+		klog.V(4).InfoS("Skip to kill container because of not found or non-running state.", "id", containerID.String())
 		return nil
 	}
 
-	klog.V(3).Infof("Preparing to stop container %s", containerID.String())
+	klog.V(3).InfoS("Preparing to stop container", "id", containerID.String())
 	kubeRuntime := kuberuntime.NewGenericRuntime(containerID.Type, criRuntime, c.eventRecorder, &http.Client{})
 	msg := fmt.Sprintf("Stopping containerID %s by container meta restarter", containerID.String())
 	err = kubeRuntime.KillContainer(nil, containerID, "", msg, nil)

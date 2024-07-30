@@ -107,7 +107,7 @@ func (r *noDeepCopyLister) List(ctx context.Context, out client.ObjectList, opts
 		runtimeObjs = append(runtimeObjs, obj)
 	}
 	defer func() {
-		klog.V(6).Infof("Listed %v %v objects %v without DeepCopy, cost %v", gvk.GroupVersion(), gvk.Kind, len(runtimeObjs), time.Since(startTime))
+		klog.V(6).InfoS("Objects listed without DeepCopy", "groupVersion", gvk.GroupVersion(), "kind", gvk.Kind, "objects", len(runtimeObjs), "cost", time.Since(startTime))
 	}()
 	return apimeta.SetList(out, runtimeObjs)
 }

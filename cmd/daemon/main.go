@@ -79,12 +79,12 @@ func main() {
 	if _, err := os.Stat(*pluginConfigFile); err == nil {
 		err = plugin.RegisterCredentialProviderPlugins(*pluginConfigFile, *pluginBinDir)
 		if err != nil {
-			klog.Errorf("Failed to register credential provider plugins: %v", err)
+			klog.ErrorS(err, "Failed to register credential provider plugins")
 		}
 	} else if os.IsNotExist(err) {
-		klog.Infof("No plugin config file found, skipping: %s", *pluginConfigFile)
+		klog.InfoS("No plugin config file found, skipping", "configFile", *pluginConfigFile)
 	} else {
-		klog.Errorf("Failed to check plugin config file: %v", err)
+		klog.ErrorS(err, "Failed to check plugin config file")
 	}
 	// make sure the new docker key ring is made and set after the credential plugins are registered
 	secret.MakeAndSetKeyring()

@@ -161,7 +161,7 @@ func getCRRSyncContainerStatuses(crr *appsv1alpha1.ContainerRecreateRequest) map
 	}
 	var syncContainerStatuses []appsv1alpha1.ContainerRecreateRequestSyncContainerStatus
 	if err := json.Unmarshal([]byte(str), &syncContainerStatuses); err != nil {
-		klog.Errorf("Failed to unmarshal CRR %s/%s syncContainerStatuses %s: %v", crr.Namespace, crr.Name, str, err)
+		klog.ErrorS(err, "Failed to unmarshal CRR syncContainerStatuses", "namespace", crr.Namespace, "name", crr.Name, "rawString", str)
 		return nil
 	}
 

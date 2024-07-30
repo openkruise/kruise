@@ -55,7 +55,7 @@ func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission
 	}
 
 	if err := validate(obj); err != nil {
-		klog.Warningf("Error validate NodeImage %s: %v", obj.Name, err)
+		klog.ErrorS(err, "Error validate NodeImage", "name", obj.Name)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 

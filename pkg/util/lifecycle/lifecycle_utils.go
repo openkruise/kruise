@@ -116,8 +116,8 @@ func (c *realControl) executePodNotReadyPolicy(pod *v1.Pod, state appspub.Lifecy
 	}
 
 	if err != nil {
-		klog.Errorf("Failed to set pod(%v) Ready/NotReady at %s lifecycle state, error: %v",
-			client.ObjectKeyFromObject(pod), state, err)
+		klog.ErrorS(err, "Failed to set pod Ready/NotReady at lifecycle state",
+			"pod", client.ObjectKeyFromObject(pod), "state", state)
 	}
 	return
 }

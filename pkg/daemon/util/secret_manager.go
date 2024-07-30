@@ -62,7 +62,7 @@ func (c *cacheBasedSecretManager) GetSecrets(secrets []appsv1alpha1.ReferenceObj
 		} else {
 			s, err := c.client.CoreV1().Secrets(secret.Namespace).Get(context.TODO(), secret.Name, metav1.GetOptions{ResourceVersion: "0"})
 			if err != nil {
-				klog.Errorf("failed to get secret %s, err %v", secret, err)
+				klog.ErrorS(err, "failed to get secret", "secret", secret)
 			} else {
 				// renew cache in 5~10 minutes
 				interval := time.Duration(rand.Int31n(6)+5) * time.Minute

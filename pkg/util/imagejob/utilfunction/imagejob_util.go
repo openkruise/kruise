@@ -86,7 +86,7 @@ func DeleteJobsForWorkload(c client.Client, ownerObj metav1.Object) error {
 		if owner == nil || owner.UID != ownerObj.GetUID() {
 			continue
 		}
-		klog.Infof("Deleting ImagePullJob %s for workload %s %s/%s", job.Name, owner.Kind, ownerObj.GetNamespace(), ownerObj.GetName())
+		klog.InfoS("Deleting ImagePullJob for workload", "jobName", job.Name, "ownerKind", owner.Kind, "ownerNamespace", ownerObj.GetNamespace(), "ownerName", ownerObj.GetName())
 		if err := c.Delete(context.TODO(), job); err != nil {
 			return err
 		}
