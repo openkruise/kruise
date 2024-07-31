@@ -116,7 +116,7 @@ func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy, oldStrateg
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podsToDelete"), podName, fmt.Sprintf("find pod %s failed: %v", podName, err)))
 		} else if pod.DeletionTimestamp != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podsToDelete"), podName, fmt.Sprintf("find pod %s already terminating", podName)))
-		} else if owner := metav1.GetControllerOf(pod); owner.UID != metadata.UID {
+		} else if owner := metav1.GetControllerOf(pod); owner == nil || owner.UID != metadata.UID {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podsToDelete"), podName, fmt.Sprintf("find pod %s owner is not this CloneSet", podName)))
 		}
 	}
