@@ -238,6 +238,7 @@ func (c *Controller) sync() error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.EnableExternalCerts) {
 		certWriter, err = writer.NewExternalCertWriter(writer.ExternalCertWriterOptions{
 			Clientset: c.kubeClient,
+			Secret:    &types.NamespacedName{Namespace: webhookutil.GetNamespace(), Name: webhookutil.GetSecretName()},
 		})
 	} else if certWriterType == writer.FsCertWriter || (len(certWriterType) == 0 && len(webhookutil.GetHost()) != 0) {
 		certWriter, err = writer.NewFSCertWriter(writer.FSCertWriterOptions{

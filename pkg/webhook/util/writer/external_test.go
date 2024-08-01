@@ -21,9 +21,11 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/generator"
-	v1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -36,11 +38,13 @@ func TestEnsureCert(t *testing.T) {
 	teatCases := []struct {
 		name                 string
 		needRefreshCertCache bool
+		secret               types.NamespacedName
 		expect               ExpectOut
 	}{
 		{
-			name:                 "test get certs from mutating webhook configuration",
+			name:                 "test get certs from secret",
 			needRefreshCertCache: true,
+			secret:               types.NamespacedName{Namespace: webhookutil.GetNamespace(), Name: webhookutil.GetSecretName()},
 			expect: ExpectOut{
 				changed:      true,
 				errorHappens: false,
@@ -49,9 +53,19 @@ func TestEnsureCert(t *testing.T) {
 		{
 			name:                 "test get certs from cache",
 			needRefreshCertCache: false,
+			secret:               types.NamespacedName{Namespace: webhookutil.GetNamespace(), Name: webhookutil.GetSecretName()},
 			expect: ExpectOut{
 				changed:      false,
 				errorHappens: false,
+			},
+		},
+		{
+			name:                 "test secret not found",
+			needRefreshCertCache: true,
+			secret:               types.NamespacedName{Namespace: "default", Name: "not-existed-secret"},
+			expect: ExpectOut{
+				changed:      false,
+				errorHappens: true,
 			},
 		},
 	}
@@ -63,20 +77,23 @@ func TestEnsureCert(t *testing.T) {
 	// certs expire after 10 years
 	certs, err := certGenerator.Generate(dnsName)
 	g.Expect(err).NotTo(gomega.HaveOccurred())
-	wh := &v1.MutatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: mutatingWebhookConfigurationName,
+	secret := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
 		},
-		Webhooks: []v1.MutatingWebhook{
-			{
-				ClientConfig: v1.WebhookClientConfig{
-					CABundle: certs.CACert,
-				},
-			},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: webhookutil.GetNamespace(),
+			Name:      webhookutil.GetSecretName(),
+		},
+		Data: map[string][]byte{
+			ExternalCAKey:      certs.CAKey,
+			ExternalCACert:     certs.CACert,
+			ExternalServerKey:  certs.Key,
+			ExternalServerCert: certs.Cert,
 		},
 	}
-
-	_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), wh, metav1.CreateOptions{})
+	_, err = client.CoreV1().Secrets(webhookutil.GetNamespace()).Create(context.TODO(), &secret, metav1.CreateOptions{})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
 	for _, tc := range teatCases {
@@ -89,10 +106,10 @@ func TestEnsureCert(t *testing.T) {
 
 			externalCertWriter, err := NewExternalCertWriter(ExternalCertWriterOptions{
 				Clientset: client,
+				Secret:    &types.NamespacedName{Namespace: tc.secret.Namespace, Name: tc.secret.Name},
 			})
 			g.Expect(err).NotTo(gomega.HaveOccurred())
-			externalCerts, changed, err := externalCertWriter.EnsureCert(dnsName)
-			g.Expect(externalCerts.CACert).Should(gomega.Equal(certs.CACert))
+			_, changed, err := externalCertWriter.EnsureCert(dnsName)
 			g.Expect(changed).Should(gomega.Equal(tc.expect.changed))
 			g.Expect(err != nil).Should(gomega.Equal(tc.expect.errorHappens))
 		})
@@ -104,5 +121,5 @@ func RefreshCurrentExternalCertsCache() {
 }
 
 func UpdateCurrentExternalCertsCache(externalCerts *generator.Artifacts) {
-	currentExternalCerts.CACert = externalCerts.CACert
+	currentExternalCerts = externalCerts
 }

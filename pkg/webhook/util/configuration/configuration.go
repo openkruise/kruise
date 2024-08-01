@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -52,15 +53,30 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 	if utilfeature.DefaultFeatureGate.Enabled(features.EnableExternalCerts) {
 		// if using external certs, only check the caBundle of webhook
 		for _, wh := range mutatingConfig.Webhooks {
-			if wh.ClientConfig.CABundle == nil {
-				return fmt.Errorf("caBundle of MutatingWebhookConfiguration %s is nil", mutatingWebhookConfigurationName)
-
+			path, err := getPath(&wh.ClientConfig)
+			if err != nil {
+				return err
+			}
+			if _, ok := handlers[path]; !ok {
+				klog.Warningf("Ignore webhook for %s in configuration", path)
+				continue
+			}
+			if !bytes.Equal(wh.ClientConfig.CABundle, caBundle) {
+				return fmt.Errorf("caBundle of MutatingWebhookConfiguration %s does not match the external caBundle", mutatingWebhookConfigurationName)
 			}
 		}
 
 		for _, wh := range validatingConfig.Webhooks {
-			if wh.ClientConfig.CABundle == nil {
-				return fmt.Errorf("caBundle of ValidatingWebhookConfiguration %s is nil", mutatingWebhookConfigurationName)
+			path, err := getPath(&wh.ClientConfig)
+			if err != nil {
+				return err
+			}
+			if _, ok := handlers[path]; !ok {
+				klog.Warningf("Ignore webhook for %s in configuration", path)
+				continue
+			}
+			if !bytes.Equal(wh.ClientConfig.CABundle, caBundle) {
+				return fmt.Errorf("caBundle of ValidatingWebhookConfiguration %s does not match the external caBundle", validatingWebhookConfigurationName)
 			}
 		}
 		return nil

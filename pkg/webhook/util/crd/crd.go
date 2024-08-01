@@ -17,6 +17,7 @@ limitations under the License.
 package crd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -60,8 +61,12 @@ func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters
 				continue
 			}
 
-			if crd.Spec.Conversion.Webhook == nil || crd.Spec.Conversion.Webhook.ClientConfig == nil || crd.Spec.Conversion.Webhook.ClientConfig.CABundle == nil {
+			if crd.Spec.Conversion.Webhook == nil || crd.Spec.Conversion.Webhook.ClientConfig == nil {
 				return fmt.Errorf("bad conversion configuration of CRD %s", crd.Name)
+			}
+
+			if !bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, caBundle) {
+				return fmt.Errorf("caBundle of CRD %s does not match external caBundle", crd.Name)
 			}
 		}
 		return nil
