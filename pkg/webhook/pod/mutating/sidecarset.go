@@ -29,6 +29,7 @@ import (
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/history"
+	"k8s.io/apimachinery/pkg/labels"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"
@@ -203,6 +204,21 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 		revisionInfo := sidecarSet.Spec.InjectionStrategy.Revision
 		if revisionInfo == nil || (revisionInfo.RevisionName == nil && revisionInfo.CustomVersion == nil) {
 			return sidecarSet.DeepCopy(), nil
+		}
+
+		// On pod creation, if a new pod matches the SidecarSet update strategy selector,
+		// the latest revision rather than that specified in the sidecarset.spec.injectionStrategy will be injected.
+		if updateStrategy := sidecarSet.Spec.UpdateStrategy; !updateStrategy.Paused && updateStrategy.Selector != nil {
+			selector, err := util.ValidatedLabelSelectorAsSelector(updateStrategy.Selector)
+			if err != nil {
+				klog.ErrorS(err, "Failed to parse SidecarSet update strategy selector", "name", sidecarSet.Name)
+				return nil, err
+			}
+			if selector.Matches(labels.Set(newPod.Labels)) {
+				klog.InfoS("New pod matches SidecarSet update strategy selector, latest revision will be injected",
+					"namespace", newPod.Namespace, "podName", newPod.Name, "sidecarSet", sidecarSet.Name)
+				return sidecarSet.DeepCopy(), nil
+			}
 		}
 
 		// TODO: support 'PartitionBased' policy to inject old/new revision according to Partition
