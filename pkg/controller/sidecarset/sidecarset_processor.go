@@ -87,11 +87,15 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 	}
 
 	// 2. calculate SidecarSet status based on pod and revision information
-	status := calculateStatus(control, pods, latestRevision, collisionCount)
+	status, podsAwaitingPatchNormal := calculateStatus(control, pods, latestRevision, collisionCount)
 	//update sidecarSet status in store
 	if err := p.updateSidecarSetStatus(sidecarSet, status); err != nil {
 		return reconcile.Result{}, err
 	}
+	if err := p.updateSidecarSetUpgradeState(sidecarSet, podsAwaitingPatchNormal, sidecarcontrol.SidecarSetUpgradeStateNormal); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	sidecarSet.Status = *status
 
 	// in case of informer cache latency
@@ -189,6 +193,27 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 
 	klog.V(3).InfoS("SidecarSet updated pods", "sidecarSet", klog.KObj(sidecarset), "podNames", strings.Join(podNames, ","))
 	return nil
+}
+
+func (p *Processor) updateSidecarSetUpgradeState(sidecarSet *appsv1alpha1.SidecarSet, pods []*corev1.Pod,
+	sideCarSetUpgradeState sidecarcontrol.SidecarSetUpgradeState) (ret error) {
+	for _, pod := range pods {
+		podClone := pod.DeepCopy()
+		updatedAnnotation, err := sidecarcontrol.GetPodSidecarSetHashUpdatedState(podClone, sidecarSet, sideCarSetUpgradeState)
+		if err != nil {
+			klog.ErrorS(err, "SidecarSet got pod SidecarSetUpgradeState annotation failed", "sidecarSet", klog.KObj(sidecarSet), "pod", klog.KObj(podClone))
+			ret = err
+			continue
+		}
+		body := fmt.Sprintf(`{"metadata":%s}`, updatedAnnotation)
+		if err = p.Client.Patch(context.TODO(), podClone, client.RawPatch(types.MergePatchType, []byte(body))); err != nil {
+			klog.ErrorS(err, "SidecarSet patched SidecarSetUpgradeState annotation failed", "sidecarSet", klog.KObj(sidecarSet), "pod", klog.KObj(podClone))
+			ret = err
+			continue
+		}
+		klog.InfoS("SidecarSet updated pod SidecarSetUpgradeState success", "sidecarSet", klog.KObj(sidecarSet), "pod", klog.KObj(podClone))
+	}
+	return
 }
 
 func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarControl, pod *corev1.Pod) error {
@@ -516,10 +541,11 @@ func replaceRevision(revisions []*apps.ControllerRevision, oldOne, newOne *apps.
 // UpdatedReadyPods: updated and ready pods number
 // UnavailablePods: MatchedPods - UpdatedReadyPods
 func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod, latestRevision *apps.ControllerRevision, collisionCount int32,
-) *appsv1alpha1.SidecarSetStatus {
+) (*appsv1alpha1.SidecarSetStatus, []*corev1.Pod) {
 	sidecarset := control.GetSidecarset()
 	var matchedPods, updatedPods, readyPods, updatedAndReady int32
 	matchedPods = int32(len(pods))
+	var podsAwaitingPatchNormal []*corev1.Pod
 	for _, pod := range pods {
 		updated := sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod)
 		if updated {
@@ -529,6 +555,9 @@ func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod, 
 			readyPods++
 			if updated {
 				updatedAndReady++
+				if sidecarcontrol.IsPodSidecarSetUpgradeStateAwaitingPatchNormal(sidecarset, pod) {
+					podsAwaitingPatchNormal = append(podsAwaitingPatchNormal, pod)
+				}
 			}
 		}
 	}
@@ -540,7 +569,7 @@ func calculateStatus(control sidecarcontrol.SidecarControl, pods []*corev1.Pod, 
 		UpdatedReadyPods:   updatedAndReady,
 		LatestRevision:     latestRevision.Name,
 		CollisionCount:     pointer.Int32Ptr(collisionCount),
-	}
+	}, podsAwaitingPatchNormal
 }
 
 func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
@@ -612,7 +641,7 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 		}
 	}
 	// update sidecarSet hash in pod annotations[kruise.io/sidecarset-hash]
-	sidecarcontrol.UpdatePodSidecarSetHash(pod, sidecarSet)
+	sidecarcontrol.UpdatePodSidecarSetHash(pod, sidecarSet, sidecarcontrol.SidecarSetUpgradeStateUpdating)
 	// update pod information in upgrade
 	// UpdatePodAnnotationsInUpgrade needs to be called when Update Container, including hot-upgrade reset empty image.
 	// However, reset empty image should not update pod sidecarSet hash annotation, so UpdatePodSidecarSetHash needs to be called additionally
