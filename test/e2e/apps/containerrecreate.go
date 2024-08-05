@@ -191,6 +191,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					Image: AgnhostImage,
 				},
 			})
+			time.Sleep(time.Second * 3)
 
 			{
 				ginkgo.By("Create CRR for pods[0], recreate container: app(postStartHook) and sidecar")
@@ -369,7 +370,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				sidecarContainerStatus := util.GetContainerStatus("sidecar", pod)
 				gomega.Expect(appContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
-
+				gomega.Expect(sidecarContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
 				ginkgo.By("Check Pod app container stopped after preStop")
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(crr.CreationTimestamp.Time)
 				gomega.Expect(interval >= 8*time.Second).Should(gomega.Equal(true))

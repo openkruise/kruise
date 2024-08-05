@@ -1,5 +1,50 @@
 # Change Log
 
+## v1.7.0
+> Change log since v1.6.3
+
+### Key Features
+- When CloneSet volumeClaimTemplates changed, always recreate pods and related volumes. ([#1561](https://github.com/openkruise/kruise/pull/1561), [@ABNER-1](https://github.com/ABNER-1))
+- Bump K8s dependency to 1.28, and OpenKruise still works with Kubernetes Version >= 1.18. ([#1598](https://github.com/openkruise/kruise/pull/1598), [@ABNER-1](https://github.com/ABNER-1))
+- SidecarSet support k8s 1.28 Sidecar Containers(initContainers[x].restartPolicy=Always), and significantly improves the lifecycle management of Sidecar containers,
+refer to the [community documentation](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) for details. ([#1613](https://github.com/openkruise/kruise/pull/1613), [@zmberg](https://github.com/zmberg))
+- ImagePullJob support for credential provider plugin, e.g. aws. ([#1383](https://github.com/openkruise/kruise/pull/1383), [@Kuromesi](https://github.com/Kuromesi))
+- Advanced StatefulSet support [start ordinal](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#start-ordinal). ([#1643](https://github.com/openkruise/kruise/pull/1643), [@ABNER-1](https://github.com/ABNER-1))
+- Support webhook CA injection using external certification management tool, e.g. [cert-manager](https://cert-manager.io/). ([#1665](https://github.com/openkruise/kruise/pull/1665), [@Kuromesi](https://github.com/Kuromesi))
+- Kruise-daemon support cri-docker.sock for kubernetes clusters that use docker runtime. ([#1631](https://github.com/openkruise/kruise/pull/1631), [@BraceCY](https://github.com/BraceCY))
+- Advanced StatefulSet add pod index label `statefulset.kubernetes.io/pod-index`. ([#1667](https://github.com/openkruise/kruise/pull/1667), [@cr7258](https://github.com/cr7258))
+- Add Structured logging support. ([#1565](https://github.com/openkruise/kruise/pull/1565), [@MajLuu](https://github.com/MajLuu)); ([#1629](https://github.com/openkruise/kruise/pull/1629), [@jairuigou](https://github.com/jairuigou)); ([#1669](https://github.com/openkruise/kruise/pull/1669), [@AiRanthem](https://github.com/AiRanthem))
+
+### Performance Enhancement
+- Optimizing Pod SidecarSet webhook and controller performance when lots of namespace scoped sidecarSet exists ([#1547](https://github.com/openkruise/kruise/pull/1547), [@ls-2018](https://github.com/ls-2018))
+- Pod readiness controller use Patch instead of Update, thus reducing updating conflict when creating a large number of Pods. ([#1560](https://github.com/openkruise/kruise/pull/1560), [@BruceAko](https://github.com/BruceAko))
+
+### Bug fixes
+- Multi-domain Management
+  - Fixes workloadSpread validation message when using adaptive strategy type. ([#1553](https://github.com/openkruise/kruise/pull/1553), [@voron](https://github.com/voron))
+  - When feature-gate WorkloadSpread=false, the WorkloadSpread Controller is no longer started and the creation of workloadSpread CR is not allowed. ([#1566](https://github.com/openkruise/kruise/pull/1566), [@ls-2018](https://github.com/ls-2018))
+- Application Protection
+  - In some extreme scenarios, fix PodUnavailableBudget blocking KCM recycling Pods. ([#1567](https://github.com/openkruise/kruise/pull/1567), [@Spground](https://github.com/Spground))
+- Sidecar Container
+  - Fix SidecarSet invalid update status. ([#1641](https://github.com/openkruise/kruise/pull/1641), [@Spground](https://github.com/Spground))
+- Advanced Workload
+  - Fix potential nil panic in CloneSet validating webhook when Pod's controller owner ref is nil. ([#1678](https://github.com/openkruise/kruise/pull/1678), [@Spground](https://github.com/Spground))
+
+### Misc (cleanup and Flake)
+- Optimized Advanced StatefulSet code structure based on upstream community code(k8s 1.28). ([#1648](https://github.com/openkruise/kruise/pull/1648), [@ABNER-1](https://github.com/ABNER-1))
+- Reduce github workflow action permission. ([#1523](https://github.com/openkruise/kruise/pull/1523), [@furykerry](https://github.com/furykerry))
+- Bug fix for Makefile envtest failed. ([#1548](https://github.com/openkruise/kruise/pull/1548), [@BH4AWS](https://github.com/BH4AWS))
+- Fix UT TestRevisionManage. ([#1555](https://github.com/openkruise/kruise/pull/1555), [@furykerry](https://github.com/furykerry))
+- Upgrade opencontainers/runc (1.1.12) and controller-gen (0.14.0). ([#1562](https://github.com/openkruise/kruise/pull/1562), [@ppbits](https://github.com/ppbits))
+- Remove vendor directory. ([#1554](https://github.com/openkruise/kruise/pull/1554), [@liangyuanpeng](https://github.com/liangyuanpeng))
+- Add dependabot config for auto-update github-actions. ([#1570](https://github.com/openkruise/kruise/pull/1570), [@liangyuanpeng](https://github.com/liangyuanpeng))
+- Add permission of security-events write for ghaction golangci-lint. ([#1582](https://github.com/openkruise/kruise/pull/1582), [@liangyuanpeng](https://github.com/liangyuanpeng))
+- Fix vendor error while running command make docker-multiarch. ([#1601](https://github.com/openkruise/kruise/pull/1601), [@MichaelRren](https://github.com/MichaelRren))
+- Change e2e centos image from 6.7 to 7, then e2e can work on arm node. ([#1623](https://github.com/openkruise/kruise/pull/1623), [@Colvin-Y](https://github.com/Colvin-Y))
+- Fix slice declarations that are not initialized with zero length. ([#1628](https://github.com/openkruise/kruise/pull/1628), [@alingse](https://github.com/alingse))
+- Fix UT TestMatchRegistryAuths failed. ([#1583](https://github.com/openkruise/kruise/pull/1583), [@ABNER-1](https://github.com/ABNER-1))
+- Changes the scorecard badge link from old format to the Standard human-readable OpenSSF Scorecard Report. ([#1657](https://github.com/openkruise/kruise/pull/1657), [@harshitasao](https://github.com/harshitasao))
+
 ## v1.6.3
 > Change log since v1.6.2
 
