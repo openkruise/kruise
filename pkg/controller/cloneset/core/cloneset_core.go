@@ -95,7 +95,7 @@ func (c *commonControl) newVersionedPods(cs *appsv1alpha1.CloneSet, revision str
 		}
 		clonesetutils.WriteRevisionHash(pod, revision)
 
-		pod.Name = fmt.Sprintf("%s-%s", cs.Name, id)
+		pod.Name = fmt.Sprintf("%s-%s", cs.GenerateName, id)
 		pod.Namespace = cs.Namespace
 		pod.Labels[appsv1alpha1.CloneSetInstanceID] = id
 
