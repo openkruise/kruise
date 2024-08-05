@@ -58,7 +58,7 @@ jobs:
         run: |
           make generate
       - name: Lint golang code
-        uses: golangci/golangci-lint-action@v6.0.1
+        uses: golangci/golangci-lint-action@v6.1.0
         with:
           version: ${{ env.GOLANGCI_VERSION }}
           args: --verbose
