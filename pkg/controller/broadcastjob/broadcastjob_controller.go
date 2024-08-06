@@ -225,7 +225,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 		Namespace:     request.Namespace,
 		LabelSelector: labels.SelectorFromSet(labelsAsMap(job)),
 	}
-	err = r.List(context.TODO(), podList, listOptions)
+	err = r.List(context.TODO(), podList, listOptions, utilclient.DisableDeepCopy)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get podList for BroadcastJob", "broadcastJob", klog.KObj(job))
 		return reconcile.Result{}, err
