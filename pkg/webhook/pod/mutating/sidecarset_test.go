@@ -665,6 +665,134 @@ func TestSidecarSetPodInjectPolicy(t *testing.T) {
 	testSidecarSetPodInjectPolicy(t, sidecarSetIn)
 }
 
+func TestCanarySidecarSetInjection(t *testing.T) {
+	podStable := pod1.DeepCopy()
+	podCanary := podStable.DeepCopy()
+	podCanary.Labels["canary"] = "true"
+
+	stableImage := "sidecar-image:stable"
+	canaryImage := "sidecar-image:canary"
+	sidecarSetName := "sidecarset1"
+
+	// a canary sidecarset contains both updatestrategy.selector and injectionstrategy.revision
+	revisionID := fmt.Sprintf("%s-12345", sidecarSetName)
+	sidecarSetCanary := &appsv1alpha1.SidecarSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: sidecarSetName,
+		},
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "demo",
+				},
+			},
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "sidecar",
+						Image: canaryImage,
+					},
+				},
+			},
+			UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"canary": "true"},
+				},
+			},
+			InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
+				Revision: &appsv1alpha1.SidecarSetInjectRevision{
+					CustomVersion: &revisionID,
+					Policy:        appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
+				},
+			},
+		},
+	}
+
+	specRaw, _ := json.Marshal(map[string]interface{}{
+		"spec": map[string]interface{}{
+			"$patch": "replace",
+			"containers": []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name:  "sidecar",
+						Image: stableImage,
+					},
+				},
+			},
+		},
+	})
+
+	revision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: webhookutil.GetNamespace(),
+			Name:      revisionID,
+			Labels: map[string]string{
+				sidecarcontrol.SidecarSetKindName:         sidecarSet1.GetName(),
+				appsv1alpha1.SidecarSetCustomVersionLabel: revisionID,
+			},
+		},
+		Data: runtime.RawExtension{
+			Raw: specRaw,
+		},
+	}
+
+	stablePod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod-stable",
+			Labels: map[string]string{
+				"app": "demo",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "app",
+					Image: "demo",
+				},
+			},
+		},
+	}
+
+	canaryPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod-canary",
+			Labels: map[string]string{
+				"app":    "demo",
+				"canary": "true",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "app",
+					Image: "demo",
+				},
+			},
+		},
+	}
+
+	decoder := admission.NewDecoder(scheme.Scheme)
+	testClient := fake.NewClientBuilder().WithObjects(revision, sidecarSetCanary).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: testClient}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	if _, err := podHandler.sidecarsetMutatingPod(context.Background(), req, stablePod); err != nil {
+		t.Fatalf("failed to mutating pod, err: %v", err)
+	}
+	if _, err := podHandler.sidecarsetMutatingPod(context.Background(), req, canaryPod); err != nil {
+		t.Fatalf("failed to mutating pod, err: %v", err)
+	}
+	if len(stablePod.Spec.Containers) != 2 || stablePod.Spec.Containers[1].Image != stableImage {
+		t.Fatalf("inject stable sidecar failed")
+	}
+	fmt.Printf("stable sidecar image: %s\n", stablePod.Spec.Containers[1].Image)
+	if len(canaryPod.Spec.Containers) != 2 || canaryPod.Spec.Containers[1].Image != canaryImage {
+		t.Fatalf("inject canary sidecar failed")
+	}
+	fmt.Printf("canary sidecar image: %s\n", canaryPod.Spec.Containers[1].Image)
+}
+
 func testSidecarSetPodInjectPolicy(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder := admission.NewDecoder(scheme.Scheme)

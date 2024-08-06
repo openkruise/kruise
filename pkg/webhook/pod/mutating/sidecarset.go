@@ -34,6 +34,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -203,6 +204,21 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 		revisionInfo := sidecarSet.Spec.InjectionStrategy.Revision
 		if revisionInfo == nil || (revisionInfo.RevisionName == nil && revisionInfo.CustomVersion == nil) {
 			return sidecarSet.DeepCopy(), nil
+		}
+
+		// On pod creation, if a new pod matches the SidecarSet update strategy selector,
+		// the latest revision rather than that specified in the sidecarset.spec.injectionStrategy will be injected.
+		if updateStrategy := sidecarSet.Spec.UpdateStrategy; !updateStrategy.Paused && updateStrategy.Selector != nil {
+			selector, err := util.ValidatedLabelSelectorAsSelector(updateStrategy.Selector)
+			if err != nil {
+				klog.ErrorS(err, "Failed to parse SidecarSet update strategy selector", "name", sidecarSet.Name)
+				return nil, err
+			}
+			if selector.Matches(labels.Set(newPod.Labels)) {
+				klog.InfoS("New pod matches SidecarSet update strategy selector, latest revision will be injected",
+					"namespace", newPod.Namespace, "podName", newPod.Name, "sidecarSet", sidecarSet.Name)
+				return sidecarSet.DeepCopy(), nil
+			}
 		}
 
 		// TODO: support 'PartitionBased' policy to inject old/new revision according to Partition
@@ -421,7 +437,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(sidecarContainer, pod)
 			// append volumeMounts SubPathExpr environments
 			transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-			klog.InfoS("try to inject Container sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
+			klog.InfoS("try to inject Container sidecar, with injected envs",
 				"containerName", sidecarContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts)
 			//when update pod object
 			if isUpdated {
