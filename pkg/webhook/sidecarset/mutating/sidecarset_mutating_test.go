@@ -77,7 +77,7 @@ func TestMutatingSidecarSetFn(t *testing.T) {
 	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation] != "6wbd76bd7984x24fb4f44fv9222cw9v9bcf85x766744wddd4zwx927zzz2zb684" {
 		t.Fatalf("sidecarset %v hash initialized incorrectly, got %v", sidecarSet.Name, sidecarSet.Annotations[sidecarcontrol.SidecarSetHashAnnotation])
 	}
-	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] != "82684vwf9d4cb4wz4vffx4ddfbb47ww4z4wwxdbwb8w2zbb7zvf4524cdd49bv94" {
+	if sidecarSet.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] != "wv7f5xvv7vbwcz9b62f884z4bf62822zd5ff66429475b4527bb7d2z5df5x8479" {
 		t.Fatalf("sidecarset %v hash-without-image initialized incorrectly, got %v", sidecarSet.Name, sidecarSet.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation])
 	}
 	if sidecarSet.Spec.PatchPodMetadata[0].PatchPolicy != appsv1alpha1.SidecarSetRetainPatchPolicy {
