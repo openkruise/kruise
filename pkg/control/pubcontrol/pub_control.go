@@ -181,6 +181,12 @@ func getSidecarSetsInPod(pod *corev1.Pod) (sidecarSets, containers sets.String) 
 			sidecarSets.Insert(sidecarSetName)
 		}
 	}
+	for _, container := range pod.Spec.InitContainers {
+		val := util.GetContainerEnvValue(&container, sidecarcontrol.SidecarEnvKey)
+		if val == "true" {
+			containers.Insert(container.Name)
+		}
+	}
 	for _, container := range pod.Spec.Containers {
 		val := util.GetContainerEnvValue(&container, sidecarcontrol.SidecarEnvKey)
 		if val == "true" {
