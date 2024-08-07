@@ -45,7 +45,6 @@ import (
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
-	"github.com/openkruise/kruise/pkg/util/pvc"
 )
 
 // Realistic value for maximum in-flight requests when processing in parallel mode.
@@ -610,12 +609,8 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 			}
 		} else if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
 			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
-			checkReadyFn := func(claim, template *v1.PersistentVolumeClaim) bool {
-				_, ready := pvc.IsPVCCompatibleAndReady(claim, template)
-				return ready
-			}
 			// check pvc resize status, if not ready, record pod to unavailablePods
-			ready, err := ssc.checkOwnedPVCStatus(set, replicas[target], checkReadyFn)
+			ready, err := ssc.podControl.IsOwnedPVCsReady(set, replicas[target])
 			if err == nil && ready {
 				continue
 			}
@@ -645,30 +640,34 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 			return status, nil
 		}
 
-		// delete the Pod if it is not already terminating and does not match the update revision.
-		if !isTerminating(replicas[target]) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
-				set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
-				// resize pvc if necessary and wait for resize completed
-				if match, err := ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
-					return status, err
-				} else if !match {
-					err = ssc.podControl.TryPatchPVCSize(set, replicas[target])
-					if err != nil {
-						return status, err
-					}
-				}
-
-				allCompleted, err := ssc.checkOwnedPVCStatus(set, replicas[target], pvc.IsPatchPVCCompleted)
+		// Kruise currently will not patch pvc size until a pod references the resized volume.
+		// online-file-system-expansion: if no pods referencing the volume are running, file system expansion will not happen.
+		// refer to https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/#online-file-system-expansion
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
+			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
+			// resize pvc if necessary and wait for resize completed
+			if match, err := ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
+				return status, err
+			} else if !match {
+				err = ssc.podControl.TryPatchPVC(set, replicas[target])
 				if err != nil {
 					return status, err
-				} else if !allCompleted {
-					// mark target as unavailable because pvc's updated
-					unavailablePods.Insert(replicas[target].Name)
-					// need to wait for pvc resize completed, continue to handle next pod
-					continue
 				}
 			}
+
+			allCompleted, err := ssc.podControl.IsOwnedPVCsCompleted(set, replicas[target])
+			if err != nil {
+				return status, err
+			} else if !allCompleted {
+				// mark target as unavailable because pvc's updated
+				unavailablePods.Insert(replicas[target].Name)
+				// need to wait for pvc resize completed, continue to handle next pod
+				continue
+			}
+		}
+
+		// delete the Pod if it is not already terminating and does not match the update revision.
+		if !isTerminating(replicas[target]) {
 			// todo validate in-place for pub
 			inplacing, inplaceUpdateErr := ssc.inPlaceUpdatePod(set, replicas[target], updateRevision, revisions)
 			if inplaceUpdateErr != nil {

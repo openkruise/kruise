@@ -104,7 +104,7 @@ func getPodName(set *appsv1beta1.StatefulSet, ordinal int) string {
 }
 
 // getPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a Pod with an ordinal index of ordinal. claim
-// must be a PersistentVolumeClaim from set's VolumeClaims template.
+// must be a PersistentVolumeClaim from set's VolumeClaimTemplates template.
 func getPersistentVolumeClaimName(set *appsv1beta1.StatefulSet, claim *v1.PersistentVolumeClaim, ordinal int) string {
 	// NOTE: This name format is used by the heuristics for zone spreading in ChooseZoneForVolume
 	return fmt.Sprintf("%s-%s-%d", claim.Name, set.Name, ordinal)
@@ -623,7 +623,7 @@ func nextRevision(revisions []*apps.ControllerRevision) int64 {
 // inconsistentStatus returns true if the ObservedGeneration of status is greater than set's
 // Generation or if any of the status's fields do not match those of set's status.
 func inconsistentStatus(set *appsv1beta1.StatefulSet, status *appsv1beta1.StatefulSetStatus) bool {
-	return status.ObservedGeneration > set.Status.ObservedGeneration ||
+	if status.ObservedGeneration > set.Status.ObservedGeneration ||
 		status.Replicas != set.Status.Replicas ||
 		status.CurrentReplicas != set.Status.CurrentReplicas ||
 		status.ReadyReplicas != set.Status.ReadyReplicas ||
@@ -631,7 +631,24 @@ func inconsistentStatus(set *appsv1beta1.StatefulSet, status *appsv1beta1.Statef
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
 		status.UpdateRevision != set.Status.UpdateRevision ||
-		status.LabelSelector != set.Status.LabelSelector
+		status.LabelSelector != set.Status.LabelSelector {
+		return true
+	}
+
+	volumeClaimName2StatusIdx := map[string]int{}
+	for i, v := range status.VolumeClaims {
+		volumeClaimName2StatusIdx[v.VolumeClaimName] = i
+	}
+	for _, v := range set.Status.VolumeClaims {
+		if idx, ok := volumeClaimName2StatusIdx[v.VolumeClaimName]; !ok {
+			// raw template not exist in current status => inconsistent
+			return true
+		} else if status.VolumeClaims[idx].CompatibleReplicas != v.CompatibleReplicas ||
+			status.VolumeClaims[idx].CompatibleReadyReplicas != v.CompatibleReadyReplicas {
+			return true
+		}
+	}
+	return false
 }
 
 // completeRollingUpdate completes a rolling update when all of set's replica Pods have been updated

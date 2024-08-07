@@ -387,7 +387,7 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "name"), "volumeClaimTemplate name can not be modified")}
 		}
 
-		matched, resizeOnly := pvc.CompareWithCheckFn(oldTemplate, &template, isPVCResizeOnly)
+		matched, resizeOnly := pvc.CompareWithCheckFn(oldTemplate, &template, isPVCResize)
 		if matched {
 			continue
 		}
@@ -416,7 +416,7 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 		}
 		if sc.AllowVolumeExpansion != nil && !*sc.AllowVolumeExpansion {
 			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "spec", "resources", "requests", "storage"),
-				fmt.Sprintf("sc %v disallow volume expansion", sc.Name))}
+				fmt.Sprintf("storage class %v does not support volume expansion", sc.Name))}
 		}
 	}
 	return nil
@@ -443,7 +443,7 @@ func GetDefaultStorageClass(c client.Client) (*storagev1.StorageClass, error) {
 	return defaultSC, nil
 }
 
-func isPVCResizeOnly(claim, template *v1.PersistentVolumeClaim) bool {
+func isPVCResize(claim, template *v1.PersistentVolumeClaim) bool {
 	if claim.Spec.Resources.Requests.Storage().Cmp(*template.Spec.Resources.Requests.Storage()) != 0 ||
 		claim.Spec.Resources.Limits.Storage().Cmp(*template.Spec.Resources.Limits.Storage()) != 0 {
 		return true

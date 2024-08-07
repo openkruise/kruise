@@ -128,6 +128,44 @@ func TestCompareWithCheckFn(t *testing.T) {
 			expectedResizeOnly: false,
 		},
 		{
+			name: "Different access modes2",
+			claim: &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: pointerToString("standard"),
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+						v1.ReadWriteOncePod,
+					},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			template: &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: pointerToString("standard"),
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadOnlyMany,
+					},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			expectedMatch:      false,
+			expectedResizeOnly: false,
+		},
+		{
 			name: "Claim requests less storage than template",
 			claim: &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
@@ -221,7 +259,7 @@ func pointerToString(s string) *string {
 	return &s
 }
 
-func TestPVCCompatibleAndReady(t *testing.T) {
+func TestIsPVCCompatibleAndReady(t *testing.T) {
 	tests := []struct {
 		name           string
 		claim          *v1.PersistentVolumeClaim
@@ -379,6 +417,111 @@ func TestPVCCompatibleAndReady(t *testing.T) {
 			}
 			if ready != tt.expectedReady {
 				t.Errorf("expected ready to be %v, got %v", tt.expectedReady, ready)
+			}
+		})
+	}
+}
+
+func TestIsPatchPVCCompleted(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name          string
+		compatible    bool
+		ready         bool
+		pvcConditions []v1.PersistentVolumeClaimCondition
+		wantCompleted bool
+	}{
+		{
+			name:          "Compatible and ready",
+			compatible:    true,
+			ready:         true,
+			pvcConditions: nil,
+			wantCompleted: true,
+		},
+		{
+			name:       "Compatible but not ready(pending=true)",
+			compatible: true,
+			ready:      false,
+			pvcConditions: []v1.PersistentVolumeClaimCondition{
+				{
+					Type:   v1.PersistentVolumeClaimFileSystemResizePending,
+					Status: v1.ConditionTrue,
+				},
+			},
+			wantCompleted: true,
+		},
+		{
+			name:       "Compatible but not ready(pending=false)",
+			compatible: true,
+			ready:      false,
+			pvcConditions: []v1.PersistentVolumeClaimCondition{
+				{
+					Type:   v1.PersistentVolumeClaimFileSystemResizePending,
+					Status: v1.ConditionFalse,
+				},
+			},
+			wantCompleted: false,
+		},
+		{
+			name:       "Compatible but not ready(resizing=true)",
+			compatible: true,
+			ready:      false,
+			pvcConditions: []v1.PersistentVolumeClaimCondition{
+				{
+					Type:   v1.PersistentVolumeClaimResizing,
+					Status: v1.ConditionTrue,
+				},
+			},
+			wantCompleted: false,
+		},
+		{
+			name:          "Not compatible",
+			compatible:    false,
+			ready:         true,
+			pvcConditions: nil,
+			wantCompleted: false,
+		},
+	}
+
+	template := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+
+	// Run test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claim := &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+				Status: v1.PersistentVolumeClaimStatus{
+					Conditions: tt.pvcConditions,
+					Capacity:   map[v1.ResourceName]resource.Quantity{},
+				},
+			}
+			if tt.compatible {
+				claim.Spec.Resources.Requests[v1.ResourceStorage] = resource.MustParse("1Gi")
+			} else {
+				claim.Spec.Resources.Requests[v1.ResourceStorage] = resource.MustParse("2Mi")
+			}
+			if tt.ready {
+				claim.Status.Capacity[v1.ResourceStorage] = claim.Spec.Resources.Requests[v1.ResourceStorage]
+			} else {
+				claim.Status.Capacity[v1.ResourceStorage] = resource.MustParse("1Mi")
+			}
+			gotCompleted := IsPatchPVCCompleted(claim, template)
+			if gotCompleted != tt.wantCompleted {
+				t.Errorf("IsPatchPVCCompleted() = %v, want %v", gotCompleted, tt.wantCompleted)
 			}
 		})
 	}
