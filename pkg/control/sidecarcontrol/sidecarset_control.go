@@ -18,7 +18,6 @@ package sidecarcontrol
 
 import (
 	"encoding/json"
-
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -31,6 +30,16 @@ import (
 
 type commonControl struct {
 	*appsv1alpha1.SidecarSet
+
+	supportInitContainerInPlace bool
+}
+
+type Option func(*commonControl)
+
+func WithSupportInitContainerInPlace(support bool) Option {
+	return func(c *commonControl) {
+		c.supportInitContainerInPlace = support
+	}
 }
 
 func (c *commonControl) GetSidecarset() *appsv1alpha1.SidecarSet {
@@ -39,6 +48,9 @@ func (c *commonControl) GetSidecarset() *appsv1alpha1.SidecarSet {
 
 func (c *commonControl) IsActiveSidecarSet() bool {
 	return true
+}
+func (c *commonControl) IsSupportInitContainerInPlace() bool {
+	return c.supportInitContainerInPlace
 }
 
 func (c *commonControl) UpgradeSidecarContainer(sidecarContainer *appsv1alpha1.SidecarContainer, pod *v1.Pod) *v1.Container {
@@ -120,7 +132,11 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 		inPlaceUpdateState.LastContainerStatuses = make(map[string]pub.InPlaceUpdateContainerStatus)
 	}
 
-	cStatus := make(map[string]string, len(pod.Status.ContainerStatuses))
+	cStatus := make(map[string]string, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
+	for i := range pod.Status.InitContainerStatuses {
+		c := &pod.Status.InitContainerStatuses[i]
+		cStatus[c.Name] = c.ImageID
+	}
 	for i := range pod.Status.ContainerStatuses {
 		c := &pod.Status.ContainerStatuses[i]
 		cStatus[c.Name] = c.ImageID
@@ -147,12 +163,15 @@ func (c *commonControl) IsPodStateConsistent(pod *v1.Pod, sidecarContainers sets
 
 	sidecarset := c.GetSidecarset()
 	if sidecarContainers.Len() == 0 {
-		sidecarContainers = GetSidecarContainersInPod(sidecarset)
+		sidecarContainers = GetSidecarContainersInPod(sidecarset, c.supportInitContainerInPlace)
 	}
 
 	allDigestImage := true
 	cImageIDs := util.GetPodContainerImageIDs(pod)
-	for _, container := range pod.Spec.Containers {
+	containers := make([]v1.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
+	containers = append(containers, pod.Spec.Containers...)
+	containers = append(containers, pod.Spec.InitContainers...)
+	for _, container := range containers {
 		// only check whether sidecar container is consistent
 		if !sidecarContainers.Has(container.Name) {
 			continue
@@ -195,7 +214,10 @@ func (c *commonControl) IsSidecarSetUpgradable(pod *v1.Pod) (canUpgrade, consist
 	for _, status := range pod.Status.ContainerStatuses {
 		cStatus[status.Name] = status.Ready
 	}
-	sidecarContainerList := GetSidecarContainersInPod(sidecarSet)
+	for _, status := range pod.Status.InitContainerStatuses {
+		cStatus[status.Name] = status.Ready
+	}
+	sidecarContainerList := GetSidecarContainersInPod(sidecarSet, c.supportInitContainerInPlace)
 	for _, sidecar := range sidecarContainerList.List() {
 		// when containerStatus.Ready == true and container non-consistent,
 		// indicates that sidecar container is in the process of being upgraded
@@ -241,12 +263,20 @@ func IsSidecarContainerUpdateCompleted(pod *v1.Pod, sidecarSets, containers sets
 	}
 
 	containerImages := make(map[string]string, len(pod.Spec.Containers))
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		containerImages[c.Name] = c.Image
+	}
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		containerImages[c.Name] = c.Image
 	}
 
-	for _, cs := range pod.Status.ContainerStatuses {
+	containerStatues := make([]v1.ContainerStatus, 0, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
+	containerStatues = append(containerStatues, pod.Status.InitContainerStatuses...)
+	containerStatues = append(containerStatues, pod.Status.ContainerStatuses...)
+
+	for _, cs := range containerStatues {
 		// only check containers set
 		if !containers.Has(cs.Name) {
 			continue

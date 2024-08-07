@@ -19,6 +19,7 @@ package util
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/version"
 	"sync"
 	"testing"
 
@@ -408,5 +409,47 @@ func TestGetScaledValueFromIntOrPercent(t *testing.T) {
 		if test.expectVal != value {
 			t.Errorf("expected %v, but got %v", test.expectVal, value)
 		}
+	}
+}
+
+func TestIsSupportInitContainerInPlace(t *testing.T) {
+	tests := []struct {
+		name     string
+		version  version.Info
+		expected bool
+	}{
+		{
+			name:     "v1.18.0",
+			version:  version.Info{Major: "1", Minor: "18"},
+			expected: false,
+		},
+		{
+			name:     "v1.26",
+			version:  version.Info{Major: "1", Minor: "26"},
+			expected: false,
+		},
+		{
+			name:     "v1.27.4",
+			version:  version.Info{Major: "1", Minor: "27"},
+			expected: false,
+		},
+		{
+			name:     "v1.28",
+			version:  version.Info{Major: "1", Minor: "28"},
+			expected: true,
+		},
+		{
+			name:     "v1.29",
+			version:  version.Info{Major: "1", Minor: "29"},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if IsSupportInitContainerInPlace(test.version) != test.expected {
+				t.Errorf("expected %v, but got %v", test.expected, !test.expected)
+			}
+		})
 	}
 }

@@ -30,6 +30,7 @@ import (
 	controlutil "github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	historyutil "github.com/openkruise/kruise/pkg/util/history"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -52,21 +53,23 @@ import (
 )
 
 type Processor struct {
-	Client            client.Client
-	recorder          record.EventRecorder
-	historyController history.Interface
+	Client                      client.Client
+	recorder                    record.EventRecorder
+	historyController           history.Interface
+	supportInitContainerInPlace bool
 }
 
 func NewSidecarSetProcessor(cli client.Client, rec record.EventRecorder) *Processor {
 	return &Processor{
-		Client:            cli,
-		recorder:          rec,
-		historyController: historyutil.NewHistory(cli),
+		Client:                      cli,
+		recorder:                    rec,
+		historyController:           historyutil.NewHistory(cli),
+		supportInitContainerInPlace: util.IsSupportInitContainerInPlace(utildiscovery.DiscoverServerVersion()),
 	}
 }
 
 func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (reconcile.Result, error) {
-	control := sidecarcontrol.New(sidecarSet)
+	control := sidecarcontrol.New(sidecarSet, sidecarcontrol.WithSupportInitContainerInPlace(p.supportInitContainerInPlace))
 	// check whether sidecarSet is active
 	if !control.IsActiveSidecarSet() {
 		return reconcile.Result{}, nil
@@ -114,7 +117,13 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 			// 3. all containers with exception of empty sidecar containers is ready
 
 			// don't contain sidecar empty containers
-			sidecarContainers := sidecarcontrol.GetSidecarContainersInPod(sidecarSet)
+			sidecarContainers := sidecarcontrol.GetSidecarContainersInPod(sidecarSet, p.supportInitContainerInPlace)
+			for _, initContainer := range sidecarSet.Spec.InitContainers {
+				if sidecarcontrol.IsSidecarContainer(initContainer.Container) && sidecarcontrol.IsHotUpgradeContainer(&initContainer) {
+					_, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers(initContainer.Name, pod)
+					sidecarContainers.Delete(emptyContainer)
+				}
+			}
 			for _, sidecarContainer := range sidecarSet.Spec.Containers {
 				if sidecarcontrol.IsHotUpgradeContainer(&sidecarContainer) {
 					_, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainer.Name, pod)
@@ -199,7 +208,7 @@ func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarContro
 			klog.ErrorS(err, "SidecarSet got updated pod from client failed", "sidecarSet", klog.KObj(sidecarSet), "pod", klog.KObj(pod))
 		}
 		// update pod sidecar container
-		updatePodSidecarContainer(control, podClone)
+		updatePodSidecarContainer(control, podClone, p.supportInitContainerInPlace)
 		// older pod don't have SidecarSetListAnnotation
 		// which is to improve the performance of the sidecarSet controller
 		sidecarSetNames, ok := podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation]
@@ -552,6 +561,12 @@ func isSidecarSetNotUpdate(s *appsv1alpha1.SidecarSet) bool {
 }
 
 func updateContainerInPod(container corev1.Container, pod *corev1.Pod) {
+	for i := range pod.Spec.InitContainers {
+		if pod.Spec.InitContainers[i].Name == container.Name {
+			pod.Spec.InitContainers[i] = container
+			return
+		}
+	}
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name == container.Name {
 			pod.Spec.Containers[i] = container
@@ -560,12 +575,21 @@ func updateContainerInPod(container corev1.Container, pod *corev1.Pod) {
 	}
 }
 
-func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev1.Pod) {
+func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev1.Pod, supportInitContainer bool) {
 	sidecarSet := control.GetSidecarset()
 
 	// upgrade sidecar containers
 	var changedContainers []string
-	for _, sidecarContainer := range sidecarSet.Spec.Containers {
+	containers := make([]appsv1alpha1.SidecarContainer, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
+	if supportInitContainer {
+		for _, sidecarContainer := range sidecarSet.Spec.InitContainers {
+			if sidecarcontrol.IsSidecarContainer(sidecarContainer.Container) {
+				containers = append(containers, sidecarContainer)
+			}
+		}
+	}
+	containers = append(containers, sidecarSet.Spec.Containers...)
+	for _, sidecarContainer := range containers {
 		//sidecarContainer := &sidecarset.Spec.Containers[i]
 		// volumeMounts that injected into sidecar container
 		// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)

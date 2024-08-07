@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/docker/distribution/reference"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -31,6 +32,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
 )
@@ -234,4 +236,14 @@ func EqualIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
 	delete(t1Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
 	delete(t2Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
+}
+
+// IsSupportInitContainerInPlace checks if the version supports init container in place, only available from 1.28
+func IsSupportInitContainerInPlace(ver version.Info) bool {
+	major := ver.Major
+	minor := ver.Minor
+	if major == "" || minor == "" {
+		return false
+	}
+	return semver.New(fmt.Sprintf("%s.%s.0", ver.Major, ver.Minor)).Compare(*semver.New("1.28.0")) >= 0
 }

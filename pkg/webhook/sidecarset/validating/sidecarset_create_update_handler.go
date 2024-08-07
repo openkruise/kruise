@@ -63,6 +63,9 @@ var (
 
 // SidecarSetCreateUpdateHandler handles SidecarSet
 type SidecarSetCreateUpdateHandler struct {
+	curVersion                  string
+	supportInitContainerInPlace bool
+
 	// To use the client, you need to do the following:
 	// - uncomment it
 	// - import sigs.k8s.io/controller-runtime/pkg/client
@@ -116,9 +119,11 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	// currently when initContainer restartPolicy = Always, kruise don't support in-place update
-	for _, c := range obj.Spec.InitContainers {
-		if sidecarcontrol.IsSidecarContainer(c.Container) && obj.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateSidecarSetStrategyType {
-			allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), "The initContainer in-place upgrade is not currently supported."))
+	if !h.supportInitContainerInPlace {
+		for _, c := range obj.Spec.InitContainers {
+			if sidecarcontrol.IsSidecarContainer(c.Container) && obj.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateSidecarSetStrategyType {
+				allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), fmt.Sprintf("The initContainer in-place upgrade is not currently supported for current version: %s.", h.curVersion)))
+			}
 		}
 	}
 

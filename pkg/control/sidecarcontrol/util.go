@@ -261,9 +261,18 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 	pod.Annotations[hashKey] = string(newHash)
 }
 
-func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
+func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet, supportInitContainer bool) sets.String {
 	names := sets.NewString()
-	for _, sidecarContainer := range sidecarSet.Spec.Containers {
+	containers := make([]appsv1alpha1.SidecarContainer, 0, len(sidecarSet.Spec.Containers)+len(sidecarSet.Spec.InitContainers))
+	if supportInitContainer {
+		for _, sidecarContainer := range sidecarSet.Spec.InitContainers {
+			if IsSidecarContainer(sidecarContainer.Container) {
+				containers = append(containers, sidecarContainer)
+			}
+		}
+	}
+	containers = append(containers, sidecarSet.Spec.Containers...)
+	for _, sidecarContainer := range containers {
 		if IsHotUpgradeContainer(&sidecarContainer) {
 			name1, name2 := GetHotUpgradeContainerName(sidecarContainer.Name)
 			names.Insert(name2)
