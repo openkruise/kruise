@@ -4,8 +4,8 @@ import v1 "k8s.io/api/core/v1"
 
 type CheckClaimFn = func(*v1.PersistentVolumeClaim, *v1.PersistentVolumeClaim) bool
 
-// CheckClaimCompatibleWithoutSize PersistentVolumeClaim Compare function
-func CheckClaimCompatibleWithoutSize(claim, template *v1.PersistentVolumeClaim) bool {
+// IsClaimCompatibleWithoutSize PersistentVolumeClaim Compare function
+func IsClaimCompatibleWithoutSize(claim, template *v1.PersistentVolumeClaim) bool {
 	// when there is default sc,
 	// template StorageClassName is nil but claim is not nil
 	if template.Spec.StorageClassName != nil &&
@@ -34,7 +34,8 @@ func IsPatchPVCCompleted(claim, template *v1.PersistentVolumeClaim) bool {
 	if compatible {
 		pending := false
 		for _, condition := range claim.Status.Conditions {
-			if condition.Type == v1.PersistentVolumeClaimFileSystemResizePending {
+			if condition.Type == v1.PersistentVolumeClaimFileSystemResizePending &&
+				condition.Status == v1.ConditionTrue {
 				pending = true
 			}
 		}
@@ -44,8 +45,22 @@ func IsPatchPVCCompleted(claim, template *v1.PersistentVolumeClaim) bool {
 	return false
 }
 
+// CompareWithCheckFn compares a PersistentVolumeClaim with a template claim using a custom comparison function.
+// This function first checks if the claim is compatible with the template claim excluding size considerations.
+// If the claim is compatible, it then uses the provided CheckClaimFn function to perform a detailed comparison.
+// The function returns two boolean values: the first indicates whether the claim matches the template,
+// and the second provides the result of the custom comparison function.
+//
+// Parameters:
+// claim: The PersistentVolumeClaim to be compared.
+// template: The template PersistentVolumeClaim to compare against.
+// cmp: A CheckClaimFn function used for detailed comparison.
+//
+// Return values:
+// matched: Indicates whether the claim matches the template (true if it matches, false otherwise).
+// cmpResult: The result of the custom comparison function (true if the function returns true, false otherwise).
 func CompareWithCheckFn(claim, template *v1.PersistentVolumeClaim, cmp CheckClaimFn) (matched, cmpResult bool) {
-	if !CheckClaimCompatibleWithoutSize(claim, template) {
+	if !IsClaimCompatibleWithoutSize(claim, template) {
 		return false, false
 	}
 	if cmp(claim, template) {
@@ -55,7 +70,7 @@ func CompareWithCheckFn(claim, template *v1.PersistentVolumeClaim, cmp CheckClai
 }
 
 func IsPVCCompatibleAndReady(claim, template *v1.PersistentVolumeClaim) (compatible bool, ready bool) {
-	if !CheckClaimCompatibleWithoutSize(claim, template) {
+	if !IsClaimCompatibleWithoutSize(claim, template) {
 		return false, false
 	}
 	compatible = func(claim, template *v1.PersistentVolumeClaim) bool {

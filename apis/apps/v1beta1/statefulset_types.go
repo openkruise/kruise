@@ -171,7 +171,7 @@ const (
 )
 
 // StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
-// created from the StatefulSet VolumeClaimTemplates.
+// created from the StatefulSet VolumeClaims.
 type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 	// WhenDeleted specifies what happens to PVCs created from StatefulSet
 	// VolumeClaimTemplates when the StatefulSet is deleted. The default policy
@@ -365,11 +365,11 @@ type StatefulSetStatus struct {
 	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
 	LabelSelector string `json:"labelSelector,omitempty"`
 
-	// VolumeClaimTemplates represents the status of compatibility between existing VolumeClaims
-	// and their respective templates. It tracks whether the VolumeClaims have been updated
-	// to match any changes made to the VolumeClaimTemplates, ensuring synchronization
+	// VolumeClaims represents the status of compatibility between existing PVCs
+	// and their respective templates. It tracks whether the PersistentVolumeClaims have been updated
+	// to match any changes made to the volumeClaimTemplates, ensuring synchronization
 	// between the defined templates and the actual PersistentVolumeClaims in use.
-	VolumeClaimTemplates []VolumeClaimStatus `json:"volumeClaimTemplates,omitempty"`
+	VolumeClaims []VolumeClaimStatus `json:"volumeClaims,omitempty"`
 }
 
 // These are valid conditions of a statefulset.

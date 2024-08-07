@@ -1036,11 +1036,11 @@ spec:
                   indicated by updateRevision.
                 format: int32
                 type: integer
-              volumeClaimTemplates:
+              volumeClaims:
                 description: |-
-                  VolumeClaimTemplates represents the status of compatibility between existing VolumeClaims
-                  and their respective templates. It tracks whether the VolumeClaims have been updated
-                  to match any changes made to the VolumeClaimTemplates, ensuring synchronization
+                  VolumeClaims represents the status of compatibility between existing PVCs
+                  and their respective templates. It tracks whether the PersistentVolumeClaims have been updated
+                  to match any changes made to the volumeClaimTemplates, ensuring synchronization
                   between the defined templates and the actual PersistentVolumeClaims in use.
                 items:
                   description: |-
