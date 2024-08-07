@@ -128,6 +128,44 @@ func TestCompareWithCheckFn(t *testing.T) {
 			expectedResizeOnly: false,
 		},
 		{
+			name: "Different access modes2",
+			claim: &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: pointerToString("standard"),
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+						v1.ReadWriteOncePod,
+					},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			template: &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					StorageClassName: pointerToString("standard"),
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadOnlyMany,
+					},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceStorage: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			expectedMatch:      false,
+			expectedResizeOnly: false,
+		},
+		{
 			name: "Claim requests less storage than template",
 			claim: &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{

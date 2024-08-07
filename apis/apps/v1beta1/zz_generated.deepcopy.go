@@ -258,8 +258,8 @@ func (in *StatefulSetStatus) DeepCopyInto(out *StatefulSetStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.VolumeClaimTemplates != nil {
-		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+	if in.VolumeClaims != nil {
+		in, out := &in.VolumeClaims, &out.VolumeClaims
 		*out = make([]VolumeClaimStatus, len(*in))
 		copy(*out, *in)
 	}

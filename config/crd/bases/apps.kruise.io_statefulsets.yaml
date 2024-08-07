@@ -610,14 +610,14 @@ spec:
                   whenDeleted:
                     description: |-
                       WhenDeleted specifies what happens to PVCs created from StatefulSet
-                      VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+                      VolumeClaims when the StatefulSet is deleted. The default policy
                       of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
                       `Delete` policy causes those PVCs to be deleted.
                     type: string
                   whenScaled:
                     description: |-
                       WhenScaled specifies what happens to PVCs created from StatefulSet
-                      VolumeClaimTemplates when the StatefulSet is scaled down. The default
+                      VolumeClaims when the StatefulSet is scaled down. The default
                       policy of `Retain` causes PVCs to not be affected by a scaledown. The
                       `Delete` policy causes the associated PVCs for any excess pods above
                       the replica count to be deleted.
@@ -1036,11 +1036,11 @@ spec:
                   indicated by updateRevision.
                 format: int32
                 type: integer
-              volumeClaimTemplates:
+              volumeClaims:
                 description: |-
-                  VolumeClaimTemplates represents the status of compatibility between existing VolumeClaims
-                  and their respective templates. It tracks whether the VolumeClaims have been updated
-                  to match any changes made to the VolumeClaimTemplates, ensuring synchronization
+                  VolumeClaims represents the status of compatibility between existing PVCs
+                  and their respective templates. It tracks whether the PersistentVolumeClaims have been updated
+                  to match any changes made to the volumeClaimTemplates, ensuring synchronization
                   between the defined templates and the actual PersistentVolumeClaims in use.
                 items:
                   description: |-

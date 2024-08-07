@@ -17,11 +17,12 @@ limitations under the License.
 package validating
 
 import (
-	"testing"
-
 	"strconv"
 	"strings"
+	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -735,17 +736,24 @@ func init() {
 	utilruntime.Must(appsv1alpha1.AddToScheme(testScheme))
 }
 
-func newFakeStorageClass(name string, allowExpansion bool) *storagev1.StorageClass {
-	return &storagev1.StorageClass{
+func newFakeStorageClass(name string, allowExpansion, isDefault bool) *storagev1.StorageClass {
+	sc := &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		AllowVolumeExpansion: &allowExpansion,
 	}
+	if isDefault {
+		sc.Annotations = map[string]string{
+			isDefaultStorageClassAnnotation: "true",
+		}
+	}
+	return sc
 }
+
 func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
-	allowExpandSC := newFakeStorageClass("allowExpand", true)
-	disallowExpandSC := newFakeStorageClass("disallowExpand", false)
+	allowExpandSC := newFakeStorageClass("allowExpand", true, false)
+	disallowExpandSC := newFakeStorageClass("disallowExpand", false, false)
 	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(allowExpandSC, disallowExpandSC).Build()
 
 	tests := []struct {
@@ -1052,4 +1060,75 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetDefaultStorageClass(t *testing.T) {
+	// Create StorageClass objects to use in the test.
+	newSCWithCreateTime := func(name string, allowExpansion, isDefault bool, createTime time.Time) *storagev1.StorageClass {
+		sc := newFakeStorageClass(name, allowExpansion, isDefault)
+		sc.CreationTimestamp = metav1.NewTime(createTime)
+		return sc
+	}
+	tests := []struct {
+		name      string
+		scs       []*storagev1.StorageClass
+		expected  *storagev1.StorageClass
+		expectNil bool
+	}{
+		{
+			name:      "no storage class",
+			scs:       []*storagev1.StorageClass{},
+			expected:  nil,
+			expectNil: true,
+		},
+		{
+			name: "no default storage class",
+			scs: []*storagev1.StorageClass{
+				newFakeStorageClass("sc1", true, false),
+				newFakeStorageClass("sc2", true, false),
+			},
+			expected:  nil,
+			expectNil: true,
+		},
+		{
+			name: "only one default storage class",
+			scs: []*storagev1.StorageClass{
+				newFakeStorageClass("sc1", true, true),
+				newFakeStorageClass("sc2", true, false),
+			},
+			expected:  newFakeStorageClass("sc1", true, true),
+			expectNil: false,
+		},
+		{
+			name: "multi default storage classes",
+			scs: []*storagev1.StorageClass{
+				newSCWithCreateTime("sc1", true, true, time.Now().Add(time.Hour)),
+				newSCWithCreateTime("sc2", true, true, time.Now()),
+				newSCWithCreateTime("sc3", true, true, time.Now().Add(-time.Hour)),
+			},
+			expected:  newFakeStorageClass("sc1", true, true),
+			expectNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		// Create a fake client to mock API calls.
+		builder := fake.NewClientBuilder().WithScheme(testScheme)
+		for _, sc := range tt.scs {
+			builder.WithObjects(sc)
+		}
+		client := builder.Build()
+
+		// Test the GetDefaultStorageClass function.
+		defaultSC, err := GetDefaultStorageClass(client)
+		assert.NoError(t, err)
+		if tt.expectNil {
+			assert.Nil(t, defaultSC)
+		} else {
+			assert.NotNil(t, defaultSC)
+			assert.Equal(t, tt.expected.Name, defaultSC.Name)
+		}
+
+	}
+
 }

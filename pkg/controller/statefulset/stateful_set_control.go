@@ -615,7 +615,7 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 				return ready
 			}
 			// check pvc resize status, if not ready, record pod to unavailablePods
-			ready, err := ssc.checkOwnedPVCStatus(set, replicas[target], checkReadyFn)
+			ready, err := ssc.podControl.checkOwnedPVCStatus(set, replicas[target], checkReadyFn)
 			if err == nil && ready {
 				continue
 			}
@@ -645,30 +645,31 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 			return status, nil
 		}
 
-		// delete the Pod if it is not already terminating and does not match the update revision.
-		if !isTerminating(replicas[target]) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
-				set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
-				// resize pvc if necessary and wait for resize completed
-				if match, err := ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
-					return status, err
-				} else if !match {
-					err = ssc.podControl.TryPatchPVCSize(set, replicas[target])
-					if err != nil {
-						return status, err
-					}
-				}
-
-				allCompleted, err := ssc.checkOwnedPVCStatus(set, replicas[target], pvc.IsPatchPVCCompleted)
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
+			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
+			// resize pvc if necessary and wait for resize completed
+			if match, err := ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
+				return status, err
+			} else if !match {
+				err = ssc.podControl.TryPatchPVCSize(set, replicas[target])
 				if err != nil {
 					return status, err
-				} else if !allCompleted {
-					// mark target as unavailable because pvc's updated
-					unavailablePods.Insert(replicas[target].Name)
-					// need to wait for pvc resize completed, continue to handle next pod
-					continue
 				}
 			}
+
+			allCompleted, err := ssc.podControl.checkOwnedPVCStatus(set, replicas[target], pvc.IsPatchPVCCompleted)
+			if err != nil {
+				return status, err
+			} else if !allCompleted {
+				// mark target as unavailable because pvc's updated
+				unavailablePods.Insert(replicas[target].Name)
+				// need to wait for pvc resize completed, continue to handle next pod
+				continue
+			}
+		}
+
+		// delete the Pod if it is not already terminating and does not match the update revision.
+		if !isTerminating(replicas[target]) {
 			// todo validate in-place for pub
 			inplacing, inplaceUpdateErr := ssc.inPlaceUpdatePod(set, replicas[target], updateRevision, revisions)
 			if inplaceUpdateErr != nil {

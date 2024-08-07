@@ -350,7 +350,6 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 	})
 
-	_ = cannotExpandSC
 	ginkgo.Describe("Resize PVC with rollback", func() {
 		oldSize, newSize := "1Gi", "2Gi"
 		injectSC := func(podUpdatePolicy appsv1beta1.PodUpdateStrategyType, ss *appsv1beta1.StatefulSet, volumeClaimUpdateStrategy appsv1beta1.VolumeClaimUpdateStrategyType, scNames ...string) {

@@ -672,10 +672,10 @@ func (s *StatefulSetTester) WaitForStatusPVCReadyReplicas(ss *appsv1beta1.Statef
 			if ssGet.Status.ObservedGeneration < ss.Generation {
 				return false, nil
 			}
-			for _, template := range ssGet.Status.VolumeClaimTemplates {
+			for _, template := range ssGet.Status.VolumeClaims {
 				if template.CompatibleReplicas != expectedReplicas ||
 					template.CompatibleReadyReplicas != expectedReplicas {
-					Logf("Waiting for stateful set status.VolumeClaimTemplates.CompatibleReadyReplicas to become %d, currently %d",
+					Logf("Waiting for stateful set status.VolumeClaims.CompatibleReadyReplicas to become %d, currently %d",
 						expectedReplicas, template.CompatibleReadyReplicas)
 					return false, nil
 				}

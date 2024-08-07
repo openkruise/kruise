@@ -153,33 +153,33 @@ const (
 )
 
 // PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
-// when volumes from the VolumeClaimTemplates will be deleted when the controlling StatefulSet is
+// when volumes from the VolumeClaims will be deleted when the controlling StatefulSet is
 // deleted or scaled down.
 type PersistentVolumeClaimRetentionPolicyType string
 
 const (
 	// RetainPersistentVolumeClaimRetentionPolicyType is the default
 	// PersistentVolumeClaimRetentionPolicy and specifies that
-	// PersistentVolumeClaims associated with StatefulSet VolumeClaimTemplates
+	// PersistentVolumeClaims associated with StatefulSet VolumeClaims
 	// will not be deleted.
 	RetainPersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Retain"
 	// DeletePersistentVolumeClaimRetentionPolicyType specifies that
-	// PersistentVolumeClaims associated with StatefulSet VolumeClaimTemplates
+	// PersistentVolumeClaims associated with StatefulSet VolumeClaims
 	// will be deleted in the scenario specified in
 	// StatefulSetPersistentVolumeClaimPolicy.
 	DeletePersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Delete"
 )
 
 // StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
-// created from the StatefulSet VolumeClaimTemplates.
+// created from the StatefulSet VolumeClaims.
 type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 	// WhenDeleted specifies what happens to PVCs created from StatefulSet
-	// VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+	// VolumeClaims when the StatefulSet is deleted. The default policy
 	// of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
 	// `Delete` policy causes those PVCs to be deleted.
 	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
 	// WhenScaled specifies what happens to PVCs created from StatefulSet
-	// VolumeClaimTemplates when the StatefulSet is scaled down. The default
+	// VolumeClaims when the StatefulSet is scaled down. The default
 	// policy of `Retain` causes PVCs to not be affected by a scaledown. The
 	// `Delete` policy causes the associated PVCs for any excess pods above
 	// the replica count to be deleted.
@@ -365,11 +365,11 @@ type StatefulSetStatus struct {
 	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
 	LabelSelector string `json:"labelSelector,omitempty"`
 
-	// VolumeClaimTemplates represents the status of compatibility between existing VolumeClaims
-	// and their respective templates. It tracks whether the VolumeClaims have been updated
-	// to match any changes made to the VolumeClaimTemplates, ensuring synchronization
+	// VolumeClaims represents the status of compatibility between existing PVCs
+	// and their respective templates. It tracks whether the PersistentVolumeClaims have been updated
+	// to match any changes made to the volumeClaimTemplates, ensuring synchronization
 	// between the defined templates and the actual PersistentVolumeClaims in use.
-	VolumeClaimTemplates []VolumeClaimStatus `json:"volumeClaimTemplates,omitempty"`
+	VolumeClaims []VolumeClaimStatus `json:"volumeClaims,omitempty"`
 }
 
 // These are valid conditions of a statefulset.

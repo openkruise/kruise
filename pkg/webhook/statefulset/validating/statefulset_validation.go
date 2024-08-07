@@ -416,7 +416,7 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 		}
 		if sc.AllowVolumeExpansion != nil && !*sc.AllowVolumeExpansion {
 			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "spec", "resources", "requests", "storage"),
-				fmt.Sprintf("sc %v disallow volume expansion", sc.Name))}
+				fmt.Sprintf("storage class %v does not support volume expansion", sc.Name))}
 		}
 	}
 	return nil
