@@ -152,6 +152,10 @@ endif
 create-cluster: $(tools/kind)
 	tools/hack/create-cluster.sh
 
+.PHONY: install-csi
+install-csi:
+	cd tools/hack/csi-driver-host-path; ./install-snapshot.sh
+
 # delete-cluster deletes a kube cluster.
 .PHONY: delete-cluster
 delete-cluster: $(tools/kind) ## Delete kind cluster.
@@ -178,4 +182,4 @@ generate_helm_crds:
 
 # kruise-e2e-test runs kruise e2e tests.
 .PHONY: kruise-e2e-test
-kruise-e2e-test: $(tools/kind) delete-cluster create-cluster docker-build kube-load-image install-kruise run-kruise-e2e-test delete-cluster
+kruise-e2e-test: $(tools/kind) delete-cluster create-cluster install-csi docker-build kube-load-image install-kruise run-kruise-e2e-test delete-cluster

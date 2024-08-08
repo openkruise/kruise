@@ -17,13 +17,14 @@ limitations under the License.
 package defaults
 
 import (
-	"github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
+
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 // SetDefaultsStatefulSet set default values for StatefulSet.
@@ -65,6 +66,12 @@ func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults boo
 		}
 		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
 			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = v1beta1.RetainPersistentVolumeClaimRetentionPolicyType
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) {
+		if obj.Spec.VolumeClaimUpdateStrategy.Type == "" {
+			obj.Spec.VolumeClaimUpdateStrategy.Type = v1beta1.OnPVCDeleteVolumeClaimUpdateStrategyType
 		}
 	}
 

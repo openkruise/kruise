@@ -23,12 +23,14 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -48,6 +50,7 @@ type StatefulPodControlObjectManager interface {
 	CreateClaim(claim *v1.PersistentVolumeClaim) error
 	GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error)
 	UpdateClaim(claim *v1.PersistentVolumeClaim) error
+	GetStorageClass(scName string) (*storagev1.StorageClass, error)
 }
 
 // StatefulPodControl defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -63,9 +66,10 @@ func NewStatefulPodControl(
 	client clientset.Interface,
 	podLister corelisters.PodLister,
 	claimLister corelisters.PersistentVolumeClaimLister,
+	scLister storagelisters.StorageClassLister,
 	recorder record.EventRecorder,
 ) *StatefulPodControl {
-	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, podLister, claimLister}, recorder}
+	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, podLister, claimLister, scLister}, recorder}
 }
 
 // NewStatefulPodControlFromManager creates a StatefulPodControl using the given StatefulPodControlObjectManager and recorder.
@@ -78,6 +82,7 @@ type realStatefulPodControlObjectManager struct {
 	client      clientset.Interface
 	podLister   corelisters.PodLister
 	claimLister corelisters.PersistentVolumeClaimLister
+	scLister    storagelisters.StorageClassLister
 }
 
 func (om *realStatefulPodControlObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
@@ -110,6 +115,10 @@ func (om *realStatefulPodControlObjectManager) GetClaim(namespace, claimName str
 func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error {
 	_, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
 	return err
+}
+
+func (om *realStatefulPodControlObjectManager) GetStorageClass(scName string) (*storagev1.StorageClass, error) {
+	return om.scLister.Get(scName)
 }
 
 func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *appsv1beta1.StatefulSet, pod *v1.Pod) error {

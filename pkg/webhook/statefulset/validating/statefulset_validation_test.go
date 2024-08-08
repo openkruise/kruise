@@ -20,15 +20,25 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestValidateStatefulSet(t *testing.T) {
@@ -713,4 +723,412 @@ func setTestDefault(obj *appsv1beta1.StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 0
 	}
+}
+
+var (
+	testScheme *runtime.Scheme
+)
+
+func init() {
+	testScheme = k8sruntime.NewScheme()
+	utilruntime.Must(corev1.AddToScheme(testScheme))
+	utilruntime.Must(storagev1.AddToScheme(testScheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(testScheme))
+}
+
+func newFakeStorageClass(name string, allowExpansion, isDefault bool) *storagev1.StorageClass {
+	sc := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		AllowVolumeExpansion: &allowExpansion,
+	}
+	if isDefault {
+		sc.Annotations = map[string]string{
+			isDefaultStorageClassAnnotation: "true",
+		}
+	}
+	return sc
+}
+
+func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
+	allowExpandSC := newFakeStorageClass("allowExpand", true, false)
+	disallowExpandSC := newFakeStorageClass("disallowExpand", false, false)
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(allowExpandSC, disallowExpandSC).Build()
+
+	tests := []struct {
+		name           string
+		sts            *appsv1beta1.StatefulSet
+		oldSts         *appsv1beta1.StatefulSet
+		expectedErrors bool
+	}{
+		{
+			name: "no update strategy and change sc",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &disallowExpandSC.Name},
+						},
+					},
+				},
+			},
+			expectedErrors: false,
+		},
+		{
+			name: "on delete update strategy and change sc",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPVCDeleteVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &disallowExpandSC.Name},
+						},
+					},
+				},
+			},
+			expectedErrors: false,
+		},
+		{
+			name: "on pod rolling update strategy and change sc",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &disallowExpandSC.Name},
+						},
+					},
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "on pod rolling update strategy and expand size with expansion allowed sc",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &allowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("3Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &allowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("2Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: false,
+		},
+		{
+			name: "on pod rolling update strategy and expand size with expansion disallowed sc",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &disallowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("3Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &disallowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("2Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "onDelete update strategy and expand size",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPVCDeleteVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &allowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("3Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &allowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("2Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: false,
+		},
+		{
+			name: "on pod rolling update strategy and scale down size with expansion allowed sc",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &allowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("2Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &allowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("3Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: false,
+		},
+		{
+			name: "on pod rolling update strategy and scale down size with expansion disallowed sc",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &disallowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("2Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec: v1.PersistentVolumeClaimSpec{
+								StorageClassName: &disallowExpandSC.Name,
+								Resources: v1.ResourceRequirements{
+									Requests: map[v1.ResourceName]resource.Quantity{
+										v1.ResourceStorage: resource.MustParse("3Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: true,
+		},
+		// Add more test cases here
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateVolumeClaimTemplateUpdate(fakeClient, tt.sts, tt.oldSts)
+			hasErrors := len(errs) > 0
+			if hasErrors {
+				t.Log(errs.ToAggregate())
+			}
+			if tt.expectedErrors != hasErrors {
+				t.Errorf("TestValidateVolumeClaimTemplateUpdate(%s) expected errors: %v, got: %v", tt.name, tt.expectedErrors, hasErrors)
+			}
+		})
+	}
+}
+
+func TestGetDefaultStorageClass(t *testing.T) {
+	// Create StorageClass objects to use in the test.
+	newSCWithCreateTime := func(name string, allowExpansion, isDefault bool, createTime time.Time) *storagev1.StorageClass {
+		sc := newFakeStorageClass(name, allowExpansion, isDefault)
+		sc.CreationTimestamp = metav1.NewTime(createTime)
+		return sc
+	}
+	tests := []struct {
+		name      string
+		scs       []*storagev1.StorageClass
+		expected  *storagev1.StorageClass
+		expectNil bool
+	}{
+		{
+			name:      "no storage class",
+			scs:       []*storagev1.StorageClass{},
+			expected:  nil,
+			expectNil: true,
+		},
+		{
+			name: "no default storage class",
+			scs: []*storagev1.StorageClass{
+				newFakeStorageClass("sc1", true, false),
+				newFakeStorageClass("sc2", true, false),
+			},
+			expected:  nil,
+			expectNil: true,
+		},
+		{
+			name: "only one default storage class",
+			scs: []*storagev1.StorageClass{
+				newFakeStorageClass("sc1", true, true),
+				newFakeStorageClass("sc2", true, false),
+			},
+			expected:  newFakeStorageClass("sc1", true, true),
+			expectNil: false,
+		},
+		{
+			name: "multi default storage classes",
+			scs: []*storagev1.StorageClass{
+				newSCWithCreateTime("sc1", true, true, time.Now().Add(time.Hour)),
+				newSCWithCreateTime("sc2", true, true, time.Now()),
+				newSCWithCreateTime("sc3", true, true, time.Now().Add(-time.Hour)),
+			},
+			expected:  newFakeStorageClass("sc1", true, true),
+			expectNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		// Create a fake client to mock API calls.
+		builder := fake.NewClientBuilder().WithScheme(testScheme)
+		for _, sc := range tt.scs {
+			builder.WithObjects(sc)
+		}
+		client := builder.Build()
+
+		// Test the GetDefaultStorageClass function.
+		defaultSC, err := GetDefaultStorageClass(client)
+		assert.NoError(t, err)
+		if tt.expectNil {
+			assert.Nil(t, defaultSC)
+		} else {
+			assert.NotNil(t, defaultSC)
+			assert.Equal(t, tt.expected.Name, defaultSC.Name)
+		}
+
+	}
+
 }

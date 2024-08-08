@@ -45,10 +45,13 @@ import (
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/pvc"
 )
 
 // Realistic value for maximum in-flight requests when processing in parallel mode.
 const MaxBatchSize = 500
+
+const PVCOwnedByStsAnnotationKey = "apps.kruise.io/owned-by-asts"
 
 // StatefulSetControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
 // as an interface to allow for extensions that provide different semantics. Currently, there is only one implementation.
@@ -383,6 +386,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.LabelSelector = selector.String()
 	minReadySeconds := getMinReadySeconds(set)
 
+	ssc.updatePVCStatus(&status, set, pods)
 	updateStatus(&status, minReadySeconds, currentRevision, updateRevision, pods)
 
 	startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(set)
@@ -472,6 +476,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return ssc.processReplica(ctx, set, updateSet, monotonic, replicas, i, &status, scaleMaxUnavailable)
 	}
 	if shouldExit, err := runForAllWithBreak(replicas, processReplicaFn); shouldExit || err != nil {
+		ssc.updatePVCStatus(&status, set, replicas)
 		updateStatus(&status, minReadySeconds, currentRevision, updateRevision, replicas, condemned)
 		return &status, err
 	}
@@ -489,6 +494,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return false, nil
 		}
 		if shouldExit, err := runForAll(condemned, fixPodClaim, monotonic); shouldExit || err != nil {
+			ssc.updatePVCStatus(&status, set, replicas)
 			updateStatus(&status, minReadySeconds, currentRevision, updateRevision, replicas, condemned)
 			return &status, err
 		}
@@ -504,9 +510,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		return ssc.processCondemned(ctx, set, firstUnhealthyPod, monotonic, condemned, i)
 	}
 	if shouldExit, err := runForAll(condemned, processCondemnedFn, monotonic); shouldExit || err != nil {
+		ssc.updatePVCStatus(&status, set, replicas)
 		updateStatus(&status, minReadySeconds, currentRevision, updateRevision, replicas, condemned)
 		return &status, err
 	}
+	ssc.updatePVCStatus(&status, set, replicas)
 	updateStatus(&status, minReadySeconds, currentRevision, updateRevision, replicas, condemned)
 
 	// for the OnDelete strategy we short circuit. Pods will be updated when they are manually deleted.
@@ -600,6 +608,22 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 				minWaitTime = waitTime
 				durationStore.Push(getStatefulSetKey(set), waitTime)
 			}
+		} else if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
+			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
+			checkReadyFn := func(claim, template *v1.PersistentVolumeClaim) bool {
+				_, ready := pvc.IsPVCCompatibleAndReady(claim, template)
+				return ready
+			}
+			// check pvc resize status, if not ready, record pod to unavailablePods
+			ready, err := ssc.podControl.checkOwnedPVCStatus(set, replicas[target], checkReadyFn)
+			if err == nil && ready {
+				continue
+			}
+			if err != nil {
+				klog.V(4).ErrorS(err, "StatefulSet check owned pvcs unready",
+					"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
+			}
+			unavailablePods.Insert(replicas[target].Name)
 		}
 	}
 
@@ -619,6 +643,29 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 			klog.V(4).InfoS("StatefulSet was waiting for unavailable Pods to update, blocked pod",
 				"statefulSet", klog.KObj(set), "unavailablePods", unavailablePods.List(), "blockedPod", klog.KObj(replicas[target]))
 			return status, nil
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
+			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
+			// resize pvc if necessary and wait for resize completed
+			if match, err := ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
+				return status, err
+			} else if !match {
+				err = ssc.podControl.TryPatchPVCSize(set, replicas[target])
+				if err != nil {
+					return status, err
+				}
+			}
+
+			allCompleted, err := ssc.podControl.checkOwnedPVCStatus(set, replicas[target], pvc.IsPatchPVCCompleted)
+			if err != nil {
+				return status, err
+			} else if !allCompleted {
+				// mark target as unavailable because pvc's updated
+				unavailablePods.Insert(replicas[target].Name)
+				// need to wait for pvc resize completed, continue to handle next pod
+				continue
+			}
 		}
 
 		// delete the Pod if it is not already terminating and does not match the update revision.

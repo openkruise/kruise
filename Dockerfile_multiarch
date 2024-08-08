@@ -1,7 +1,8 @@
 # Build the manager and daemon binaries
 ARG BASE_IMAGE=alpine
 ARG BASE_IMAGE_VERSION=3.19
-FROM --platform=$BUILDPLATFORM golang:1.20.14-alpine3.19 as builder
+ARG BUILD_BASE_IMAGE=golang:1.20.14-alpine3.19
+FROM --platform=$BUILDPLATFORM ${BUILD_BASE_IMAGE} as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -13,6 +14,9 @@ COPY main.go main.go
 COPY apis/ apis/
 COPY cmd/ cmd/
 COPY pkg/ pkg/
+
+#ENV GOPROXY=https://goproxy.cn,direct
+RUN go mod tidy
 
 # Build
 ARG TARGETOS
