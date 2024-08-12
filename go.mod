@@ -7,7 +7,7 @@ require (
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/codegangsta/negroni v1.0.0
 	github.com/docker/distribution v2.8.2+incompatible
-	github.com/docker/docker v26.1.4+incompatible
+	github.com/docker/docker v26.1.5+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
