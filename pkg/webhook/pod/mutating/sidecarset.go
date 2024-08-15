@@ -421,7 +421,7 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(sidecarContainer, pod)
 			// append volumeMounts SubPathExpr environments
 			transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-			klog.InfoS("try to inject Container sidecar %v@%v/%v, with injected envs: %v, volumeMounts: %v",
+			klog.InfoS("try to inject Container sidecar",
 				"containerName", sidecarContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts)
 			//when update pod object
 			if isUpdated {
