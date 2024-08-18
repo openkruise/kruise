@@ -29,9 +29,9 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout Actions Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Check spelling with custom config file
-        uses: crate-ci/typos@v1.23.5
+        uses: crate-ci/typos@c7af4712eda24dd1ef54bd8212973888489eb0ce # v1.23.5
         with:
           config: ./typos.toml
 
@@ -41,15 +41,15 @@ jobs:
       security-events: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Cache Go Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -58,14 +58,14 @@ jobs:
         run: |
           make generate
       - name: Lint golang code
-        uses: golangci/golangci-lint-action@v6.1.0
+        uses: golangci/golangci-lint-action@aaa42aa0628b4ae2578232a66b541047968fac86 # v6.1.0
         with:
           version: ${{ env.GOLANGCI_VERSION }}
           args: --verbose
           skip-pkg-cache: true
           mod: readonly
       - name: Run Trivy vulnerability scanner in repo mode
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@d9cd5b1c23aaf8cb31bb09141028215828364bbb # master
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -73,7 +73,7 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL'
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3.26.0
+        uses: github/codeql-action/upload-sarif@eb055d739abdc2e8de2e5f4ba1a8b246daa779aa # v3.26.0
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -108,17 +108,17 @@ jobs:
   unit-tests:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           submodules: true
       - name: Fetch History
         run: git fetch --prune --unshallow
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Cache Go Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -128,7 +128,7 @@ jobs:
           make test
           git status
       - name: Publish Unit Test Coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
         with:
           flags: unittests
           file: cover.out
