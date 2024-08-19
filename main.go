@@ -33,6 +33,9 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -125,11 +128,17 @@ func main() {
 	flag.DurationVar(&controllerCacheSyncTimeout, "controller-cache-sync-timeout", defaultControllerCacheSyncTimeout, "CacheSyncTimeout refers to the time limit set to wait for syncing caches. Defaults to 2 minutes if not set.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
+	logOptions := logs.NewOptions()
+	logsapi.AddFlags(logOptions, pflag.CommandLine)
 	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	ctrl.SetLogger(klogr.New())
+	if err := logsapi.ValidateAndApply(logOptions, nil); err != nil {
+		setupLog.Error(err, "logsapi ValidateAndApply failed")
+		os.Exit(1)
+	}
 	features.SetDefaultFeatureGates()
 	util.SetControllerCacheSyncTimeout(controllerCacheSyncTimeout)
 
