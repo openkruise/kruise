@@ -25,9 +25,9 @@ require (
 	golang.org/x/time v0.3.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0
 	google.golang.org/grpc v1.63.0
-	k8s.io/api v0.30.0
-	k8s.io/apiextensions-apiserver v0.30.0
-	k8s.io/apimachinery v0.30.0
+	k8s.io/api v0.28.9
+	k8s.io/apiextensions-apiserver v0.28.9
+	k8s.io/apimachinery v0.28.9
 	k8s.io/apiserver v0.28.9
 	k8s.io/client-go v0.28.9
 	k8s.io/code-generator v0.28.9
