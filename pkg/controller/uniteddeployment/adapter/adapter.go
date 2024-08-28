@@ -17,6 +17,7 @@ limitations under the License.
 package adapter
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,14 +26,22 @@ import (
 )
 
 type Adapter interface {
-	// NewResourceObject creates a empty subset object.
+	// NewResourceObject creates an empty subset object.
 	NewResourceObject() client.Object
-	// NewResourceListObject creates a empty subset list object.
+	// NewResourceListObject creates an empty subset list object.
 	NewResourceListObject() client.ObjectList
 	// GetStatusObservedGeneration returns the observed generation of the subset.
 	GetStatusObservedGeneration(subset metav1.Object) int64
-	// GetReplicaDetails returns the replicas information of the subset status.
-	GetReplicaDetails(subset metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error)
+	// GetSubsetPods returns all pods of the subset workload.
+	GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error)
+	// GetSpecReplicas returns the replicas information of the subset workload.
+	GetSpecReplicas(obj metav1.Object) *int32
+	// GetSpecPartition returns the partition information of the subset workload if possible.
+	GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32
+	// GetStatusReplicas returns the replicas from the subset workload status.
+	GetStatusReplicas(obj metav1.Object) int32
+	// GetStatusReadyReplicas returns the ready replicas information from the subset workload status.
+	GetStatusReadyReplicas(obj metav1.Object) int32
 	// GetSubsetFailure returns failure information of the subset.
 	GetSubsetFailure() *string
 	// ApplySubsetTemplate updates the subset to the latest revision.

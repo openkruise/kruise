@@ -19,11 +19,12 @@ package adapter
 import (
 	"fmt"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func getSubsetPrefix(controllerName, subsetName string) string {
@@ -96,4 +97,20 @@ func getCurrentPartition(pods []*corev1.Pod, revision string) *int32 {
 	}
 
 	return &partition
+}
+
+func CalculateUpdatedReplicas(podList []*corev1.Pod, updatedRevision string) (updatedReplicas, updatedReadyReplicas int32) {
+	for _, pod := range podList {
+		revision := getRevision(&pod.ObjectMeta)
+
+		// Only count pods that are updated and are not terminating
+		if revision == updatedRevision && controller.IsPodActive(pod) {
+			updatedReplicas++
+			if podutil.IsPodReady(pod) {
+				updatedReadyReplicas++
+			}
+		}
+	}
+
+	return
 }
