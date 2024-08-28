@@ -619,6 +619,8 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 				klog.V(4).ErrorS(err, "StatefulSet check owned pvcs unready",
 					"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
 			}
+			klog.V(4).InfoS("owned pvcs unready, added in unavailable Pods",
+				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
 			unavailablePods.Insert(replicas[target].Name)
 		}
 	}
@@ -634,8 +636,16 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 	klog.V(3).InfoS("Prepare to update pods indexes for StatefulSet", "statefulSet", klog.KObj(set), "podIndexes", updateIndexes)
 	// update pods in sequence
 	for _, target := range updateIndexes {
+		var pvcMatched bool = true
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
+			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
+			if pvcMatched, err = ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
+				return status, err
+			}
+		}
+
 		// the target is already up-to-date, go to next
-		if getPodRevision(replicas[target]) == updateRevision.Name {
+		if getPodRevision(replicas[target]) == updateRevision.Name && pvcMatched {
 			continue
 		}
 
@@ -653,9 +663,7 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) &&
 			set.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType {
 			// resize pvc if necessary and wait for resize completed
-			if match, err := ssc.podControl.IsClaimsCompatible(set, replicas[target]); err != nil {
-				return status, err
-			} else if !match {
+			if !pvcMatched {
 				err = ssc.podControl.TryPatchPVC(set, replicas[target])
 				if err != nil {
 					return status, err

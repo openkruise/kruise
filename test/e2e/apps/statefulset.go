@@ -385,6 +385,248 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 	})
 
+	ginkgo.Describe("Resize PVC only", func() {
+		oldSize, newSize := "1Gi", "2Gi"
+		injectSC := func(podUpdatePolicy appsv1beta1.PodUpdateStrategyType, ss *appsv1beta1.StatefulSet, volumeClaimUpdateStrategy appsv1beta1.VolumeClaimUpdateStrategyType, scNames ...string) {
+			if podUpdatePolicy == appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType {
+				ss.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{
+					PodUpdatePolicy: podUpdatePolicy,
+				}
+				ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
+			}
+
+			ss.Spec.VolumeClaimUpdateStrategy = appsv1beta1.VolumeClaimUpdateStrategy{
+				Type: volumeClaimUpdateStrategy,
+			}
+			if len(ss.Spec.VolumeClaimTemplates) != len(scNames) {
+				return
+			}
+			quantity, _ := resource.ParseQuantity(oldSize)
+			for i := range scNames {
+				ss.Spec.VolumeClaimTemplates[i].Spec.StorageClassName = &scNames[i]
+				ss.Spec.VolumeClaimTemplates[i].Spec.Resources.Requests[v1.ResourceStorage] = quantity
+			}
+		}
+		resizeVCT := func(ss *appsv1beta1.StatefulSet, size string, resizeElementSize int) {
+			quantity, _ := resource.ParseQuantity(size)
+			for i := range ss.Spec.VolumeClaimTemplates {
+				if i >= resizeElementSize {
+					return
+				}
+				ss.Spec.VolumeClaimTemplates[i].Spec.Resources.Requests[v1.ResourceStorage] = quantity
+			}
+		}
+		ssName := "ss"
+		labels := map[string]string{
+			"foo": "bar",
+			"baz": "blah",
+		}
+		headlessSvcName := "test"
+		var ss *appsv1beta1.StatefulSet
+		var sst *framework.StatefulSetTester
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
+			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			sst = framework.NewStatefulSetTester(c, kc)
+		})
+
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all statefulset in ns %v", ns)
+			framework.DeleteAllStatefulSets(c, kc, ns)
+		})
+		validateExpandVCT := func(vctNumber int, injectSCFn func(ss *appsv1beta1.StatefulSet), updateFn func(ss *appsv1beta1.StatefulSet), expectErr bool) {
+			ctx := context.TODO()
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			vms := []v1.VolumeMount{}
+			for i := 0; i < vctNumber; i++ {
+				vms = append(vms, v1.VolumeMount{
+					Name:      fmt.Sprintf("data%d", i),
+					MountPath: fmt.Sprintf("/data%d", i),
+				})
+			}
+			ss = framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, vms, nil, labels)
+			injectSCFn(ss)
+
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			sst = framework.NewStatefulSetTester(c, kc)
+			waitForStatus(ctx, c, kc, ss)
+			sst.WaitForStatusReplicas(ss, 3)
+			sst.WaitForStatusReadyReplicas(ss, 3)
+
+			ginkgo.By("expand volume claim size")
+			ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, updateFn)
+			if expectErr {
+				// error is expected
+				if err == nil {
+					framework.Failf("unexpected to update pvc with sc can not expand, but get error %v", err)
+				}
+				return
+			} else {
+				framework.ExpectNoError(err)
+			}
+
+			// we need to ensure we wait for all the new ones to show up, not
+			// just for any random 3
+			waitForStatus(ctx, c, kc, ss)
+			waitForPVCCapacity(ctx, c, kc, ss, func(pvc, template resource.Quantity) bool {
+				return pvc.Cmp(template) == 0
+			})
+
+			ginkgo.By("Confirming 3 pvc capacity consistent with spec")
+			sst.WaitForStatusReplicas(ss, 3)
+			sst.WaitForStatusReadyReplicas(ss, 3)
+			sst.WaitForStatusPVCReadyReplicas(ss, 3)
+		}
+
+		ginkgo.It("recreate_with_sc_can_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(1, injectFn, updateFn, false)
+		})
+
+		ginkgo.It("recreate_with_sc_cannot_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(1, injectFn, updateFn, true)
+		})
+
+		ginkgo.It("recreate_with_2sc_can_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, canExpandSC, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(2, injectFn, updateFn, false)
+		})
+
+		ginkgo.It("recreate_with_2sc_cannot_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC, cannotExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(2, injectFn, updateFn, true)
+		})
+
+		ginkgo.It("recreate_expand_only_can_with_mixed_sc", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, canExpandSC, cannotExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 1)
+			}
+			validateExpandVCT(2, injectFn, updateFn, false)
+		})
+
+		ginkgo.It("recreate_expand_only_cannot_with_mixed_sc", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 1)
+			}
+			validateExpandVCT(2, injectFn, updateFn, true)
+		})
+
+		ginkgo.It("recreate_expand_both_cannot_with_mixed_sc", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(2, injectFn, updateFn, true)
+		})
+
+		ginkgo.It("inplace_with_sc_can_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(1, injectFn, updateFn, false)
+		})
+
+		ginkgo.It("inplace_with_sc_cannot_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(1, injectFn, updateFn, true)
+		})
+
+		ginkgo.It("inplace_with_2sc_can_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, canExpandSC, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(2, injectFn, updateFn, false)
+		})
+
+		ginkgo.It("inplace_with_2sc_cannot_expand", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC, cannotExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(2, injectFn, updateFn, true)
+		})
+
+		ginkgo.It("inplace_expand_only_can_with_mixed_sc", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, canExpandSC, cannotExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 1)
+			}
+			validateExpandVCT(2, injectFn, updateFn, false)
+		})
+
+		ginkgo.It("inplace_expand_only_cannot_with_mixed_sc", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 1)
+			}
+			validateExpandVCT(2, injectFn, updateFn, true)
+		})
+
+		ginkgo.It("inplace_expand_both_cannot_with_mixed_sc", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, cannotExpandSC, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				resizeVCT(update, newSize, 2)
+			}
+			validateExpandVCT(2, injectFn, updateFn, true)
+		})
+	})
+
 	ginkgo.Describe("Resize PVC with rollback", func() {
 		oldSize, newSize := "1Gi", "2Gi"
 		injectSC := func(podUpdatePolicy appsv1beta1.PodUpdateStrategyType, ss *appsv1beta1.StatefulSet, volumeClaimUpdateStrategy appsv1beta1.VolumeClaimUpdateStrategyType, scNames ...string) {
@@ -517,6 +759,54 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 			sst.WaitForStatusReplicas(ss, 3)
 			sst.WaitForStatusReadyReplicas(ss, 3)
 		}
+
+		// support reconcile when vct resize only
+		ginkgo.It("partition 2, rollback only image", func() {
+			injectFn := func(ss *appsv1beta1.StatefulSet) {
+				injectSC(appsv1beta1.RecreatePodUpdateStrategyType, ss, appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, canExpandSC)
+			}
+			updateFn := func(update *appsv1beta1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = newImage
+				resizeVCT(update, newSize, 2)
+				partition := int32(2)
+				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
+			}
+			rollbackFn := func(update *appsv1beta1.StatefulSet) {
+				ginkgo.By("rollback only image, remain new pvc size")
+				update.Spec.Template.Spec.Containers[0].Image = oldImage
+				partition := int32(0)
+				update.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
+			}
+			validateUpdateVCTAndRollback(1, injectFn, updateFn, rollbackFn)
+			ctx := context.TODO()
+			waitForPVCCapacity(ctx, c, kc, ss, func(pvc, template resource.Quantity) bool {
+				return pvc.Cmp(template) == 0
+			})
+
+			ginkgo.By("Confirming 3 pvc capacity consistent with spec")
+			sst.WaitForStatusReplicas(ss, 3)
+			sst.WaitForStatusReadyReplicas(ss, 3)
+			sst.WaitForStatusPVCReadyReplicas(ss, 3)
+
+			// update to another version
+			ginkgo.By("After rollbacked, continue to expand pvc size")
+			var err error
+			ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(set *appsv1beta1.StatefulSet) {
+				resizeVCT(set, "3Gi", 2)
+			})
+			framework.ExpectNoError(err)
+
+			sst.WaitForStatusReadyReplicas(ss, 3)
+			waitForStatus(ctx, c, kc, ss)
+			waitForPVCCapacity(ctx, c, kc, ss, func(pvc, template resource.Quantity) bool {
+				return pvc.Cmp(template) == 0
+			})
+
+			ginkgo.By("Confirming 3 pvc capacity consistent with spec")
+			sst.WaitForStatusReplicas(ss, 3)
+			sst.WaitForStatusReadyReplicas(ss, 3)
+			sst.WaitForStatusPVCReadyReplicas(ss, 3)
+		})
 
 		ginkgo.It("partition 2, rollback only image and update to another image", func() {
 			injectFn := func(ss *appsv1beta1.StatefulSet) {
