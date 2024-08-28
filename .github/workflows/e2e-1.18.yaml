@@ -79,7 +79,7 @@ jobs:
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
           set +e
-          ./bin/ginkgo -timeout 60m -v --focus='\[apps\] AppStatefulSetStorage' test/e2e
+          ./bin/ginkgo -timeout 60m -p -v --focus='\[apps\] AppStatefulSetStorage' test/e2e
           retVal=$?
           restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
           if [ "${restartCount}" -eq "0" ];then
