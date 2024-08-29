@@ -40,7 +40,7 @@ require (
 	k8s.io/kubelet v0.28.9
 	k8s.io/kubernetes v1.28.9
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
-	sigs.k8s.io/controller-runtime v0.16.5
+	sigs.k8s.io/controller-runtime v0.16.6
 )
 
 require (
