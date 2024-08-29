@@ -20,9 +20,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"reflect"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"reflect"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -31,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
 
 	"github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/pkg/features"
@@ -71,7 +72,7 @@ func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters
 		}
 		return nil
 	}
-	webhookConfig := apiextensionsv1.WebhookClientConfig{
+	webhookConfig := &apiextensionsv1.WebhookClientConfig{
 		CABundle: caBundle,
 	}
 	path := "/convert"
@@ -105,6 +106,7 @@ func Ensure(client apiextensionsclientset.Interface, lister apiextensionslisters
 			if _, err := client.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), newCRD, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("failed to update CRD %s: %v", newCRD.Name, err)
 			}
+			klog.InfoS("Update caBundle success", "CustomResourceDefinitions", klog.KObj(newCRD))
 		}
 	}
 
