@@ -148,12 +148,14 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 		if _, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.TODO(), mutatingConfig, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to update %s: %v", mutatingWebhookConfigurationName, err)
 		}
+		klog.InfoS("Update caBundle success", "MutatingWebhookConfigurations", klog.KObj(mutatingConfig))
 	}
 
 	if !reflect.DeepEqual(validatingConfig, oldValidatingConfig) {
 		if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.TODO(), validatingConfig, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to update %s: %v", validatingWebhookConfigurationName, err)
 		}
+		klog.InfoS("Update caBundle success", "ValidatingWebhookConfigurations", klog.KObj(validatingConfig))
 	}
 
 	return nil
