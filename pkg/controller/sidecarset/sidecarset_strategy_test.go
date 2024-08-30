@@ -93,7 +93,7 @@ func factoryPodsCommon(count, upgraded int, sidecarSet *appsv1alpha1.SidecarSet)
 	}
 	for i := 0; i < upgraded; i++ {
 		pods[i].Spec.Containers[1].Image = "test-image:v2"
-		sidecarcontrol.UpdatePodSidecarSetHash(pods[i], control.GetSidecarset())
+		sidecarcontrol.UpdatePodSidecarSetHash(pods[i], control.GetSidecarset(), sidecarcontrol.SidecarSetUpgradeStateUpdating)
 		control.UpdatePodAnnotationsInUpgrade([]string{"test-sidecar"}, pods[i])
 	}
 	return pods

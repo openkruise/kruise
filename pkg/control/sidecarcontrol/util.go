@@ -75,12 +75,20 @@ var (
 	UpdateExpectations = expectations.NewUpdateExpectations(RevisionAdapterImpl)
 )
 
+type SidecarSetUpgradeState string
+
+const (
+	SidecarSetUpgradeStateNormal   SidecarSetUpgradeState = "Normal"
+	SidecarSetUpgradeStateUpdating SidecarSetUpgradeState = "Updating"
+)
+
 type SidecarSetUpgradeSpec struct {
-	UpdateTimestamp              metav1.Time `json:"updateTimestamp"`
-	SidecarSetHash               string      `json:"hash"`
-	SidecarSetName               string      `json:"sidecarSetName"`
-	SidecarList                  []string    `json:"sidecarList"`                  // sidecarSet container list
-	SidecarSetControllerRevision string      `json:"controllerRevision,omitempty"` // sidecarSet controllerRevision name
+	UpdateTimestamp              metav1.Time            `json:"updateTimestamp"`
+	SidecarSetHash               string                 `json:"hash"`
+	SidecarSetName               string                 `json:"sidecarSetName"`
+	SidecarList                  []string               `json:"sidecarList"`                  // sidecarSet container list
+	SidecarSetControllerRevision string                 `json:"controllerRevision,omitempty"` // sidecarSet controllerRevision name
+	State                        SidecarSetUpgradeState `json:"state,omitempty"`              // sidecarSet upgrade state
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
@@ -210,7 +218,7 @@ func IsPodSidecarUpdated(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) b
 }
 
 // UpdatePodSidecarSetHash when sidecarSet in-place update sidecar container, Update sidecarSet hash in Pod annotations[kruise.io/sidecarset-hash]
-func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) {
+func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet, state SidecarSetUpgradeState) {
 	hashKey := SidecarSetHashAnnotation
 	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
 	if err := json.Unmarshal([]byte(pod.Annotations[hashKey]), &sidecarSetHash); err != nil {
@@ -256,9 +264,32 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 		SidecarSetName:               sidecarSet.Name,
 		SidecarList:                  sidecarList.List(),
 		SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,
+		State:                        state,
 	}
 	newHash, _ := json.Marshal(sidecarSetHash)
 	pod.Annotations[hashKey] = string(newHash)
+}
+
+// GetPodSidecarSetHashUpdatedState retrieves the SidecarSet hash annotation after the state is updated.
+func GetPodSidecarSetHashUpdatedState(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet, state SidecarSetUpgradeState) (string, error) {
+	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
+	if err := json.Unmarshal([]byte(pod.Annotations[SidecarSetHashAnnotation]), &sidecarSetHash); err != nil {
+		return "", err
+	}
+	spec, exists := sidecarSetHash[sidecarSet.Name]
+	if !exists {
+		return "", fmt.Errorf("SidecarSet %s not found", sidecarSet.Name)
+	}
+
+	spec.State = state
+	sidecarSetHash[sidecarSet.Name] = spec
+	newHash, _ := json.Marshal(sidecarSetHash)
+
+	updatedAnnotation, err := json.Marshal(metav1.ObjectMeta{Annotations: map[string]string{SidecarSetHashAnnotation: string(newHash)}})
+	if err != nil {
+		return "", err
+	}
+	return string(updatedAnnotation), nil
 }
 
 func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
@@ -574,4 +605,13 @@ func IsSidecarContainer(container corev1.Container) bool {
 		return true
 	}
 	return false
+}
+
+// IsPodSidecarSetUpgradeStateAwaitingPatchNormal checks whether the SidecarSet upgrade state needs to be patched to Normal
+func IsPodSidecarSetUpgradeStateAwaitingPatchNormal(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
+	if pod.Annotations == nil || pod.Annotations[SidecarSetHashAnnotation] == "" {
+		return false
+	}
+	spec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSet.Name, SidecarSetHashAnnotation, pod)
+	return spec.State == SidecarSetUpgradeStateUpdating
 }
