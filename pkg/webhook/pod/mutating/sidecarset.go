@@ -373,7 +373,10 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		if !isUpdated {
 			for i := range sidecarSet.Spec.InitContainers {
 				initContainer := &sidecarSet.Spec.InitContainers[i]
-				sidecarList.Insert(initContainer.Name)
+				// only insert k8s native sidecar container for in-place update
+				if sidecarcontrol.IsSidecarContainer(initContainer.Container) {
+					sidecarList.Insert(initContainer.Name)
+				}
 				// volumeMounts that injected into sidecar container
 				// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
 				injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, initContainer, pod)

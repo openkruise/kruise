@@ -242,14 +242,7 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 		// compatible done
 	}
 
-	sidecarList := sets.NewString()
-	for _, sidecar := range sidecarSet.Spec.Containers {
-		sidecarList.Insert(sidecar.Name)
-	}
-	for _, sidecar := range sidecarSet.Spec.InitContainers {
-		sidecarList.Insert(sidecar.Name)
-	}
-
+	sidecarList := listSidecarNameInSidecarSet(sidecarSet)
 	sidecarSetHash[sidecarSet.Name] = SidecarSetUpgradeSpec{
 		UpdateTimestamp:              metav1.Now(),
 		SidecarSetHash:               GetSidecarSetRevision(sidecarSet),
@@ -574,4 +567,18 @@ func IsSidecarContainer(container corev1.Container) bool {
 		return true
 	}
 	return false
+}
+
+// listSidecarNameInSidecarSet list always init containers and sidecar containers
+func listSidecarNameInSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
+	sidecarList := sets.NewString()
+	for _, sidecar := range sidecarSet.Spec.InitContainers {
+		if IsSidecarContainer(sidecar.Container) {
+			sidecarList.Insert(sidecar.Name)
+		}
+	}
+	for _, sidecar := range sidecarSet.Spec.Containers {
+		sidecarList.Insert(sidecar.Name)
+	}
+	return sidecarList
 }
