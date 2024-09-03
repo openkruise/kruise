@@ -853,10 +853,12 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
 				origin := sets.String{}
-				for _, sidecar := range sidecarSetIn.Spec.Containers {
-					origin.Insert(sidecar.Name)
-				}
 				for _, sidecar := range sidecarSetIn.Spec.InitContainers {
+					if sidecarcontrol.IsSidecarContainer(sidecar.Container) {
+						origin.Insert(sidecar.Name)
+					}
+				}
+				for _, sidecar := range sidecarSetIn.Spec.Containers {
 					origin.Insert(sidecar.Name)
 				}
 				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
@@ -902,10 +904,12 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
 				origin := sets.String{}
-				for _, sidecar := range sidecarSetIn.Spec.Containers {
-					origin.Insert(sidecar.Name)
-				}
 				for _, sidecar := range sidecarSetIn.Spec.InitContainers {
+					if sidecarcontrol.IsSidecarContainer(sidecar.Container) {
+						origin.Insert(sidecar.Name)
+					}
+				}
+				for _, sidecar := range sidecarSetIn.Spec.Containers {
 					origin.Insert(sidecar.Name)
 				}
 				// SidecarSetHashAnnotation = "kruise.io/sidecarset-hash"
@@ -950,6 +954,11 @@ var _ = SIGDescribe("SidecarSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
 				origin := sets.String{}
+				for _, sidecar := range sidecarSetIn.Spec.InitContainers {
+					if sidecarcontrol.IsSidecarContainer(sidecar.Container) {
+						origin.Insert(sidecar.Name)
+					}
+				}
 				for _, sidecar := range sidecarSetIn.Spec.Containers {
 					origin.Insert(sidecar.Name)
 				}
