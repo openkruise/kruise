@@ -144,9 +144,9 @@ func (h *StatefulSetCreateUpdateHandler) decodeOldObject(req admission.Request, 
 }
 
 //var _ inject.Client = &StatefulSetCreateUpdateHandler{}
-//
-//// InjectClient injects the client into the StatefulSetCreateUpdateHandler
-//func (h *StatefulSetCreateUpdateHandler) InjectClient(c client.Client) error {
-//	h.Client = c
-//	return nil
-//}
+
+// InjectClient injects the client into the StatefulSetCreateUpdateHandler
+func (h *StatefulSetCreateUpdateHandler) InjectClient(c client.Client) error {
+	h.Client = c
+	return nil
+}
