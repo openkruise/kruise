@@ -34,7 +34,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Install-CSI
         run: |
@@ -117,7 +117,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -196,7 +196,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -288,7 +288,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -380,7 +380,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -472,7 +472,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -542,7 +542,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -592,6 +592,89 @@ jobs:
               done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')             
           fi
           exit $retVal
+  clonesetAndInplace:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Install-CSI
+        run: |
+          make install-csi
+
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          set -ex
+          kubectl cluster-info
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
+          NODES=$(kubectl get node | wc -l)
+          for ((i=1;i<10;i++));
+          do
+            set +e
+            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+            set -e
+            if [ "$PODS" -eq "$NODES" ]; then
+              break
+            fi
+            sleep 3
+          done
+          set +e
+          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
+          kubectl get node -o yaml
+          kubectl get all -n kruise-system -o yaml
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
+          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
+          set -e
+          if [ "$PODS" -eq "$NODES" ]; then
+            echo "Wait for kruise-manager and kruise-daemon ready successfully"
+          else
+            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
+            exit 1
+          fi
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          make ginkgo
+          set +e
+          ./bin/ginkgo -p -timeout 120m -v --focus='\[apps\] (InplaceVPA)' test/e2e
+          retVal=$?
+          restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
+          if [ "${restartCount}" -eq "0" ];then
+              echo "Kruise-manager has not restarted"
+          else
+              kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers
+              echo "Kruise-manager has restarted, abort!!!"
+              kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
+              exit 1
+          fi
+          if [ "$retVal" -ne 0 ];then
+              echo "test fail, dump kruise-manager logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}') 
+              echo "test fail, dump kruise-daemon logs"
+              while read pod; do 
+                   kubectl logs -n kruise-system $pod
+              done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')         
+          fi
+          exit $retVal
+
   other:
     runs-on: ubuntu-20.04
     steps:
@@ -607,7 +690,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf-with-vpa.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Build image
         run: |
@@ -648,7 +731,7 @@ jobs:
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
           set +e
-          ./bin/ginkgo -timeout 90m -v --skip='\[apps\] (AppStatefulSetStorage|StatefulSet|PullImage|PullImages|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' --skip='\[policy\] PodUnavailableBudget' test/e2e
+          ./bin/ginkgo -timeout 90m -v --skip='\[apps\] (InplaceVPA|AppStatefulSetStorage|StatefulSet|PullImage|PullImages|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' --skip='\[policy\] PodUnavailableBudget' test/e2e
           retVal=$?
           restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
           if [ "${restartCount}" -eq "0" ];then

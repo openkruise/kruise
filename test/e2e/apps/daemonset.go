@@ -7,11 +7,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util/lifecycle"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -23,6 +18,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 var _ = SIGDescribe("DaemonSet", func() {
@@ -331,12 +332,6 @@ var _ = SIGDescribe("DaemonSet", func() {
 					v1.ResourceCPU: resource.MustParse("100m"),
 				},
 			}
-			ads.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
-				{
-					Name:  "TEST",
-					Value: "",
-				},
-			}
 			ds, err := tester.CreateDaemonSet(ads)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -357,12 +352,8 @@ var _ = SIGDescribe("DaemonSet", func() {
 						v1.ResourceCPU: resource.MustParse("120m"),
 					},
 				}
-				ads.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
-					{
-						Name:  "TEST",
-						Value: "TEST",
-					},
-				}
+				// when enable InPlaceWorkloadVerticalScaling feature, just resize request will not delete pod
+				ads.Spec.Template.Spec.Containers[0].Env = append(ads.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "test", Value: "test"})
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
 

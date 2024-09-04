@@ -151,9 +151,15 @@ endif
 create-cluster: $(tools/kind)
 	tools/hack/create-cluster.sh
 
+DISABLE_CSI ?= false
+
 .PHONY: install-csi
 install-csi:
+ifeq ($(DISABLE_CSI), true)
+	@echo "CSI is disabled, skip"
+else
 	cd tools/hack/csi-driver-host-path; ./install-snapshot.sh
+endif
 
 # delete-cluster deletes a kube cluster.
 .PHONY: delete-cluster

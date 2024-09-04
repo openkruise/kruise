@@ -69,6 +69,7 @@ type UpdateOptions struct {
 	PatchSpecToPod                 func(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, error)
 	CheckPodUpdateCompleted        func(pod *v1.Pod) error
 	CheckContainersUpdateCompleted func(pod *v1.Pod, state *appspub.InPlaceUpdateState) error
+	CheckPodNeedsBeUnready         func(pod *v1.Pod, spec *UpdateSpec) bool
 	GetRevision                    func(rev *apps.ControllerRevision) string
 }
 
@@ -89,10 +90,13 @@ type UpdateSpec struct {
 	MetaDataPatch         []byte                             `json:"metaDataPatch,omitempty"`
 	UpdateEnvFromMetadata bool                               `json:"updateEnvFromMetadata,omitempty"`
 	GraceSeconds          int32                              `json:"graceSeconds,omitempty"`
-	VerticalUpdateOnly    bool                               `json:"verticalUpdate,omitempty"`
 
 	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
 	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
+}
+
+func (u *UpdateSpec) VerticalUpdateOnly() bool {
+	return len(u.ContainerResources) > 0 && len(u.ContainerImages) == 0 && !u.UpdateEnvFromMetadata
 }
 
 type realControl struct {
@@ -291,7 +295,7 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 
 	// 2. update condition for pod with readiness-gate
 	// When only workload resources are updated, they are marked as not needing to remove traffic
-	if !spec.VerticalUpdateOnly && containsReadinessGate(pod) {
+	if opts.CheckPodNeedsBeUnready(pod, spec) {
 		newCondition := v1.PodCondition{
 			Type:               appspub.InPlaceUpdateReady,
 			LastTransitionTime: metav1.NewTime(Clock.Now()),
@@ -337,6 +341,8 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			Revision:              spec.Revision,
 			UpdateTimestamp:       metav1.NewTime(Clock.Now()),
 			UpdateEnvFromMetadata: spec.UpdateEnvFromMetadata,
+			UpdateImages:          len(spec.ContainerImages) > 0,
+			UpdateResources:       len(spec.ContainerResources) > 0,
 		}
 		inPlaceUpdateStateJSON, _ := json.Marshal(inPlaceUpdateState)
 		clone.Annotations[appspub.InPlaceUpdateStateKey] = string(inPlaceUpdateStateJSON)

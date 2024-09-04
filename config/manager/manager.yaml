@@ -60,8 +60,8 @@ spec:
             port: 8000
         resources:
           limits:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 2
+            memory: 2Gi
           requests:
             cpu: 100m
             memory: 200Mi

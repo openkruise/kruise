@@ -64,6 +64,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 			expectedSpec: &UpdateSpec{
 				Revision:             "new-revision",
 				ContainerImages:      map[string]string{"c1": "foo2"},
+				ContainerResources:   map[string]v1.ResourceRequirements{},
 				ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 			},
 		},
@@ -79,6 +80,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 			expectedSpec: &UpdateSpec{
 				Revision:             "new-revision",
 				ContainerImages:      map[string]string{"c1": "foo2"},
+				ContainerResources:   map[string]v1.ResourceRequirements{},
 				ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 			},
 		},
@@ -94,6 +96,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 			expectedSpec: &UpdateSpec{
 				Revision:             "new-revision",
 				ContainerImages:      map[string]string{"c1": "foo2"},
+				ContainerResources:   map[string]v1.ResourceRequirements{},
 				ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 				MetaDataPatch:        []byte(`{"metadata":{"labels":{"k1":"v1"}}}`),
 			},
@@ -110,6 +113,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 			expectedSpec: &UpdateSpec{
 				Revision:              "new-revision",
 				ContainerImages:       map[string]string{"c1": "foo2"},
+				ContainerResources:    map[string]v1.ResourceRequirements{},
 				ContainerRefMetadata:  map[string]metav1.ObjectMeta{"c1": {Labels: map[string]string{"k": "v2"}}},
 				MetaDataPatch:         []byte(`{"metadata":{"labels":{"k1":"v1"}}}`),
 				UpdateEnvFromMetadata: true,
@@ -127,6 +131,7 @@ func TestCalculateInPlaceUpdateSpec(t *testing.T) {
 			expectedSpec: &UpdateSpec{
 				Revision:             "new-revision",
 				ContainerImages:      map[string]string{"c1": "foo2"},
+				ContainerResources:   map[string]v1.ResourceRequirements{},
 				ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 				MetaDataPatch:        []byte(`{"metadata":{"$deleteFromPrimitiveList/finalizers":["fz1"],"$setElementOrder/finalizers":["fz2"],"labels":{"k1":"v1","k2":null}}}`),
 			},
