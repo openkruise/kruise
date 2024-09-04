@@ -17,10 +17,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
 const (
@@ -178,6 +179,8 @@ type CloneSetStatus struct {
 
 	// UpdatedAvailableReplicas is the number of Pods created by the CloneSet controller from the CloneSet version
 	// indicated by updateRevision and have a Ready Condition for at least minReadySeconds.
+	// Notice: when enable InPlaceWorkloadVerticalScaling, only resource resize updating pod will also be unavailable.
+	// This means these pod will be counted in maxUnavailable.
 	UpdatedAvailableReplicas int32 `json:"updatedAvailableReplicas,omitempty"`
 
 	// ExpectedUpdatedReplicas is the number of Pods that should be updated by CloneSet controller.
@@ -237,6 +240,7 @@ type CloneSetCondition struct {
 // +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".spec.replicas",description="The desired number of pods."
 // +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedReplicas",description="The number of pods updated."
 // +kubebuilder:printcolumn:name="UPDATED_READY",type="integer",JSONPath=".status.updatedReadyReplicas",description="The number of pods updated and ready."
+// +kubebuilder:printcolumn:name="UPDATED_AVAILABLE",type="integer",JSONPath=".status.updatedAvailableReplicas",description="The number of pods updated and available."
 // +kubebuilder:printcolumn:name="READY",type="integer",JSONPath=".status.readyReplicas",description="The number of pods ready."
 // +kubebuilder:printcolumn:name="TOTAL",type="integer",JSONPath=".status.replicas",description="The number of currently all pods."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp",description="CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC."
