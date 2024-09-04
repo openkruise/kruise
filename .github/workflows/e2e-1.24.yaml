@@ -35,7 +35,7 @@ jobs:
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
-          config: ./test/kind-conf-none-fg.yaml
+          config: ./test/kind-conf.yaml
           version: ${{ env.KIND_VERSION }}
       - name: Install-CSI
         run: |

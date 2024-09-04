@@ -29,6 +29,10 @@ spec:
       jsonPath: .status.updatedReadyReplicas
       name: UPDATED_READY
       type: integer
+    - description: The number of pods updated and available.
+      jsonPath: .status.updatedAvailableReplicas
+      name: UPDATED_AVAILABLE
+      type: integer
     - description: The number of pods ready.
       jsonPath: .status.readyReplicas
       name: READY
@@ -512,6 +516,8 @@ spec:
                 description: |-
                   UpdatedAvailableReplicas is the number of Pods created by the CloneSet controller from the CloneSet version
                   indicated by updateRevision and have a Ready Condition for at least minReadySeconds.
+                  Notice: when enable InPlaceWorkloadVerticalScaling, only resource resize updating pod will also be unavailable.
+                  This means these pod will be counted in maxUnavailable.
                 format: int32
                 type: integer
               updatedReadyReplicas:

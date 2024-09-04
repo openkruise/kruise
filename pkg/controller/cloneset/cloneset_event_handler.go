@@ -138,6 +138,13 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 
 	// If it has a ControllerRef, that's all that matters.
 	if curControllerRef != nil {
+		// TODO(Abner-1): delete it when fixes only resize resource
+		//old, _ := json.Marshal(oldPod)
+		//cur, _ := json.Marshal(curPod)
+		//patches, _ := jsonpatch.CreatePatch(old, cur)
+		//pjson, _ := json.Marshal(patches)
+		//klog.V(4).InfoS("Pod updated json", "pod", klog.KObj(curPod), "patch", pjson)
+
 		req := resolveControllerRef(curPod.Namespace, curControllerRef)
 		if req == nil {
 			return
