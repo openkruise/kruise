@@ -1,5 +1,12 @@
 # Change Log
 
+## v1.7.1
+> Change log since v1.7.0
+
+### Bug fixes
+- When update crd webhook caBundle, if caBundle does not change, do not update crd again. ([#1717](https://github.com/openkruise/kruise/pull/1717), [@zmberg](https://github.com/zmberg))
+- Remove normal init container in pod's sidecarSet in-place update annotation. ([#1719](https://github.com/openkruise/kruise/pull/1719), [@zmberg](https://github.com/zmberg))
+
 ## v1.7.0
 > Change log since v1.6.3
 
