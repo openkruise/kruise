@@ -24,12 +24,16 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
 // NewHistory returns an an instance of Interface that uses client to communicate with the API Server and lister to list ControllerRevisions.
@@ -44,16 +48,14 @@ type realHistory struct {
 func (rh *realHistory) ListControllerRevisions(parent metav1.Object, selector labels.Selector) ([]*apps.ControllerRevision, error) {
 	// List all revisions in the namespace that match the selector
 	revisions := apps.ControllerRevisionList{}
-	err := rh.List(context.TODO(), &revisions, &client.ListOptions{Namespace: parent.GetNamespace(), LabelSelector: selector})
-	if err != nil {
-		return nil, err
+	opts := &client.ListOptions{
+		Namespace:     parent.GetNamespace(),
+		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(parent.GetUID())}),
 	}
+	err := rh.List(context.TODO(), &revisions, opts, utilclient.DisableDeepCopy)
 	var owned []*apps.ControllerRevision
 	for i := range revisions.Items {
-		ref := metav1.GetControllerOf(&revisions.Items[i])
-		if ref == nil || ref.UID == parent.GetUID() {
-			owned = append(owned, &revisions.Items[i])
-		}
+		owned = append(owned, &revisions.Items[i])
 	}
 	return owned, err
 }

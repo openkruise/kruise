@@ -9,6 +9,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -137,6 +139,7 @@ func init() {
 	utilruntime.Must(appsv1.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(apps.AddToScheme(scheme))
 }
 
 func getLatestPod(client client.Client, pod *corev1.Pod) (*corev1.Pod, error) {
@@ -184,6 +187,13 @@ func testUpdateWhenUseNotUpdateStrategy(t *testing.T, sidecarSetInput *appsv1alp
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(sidecarSetInput, podInput).
+		WithIndex(&apps.ControllerRevision{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+			var owners []string
+			for _, ref := range obj.GetOwnerReferences() {
+				owners = append(owners, string(ref.UID))
+			}
+			return owners
+		}).
 		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
@@ -219,6 +229,13 @@ func testUpdateWhenSidecarSetPaused(t *testing.T, sidecarSetInput *appsv1alpha1.
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(sidecarSetInput, podInput).
+		WithIndex(&apps.ControllerRevision{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+			var owners []string
+			for _, ref := range obj.GetOwnerReferences() {
+				owners = append(owners, string(ref.UID))
+			}
+			return owners
+		}).
 		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
@@ -254,6 +271,13 @@ func testUpdateWhenMaxUnavailableNotZero(t *testing.T, sidecarSetInput *appsv1al
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(sidecarSetInput, podInput).
+		WithIndex(&apps.ControllerRevision{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+			var owners []string
+			for _, ref := range obj.GetOwnerReferences() {
+				owners = append(owners, string(ref.UID))
+			}
+			return owners
+		}).
 		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
@@ -289,6 +313,13 @@ func testUpdateWhenPartitionFinished(t *testing.T, sidecarSetInput *appsv1alpha1
 	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).
+		WithIndex(&apps.ControllerRevision{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+			var owners []string
+			for _, ref := range obj.GetOwnerReferences() {
+				owners = append(owners, string(ref.UID))
+			}
+			return owners
+		}).
 		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,
@@ -324,6 +355,13 @@ func testRemoveSidecarSet(t *testing.T, sidecarSetInput *appsv1alpha1.SidecarSet
 	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSetInput, podInput).
+		WithIndex(&apps.ControllerRevision{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+			var owners []string
+			for _, ref := range obj.GetOwnerReferences() {
+				owners = append(owners, string(ref.UID))
+			}
+			return owners
+		}).
 		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
 	reconciler := ReconcileSidecarSet{
 		Client:    fakeClient,

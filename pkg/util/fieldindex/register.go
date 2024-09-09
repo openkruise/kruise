@@ -23,6 +23,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,11 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		if err = c.IndexField(context.TODO(), &v1.PersistentVolumeClaim{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
+		// controller revision ownerReference
+		if err = c.IndexField(context.TODO(), &appsv1.ControllerRevision{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+			return
+		}
+
 		// ImagePullJob ownerReference
 		if err = c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
