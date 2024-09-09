@@ -45,6 +45,7 @@ import (
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 )
 
 // Realistic value for maximum in-flight requests when processing in parallel mode.
@@ -622,11 +623,17 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 		}
 	}
 
+	// handle specified deleted pod under maxUnavailable constrain
+	// NOTE: specified deletion is not constraint by partition setting
+	specifiedDeletedPods, err := ssc.handleSpecifiedDeletedPods(set, status, currentRevision, updateRevision, replicas, maxUnavailable, unavailablePods)
+	if err != nil {
+		return status, err
+	}
+
 	updateIndexes := sortPodsToUpdate(set.Spec.UpdateStrategy.RollingUpdate, updateRevision.Name, *set.Spec.Replicas, replicas)
 	klog.V(3).InfoS("Prepare to update pods indexes for StatefulSet", "statefulSet", klog.KObj(set), "podIndexes", updateIndexes)
 	// update pods in sequence
 	for _, target := range updateIndexes {
-
 		// the target is already up-to-date, go to next
 		if getPodRevision(replicas[target]) == updateRevision.Name {
 			continue
@@ -667,22 +674,26 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 		}
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
-		if !isTerminating(replicas[target]) {
+		if !specifiedDeletedPods.Has(replicas[target].Name) && !isTerminating(replicas[target]) {
 			// todo validate in-place for pub
 			inplacing, inplaceUpdateErr := ssc.inPlaceUpdatePod(set, replicas[target], updateRevision, revisions)
 			if inplaceUpdateErr != nil {
 				return status, inplaceUpdateErr
 			}
+			// if pod is inplacing or actual deleting, decrease revision
+			revisionNeedDecrease := inplacing
 			if !inplacing {
 				klog.V(2).InfoS("StatefulSet terminating Pod for update", "statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
-				if _, err := ssc.deletePod(set, replicas[target]); err != nil {
+				if _, actualDeleting, err := ssc.deletePod(set, replicas[target]); err != nil {
 					return status, err
+				} else {
+					revisionNeedDecrease = actualDeleting
 				}
 			}
 			// mark target as unavailable because it's updated
 			unavailablePods.Insert(replicas[target].Name)
 
-			if getPodRevision(replicas[target]) == currentRevision.Name {
+			if revisionNeedDecrease && getPodRevision(replicas[target]) == currentRevision.Name {
 				status.CurrentReplicas--
 			}
 		}
@@ -691,22 +702,63 @@ func (ssc *defaultStatefulSetControl) rollingUpdateStatefulsetPods(
 	return status, nil
 }
 
-func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, pod *v1.Pod) (bool, error) {
+func (ssc *defaultStatefulSetControl) handleSpecifiedDeletedPods(
+	set *appsv1beta1.StatefulSet,
+	status *appsv1beta1.StatefulSetStatus,
+	currentRevision *apps.ControllerRevision,
+	updateRevision *apps.ControllerRevision,
+	replicas []*v1.Pod,
+	maxUnavailable int,
+	unavailablePods sets.String) (sets.String, error) {
+	specifiedDeletedPods := sets.NewString()
+	for target := len(replicas) - 1; target >= 0; target-- {
+		if replicas[target] == nil || !specifieddelete.IsSpecifiedDelete(replicas[target]) {
+			continue
+		}
+		// the unavailable pods count exceed the maxUnavailable and the target is available, so we can't process it,
+		// why skip here rather than return?
+		// case: pod 0 ready, pod1 unready, pod 2 unready, pod3 ready, pod4 ready
+		// when maxUnavailable = 3, pod4 with specified deleted will be deleted but pod3 can't
+		// pod 2 and pod 1 can be deleted because they were unavailable
+		if len(unavailablePods) >= maxUnavailable && !unavailablePods.Has(replicas[target].Name) {
+			klog.V(4).InfoS("StatefulSet was waiting for unavailable Pods to update, blocked pod",
+				"statefulSet", klog.KObj(set), "unavailablePods", unavailablePods.List(), "blockedPod", klog.KObj(replicas[target]))
+			continue
+		}
+
+		specifiedDeletedPods.Insert(replicas[target].Name)
+		if _, actualDeleting, err := ssc.deletePod(set, replicas[target]); err != nil {
+			return specifiedDeletedPods, err
+		} else if actualDeleting {
+			// if actual deleted, update revision count in status
+			if getPodRevision(replicas[target]) == currentRevision.Name {
+				status.CurrentReplicas--
+			} else if getPodRevision(replicas[target]) == updateRevision.Name {
+				status.UpdatedReplicas--
+			}
+		}
+		// mark target as unavailable because it's deleting or pre-deleting
+		unavailablePods.Insert(replicas[target].Name)
+	}
+	return specifiedDeletedPods, nil
+}
+
+func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, pod *v1.Pod) (modified, actualDeleting bool, err error) {
 	if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.PreDelete, pod) {
 		markPodNotReady := set.Spec.Lifecycle.PreDelete.MarkPodNotReady
 		if updated, _, err := ssc.lifecycleControl.UpdatePodLifecycle(pod, appspub.LifecycleStatePreparingDelete, markPodNotReady); err != nil {
-			return false, err
+			return false, false, err
 		} else if updated {
 			klog.V(3).InfoS("StatefulSet scaling update pod lifecycle to PreparingDelete", "statefulSet", klog.KObj(set), "pod", klog.KObj(pod))
-			return true, nil
+			return true, false, nil
 		}
-		return false, nil
+		return false, false, nil
 	}
 	if err := ssc.podControl.DeleteStatefulPod(set, pod); err != nil {
 		ssc.recorder.Eventf(set, v1.EventTypeWarning, "FailedDelete", "failed to delete pod %s: %v", pod.Name, err)
-		return false, err
+		return false, false, err
 	}
-	return true, nil
+	return true, true, nil
 }
 
 func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulSet, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
@@ -992,7 +1044,7 @@ func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set 
 	logger.V(2).Info("Pod of StatefulSet is terminating for scale down",
 		"statefulSet", klog.KObj(set), "pod", klog.KObj(condemned[i]))
 
-	modified, err := ssc.deletePod(set, condemned[i])
+	modified, _, err := ssc.deletePod(set, condemned[i])
 	if err != nil || (monotonic && modified) {
 		return true, err
 	}
@@ -1035,7 +1087,7 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	// regardless of the exit code.
 	if isFailed(replicas[i]) || isSucceeded(replicas[i]) {
 		if replicas[i].DeletionTimestamp == nil {
-			if _, err := ssc.deletePod(set, replicas[i]); err != nil {
+			if _, _, err := ssc.deletePod(set, replicas[i]); err != nil {
 				return true, false, err
 			}
 		}
