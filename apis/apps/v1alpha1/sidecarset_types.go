@@ -242,11 +242,17 @@ type SidecarSetUpdateStrategy struct {
 	Type SidecarSetUpdateStrategyType `json:"type,omitempty"`
 
 	// Paused indicates that the SidecarSet is paused to update the injected pods,
-	// but it don't affect the webhook inject sidecar container into the newly created pods.
-	// default is false
+	// For the impact on the injection behavior for newly created Pods, please refer to the comments of Selector.
 	Paused bool `json:"paused,omitempty"`
 
 	// If selector is not nil, this upgrade will only update the selected pods.
+	//
+	// Starting from Kruise 1.8.0, the updateStrategy.Selector affects the version of the Sidecar container
+	// injected into newly created Pods by a SidecarSet configured with an injectionStrategy.
+	// In most cases, all newly created Pods are injected with the specified Sidecar version as configured in injectionStrategy.revision,
+	// which is consistent with previous versions.
+	// Now, if updateStrategy.Selector is  also configured and the updateStrategy.paused field is set to false,
+	// then Pods matching the selector will be injected with the latest version of the Sidecar container.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Partition is the desired number of pods in old revisions. It means when partition
