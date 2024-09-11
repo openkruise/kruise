@@ -27,12 +27,19 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/integer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+)
+
+const (
+	shortNameLimitation = 63
 )
 
 var (
@@ -96,7 +103,7 @@ func (c *commonControl) newVersionedPods(cs *appsv1alpha1.CloneSet, revision str
 		}
 		clonesetutils.WriteRevisionHash(pod, revision)
 
-		pod.Name = fmt.Sprintf("%s-%s", cs.Name, id)
+		pod.Name = generatePodName(cs.Name, id)
 		pod.Namespace = cs.Namespace
 		pod.Labels[appsv1alpha1.CloneSetInstanceID] = id
 
@@ -248,4 +255,13 @@ func lifecycleFinalizerChanged(cs *appsv1alpha1.CloneSet, oldPod, curPod *v1.Pod
 	}
 
 	return false
+}
+
+func generatePodName(prefix, id string) string {
+	name := fmt.Sprintf("%s-%s", prefix, id)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetShortPodName) || len(name) <= shortNameLimitation {
+		return name
+	}
+	maxPrefixLen := integer.IntMax(integer.IntMin(len(prefix), shortNameLimitation-len(id)), 0)
+	return fmt.Sprintf("%s%s", prefix[:maxPrefixLen], id)
 }

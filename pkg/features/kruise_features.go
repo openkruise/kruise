@@ -131,6 +131,9 @@ const (
 
 	// Enables policies auto resizing PVCs created by a StatefulSet when user expands volumeClaimTemplates.
 	StatefulSetAutoResizePVCGate featuregate.Feature = "StatefulSetAutoResizePVCGate"
+
+	// CloneSetShortPodName enable CloneSet create Pods with 63 name length or less.
+	CloneSetShortPodName featuregate.Feature = "CloneSetShortPodName"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -166,6 +169,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PodIndexLabel:                          {Default: true, PreRelease: featuregate.Beta},
 	EnableExternalCerts:                    {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetAutoResizePVCGate:           {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetShortPodName:                   {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
