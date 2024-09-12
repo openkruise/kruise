@@ -33,11 +33,9 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -398,29 +396,7 @@ func GetSidecarTransferEnvs(sidecarContainer *appsv1alpha1.SidecarContainer, pod
 }
 
 func ExtractContainerNameFromFieldPath(fs *corev1.ObjectFieldSelector, pod *corev1.Pod) (string, error) {
-	fieldPath := fs.FieldPath
-	accessor, err := meta.Accessor(pod)
-	if err != nil {
-		return "", err
-	}
-	path, subscript, ok := fieldpath.SplitMaybeSubscriptedPath(fieldPath)
-	if ok {
-		switch path {
-		case "metadata.annotations":
-			if errs := validation.IsQualifiedName(strings.ToLower(subscript)); len(errs) != 0 {
-				return "", fmt.Errorf("invalid key subscript in %s: %s", fieldPath, strings.Join(errs, ";"))
-			}
-			return accessor.GetAnnotations()[subscript], nil
-		case "metadata.labels":
-			if errs := validation.IsQualifiedName(subscript); len(errs) != 0 {
-				return "", fmt.Errorf("invalid key subscript in %s: %s", fieldPath, strings.Join(errs, ";"))
-			}
-			return accessor.GetLabels()[subscript], nil
-		default:
-			return "", fmt.Errorf("fieldPath %q does not support subscript", fieldPath)
-		}
-	}
-	return "", fmt.Errorf("unsupported fieldPath: %v", fieldPath)
+	return fieldpath.ExtractFieldPathAsString(pod, fs.FieldPath)
 }
 
 // code lifted from https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/core/pods/helpers.go
@@ -432,16 +408,38 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 	if version != "v1" {
 		return "", "", fmt.Errorf("unsupported pod version: %s", version)
 	}
-	path, _, ok := fieldpath.SplitMaybeSubscriptedPath(label)
-	if ok {
+
+	if path, _, ok := fieldpath.SplitMaybeSubscriptedPath(label); ok {
 		switch path {
 		case "metadata.annotations", "metadata.labels":
 			return label, value, nil
 		default:
-			return "", "", fmt.Errorf("field path not supported: %s", path)
+			return "", "", fmt.Errorf("field label does not support subscript: %s", label)
 		}
 	}
-	return "", "", fmt.Errorf("field label not supported: %s", label)
+
+	switch label {
+	case "metadata.annotations",
+		"metadata.labels",
+		"metadata.name",
+		"metadata.namespace",
+		"metadata.uid",
+		"spec.nodeName",
+		"spec.restartPolicy",
+		"spec.serviceAccountName",
+		"spec.schedulerName",
+		"status.phase",
+		"status.hostIP",
+		"status.hostIPs",
+		"status.podIP",
+		"status.podIPs":
+		return label, value, nil
+	// This is for backwards compatibility with old v1 clients which send spec.host
+	case "spec.host":
+		return "spec.nodeName", value, nil
+	default:
+		return "", "", fmt.Errorf("field label not supported: %s", label)
+	}
 }
 
 // PatchPodMetadata patch pod annotations and labels
