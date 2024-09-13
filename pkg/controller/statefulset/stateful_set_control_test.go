@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2887,6 +2888,7 @@ func TestStatefulSetControlRollback(t *testing.T) {
 }
 
 type requestTracker struct {
+	l        sync.Mutex
 	requests int
 	err      error
 	after    int
@@ -2897,10 +2899,14 @@ func (rt *requestTracker) errorReady() bool {
 }
 
 func (rt *requestTracker) inc() {
+	rt.l.Lock()
+	defer rt.l.Unlock()
 	rt.requests++
 }
 
 func (rt *requestTracker) reset() {
+	rt.l.Lock()
+	defer rt.l.Unlock()
 	rt.err = nil
 	rt.after = 0
 }
@@ -2935,9 +2941,9 @@ func newFakeObjectManager(informerFactory informers.SharedInformerFactory, kruis
 		claimInformer.Informer().GetIndexer(),
 		setInformer.Informer().GetIndexer(),
 		revisionInformer.Informer().GetIndexer(),
-		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0}}
+		requestTracker{sync.Mutex{}, 0, nil, 0},
+		requestTracker{sync.Mutex{}, 0, nil, 0},
+		requestTracker{sync.Mutex{}, 0, nil, 0}}
 }
 
 func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
@@ -3131,7 +3137,7 @@ func newFakeStatefulSetStatusUpdater(setInformer kruiseappsinformers.StatefulSet
 	return &fakeStatefulSetStatusUpdater{
 		setInformer.Lister(),
 		setInformer.Informer().GetIndexer(),
-		requestTracker{0, nil, 0},
+		requestTracker{sync.Mutex{}, 0, nil, 0},
 	}
 }
 
