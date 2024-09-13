@@ -600,9 +600,13 @@ func TestSyncNodePodProbe(t *testing.T) {
 				return
 			}
 			time.Sleep(time.Second)
+
+			c.workerLock.RLock()
 			if len(c.workers) != len(cs.expectWorkers(c)) {
 				t.Fatalf("expect(%d), but get(%d)", len(cs.expectWorkers(c)), len(c.workers))
 			}
+			c.workerLock.RUnlock()
+
 			for _, worker := range cs.expectWorkers(c) {
 				obj, ok := c.workers[worker.key]
 				if !ok {
