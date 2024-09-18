@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +35,8 @@ import (
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"

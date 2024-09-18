@@ -41,6 +41,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -1109,6 +1110,16 @@ var _ = SIGDescribe("StatefulSet", func() {
 				gomega.Expect(pods.Items[i].Labels["test-update"]).To(gomega.Equal("yes"))
 			}
 		})
+
+		/*
+			Testname: StatefulSet, Specified delete
+			Description: Specified delete pod MUST under maxUnavailable constrain.
+		*/
+		framework.ConformanceIt("should perform rolling updates with specified-deleted", func() {
+			ginkgo.By("Creating a new StatefulSet")
+			ss = framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			testWithSpecifiedDeleted(c, kc, ns, ss)
+		})
 	})
 
 	//ginkgo.Describe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
@@ -1827,4 +1838,102 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, kc kruisecli
 		}
 		return true, nil
 	})
+}
+
+// This function is used by two tests to test StatefulSet rollbacks: one using
+// PVCs and one using no storage.
+func testWithSpecifiedDeleted(c clientset.Interface, kc kruiseclientset.Interface, ns string, ss *appsv1beta1.StatefulSet,
+	fns ...func(update *appsv1beta1.StatefulSet)) {
+	sst := framework.NewStatefulSetTester(c, kc)
+	*(ss.Spec.Replicas) = 4
+	ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+	ss = sst.WaitForStatus(ss)
+	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
+	gomega.Expect(currentRevision).To(gomega.Equal(updateRevision),
+		fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+			ss.Namespace, ss.Name, updateRevision, currentRevision))
+	pods := sst.GetPodList(ss)
+	for i := range pods.Items {
+		gomega.Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
+			fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+				pods.Items[i].Namespace,
+				pods.Items[i].Name,
+				pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+				currentRevision))
+	}
+	specifiedDeletePod := func(idx int) {
+		sst.SortStatefulPods(pods)
+		oldUid := pods.Items[idx].UID
+		err = setPodSpecifiedDelete(c, ns, pods.Items[idx].Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ss = sst.WaitForStatus(ss)
+		name := pods.Items[idx].Name
+		// wait be deleted
+		sst.WaitForState(ss, func(set2 *appsv1beta1.StatefulSet, pods2 *v1.PodList) (bool, error) {
+			ss = set2
+			pods = pods2
+			for i := range pods.Items {
+				if pods.Items[i].Name == name {
+					return pods.Items[i].UID != oldUid, nil
+				}
+			}
+			return false, nil
+		})
+		sst.WaitForPodReady(ss, pods.Items[idx].Name)
+		pods = sst.GetPodList(ss)
+		sst.SortStatefulPods(pods)
+	}
+	specifiedDeletePod(1)
+	newImage := NewNginxImage
+	oldImage := ss.Spec.Template.Spec.Containers[0].Image
+
+	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
+	gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+	var partition int32 = 2
+	ss, err = framework.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+		update.Spec.Template.Spec.Containers[0].Image = newImage
+		if update.Spec.UpdateStrategy.RollingUpdate == nil {
+			update.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{}
+		}
+		update.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{
+			Partition: &partition,
+		}
+		for _, fn := range fns {
+			fn(update)
+		}
+	})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	specifiedDeletePod(2)
+
+	ginkgo.By("Creating a new revision")
+	ss = sst.WaitForStatus(ss)
+	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
+	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
+		"Current revision should not equal update revision during rolling update")
+	specifiedDeletePod(1)
+	for i := range pods.Items {
+		if i >= int(partition) {
+			gomega.Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(gomega.Equal(updateRevision),
+				fmt.Sprintf("Pod %s/%s revision %s is not equal to updated revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+					updateRevision))
+		} else {
+			gomega.Expect(pods.Items[i].Labels[apps.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision),
+				fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[apps.StatefulSetRevisionLabel],
+					currentRevision))
+		}
+	}
+}
+
+func setPodSpecifiedDelete(c clientset.Interface, ns, name string) error {
+	_, err := c.CoreV1().Pods(ns).Patch(context.TODO(), name, types.StrategicMergePatchType, []byte(`{"metadata":{"labels":{"apps.kruise.io/specified-delete":"true"}}}`), metav1.PatchOptions{})
+	return err
 }
