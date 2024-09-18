@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -55,6 +56,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
@@ -2216,6 +2218,153 @@ func TestStatefulSetControlRollingUpdateBlockByMaxUnavailable(t *testing.T) {
 	}
 }
 
+func TestStatefulSetControlRollingUpdateWithSpecifiedDelete(t *testing.T) {
+	set := burst(newStatefulSet(6))
+	var partition int32 = 3
+	var maxUnavailable = intstr.FromInt(3)
+	set.Spec.UpdateStrategy = appsv1beta1.StatefulSetUpdateStrategy{
+		Type: apps.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
+			return &appsv1beta1.RollingUpdateStatefulSetStrategy{
+				Partition:       &partition,
+				MaxUnavailable:  &maxUnavailable,
+				PodUpdatePolicy: appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
+			}
+		}(),
+	}
+
+	client := fake.NewSimpleClientset()
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	spc, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+	if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+		t.Fatal(err)
+	}
+	set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// set pod 0 to specified delete
+	originalPods, err := spc.setPodSpecifiedDelete(set, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(originalPods))
+
+	// start to update
+	set.Spec.Template.Spec.Containers[0].Image = "foo"
+
+	// first update pod 5 only because pod 0 is specified deleted
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// inplace update 5 and create 0
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pods) != 6 {
+		t.Fatalf("Expected create pods 5, got pods %v", pods)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	_, exist := pods[0].Labels[appsv1alpha1.SpecifiedDeleteKey]
+	assert.True(t, !exist)
+	// pod 0 is old image and pod 5/4 is new image
+	assert.Equal(t, pods[5].Spec.Containers[0].Image, "foo")
+	assert.Equal(t, pods[4].Spec.Containers[0].Image, "foo")
+	assert.Equal(t, pods[0].Spec.Containers[0].Image, "nginx")
+
+	// set pod 1/2/5 to specified deleted and pod 0/4/5 to ready
+	spc.setPodSpecifiedDelete(set, 0)
+	spc.setPodSpecifiedDelete(set, 1)
+	spc.setPodSpecifiedDelete(set, 2)
+	for i := 0; i < 6; i++ {
+		spc.setPodRunning(set, i)
+		spc.setPodReady(set, i)
+	}
+	originalPods, _ = spc.setPodSpecifiedDelete(set, 5)
+	sort.Sort(ascendingOrdinal(originalPods))
+
+	// create new pod for 1/2/5, do not update 3
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create new pods 5 and inplace update 3
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if len(pods) != 6 {
+		t.Fatalf("Expected create pods 5, got pods %v", pods)
+	}
+
+	_, exist = pods[5].Labels[appsv1alpha1.SpecifiedDeleteKey]
+	assert.True(t, !exist)
+	_, exist = pods[2].Labels[appsv1alpha1.SpecifiedDeleteKey]
+	assert.True(t, !exist)
+	_, exist = pods[1].Labels[appsv1alpha1.SpecifiedDeleteKey]
+	assert.True(t, !exist)
+	// pod 0 still undeleted
+	_, exist = pods[0].Labels[appsv1alpha1.SpecifiedDeleteKey]
+	assert.True(t, exist)
+	assert.Equal(t, pods[5].Spec.Containers[0].Image, "foo")
+	assert.Equal(t, pods[3].Spec.Containers[0].Image, "nginx")
+	assert.Equal(t, pods[2].Spec.Containers[0].Image, "nginx")
+	assert.Equal(t, pods[1].Spec.Containers[0].Image, "nginx")
+
+	// set pod 3 to specified deleted and all pod to ready => pod3 will be deleted and updated
+	for i := 0; i < 6; i++ {
+		spc.setPodRunning(set, i)
+		spc.setPodReady(set, i)
+	}
+	originalPods, _ = spc.setPodSpecifiedDelete(set, 3)
+	sort.Sort(ascendingOrdinal(originalPods))
+	// create new pod for 3, do not inplace-update 3
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create new pods 5 and inplace update 3
+	if err = ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Fatal(err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if len(pods) != 6 {
+		t.Fatalf("Expected create pods 5, got pods %v", pods)
+	}
+	assert.Equal(t, pods[3].Spec.Containers[0].Image, "foo")
+}
+
 func TestStatefulSetControlInPlaceUpdate(t *testing.T) {
 	set := burst(newStatefulSet(3))
 	var partition int32 = 1
@@ -3116,6 +3265,21 @@ func (om *fakeObjectManager) setPodTerminated(set *appsv1beta1.StatefulSet, ordi
 	pod := newStatefulSetPod(set, ordinal)
 	deleted := metav1.NewTime(time.Now())
 	pod.DeletionTimestamp = &deleted
+	fakeResourceVersion(pod)
+	om.podsIndexer.Update(pod)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	return om.podsLister.Pods(set.Namespace).List(selector)
+}
+
+func (om *fakeObjectManager) setPodSpecifiedDelete(set *appsv1beta1.StatefulSet, ordinal int) ([]*v1.Pod, error) {
+	pod := newStatefulSetPod(set, ordinal)
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels[appsv1alpha1.SpecifiedDeleteKey] = "true"
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
