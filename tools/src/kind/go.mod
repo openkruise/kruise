@@ -1,8 +1,8 @@
 module github.com/envoyproxy/gateway/tools/src/kind
 
-go 1.19
+go 1.20
 
-require sigs.k8s.io/kind v0.17.0
+require sigs.k8s.io/kind v0.22.0
 
 require (
 	github.com/BurntSushi/toml v1.0.0 // indirect
