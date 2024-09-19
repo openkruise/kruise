@@ -1,4 +1,22 @@
 # Change Log
+## v1.7.2
+> Change log since v1.7.1
+
+### Advanced Workload
+- Support specified-delete in AdvancedStatefulSet and handle specified deleted pod under maxUnavailable constrain. ([#1734](https://github.com/openkruise/kruise/pull/1734), [@ABNER-1](https://github.com/ABNER-1))
+
+## v1.6.4
+> Change log since v1.6.3
+
+### Advanced Workload
+- Support specified-delete in AdvancedStatefulSet and handle specified deleted pod under maxUnavailable constrain. ([#1734](https://github.com/openkruise/kruise/pull/1734), [@ABNER-1](https://github.com/ABNER-1))
+
+## v1.5.5 
+> Chang log since v1.5.4
+
+### Advanced Workload
+- Support specified-delete in AdvancedStatefulSet and handle specified deleted pod under maxUnavailable constrain. ([#1734](https://github.com/openkruise/kruise/pull/1734), [@ABNER-1](https://github.com/ABNER-1))
+- Advanced StatefulSet maxUnavailable now counts unavailable pods with smaller ordinal in the update order during rolling upgrade. ([#1480](https://github.com/openkruise/kruise/pull/1480), [@Yesphet](https://github.com/Yesphet))
 
 ## v1.7.1
 > Change log since v1.7.0
