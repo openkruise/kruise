@@ -989,3 +989,87 @@ func newStorageClass(name string, canExpand bool) storagev1.StorageClass {
 		AllowVolumeExpansion: &canExpand,
 	}
 }
+
+func TestIsCurrentRevisionNeeded(t *testing.T) {
+	currentRevisionHash := "1"
+	updatedRevisionHash := "2"
+	int32Ptr := func(i int32) *int32 {
+		return &i
+	}
+
+	newRelicas := func(size int, revisionHash string) []*corev1.Pod {
+		pods := make([]*corev1.Pod, size)
+		for i := 0; i < size; i++ {
+			pods[i] = &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.ControllerRevisionHashLabelKey: revisionHash,
+					},
+				},
+			}
+		}
+		return pods
+	}
+
+	utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)
+
+	tests := []struct {
+		name           string
+		statefulSet    *appsv1beta1.StatefulSet
+		updateRevision string
+		ordinal        int
+		replicas       []*corev1.Pod
+		expectedRes    bool
+	}{
+		{
+			name: "Ordinals start 0",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+					},
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas:       newRelicas(2, currentRevisionHash),
+			expectedRes:    false,
+		},
+		{
+			name: "Ordinals start 2",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(4),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+					},
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas:       newRelicas(2, currentRevisionHash),
+			expectedRes:    true,
+		},
+		// ... other test cases
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := isCurrentRevisionNeeded(tt.statefulSet, tt.updateRevision, tt.ordinal, tt.replicas)
+			if res != tt.expectedRes {
+				t.Errorf("checkIsCurrentRevisionNeeded(%v) got (%v), want (%v)",
+					tt.name, res, tt.expectedRes)
+			}
+		})
+	}
+}
