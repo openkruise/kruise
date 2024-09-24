@@ -78,6 +78,10 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
 		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
+		if value, _ := pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; value != "" {
+			count, _ := strconv.ParseInt(value, 10, 32)
+			expectedCount = int32(count)
+		}
 		return matchedPods, expectedCount, err
 	} else if pub.Spec.Selector == nil {
 		klog.InfoS("Pub spec.Selector could not be empty", "pub", klog.KObj(pub))
@@ -101,13 +105,13 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 			matchedPods = append(matchedPods, pod)
 		}
 	}
+	if value, _ := pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; value != "" {
+		expectedCount, _ := strconv.ParseInt(value, 10, 32)
+		return matchedPods, int32(expectedCount), nil
+	}
 	expectedCount, err := c.controllerFinder.GetExpectedScaleForPods(matchedPods)
 	if err != nil {
 		return nil, 0, err
-	}
-	if expectedCount == 0 && pub.Annotations[policyv1alpha1.PubProtectTotalReplicas] != "" {
-		expectedCount, _ := strconv.ParseInt(pub.Annotations[policyv1alpha1.PubProtectTotalReplicas], 10, 32)
-		return matchedPods, int32(expectedCount), nil
 	}
 	return matchedPods, expectedCount, nil
 }
