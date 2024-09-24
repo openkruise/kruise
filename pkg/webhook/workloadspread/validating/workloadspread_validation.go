@@ -285,7 +285,6 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 			allErrs = append(allErrs, corevalidation.ValidateTolerations(coreTolerations, fldPath.Index(i).Child("tolerations"))...)
 		}
 
-		//TODO validate patch
 		if subset.Patch.Raw != nil {
 			// In the case the WorkloadSpread is created before the workload,so no workloadTemplate is obtained, skip the remaining checks.
 			if workloadTemplate != nil {
@@ -293,7 +292,8 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 				var podSpec v1.PodTemplateSpec
 				switch workloadTemplate.GetObjectKind().GroupVersionKind() {
 				case controllerKruiseKindCS:
-					podSpec = workloadTemplate.(*appsv1alpha1.CloneSet).Spec.Template
+					cs := workloadTemplate.(*appsv1alpha1.CloneSet)
+					podSpec = withVolumeClaimTemplates(cs.Spec.Template, cs.Spec.VolumeClaimTemplates)
 				case controllerKindDep:
 					podSpec = workloadTemplate.(*appsv1.Deployment).Spec.Template
 				case controllerKindRS:
@@ -301,7 +301,8 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 				case controllerKindJob:
 					podSpec = workloadTemplate.(*batchv1.Job).Spec.Template
 				case controllerKindSts:
-					podSpec = workloadTemplate.(*appsv1.StatefulSet).Spec.Template
+					sts := workloadTemplate.(*appsv1.StatefulSet)
+					podSpec = withVolumeClaimTemplates(sts.Spec.Template, sts.Spec.VolumeClaimTemplates)
 				}
 				podBytes, _ := json.Marshal(podSpec)
 				modified, err := strategicpatch.StrategicMergePatch(podBytes, subset.Patch.Raw, &v1.Pod{})
@@ -356,6 +357,20 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 		allErrs = append(allErrs, field.Invalid(fldPath.Index(0).Child("maxReplicas"), subsets[0].MaxReplicas, "maxReplicas sum of all subsets must equal 100% when type is specified as percent"))
 	}
 	return allErrs
+}
+
+func withVolumeClaimTemplates(pod v1.PodTemplateSpec, claims []v1.PersistentVolumeClaim) v1.PodTemplateSpec {
+	for _, pvc := range claims {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+			Name: pvc.Name,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+				},
+			},
+		})
+	}
+	return pod
 }
 
 func validateWorkloadSpreadConflict(ws *appsv1alpha1.WorkloadSpread, others []appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
