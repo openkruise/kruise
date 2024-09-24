@@ -35,9 +35,11 @@ const (
 	PubUpdateOperation PubOperation = "UPDATE"
 	PubDeleteOperation PubOperation = "DELETE"
 	PubEvictOperation  PubOperation = "EVICT"
-	// PubProtectTotalReplicas indicates the pub protected total replicas, rather than workload.spec.replicas.
-	// and must be used with pub.spec.selector.
-	PubProtectTotalReplicas = "pub.kruise.io/protect-total-replicas"
+	// PubProtectTotalReplicasAnnotation is the target replicas.
+	// By default, PUB will get the target replicas through workload.spec.replicas. but there are some scenarios that may workload doesn't
+	// implement scale subresources or Pod doesn't have workload management. In this scenario, you can set pub.kruise.io/protect-total-replicas
+	// in pub annotations to get the target replicas to realize the same effect of protection ability.
+	PubProtectTotalReplicasAnnotation = "pub.kruise.io/protect-total-replicas"
 	// Marked the pod will not be pub-protected, solving the scenario of force pod deletion
 	PodPubNoProtectionAnnotation = "pub.kruise.io/no-protect"
 )
