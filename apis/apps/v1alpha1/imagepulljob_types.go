@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -62,6 +63,10 @@ type ImagePullJobTemplate struct {
 	// Mutually exclusive with Selector.
 	// +optional
 	PodSelector *ImagePullJobPodSelector `json:"podSelector,omitempty"`
+
+	// Tolerations allow image pull to be scheduled onto nodes with specific taints
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 
 	// Parallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified,
 	// it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.

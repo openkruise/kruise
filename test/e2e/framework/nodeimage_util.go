@@ -75,6 +75,10 @@ func (tester *NodeImageTester) ListNodeImages() (*appsv1alpha1.NodeImageList, er
 	return tester.kc.AppsV1alpha1().NodeImages().List(context.TODO(), metav1.ListOptions{})
 }
 
+func (tester *NodeImageTester) ListNode() (*v1.NodeList, error) {
+	return tester.c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+}
+
 func (tester *NodeImageTester) ExpectNodes() ([]*v1.Node, error) {
 	nodeList, err := tester.c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
