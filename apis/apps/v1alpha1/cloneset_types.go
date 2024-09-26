@@ -207,6 +207,10 @@ type CloneSetStatus struct {
 	// indicated by updateRevision and have a Ready Condition.
 	HotStandbyUpdatedReadyReplicas int32 `json:"hotStandbyUpdatedReadyReplicas,omitempty"`
 
+	// HotStandbyUpdatedAvailableReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version
+	// indicated by updateRevision and have a Ready Condition for at least minReadySeconds.
+	HotStandbyUpdatedAvailableReplicas int32 `json:"hotStandbyUpdatedAvailableReplicas,omitempty"`
+
 	// HotStandbyExpectedUpdatedReplicas is the number of hot-standby Pods that should be updated by CloneSet controller.
 	// This field is calculated via Replicas - Partition.
 	HotStandbyExpectedUpdatedReplicas int32 `json:"hotStandbyExpectedUpdatedReplicas,omitempty"`

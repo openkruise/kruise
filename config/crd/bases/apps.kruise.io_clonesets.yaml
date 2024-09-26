@@ -560,6 +560,12 @@ spec:
                   indicated by updateRevision and have a Ready Condition.
                 format: int32
                 type: integer
+              HotStandbyUpdatedAvailableReplicas:
+                description: |-
+                  HotStandbyUpdatedAvailableReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version
+                  indicated by updateRevision and have a Ready Condition for at least minReadySeconds.
+                format: int32
+                type: integer
               hotStandbyExpectedUpdatedReplicas:
                 description: |-
                   HotStandbyUpdatedReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version 
