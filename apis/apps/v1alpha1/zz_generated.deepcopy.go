@@ -428,6 +428,11 @@ func (in *CloneSetSpec) DeepCopyInto(out *CloneSetSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.HotStandbyReplicas != nil {
+		in, out := &in.HotStandbyReplicas, &out.HotStandbyReplicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(metav1.LabelSelector)

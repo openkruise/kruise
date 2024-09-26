@@ -166,6 +166,14 @@ spec:
                   If unspecified, defaults to 1.
                 format: int32
                 type: integer
+              hotStandbyReplicas:
+                description: |-
+                  Replicas is the desired number of hot-standby replicas of the given Template.
+                  These are replicas in the sense that they are instantiations of the
+                  same Template.
+                  If unspecified, defaults to 0.
+                format: int32
+                type: integer
               revisionHistoryLimit:
                 description: |-
                   RevisionHistoryLimit is the maximum number of revisions that will
@@ -523,6 +531,38 @@ spec:
               updatedReplicas:
                 description: |-
                   UpdatedReplicas is the number of Pods created by the CloneSet controller from the CloneSet version
+                  indicated by updateRevision.
+                format: int32
+                type: integer
+              hotStandbyReplicas:
+                description: HotStandbyReplicas is the number of hot-standby Pods created by the CloneSet controller.
+                format: int32
+                type: integer
+              hotStandbyReadyReplicas:
+                description: HotStandbyReadyReplicas is the number of hot-standby Pods created by the
+                  CloneSet controller that have a Ready Condition.
+                format: int32
+                type: integer
+              hotStandbyAvailableReplicas:
+                description: HotStandbyAvailableReplicas is the number of hot-standby Pods created by the
+                  CloneSet controller that have a Ready Condition for at least minReadySeconds.
+                format: int32
+                type: integer
+              hotStandbyUpdatedReplicas:
+                description: |-
+                  HotStandbyUpdatedReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version
+                  indicated by updateRevision.
+                format: int32
+                type: integer
+              hotStandbyUpdatedReadyReplicas:
+                description: |-
+                  HotStandbyUpdatedReadyReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version
+                  indicated by updateRevision and have a Ready Condition.
+                format: int32
+                type: integer
+              hotStandbyExpectedUpdatedReplicas:
+                description: |-
+                  HotStandbyUpdatedReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version 
                   indicated by updateRevision.
                 format: int32
                 type: integer

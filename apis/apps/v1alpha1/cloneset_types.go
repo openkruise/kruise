@@ -44,6 +44,12 @@ type CloneSetSpec struct {
 	// If unspecified, defaults to 1.
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// HotStandbyReplicas is the desired number of hot-standby replicas of the given Template.
+	// These are replicas in the sense that they are instantiations of the
+	// same Template.
+	// If unspecified, defaults to 0.
+	HotStandbyReplicas *int32 `json:"hotStandbyReplicas,omitempty"`
+
 	// Selector is a label query over pods that should match the replica count.
 	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
@@ -184,6 +190,27 @@ type CloneSetStatus struct {
 	// This field is calculated via Replicas - Partition.
 	ExpectedUpdatedReplicas int32 `json:"expectedUpdatedReplicas,omitempty"`
 
+	// HotStandbyReplicas is the number of hot-standby Pods created by the CloneSet controller.
+	HotStandbyReplicas int32 `json:"hotStandbyReplicas,omitempty"`
+
+	// HotStandbyReadyReplicas is the number of hot-standby Pods created by the CloneSet controller that have a Ready Condition.
+	HotStandbyReadyReplicas int32 `json:"hotStandbyReadyReplicas,omitempty"`
+
+	// HotStandbyAvailableReplicas is the number of hot-standby Pods created by the CloneSet controller that have a Ready Condition for at least minReadySeconds.
+	HotStandbyAvailableReplicas int32 `json:"hotStandbyAvailableReplicas,omitempty"`
+
+	// HotStandbyUpdatedReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version
+	// indicated by updateRevision.
+	HotStandbyUpdatedReplicas int32 `json:"hotStandbyUpdatedReplicas,omitempty"`
+
+	// HotStandbyUpdatedReadyReplicas is the number of hot-standby Pods created by the CloneSet controller from the CloneSet version
+	// indicated by updateRevision and have a Ready Condition.
+	HotStandbyUpdatedReadyReplicas int32 `json:"hotStandbyUpdatedReadyReplicas,omitempty"`
+
+	// HotStandbyExpectedUpdatedReplicas is the number of hot-standby Pods that should be updated by CloneSet controller.
+	// This field is calculated via Replicas - Partition.
+	HotStandbyExpectedUpdatedReplicas int32 `json:"hotStandbyExpectedUpdatedReplicas,omitempty"`
+
 	// UpdateRevision, if not empty, indicates the latest revision of the CloneSet.
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
@@ -210,6 +237,10 @@ const (
 	CloneSetConditionFailedScale CloneSetConditionType = "FailedScale"
 	// CloneSetConditionFailedUpdate indicates cloneset controller failed to update pods.
 	CloneSetConditionFailedUpdate CloneSetConditionType = "FailedUpdate"
+	// CloneSetConditionHotStandbyFailedScale indicates cloneset controller failed to create or delete hot-standby pods/pvc.
+	CloneSetConditionHotStandbyFailedScale CloneSetConditionType = "HotStandbyFailedScale"
+	// CloneSetConditionHotStandbyFailedUpdate indicates cloneset controller failed to update hot-standby pods.
+	CloneSetConditionHotStandbyFailedUpdate CloneSetConditionType = "HotStandbyFailedUpdate"
 )
 
 // CloneSetCondition describes the state of a CloneSet at a certain point.
