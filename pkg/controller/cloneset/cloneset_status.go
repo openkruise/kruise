@@ -19,6 +19,7 @@ package cloneset
 import (
 	"context"
 	"fmt"
+	"github.com/openkruise/kruise/pkg/util/hotstandby"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -81,35 +82,67 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.ExpectedUpdatedReplicas != oldStatus.ExpectedUpdatedReplicas ||
 		newStatus.UpdateRevision != oldStatus.UpdateRevision ||
 		newStatus.CurrentRevision != oldStatus.CurrentRevision ||
-		newStatus.LabelSelector != oldStatus.LabelSelector
+		newStatus.LabelSelector != oldStatus.LabelSelector ||
+		newStatus.HotStandbyReplicas != oldStatus.HotStandbyReplicas ||
+		newStatus.HotStandbyReadyReplicas != oldStatus.HotStandbyReadyReplicas ||
+		newStatus.HotStandbyAvailableReplicas != oldStatus.HotStandbyAvailableReplicas ||
+		newStatus.HotStandbyUpdatedReadyReplicas != oldStatus.HotStandbyUpdatedReadyReplicas ||
+		newStatus.HotStandbyUpdatedReplicas != oldStatus.HotStandbyUpdatedReplicas ||
+		newStatus.HotStandbyUpdatedAvailableReplicas != oldStatus.HotStandbyUpdatedAvailableReplicas ||
+		newStatus.HotStandbyExpectedUpdatedReplicas != oldStatus.HotStandbyExpectedUpdatedReplicas
 }
 
 func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) {
 	coreControl := clonesetcore.New(cs)
 	for _, pod := range pods {
-		newStatus.Replicas++
-		if coreControl.IsPodUpdateReady(pod, 0) {
-			newStatus.ReadyReplicas++
+		if !hotstandby.IsHotStandbyPod(pod) {
+			newStatus.Replicas++
+			if coreControl.IsPodUpdateReady(pod, 0) {
+				newStatus.ReadyReplicas++
+			}
+			if sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
+				newStatus.AvailableReplicas++
+			}
+			if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) {
+				newStatus.UpdatedReplicas++
+			}
+			if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && coreControl.IsPodUpdateReady(pod, 0) {
+				newStatus.UpdatedReadyReplicas++
+			}
+			if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
+				newStatus.UpdatedAvailableReplicas++
+			}
+		} else {
+			newStatus.HotStandbyReplicas++
+			if coreControl.IsPodUpdateReady(pod, 0) {
+				newStatus.HotStandbyReadyReplicas++
+			}
+			if sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
+				newStatus.HotStandbyAvailableReplicas++
+			}
+			if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) {
+				newStatus.HotStandbyUpdatedReplicas++
+			}
+			if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && coreControl.IsPodUpdateReady(pod, 0) {
+				newStatus.HotStandbyUpdatedReadyReplicas++
+			}
+			if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
+				newStatus.HotStandbyUpdatedAvailableReplicas++
+			}
 		}
-		if sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
-			newStatus.AvailableReplicas++
-		}
-		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) {
-			newStatus.UpdatedReplicas++
-		}
-		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && coreControl.IsPodUpdateReady(pod, 0) {
-			newStatus.UpdatedReadyReplicas++
-		}
-		if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) && sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) {
-			newStatus.UpdatedAvailableReplicas++
-		}
+
 	}
-	// Consider the update revision as stable if revisions of all pods are consistent to it and have the expected number of replicas, no need to wait all of them ready
-	if newStatus.UpdatedReplicas == newStatus.Replicas && newStatus.Replicas == *cs.Spec.Replicas {
+	// Consider the update revision as stable if revisions of all normal pods and hot-standby pods are consistent to it.
+	// no need to wait all of them ready
+	if newStatus.UpdatedReplicas == newStatus.Replicas && newStatus.Replicas == *cs.Spec.Replicas && newStatus.HotStandbyUpdatedReplicas == newStatus.HotStandbyReplicas {
 		newStatus.CurrentRevision = newStatus.UpdateRevision
 	}
 
 	if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err == nil {
 		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
+	}
+
+	if cs.Spec.HotStandbyReplicas != nil {
+		newStatus.HotStandbyExpectedUpdatedReplicas = *cs.Spec.HotStandbyReplicas
 	}
 }
