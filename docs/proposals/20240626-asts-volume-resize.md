@@ -18,7 +18,34 @@ A table of contents is helpful for quickly jumping to sections of a proposal and
 any additional information provided beyond the standard proposal template.
 [Tools for generating](https://github.com/ekalinin/github-markdown-toc) a table of contents from markdown are available.
 
-* [Table of Contents](#table-of-contents)
+* [Advanced StatefulSet Volume Resize](#advanced-statefulset-volume-resize)
+    * [Table of Contents](#table-of-contents)
+    * [Motivation](#motivation)
+        * [User Story](#user-story)
+        * [Failure Recovery User Story](#failure-recovery-user-story)
+        * [Fundamental Issues](#fundamental-issues)
+        * [Goal](#goal)
+        * [None Goal](#none-goal)
+    * [Proposal](#proposal)
+        * [API Definition](#api-definition)
+        * [Adding Webhook Validation](#adding-webhook-validation)
+        * [Updating PVC Process](#updating-pvc-process)
+        * [Handling In-place PVC Update Failures](#handling-in-place-pvc-update-failures)
+        * [What to Do After a PVC Update Fails In-Place?](#what-to-do-after-a-pvc-update-fails-in-place)
+            * [How to Determine Update Failure](#how-to-determine-update-failure)
+            * [Post-Failure Process](#post-failure-process)
+                * [Scheme A](#scheme-a)
+                * [Scheme B](#scheme-b)
+        * [Implementation](#implementation)
+        * [Reasons for Not Tracking Historical Versions of VolumeClaimTemplates per KEP-661](#reasons-for-not-tracking-historical-versions-of-volumeclaimtemplates-per-kep-661)
+        * [Reasons for adding the VolumeClaimUpdateStrategy Field](#reasons-for-adding-the-volumeclaimupdatestrategy-field)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+➜  kruise git:(opt_proposal_about_pvc_resize) ✗ gh-md-toc docs/proposals/20240626-asts-volume-resize.md
+
+Table of Contents
+=================
+
 * [Motivation](#motivation)
     * [User Story](#user-story)
     * [Failure Recovery User Story](#failure-recovery-user-story)
@@ -30,8 +57,13 @@ any additional information provided beyond the standard proposal template.
     * [Adding Webhook Validation](#adding-webhook-validation)
     * [Updating PVC Process](#updating-pvc-process)
     * [Handling In-place PVC Update Failures](#handling-in-place-pvc-update-failures)
-    * [Reasons for Not Tracking Historical Versions of VolumeClaimTemplates per KEP-661](#reasons-for-not-tracking-historical-versions-of-volumeclaimtemplates-per-kep-661)
+        * [How to Determine Update Failure](#how-to-determine-update-failure)
+        * [Post-Failure Process](#post-failure-process)
+            * [Scheme A](#scheme-a)
+            * [Scheme B](#scheme-b)
     * [Implementation](#implementation)
+    * [Reasons for Not Tracking Historical Versions of VolumeClaimTemplates](#reasons-for-not-tracking-historical-versions-of-volumeclaimtemplates)
+    * [Reasons for adding the VolumeClaimUpdateStrategy Field](#reasons-for-adding-the-volumeclaimupdatestrategy-field)
 
 ## Motivation
 
@@ -47,6 +79,8 @@ the creation of new pods. Users may encounter situations such as:
 
 1. **[H]** In cases where StorageClasses support expansion, users can directly edit the PVC's storage capacity to
    increase it (decreasing is not supported).
+   - Concurrently update pod fields and PVCs.
+   - Modify only the PVC.
 2. For StorageClasses that do not support expansion, users must ensure that the contents of existing PVCs are no longer
    needed before manually or automatically deleting the PVC and associated pods. New PVCs and pods will then be
    reconciled with the latest configuration. (This scenario requires refinement as it is theoretically necessary.)
@@ -107,8 +141,9 @@ Users may expect the following recovery options:
 ### None Goal
 
 1. **Do Not Implement KEP-1790**.
-2. **No Version Management**: Do not implement version management and tracking for volume claims.
-
+2. **No Version Management**: Do not implement version management and tracking for volume claims. For detailed impact, see Why choose to continue with the KEP-661 approach without tracking the historical versions of VCT?
+3. Do not implement a tuning mechanism for identifying and deleting linked PVCs.
+4. Do not implement a backup and migration mechanism combined with VolumeSnapshot.
 ## Proposal
 
 ### API Definition
@@ -205,37 +240,66 @@ Webhook validation can be implemented using the `allowVolumeExpansion` field in 
 
 ### Handling In-place PVC Update Failures
 
-In theory, after an `InPlace + LockStep` failure, user intervention is typically necessary, often involving the creation of a new PVC and Pod.
+#### How to Determine Update Failure
+1. Clear update errors
+2. Unclear errors that might succeed upon retry, waiting for a maxWaitTime (global setting, default value 60 seconds), considering it as a failure after timeout
 
-The ideal response would be to revert to the `OnDelete + LockStep` process. For example, using a three-replica scenario where `PVC2` fails to update in place:
+After recognizing the failure, an error event will be printed on the sts resource.
 
-1. Delete `Pod2` and simultaneously apply a label to `PVC2`.
-2. Detect the label on `PVC2` to prevent the creation of a new `Pod2`.
-3. Await `PVC2` compatibility and label removal (which can be automated once compatibility is confirmed).
-    - **User intervention scenarios**:
-        - If the data on `PVC2` is expendable: Delete `PVC2`.
-        - If backup is required: create a job mounting `PVC2` to perform necessary operations. After completion, delete `PVC2`.
-4. If `Pod0` is deleted in the meantime, it should be recreated without being hindered by `PVC0` incompatibility.
-5. Once compatibility is restored, recreate `Pod2`. After `Pod2` is ready, proceed to update the subsequent replicas.
+#### Post-Failure Process
+Theoretically, after `OnPodRollingUpdate` fails, user intervention is required, which generally involves rebuilding the pvc (and also implies that the pod must be rebuilt).
 
-### Reasons for Not Tracking Historical Versions of `VolumeClaimTemplates` per KEP-661
+Taking a three-replica scenario as an example, after the in-place variation of pvc2 fails:
+0. After recognizing the failure, an error event will be printed on the sts resource.
 
-Currently, `AdvancedStatefulSet/CloneSet` do not track historical `VolumeClaimTemplates` in controller revisions, focusing on current values. This approach is maintained for the following reasons:
+There are two schemes for failure handling:
+##### Scheme A
 
-1. **Impact on Controller Revision**:
-    - Incorporating `VolumeClaimTemplates` in controller revisions would trigger version changes in `AdvancedStatefulSet` even with mere modifications to `VolumeClaimTemplates`. This could significantly disrupt existing controller processes, necessitating extensive modifications and posing high risks.
+1. Delete pod2 and tag pvc2
+2. Upon recognizing the tag on pvc2, no new pod2 will be created
+3. Wait for pvc2 to be compatible and the tag to be removed (can be automatically removed after recognizing pvc compatibility)
+    1. At this point, user intervention is expected in several scenarios:
+        - No need for pvc2 data, delete pvc2
+        - Issue a new job to mount pvc2 for backup/snapshot, delete pvc2 after success
+        - If the storage class supports snapshots, issue a `VolumeSnapshot` resource and restore at an appropriate time
+4. (3.5) At this time, if pod0 is deleted, it will trigger the reconstruction of pod0, and it will not be stuck due to the incompatibility of pvc0
+5. After compatibility, create pod2 again, and update the next sequence number after pod2 is ready
 
-2. **Handling Rollbacks via Upper Layer**:
-    - Rollback operations can typically be managed by reapplying configurations from the upper layer. In most scenarios, reverting PVC configurations (or the lack of urgency for rollbacks) is deemed sufficient.
-        - The demand for expanding PVCs is more pressing. Future evolution can be considered based on necessity.
+Suitable for scenarios where pvc updates are clearly not possible, such as patches being rejected, etc.
 
-3. **Historical Version Tracking and PVC Deletion**:
-    - With historical version tracking, an un-updated PVC would revert to an older version (instead of the latest) upon deletion.
-        - **Data Integrity**: The restoration of PVC data is still not guaranteed. If a user deletes a PVC, is the intention to reinstate an older version configuration? The distinction appears negligible.
+However, failure recognition based on timeout may cause pods to be deleted too early, resulting in pvc that only supports online updates to always fail to vary.
 
-In the absence of specific user scenarios, the core advantage of reverting to historical version configurations over the latest ones is unclear, particularly in cases of data loss for persistent storage.
+##### Scheme B
+
+1. The controller waits for the pvc change to complete after patching pvc
+2. It will keep waiting for the pvc change to complete, being stuck
+3. At this time, the user recognizes the error event and intervenes
+    1. Manually handle the completion of pvc change
+    2. The data in the original pvc is no longer needed, delete the original pvc (need to delete both pod and pvc), and the controller automatically creates a new pvc
+    3. After backing up/snapshotting the data in the original pvc, perform step 2
+    4. If it is judged that it cannot be handled temporarily, change `OnPodRollingUpdate` to `OnDelete`, and no longer change pvc
+
+In this design, Everything is judged by user, suitable for any scenario.
+
+Considering both schemes, Scheme 1 currently cannot solve the boundary issues of all scenarios, and Scheme 2 is preferred for implementation, which can be optimized after accumulating user cases.
 
 ### Implementation
 Main modification is in the `rollingUpdateStatefulsetPods` Function.
-![asts-resize-pvc](../img/asts-resize-pvc.png)
+![asts-resize-pvc](../img/en-asts-resize-pvc.png)
 
+### Reasons for Not Tracking Historical Versions of `VolumeClaimTemplates`
+Currently, asts/cloneset does not track the historical information of volumeClaimTemplates in controller revisions, focusing only on the current value. The main reasons for continuing the current behavior are:
+
+1. Direct rollback operations can be resolved by re-issuing configurations from the upper layer, and most scenarios envisioned do not require rolling back PVC configurations (or are not urgent).
+   - Compared to the demand for expanding PVCs, the priority is lower, and if necessary, it can be evolved later.
+
+2. With historical version tracking, even if a pvc is deleted before being updated to a certain version, it will be pulled up to the historical version, not the latest version.
+   - The pvc data is still not recoverable. Is the user's purpose for deleting a certain pvc to pull up the old version of the pvc configuration? It seems to make no difference.
+
+In the absence of further feedback on these two scenarios, considering the complexity, gradual evolution is chosen, and implementation is not pursued for the time being.
+
+### Reasons for adding the VolumeClaimUpdateStrategy Field
+1. Previously, sts did not allow modifying any fields of vct, and 661 implements feature enhancement.
+2. Previously, asts allowed modifying any fields of vct. If only the size is allowed to be modified, it cannot ensure compatibility with previous user scenarios. Adding the VolumeClaimUpdateStrategy field to maintain previous behavior.
+3. It can be used to unify the current recreate behavior of CloneSet, making it easier to understand.
+4. It can be used for potential future integration with VolumeSnapshot features.

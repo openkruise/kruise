@@ -13,26 +13,24 @@ status:
 # Advanced StatefulSet 支持卷变配
 
 ## 目录
-* [Advanced StatefulSet 支持卷变配](#advanced-statefulset-支持卷变配)
-    * [目录](#目录)
-    * [Motivation](#motivation)
-        * [用户场景](#用户场景)
-        * [用户失败恢复场景](#用户失败恢复场景)
-        * [本质问题](#本质问题)
-        * [目标](#目标)
-        * [非目标](#非目标)
-    * [Proposal](#proposal)
-        * [API 修改](#api-修改)
-        * [增加 webhook 校验](#增加-webhook-校验)
-        * [PVC 调谐过程修改](#pvc-调谐过程修改)
-        * [原地变配 pvc 更新失败后怎么办？](#原地变配-pvc-更新失败后怎么办)
-            * [如何认定更新失败](#如何认定更新失败)
-            * [失败后处理流程](#失败后处理流程)
-                * [方案A](#方案a)
-                * [方案B](#方案b)
-        * [Implementation](#implementation)
-        * [为什么选择延续 KEP-661 的思路不追踪 vct 的历史版本?](#为什么选择延续-kep-661-的思路不追踪-vct-的历史版本)
-        * [为什么需要增加 VolumeClaimUpdateStrategy 字段，而不是完全参照 KEP-661？](#为什么需要增加-volumeclaimupdatestrategy-字段而不是完全参照-kep-661)
+
+* [Motivation](#motivation)
+    * [用户场景](#用户场景)
+    * [用户失败恢复场景](#用户失败恢复场景)
+    * [本质问题](#本质问题)
+    * [目标](#目标)
+    * [非目标](#非目标)
+* [Proposal](#proposal)
+    * [API 修改](#api-修改)
+    * [增加 webhook 校验](#增加-webhook-校验)
+    * [PVC 调谐过程修改](#pvc-调谐过程修改)
+    * [原地变配 pvc 更新失败后怎么办？](#原地变配-pvc-更新失败后怎么办)
+        * [如何认定更新失败](#如何认定更新失败)
+        * [失败后处理流程](#失败后处理流程)
+    * [Implementation](#implementation)
+    * [为什么选择延续 KEP-661 的思路不追踪 vct 的历史版本?](#为什么选择延续-kep-661-的思路不追踪-vct-的历史版本)
+    * [为什么需要增加 VolumeClaimUpdateStrategy 字段，而不是完全参照 KEP-661？](#为什么需要增加-volumeclaimupdatestrategy-字段而不是完全参照-kep-661)
+
 
 ## Motivation
 
@@ -45,10 +43,12 @@ asts 现在对 Volume Claim Templates 变动完全不关注，只对新的 pod �
 ### 用户场景
 
 1. **[H]** 对可支持变配的 StorageClass 的场景, 可以直接 edit pvc storage 字段增加规格大小（不支持减少）
+   - 联动 pod 修改按并发度同时修改 pod 字段和 pvc
+   - 只修改 pvc
 2. 对不支持变配的 StorageClass 的场景，需要确保已有 pvc 内容不再需要后可（手动/自动）删除 pvc 和 pod，新 reconcile 出来的 pvc 和 pod 就可以使用最新的配置 （完善用户场景， 该场景理论上是需要）
-   a. 部分消费类场景，使用一段时间后磁盘会有一部分碎片，有时候会在消费完成后 recreate 以提高性能 （sts删除后重建是不是也可以）
+   - 部分消费类场景，使用一段时间后磁盘会有一部分碎片，有时候会在消费完成后 recreate 以提高性能 （sts删除后重建是不是也可以）
 3. 对需要更改 StorageClass 的场景，操作和场景 2 类似
-   a. 更改 ssd -> essd / 迁移上云等
+   - 更改 ssd -> essd / 迁移上云等
 
 ### 用户失败恢复场景
 
@@ -76,6 +76,7 @@ asts 现在对 Volume Claim Templates 变动完全不关注，只对新的 pod �
 ### 目标
 
 1. 希望在 sc 支持容量扩展的前提下扩展 Volume Claim Templates 规格可以自动化操作
+    1. 实现只改动 volume claim 的修改，此需求可以用来做一些存储的运维工作。
 2. 确保用户可以知道 pvc 的变配是否完成或发生错误
 3. 不阻碍用户尝试从异常情况下进行恢复
 4. 在打开 RecoverVolumeExpansionFailure feature gate 的集群中，允许用户达成恢复期望4
@@ -87,10 +88,8 @@ asts 现在对 Volume Claim Templates 变动完全不关注，只对新的 pod �
 
 1. 不实现 kep 1790
 2. 不实现 volume claim 的版本管理和跟踪，详细影响[为什么选择延续 KEP-661 的思路不追踪 vct 的历史版本?](#为什么选择延续-kep-661-的思路不追踪-vct-的历史版本)
-   1. 不实现只改动 volume claim 的修改，此需求可以用运维手段来实现。
 3. 不实现和标识 pvc 可删除联动的调谐机制
 4. 不实现结合 VolumeSnapshot 做备份迁移的机制
-
 
 ## Proposal
 
@@ -212,24 +211,19 @@ status:
 主体修改位于 `rollingUpdateStatefulsetPods` 函数
 ![asts-resize-pvc](../img/asts-resize-pvc.png)
 
-
 ### 为什么选择延续 KEP-661 的思路不追踪 vct 的历史版本?
 现在 asts/cloneset 不在 controller revision 追踪 volumeClaimTemplates 的历史信息，只关注当前值，延续当前行为的主要原因：
-1. 将 vct 的信息加入 controller revision，意味着**如果只存在 vct 的改动也会触发 asts 的版本变动**
-    1. 目前没有收集到相关的需求
-    2. 对现有控制器流程影响比较大，涉及改动多，风险比较大
-    3. 该需求可通过运行脚本来批量 patch 或通过下发一个 job 来解决
 
-2. 直接回滚的操作可以通过上层重新下发配置解决，预想中的大部分场景是可以不回滚pvc配置（或不紧急）
+1. 直接回滚的操作可以通过上层重新下发配置解决，预想中的大部分场景是可以不回滚pvc配置（或不紧急）
     - 相较 expand pvc 的需求优先级较低，如有必要，可以后续演进
 
-3. 加入历史版本跟踪，可以在尚未更新到某 pvc 时，即使 pvc 被删除也会被拉起到历史版本, 而非最新版本
+2. 加入历史版本跟踪，可以在尚未更新到某 pvc 时，即使 pvc 被删除也会被拉起到历史版本, 而非最新版本
     - pvc 数据还是没法恢复的，此时用户 delete 某个 pvc 的目的是为了拉起旧版本的 pvc 配置吗？ 貌似没啥区别
 
-在上述三个场景没有进一步反馈的情况下，考虑到复杂度，逐步演进暂不实现。
+在上述两个场景没有进一步反馈的情况下，考虑到复杂度，逐步演进暂不实现。
 
 ### 为什么需要增加 VolumeClaimUpdateStrategy 字段，而不是完全参照 KEP-661？
 1. sts 之前不允许修改 vct 任何字段，661 实现的是功能增强
 2. asts 之前允许修改 vct 任何字段，如只允许修改 size，无法保证以前的用户场景兼容。通过增加 VolumeClaimUpdateStrategy 字段来兼容之前的行为
-3. 可用于统一 cloneset 目前的 recreate 行为，便于理解
+3. 可用于统一 CloneSet 目前的 recreate 行为，便于理解
 4. 可用于未来可能的集合 VolumeSnapshot 的功能。
