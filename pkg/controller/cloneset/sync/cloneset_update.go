@@ -369,7 +369,7 @@ func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32,
 
 		// Make sure unavailable pods in all revisions should not be more than maxUnavailable.
 		// Note that update an old pod that already be unavailable will not increase the unavailable number.
-		if IsPodAvailable(coreControl, pods[i], minReadySeconds) {
+		if !IsPodAvailable(coreControl, pods[i], minReadySeconds) {
 			if unavailableCount >= diffRes.updateMaxUnavailable {
 				break
 			}
