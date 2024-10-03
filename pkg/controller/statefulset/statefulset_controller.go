@@ -35,7 +35,6 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -54,6 +53,7 @@ import (
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
+	controllerutil "github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -133,10 +133,10 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		return nil, err
 	}
 
-	statefulSetLister := kruiseappslisters.NewStatefulSetLister(statefulSetInformer.(toolscache.SharedIndexInformer).GetIndexer())
-	podLister := corelisters.NewPodLister(podInformer.(toolscache.SharedIndexInformer).GetIndexer())
-	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcInformer.(toolscache.SharedIndexInformer).GetIndexer())
-	scLister := storagelisters.NewStorageClassLister(scInformer.(toolscache.SharedIndexInformer).GetIndexer())
+	statefulSetLister := kruiseappslisters.NewStatefulSetLister(controllerutil.GetCacheIndexer(statefulSetInformer))
+	podLister := corelisters.NewPodLister(controllerutil.GetCacheIndexer(podInformer))
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(controllerutil.GetCacheIndexer(pvcInformer))
+	scLister := storagelisters.NewStorageClassLister(controllerutil.GetCacheIndexer(scInformer))
 
 	genericClient := client.GetGenericClientWithName("statefulset-controller")
 	eventBroadcaster := record.NewBroadcaster()
@@ -159,7 +159,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 			inplaceupdate.New(utilclient.NewClientFromManager(mgr, "statefulset-controller"), revisionadapter.NewDefaultImpl()),
 			lifecycle.New(utilclient.NewClientFromManager(mgr, "statefulset-controller")),
 			NewRealStatefulSetStatusUpdater(genericClient.KruiseClient, statefulSetLister),
-			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(revInformer.(toolscache.SharedIndexInformer).GetIndexer())),
+			history.NewHistory(genericClient.KubeClient, appslisters.NewControllerRevisionLister(controllerutil.GetCacheIndexer(revInformer))),
 			recorder,
 		),
 		podControl: kubecontroller.RealPodControl{KubeClient: genericClient.KubeClient, Recorder: recorder},
