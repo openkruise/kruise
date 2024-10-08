@@ -1781,8 +1781,11 @@ func TestDelayReconcile(t *testing.T) {
 			durationStore = requeueduration.DurationStore{}
 
 			nsn := types.NamespacedName{Namespace: workloadSpread.Namespace, Name: workloadSpread.Name}
+			start := time.Now()
 			result, _ := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nsn})
-			if (cs.expectRequeueAfter - result.RequeueAfter) > 1*time.Second {
+			cost := time.Now().Sub(start)
+			t.Logf("time cost %f seconds", cost.Seconds())
+			if cs.expectRequeueAfter-result.RequeueAfter > 1*time.Second+cost {
 				t.Fatalf("requeue key failed")
 			}
 		})
