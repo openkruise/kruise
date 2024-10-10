@@ -43,6 +43,7 @@ const (
 type Interface interface {
 	UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleStateType, markPodNotReady bool) (bool, *v1.Pod, error)
 	UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook) (bool, *v1.Pod, error)
+	UpdatePodLifecycleWithHandlerAndLabels(pod *v1.Pod, state appspub.LifecycleStateType, inPlaceUpdateHandler *appspub.LifecycleHook, labels map[string]string) (bool, *v1.Pod, error)
 }
 
 type realControl struct {
@@ -197,6 +198,68 @@ func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.L
 		pod.Finalizers = append(pod.Finalizers, inPlaceUpdateHandler.FinalizersHandler...)
 
 		SetPodLifecycle(state)(pod)
+		gotPod, err = c.adp.UpdatePod(pod)
+	}
+
+	return true, gotPod, err
+}
+
+func (c *realControl) UpdatePodLifecycleWithHandlerAndLabels(pod *v1.Pod, state appspub.LifecycleStateType,
+	inPlaceUpdateHandler *appspub.LifecycleHook, labels map[string]string) (updated bool, gotPod *v1.Pod, err error) {
+	if inPlaceUpdateHandler == nil || pod == nil {
+		return false, pod, nil
+	}
+
+	if inPlaceUpdateHandler.MarkPodNotReady {
+		if err = c.executePodNotReadyPolicy(pod, state); err != nil {
+			return false, nil, err
+		}
+	}
+
+	if GetPodLifecycleState(pod) == state {
+		return false, pod, nil
+	}
+
+	pod = pod.DeepCopy()
+	if adp, ok := c.adp.(podadapter.AdapterWithPatch); ok {
+		var labelsHandler, finalizersHandler string
+		for k, v := range inPlaceUpdateHandler.LabelsHandler {
+			labelsHandler = fmt.Sprintf(`%s,"%s":"%s"`, labelsHandler, k, v)
+		}
+		for _, v := range inPlaceUpdateHandler.FinalizersHandler {
+			finalizersHandler = fmt.Sprintf(`%s,"%s"`, finalizersHandler, v)
+		}
+		finalizersHandler = fmt.Sprintf(`[%s]`, strings.TrimLeft(finalizersHandler, ","))
+
+		var labelsStr string
+		for k, v := range labels {
+			labelsStr += fmt.Sprintf(",\"%s\":\"%s\"", k, v)
+		}
+
+		body := fmt.Sprintf(
+			`{"metadata":{"labels":{"%s":"%s"%s%s},"annotations":{"%s":"%s"},"finalizers":%s}}`,
+			appspub.LifecycleStateKey,
+			string(state),
+			labelsHandler,
+			labelsStr,
+			appspub.LifecycleTimestampKey,
+			time.Now().Format(time.RFC3339),
+			finalizersHandler,
+		)
+		gotPod, err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	} else {
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		for k, v := range inPlaceUpdateHandler.LabelsHandler {
+			pod.Labels[k] = v
+		}
+		pod.Finalizers = append(pod.Finalizers, inPlaceUpdateHandler.FinalizersHandler...)
+
+		SetPodLifecycle(state)(pod)
+		for k, v := range labels {
+			pod.Labels[k] = v
+		}
 		gotPod, err = c.adp.UpdatePod(pod)
 	}
 
