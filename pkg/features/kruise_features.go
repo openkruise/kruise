@@ -108,6 +108,9 @@ const (
 	// ImagePullJobGate enable imagepulljob-controller execute ImagePullJob.
 	ImagePullJobGate featuregate.Feature = "ImagePullJobGate"
 
+	// ImagePullJobTolerationGate enable ImagePullJob support Tolerations.
+	ImagePullJobTolerationGate featuregate.Feature = "ImagePullJobTolerationGate"
+
 	// ResourceDistributionGate enable resourcedistribution-controller execute ResourceDistribution.
 	ResourceDistributionGate featuregate.Feature = "ResourceDistributionGate"
 
@@ -157,6 +160,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CloneSetEventHandlerOptimization:      {Default: false, PreRelease: featuregate.Alpha},
 	PreparingUpdateAsUpdate:               {Default: false, PreRelease: featuregate.Alpha},
 	ImagePullJobGate:                      {Default: false, PreRelease: featuregate.Alpha},
+	ImagePullJobTolerationGate:            {Default: false, PreRelease: featuregate.Alpha},
 	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate: {Default: false, PreRelease: featuregate.Alpha},
 
