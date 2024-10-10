@@ -254,6 +254,9 @@ func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateD
 
 // SetDefaults_CloneSet set default values for CloneSet.
 func SetDefaultsCloneSet(obj *v1alpha1.CloneSet, injectTemplateDefaults bool) {
+	if obj.GenerateName == "" {
+		obj.GenerateName = obj.Name
+	}
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
 	}
