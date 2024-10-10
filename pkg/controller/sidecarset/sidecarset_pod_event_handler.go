@@ -8,6 +8,8 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/discovery"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -184,7 +186,8 @@ func isPodStatusChanged(oldPod, newPod *corev1.Pod) bool {
 }
 
 func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, time.Duration) {
-	control := sidecarcontrol.New(sidecarSet)
+	control := sidecarcontrol.New(sidecarSet,
+		sidecarcontrol.WithSupportInitContainerInPlace(util.IsSupportInitContainerInPlace(discovery.DiscoverServerVersion())))
 	var enqueueDelayTime time.Duration
 	// contain sidecar empty container
 	oldConsistent := control.IsPodStateConsistent(oldPod, nil)
