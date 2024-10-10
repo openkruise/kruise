@@ -566,7 +566,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 }
 
 // return two parameters
-// 1. isRecord(bool) 2. SubsetStatus
+// 1. isRecord(bool) 2. SubsetStatuses
 func isPodRecordedInSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus, podName string) (bool, *appsv1alpha1.WorkloadSpreadSubsetStatus) {
 	for _, subset := range subsetStatuses {
 		if _, ok := subset.CreatingPods[podName]; ok {

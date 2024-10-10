@@ -18,6 +18,7 @@ package uniteddeployment
 
 import (
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -95,7 +96,7 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 
-	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
+	// Set up the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
 	mgr, err := manager.New(cfg, manager.Options{})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
@@ -123,4 +124,174 @@ func TestReconcile(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	defer c.Delete(context.TODO(), instance)
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+}
+
+func TestUnschedulableStatusManagement(t *testing.T) {
+	subsetName := "subset-1"
+	baseEnvFactory := func() (*corev1.Pod, *Subset, *appsv1alpha1.UnitedDeployment) {
+		pod := &corev1.Pod{
+			Status: corev1.PodStatus{
+				Phase: corev1.PodPending,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodScheduled,
+						Status: corev1.ConditionFalse,
+						Reason: corev1.PodReasonUnschedulable,
+					},
+				},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-15 * time.Second)),
+			},
+		}
+		subset := &Subset{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: subsetName,
+			},
+			Status: SubsetStatus{
+				ReadyReplicas: 0,
+				Replicas:      1,
+			},
+			Spec: SubsetSpec{
+				SubsetPods: []*corev1.Pod{pod},
+			},
+		}
+		return pod, subset, &appsv1alpha1.UnitedDeployment{
+			Status: appsv1alpha1.UnitedDeploymentStatus{
+				SubsetStatuses: []appsv1alpha1.UnitedDeploymentSubsetStatus{
+					{
+						Name: subsetName,
+						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+							{
+								Type:   appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Status: corev1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Topology: appsv1alpha1.Topology{
+					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name              string
+		envFactory        func() (*Subset, *appsv1alpha1.UnitedDeployment)
+		expectPendingPods int32
+		requeueUpperLimit time.Duration
+		requeueLowerLimit time.Duration
+		unschedulable     bool
+	}{
+		{
+			name: "Not timeouted yet",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				_, subset, ud := baseEnvFactory()
+				return subset, ud
+			},
+			expectPendingPods: 0,
+			requeueUpperLimit: appsv1alpha1.DefaultRescheduleCriticalDuration - 15*time.Second + 100*time.Millisecond,
+			requeueLowerLimit: appsv1alpha1.DefaultRescheduleCriticalDuration - 15*time.Second - 100*time.Millisecond,
+			unschedulable:     false,
+		},
+		{
+			name: "Timeouted",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				pod, subset, ud := baseEnvFactory()
+				pod.CreationTimestamp = metav1.NewTime(time.Now().Add(-31 * time.Second))
+				return subset, ud
+			},
+			expectPendingPods: 1,
+			requeueUpperLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration,
+			requeueLowerLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration,
+			unschedulable:     true,
+		},
+		{
+			name: "During unschedulable status",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				_, subset, ud := baseEnvFactory()
+				ud.Status.SubsetStatuses = []appsv1alpha1.UnitedDeploymentSubsetStatus{
+					{
+						Name: subset.Name,
+						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+							{
+								Type:               appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Status:             corev1.ConditionFalse,
+								LastTransitionTime: metav1.Time{Time: time.Now().Add(-time.Minute)},
+							},
+						},
+					},
+				}
+				subset.Status.ReadyReplicas = 1
+				subset.Status.UnschedulableStatus.PendingPods = 0
+				return subset, ud
+			},
+			expectPendingPods: 0,
+			requeueUpperLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration - time.Minute + time.Second,
+			requeueLowerLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration - time.Minute - time.Second,
+			unschedulable:     true,
+		},
+		{
+			name: "After status reset",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				pod, subset, ud := baseEnvFactory()
+				ud.Status.SubsetStatuses = []appsv1alpha1.UnitedDeploymentSubsetStatus{
+					{
+						Name: subset.Name,
+						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+							{
+								Type:               appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Status:             corev1.ConditionFalse,
+								LastTransitionTime: metav1.Time{Time: time.Now().Add(-time.Minute - appsv1alpha1.DefaultUnschedulableStatusLastDuration)},
+							},
+						},
+					},
+				}
+				pod.Status.Conditions = []corev1.PodCondition{
+					{
+						Type:   corev1.PodScheduled,
+						Status: corev1.ConditionTrue,
+					},
+				}
+				return subset, ud
+			},
+			expectPendingPods: 0,
+			requeueUpperLimit: 0,
+			requeueLowerLimit: 0,
+			unschedulable:     false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			subset, ud := c.envFactory()
+			start := time.Now()
+			manageUnschedulableStatusForExistingSubset(subset.Name, subset, ud)
+			cost := time.Now().Sub(start)
+			if subset.Status.UnschedulableStatus.PendingPods != c.expectPendingPods {
+				t.Logf("case %s failed: expect pending pods %d, but got %d", c.name, c.expectPendingPods, subset.Status.UnschedulableStatus.PendingPods)
+				t.Fail()
+			}
+			requeueAfter := durationStore.Pop(getUnitedDeploymentKey(ud))
+			if c.requeueUpperLimit != c.requeueLowerLimit {
+				// result is not a const, which means this case will be affected by low execution speed.
+				requeueAfter += cost
+			} else {
+				cost = 0
+			}
+			t.Logf("got requeueAfter %f not in range [%f, %f] (cost fix %f)",
+				requeueAfter.Seconds(), c.requeueLowerLimit.Seconds(), c.requeueUpperLimit.Seconds(), cost.Seconds())
+			if requeueAfter > c.requeueUpperLimit || requeueAfter < c.requeueLowerLimit {
+				t.Fail()
+			}
+			if subset.Status.UnschedulableStatus.Unschedulable != c.unschedulable {
+				t.Logf("case %s failed: expect unschedulable %v, but got %v", c.name, c.unschedulable, subset.Status.UnschedulableStatus.Unschedulable)
+				t.Fail()
+			}
+		})
+	}
 }

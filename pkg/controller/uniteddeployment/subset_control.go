@@ -39,7 +39,7 @@ type SubsetControl struct {
 	adapter adapter.Adapter
 }
 
-// GetAllSubsets returns all of subsets owned by the UnitedDeployment.
+// GetAllSubsets returns all subsets owned by the UnitedDeployment.
 func (m *SubsetControl) GetAllSubsets(ud *alpha1.UnitedDeployment, updatedRevision string) (subSets []*Subset, err error) {
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
 	if err != nil {
@@ -132,11 +132,6 @@ func (m *SubsetControl) IsExpected(subSet *Subset, revision string) bool {
 }
 
 func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision string) (*Subset, error) {
-	subSetName, err := getSubsetNameFrom(set)
-	if err != nil {
-		return nil, err
-	}
-
 	subset := &Subset{}
 	subset.ObjectMeta = metav1.ObjectMeta{
 		Name:                       set.GetName(),
@@ -154,28 +149,32 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 		OwnerReferences:            set.GetOwnerReferences(),
 		Finalizers:                 set.GetFinalizers(),
 	}
+
+	pods, err := m.adapter.GetSubsetPods(set)
+	if err != nil {
+		return nil, err
+	}
+	subset.Spec.SubsetPods = pods
+
+	subSetName, err := getSubsetNameFrom(set)
+	if err != nil {
+		return nil, err
+	}
 	subset.Spec.SubsetName = subSetName
 
-	specReplicas, specPartition, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas, err := m.adapter.GetReplicaDetails(set, updatedRevision)
-	if err != nil {
-		return subset, err
-	}
-
-	if specReplicas != nil {
+	if specReplicas := m.adapter.GetSpecReplicas(set); specReplicas != nil {
 		subset.Spec.Replicas = *specReplicas
 	}
 
-	if specPartition != nil {
+	if specPartition := m.adapter.GetSpecPartition(set, pods); specPartition != nil {
 		subset.Spec.UpdateStrategy.Partition = *specPartition
 	}
+	subset.Spec.SubsetRef.Resources = append(subset.Spec.SubsetRef.Resources, set)
 
 	subset.Status.ObservedGeneration = m.adapter.GetStatusObservedGeneration(set)
-	subset.Status.Replicas = statusReplicas
-	subset.Status.ReadyReplicas = statusReadyReplicas
-	subset.Status.UpdatedReplicas = statusUpdatedReplicas
-	subset.Status.UpdatedReadyReplicas = statusUpdatedReadyReplicas
-
-	subset.Spec.SubsetRef.Resources = append(subset.Spec.SubsetRef.Resources, set)
+	subset.Status.Replicas = m.adapter.GetStatusReplicas(set)
+	subset.Status.ReadyReplicas = m.adapter.GetStatusReadyReplicas(set)
+	subset.Status.UpdatedReplicas, subset.Status.UpdatedReadyReplicas = adapter.CalculateUpdatedReplicas(pods, updatedRevision)
 
 	return subset, nil
 }

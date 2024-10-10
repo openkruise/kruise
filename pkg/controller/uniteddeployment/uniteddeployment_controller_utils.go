@@ -23,11 +23,11 @@ import (
 	"strconv"
 	"strings"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const updateRetries = 5
@@ -132,3 +132,9 @@ func filterOutCondition(conditions []appsv1alpha1.UnitedDeploymentCondition, con
 	}
 	return newConditions
 }
+
+func getUnitedDeploymentKey(ud *appsv1alpha1.UnitedDeployment) string {
+	return ud.GetNamespace() + "/" + ud.GetName()
+}
+
+var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()

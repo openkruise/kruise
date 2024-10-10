@@ -17,13 +17,14 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	"github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // UpdateStrategyType is a string enumeration type that enumerates
@@ -165,6 +166,10 @@ type Topology struct {
 	// +patchStrategy=merge
 	// +optional
 	Subsets []Subset `json:"subsets,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+
+	// ScheduleStrategy indicates the strategy the UnitedDeployment used to preform the schedule between each of subsets.
+	// +optional
+	ScheduleStrategy UnitedDeploymentScheduleStrategy `json:"scheduleStrategy,omitempty"`
 }
 
 // Subset defines the detail of a subset.
@@ -218,6 +223,69 @@ type Subset struct {
 	Patch runtime.RawExtension `json:"patch,omitempty"`
 }
 
+// UnitedDeploymentScheduleStrategyType is a string enumeration type that enumerates
+// all possible schedule strategies for the UnitedDeployment controller.
+// +kubebuilder:validation:Enum=Adaptive;Fixed;""
+type UnitedDeploymentScheduleStrategyType string
+
+const (
+	// AdaptiveUnitedDeploymentScheduleStrategyType represents that when a pod is stuck in the pending status and cannot
+	// be scheduled, allow it to be rescheduled to another subset.
+	AdaptiveUnitedDeploymentScheduleStrategyType UnitedDeploymentScheduleStrategyType = "Adaptive"
+	// FixedUnitedDeploymentScheduleStrategyType represents that pods are strictly scheduled to the selected subset
+	// even if scheduling fail.
+	FixedUnitedDeploymentScheduleStrategyType UnitedDeploymentScheduleStrategyType = "Fixed"
+)
+
+const (
+	DefaultRescheduleCriticalDuration      = 30 * time.Second
+	DefaultUnschedulableStatusLastDuration = 300 * time.Second
+)
+
+// AdaptiveUnitedDeploymentStrategy is used to communicate parameters when Type is AdaptiveUnitedDeploymentScheduleStrategyType.
+type AdaptiveUnitedDeploymentStrategy struct {
+	// RescheduleCriticalSeconds indicates how long controller will reschedule a schedule failed Pod to the subset that has
+	// redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in an unschedulabe status
+	// over RescheduleCriticalSeconds duration, the controller will reschedule it to a suitable subset. Default is 30 seconds.
+	// +optional
+	RescheduleCriticalSeconds *int32 `json:"rescheduleCriticalSeconds,omitempty"`
+
+	// UnschedulableLastSeconds is used to set the number of seconds for a Subset to recover from an unschedulable state,
+	// with a default value of 300 seconds.
+	// +optional
+	UnschedulableLastSeconds *int32 `json:"unschedulableLastSeconds,omitempty"`
+}
+
+// UnitedDeploymentScheduleStrategy defines the schedule performance of UnitedDeployment.
+type UnitedDeploymentScheduleStrategy struct {
+	// Type indicates the type of the UnitedDeploymentScheduleStrategy.
+	// Default is Fixed
+	// +optional
+	Type UnitedDeploymentScheduleStrategyType `json:"type,omitempty"`
+
+	// Adaptive is used to communicate parameters when Type is AdaptiveUnitedDeploymentScheduleStrategyType.
+	// +optional
+	Adaptive *AdaptiveUnitedDeploymentStrategy `json:"adaptive,omitempty"`
+}
+
+func (s *UnitedDeploymentScheduleStrategy) IsAdaptive() bool {
+	return s.Type == AdaptiveUnitedDeploymentScheduleStrategyType
+}
+
+func (s *UnitedDeploymentScheduleStrategy) GetRescheduleCriticalDuration() time.Duration {
+	if s.Adaptive == nil || s.Adaptive.RescheduleCriticalSeconds == nil {
+		return DefaultRescheduleCriticalDuration
+	}
+	return time.Duration(*s.Adaptive.RescheduleCriticalSeconds) * time.Second
+}
+
+func (s *UnitedDeploymentScheduleStrategy) GetUnschedulableLastDuration() time.Duration {
+	if s.Adaptive == nil || s.Adaptive.UnschedulableLastSeconds == nil {
+		return DefaultUnschedulableStatusLastDuration
+	}
+	return time.Duration(*s.Adaptive.UnschedulableLastSeconds) * time.Second
+}
+
 // UnitedDeploymentStatus defines the observed state of UnitedDeployment.
 type UnitedDeploymentStatus struct {
 	// ObservedGeneration is the most recent generation observed for this UnitedDeployment. It corresponds to the
@@ -252,6 +320,8 @@ type UnitedDeploymentStatus struct {
 	// +optional
 	SubsetReplicas map[string]int32 `json:"subsetReplicas,omitempty"`
 
+	// Record the conditions of each subset.
+	SubsetStatuses []UnitedDeploymentSubsetStatus `json:"subsetStatuses,omitempty"`
 	// Represents the latest available observations of a UnitedDeployment's current state.
 	// +optional
 	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty"`
@@ -262,6 +332,23 @@ type UnitedDeploymentStatus struct {
 
 	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
 	LabelSelector string `json:"labelSelector,omitempty"`
+}
+
+func (s *UnitedDeploymentStatus) GetSubsetStatus(subset string) *UnitedDeploymentSubsetStatus {
+	for i, subsetStatus := range s.SubsetStatuses {
+		if subsetStatus.Name == subset {
+			return &s.SubsetStatuses[i]
+		}
+	}
+	return nil
+}
+
+func (u *UnitedDeployment) InitSubsetStatuses() {
+	for _, subset := range u.Spec.Topology.Subsets {
+		if u.Status.GetSubsetStatus(subset.Name) == nil {
+			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, UnitedDeploymentSubsetStatus{Name: subset.Name})
+		}
+	}
 }
 
 // UnitedDeploymentCondition describes current state of a UnitedDeployment.
@@ -278,7 +365,7 @@ type UnitedDeploymentCondition struct {
 	// The reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
 
-	// A human readable message indicating details about the transition.
+	// A human-readable message indicating details about the transition.
 	Message string `json:"message,omitempty"`
 }
 
@@ -291,6 +378,62 @@ type UpdateStatus struct {
 	// Records the current partition.
 	// +optional
 	CurrentPartitions map[string]int32 `json:"currentPartitions,omitempty"`
+}
+
+type UnitedDeploymentSubsetStatus struct {
+	// Subset name specified in Topology.Subsets
+	Name string `json:"name,omitempty"`
+	// Recores the current replicas. Currently unused.
+	Replicas int32 `json:"replicas,omitempty"`
+	// Records the current partition. Currently unused.
+	Partition int32 `json:"partition,omitempty"`
+	// Conditions is an array of current observed subset conditions.
+	Conditions []UnitedDeploymentSubsetCondition `json:"conditions,omitempty"`
+}
+
+func (s *UnitedDeploymentSubsetStatus) GetCondition(condType UnitedDeploymentSubsetConditionType) *UnitedDeploymentSubsetCondition {
+	for _, condition := range s.Conditions {
+		if condition.Type == condType {
+			return &condition
+		}
+	}
+	return nil
+}
+
+func (s *UnitedDeploymentSubsetStatus) SetCondition(condType UnitedDeploymentSubsetConditionType, status corev1.ConditionStatus, reason, message string) {
+	var currentCond *UnitedDeploymentSubsetCondition
+	for i, c := range s.Conditions {
+		if c.Type == condType {
+			currentCond = &s.Conditions[i]
+			break
+		}
+	}
+	if currentCond != nil && currentCond.Status == status && currentCond.Reason == reason {
+		return
+	}
+	if currentCond == nil {
+		s.Conditions = append(s.Conditions, UnitedDeploymentSubsetCondition{Type: condType})
+		currentCond = &s.Conditions[len(s.Conditions)-1]
+	}
+	currentCond.LastTransitionTime = metav1.Now()
+	currentCond.Status = status
+	currentCond.Reason = reason
+	currentCond.Message = message
+}
+
+type UnitedDeploymentSubsetConditionType string
+
+const (
+	// UnitedDeploymentSubsetSchedulable means new pods allocated into the subset will keep pending.
+	UnitedDeploymentSubsetSchedulable UnitedDeploymentSubsetConditionType = "Schedulable"
+)
+
+type UnitedDeploymentSubsetCondition struct {
+	Type               UnitedDeploymentSubsetConditionType `json:"type"`
+	Status             corev1.ConditionStatus              `json:"status"`
+	LastTransitionTime metav1.Time                         `json:"lastTransitionTime,omitempty"`
+	Reason             string                              `json:"reason,omitempty"`
+	Message            string                              `json:"message,omitempty"`
 }
 
 // +genclient

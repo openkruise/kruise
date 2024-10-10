@@ -62,29 +62,32 @@ func (a *AdvancedStatefulSetAdapter) GetStatusObservedGeneration(obj metav1.Obje
 	return obj.(*v1beta1.StatefulSet).Status.ObservedGeneration
 }
 
-// GetReplicaDetails returns the replicas detail the subset needs.
-func (a *AdvancedStatefulSetAdapter) GetReplicaDetails(obj metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error) {
-	set := obj.(*v1beta1.StatefulSet)
-	var pods []*corev1.Pod
-	pods, err = a.getStatefulSetPods(set)
-	if err != nil {
-		return
-	}
+func (a *AdvancedStatefulSetAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
+	return a.getStatefulSetPods(obj.(*v1beta1.StatefulSet))
+}
 
-	specReplicas = set.Spec.Replicas
+func (a *AdvancedStatefulSetAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
+	return obj.(*v1beta1.StatefulSet).Spec.Replicas
+}
+
+func (a *AdvancedStatefulSetAdapter) GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32 {
+	set := obj.(*v1beta1.StatefulSet)
 	if set.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
 		revision := getRevision(&set.ObjectMeta)
-		specPartition = getCurrentPartition(pods, revision)
+		return getCurrentPartition(pods, revision)
 	} else if set.Spec.UpdateStrategy.RollingUpdate != nil &&
 		set.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		specPartition = set.Spec.UpdateStrategy.RollingUpdate.Partition
+		return set.Spec.UpdateStrategy.RollingUpdate.Partition
 	}
+	return nil
+}
 
-	statusReplicas = set.Status.Replicas
-	statusReadyReplicas = set.Status.ReadyReplicas
-	statusUpdatedReplicas, statusUpdatedReadyReplicas = calculateUpdatedReplicas(pods, updatedRevision)
+func (a *AdvancedStatefulSetAdapter) GetStatusReplicas(obj metav1.Object) int32 {
+	return obj.(*v1beta1.StatefulSet).Status.Replicas
+}
 
-	return
+func (a *AdvancedStatefulSetAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
+	return obj.(*v1beta1.StatefulSet).Status.ReadyReplicas
 }
 
 // GetSubsetFailure returns the failure information of the subset.

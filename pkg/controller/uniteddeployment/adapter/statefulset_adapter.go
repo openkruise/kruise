@@ -58,29 +58,32 @@ func (a *StatefulSetAdapter) GetStatusObservedGeneration(obj metav1.Object) int6
 	return obj.(*appsv1.StatefulSet).Status.ObservedGeneration
 }
 
-// GetReplicaDetails returns the replicas detail the subset needs.
-func (a *StatefulSetAdapter) GetReplicaDetails(obj metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error) {
-	set := obj.(*appsv1.StatefulSet)
-	var pods []*corev1.Pod
-	pods, err = a.getStatefulSetPods(set)
-	if err != nil {
-		return
-	}
+func (a *StatefulSetAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
+	return a.getStatefulSetPods(obj.(*appsv1.StatefulSet))
+}
 
-	specReplicas = set.Spec.Replicas
+func (a *StatefulSetAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
+	return obj.(*appsv1.StatefulSet).Spec.Replicas
+}
+
+func (a *StatefulSetAdapter) GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32 {
+	set := obj.(*appsv1.StatefulSet)
 	if set.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
 		revision := getRevision(&set.ObjectMeta)
-		specPartition = getCurrentPartition(pods, revision)
+		return getCurrentPartition(pods, revision)
 	} else if set.Spec.UpdateStrategy.RollingUpdate != nil &&
 		set.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		specPartition = set.Spec.UpdateStrategy.RollingUpdate.Partition
+		return set.Spec.UpdateStrategy.RollingUpdate.Partition
 	}
+	return nil
+}
 
-	statusReplicas = set.Status.Replicas
-	statusReadyReplicas = set.Status.ReadyReplicas
-	statusUpdatedReplicas, statusUpdatedReadyReplicas = calculateUpdatedReplicas(pods, updatedRevision)
+func (a *StatefulSetAdapter) GetStatusReplicas(obj metav1.Object) int32 {
+	return obj.(*appsv1.StatefulSet).Status.Replicas
+}
 
-	return
+func (a *StatefulSetAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
+	return obj.(*appsv1.StatefulSet).Status.ReadyReplicas
 }
 
 // GetSubsetFailure returns the failure information of the subset.
@@ -230,22 +233,6 @@ func (a *StatefulSetAdapter) getStatefulSetPods(set *appsv1.StatefulSet) ([]*cor
 		claimedPods[i] = pod.(*corev1.Pod)
 	}
 	return claimedPods, nil
-}
-
-func calculateUpdatedReplicas(podList []*corev1.Pod, updatedRevision string) (updatedReplicas, updatedReadyReplicas int32) {
-	for _, pod := range podList {
-		revision := getRevision(&pod.ObjectMeta)
-
-		// Only count pods that are updated and are not terminating
-		if revision == updatedRevision && pod.GetDeletionTimestamp() == nil {
-			updatedReplicas++
-			if podutil.IsPodReady(pod) {
-				updatedReadyReplicas++
-			}
-		}
-	}
-
-	return
 }
 
 // deleteStuckPods tries to work around the blocking issue https://github.com/kubernetes/kubernetes/issues/67250

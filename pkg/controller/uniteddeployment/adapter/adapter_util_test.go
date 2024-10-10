@@ -85,3 +85,50 @@ func buildPodList(ordinals []int, revisions []string, t *testing.T) []*corev1.Po
 
 	return pods
 }
+
+// mockPodList 创建一个模拟的Pod列表
+func mockPodList(updatedRevision string, replicas int32, readyReplicas int32) []*corev1.Pod {
+	pods := make([]*corev1.Pod, replicas)
+	for i := int32(0); i < replicas; i++ {
+		var status corev1.ConditionStatus
+		if i < readyReplicas {
+			status = corev1.ConditionTrue
+		} else {
+			status = corev1.ConditionFalse
+		}
+		pods[i] = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					appsv1alpha1.ControllerRevisionHashLabelKey: updatedRevision,
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: status,
+					},
+				},
+			},
+		}
+	}
+	return pods
+}
+
+func TestCalculateUpdatedReplicas(t *testing.T) {
+	updatedRevision := "updated-revision"
+	replicas := int32(5)
+	readyReplicas := int32(3)
+
+	podList := mockPodList(updatedRevision, replicas, readyReplicas)
+	podList = append(podList, mockPodList("old-revision", 2, 3)...)
+
+	updated, updatedReady := CalculateUpdatedReplicas(podList, updatedRevision)
+	if updated != replicas {
+		t.Errorf("Expected %d updated replicas, got %d", replicas, updated)
+	}
+	if updatedReady != readyReplicas {
+		t.Errorf("Expected %d updated ready replicas, got %d", readyReplicas, updatedReady)
+	}
+}

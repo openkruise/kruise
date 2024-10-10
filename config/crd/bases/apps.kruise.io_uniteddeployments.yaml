@@ -955,6 +955,38 @@ spec:
                 description: Topology describes the pods distribution detail between
                   each of subsets.
                 properties:
+                  scheduleStrategy:
+                    description: ScheduleStrategy indicates the strategy the UnitedDeployment
+                      used to preform the schedule between each of subsets.
+                    properties:
+                      adaptive:
+                        description: Adaptive is used to communicate parameters when
+                          Type is AdaptiveUnitedDeploymentScheduleStrategyType.
+                        properties:
+                          rescheduleCriticalSeconds:
+                            description: |-
+                              RescheduleCriticalSeconds indicates how long controller will reschedule a schedule failed Pod to the subset that has
+                              redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in an unschedulabe status
+                              over RescheduleCriticalSeconds duration, the controller will reschedule it to a suitable subset. Default is 30 seconds.
+                            format: int32
+                            type: integer
+                          unschedulableLastSeconds:
+                            description: |-
+                              UnschedulableLastSeconds is used to set the number of seconds for a Subset to recover from an unschedulable state,
+                              with a default value of 300 seconds.
+                            format: int32
+                            type: integer
+                        type: object
+                      type:
+                        description: |-
+                          Type indicates the type of the UnitedDeploymentScheduleStrategy.
+                          Default is Fixed
+                        enum:
+                        - Adaptive
+                        - Fixed
+                        - ""
+                        type: string
+                    type: object
                   subsets:
                     description: |-
                       Contains the details of each subset. Each element in this array represents one subset
@@ -1173,7 +1205,7 @@ spec:
                       format: date-time
                       type: string
                     message:
-                      description: A human readable message indicating details about
+                      description: A human-readable message indicating details about
                         the transition.
                       type: string
                     reason:
@@ -1216,6 +1248,44 @@ spec:
                 description: Records the topology detail information of the replicas
                   of each subset.
                 type: object
+              subsetStatuses:
+                description: Record the conditions of each subset.
+                items:
+                  properties:
+                    conditions:
+                      description: Conditions is an array of current observed subset
+                        conditions.
+                      items:
+                        properties:
+                          lastTransitionTime:
+                            format: date-time
+                            type: string
+                          message:
+                            type: string
+                          reason:
+                            type: string
+                          status:
+                            type: string
+                          type:
+                            type: string
+                        required:
+                        - status
+                        - type
+                        type: object
+                      type: array
+                    name:
+                      description: Subset name specified in Topology.Subsets
+                      type: string
+                    partition:
+                      description: Records the current partition. Currently unused.
+                      format: int32
+                      type: integer
+                    replicas:
+                      description: Recores the current replicas. Currently unused.
+                      format: int32
+                      type: integer
+                  type: object
+                type: array
               updateStatus:
                 description: Records the information of update progress.
                 properties:

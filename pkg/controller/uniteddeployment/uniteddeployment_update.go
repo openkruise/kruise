@@ -32,6 +32,7 @@ import (
 
 func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, nameToSubset *map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (newStatus *appsv1alpha1.UnitedDeploymentStatus, updateErr error) {
 	newStatus = ud.Status.DeepCopy()
+
 	exists, provisioned, err := r.manageSubsetProvision(ud, nameToSubset, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetProvisioned, corev1.ConditionFalse, "Error", err.Error()))
@@ -79,6 +80,17 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	if updateErr == nil {
 		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetUpdated, corev1.ConditionTrue, "", ""))
 	} else {
+		// If using an Adaptive scheduling strategy, when the subset is scaled out leading to the creation of new Pods,
+		// future potential scheduling failures need to be checked for rescheduling.
+		var newPodCreated = false
+		for _, cell := range needUpdate {
+			subset := (*nameToSubset)[cell]
+			replicas := nextUpdate[cell].Replicas
+			newPodCreated = newPodCreated || subset.Spec.Replicas < replicas
+		}
+		if strategy := ud.Spec.Topology.ScheduleStrategy; strategy.IsAdaptive() && newPodCreated {
+			durationStore.Push(getUnitedDeploymentKey(ud), strategy.GetRescheduleCriticalDuration())
+		}
 		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetUpdated, corev1.ConditionFalse, "Error", updateErr.Error()))
 	}
 	return
@@ -132,6 +144,11 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 			return nil
 		})
 		if createdErr == nil {
+			// When a new subset is created, regardless of whether it contains newly created Pods,
+			// a requeue is triggered to treat it as an existing subset and update its unschedulable information.
+			if strategy := ud.Spec.Topology.ScheduleStrategy; strategy.IsAdaptive() {
+				durationStore.Push(getUnitedDeploymentKey(ud), strategy.GetRescheduleCriticalDuration())
+			}
 			r.recorder.Eventf(ud.DeepCopy(), corev1.EventTypeNormal, fmt.Sprintf("Successful%s", eventTypeSubsetsUpdate), "Create %d Subset (%s)", createdNum, subsetType)
 		} else {
 			errs = append(errs, createdErr)

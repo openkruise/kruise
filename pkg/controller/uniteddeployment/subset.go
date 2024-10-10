@@ -17,9 +17,9 @@ limitations under the License.
 package uniteddeployment
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Subset stores the details of a subset resource owned by one UnitedDeployment.
@@ -36,6 +36,7 @@ type SubsetSpec struct {
 	Replicas       int32
 	UpdateStrategy SubsetUpdateStrategy
 	SubsetRef      ResourceRef
+	SubsetPods     []*corev1.Pod
 }
 
 // SubsetStatus stores the observed state of the Subset.
@@ -45,6 +46,12 @@ type SubsetStatus struct {
 	ReadyReplicas        int32
 	UpdatedReplicas      int32
 	UpdatedReadyReplicas int32
+	UnschedulableStatus  SubsetUnschedulableStatus
+}
+
+type SubsetUnschedulableStatus struct {
+	Unschedulable bool
+	PendingPods   int32
 }
 
 // SubsetUpdateStrategy stores the strategy detail of the Subset.
@@ -72,7 +79,7 @@ type ControlInterface interface {
 	CreateSubset(ud *appsv1alpha1.UnitedDeployment, unit string, revision string, replicas, partition int32) error
 	// UpdateSubset updates the target subset with the input information.
 	UpdateSubset(subSet *Subset, ud *appsv1alpha1.UnitedDeployment, revision string, replicas, partition int32) error
-	// UpdateSubset is used to delete the input subset.
+	// DeleteSubset is used to delete the input subset.
 	DeleteSubset(*Subset) error
 	// GetSubsetFailure extracts the subset failure message to expose on UnitedDeployment status.
 	GetSubsetFailure(*Subset) *string
