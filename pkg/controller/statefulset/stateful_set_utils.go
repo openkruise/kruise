@@ -518,8 +518,8 @@ func isCurrentRevisionNeeded(set *appsv1beta1.StatefulSet, updateRevision string
 	}
 
 	var noUpdatedReplicas int
-	for i, pod := range replicas {
-		if pod == nil || i+getStartOrdinal(set) == ordinal {
+	for _, pod := range replicas {
+		if pod == nil || getOrdinal(pod) == ordinal {
 			continue
 		}
 		if !revision.IsPodUpdate(pod, updateRevision) {
