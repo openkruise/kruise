@@ -511,15 +511,15 @@ func isCurrentRevisionNeeded(set *appsv1beta1.StatefulSet, updateRevision string
 		return false
 	}
 	if set.Spec.UpdateStrategy.RollingUpdate == nil {
-		return ordinal < int(set.Status.CurrentReplicas)
+		return ordinal < getStartOrdinal(set)+int(set.Status.CurrentReplicas)
 	}
 	if set.Spec.UpdateStrategy.RollingUpdate.UnorderedUpdate == nil {
-		return ordinal < int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
+		return ordinal < getStartOrdinal(set)+int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 	}
 
 	var noUpdatedReplicas int
-	for i, pod := range replicas {
-		if pod == nil || i == ordinal {
+	for _, pod := range replicas {
+		if pod == nil || getOrdinal(pod) == ordinal {
 			continue
 		}
 		if !revision.IsPodUpdate(pod, updateRevision) {

@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	utilpointer "k8s.io/utils/pointer"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -987,5 +988,815 @@ func newStorageClass(name string, canExpand bool) storagev1.StorageClass {
 			Name: name,
 		},
 		AllowVolumeExpansion: &canExpand,
+	}
+}
+
+func TestIsCurrentRevisionNeeded(t *testing.T) {
+	currentRevisionHash := "1"
+	updatedRevisionHash := "2"
+	int32Ptr := func(i int32) *int32 {
+		return &i
+	}
+	setName := "ss"
+
+	newReplicas := func(startOrdinal, size int, revisionHash string) []*corev1.Pod {
+		pods := make([]*corev1.Pod, size)
+		for i := 0; i < size; i++ {
+			pods[i] = &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.ControllerRevisionHashLabelKey: revisionHash,
+					},
+					Name: fmt.Sprintf("%s-%d", setName, i+startOrdinal),
+				},
+			}
+		}
+		return pods
+	}
+
+	utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)
+
+	tests := []struct {
+		name           string
+		statefulSet    *appsv1beta1.StatefulSet
+		updateRevision string
+		ordinal        int
+		replicas       []*corev1.Pod
+		expectedRes    bool
+	}{
+		{
+			// replicas 3, no partition
+			// 0: current revision
+			// 2: current revision
+			// => 1: should be current revision
+			name: "Ordinals start 0, no partition with update 0",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 2,
+					UpdatedReplicas: 0,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(2, 1, currentRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+		{
+			// replicas 3, no partition
+			// 0: current revision
+			// 2: updated revision
+			// => 1: should be updated revision
+			name: "Ordinals start 0, no partition with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(2, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// replicas 3, partition 1
+			// 0: current revision
+			// 2: current revision
+			// => 1: should be updated revision
+			name: "Ordinals start 0, partition 1 with update 0",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 2,
+					UpdatedReplicas: 0,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(2, 1, currentRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// replicas 3, partition 1
+			// 0: current revision
+			// 2: updated revision
+			// => 1: should be updated revision
+			name: "Ordinals start 0, partition 1 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(2, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// replicas 3, partition 1
+			// 1: current revision
+			// 2: current revision
+			// => 0: should be current revision
+			name: "Ordinals start 0, partition 1, create current pod1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 2,
+					UpdatedReplicas: 0,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        0,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(1, 2, currentRevisionHash)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+		{
+			// replicas 3, partition 1
+			// 1: updated revision
+			// 2: updated revision
+			// => 0: should be current revision
+			name: "Ordinals start 0, partition 1, create current pod2",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 0,
+					UpdatedReplicas: 2,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        0,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(1, 2, currentRevisionHash)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+		// with reservedIds
+		{
+			// reservedId 1, replicas 3, partition 2
+			// 2: current revision
+			// 3: current revision
+			// => 0: should be current revision
+			name: "ReservedId 1, partition 2, create current pod1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{1},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(2),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 2,
+					UpdatedReplicas: 0,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        0,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 2, currentRevisionHash)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+
+		// with startOrdinal
+		{
+			// start ordinal 2, replicas 3, no partition
+			// 2: current revision
+			// 4: current revision
+			// => 3: should be current revision
+			name: "Ordinals start 2, no partition with update 0",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 2,
+					UpdatedReplicas: 0,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        3,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(4, 1, currentRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+		{
+			// start ordinal 2, replicas 3, no partition
+			// 2: current revision
+			// 4: updated revision
+			// => 3: should be updated revision
+			name: "Ordinals start 2, no partition with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        3,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(4, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// start ordinal 2, replicas 3, partition 1
+			// 2: current revision
+			// 4: current revision
+			// => 3: should be updated revision
+			name: "Ordinals start 2, partition 1 with update 0",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 2,
+					UpdatedReplicas: 0,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        3,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(4, 1, currentRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// start ordinal 2, replicas 3, partition 1
+			// 2: current revision
+			// 4: updated revision
+			// => 3: should be updated revision
+			name: "Ordinals start 2, partition 1 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        3,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(4, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// start ordinal 2, replicas 3, partition 1
+			// 3: current revision
+			// 4: current revision
+			// => 2: should be current revision
+			name: "Ordinals start 2, partition 1, create current pod1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 2,
+					UpdatedReplicas: 0,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        2,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(3, 2, currentRevisionHash)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+		{
+			// start ordinal 2, replicas 3, partition 1
+			// 3: updated revision
+			// 4: updated revision
+			// => 2: should be current revision
+			name: "Ordinals start 0, partition 1, create current pod2",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 0,
+					UpdatedReplicas: 2,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        2,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(1, 2, currentRevisionHash)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+
+		// with UnorderedUpdate
+		{
+			// replicas 3, partition 1 with UnorderedUpdate
+			// 0: current revision
+			// 2: updated revision
+			// => 1: should be updated revision
+			name: "UnorderedUpdate, partition 1 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+							UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{
+								PriorityStrategy: &appspub.UpdatePriorityStrategy{
+									// some priority strategy
+								},
+							},
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(2, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// replicas 3, partition 1 with UnorderedUpdate
+			// 0: updated revision
+			// 2: updated revision
+			// => 1: should be current revision
+			name: "UnorderedUpdate, partition 1 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+							UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{
+								PriorityStrategy: &appspub.UpdatePriorityStrategy{
+									// some priority strategy
+								},
+							},
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 0,
+					UpdatedReplicas: 2,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        1,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, updatedRevisionHash)
+				pods = append(pods, newReplicas(2, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+
+		// with UnorderedUpdate and startOrdinal
+		{
+			// start ordinal 2, replicas 3, partition 1 with UnorderedUpdate
+			// 2: current revision
+			// 4: updated revision
+			// => 3: should be updated revision
+			name: "UnorderedUpdate, partition 1 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+							UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{
+								PriorityStrategy: &appspub.UpdatePriorityStrategy{
+									// some priority strategy
+								},
+							},
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        3,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(4, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// start ordinal 2, replicas 3, partition 1 with UnorderedUpdate
+			// 2: updated revision
+			// 4: updated revision
+			// => 3: should be current revision
+			name: "UnorderedUpdate, partition 1 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+							UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{
+								PriorityStrategy: &appspub.UpdatePriorityStrategy{
+									// some priority strategy
+								},
+							},
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 0,
+					UpdatedReplicas: 2,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        3,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 1, updatedRevisionHash)
+				pods = append(pods, newReplicas(4, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+
+		// with UnorderedUpdate and reservedIds
+		{
+			// reservedIds 1, replicas 3, partition 1 with UnorderedUpdate
+			// 0: current revision
+			// 3: updated revision
+			// => 2: should be updated revision
+			name: "ReservedIds 1, UnorderedUpdate, partition 2 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{1},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+							UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{
+								PriorityStrategy: &appspub.UpdatePriorityStrategy{
+									// some priority strategy
+								},
+							},
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        2,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, nil)
+				pods = append(pods, nil)
+				pods = append(pods, newReplicas(3, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// ReservedIds 1, replicas 3, partition 1 with UnorderedUpdate
+			// 0: updated revision
+			// 3: updated revision
+			// => 2: should be current revision
+			name: "ReservedIds 1, UnorderedUpdate, partition 2 with update 1",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{1},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(1),
+							UnorderedUpdate: &appsv1beta1.UnorderedUpdateStrategy{
+								PriorityStrategy: &appspub.UpdatePriorityStrategy{
+									// some priority strategy
+								},
+							},
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 0,
+					UpdatedReplicas: 2,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        2,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, updatedRevisionHash)
+				// reversed ids
+				pods = append(pods, nil)
+				// pod need to be created
+				pods = append(pods, newReplicas(2, 1, currentRevisionHash)...)
+				pods = append(pods, newReplicas(3, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: true,
+		},
+
+		// with startOrdinal and reservedIds
+		// TODO Abner-1: These cases will be discussed and may be changed
+		{
+			// reservedId 1, replicas 3, partition 2
+			// 3: updated revision
+			// 0: current revision
+			// => 2: should be updated revision
+			name: "Ordinals start 0, reservedId 1, partition 1, create pod2",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{1},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 0,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(2),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        2,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(3, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+		{
+			// start ordinal 2, reservedId 3, replicas 3, partition 2
+			// 5: updated revision
+			// 2: current revision
+			// => 4: should be updated revision
+			name: "Ordinals start 2, reservedId 1, partition 1, create pod2",
+			statefulSet: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					Replicas:        int32Ptr(3),
+					ReserveOrdinals: []int{1},
+					Ordinals: &appsv1beta1.StatefulSetOrdinals{
+						Start: 2,
+					},
+					UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{
+						Type: apps.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta1.RollingUpdateStatefulSetStrategy{
+							Partition: int32Ptr(2),
+						},
+					},
+				},
+				Status: appsv1beta1.StatefulSetStatus{
+					CurrentReplicas: 1,
+					UpdatedReplicas: 1,
+				},
+			},
+			updateRevision: updatedRevisionHash,
+			ordinal:        4,
+			replicas: func() []*corev1.Pod {
+				pods := newReplicas(2, 1, currentRevisionHash)
+				pods = append(pods, newReplicas(5, 1, updatedRevisionHash)...)
+				return pods
+			}(),
+			expectedRes: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// for some cases RollingUpdateStatefulSetStrategy is nil
+			// we will create current revision pods if the ordinal has not been updated
+			current, updated := int32(0), int32(0)
+			for _, pod := range tt.replicas {
+				if pod == nil {
+					continue
+				}
+				if pod.Labels[apps.ControllerRevisionHashLabelKey] == currentRevisionHash {
+					current++
+				} else if pod.Labels[apps.ControllerRevisionHashLabelKey] == updatedRevisionHash {
+					updated++
+				}
+			}
+			if tt.statefulSet != nil {
+				tt.statefulSet.Status.CurrentReplicas = current
+				tt.statefulSet.Status.UpdatedReplicas = updated
+			}
+
+			res := isCurrentRevisionNeeded(tt.statefulSet, tt.updateRevision, tt.ordinal, tt.replicas)
+			if res != tt.expectedRes {
+				t.Errorf("checkIsCurrentRevisionNeeded(%v) got (%v), want (%v)",
+					tt.name, res, tt.expectedRes)
+			}
+		})
 	}
 }
