@@ -57,25 +57,28 @@ func (a *DeploymentAdapter) GetStatusObservedGeneration(obj metav1.Object) int64
 	return obj.(*appsv1.Deployment).Status.ObservedGeneration
 }
 
-// GetReplicaDetails returns the replicas detail the subset needs.
-func (a *DeploymentAdapter) GetReplicaDetails(obj metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error) {
-	// Convert to Deployment Object
+func (a *DeploymentAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
 	set := obj.(*appsv1.Deployment)
+	return a.getDeploymentPods(set)
+}
 
-	// Get all pods belonging to deployment
-	var pods []*corev1.Pod
-	pods, err = a.getDeploymentPods(set)
-	if err != nil {
-		return
-	}
+func (a *DeploymentAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
+	set := obj.(*appsv1.Deployment)
+	return set.Spec.Replicas
+}
 
-	// Set according replica counts
-	specReplicas = set.Spec.Replicas
-	statusReplicas = set.Status.Replicas
-	statusReadyReplicas = set.Status.ReadyReplicas
-	statusUpdatedReplicas, statusUpdatedReadyReplicas = calculateUpdatedReplicas(pods, updatedRevision)
+func (a *DeploymentAdapter) GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32 {
+	return nil
+}
 
-	return
+func (a *DeploymentAdapter) GetStatusReplicas(obj metav1.Object) int32 {
+	set := obj.(*appsv1.Deployment)
+	return set.Status.Replicas
+}
+
+func (a *DeploymentAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
+	set := obj.(*appsv1.Deployment)
+	return set.Status.ReadyReplicas
 }
 
 // GetSubsetFailure returns the failure information of the subset.

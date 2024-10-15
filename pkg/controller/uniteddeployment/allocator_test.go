@@ -39,7 +39,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator := sortToAllocator(infos)
-	allocator.AllocateReplicas(5, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(5, &map[string]int32{})
 	if " t1 -> 1; t3 -> 1; t4 -> 1; t2 -> 2;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -48,7 +48,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t1", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(0, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(0, &map[string]int32{})
 	if " t1 -> 0;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -60,7 +60,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(17, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(17, &map[string]int32{})
 	if " t1 -> 4; t3 -> 4; t4 -> 4; t2 -> 5;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -72,7 +72,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(9, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(9, &map[string]int32{})
 	if " t1 -> 2; t3 -> 2; t4 -> 2; t2 -> 3;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -82,7 +82,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t2", 10),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(19, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(19, &map[string]int32{})
 	if " t1 -> 9; t2 -> 10;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -92,7 +92,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t2", 10),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(21, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(21, &map[string]int32{})
 	if " t1 -> 10; t2 -> 11;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -106,7 +106,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator := sortToAllocator(infos)
-	allocator.AllocateReplicas(27, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(27, &map[string]int32{
 		"t1": 4,
 		"t3": 4,
 	})
@@ -121,7 +121,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(8, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(8, &map[string]int32{
 		"t1": 4,
 		"t3": 4,
 	})
@@ -136,7 +136,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(16, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(16, &map[string]int32{
 		"t1": 4,
 		"t2": 4,
 		"t3": 4,
@@ -153,7 +153,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(10, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(10, &map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -169,7 +169,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(10, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(10, &map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -186,7 +186,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(-1, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(-1, &map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -203,7 +203,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t2", 4),
 	}
 	allocator := sortToAllocator(infos)
-	allocator.AllocateReplicas(14, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(14, &map[string]int32{
 		"t1": 6,
 		"t2": 6,
 	})
@@ -216,7 +216,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t2", 4),
 	}
 	allocator = sortToAllocator(infos)
-	allocator.AllocateReplicas(14, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(14, &map[string]int32{
 		"t1": 10,
 		"t2": 11,
 	})
@@ -280,16 +280,16 @@ func TestCapacityAllocator(t *testing.T) {
 			ud.Spec.Replicas = pointer.Int32(cs.replicas)
 			ud.Spec.Topology.Subsets = []appsv1alpha1.Subset{}
 			for index := range cs.minReplicas {
-				min := intstr.FromInt(int(cs.minReplicas[index]))
-				var max *intstr.IntOrString
+				minReplicas := intstr.FromInt32(cs.minReplicas[index])
+				var maxReplicas *intstr.IntOrString
 				if cs.maxReplicas[index] != -1 {
-					m := intstr.FromInt(int(cs.maxReplicas[index]))
-					max = &m
+					m := intstr.FromInt32(cs.maxReplicas[index])
+					maxReplicas = &m
 				}
 				ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
 					Name:        fmt.Sprintf("subset-%d", index),
-					MinReplicas: &min,
-					MaxReplicas: max,
+					MinReplicas: &minReplicas,
+					MaxReplicas: maxReplicas,
 				})
 			}
 
@@ -304,6 +304,209 @@ func TestCapacityAllocator(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAdaptiveElasticAllocator(t *testing.T) {
+	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas, failedPods int32) (
+		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
+		minR, maxR := intstr.FromInt32(minReplicas), intstr.FromInt32(maxReplicas)
+		return &appsv1alpha1.UnitedDeployment{
+				Spec: appsv1alpha1.UnitedDeploymentSpec{
+					Replicas: &totalReplicas,
+					Topology: appsv1alpha1.Topology{
+						Subsets: []appsv1alpha1.Subset{
+							{
+								Name:        "subset-1",
+								MinReplicas: &minR,
+								MaxReplicas: &maxR,
+							},
+							{
+								Name: "subset-2",
+							},
+						},
+						ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+							Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						},
+					},
+				},
+			}, map[string]*Subset{
+				"subset-1": {
+					Status: SubsetStatus{
+						UnschedulableStatus: SubsetUnschedulableStatus{
+							Unschedulable: true,
+							PendingPods:   failedPods,
+						},
+						Replicas: maxReplicas,
+					},
+					Spec: SubsetSpec{Replicas: minReplicas},
+				},
+				//"subset-2": {
+				//	Status: SubsetStatus{},
+				//},
+			}
+	}
+	cases := []struct {
+		name                                                 string
+		totalReplicas, minReplicas, maxReplicas, pendingPods int32
+		subset1Replicas, subset2Replicas                     int32
+	}{
+		{
+			name:          "5 pending pods > maxReplicas -> 0, 10",
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 5,
+			subset1Replicas: 0, subset2Replicas: 10,
+		},
+		{
+			name:          "4 pending pods = maxReplicas -> 0, 10",
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 4,
+			subset1Replicas: 0, subset2Replicas: 10,
+		},
+		{
+			name:          "3 pending pods < maxReplicas -> 1, 9",
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 3,
+			subset1Replicas: 1, subset2Replicas: 9,
+		},
+		{
+			name:          "2 pending pods = minReplicas -> 2, 8",
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 2,
+			subset1Replicas: 2, subset2Replicas: 8,
+		},
+		{
+			name:          "1 pending pods < minReplicas -> 3, 7",
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 1,
+			subset1Replicas: 3, subset2Replicas: 7,
+		},
+		{
+			name:          "no pending pods -> 2, 8",
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 0,
+			subset1Replicas: 4, subset2Replicas: 6,
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ud, subsets := getUnitedDeploymentAndSubsets(
+				testCase.totalReplicas, testCase.minReplicas, testCase.maxReplicas, testCase.pendingPods)
+			alloc, err := NewReplicaAllocator(ud).Alloc(&subsets)
+			if err != nil {
+				t.Fatalf("unexpected alloc error %v", err)
+			} else {
+				subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
+				if subset1Replicas != testCase.subset1Replicas || subset2Replicas != testCase.subset2Replicas {
+					t.Fatalf("subset1Replicas = %d, subset1Replicas = %d,  test case is %+v",
+						subset1Replicas, subset2Replicas, testCase)
+				}
+			}
+		})
+	}
+}
+
+func TestProtectingRunningPodsAdaptive(t *testing.T) {
+	getUnitedDeploymentAndSubsets := func(subset1MinReplicas, subset1MaxReplicas, subset1RunningReplicas, subset2RunningReplicas int32) (
+		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
+		minR, maxR := intstr.FromInt32(subset1MinReplicas), intstr.FromInt32(subset1MaxReplicas)
+		totalReplicas := subset1RunningReplicas + subset2RunningReplicas
+		return &appsv1alpha1.UnitedDeployment{
+				Spec: appsv1alpha1.UnitedDeploymentSpec{
+					Replicas: &totalReplicas,
+					Topology: appsv1alpha1.Topology{
+						Subsets: []appsv1alpha1.Subset{
+							{
+								Name:        "subset-1",
+								MinReplicas: &minR,
+								MaxReplicas: &maxR,
+							},
+							{
+								Name: "subset-2",
+							},
+						},
+						ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+							Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						},
+					},
+				},
+			}, map[string]*Subset{
+				"subset-1": {
+					Status: SubsetStatus{
+						Replicas: subset1RunningReplicas,
+					},
+				},
+				"subset-2": {
+					Status: SubsetStatus{
+						Replicas: subset2RunningReplicas,
+					},
+				},
+			}
+	}
+	cases := []struct {
+		name                                                                                   string
+		subset1MinReplicas, subset1MaxReplicas, subset1RunningReplicas, subset2RunningReplicas int32
+		subset1Replicas, subset2Replicas                                                       int32
+	}{
+		{
+			name:                   "subset1: [2,4], 1,1 -> 2,0",
+			subset1MinReplicas:     2,
+			subset1MaxReplicas:     4,
+			subset1RunningReplicas: 1,
+			subset2RunningReplicas: 1,
+			subset1Replicas:        2,
+			subset2Replicas:        0,
+		},
+		{
+			name:                   "subset1: [2,4], 2,1 -> 2,1",
+			subset1MinReplicas:     2,
+			subset1MaxReplicas:     4,
+			subset1RunningReplicas: 2,
+			subset2RunningReplicas: 1,
+			subset1Replicas:        2,
+			subset2Replicas:        1,
+		},
+		{
+			name:                   "subset1: [2,4], 1,2 -> 2,1",
+			subset1MinReplicas:     2,
+			subset1MaxReplicas:     4,
+			subset1RunningReplicas: 1,
+			subset2RunningReplicas: 2,
+			subset1Replicas:        2,
+			subset2Replicas:        1,
+		},
+		{
+			name:                   "subset1: [2,4], 0,4 -> 2,2",
+			subset1MinReplicas:     2,
+			subset1MaxReplicas:     4,
+			subset1RunningReplicas: 0,
+			subset2RunningReplicas: 4,
+			subset1Replicas:        2,
+			subset2Replicas:        2,
+		},
+		{
+			name:                   "subset1: [2,4], 3,1 -> 3,1",
+			subset1MinReplicas:     2,
+			subset1MaxReplicas:     4,
+			subset1RunningReplicas: 3,
+			subset2RunningReplicas: 1,
+			subset1Replicas:        3,
+			subset2Replicas:        1,
+		},
+	}
+	for _, c := range cases {
+		ud, nameToSubset := getUnitedDeploymentAndSubsets(c.subset1MinReplicas, c.subset1MaxReplicas, c.subset1RunningReplicas, c.subset2RunningReplicas)
+		alloc, err := NewReplicaAllocator(ud).Alloc(&nameToSubset)
+		if err != nil {
+			t.Fatalf("unexpected alloc error %v", err)
+		} else {
+			subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
+			if subset1Replicas != c.subset1Replicas || subset2Replicas != c.subset2Replicas {
+				t.Logf("subset1Replicas got %d, expect %d, subset1Replicas got %d, expect %d", subset1Replicas, c.subset1Replicas, subset2Replicas, c.subset2Replicas)
+				t.Fail()
+			}
+		}
+	}
+	// invalid inputs
+	ud, nameToSubset := getUnitedDeploymentAndSubsets(4, 2, 0, 0)
+	_, err := NewReplicaAllocator(ud).Alloc(&nameToSubset)
+	if err == nil {
+		t.Logf("expected error not happen")
+		t.Fail()
 	}
 }
 

@@ -41,30 +41,29 @@ func (a *CloneSetAdapter) GetStatusObservedGeneration(obj metav1.Object) int64 {
 	return obj.(*alpha1.CloneSet).Status.ObservedGeneration
 }
 
-func (a *CloneSetAdapter) GetReplicaDetails(obj metav1.Object, updatedRevision string) (specReplicas, specPartition *int32, statusReplicas, statusReadyReplicas, statusUpdatedReplicas, statusUpdatedReadyReplicas int32, err error) {
+func (a *CloneSetAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
+	return a.getCloneSetPods(obj.(*alpha1.CloneSet))
+}
 
+func (a *CloneSetAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
+	return obj.(*alpha1.CloneSet).Spec.Replicas
+}
+
+func (a *CloneSetAdapter) GetSpecPartition(obj metav1.Object, _ []*corev1.Pod) *int32 {
 	set := obj.(*alpha1.CloneSet)
-
-	var pods []*corev1.Pod
-
-	pods, err = a.getCloneSetPods(set)
-
-	if err != nil {
-		return
-	}
-
-	specReplicas = set.Spec.Replicas
-
 	if set.Spec.UpdateStrategy.Partition != nil {
-		partition, _ := intstr.GetValueFromIntOrPercent(set.Spec.UpdateStrategy.Partition, int(*set.Spec.Replicas), true)
-		specPartition = utilpointer.Int32Ptr(int32(partition))
+		partition, _ := intstr.GetScaledValueFromIntOrPercent(set.Spec.UpdateStrategy.Partition, int(*set.Spec.Replicas), true)
+		return utilpointer.Int32Ptr(int32(partition))
 	}
+	return nil
+}
 
-	statusReplicas = set.Status.Replicas
-	statusReadyReplicas = set.Status.ReadyReplicas
-	statusUpdatedReplicas, statusUpdatedReadyReplicas = calculateUpdatedReplicas(pods, updatedRevision)
+func (a *CloneSetAdapter) GetStatusReplicas(obj metav1.Object) int32 {
+	return obj.(*alpha1.CloneSet).Status.Replicas
+}
 
-	return
+func (a *CloneSetAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
+	return obj.(*alpha1.CloneSet).Status.ReadyReplicas
 }
 
 func (a *CloneSetAdapter) GetSubsetFailure() *string {

@@ -3,6 +3,9 @@ package framework
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -13,8 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
-	"reflect"
-	"time"
 )
 
 type UnitedDeploymentTester struct {
@@ -30,6 +31,8 @@ func NewUnitedDeploymentTester(c clientset.Interface, kc kruiseclientset.Interfa
 		ns: ns,
 	}
 }
+
+var zero = int64(0)
 
 func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string) *UnitedDeploymentManager {
 	return &UnitedDeploymentManager{
@@ -64,6 +67,7 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string) *United
 									},
 								},
 								Spec: v1.PodSpec{
+									TerminationGracePeriodSeconds: &zero,
 									Containers: []v1.Container{
 										{
 											Name:  "busybox",
@@ -81,12 +85,14 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string) *United
 			},
 		},
 		kc: t.kc,
+		c:  t.c,
 	}
 }
 
 type UnitedDeploymentManager struct {
 	*appsv1alpha1.UnitedDeployment
 	kc kruiseclientset.Interface
+	c  clientset.Interface
 }
 
 func (m *UnitedDeploymentManager) AddSubset(name string, replicas, minReplicas, maxReplicas *intstr.IntOrString) {
@@ -120,7 +126,12 @@ func (m *UnitedDeploymentManager) Create(replicas int32) {
 	gomega.Eventually(func() bool {
 		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		return ud.Status.Replicas == replicas && ud.Generation == ud.Status.ObservedGeneration
+		ok := ud.Status.Replicas == replicas && ud.Generation == ud.Status.ObservedGeneration
+		if !ok {
+			fmt.Printf("UnitedDeploymentManager.Create failed\nud.Status.Replicas: %d, ud.Generation: %d, ud.Status.ObservedGeneration: %d\n",
+				ud.Status.Replicas, ud.Generation, ud.Status.ObservedGeneration)
+		}
+		return ok
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
@@ -128,6 +139,57 @@ func (m *UnitedDeploymentManager) CheckSubsets(replicas map[string]int32) {
 	gomega.Eventually(func() bool {
 		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		return ud.GetGeneration() == ud.Status.ObservedGeneration && *ud.Spec.Replicas == ud.Status.Replicas && reflect.DeepEqual(replicas, ud.Status.SubsetReplicas)
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
+		ok := ud.GetGeneration() == ud.Status.ObservedGeneration && *ud.Spec.Replicas == ud.Status.Replicas && reflect.DeepEqual(replicas, ud.Status.SubsetReplicas)
+		if !ok {
+			fmt.Printf("UnitedDeploymentManager.CheckSubsets failed\nud.GetGeneration(): %d, ud.Status.ObservedGeneration: %d, *ud.Spec.Replicas: %d, ud.Status.Replicas: %d, ud.Status.SubsetReplicas: %v\n", ud.GetGeneration(),
+				ud.Status.ObservedGeneration, *ud.Spec.Replicas, ud.Status.Replicas, ud.Status.SubsetReplicas)
+		}
+		return ok
+	}, 3*time.Minute, time.Second).Should(gomega.BeTrue())
+}
+
+func (m *UnitedDeploymentManager) Update() {
+	gomega.Eventually(func(g gomega.Gomega) {
+		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.Background(), m.Name, metav1.GetOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		ud.Spec = m.UnitedDeployment.DeepCopy().Spec
+		_, err = m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Update(context.Background(), ud, metav1.UpdateOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+	}, time.Minute, time.Second).Should(gomega.Succeed())
+}
+
+func (m *UnitedDeploymentManager) CheckSubsetPods(expect map[string]int32) {
+	fmt.Print("CheckSubsetPods ")
+	ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Eventually(func(g gomega.Gomega) {
+		actual := map[string]int32{}
+		for _, subset := range ud.Spec.Topology.Subsets {
+			podList, err := m.c.CoreV1().Pods(m.Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("apps.kruise.io/subset-name=%s", subset.Name),
+			})
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+			actual[subset.Name] = int32(len(podList.Items))
+		}
+		g.Expect(expect).To(gomega.BeEquivalentTo(actual))
+	}, time.Minute, 500*time.Millisecond).Should(gomega.Succeed())
+	fmt.Println("pass")
+}
+
+func (m *UnitedDeploymentManager) CheckUnschedulableStatus(expect map[string]bool) {
+	fmt.Print("CheckUnschedulableStatus ")
+	gomega.Eventually(func(g gomega.Gomega) {
+		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(ud.Status.SubsetStatuses != nil).To(gomega.BeTrue())
+		actual := map[string]bool{}
+		for name := range expect {
+			status := ud.Status.GetSubsetStatus(name)
+			g.Expect(status != nil).To(gomega.BeTrue())
+			condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
+			actual[name] = condition != nil && condition.Status == v1.ConditionFalse
+		}
+		g.Expect(expect).To(gomega.BeEquivalentTo(actual))
+	}, time.Minute, 500*time.Millisecond).Should(gomega.Succeed())
+	fmt.Println("pass")
 }
