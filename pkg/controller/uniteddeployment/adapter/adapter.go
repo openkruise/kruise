@@ -46,9 +46,6 @@ type Adapter interface {
 	GetSubsetFailure() *string
 	// ApplySubsetTemplate updates the subset to the latest revision.
 	ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, subset runtime.Object) error
-	// IsExpected checks the subset is the expected revision or not.
-	// If not, UnitedDeployment will call ApplySubsetTemplate to update it.
-	IsExpected(subset metav1.Object, revision string) bool
 	// PostUpdate does some works after subset updated
 	PostUpdate(ud *alpha1.UnitedDeployment, subset runtime.Object, revision string, partition int32) error
 }

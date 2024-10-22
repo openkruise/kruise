@@ -67,7 +67,7 @@ func (a *DeploymentAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
 	return set.Spec.Replicas
 }
 
-func (a *DeploymentAdapter) GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32 {
+func (a *DeploymentAdapter) GetSpecPartition(_ metav1.Object, _ []*corev1.Pod) *int32 {
 	return nil
 }
 
@@ -88,7 +88,7 @@ func (a *DeploymentAdapter) GetSubsetFailure() *string {
 }
 
 // ApplySubsetTemplate updates the subset to the latest revision, depending on the DeploymentTemplate.
-func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, obj runtime.Object) error {
+func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, _ int32, obj runtime.Object) error {
 	// Convert to Deployment Object
 	set := obj.(*appsv1.Deployment)
 
@@ -140,15 +140,14 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, sub
 		return err
 	}
 
+	set.Spec = *ud.Spec.Template.DeploymentTemplate.Spec.DeepCopy()
 	set.Spec.Selector = selectors
 	set.Spec.Replicas = &replicas
-	set.Spec.Template = *ud.Spec.Template.DeploymentTemplate.Spec.Template.DeepCopy()
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
 	}
 	set.Spec.Template.Labels[alpha1.SubSetNameLabelKey] = subsetName
 	set.Spec.Template.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
-	set.Spec.RevisionHistoryLimit = ud.Spec.Template.DeploymentTemplate.Spec.RevisionHistoryLimit
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
@@ -178,14 +177,8 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, sub
 }
 
 // PostUpdate does some works after subset updated. Deployments typically don't have post update operations.
-func (a *DeploymentAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj runtime.Object, revision string, partition int32) error {
+func (a *DeploymentAdapter) PostUpdate(_ *alpha1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
 	return nil
-}
-
-// IsExpected checks the subset is the expected revision or not.
-// The revision label can tell the current subset revision.
-func (a *DeploymentAdapter) IsExpected(obj metav1.Object, revision string) bool {
-	return obj.GetLabels()[appsv1.ControllerRevisionHashLabelKey] != revision
 }
 
 // getDeploymentPods gets all Pods under a Deployment object

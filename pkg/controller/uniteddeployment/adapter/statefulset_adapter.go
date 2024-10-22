@@ -138,28 +138,23 @@ func (a *StatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, su
 		return err
 	}
 
+	set.Spec = *ud.Spec.Template.StatefulSetTemplate.Spec.DeepCopy()
 	set.Spec.Selector = selectors
 	set.Spec.Replicas = &replicas
-	if ud.Spec.Template.StatefulSetTemplate.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
-		set.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-	} else {
+	if ud.Spec.Template.StatefulSetTemplate.Spec.UpdateStrategy.Type == "" || // Default value is RollingUpdate, which is not set in webhook
+		ud.Spec.Template.StatefulSetTemplate.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+		set.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
 		if set.Spec.UpdateStrategy.RollingUpdate == nil {
 			set.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
 		}
 		set.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
 	}
 
-	set.Spec.Template = *ud.Spec.Template.StatefulSetTemplate.Spec.Template.DeepCopy()
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
 	}
 	set.Spec.Template.Labels[alpha1.SubSetNameLabelKey] = subsetName
 	set.Spec.Template.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
-
-	set.Spec.RevisionHistoryLimit = ud.Spec.Template.StatefulSetTemplate.Spec.RevisionHistoryLimit
-	set.Spec.PodManagementPolicy = ud.Spec.Template.StatefulSetTemplate.Spec.PodManagementPolicy
-	set.Spec.ServiceName = ud.Spec.Template.StatefulSetTemplate.Spec.ServiceName
-	set.Spec.VolumeClaimTemplates = ud.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
@@ -188,7 +183,7 @@ func (a *StatefulSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, su
 }
 
 // PostUpdate does some works after subset updated. StatefulSet will implement this method to clean stuck pods.
-func (a *StatefulSetAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj runtime.Object, revision string, partition int32) error {
+func (a *StatefulSetAdapter) PostUpdate(_ *alpha1.UnitedDeployment, obj runtime.Object, revision string, partition int32) error {
 	set := obj.(*appsv1.StatefulSet)
 	if set.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
 		return nil
@@ -196,12 +191,6 @@ func (a *StatefulSetAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj runtime
 
 	// If RollingUpdate, work around for issue https://github.com/kubernetes/kubernetes/issues/67250
 	return a.deleteStuckPods(set, revision, partition)
-}
-
-// IsExpected checks the subset is the expected revision or not.
-// The revision label can tell the current subset revision.
-func (a *StatefulSetAdapter) IsExpected(obj metav1.Object, revision string) bool {
-	return obj.GetLabels()[alpha1.ControllerRevisionHashLabelKey] != revision
 }
 
 func (a *StatefulSetAdapter) getStatefulSetPods(set *appsv1.StatefulSet) ([]*corev1.Pod, error) {
