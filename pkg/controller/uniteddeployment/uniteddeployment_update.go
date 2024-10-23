@@ -51,10 +51,25 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	var needUpdate []string
 	for _, name := range exists.List() {
 		subset := (*nameToSubset)[name]
-		if r.subSetControls[subsetType].IsExpected(subset, expectedRevision.Name) ||
-			subset.Spec.Replicas != nextUpdate[name].Replicas ||
-			subset.Spec.UpdateStrategy.Partition != nextUpdate[name].Partition ||
-			subset.GetAnnotations()[appsv1alpha1.AnnotationSubsetPatchKey] != nextUpdate[name].Patch {
+		if revision := subset.GetLabels()[appsv1alpha1.ControllerRevisionHashLabelKey]; revision != expectedRevision.Name {
+			klog.InfoS("UnitedDeployment subset needs update: revision changed",
+				"unitedDeployment", klog.KObj(ud), "subset", klog.KObj(subset),
+				"current", revision, "updated", expectedRevision.Name)
+			needUpdate = append(needUpdate, name)
+		} else if subset.Spec.Replicas != nextUpdate[name].Replicas {
+			klog.InfoS("UnitedDeployment subset needs update: replicas changed",
+				"unitedDeployment", klog.KObj(ud), "subset", klog.KObj(subset),
+				"current", subset.Spec.Replicas, "updated", nextUpdate[name].Replicas)
+			needUpdate = append(needUpdate, name)
+		} else if subset.Spec.UpdateStrategy.Partition != nextUpdate[name].Partition {
+			klog.InfoS("UnitedDeployment subset needs update: partition changed",
+				"unitedDeployment", klog.KObj(ud), "subset", klog.KObj(subset),
+				"current", subset.Spec.UpdateStrategy.Partition, "updated", nextUpdate[name].Partition)
+			needUpdate = append(needUpdate, name)
+		} else if subset.GetAnnotations()[appsv1alpha1.AnnotationSubsetPatchKey] != nextUpdate[name].Patch {
+			klog.InfoS("UnitedDeployment subset needs update: patch changed",
+				"unitedDeployment", klog.KObj(ud), "subset", klog.KObj(subset),
+				"current", subset.GetAnnotations()[appsv1alpha1.AnnotationSubsetPatchKey], "updated", nextUpdate[name].Patch)
 			needUpdate = append(needUpdate, name)
 		}
 	}

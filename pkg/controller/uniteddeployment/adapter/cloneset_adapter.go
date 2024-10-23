@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -15,7 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -53,7 +53,7 @@ func (a *CloneSetAdapter) GetSpecPartition(obj metav1.Object, _ []*corev1.Pod) *
 	set := obj.(*alpha1.CloneSet)
 	if set.Spec.UpdateStrategy.Partition != nil {
 		partition, _ := intstr.GetScaledValueFromIntOrPercent(set.Spec.UpdateStrategy.Partition, int(*set.Spec.Replicas), true)
-		return utilpointer.Int32Ptr(int32(partition))
+		return ptr.To(int32(partition))
 	}
 	return nil
 }
@@ -117,14 +117,11 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 		return err
 	}
 
+	set.Spec = *ud.Spec.Template.CloneSetTemplate.Spec.DeepCopy()
 	set.Spec.Selector = selectors
 	set.Spec.Replicas = &replicas
 
-	set.Spec.UpdateStrategy = ud.Spec.Template.CloneSetTemplate.Spec.UpdateStrategy
-
-	set.Spec.UpdateStrategy.Partition = util.GetIntOrStrPointer(intstr.FromInt(int(partition)))
-
-	set.Spec.Template = *ud.Spec.Template.CloneSetTemplate.Spec.Template.DeepCopy()
+	set.Spec.UpdateStrategy.Partition = util.GetIntOrStrPointer(intstr.FromInt32(partition))
 
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
@@ -132,8 +129,6 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 
 	set.Spec.Template.Labels[alpha1.SubSetNameLabelKey] = subsetName
 	set.Spec.Template.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
-	set.Spec.RevisionHistoryLimit = ud.Spec.Template.CloneSetTemplate.Spec.RevisionHistoryLimit
-	set.Spec.VolumeClaimTemplates = ud.Spec.Template.CloneSetTemplate.Spec.VolumeClaimTemplates
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
@@ -160,12 +155,8 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 	return nil
 }
 
-func (a *CloneSetAdapter) PostUpdate(ud *alpha1.UnitedDeployment, obj runtime.Object, revision string, partition int32) error {
+func (a *CloneSetAdapter) PostUpdate(_ *alpha1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
 	return nil
-}
-
-func (a *CloneSetAdapter) IsExpected(obj metav1.Object, revision string) bool {
-	return obj.GetLabels()[alpha1.ControllerRevisionHashLabelKey] != revision
 }
 
 func (a *CloneSetAdapter) getCloneSetPods(set *alpha1.CloneSet) ([]*corev1.Pod, error) {

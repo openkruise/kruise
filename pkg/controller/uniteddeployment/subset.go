@@ -83,6 +83,4 @@ type ControlInterface interface {
 	DeleteSubset(*Subset) error
 	// GetSubsetFailure extracts the subset failure message to expose on UnitedDeployment status.
 	GetSubsetFailure(*Subset) *string
-	// IsExpected check the subset is the expected revision
-	IsExpected(subSet *Subset, revision string) bool
 }

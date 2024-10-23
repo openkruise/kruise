@@ -1214,7 +1214,7 @@ func TestDeploymentSubsetCount(t *testing.T) {
 	g.Expect(*deploymentList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(5))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	nine := intstr.FromInt(9)
+	nine := intstr.FromInt32(9)
 	instance.Spec.Topology.Subsets[0].Replicas = &nine
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
 	waitReconcilerProcessFinished(g, requests, 2)
@@ -1327,6 +1327,110 @@ func TestDeploymentSubsetCount(t *testing.T) {
 	setsubB = getDeploymentSubsetByName(deploymentList, "subset-b")
 	g.Expect(*setsubB.Spec.Replicas).Should(gomega.BeEquivalentTo(6))
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
+}
+
+func TestDeploymentRollingUpdate(t *testing.T) {
+	g, requests, cancel, mgrStopped := setUp(t)
+	defer func() {
+		clean(g, c)
+		cancel()
+		mgrStopped.Wait()
+	}()
+
+	caseName := "test-deployment-rolling-update"
+	instance := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      caseName,
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &ten,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": caseName,
+				},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": caseName,
+						},
+					},
+					Spec: appsv1.DeploymentSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": caseName,
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "container-a",
+										Image: "nginx:1.0",
+									},
+								},
+							},
+						},
+						Strategy: appsv1.DeploymentStrategy{
+							Type: appsv1.RollingUpdateDeploymentStrategyType,
+							RollingUpdate: &appsv1.RollingUpdateDeployment{
+								MaxSurge: &intstr.IntOrString{
+									Type:   intstr.Int,
+									IntVal: 1,
+								},
+								MaxUnavailable: &intstr.IntOrString{
+									Type:   intstr.Int,
+									IntVal: 4,
+								},
+							},
+						},
+						MinReadySeconds: ten,
+					},
+				},
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{
+					{
+						Name: "subset-a",
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeA"},
+								},
+							},
+						},
+					},
+					{
+						Name: "subset-b",
+						NodeSelectorTerm: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "node-name",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"nodeB"},
+								},
+							},
+						},
+					},
+				},
+			},
+			RevisionHistoryLimit: &ten,
+		},
+	}
+	g.Expect(c.Create(context.TODO(), instance)).Should(gomega.BeNil())
+	waitReconcilerProcessFinished(g, requests, 2)
+	deploymentList := expectedDeploymentCount(g, instance, 2)
+	for _, name := range []string{"subset-a", "subset-b"} {
+		subset := getDeploymentSubsetByName(deploymentList, name)
+		g.Expect(subset.Spec.Strategy.Type).Should(gomega.BeEquivalentTo(appsv1.RollingUpdateDeploymentStrategyType))
+		g.Expect(subset.Spec.Strategy.RollingUpdate.MaxUnavailable.IntVal).Should(gomega.BeEquivalentTo(4))
+		g.Expect(subset.Spec.Strategy.RollingUpdate.MaxSurge.IntVal).Should(gomega.BeEquivalentTo(1))
+		g.Expect(subset.Spec.MinReadySeconds).Should(gomega.BeEquivalentTo(ten))
+	}
 }
 
 func getDeploymentSubsetByName(deploymentList *appsv1.DeploymentList, name string) *appsv1.Deployment {
