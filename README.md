@@ -7,6 +7,7 @@
 [![CircleCI](https://circleci.com/gh/openkruise/kruise.svg?style=svg)](https://circleci.com/gh/openkruise/kruise)
 [![codecov](https://codecov.io/gh/openkruise/kruise/branch/master/graph/badge.svg)](https://codecov.io/gh/openkruise/kruise)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](./CODE_OF_CONDUCT.md)
+[![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20Kruise%20Guru-006BFF)](https://gurubase.io/g/kruise)
 
 English | [简体中文](./README-zh_CN.md)
 
