@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -52,6 +54,13 @@ import (
 
 var (
 	scheme *runtime.Scheme
+
+	cloneSetDemo = &appsv1alpha1.CloneSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cloneset-test",
+			Namespace: "default",
+		},
+	}
 
 	podDemo = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -472,10 +481,14 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 }
 
 func TestWorkloadSpreadMutatingPod(t *testing.T) {
+	defaultErrorHandler := func(err error) bool {
+		return err == nil
+	}
 	cases := []struct {
 		name                 string
 		getPod               func() *corev1.Pod
 		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
+		errorHandler         func(err error) bool // errorHandler returns true means the error is expected
 		getOperation         func() Operation
 		expectPod            func() *corev1.Pod
 		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
@@ -1080,6 +1093,31 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				return workloadSpread
 			},
 		},
+		{
+			name: "operation = create, pod owner reference replicaset not found",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.OwnerReferences[0].Name = "not-exist"
+				return pod
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				return workloadSpreadDemo.DeepCopy()
+			},
+			getOperation: func() Operation {
+				return CreateOperation
+			},
+			expectPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.OwnerReferences[0].Name = "not-exist"
+				return pod
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				return workloadSpreadDemo.DeepCopy()
+			},
+			errorHandler: func(err error) bool {
+				return errors.IsNotFound(err)
+			},
+		},
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
@@ -1088,7 +1126,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			expectWS := cs.expectWorkloadSpread()
 			podExpect := cs.expectPod()
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).
-				WithObjects(workloadSpreadIn).WithStatusSubresource(&appsv1alpha1.WorkloadSpread{}).Build()
+				WithObjects(workloadSpreadIn, cloneSetDemo).WithStatusSubresource(&appsv1alpha1.WorkloadSpread{}).Build()
 			handler := NewWorkloadSpreadHandler(fakeClient)
 
 			var err error
@@ -1100,8 +1138,12 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			case EvictionOperation:
 				err = handler.HandlePodDeletion(podIn, EvictionOperation)
 			}
-			if err != nil {
-				t.Fatalf("WorkloadSpreadMutatingPod failed: %s", err.Error())
+			errHandler := cs.errorHandler
+			if errHandler == nil {
+				errHandler = defaultErrorHandler
+			}
+			if !errHandler(err) {
+				t.Fatalf("WorkloadSpreadMutatingPod errHandler failed: %v", err)
 			}
 			podInBy, _ := json.Marshal(podIn)
 			expectPodBy, _ := json.Marshal(podExpect)
@@ -1178,10 +1220,11 @@ func compareTimeMap(actual, expect map[string]metav1.Time) bool {
 
 func TestIsReferenceEqual(t *testing.T) {
 	cases := []struct {
-		name         string
-		getTargetRef func() *appsv1alpha1.TargetReference
-		getOwnerRef  func() *metav1.OwnerReference
-		expectEqual  bool
+		name          string
+		getTargetRef  func() *appsv1alpha1.TargetReference
+		getOwnerRef   func() *metav1.OwnerReference
+		expectEqual   bool
+		errorExpected func(err error) bool
 	}{
 		{
 			name: "ApiVersion, Kind, Name equals",
@@ -1255,13 +1298,59 @@ func TestIsReferenceEqual(t *testing.T) {
 			},
 			expectEqual: false,
 		},
+		{
+			name: "target ApiVersion parse failed",
+			getTargetRef: func() *appsv1alpha1.TargetReference {
+				return &appsv1alpha1.TargetReference{
+					APIVersion: "apps.kruise.io/v1alpha1/yahaha",
+					Kind:       "CloneSet",
+					Name:       "test-1",
+				}
+			},
+			getOwnerRef: func() *metav1.OwnerReference {
+				return &metav1.OwnerReference{
+					APIVersion: "apps.kruise.io/v1alpha1",
+					Kind:       "CloneSet",
+					Name:       "test-2",
+				}
+			},
+			expectEqual: false,
+			errorExpected: func(err error) bool {
+				return strings.Contains(err.Error(), "unexpected GroupVersion string: apps.kruise.io/v1alpha1/yahaha")
+			},
+		},
+		{
+			name: "owner ApiVersion parse failed",
+			getTargetRef: func() *appsv1alpha1.TargetReference {
+				return &appsv1alpha1.TargetReference{
+					APIVersion: "apps.kruise.io/v1alpha1",
+					Kind:       "CloneSet",
+					Name:       "test-1",
+				}
+			},
+			getOwnerRef: func() *metav1.OwnerReference {
+				return &metav1.OwnerReference{
+					APIVersion: "apps.kruise.io/v1alpha1/yahaha",
+					Kind:       "CloneSet",
+					Name:       "test-2",
+				}
+			},
+			expectEqual: false,
+			errorExpected: func(err error) bool {
+				return strings.Contains(err.Error(), "unexpected GroupVersion string: apps.kruise.io/v1alpha1/yahaha")
+			},
+		},
 	}
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			h := Handler{fake.NewClientBuilder().Build()}
-			if h.isReferenceEqual(cs.getTargetRef(), cs.getOwnerRef(), "") != cs.expectEqual {
+			ok, err := h.isReferenceEqual(cs.getTargetRef(), cs.getOwnerRef(), "")
+			if ok != cs.expectEqual {
 				t.Fatalf("isReferenceEqual failed")
+			}
+			if cs.errorExpected != nil && !cs.errorExpected(err) {
+				t.Fatalf("isReferenceEqual failed with error: %v", err)
 			}
 		})
 	}
@@ -1400,7 +1489,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 			handler := &Handler{Client: cli}
 			workloadsInWhiteListInitialized = false
 			initializeWorkloadsInWhiteList(cli)
-			result := handler.isReferenceEqual(&ref, metav1.GetControllerOf(pod), pod.GetNamespace())
+			result, _ := handler.isReferenceEqual(&ref, metav1.GetControllerOf(pod), pod.GetNamespace())
 			if result != cs.Expect {
 				t.Fatalf("got unexpected result")
 			}
