@@ -200,7 +200,7 @@ func main() {
 			DefaultNamespaces: getCacheNamespacesFromFlag(namespace),
 		},
 		WebhookServer: ctrlwebhook.NewServer(ctrlwebhook.Options{
-			Host:    "0.0.0.0",
+			Host:    "",
 			Port:    webhookutil.GetPort(),
 			CertDir: webhookutil.GetCertDir(),
 		}),
