@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -181,7 +181,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 
 			// create cloneset, replicas = 6
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
+			cloneSet.Spec.Replicas = ptr.To(int32(6))
 			cloneSet = tester.CreateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -200,11 +200,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -250,11 +252,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -284,7 +288,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			workloadSpread.Spec.Subsets[0].MaxReplicas.IntVal = 2
 			workloadSpread.Spec.Subsets[1].MaxReplicas.IntVal = 2
 			tester.UpdateWorkloadSpread(workloadSpread)
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(4)
+			cloneSet.Spec.Replicas = ptr.To(int32(4))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -303,11 +307,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -338,7 +344,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			workloadSpread.Spec.Subsets[0].MaxReplicas.IntVal = 4
 			workloadSpread.Spec.Subsets[1].MaxReplicas.IntVal = 4
 			tester.UpdateWorkloadSpread(workloadSpread)
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(8)
+			cloneSet.Spec.Replicas = ptr.To(int32(8))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -357,11 +363,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -452,11 +460,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -484,7 +494,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			//scale up cloneSet.replicas = 6
 			ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=6", cloneSet.Namespace, cloneSet.Name))
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
+			cloneSet.Spec.Replicas = ptr.To(int32(6))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -503,11 +513,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -554,11 +566,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -586,7 +600,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			//scale down cloneSet.replicas = 2
 			ginkgo.By(fmt.Sprintf("scale down cloneSet(%s/%s) replicas=2", cloneSet.Namespace, cloneSet.Name))
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(2)
+			cloneSet.Spec.Replicas = ptr.To(int32(2))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -605,11 +619,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -686,7 +702,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			workloadSpread = tester.CreateWorkloadSpread(workloadSpread)
 
 			// create cloneset, replicas = 5
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(5)
+			cloneSet.Spec.Replicas = ptr.To(int32(5))
 			cloneSet = tester.CreateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunReplicas(cloneSet, int32(3))
 
@@ -718,6 +734,7 @@ var _ = SIGDescribe("workloadspread", func() {
 							subset2RunningPods++
 						}
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 						gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset2.Name))
@@ -752,13 +769,13 @@ var _ = SIGDescribe("workloadspread", func() {
 				Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
 				Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
 					DisableSimulationSchedule: true,
-					RescheduleCriticalSeconds: pointer.Int32Ptr(5),
+					RescheduleCriticalSeconds: ptr.To(int32(5)),
 				},
 			}
 			tester.UpdateWorkloadSpread(workloadSpread)
 			tester.WaitForWorkloadSpreadRunning(workloadSpread)
 
-			err = wait.PollImmediate(time.Second, time.Minute*6, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*6, true, func(ctx context.Context) (bool, error) {
 				ws, err := kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -790,6 +807,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 						gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset2.Name))
@@ -804,7 +822,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			// wait subset-a to schedulable
 			ginkgo.By("wait subset-a to schedulable")
-			err = wait.PollImmediate(time.Second, time.Minute*5, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*5, true, func(ctx context.Context) (bool, error) {
 				ws, err := kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
@@ -823,7 +841,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		framework.ConformanceIt("manage the pods that were created before workloadspread", func() {
 			// build cloneSet, default to schedule its pods to zone-a
 			cloneSet := tester.NewBaseCloneSet(ns)
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(4)
+			cloneSet.Spec.Replicas = ptr.To(int32(4))
 			cloneSet.Spec.Template.Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{{
 					Weight: 100,
@@ -900,7 +918,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			}, 5*time.Minute, time.Second).Should(gomega.Equal(int32(4)))
 
 			ginkgo.By("Extend CloneSet to 6 replicas, check subsetStatus and pods...")
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
+			cloneSet.Spec.Replicas = ptr.To(int32(6))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 			gomega.Eventually(func() int32 {
@@ -940,6 +958,7 @@ var _ = SIGDescribe("workloadspread", func() {
 						} else if injectWorkloadSpread.Subset == subset2.Name {
 							subset2Pods++
 							gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+							gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 							gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 							gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 							gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset2.Name))
@@ -957,7 +976,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(uninjectPods).To(gomega.Equal(0))
 
 			ginkgo.By("Shrink CloneSet to 3 replicas, check subsetStatus and pods...")
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(3)
+			cloneSet.Spec.Replicas = ptr.To(int32(3))
 			cloneSet.Spec.Template.Spec.NodeSelector = nil
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
@@ -998,6 +1017,7 @@ var _ = SIGDescribe("workloadspread", func() {
 						} else if injectWorkloadSpread.Subset == subset2.Name {
 							subset2Pods++
 							gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+							gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 							gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 							gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 							gomega.Expect(pod.Annotations["subset"]).To(gomega.Equal(subset2.Name))
@@ -1061,6 +1081,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1082,7 +1103,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			//scale up cloneSet.replicas = 6
 			ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=6", cloneSet.Namespace, cloneSet.Name))
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
+			cloneSet.Spec.Replicas = ptr.To(int32(6))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -1100,6 +1121,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1139,6 +1161,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1207,6 +1230,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1228,7 +1252,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			//scale up cloneSet.replicas = 6
 			ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=6", cloneSet.Namespace, cloneSet.Name))
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
+			cloneSet.Spec.Replicas = ptr.To(int32(6))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -1246,6 +1270,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1268,7 +1293,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			// scale down cloneset image
 			//scale up cloneSet.replicas = 2
 			ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=6", cloneSet.Namespace, cloneSet.Name))
-			cloneSet.Spec.Replicas = pointer.Int32Ptr(2)
+			cloneSet.Spec.Replicas = ptr.To(int32(2))
 			tester.UpdateCloneSet(cloneSet)
 			tester.WaitForCloneSetRunning(cloneSet)
 
@@ -1286,6 +1311,7 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1380,7 +1406,7 @@ var _ = SIGDescribe("workloadspread", func() {
 				},
 			}
 
-			cs.Spec.Replicas = pointer.Int32Ptr(3)
+			cs.Spec.Replicas = ptr.To(int32(3))
 			cs.Spec.Template.Spec.Affinity = &corev1.Affinity{
 				NodeAffinity: &corev1.NodeAffinity{
 					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
@@ -1483,7 +1509,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			tester.WaitForWorkloadSpreadRunning(ws)
 
 			ginkgo.By("Creating statefulset with 5 replicas and waiting for pods to be ready...")
-			sts.Spec.Replicas = pointer.Int32Ptr(5)
+			sts.Spec.Replicas = ptr.To(int32(5))
 			tester.CreateService(svc)
 			statefulSet := tester.CreateStatefulSet(sts)
 			tester.WaitForStatefulSetRunning(statefulSet)
@@ -1642,7 +1668,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//
 		//	//scale up cloneSet.replicas = 6
 		//	ginkgo.By(fmt.Sprintf("scale up cloneSet(%s/%s) replicas=6", cloneSet.Namespace, cloneSet.Name))
-		//	cloneSet.Spec.Replicas = pointer.Int32Ptr(6)
+		//	cloneSet.Spec.Replicas = ptr.To(int32(6))
 		//	tester.UpdateCloneSet(cloneSet)
 		//	tester.WaitForCloneSetRunning(cloneSet)
 		//
@@ -1687,7 +1713,7 @@ var _ = SIGDescribe("workloadspread", func() {
 		//
 		//	//scale down cloneSet.replicas = 2
 		//	ginkgo.By(fmt.Sprintf("scale down cloneSet(%s/%s) replicas=2", cloneSet.Namespace, cloneSet.Name))
-		//	cloneSet.Spec.Replicas = pointer.Int32Ptr(2)
+		//	cloneSet.Spec.Replicas = ptr.To(int32(2))
 		//	tester.UpdateCloneSet(cloneSet)
 		//	tester.WaitForCloneSetRunning(cloneSet)
 		//
@@ -1792,11 +1818,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1810,7 +1838,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			//scale up deployment.replicas = 6
 			ginkgo.By(fmt.Sprintf("scale up deployment(%s/%s) replicas=6", deployment.Namespace, deployment.Name))
-			deployment.Spec.Replicas = pointer.Int32Ptr(6)
+			deployment.Spec.Replicas = ptr.To(int32(6))
 			tester.UpdateDeployment(deployment)
 			tester.WaitForDeploymentRunning(deployment)
 
@@ -1829,11 +1857,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1874,11 +1904,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
@@ -1892,7 +1924,7 @@ var _ = SIGDescribe("workloadspread", func() {
 
 			//scale down deployment.replicas = 2
 			ginkgo.By(fmt.Sprintf("scale down deployment(%s/%s) replicas=2", deployment.Namespace, deployment.Name))
-			deployment.Spec.Replicas = pointer.Int32Ptr(2)
+			deployment.Spec.Replicas = ptr.To(int32(2))
 			tester.UpdateDeployment(deployment)
 			tester.WaitForDeploymentRunning(deployment)
 
@@ -1911,11 +1943,13 @@ var _ = SIGDescribe("workloadspread", func() {
 					if injectWorkloadSpread.Subset == subset1.Name {
 						subset1Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("200"))
 					} else if injectWorkloadSpread.Subset == subset2.Name {
 						subset2Pods++
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
+						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset2.RequiredNodeSelectorTerm.MatchExpressions))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}

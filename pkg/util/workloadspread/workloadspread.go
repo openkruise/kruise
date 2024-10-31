@@ -224,10 +224,16 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 			continue
 		}
 		// determine if the reference of workloadSpread and pod is equal
-		if h.isReferenceEqual(ws.Spec.TargetReference, ref, pod.Namespace) {
+		if ok, err := h.isReferenceEqual(ws.Spec.TargetReference, ref, pod.Namespace); ok {
 			matchedWS = &ws
 			// pod has at most one matched workloadSpread
 			break
+		} else if err != nil {
+			klog.ErrorS(err, "failed to determine whether workloadspread refers pod's owner",
+				"pod", klog.KObj(pod), "workloadspread", klog.KObj(&ws))
+			if errors.IsNotFound(err) {
+				return true, err
+			}
 		}
 	}
 	// not found matched workloadSpread
@@ -687,35 +693,34 @@ func (h *Handler) getSuitableSubset(subsetStatuses []appsv1alpha1.WorkloadSpread
 	return nil
 }
 
-func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) bool {
+func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) (bool, error) {
 	if owner == nil {
-		return false
+		return false, nil
 	}
 
 	targetGv, err := schema.ParseGroupVersion(target.APIVersion)
 	if err != nil {
 		klog.ErrorS(err, "parse TargetReference apiVersion failed", "apiVersion", target.APIVersion)
-		return false
+		return false, err
 	}
 
 	ownerGv, err := schema.ParseGroupVersion(owner.APIVersion)
 	if err != nil {
 		klog.ErrorS(err, "parse OwnerReference apiVersion failed", "apiVersion", owner.APIVersion)
-		return false
+		return false, err
 	}
 
 	if targetGv.Group == ownerGv.Group && target.Kind == owner.Kind && target.Name == owner.Name {
-		return true
+		return true, nil
 	}
 
 	if match, err := matchReference(owner); err != nil || !match {
-		return false
+		return false, err
 	}
 
 	ownerObject, err := h.getObjectOf(owner, namespace)
 	if err != nil {
-		klog.ErrorS(err, "Failed to get owner object", "owner", owner)
-		return false
+		return false, err
 	}
 
 	return h.isReferenceEqual(target, metav1.GetControllerOfNoCopy(ownerObject), namespace)
