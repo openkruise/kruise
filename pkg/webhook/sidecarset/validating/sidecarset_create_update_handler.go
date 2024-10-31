@@ -52,6 +52,7 @@ const (
 
 var validDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.name",
+	"metadata.namespace",
 	"metadata.labels",
 	"metadata.annotations")
 

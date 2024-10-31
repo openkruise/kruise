@@ -470,36 +470,60 @@ func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			version:     "v1",
-			label:       "metadata.name",
-			value:       "test-pod",
-			expectedErr: true,
-		},
-		{
-			version:     "v1",
-			label:       "metadata.annotations",
-			value:       "myAnnoValue",
-			expectedErr: true,
-		},
-		{
-			version:     "v1",
-			label:       "metadata.labels",
-			value:       "myLabelValue",
-			expectedErr: true,
+			version:       "v1",
+			label:         "metadata.name",
+			value:         "test-pod",
+			expectedLabel: "metadata.name",
+			expectedValue: "test-pod",
 		},
 		{
 			version:       "v1",
-			label:         "metadata.annotations['myAnnoKey']",
-			value:         "myAnnoValue",
-			expectedLabel: "metadata.annotations['myAnnoKey']",
-			expectedValue: "myAnnoValue",
+			label:         "metadata.annotations",
+			value:         "myValue",
+			expectedLabel: "metadata.annotations",
+			expectedValue: "myValue",
 		},
 		{
 			version:       "v1",
-			label:         "metadata.labels['myLabelKey']",
-			value:         "myLabelValue",
-			expectedLabel: "metadata.labels['myLabelKey']",
-			expectedValue: "myLabelValue",
+			label:         "metadata.annotations['myKey']",
+			value:         "myValue",
+			expectedLabel: "metadata.annotations['myKey']",
+			expectedValue: "myValue",
+		},
+		{
+			version:       "v1",
+			label:         "spec.host",
+			value:         "127.0.0.1",
+			expectedLabel: "spec.nodeName",
+			expectedValue: "127.0.0.1",
+		},
+		{
+			version:       "v1",
+			label:         "status.podIPs",
+			value:         "10.244.0.6,fd00::6",
+			expectedLabel: "status.podIPs",
+			expectedValue: "10.244.0.6,fd00::6",
+		},
+		{
+			version:       "v1",
+			label:         "status.podIPs",
+			value:         "10.244.0.6",
+			expectedLabel: "status.podIPs",
+			expectedValue: "10.244.0.6",
+		},
+		{
+			version:       "v1",
+			label:         "status.hostIPs",
+			value:         "10.244.0.6,fd00::6",
+			expectedLabel: "status.hostIPs",
+			expectedValue: "10.244.0.6,fd00::6",
+		},
+		{
+			version:       "v1",
+			label:         "status.hostIPs",
+			value:         "10.244.0.6",
+			expectedLabel: "status.hostIPs",
+			expectedValue: "10.244.0.6",
 		},
 	}
 	for _, tc := range testCases {
@@ -560,6 +584,33 @@ func TestExtractContainerNameFromFieldPath(t *testing.T) {
 				},
 			}},
 			expectedName: "test-pod-anno",
+		},
+		{
+			fieldSelector: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.name",
+			},
+			pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod-anno",
+				Annotations: map[string]string{
+					"test-anno": "test-pod-anno",
+				},
+			}},
+			expectedName: "test-pod-anno",
+		},
+		{
+			fieldSelector: &corev1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.namespace",
+			},
+			pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod-anno",
+				Namespace: "test-namespace",
+				Annotations: map[string]string{
+					"test-anno": "test-pod-anno",
+				},
+			}},
+			expectedName: "test-namespace",
 		},
 	}
 	for _, tc := range testCases {
