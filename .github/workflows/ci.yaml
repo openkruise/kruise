@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout Actions Repository
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Check spelling with custom config file
         uses: crate-ci/typos@b86466d268920e98b8f1acc7fbb6f08ec871d136 # v1.24.1
         with:
@@ -41,7 +41,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -108,7 +108,7 @@ jobs:
   unit-tests:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Fetch History
