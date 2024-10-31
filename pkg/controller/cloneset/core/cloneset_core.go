@@ -32,6 +32,8 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -209,6 +211,15 @@ func (c *commonControl) IgnorePodUpdateEvent(oldPod, curPod *v1.Pod) bool {
 			if cond := inplaceupdate.GetCondition(curPod); cond == nil || cond.Status != v1.ConditionTrue {
 				return false
 			}
+		}
+	}
+	// only inplace resource resize
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) &&
+		len(curPod.Labels) > 0 && appspub.LifecycleStateType(curPod.Labels[appspub.LifecycleStateKey]) != appspub.LifecycleStateNormal {
+		opts := c.GetUpdateOptions()
+		opts = inplaceupdate.SetOptionsDefaults(opts)
+		if err := containersUpdateCompleted(curPod, opts.CheckContainersUpdateCompleted); err == nil {
+			return false
 		}
 	}
 

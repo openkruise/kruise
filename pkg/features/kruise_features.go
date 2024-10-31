@@ -131,6 +131,10 @@ const (
 
 	// Enables policies auto resizing PVCs created by a StatefulSet when user expands volumeClaimTemplates.
 	StatefulSetAutoResizePVCGate featuregate.Feature = "StatefulSetAutoResizePVCGate"
+
+	// InPlaceWorkloadVerticalScaling enable CloneSet/Advanced StatefulSet controller to support vertical scaling
+	// of managed Pods.
+	InPlaceWorkloadVerticalScaling featuregate.Feature = "InPlaceWorkloadVerticalScaling"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -166,6 +170,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	PodIndexLabel:                          {Default: true, PreRelease: featuregate.Beta},
 	EnableExternalCerts:                    {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetAutoResizePVCGate:           {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceWorkloadVerticalScaling:         {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
