@@ -84,7 +84,7 @@ func (o overlappingStatefulSets) Less(i, j int) bool {
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
-	if parent, ordinal := getParentNameAndOrdinal(pod); parent != set.Name {
+	if parent, ordinal := getParentNameAndOrdinal(pod); parent != set.GenerateName {
 		t.Errorf("Extracted the wrong parent name expected %s found %s", set.Name, parent)
 	} else if ordinal != 1 {
 		t.Errorf("Extracted the wrong ordinal expected %d found %d", 1, ordinal)
@@ -123,6 +123,7 @@ func TestIsMemberOf(t *testing.T) {
 	set := newStatefulSet(3)
 	set2 := newStatefulSet(3)
 	set2.Name = "foo2"
+	set2.GenerateName = "foo2-gen"
 	pod := newStatefulSetPod(set, 1)
 	if !isMemberOf(set, pod) {
 		t.Error("isMemberOf returned false negative")
@@ -823,7 +824,7 @@ func newPVC(name string) corev1.PersistentVolumeClaim {
 	}
 }
 
-func newStatefulSetWithVolumes(replicas int, name string, petMounts []corev1.VolumeMount, podMounts []corev1.VolumeMount) *appsv1beta1.StatefulSet {
+func newStatefulSetWithVolumes(replicas int, name string, generateName string, petMounts []corev1.VolumeMount, podMounts []corev1.VolumeMount) *appsv1beta1.StatefulSet {
 	mounts := append(petMounts, podMounts...)
 	claims := []corev1.PersistentVolumeClaim{}
 	for _, m := range petMounts {
@@ -863,9 +864,10 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []corev1.Vol
 			APIVersion: "apps.kruise.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: corev1.NamespaceDefault,
-			UID:       "test",
+			Name:         name,
+			GenerateName: generateName,
+			Namespace:    corev1.NamespaceDefault,
+			UID:          "test",
 		},
 		Spec: appsv1beta1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -895,7 +897,7 @@ func newStatefulSet(replicas int) *appsv1beta1.StatefulSet {
 	podMounts := []corev1.VolumeMount{
 		{Name: "home", MountPath: "/home"},
 	}
-	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
+	return newStatefulSetWithVolumes(replicas, "foo", "foo-gen", petMounts, podMounts)
 }
 
 func TestGetStatefulSetReplicasRange(t *testing.T) {

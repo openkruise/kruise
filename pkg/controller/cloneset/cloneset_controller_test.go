@@ -60,7 +60,7 @@ import (
 var c client.Client
 
 var (
-	expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
+	expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foooo", Namespace: "default"}}
 	images          = []string{"nginx:1.9.1", "nginx:1.9.2", "nginx:1.9.3", "nginx:1.9.2-alphine", "nginx:1.9.3-alphine"}
 	clonesetUID     = "123"
 	productionLabel = map[string]string{"type": "production"}
@@ -72,7 +72,7 @@ var (
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	instance := &appsv1alpha1.CloneSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foooo", GenerateName: "foo", Namespace: "default"},
 		Spec: appsv1alpha1.CloneSetSpec{
 			Replicas: getInt32(1),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
@@ -101,7 +101,7 @@ func TestReconcile(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = utilclient.NewClientFromManager(mgr, "test-cloneset-controller")
 
-	//recFn, requests := SetupTestReconcile(newReconciler(mgr))
+	// recFn, requests := SetupTestReconcile(newReconciler(mgr))
 	g.Expect(add(mgr, newReconciler(mgr))).NotTo(gomega.HaveOccurred())
 
 	ctx, cancel := context.WithCancel(context.Background())
