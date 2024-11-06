@@ -87,9 +87,7 @@ type VolumeClaimUpdateStrategy struct {
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
-	// Partition indicates the ordinal at which the StatefulSet should be partitioned by default.
-	// But if unorderedUpdate has been set:
-	//   - Partition indicates the number of pods with non-updated revisions when rolling update.
+	// Partition indicates the number of pods the StatefulSet should be partitioned by default.
 	//   - It means controller will update $(replicas - partition) number of pod.
 	// Default value is 0.
 	// +optional

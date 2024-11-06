@@ -514,7 +514,16 @@ func isCurrentRevisionNeeded(set *appsv1beta1.StatefulSet, updateRevision string
 		return ordinal < getStartOrdinal(set)+int(set.Status.CurrentReplicas)
 	}
 	if set.Spec.UpdateStrategy.RollingUpdate.UnorderedUpdate == nil {
-		return ordinal < getStartOrdinal(set)+int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
+		unreservedPodsNum := 0
+		// assume all pods [0, idx) are created and only reserved pods are nil
+		idx := ordinal - getStartOrdinal(set)
+		for i := 0; i < idx; i++ {
+			if replicas[i] != nil {
+				unreservedPodsNum++
+			}
+		}
+		// if all pods [0, idx] are current revision
+		return unreservedPodsNum+1 <= int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 	}
 
 	var noUpdatedReplicas int

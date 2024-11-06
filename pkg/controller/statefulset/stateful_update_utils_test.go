@@ -87,6 +87,7 @@ func TestSortPodsToUpdate(t *testing.T) {
 			expected: []int{2, 1, 0},
 		},
 		{
+			// change the case because we define partition as number of pods with non-updated revision
 			strategy:       &appsv1beta1.RollingUpdateStatefulSetStrategy{Partition: func() *int32 { var i int32 = 2; return &i }()},
 			updateRevision: "r1",
 			totalReplicas:  3,
@@ -97,7 +98,7 @@ func TestSortPodsToUpdate(t *testing.T) {
 				nil,
 				{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "r0"}}},
 			},
-			expected: []int{4, 2},
+			expected: []int{4},
 		},
 		{
 			strategy: &appsv1beta1.RollingUpdateStatefulSetStrategy{

@@ -1250,7 +1250,8 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			updateRevision: updatedRevisionHash,
 			ordinal:        0,
 			replicas: func() []*corev1.Pod {
-				pods := newReplicas(2, 2, currentRevisionHash)
+				pods := []*corev1.Pod{nil, nil}
+				pods = append(pods, newReplicas(2, 2, currentRevisionHash)...)
 				return pods
 			}(),
 			expectedRes: true,
@@ -1701,12 +1702,12 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 		},
 
 		// with startOrdinal and reservedIds
-		// TODO Abner-1: These cases will be discussed and may be changed
+		// fixes https://github.com/openkruise/kruise/issues/1813
 		{
 			// reservedId 1, replicas 3, partition 2
 			// 3: updated revision
 			// 0: current revision
-			// => 2: should be updated revision
+			// => 2: should be current revision
 			name: "Ordinals start 0, reservedId 1, partition 1, create pod2",
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
@@ -1731,16 +1732,17 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			ordinal:        2,
 			replicas: func() []*corev1.Pod {
 				pods := newReplicas(0, 1, currentRevisionHash)
+				pods = append(pods, nil, nil)
 				pods = append(pods, newReplicas(3, 1, updatedRevisionHash)...)
 				return pods
 			}(),
-			expectedRes: false,
+			expectedRes: true,
 		},
 		{
 			// start ordinal 2, reservedId 3, replicas 3, partition 2
 			// 5: updated revision
 			// 2: current revision
-			// => 4: should be updated revision
+			// => 4: should be current revision
 			name: "Ordinals start 2, reservedId 1, partition 1, create pod2",
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
@@ -1765,10 +1767,11 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			ordinal:        4,
 			replicas: func() []*corev1.Pod {
 				pods := newReplicas(2, 1, currentRevisionHash)
+				pods = append(pods, nil, nil)
 				pods = append(pods, newReplicas(5, 1, updatedRevisionHash)...)
 				return pods
 			}(),
-			expectedRes: false,
+			expectedRes: true,
 		},
 	}
 
