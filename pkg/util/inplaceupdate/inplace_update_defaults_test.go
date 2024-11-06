@@ -1557,7 +1557,7 @@ func TestDefaultPatchUpdateSpecToPod_Resource(t *testing.T) {
 	}
 
 	// Initialize the vertical update operator
-	verticalUpdateOperator = &VerticalUpdate{}
+	verticalUpdateImpl = &NativeVerticalUpdate{}
 
 	// Run the test cases
 	for _, tc := range tests {

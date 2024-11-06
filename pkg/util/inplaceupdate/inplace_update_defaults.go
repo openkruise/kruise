@@ -127,31 +127,33 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 
 	// update images and record current imageIDs for the containers to update
 	containersImageChanged := sets.NewString()
-	containersResourceChanged := sets.NewString()
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
-		newImage, imageExists := spec.ContainerImages[c.Name]
-		newResource, resourceExists := spec.ContainerResources[c.Name]
-		if !imageExists && !resourceExists {
+		newImage, exists := spec.ContainerImages[c.Name]
+		if !exists {
 			continue
 		}
 		if containersToUpdate.Has(c.Name) {
-			if imageExists {
-				pod.Spec.Containers[i].Image = newImage
-				containersImageChanged.Insert(c.Name)
-			}
-
-			if resourceExists && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-				verticalUpdateOperator.UpdateContainerResource(c, &newResource)
-				containersResourceChanged.Insert(c.Name)
-			}
+			pod.Spec.Containers[i].Image = newImage
+			containersImageChanged.Insert(c.Name)
 		} else {
-			if imageExists {
-				state.NextContainerImages[c.Name] = newImage
-			}
-			if resourceExists && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-				state.NextContainerResources[c.Name] = newResource
-			}
+			state.NextContainerImages[c.Name] = newImage
+		}
+	}
+
+	containersResourceChanged := sets.NewString()
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		newResource, resourceExists := spec.ContainerResources[c.Name]
+
+		if !resourceExists || !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
+			continue
+		}
+		if containersToUpdate.Has(c.Name) {
+			verticalUpdateImpl.UpdateContainerResource(c, &newResource)
+			containersResourceChanged.Insert(c.Name)
+		} else {
+			state.NextContainerResources[c.Name] = newResource
 		}
 	}
 
@@ -168,7 +170,7 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 			}
 		}
 		if containersResourceChanged.Has(c.Name) && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-			verticalUpdateOperator.SyncContainerResource(&c, state)
+			verticalUpdateImpl.SyncContainerResource(&c, state)
 		}
 	}
 
@@ -178,8 +180,8 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 	// This provides a hook for vertical updates
 	// so that internal enterprise implementations can update+sync pod resources here at once
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-		verticalUpdateOperator.UpdatePodResource(pod)
-		verticalUpdateOperator.SyncPodResource(pod, state)
+		verticalUpdateImpl.UpdatePodResource(pod)
+		verticalUpdateImpl.SyncPodResource(pod, state)
 	}
 
 	// update annotations and labels for the containers to update
@@ -333,11 +335,13 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 			continue
 		}
 
+		// TODO(Abner-1): if pod qos changed, we should recreate the pod.
+		// I will resolve it in another PR
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) &&
 			containerResourcesPatchRexp.MatchString(op.Path) {
-			err = verticalUpdateOperator.ValidateResourcePatch(&op, oldTemp, updateSpec)
+			err = verticalUpdateImpl.ParseResourcePatch(&op, oldTemp, updateSpec)
 			if err != nil {
-				klog.InfoS("ValidateResourcePatch error", "err", err)
+				klog.InfoS("ParseResourcePatch error", "err", err)
 				return nil
 			}
 			continue
@@ -426,7 +430,7 @@ func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-		if ok := verticalUpdateOperator.IsPodUpdateCompleted(pod); !ok {
+		if ok := verticalUpdateImpl.IsPodUpdateCompleted(pod); !ok {
 			return fmt.Errorf("waiting for pod vertical update")
 		}
 	}
@@ -458,7 +462,7 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 		}
 		for _, cs := range pod.Status.ContainerStatuses {
 			if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
-				if !verticalUpdateOperator.IsContainerUpdateCompleted(pod, containers[cs.Name], &cs, oldStatus) {
+				if !verticalUpdateImpl.IsContainerUpdateCompleted(pod, containers[cs.Name], &cs, oldStatus) {
 					return fmt.Errorf("container %s resources not changed", cs.Name)
 				}
 			}
@@ -591,39 +595,50 @@ const (
 )
 
 func defaultCheckPodNeedsBeUnready(pod *v1.Pod, spec *UpdateSpec) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) && spec.VerticalUpdateOnly {
-		resourceFlag := make(map[string]int)
-		for c, resizeResources := range spec.ContainerResources {
-			flag := 0
-			_, limitExist := resizeResources.Limits[v1.ResourceCPU]
-			_, reqExist := resizeResources.Requests[v1.ResourceCPU]
-			if limitExist || reqExist {
-				flag |= cpuMask
-			}
-			_, limitExist = resizeResources.Limits[v1.ResourceMemory]
-			_, reqExist = resizeResources.Requests[v1.ResourceMemory]
-			if limitExist || reqExist {
-				flag |= memMask
-			}
-			resourceFlag[c] = flag
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) || !spec.VerticalUpdateOnly {
+		return containsReadinessGate(pod)
+	}
+
+	// flag represents whether cpu or memory resource changed
+	resourceFlag := make(map[string]int)
+	for c, resizeResources := range spec.ContainerResources {
+		flag := 0
+		_, limitExist := resizeResources.Limits[v1.ResourceCPU]
+		_, reqExist := resizeResources.Requests[v1.ResourceCPU]
+		if limitExist || reqExist {
+			flag |= cpuMask
 		}
-		needRestart := false
-		for _, container := range pod.Spec.Containers {
-			if flag, exist := resourceFlag[container.Name]; exist {
-				for _, resizePolicy := range container.ResizePolicy {
-					if resizePolicy.RestartPolicy != v1.RestartContainer {
-						continue
-					}
-					if (resizePolicy.ResourceName == v1.ResourceCPU && (flag&cpuMask) != 0) ||
-						(resizePolicy.ResourceName == v1.ResourceMemory && (flag&memMask) != 0) {
-						needRestart = true
-					}
+		_, limitExist = resizeResources.Limits[v1.ResourceMemory]
+		_, reqExist = resizeResources.Requests[v1.ResourceMemory]
+		if limitExist || reqExist {
+			flag |= memMask
+		}
+		resourceFlag[c] = flag
+	}
+
+	// only changed resources and restart policy are considered
+	// For example:
+	// 		we should not restart the container
+	//		when only resize cpu in container with memory RestartContainer RestartPolicy,
+	needRestart := false
+OuterLoop:
+	for _, container := range pod.Spec.Containers {
+		if flag, exist := resourceFlag[container.Name]; exist {
+			for _, resizePolicy := range container.ResizePolicy {
+				if resizePolicy.RestartPolicy != v1.RestartContainer {
+					continue
+				}
+				if (resizePolicy.ResourceName == v1.ResourceCPU && (flag&cpuMask) != 0) ||
+					(resizePolicy.ResourceName == v1.ResourceMemory && (flag&memMask) != 0) {
+					needRestart = true
+					break OuterLoop
 				}
 			}
 		}
-		if !needRestart {
-			return false
-		}
 	}
+	if !needRestart {
+		return false
+	}
+
 	return containsReadinessGate(pod)
 }

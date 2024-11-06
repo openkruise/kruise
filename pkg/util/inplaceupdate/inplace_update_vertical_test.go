@@ -96,8 +96,8 @@ func TestValidateResourcePatch(t *testing.T) {
 			updateSpec := &UpdateSpec{
 				ContainerResources: make(map[string]v1.ResourceRequirements),
 			}
-			vu := &VerticalUpdate{}
-			err := vu.ValidateResourcePatch(tt.op, oldTemp, updateSpec)
+			vu := &NativeVerticalUpdate{}
+			err := vu.ParseResourcePatch(tt.op, oldTemp, updateSpec)
 			if tt.expectedErr {
 				assert.NotNil(t, err)
 			} else {
@@ -112,7 +112,7 @@ func TestValidateResourcePatch(t *testing.T) {
 }
 
 func TestSyncContainerResource(t *testing.T) {
-	vu := VerticalUpdate{}
+	vu := NativeVerticalUpdate{}
 
 	type testcase struct {
 		name            string
@@ -240,7 +240,7 @@ func TestSyncContainerResource(t *testing.T) {
 }
 
 func TestIsContainerUpdateCompleted(t *testing.T) {
-	v := VerticalUpdate{}
+	v := NativeVerticalUpdate{}
 
 	tests := []struct {
 		name                string

@@ -179,7 +179,7 @@ type CloneSetStatus struct {
 
 	// UpdatedAvailableReplicas is the number of Pods created by the CloneSet controller from the CloneSet version
 	// indicated by updateRevision and have a Ready Condition for at least minReadySeconds.
-	// Notice: when enable InPlaceWorkloadVerticalScaling, only resource resize updating pod will also be unavailable.
+	// Notice: when enable InPlaceWorkloadVerticalScaling, pod during resource resizing will also be unavailable.
 	// This means these pod will be counted in maxUnavailable.
 	UpdatedAvailableReplicas int32 `json:"updatedAvailableReplicas,omitempty"`
 

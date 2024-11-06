@@ -32,6 +32,7 @@ import (
 )
 
 var _ = SIGDescribe("InplaceVPA", func() {
+	framework.TestContext.DeleteNamespaceOnFailure = false
 	f := framework.NewDefaultFramework("inplace-vpa")
 	var ns string
 	var c clientset.Interface
@@ -55,7 +56,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 		randStr = rand.String(10)
 
 		if IsKubernetesVersionLessThan127() {
-			ginkgo.Skip("kip this e2e case, it can only run on K8s >= 1.27")
+			ginkgo.Skip("skip this e2e case, it can only run on K8s >= 1.27")
 		}
 	})
 
@@ -81,195 +82,433 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	}
 	// TODO(Abner-1)update only inplace resources may fail in kind e2e.
 	// I will resolve it in another PR
-	framework.KruisePDescribe("CloneSet Updating with only inplace resource", func() {
+	//framework.KruiseDescribe("CloneSet Updating with only inplace resource", func() {
+	//	var err error
+	//	testUpdateResource := func(fn func(spec *v1.PodSpec), resizePolicy []v1.ContainerResizePolicy) {
+	//		cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+	//		cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
+	//		imageConfig := imageutils.GetConfig(imageutils.Nginx)
+	//		imageConfig.SetVersion("alpine")
+	//		cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+	//		cs, err = tester.CreateCloneSet(cs)
+	//		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//		gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+	//
+	//		ginkgo.By("Wait for replicas satisfied")
+	//		gomega.Eventually(func() int32 {
+	//			cs, err = tester.GetCloneSet(cs.Name)
+	//			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//			return cs.Status.Replicas
+	//		}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+	//
+	//		ginkgo.By("Wait for all pods ready")
+	//		gomega.Eventually(func() int32 {
+	//			cs, err = tester.GetCloneSet(cs.Name)
+	//			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//			return cs.Status.ReadyReplicas
+	//		}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+	//
+	//		pods, err := tester.ListPodsForCloneSet(cs.Name)
+	//		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//		gomega.Expect(len(pods)).Should(gomega.Equal(1))
+	//		oldPodResource := getPodResource(pods[0])
+	//
+	//		err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+	//			if cs.Annotations == nil {
+	//				cs.Annotations = map[string]string{}
+	//			}
+	//			fn(&cs.Spec.Template.Spec)
+	//		})
+	//		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//		lastGeneration := cs.Generation
+	//		ginkgo.By("Wait for CloneSet generation consistent")
+	//		gomega.Eventually(func() bool {
+	//			cs, err = tester.GetCloneSet(cs.Name)
+	//			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//			return cs.Generation == cs.Status.ObservedGeneration
+	//		}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+	//
+	//		framework.Logf("CloneSet last %v, generation %v, observedGeneration %v", lastGeneration, cs.Generation, cs.Status.ObservedGeneration)
+	//		start := time.Now()
+	//		ginkgo.By("Wait for all pods updated and ready")
+	//		a, b, c := getResourcesInfo(pods[0])
+	//		gomega.Eventually(func() int32 {
+	//			cs, err = tester.GetCloneSet(cs.Name)
+	//			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//
+	//			pods, err = tester.ListPodsForCloneSet(cs.Name)
+	//			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//			a1, b1, c1 := getResourcesInfo(pods[0])
+	//			if a1 != a || b1 != b || c1 != c {
+	//				framework.Logf("updateSpec %v", a1)
+	//				framework.Logf("spec %v", b1)
+	//				framework.Logf("container status %v ", c1)
+	//				a, b, c = a1, b1, c1
+	//			}
+	//			SkipTestWhenCgroupError(pods[0])
+	//
+	//			return cs.Status.UpdatedAvailableReplicas
+	//		}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+	//		duration := time.Since(start)
+	//		framework.Logf("cloneset with replica resize resource consume %vs", duration.Seconds())
+	//
+	//		ginkgo.By("Verify the resource changed and status=spec")
+	//		pods, err = tester.ListPodsForCloneSet(cs.Name)
+	//		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	//		gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
+	//	}
+	//	testWithResizePolicy := func(resizePolicy []v1.ContainerResizePolicy) {
+	//		// This can't be Conformance yet.
+	//		ginkgo.FIt("in-place update resources scale down 1", func() {
+	//			fn := func(spec *v1.PodSpec) {
+	//				ginkgo.By("scale down cpu and memory request")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("100m")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
+	//			}
+	//			testUpdateResource(fn, resizePolicy)
+	//		})
+	//		//ginkgo.FIt("in-place update resources scale down 2", func() {
+	//		//	fn := func(spec *v1.PodSpec) {
+	//		//		ginkgo.By("scale down cpu and memory limit")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("800m")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("800Mi")
+	//		//	}
+	//		//	testUpdateResource(fn, resizePolicy)
+	//		//})
+	//		//ginkgo.FIt("in-place update resources scale down 3", func() {
+	//		//	fn := func(spec *v1.PodSpec) {
+	//		//		ginkgo.By("scale down cpu and memory request&limit")
+	//		//		spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("100m")
+	//		//		spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("800m")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("800Mi")
+	//		//	}
+	//		//	testUpdateResource(fn, resizePolicy)
+	//		//})
+	//
+	//		// This can't be Conformance yet.
+	//		ginkgo.FIt("in-place update resources scale up 1", func() {
+	//			fn := func(spec *v1.PodSpec) {
+	//				ginkgo.By("scale up cpu and memory request")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
+	//			}
+	//			testUpdateResource(fn, resizePolicy)
+	//		})
+	//		//ginkgo.FIt("in-place update resources scale up 2", func() {
+	//		//	fn := func(spec *v1.PodSpec) {
+	//		//		ginkgo.By("scale up cpu and memory limit")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
+	//		//	}
+	//		//	testUpdateResource(fn, resizePolicy)
+	//		//})
+	//		ginkgo.FIt("in-place update resources scale up 3", func() {
+	//			fn := func(spec *v1.PodSpec) {
+	//				ginkgo.By("scale up cpu and memory request&limit")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
+	//				//spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+	//				//spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
+	//			}
+	//			testUpdateResource(fn, resizePolicy)
+	//		})
+	//
+	//		// This can't be Conformance yet.
+	//		ginkgo.FIt("in-place update resources scale up only cpu 1", func() {
+	//			fn := func(spec *v1.PodSpec) {
+	//				ginkgo.By("scale up cpu request")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
+	//			}
+	//			testUpdateResource(fn, resizePolicy)
+	//		})
+	//		//ginkgo.FIt("in-place update resources scale up only cpu limit", func() {
+	//		//	fn := func(spec *v1.PodSpec) {
+	//		//		ginkgo.By("scale up cpu limit")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+	//		//	}
+	//		//	testUpdateResource(fn, resizePolicy)
+	//		//})
+	//		//ginkgo.FIt("in-place update resources scale up only cpu 3", func() {
+	//		//	fn := func(spec *v1.PodSpec) {
+	//		//		ginkgo.By("scale up cpu request&limit")
+	//		//		spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+	//		//	}
+	//		//	testUpdateResource(fn, resizePolicy)
+	//		//})
+	//
+	//		// This can't be Conformance yet.
+	//		ginkgo.FIt("in-place update resources scale up only mem 1", func() {
+	//			fn := func(spec *v1.PodSpec) {
+	//				ginkgo.By("scale up memory request")
+	//				spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
+	//			}
+	//			testUpdateResource(fn, resizePolicy)
+	//		})
+	//		//ginkgo.FIt("in-place update resources scale up only mem limit", func() {
+	//		//	fn := func(spec *v1.PodSpec) {
+	//		//		ginkgo.By("scale up memory limit")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
+	//		//	}
+	//		//	testUpdateResource(fn, resizePolicy)
+	//		//})
+	//		//ginkgo.FIt("in-place update resources scale up only mem 3", func() {
+	//		//	fn := func(spec *v1.PodSpec) {
+	//		//		ginkgo.By("scale up memory request&limit")
+	//		//		spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
+	//		//		spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
+	//		//	}
+	//		//	testUpdateResource(fn, resizePolicy)
+	//		//})
+	//	}
+	//
+	//	ginkgo.By("inplace update resources with RestartContainer policy")
+	//	testWithResizePolicy([]v1.ContainerResizePolicy{
+	//		{
+	//			ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+	//		},
+	//		{
+	//			ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+	//		},
+	//	})
+	//
+	//	ginkgo.By("inplace update resources with NotRequired policy")
+	//	testWithResizePolicy([]v1.ContainerResizePolicy{
+	//		{
+	//			ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired,
+	//		},
+	//		{
+	//			ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired,
+	//		},
+	//	})
+	//
+	//	ginkgo.By("inplace update resources with cpu RestartContainer policy")
+	//	testWithResizePolicy([]v1.ContainerResizePolicy{
+	//		{
+	//			ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+	//		},
+	//		{
+	//			ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired,
+	//		},
+	//	})
+	//
+	//	ginkgo.By("inplace update resources with memory RestartContainer policy")
+	//	testWithResizePolicy([]v1.ContainerResizePolicy{
+	//		{
+	//			ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired,
+	//		},
+	//		{
+	//			ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+	//		},
+	//	})
+	//})
+
+	framework.KruiseDescribe("CloneSet failed to inplace update resource", func() {
 		var err error
-		testUpdateResource := func(fn func(spec *v1.PodSpec), resizePolicy []v1.ContainerResizePolicy) {
-			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
-			cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
-			imageConfig := imageutils.GetConfig(imageutils.Nginx)
-			imageConfig.SetRegistry("docker.io/library")
-			imageConfig.SetVersion("alpine")
-			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
-			cs, err = tester.CreateCloneSet(cs)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
-
-			ginkgo.By("Wait for replicas satisfied")
-			gomega.Eventually(func() int32 {
-				cs, err = tester.GetCloneSet(cs.Name)
+		largeResource := v1.ResourceRequirements{
+			Requests: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:    resource.MustParse("100"),
+				v1.ResourceMemory: resource.MustParse("1000Gi"),
+			},
+			Limits: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:    resource.MustParse("800"),
+				v1.ResourceMemory: resource.MustParse("8000Gi"),
+			},
+		}
+		testResizePolicyFailed := func(resizePolicy []v1.ContainerResizePolicy) {
+			testUpdateResource := func(fn func(pod *v1.PodTemplateSpec), resizePolicy []v1.ContainerResizePolicy) {
+				j, _ := json.Marshal(resizePolicy)
+				ginkgo.By(fmt.Sprintf("resize policy %v", string(j)))
+				cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+				cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
+				cs.Spec.Template.Spec.Containers[0].Image = NginxImage
+				cs.Spec.Template.ObjectMeta.Labels["test-env"] = "foo"
+				cs.Spec.Template.Spec.Containers[0].Env = append(cs.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+					Name:      "TEST_ENV",
+					ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
+				})
+				cs, err = tester.CreateCloneSet(cs)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return cs.Status.Replicas
-			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+				gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 
-			ginkgo.By("Wait for all pods ready")
-			gomega.Eventually(func() int32 {
-				cs, err = tester.GetCloneSet(cs.Name)
+				ginkgo.By("Wait for replicas satisfied")
+				gomega.Eventually(func() int32 {
+					cs, err = tester.GetCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return cs.Status.Replicas
+				}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+				ginkgo.By("Wait for all pods ready")
+				gomega.Eventually(func() int32 {
+					cs, err = tester.GetCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return cs.Status.ReadyReplicas
+				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+				pods, err := tester.ListPodsForCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return cs.Status.ReadyReplicas
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+				gomega.Expect(len(pods)).Should(gomega.Equal(1))
+				oldPodUID := pods[0].UID
+				oldContainerStatus := pods[0].Status.ContainerStatuses[0]
+				oldPodResource := getPodResource(pods[0])
 
-			pods, err := tester.ListPodsForCloneSet(cs.Name)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(len(pods)).Should(gomega.Equal(1))
-			oldPodResource := getPodResource(pods[0])
-
-			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-				if cs.Annotations == nil {
-					cs.Annotations = map[string]string{}
-				}
-				fn(&cs.Spec.Template.Spec)
-			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			lastGeneration := cs.Generation
-			ginkgo.By("Wait for CloneSet generation consistent")
-			gomega.Eventually(func() bool {
-				cs, err = tester.GetCloneSet(cs.Name)
+				ginkgo.By("Update CloneSet with large resource")
+				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+					if cs.Annotations == nil {
+						cs.Annotations = map[string]string{}
+					}
+					fn(&cs.Spec.Template)
+					cs.Spec.Template.Spec.Containers[0].Resources = largeResource
+				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return cs.Generation == cs.Status.ObservedGeneration
-			}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
 
-			framework.Logf("CloneSet last %v, generation %v, observedGeneration %v", lastGeneration, cs.Generation, cs.Status.ObservedGeneration)
-			start := time.Now()
-			ginkgo.By("Wait for all pods updated and ready")
-			a, b, c := getResourcesInfo(pods[0])
-			gomega.Eventually(func() int32 {
-				cs, err = tester.GetCloneSet(cs.Name)
+				ginkgo.By("Wait for CloneSet generation consistent")
+				gomega.Eventually(func() bool {
+					cs, err = tester.GetCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return cs.Generation == cs.Status.ObservedGeneration
+				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+
+				updatedVersion := cs.Status.UpdateRevision
+				ginkgo.By("Wait for one pods updated and rejected")
+				gomega.Eventually(func() int32 {
+					cs, err = tester.GetCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					framework.Logf("Cloneset updatedReplicas %v updatedReady %v updatedAvailableReplicas %v ",
+						cs.Status.UpdatedReplicas, cs.Status.UpdatedReadyReplicas, cs.Status.UpdatedAvailableReplicas)
+
+					pods, err = tester.ListPodsForCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					for _, pod := range pods {
+						revision := pod.Labels[apps.ControllerRevisionHashLabelKey]
+						if strings.Contains(updatedVersion, revision) {
+							if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+								return 1
+							}
+						}
+					}
+
+					SkipTestWhenCgroupError(pods[0])
+					return 0
+				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+				ginkgo.By("Update CloneSet with input resource")
+				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+					if cs.Annotations == nil {
+						cs.Annotations = map[string]string{}
+					}
+					fn(&cs.Spec.Template)
+				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				ginkgo.By("Wait for CloneSet generation consistent")
+				gomega.Eventually(func() bool {
+					cs, err = tester.GetCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					return cs.Generation == cs.Status.ObservedGeneration
+				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+
+				a, b, c := getResourcesInfo(pods[0])
+				ginkgo.By("Wait for all pods updated and ready")
+				gomega.Eventually(func() int32 {
+					cs, err = tester.GetCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					framework.Logf("Cloneset updatedReplicas %v updatedReady %v updatedAvailableReplicas %v ",
+						cs.Status.UpdatedReplicas, cs.Status.UpdatedReadyReplicas, cs.Status.UpdatedAvailableReplicas)
+
+					pods, err = tester.ListPodsForCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					a1, b1, c1 := getResourcesInfo(pods[0])
+					if a1 != a || b1 != b || c1 != c {
+						framework.Logf("updateSpec %v", a1)
+						framework.Logf("spec %v", b1)
+						framework.Logf("container status %v ", c1)
+						a, b, c = a1, b1, c1
+					}
+					SkipTestWhenCgroupError(pods[0])
+					return cs.Status.UpdatedAvailableReplicas
+				}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+				ginkgo.By("Verify the containerID changed and restartCount should not be 0")
+				pods, err = tester.ListPodsForCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(len(pods)).Should(gomega.Equal(1))
+				newPodUID := pods[0].UID
+				newContainerStatus := pods[0].Status.ContainerStatuses[0]
+
+				gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
+				gomega.Expect(newContainerStatus.ContainerID).NotTo(gomega.Equal(oldContainerStatus.ContainerID))
+				gomega.Expect(newContainerStatus.RestartCount).ShouldNot(gomega.Equal(int32(0)))
 
 				pods, err = tester.ListPodsForCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				a1, b1, c1 := getResourcesInfo(pods[0])
-				if a1 != a || b1 != b || c1 != c {
-					framework.Logf("updateSpec %v", a1)
-					framework.Logf("spec %v", b1)
-					framework.Logf("container status %v ", c1)
-					a, b, c = a1, b1, c1
-				}
-				SkipTestWhenCgroupError(pods[0])
-
-				return cs.Status.UpdatedAvailableReplicas
-			}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-			duration := time.Since(start)
-			framework.Logf("cloneset with replica resize resource consume %vs", duration.Seconds())
-
-			ginkgo.By("Verify the resource changed and status=spec")
-			pods, err = tester.ListPodsForCloneSet(cs.Name)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
-		}
-		testWithResizePolicy := func(resizePolicy []v1.ContainerResizePolicy) {
+				gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
+			}
 			// This can't be Conformance yet.
-			ginkgo.PIt("in-place update resources scale down 1", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale down cpu and memory request")
-					spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("100m")
-					spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale down 2", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale down cpu and memory limit")
-					spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("800m")
-					spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("800Mi")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale down 3", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale down cpu and memory request&limit")
-					spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("100m")
-					spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
-					spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("800m")
-					spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("800Mi")
+			ginkgo.It("in-place update image and resource", func() {
+				fn := func(pod *v1.PodTemplateSpec) {
+					spec := &pod.Spec
+					ginkgo.By("in-place update image and resource")
+					spec.Containers[0].Image = NewNginxImage
+					spec.Containers[0].Resources = newResource
 				}
 				testUpdateResource(fn, resizePolicy)
 			})
 
 			// This can't be Conformance yet.
-			ginkgo.PIt("in-place update resources scale up 1", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up cpu and memory request")
-					spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
-					spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale up 2", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up cpu and memory limit")
-					spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
-					spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale up 3", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up cpu and memory request&limit")
-					spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
-					spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
-					spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
-					spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
+			ginkgo.FIt("in-place update resource and env from label", func() {
+				fn := func(pod *v1.PodTemplateSpec) {
+					spec := &pod.Spec
+					ginkgo.By("in-place update resource and env from label")
+					pod.Labels["test-env"] = "bar"
+					spec.Containers[0].Resources = newResource
 				}
 				testUpdateResource(fn, resizePolicy)
 			})
 
 			// This can't be Conformance yet.
-			ginkgo.PIt("in-place update resources scale up only cpu 1", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up cpu request")
-					spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale up only cpu limit", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up cpu limit")
-					spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale up only cpu 3", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up cpu request&limit")
-					spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
-					spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			ginkgo.It("in-place update image, resource and env from label", func() {
+				fn := func(pod *v1.PodTemplateSpec) {
+					spec := &pod.Spec
+					ginkgo.By("in-place update image, resource and env from label")
+					spec.Containers[0].Image = NewNginxImage
+					pod.Labels["test-env"] = "bar"
+					spec.Containers[0].Resources = newResource
 				}
 				testUpdateResource(fn, resizePolicy)
 			})
 
-			// This can't be Conformance yet.
-			ginkgo.PIt("in-place update resources scale up only mem 1", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up memory request")
-					spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale up only mem limit", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up memory limit")
-					spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-			ginkgo.PIt("in-place update resources scale up only mem 3", func() {
-				fn := func(spec *v1.PodSpec) {
-					ginkgo.By("scale up memory request&limit")
-					spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
-					spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
 		}
 
 		ginkgo.By("inplace update resources with RestartContainer policy")
-		testWithResizePolicy([]v1.ContainerResizePolicy{
+		testResizePolicyFailed([]v1.ContainerResizePolicy{
 			{
 				ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
 			},
 			{
 				ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+			},
+		})
+		ginkgo.By("inplace update resources with memory RestartContainer policy")
+		testResizePolicyFailed([]v1.ContainerResizePolicy{
+			{
+				ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+			},
+		})
+		ginkgo.By("inplace update resources with cpu RestartContainer policy")
+		testResizePolicyFailed([]v1.ContainerResizePolicy{
+			{
+				ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+			},
+		})
+		ginkgo.By("inplace update resources with NotRequired policy")
+		testResizePolicyFailed([]v1.ContainerResizePolicy{
+			{
+				ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired,
+			},
+			{
+				ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired,
 			},
 		})
 	})
@@ -313,7 +552,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 				oldContainerStatus := pods[0].Status.ContainerStatuses[0]
 				oldPodResource := getPodResource(pods[0])
 
-				ginkgo.By("Update test-env label")
+				ginkgo.By("Update CloneSet")
 				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
 					if cs.Annotations == nil {
 						cs.Annotations = map[string]string{}

@@ -30,8 +30,8 @@ import (
 
 // interface for In-place workload vertical scaling
 type VerticalUpdateInterface interface {
-	// ValidateResourcePatch validates and applies the resource patch to the UpdateSpec.
-	ValidateResourcePatch(op *jsonpatch.Operation, oldTemp *v1.PodTemplateSpec, updateSpec *UpdateSpec) error
+	// ParseResourcePatch validates and applies the resource patch to the UpdateSpec.
+	ParseResourcePatch(op *jsonpatch.Operation, oldTemp *v1.PodTemplateSpec, updateSpec *UpdateSpec) error
 
 	// interface for container level vertical scaling api, such as k8s 1.27+
 
@@ -52,25 +52,25 @@ type VerticalUpdateInterface interface {
 	IsPodUpdateCompleted(pod *v1.Pod) bool
 }
 
-var verticalUpdateOperator VerticalUpdateInterface = nil
+var verticalUpdateImpl VerticalUpdateInterface = nil
 
 // To register vertical update operations,
 // you can register different vertical update implementations here
 func init() {
 	// Now, we assume that there is a single standard per cluster, so register in init()
-	// TODO(Abner-1): Perhaps we should dynamically select the verticalUpdateOperator based on the pod metadata being processed.
+	// TODO(Abner-1): Perhaps we should dynamically select the verticalUpdateImpl based on the pod metadata being processed.
 	// give us more suggestions if you need
-	if verticalUpdateOperator == nil {
-		verticalUpdateOperator = &VerticalUpdate{}
+	if verticalUpdateImpl == nil {
+		verticalUpdateImpl = &NativeVerticalUpdate{}
 	}
 }
 
-// VerticalUpdate represents the vertical scaling of k8s standard
-type VerticalUpdate struct{}
+// NativeVerticalUpdate represents the vertical scaling of k8s standard
+type NativeVerticalUpdate struct{}
 
-var _ VerticalUpdateInterface = &VerticalUpdate{}
+var _ VerticalUpdateInterface = &NativeVerticalUpdate{}
 
-func (v *VerticalUpdate) ValidateResourcePatch(op *jsonpatch.Operation, oldTemp *v1.PodTemplateSpec, updateSpec *UpdateSpec) error {
+func (v *NativeVerticalUpdate) ParseResourcePatch(op *jsonpatch.Operation, oldTemp *v1.PodTemplateSpec, updateSpec *UpdateSpec) error {
 	// for example: /spec/containers/0/resources/limits/cpu
 	words := strings.Split(op.Path, "/")
 	if len(words) != 7 {
@@ -89,23 +89,24 @@ func (v *VerticalUpdate) ValidateResourcePatch(op *jsonpatch.Operation, oldTemp 
 		return fmt.Errorf("disallowed inplace update resouece: %s", words[6])
 	}
 
-	if _, ok := updateSpec.ContainerResources[oldTemp.Spec.Containers[idx].Name]; !ok {
-		updateSpec.ContainerResources[oldTemp.Spec.Containers[idx].Name] = v1.ResourceRequirements{
+	cName := oldTemp.Spec.Containers[idx].Name
+	if _, ok := updateSpec.ContainerResources[cName]; !ok {
+		updateSpec.ContainerResources[cName] = v1.ResourceRequirements{
 			Limits:   make(v1.ResourceList),
 			Requests: make(v1.ResourceList),
 		}
 	}
 	switch words[5] {
 	case "limits":
-		updateSpec.ContainerResources[oldTemp.Spec.Containers[idx].Name].Limits[v1.ResourceName(words[6])] = quantity
+		updateSpec.ContainerResources[cName].Limits[v1.ResourceName(words[6])] = quantity
 	case "requests":
-		updateSpec.ContainerResources[oldTemp.Spec.Containers[idx].Name].Requests[v1.ResourceName(words[6])] = quantity
+		updateSpec.ContainerResources[cName].Requests[v1.ResourceName(words[6])] = quantity
 	}
 	return nil
 }
 
 // Get the resource status from the container and synchronize it to state
-func (v *VerticalUpdate) SyncContainerResource(container *v1.ContainerStatus, state *appspub.InPlaceUpdateState) {
+func (v *NativeVerticalUpdate) SyncContainerResource(container *v1.ContainerStatus, state *appspub.InPlaceUpdateState) {
 	if container == nil {
 		return
 	}
@@ -143,7 +144,7 @@ func (v *VerticalUpdate) SyncContainerResource(container *v1.ContainerStatus, st
 
 // UpdateResource implements vertical updates by directly modifying the container's resources,
 // conforming to the k8s community standard
-func (v *VerticalUpdate) UpdateContainerResource(container *v1.Container, newResource *v1.ResourceRequirements) {
+func (v *NativeVerticalUpdate) UpdateContainerResource(container *v1.Container, newResource *v1.ResourceRequirements) {
 	if container == nil || newResource == nil {
 		return
 	}
@@ -177,7 +178,7 @@ func (v *VerticalUpdate) UpdateContainerResource(container *v1.Container, newRes
 // 5. empty   empty   nil    => this container is not inplace-updated by kruise, ignore
 // 6. empty   exist   exist  => this container is not inplace-updated by kruise, ignore
 // 7. empty   exist   exist  => this container is not inplace-updated by kruise, ignore
-func (v *VerticalUpdate) IsContainerUpdateCompleted(pod *v1.Pod, container *v1.Container, containerStatus *v1.ContainerStatus, lastContainerStatus appspub.InPlaceUpdateContainerStatus) bool {
+func (v *NativeVerticalUpdate) IsContainerUpdateCompleted(pod *v1.Pod, container *v1.Container, containerStatus *v1.ContainerStatus, lastContainerStatus appspub.InPlaceUpdateContainerStatus) bool {
 	// case 5-7
 	if lastContainerStatus.Resources.Limits == nil && lastContainerStatus.Resources.Requests == nil {
 		return true
@@ -220,18 +221,18 @@ func (v *VerticalUpdate) IsContainerUpdateCompleted(pod *v1.Pod, container *v1.C
 }
 
 // Get the resource status from the pod and synchronize it to state
-func (v *VerticalUpdate) SyncPodResource(pod *v1.Pod, state *appspub.InPlaceUpdateState) {
+func (v *NativeVerticalUpdate) SyncPodResource(pod *v1.Pod, state *appspub.InPlaceUpdateState) {
 }
 
 // For the community-standard vertical scale-down implementation,
 // there is no need to do anything here because the container has already been updated in the UpdateContainerResource interface
-func (v *VerticalUpdate) UpdatePodResource(pod *v1.Pod) {
+func (v *NativeVerticalUpdate) UpdatePodResource(pod *v1.Pod) {
 	return
 }
 
 // IsUpdateCompleted directly determines whether the current pod is vertically updated by the spec and status of the container,
 // which conforms to the k8s community standard
-func (v *VerticalUpdate) IsPodUpdateCompleted(pod *v1.Pod) bool {
+func (v *NativeVerticalUpdate) IsPodUpdateCompleted(pod *v1.Pod) bool {
 	return true
 }
 
@@ -241,7 +242,7 @@ var allowedResizeResourceKey = map[string]bool{
 	string(v1.ResourceMemory): true,
 }
 
-func (v *VerticalUpdate) CanResourcesResizeInPlace(resourceKey string) bool {
+func (v *NativeVerticalUpdate) CanResourcesResizeInPlace(resourceKey string) bool {
 	allowed, exist := allowedResizeResourceKey[resourceKey]
 	return exist && allowed
 }

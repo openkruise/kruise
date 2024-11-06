@@ -174,7 +174,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableExternalCerts:                      {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
 	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceWorkloadVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
