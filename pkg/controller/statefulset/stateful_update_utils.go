@@ -30,9 +30,14 @@ func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSe
 		updateMin = int(*rollingUpdateStrategy.Partition)
 	}
 
+	maxUpdate := int(totalReplicas) - updateMin
+	if maxUpdate <= 0 {
+		return []int{}
+	}
+
 	if rollingUpdateStrategy == nil || rollingUpdateStrategy.UnorderedUpdate == nil {
 		var indexes []int
-		for target := len(replicas) - 1; target >= updateMin; target-- {
+		for target := len(replicas) - 1; target >= updateMin && len(indexes) < maxUpdate; target-- {
 			if replicas[target] == nil {
 				continue
 			}
@@ -42,10 +47,6 @@ func sortPodsToUpdate(rollingUpdateStrategy *appsv1beta1.RollingUpdateStatefulSe
 	}
 
 	priorityStrategy := rollingUpdateStrategy.UnorderedUpdate.PriorityStrategy
-	maxUpdate := int(totalReplicas) - updateMin
-	if maxUpdate <= 0 {
-		return []int{}
-	}
 
 	var updatedIdxs []int
 	var waitUpdateIdxs []int
