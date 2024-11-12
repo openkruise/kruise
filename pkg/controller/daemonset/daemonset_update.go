@@ -125,7 +125,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1alph
 			}
 		}
 
-		// use any of the candidates we can, including the allowedReplacemnntPods
+		// use any of the candidates we can, including the allowedReplacementPods
 		klog.V(5).InfoS("DaemonSet allowing replacements, including some new unavailable and candidate pods, up to maxUnavailable",
 			"daemonSet", klog.KObj(ds), "allowedReplacementPodCount", len(allowedReplacementPods), "maxUnavailable", maxUnavailable, "numUnavailable", numUnavailable, "candidatePodsToDeleteCount", len(candidatePodsToDelete))
 		remainingUnavailable := maxUnavailable - numUnavailable

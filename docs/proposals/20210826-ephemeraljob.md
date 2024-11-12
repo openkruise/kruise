@@ -99,7 +99,7 @@ spec:
 
 the number of creating ephemeralcontainer will not exceed replicas.
 
-1. parallelism means parallel running ephemeral containeres.
+1. parallelism means parallel running ephemeral containers.
 
 the value of parallelism cannot exceed 10.
 

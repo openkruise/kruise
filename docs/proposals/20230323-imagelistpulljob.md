@@ -190,7 +190,7 @@ Add webhooks for ImageListPullJob, validating-webhook and mutating-webhook.
 
 The `ImageListPullJob` will be deleted , when the condition is: `CompletionPolicy.Type=Always && CompletionPolicy.TTLSecondsAfterFinished>0`.
 
-Calculate the latest status of the  `ImageListPullJob` from all `ImagePullJob`s which is ownerd by the `ImageListPullJob`.
+Calculate the latest status of the  `ImageListPullJob` from all `ImagePullJob`s which is owned by the `ImageListPullJob`.
 
 1),Create an `ImagePullJob` based on `ImageListPullJob.Spec.Image`.
 

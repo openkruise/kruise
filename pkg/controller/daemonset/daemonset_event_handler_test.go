@@ -678,7 +678,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 		expectedQueueLen int
 	}{
 		{
-			name: "add one ummatched node",
+			name: "add one unmatched node",
 			dss: []*appsv1alpha1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{

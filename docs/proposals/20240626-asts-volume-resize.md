@@ -156,13 +156,13 @@ status:
   updatedReplicas: 3
   volumeClaimTemplates: # new field
     - finishedReconciliationGeneration: 2
-      updatedReadyReplics: 1  # resize 状态成功的副本数
+      updatedReadyReplicas: 1  # resize 状态成功的副本数
       updatedReplicas: 2        # 下发 resize 的副本数
       templateName: vol1
-      # 当 updatedReadyReplics == spec.replicas时，
+      # 当 updatedReadyReplicas == spec.replicas时，
       # 调整 finishedReconciliationGeneration 为 sts 的 generation
     - finishedReconciliationGeneration: 3
-      updatedReadyReplics: 3
+      updatedReadyReplicas: 3
       updatedReplicas: 3
       templateName: vol2
 ```
