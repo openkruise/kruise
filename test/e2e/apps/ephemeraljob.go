@@ -549,7 +549,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			oldEphemeralContainers := pods[0].Status.EphemeralContainerStatuses[0]
 
 			{
-				resetartContainerTester := framework.NewContainerRecreateTester(c, kc, ns)
+				restartContainerTester := framework.NewContainerRecreateTester(c, kc, ns)
 				ginkgo.By("Create CRR for pods[0], recreate container: app")
 				pod := pods[0]
 				crr := &appsv1alpha1.ContainerRecreateRequest{
@@ -563,7 +563,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(99999),
 					},
 				}
-				crr, err = resetartContainerTester.CreateCRR(crr)
+				crr, err = restartContainerTester.CreateCRR(crr)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				// wait webhook
@@ -577,20 +577,20 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(pod.Status.ContainerStatuses[0].ContainerID))
 				ginkgo.By("Wait CRR recreate completion")
 				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
-					crr, err = resetartContainerTester.GetCRR(crr.Name)
+					crr, err = restartContainerTester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
 				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
-					crr, err = resetartContainerTester.GetCRR(crr.Name)
+					crr, err = restartContainerTester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
 
 				ginkgo.By("Check Pod containers recreated and started for minStartedSeconds")
-				pod, err = resetartContainerTester.GetPod(pod.Name)
+				pod, err = restartContainerTester.GetPod(pod.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
 				gomega.Expect(pod.Status.ContainerStatuses[0].ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[0].StatusContext.ContainerID))
