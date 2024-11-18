@@ -23,7 +23,7 @@ jobs:
   astatefulset-storage:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -106,7 +106,7 @@ jobs:
   astatefulset:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -185,7 +185,7 @@ jobs:
   pullimages-containerrecreate:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -277,7 +277,7 @@ jobs:
   advanced-daemonset:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -369,7 +369,7 @@ jobs:
   sidecarset:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -461,7 +461,7 @@ jobs:
   ephemeraljob:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -531,7 +531,7 @@ jobs:
   podUnavailableBudget:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
@@ -596,7 +596,7 @@ jobs:
   other:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
