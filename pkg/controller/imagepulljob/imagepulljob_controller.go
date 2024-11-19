@@ -382,6 +382,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 					PullPolicy:      pullPolicy,
 					OwnerReferences: []v1.ObjectReference{*ownerRef},
 					CreatedAt:       &now,
+					ImagePullPolicy: job.Spec.ImagePullPolicy,
 				})
 			}
 			utilimagejob.SortSpecImageTags(&imageSpec)
