@@ -131,6 +131,9 @@ const (
 
 	// Enables policies auto resizing PVCs created by a StatefulSet when user expands volumeClaimTemplates.
 	StatefulSetAutoResizePVCGate featuregate.Feature = "StatefulSetAutoResizePVCGate"
+
+	// ForceDeleteTimeoutExpectationFeatureGate enable delete timeout expectation, for example: cloneSet ScaleExpectation
+	ForceDeleteTimeoutExpectationFeatureGate = "ForceDeleteTimeoutExpectationGate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -160,12 +163,13 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate: {Default: false, PreRelease: featuregate.Alpha},
 
-	EnhancedLivenessProbeGate:              {Default: false, PreRelease: featuregate.Alpha},
-	RecreatePodWhenChangeVCTInCloneSetGate: {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetStartOrdinal:                {Default: false, PreRelease: featuregate.Alpha},
-	PodIndexLabel:                          {Default: true, PreRelease: featuregate.Beta},
-	EnableExternalCerts:                    {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetAutoResizePVCGate:           {Default: false, PreRelease: featuregate.Alpha},
+	EnhancedLivenessProbeGate:                {Default: false, PreRelease: featuregate.Alpha},
+	RecreatePodWhenChangeVCTInCloneSetGate:   {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetStartOrdinal:                  {Default: false, PreRelease: featuregate.Alpha},
+	PodIndexLabel:                            {Default: true, PreRelease: featuregate.Beta},
+	EnableExternalCerts:                      {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
+	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
