@@ -41,6 +41,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 
+	"github.com/prometheus/client_golang/prometheus"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -59,6 +60,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -66,6 +68,8 @@ import (
 
 func init() {
 	flag.IntVar(&concurrentReconciles, "cloneset-workers", concurrentReconciles, "Max concurrent workers for CloneSet controller.")
+	// register prometheus
+	metrics.Registry.MustRegister(CloneSetScaleExpectationLeakageMetrics)
 }
 
 var (
@@ -73,6 +77,16 @@ var (
 
 	isPreDownloadDisabled             bool
 	minimumReplicasToPreDownloadImage int32 = 3
+)
+
+var (
+	CloneSetScaleExpectationLeakageMetrics = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cloneset_scale_expectation_leakage",
+			Help: "CloneSet Scale Expectation Leakage Metrics",
+			// cloneSet namespace, name
+		}, []string{"namespace", "name"},
+	)
 )
 
 // Add creates a new CloneSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -229,7 +243,31 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	// If scaling expectations have not satisfied yet, just skip this reconcile.
 	if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
+			// In some extreme scenarios, if the Pod is created and then quickly deleted, there may be event loss.
+			// Therefore, a touting mechanism is needed to ensure that clonesets can continue to work.
 			klog.InfoS("Expectation unsatisfied overtime", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods, "overTime", unsatisfiedDuration)
+			CloneSetScaleExpectationLeakageMetrics.WithLabelValues(request.Namespace, request.Name).Add(1)
+			// TODO: check the existence of resource in apiserver using client-go directly
+			/*for _, pods := range scaleDirtyPods {
+				for _, name := range pods {
+					_, err = kubeClient.GetGenericClient().KubeClient.CoreV1().Pods(request.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+					if err == nil {
+						klog.Warningf("CloneSet(%s/%s) ScaleExpectations leakage, but Pod(%s) already exist", request.Namespace, request.Name, name)
+						return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+					} else if !errors.IsNotFound(err) {
+						klog.ErrorS(err, "Failed to get Pod", "cloneSet", request, "pod", name)
+						return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
+					}
+				}
+			}
+			klog.InfoS("CloneSet ScaleExpectation DirtyPods no longer exists, and delete ScaleExpectation", "cloneSet", request)*/
+			if utilfeature.DefaultFeatureGate.Enabled(features.ForceDeleteTimeoutExpectationFeatureGate) {
+				klog.InfoS("Expectation unsatisfied overtime, and force delete the timeout Expectation", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods, "overTime", unsatisfiedDuration)
+				clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
+				// In order to avoid the scale expectation timeout,
+				// there is no subsequent Pod, CloneSet event causing CloneSet not to be scheduled
+				return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+			}
 			return reconcile.Result{}, nil
 		}
 		klog.V(4).InfoS("Not satisfied scale", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods)
