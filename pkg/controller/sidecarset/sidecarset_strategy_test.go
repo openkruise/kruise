@@ -355,6 +355,65 @@ func testGetNextUpgradePods(t *testing.T, factoryPods FactoryPods, factorySideca
 			exceptNeedUpgradeCount:   0,
 			exceptNotUpgradableCount: 100,
 		},
+		{
+			name: "only maxUnavailable(5%), and pods(count=5, upgraded=0, upgradedAndReady=0)",
+			getPods: func() []*corev1.Pod {
+				pods := factoryPods(5, 0, 0)
+				return Random(pods)
+			},
+			getSidecarset: func() *appsv1alpha1.SidecarSet {
+				sidecarSet := factorySidecar()
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "5%",
+				}
+				return sidecarSet
+			},
+			exceptNeedUpgradeCount:   1,
+			exceptNotUpgradableCount: 0,
+		},
+		{
+			name: "maxUnavailable(5) partition(99%), and pods(count=5, upgraded=0, upgradedAndReady=0)",
+			getPods: func() []*corev1.Pod {
+				pods := factoryPods(5, 0, 0)
+				return Random(pods)
+			},
+			getSidecarset: func() *appsv1alpha1.SidecarSet {
+				sidecarSet := factorySidecar()
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 5,
+				}
+				sidecarSet.Spec.UpdateStrategy.Partition = &intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "99%",
+				}
+				return sidecarSet
+			},
+			exceptNeedUpgradeCount:   1,
+			exceptNotUpgradableCount: 0,
+		},
+		{
+			name: "maxUnavailable(5) partition(1%), and pods(count=5, upgraded=0, upgradedAndReady=0)",
+			getPods: func() []*corev1.Pod {
+				pods := factoryPods(5, 0, 0)
+				return Random(pods)
+			},
+			getSidecarset: func() *appsv1alpha1.SidecarSet {
+				sidecarSet := factorySidecar()
+				sidecarSet.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 5,
+				}
+				sidecarSet.Spec.UpdateStrategy.Partition = &intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "1%",
+				}
+				return sidecarSet
+			},
+			exceptNeedUpgradeCount:   4,
+			exceptNotUpgradableCount: 0,
+		},
 	}
 	strategy := NewStrategy()
 	for _, cs := range cases {

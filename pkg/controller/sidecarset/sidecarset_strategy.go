@@ -139,7 +139,8 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 	// default partition = 0, indicates all pods will been upgraded
 	var partition int
 	if strategy.Partition != nil {
-		partition, _ = intstrutil.GetValueFromIntOrPercent(strategy.Partition, totalReplicas, false)
+		totalInt32 := int32(totalReplicas)
+		partition, _ = util.CalculatePartitionReplicas(strategy.Partition, &totalInt32)
 	}
 	// indicates the partition pods will not be upgraded for the time
 	if len(waitUpdateIndexes)-partition <= 0 {
@@ -150,7 +151,7 @@ func calculateUpgradeCount(coreControl sidecarcontrol.SidecarControl, waitUpdate
 	// max unavailable pods number, default is 1
 	maxUnavailable := 1
 	if strategy.MaxUnavailable != nil {
-		maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(strategy.MaxUnavailable, totalReplicas, false)
+		maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(strategy.MaxUnavailable, totalReplicas, true)
 	}
 
 	var upgradeAndNotReadyCount int
