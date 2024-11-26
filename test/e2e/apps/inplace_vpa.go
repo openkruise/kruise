@@ -32,7 +32,6 @@ import (
 )
 
 var _ = SIGDescribe("InplaceVPA", func() {
-	framework.TestContext.DeleteNamespaceOnFailure = false
 	f := framework.NewDefaultFramework("inplace-vpa")
 	var ns string
 	var c clientset.Interface

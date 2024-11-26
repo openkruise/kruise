@@ -126,14 +126,6 @@ func TestDefaultPatchUpdateSpecToPod(t *testing.T) {
 				ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: metav1.NewTime(now), Containers: []string{"c1"}}},
 			},
 			expectedPatch: map[string]interface{}{
-				//"metadata": map[string]interface{}{
-				//	"annotations": map[string]interface{}{
-				//		appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
-				//			LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "containerd://c1-img"}},
-				//			ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: metav1.NewTime(now), Containers: []string{"c1"}}},
-				//		}),
-				//	},
-				//},
 				"spec": map[string]interface{}{
 					"containers": []map[string]interface{}{
 						{
@@ -1068,7 +1060,6 @@ func TestDefaultCalculateInPlaceUpdateSpec(t *testing.T) {
 						},
 					},
 				},
-				VerticalUpdateOnly: true,
 			},
 		},
 		{
@@ -1089,7 +1080,6 @@ func TestDefaultCalculateInPlaceUpdateSpec(t *testing.T) {
 						},
 					},
 				},
-				VerticalUpdateOnly: false,
 			},
 		},
 		{
@@ -1129,7 +1119,6 @@ func TestDefaultCalculateInPlaceUpdateSpec(t *testing.T) {
 						},
 					},
 				},
-				VerticalUpdateOnly: true,
 			},
 		},
 		{
@@ -1156,7 +1145,6 @@ func TestDefaultCalculateInPlaceUpdateSpec(t *testing.T) {
 						},
 					},
 				},
-				VerticalUpdateOnly: false,
 			},
 		},
 		{
@@ -1311,20 +1299,6 @@ func TestDefaultPatchUpdateSpecToPod_Resource(t *testing.T) {
 			},
 			state: &appspub.InPlaceUpdateState{},
 			expectedState: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
-					"c1": {
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-								v1.ResourceCPU:    resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-								v1.ResourceCPU:    resource.MustParse("2"),
-							},
-						},
-					},
-				},
 				ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: metav1.NewTime(now), Containers: []string{"c1"}}},
 			},
 			expectedPatch: map[string]interface{}{
@@ -1362,16 +1336,6 @@ func TestDefaultPatchUpdateSpecToPod_Resource(t *testing.T) {
 				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
 					"c1": {
 						ImageID: "containerd://c1-img",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-								v1.ResourceCPU:    resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-								v1.ResourceCPU:    resource.MustParse("2"),
-							},
-						},
 					},
 				},
 				ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: metav1.NewTime(now), Containers: []string{"c1"}}},
@@ -1418,16 +1382,6 @@ func TestDefaultPatchUpdateSpecToPod_Resource(t *testing.T) {
 				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
 					"c1": {
 						ImageID: "containerd://c1-img",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-								v1.ResourceCPU:    resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-								v1.ResourceCPU:    resource.MustParse("2"),
-							},
-						},
 					},
 				},
 				NextContainerResources: map[string]v1.ResourceRequirements{
@@ -1479,16 +1433,6 @@ func TestDefaultPatchUpdateSpecToPod_Resource(t *testing.T) {
 				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
 					"c1": {
 						ImageID: "containerd://c2-img",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-								v1.ResourceCPU:    resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-								v1.ResourceCPU:    resource.MustParse("2"),
-							},
-						},
 					},
 				},
 				NextContainerResources: map[string]v1.ResourceRequirements{
@@ -1509,29 +1453,9 @@ func TestDefaultPatchUpdateSpecToPod_Resource(t *testing.T) {
 				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
 					"c1": {
 						ImageID: "containerd://c2-img",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-								v1.ResourceCPU:    resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-								v1.ResourceCPU:    resource.MustParse("2"),
-							},
-						},
 					},
 					"c2": {
 						ImageID: "containerd://c2-img",
-						Resources: v1.ResourceRequirements{
-							Requests: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-								v1.ResourceCPU:    resource.MustParse("1"),
-							},
-							Limits: v1.ResourceList{
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-								v1.ResourceCPU:    resource.MustParse("2"),
-							},
-						},
 					},
 				},
 				ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: metav1.NewTime(now), Containers: []string{"c1"}}, {Timestamp: metav1.NewTime(now), Containers: []string{"c2"}}},
@@ -1651,12 +1575,6 @@ func createFakePod(imageInject, resourceInject, stateInject bool, num, imageOKNu
 						v1.ResourceMemory: lastMem,
 					},
 				}
-			}
-			lastStatus.Resources = v1.ResourceRequirements{
-				Requests: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    lastCPU,
-					v1.ResourceMemory: lastMem,
-				},
 			}
 		}
 		state.LastContainerStatuses[pod.Spec.Containers[i].Name] = lastStatus
@@ -1821,7 +1739,7 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
+
 				ContainerResources: map[string]v1.ResourceRequirements{},
 			},
 			expected:   true,
@@ -1835,7 +1753,7 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
+
 				ContainerResources: map[string]v1.ResourceRequirements{},
 			},
 			expected:   false,
@@ -1852,8 +1770,14 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
-				ContainerResources: map[string]v1.ResourceRequirements{},
+				ContainerResources: map[string]v1.ResourceRequirements{
+					"c2": {
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+							v1.ResourceCPU:    resource.MustParse("2"),
+						},
+					},
+				},
 			},
 			expected:   false,
 			vpaEnabled: true,
@@ -1869,7 +1793,6 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: false,
 				ContainerResources: map[string]v1.ResourceRequirements{},
 			},
 			expected:   true,
@@ -1883,7 +1806,7 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
+
 				ContainerResources: map[string]v1.ResourceRequirements{},
 			},
 			expected:   false,
@@ -1897,7 +1820,7 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: false,
+
 				ContainerResources: map[string]v1.ResourceRequirements{},
 			},
 			expected:   false,
@@ -1914,6 +1837,9 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 								{ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer},
 							},
 						},
+						{
+							Name: "c2",
+						},
 					},
 					ReadinessGates: []v1.PodReadinessGate{
 						{ConditionType: appspub.InPlaceUpdateReady},
@@ -1921,8 +1847,14 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
-				ContainerResources: map[string]v1.ResourceRequirements{},
+				ContainerResources: map[string]v1.ResourceRequirements{
+					"c2": {
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+							v1.ResourceCPU:    resource.MustParse("2"),
+						},
+					},
+				},
 			},
 			expected:   false,
 			vpaEnabled: true,
@@ -1945,7 +1877,7 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
+
 				ContainerResources: map[string]v1.ResourceRequirements{
 					"11": {
 						Requests: map[v1.ResourceName]resource.Quantity{
@@ -1975,7 +1907,7 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
+
 				ContainerResources: map[string]v1.ResourceRequirements{
 					"11": {
 						Requests: map[v1.ResourceName]resource.Quantity{
@@ -2006,7 +1938,6 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
 				ContainerResources: map[string]v1.ResourceRequirements{
 					"11": {
 						Requests: map[v1.ResourceName]resource.Quantity{
@@ -2037,7 +1968,7 @@ func TestDefaultCheckPodNeedsBeUnready(t *testing.T) {
 				},
 			},
 			spec: &UpdateSpec{
-				VerticalUpdateOnly: true,
+
 				ContainerResources: map[string]v1.ResourceRequirements{
 					"11": {
 						Requests: map[v1.ResourceName]resource.Quantity{

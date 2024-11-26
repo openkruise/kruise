@@ -1,16 +1,12 @@
 package inplaceupdate
 
 import (
-	"encoding/json"
-	"reflect"
 	"testing"
 
 	"github.com/appscode/jsonpatch"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
 func TestValidateResourcePatch(t *testing.T) {
@@ -89,6 +85,23 @@ func TestValidateResourcePatch(t *testing.T) {
 			},
 			expectedErr: true,
 		},
+		{
+			name: "add resource",
+			op: &jsonpatch.Operation{
+				Operation: "add",
+				Path:      "/spec/containers/0/resources/limits/cpu",
+				Value:     "10m",
+			},
+			expectedErr: true,
+		},
+		{
+			name: "remove resource",
+			op: &jsonpatch.Operation{
+				Operation: "remove",
+				Path:      "/spec/containers/0/resources/limits/cpu",
+			},
+			expectedErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -111,143 +124,14 @@ func TestValidateResourcePatch(t *testing.T) {
 	}
 }
 
-func TestSyncContainerResource(t *testing.T) {
-	vu := NativeVerticalUpdate{}
-
-	type testcase struct {
-		name            string
-		containerStatus *v1.ContainerStatus
-		state           *appspub.InPlaceUpdateState
-		expectedState   *appspub.InPlaceUpdateState
-		keyNotExist     bool
-	}
-
-	container := &v1.ContainerStatus{
-		Name: "test-container",
-		Resources: &v1.ResourceRequirements{
-			Limits: map[v1.ResourceName]resource.Quantity{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
-			Requests: map[v1.ResourceName]resource.Quantity{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("1Gi"),
-			},
-		},
-	}
-	testcases := []testcase{
-		{
-			name:            "normal case",
-			containerStatus: container,
-			state: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
-					"test-container": {
-						Resources: v1.ResourceRequirements{
-							Limits: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:    resource.MustParse("2"),
-								v1.ResourceMemory: resource.MustParse("7Gi"),
-							},
-							Requests: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:    resource.MustParse("1"),
-								v1.ResourceMemory: resource.MustParse("3Gi"),
-							},
-						},
-					},
-				},
-			},
-			expectedState: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
-					"test-container": {
-						Resources: v1.ResourceRequirements{
-							Limits: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:    resource.MustParse("1"),
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-							},
-							Requests: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:    resource.MustParse("100m"),
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name:            "empty LastContainerStatuses in state",
-			containerStatus: container,
-			state: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: nil,
-			},
-			expectedState: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{
-					"test-container": {
-						Resources: v1.ResourceRequirements{
-							Limits: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:    resource.MustParse("1"),
-								v1.ResourceMemory: resource.MustParse("2Gi"),
-							},
-							Requests: map[v1.ResourceName]resource.Quantity{
-								v1.ResourceCPU:    resource.MustParse("100m"),
-								v1.ResourceMemory: resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name:            "nil containerStatus",
-			containerStatus: nil,
-			state: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{},
-			},
-			expectedState: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{},
-			},
-			keyNotExist: true,
-		},
-		{
-			name: "nil containerStatus resources",
-			containerStatus: &v1.ContainerStatus{
-				Name:      "test-container",
-				Resources: nil,
-			},
-			state: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{},
-			},
-			expectedState: &appspub.InPlaceUpdateState{
-				LastContainerStatuses: map[string]appspub.InPlaceUpdateContainerStatus{"test-container": {
-					Resources: v1.ResourceRequirements{
-						Requests: map[v1.ResourceName]resource.Quantity{},
-						Limits:   map[v1.ResourceName]resource.Quantity{},
-					},
-				}},
-			},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			vu.SyncContainerResource(tc.containerStatus, tc.state)
-			actualContainerStatus, ok := tc.state.LastContainerStatuses[container.Name]
-			assert.Equal(t, !tc.keyNotExist, ok, "Container status should be present in the state: %v", tc.keyNotExist)
-			b, _ := json.Marshal(actualContainerStatus)
-			t.Logf("container status: %v", string(b))
-			assert.True(t, reflect.DeepEqual(tc.expectedState.LastContainerStatuses[container.Name], actualContainerStatus), "Container status should match expected state")
-		})
-	}
-
-}
-
 func TestIsContainerUpdateCompleted(t *testing.T) {
 	v := NativeVerticalUpdate{}
 
 	tests := []struct {
-		name                string
-		container           v1.Container
-		containerStatus     v1.ContainerStatus
-		lastContainerStatus appspub.InPlaceUpdateContainerStatus
-		expectedResult      bool
+		name            string
+		container       v1.Container
+		containerStatus v1.ContainerStatus
+		expectedResult  bool
 	}{
 		{
 			name: "Test status ok",
@@ -263,16 +147,11 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 					Requests: v1.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("64Mi")},
 				},
 			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("200m")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("50m")},
-				},
-			},
+
 			expectedResult: true,
 		},
 		{
-			name: "Test status not ok",
+			name: "Test status not ok - cpu limit",
 			container: v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits:   v1.ResourceList{"cpu": resource.MustParse("100m")},
@@ -285,16 +164,11 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 					Requests: v1.ResourceList{"cpu": resource.MustParse("50m")},
 				},
 			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("200m")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("50m")},
-				},
-			},
+
 			expectedResult: false,
 		},
 		{
-			name: "Test status not ok",
+			name: "Test status not ok - mem limit",
 			container: v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
@@ -307,16 +181,10 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")},
 				},
 			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
-					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")},
-				},
-			},
 			expectedResult: false,
 		},
 		{
-			name: "Test status not ok",
+			name: "Test status not ok - only mem limit",
 			container: v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
@@ -327,15 +195,10 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 					Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
 				},
 			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
-				},
-			},
 			expectedResult: false,
 		},
 		{
-			name: "Test status not ok",
+			name: "Test status not ok - only mem request",
 			container: v1.Container{
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
@@ -343,11 +206,6 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 			},
 			containerStatus: v1.ContainerStatus{
 				Resources: &v1.ResourceRequirements{
-					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")},
-				},
-			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")},
 				},
 			},
@@ -361,21 +219,8 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 			containerStatus: v1.ContainerStatus{
 				Resources: &v1.ResourceRequirements{},
 			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{},
-			expectedResult:      true,
+			expectedResult: true,
 		},
-		{
-			name: "empty container and nil containerStatus",
-			container: v1.Container{
-				Resources: v1.ResourceRequirements{},
-			},
-			containerStatus: v1.ContainerStatus{
-				Resources: nil,
-			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{},
-			expectedResult:      true,
-		},
-
 		{
 			name: "container is empty",
 			container: v1.Container{
@@ -383,12 +228,6 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 			},
 			containerStatus: v1.ContainerStatus{
 				Resources: &v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("200m")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("50m")},
-				},
-			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
 					Limits:   v1.ResourceList{"cpu": resource.MustParse("200m")},
 					Requests: v1.ResourceList{"cpu": resource.MustParse("50m")},
 				},
@@ -406,12 +245,6 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 			containerStatus: v1.ContainerStatus{
 				Resources: nil,
 			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("200m")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("50m")},
-				},
-			},
 			expectedResult: false,
 		},
 		{
@@ -425,20 +258,13 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 			containerStatus: v1.ContainerStatus{
 				Resources: &v1.ResourceRequirements{},
 			},
-			lastContainerStatus: appspub.InPlaceUpdateContainerStatus{
-				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("200m")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("50m")},
-				},
-			},
 			expectedResult: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pod := &v1.Pod{}
-			result := v.IsContainerUpdateCompleted(pod, &tt.container, &tt.containerStatus, tt.lastContainerStatus)
+			result := v.IsContainerUpdateCompleted(&tt.container, &tt.containerStatus)
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}

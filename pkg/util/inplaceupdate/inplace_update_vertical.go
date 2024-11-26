@@ -17,11 +17,13 @@ limitations under the License.
 package inplaceupdate
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/appscode/jsonpatch"
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -40,7 +42,7 @@ type VerticalUpdateInterface interface {
 	// UpdateContainerResource Pass in the container to be modified and the expected resource values.
 	UpdateContainerResource(container *v1.Container, resource *v1.ResourceRequirements)
 	// IsContainerUpdateCompleted To determine whether the container has been successfully vertical updated
-	IsContainerUpdateCompleted(pod *v1.Pod, container *v1.Container, containerStatus *v1.ContainerStatus, lastContainerStatus appspub.InPlaceUpdateContainerStatus) bool
+	IsContainerUpdateCompleted(container *v1.Container, containerStatus *v1.ContainerStatus) bool
 
 	// interface for pod level vertical scaling api
 
@@ -80,6 +82,15 @@ func (v *NativeVerticalUpdate) ParseResourcePatch(op *jsonpatch.Operation, oldTe
 	if err != nil || len(oldTemp.Spec.Containers) <= idx {
 		return fmt.Errorf("invalid container index: %s", op.Path)
 	}
+	if op.Operation == "remove" || op.Operation == "add" {
+		// Before k8s 1.32, we can not resize resources for a container with no limit or request
+		// TODO(Abner-1) change it if 1.32 released and allowing this operation
+		return errors.New("can not add or remove resources")
+	}
+
+	if op.Value == nil {
+		return errors.New("json patch value is nil")
+	}
 	quantity, err := resource.ParseQuantity(op.Value.(string))
 	if err != nil {
 		return fmt.Errorf("parse quantity error: %v", err)
@@ -107,39 +118,7 @@ func (v *NativeVerticalUpdate) ParseResourcePatch(op *jsonpatch.Operation, oldTe
 
 // Get the resource status from the container and synchronize it to state
 func (v *NativeVerticalUpdate) SyncContainerResource(container *v1.ContainerStatus, state *appspub.InPlaceUpdateState) {
-	if container == nil {
-		return
-	}
-
-	if state.LastContainerStatuses == nil {
-		state.LastContainerStatuses = make(map[string]appspub.InPlaceUpdateContainerStatus)
-	}
-	c := state.LastContainerStatuses[container.Name]
-	if state.LastContainerStatuses[container.Name].Resources.Limits == nil {
-		c.Resources.Limits = make(map[v1.ResourceName]resource.Quantity)
-	}
-	if state.LastContainerStatuses[container.Name].Resources.Requests == nil {
-		c.Resources.Requests = make(map[v1.ResourceName]resource.Quantity)
-	}
-
-	if container.Resources != nil {
-		for key, quantity := range container.Resources.Limits {
-			if !v.CanResourcesResizeInPlace(string(key)) {
-				continue
-			}
-			c.Resources.Limits[key] = quantity
-		}
-		for key, quantity := range container.Resources.Requests {
-			if !v.CanResourcesResizeInPlace(string(key)) {
-				continue
-			}
-			c.Resources.Requests[key] = quantity
-		}
-	}
-	// Store container infos whether c is empty or not.
-	// It will be used in IsContainerUpdateCompleted to check container resources is updated.
-	// case: pending pod can also be resize resource
-	state.LastContainerStatuses[container.Name] = c
+	return
 }
 
 // UpdateResource implements vertical updates by directly modifying the container's resources,
@@ -164,58 +143,13 @@ func (v *NativeVerticalUpdate) UpdateContainerResource(container *v1.Container, 
 
 // IsContainerUpdateCompleted directly determines whether the current container is vertically updated by the spec and status of the container,
 // which conforms to the k8s community standard
-//
-// lstatus: lastContainerStatus record last resource：last container status => last container spec
-// cspec: container spec
-// cstatus: container status
-//
-//	lstatus   cspec  cstatus
-//
-// 1. exist   exist   exist  => compare cspec and cstatus (important)
-// 2. exist   empty   nil    => change qos is forbidden
-// 3. exist   empty   empty  => change qos is forbidden
-// 4. exist   empty   exist  => change qos is forbidden
-// 5. empty   empty   nil    => this container is not inplace-updated by kruise, ignore
-// 6. empty   exist   exist  => this container is not inplace-updated by kruise, ignore
-// 7. empty   exist   exist  => this container is not inplace-updated by kruise, ignore
-func (v *NativeVerticalUpdate) IsContainerUpdateCompleted(pod *v1.Pod, container *v1.Container, containerStatus *v1.ContainerStatus, lastContainerStatus appspub.InPlaceUpdateContainerStatus) bool {
-	// case 5-7
-	if lastContainerStatus.Resources.Limits == nil && lastContainerStatus.Resources.Requests == nil {
-		return true
+func (v *NativeVerticalUpdate) IsContainerUpdateCompleted(container *v1.Container, containerStatus *v1.ContainerStatus) bool {
+	if containerStatus == nil || containerStatus.Resources == nil || container == nil {
+		return false
 	}
-	if lastContainerStatus.Resources.Limits != nil {
-		// case 2-4 limits
-		if container.Resources.Limits == nil || containerStatus == nil ||
-			containerStatus.Resources == nil || containerStatus.Resources.Limits == nil {
-			return false
-		}
-		// case 1
-		for name, value := range container.Resources.Limits {
-			// ignore resources key which can not inplace resize
-			if !v.CanResourcesResizeInPlace(string(name)) {
-				continue
-			}
-			if !value.Equal(containerStatus.Resources.Limits[name]) {
-				return false
-			}
-		}
-	}
-
-	if lastContainerStatus.Resources.Requests != nil {
-		// case 2-4 requests
-		if container.Resources.Requests == nil || containerStatus == nil ||
-			containerStatus.Resources == nil || containerStatus.Resources.Requests == nil {
-			return false
-		}
-		// case 1
-		for name, value := range container.Resources.Requests {
-			if !v.CanResourcesResizeInPlace(string(name)) {
-				continue
-			}
-			if !value.Equal(containerStatus.Resources.Requests[name]) {
-				return false
-			}
-		}
+	if !cmp.Equal(container.Resources.Limits, containerStatus.Resources.Limits) ||
+		!cmp.Equal(container.Resources.Requests, containerStatus.Resources.Requests) {
+		return false
 	}
 	return true
 }

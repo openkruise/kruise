@@ -302,7 +302,6 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 		ContainerResources:   make(map[string]v1.ResourceRequirements),
 		ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 		GraceSeconds:         opts.GracePeriodSeconds,
-		VerticalUpdateOnly:   false,
 	}
 	if opts.GetRevision != nil {
 		updateSpec.Revision = opts.GetRevision(newRevision)
@@ -403,10 +402,6 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 		}
 		updateSpec.MetaDataPatch = patchBytes
 	}
-	// Need to distinguish whether only resources have been updated
-	if len(updateSpec.ContainerResources) > 0 && len(updateSpec.ContainerImages) == 0 && !updateSpec.UpdateEnvFromMetadata {
-		updateSpec.VerticalUpdateOnly = true
-	}
 
 	return updateSpec
 }
@@ -461,10 +456,8 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 			containers[c.Name] = c
 		}
 		for _, cs := range pod.Status.ContainerStatuses {
-			if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
-				if !verticalUpdateImpl.IsContainerUpdateCompleted(pod, containers[cs.Name], &cs, oldStatus) {
-					return fmt.Errorf("container %s resources not changed", cs.Name)
-				}
+			if !verticalUpdateImpl.IsContainerUpdateCompleted(containers[cs.Name], &cs) {
+				return fmt.Errorf("container %s resources not changed", cs.Name)
 			}
 		}
 	}
@@ -595,7 +588,7 @@ const (
 )
 
 func defaultCheckPodNeedsBeUnready(pod *v1.Pod, spec *UpdateSpec) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) || !spec.VerticalUpdateOnly {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) || !spec.VerticalUpdateOnly() {
 		return containsReadinessGate(pod)
 	}
 

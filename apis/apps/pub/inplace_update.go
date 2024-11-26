@@ -65,8 +65,8 @@ type InPlaceUpdateState struct {
 	// UpdateResources indicates there are resources that should be in-place update.
 	UpdateResources bool `json:"updateResources,omitempty"`
 
-	// VerticalUpdateOnly indicates there are only vertical update in this revision.
-	VerticalUpdateOnly bool `json:"verticalUpdateOnly"`
+	// UpdateImages indicates there are images that should be in-place update.
+	UpdateImages bool `json:"updateImages,omitempty"`
 
 	// NextContainerImages is the containers with lower priority that waiting for in-place update images in next batch.
 	NextContainerImages map[string]string `json:"nextContainerImages,omitempty"`
@@ -100,8 +100,7 @@ type InPlaceUpdateContainerBatch struct {
 // InPlaceUpdateContainerStatus records the statuses of the container that are mainly used
 // to determine whether the InPlaceUpdate is completed.
 type InPlaceUpdateContainerStatus struct {
-	ImageID   string                  `json:"imageID,omitempty"`
-	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+	ImageID string `json:"imageID,omitempty"`
 }
 
 // InPlaceUpdateStrategy defines the strategies for in-place update.

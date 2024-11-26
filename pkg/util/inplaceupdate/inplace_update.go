@@ -90,10 +90,13 @@ type UpdateSpec struct {
 	MetaDataPatch         []byte                             `json:"metaDataPatch,omitempty"`
 	UpdateEnvFromMetadata bool                               `json:"updateEnvFromMetadata,omitempty"`
 	GraceSeconds          int32                              `json:"graceSeconds,omitempty"`
-	VerticalUpdateOnly    bool                               `json:"verticalUpdate,omitempty"`
 
 	OldTemplate *v1.PodTemplateSpec `json:"oldTemplate,omitempty"`
 	NewTemplate *v1.PodTemplateSpec `json:"newTemplate,omitempty"`
+}
+
+func (u *UpdateSpec) VerticalUpdateOnly() bool {
+	return len(u.ContainerResources) > 0 && len(u.ContainerImages) == 0 && !u.UpdateEnvFromMetadata
 }
 
 type realControl struct {
@@ -338,7 +341,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			Revision:              spec.Revision,
 			UpdateTimestamp:       metav1.NewTime(Clock.Now()),
 			UpdateEnvFromMetadata: spec.UpdateEnvFromMetadata,
-			VerticalUpdateOnly:    spec.VerticalUpdateOnly,
+			UpdateImages:          len(spec.ContainerImages) > 0,
 			UpdateResources:       len(spec.ContainerResources) > 0,
 		}
 		inPlaceUpdateStateJSON, _ := json.Marshal(inPlaceUpdateState)
